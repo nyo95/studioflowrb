@@ -2,7 +2,7 @@
 
 Owner: PM/TL
 Executor type: independent deterministic coding executor
-Status: READY
+Status: COMPLETE — baseline commit `eb58f5ef7995aad22c4170d234ca84bc830eef08` accepted 2026-08-23
 
 ## Objective
 

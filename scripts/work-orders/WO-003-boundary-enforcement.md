@@ -2,7 +2,7 @@
 
 Owner: PM/TL
 Executor type: deterministic coding executor
-Status: READY after WO-001
+Status: READY FOR EXTERNAL EXECUTOR — baseline dependencies complete
 
 ## Scope
 

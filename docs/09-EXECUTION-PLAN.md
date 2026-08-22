@@ -4,63 +4,90 @@ Status: ACTIVE
 Updated: 2026-08-23
 Owner: PM / Technical Lead
 
-## Gate 0 — Reproducible baseline — TECHNICAL CHECKS COMPLETE
+## Gate 0 — Reproducible baseline — COMPLETE
 
-Execute and review WO-001 plus its PM hardening follow-up WO-001A. No implementation lane starts until install, typecheck, Prisma validation/generation, security baseline, and baseline checks are reproducible.
+WO-001, WO-001A, WO-001B, WO-001C, and WO-001D passed PM/TL review.
 
-WO-001/001A/001B passed PM review. WO-001C establishes the first reviewed Git checkpoint so subsequent executor work can run in isolated worktrees and produce reviewable diffs.
+Approved implementation baseline:
 
-## Gate 1 — Core contract lock (manager-owned) — COMPLETE
+`eb58f5ef7995aad22c4170d234ca84bc830eef08`
 
-Locked in `CORE.md` for:
+All external executors start from the clean approved `main` implementation state plus current manager documentation/work orders. The quarantine branch `codex/quarantine-unapproved-20260823` is comparison evidence only and is never an implementation base.
 
-- Prisma/DB access and transaction boundary;
-- auth/session identity boundary;
-- app-entry RBAC and permission evaluation;
-- audit envelope versus app-owned action vocabulary;
-- shared errors and validation convention;
-- decimal, money, unit, and date conventions.
+## Gate 1 — Contract lock — COMPLETE
 
-This gate decides contracts only. Deterministic implementation is issued as explicit executor work orders.
+Manager-owned contracts are locked in:
 
-## Parallel implementation window
+- `CORE.md`;
+- `DESIGN.md`;
+- `UI_ENGINE.md`;
+- the Software SSOT, Data Ownership contract, and app PRDs.
 
-After Gate 1 is locked and WO-001 passes, run independent executor lanes in parallel:
+Deterministic implementation may follow these contracts but may not change them.
 
-### Lane A — Core
+## External executor policy
 
-Implement approved Core contracts through narrow work orders. Executors may not change roles, permissions, audit meaning, transaction policy, or numeric semantics.
+- Codex acts only as PM/TL.
+- Deterministic work is executed by owner-operated external OpenCode agents.
+- Codex does not create executor tasks, agents, or worktrees.
+- Every executor reads its complete work order and stops on ambiguity or repository/contract mismatch.
+- Work remains unapproved until PM/TL reviews its diff/commit and acceptance evidence.
+- Do not create one executor per tiny task; retain context within the two approved lanes.
 
-### Lane B — UI Engine
+## Current two-lane execution
 
-Execute WO-004 against locked `DESIGN.md` and `UI_ENGINE.md`. AppShell is a domain-neutral frame; auth, permission decisions, navigation content, and app routes remain outside UI Engine.
+### Lane A — Infrastructure / Core
 
-### Lane C — Safe extraction/enforcement
+Execute sequentially:
 
-- WO-002: pure Category slug/path/input rules only.
-- WO-003: dependency and legacy-runtime enforcement.
+1. WO-003 — Dependency and Legacy-Runtime Enforcement.
+2. PM/TL review of WO-003.
+3. WO-005 — Core DB / Prisma Runtime.
+4. PM/TL review of WO-005.
+5. WO-006 — Shared Errors and Validation.
+6. PM/TL review of WO-006.
 
-These lanes may run concurrently because they have separate target files. If an executor discovers overlap or a contract discrepancy, it must stop and report rather than adapt silently.
+### Lane B — Domain / UI Foundation
 
-## Convergence gate (manager review)
+Execute sequentially:
 
-Before Master Data implementation begins, PM/TL reviews:
+1. WO-002 — Category Pure Rules.
+2. PM/TL review of WO-002.
+3. WO-004 — UI Engine Foundation.
+4. PM/TL review of WO-004.
 
-- every executor diff against its work order;
+Lane A and Lane B may run concurrently in separate owner-managed external executor checkouts. Work inside each lane remains sequential.
+
+## Convergence gate — REQUIRED STOP
+
+After both lanes complete, do not begin further deterministic implementation. PM/TL reviews:
+
+- every diff against its work order;
+- forbidden-file and scope compliance;
 - Core/UI dependency direction;
+- absence of runtime coupling to `../studioflow`;
 - UI Engine public exports and absence of domain vocabulary;
-- single-source tokens and absence of feature-specific globals;
-- test, typecheck, boundary, Prisma, and production-build results.
+- single-source design tokens and absence of feature-specific globals;
+- Category pure-rule compliance and absence of retired PRODUCT hierarchy inference;
+- tests, typecheck, boundary checks, Prisma checks, and production build.
 
-After the reviewed UI foundation is stable, create/update the executor-facing UI skill so it references `DESIGN.md`, `UI_ENGINE.md`, and manager work orders rather than duplicating their rules.
+Only this review may unlock the next work.
 
-## Product implementation sequence
+## Dependency-locked work
 
-1. Master Data domain contracts and full schema.
-2. Master Data deterministic schema/application/UI work orders.
-3. Master Data public contract.
-4. BQ readiness, provenance, snapshot, refresh, duplicate, library, and calculation contract lock.
-5. BQ schema/domain/application/UI work orders.
-6. Cross-app boundary, migration, and smoke verification.
+- WO-007 — after WO-006 approval.
+- WO-008 — after WO-006 approval.
+- WO-009 — after WO-005 and WO-006 approval.
 
-StudioFlow remains out of active implementation scope except for shared-boundary verification.
+WO-007 and WO-008 may run in parallel after being unlocked. WO-009 may run when both of its dependencies are approved. A further PM/TL review is required before full Master Data implementation.
+
+## Product implementation sequence after Core convergence
+
+1. Complete Master Data domain contracts and full schema decisions.
+2. Issue deterministic Master Data schema/application/UI work orders.
+3. Lock and implement the Master Data public contract.
+4. Lock BQ readiness, provenance, snapshot, refresh, duplicate, library, and calculation contracts.
+5. Issue BQ schema/domain/application/UI work orders.
+6. Run cross-app boundary, migration, and smoke verification.
+
+StudioFlow remains outside active implementation scope except for shared-boundary verification.

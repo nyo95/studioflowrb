@@ -2,7 +2,7 @@
 
 Owner: PM/TL
 Executor type: deterministic coding executor
-Status: READY after WO-001
+Status: READY FOR EXTERNAL EXECUTOR — baseline dependencies complete
 
 ## Scope
 
@@ -26,6 +26,7 @@ Implement only the Prisma 7 client, PostgreSQL adapter/pool, transaction client 
 2. Use `@prisma/adapter-pg` and one `pg.Pool`.
 3. Cache the client/pool safely across development hot reload; do not cache duplicate instances in production.
 4. Support explicit non-secret pool limit/timeouts from environment with conservative documented defaults.
+   - Any helper that reads pool settings accepts a narrow readonly environment shape containing only optional `DATABASE_URL`, `DB_POOL_MAX`, `DB_POOL_IDLE_TIMEOUT_MS`, and `DB_POOL_CONNECTION_TIMEOUT_MS` string fields. Do not type this helper as the full augmented `NodeJS.ProcessEnv`; it does not depend on `NODE_ENV`.
 5. Export the shared client, transaction-client type, and an explicit close helper for short-lived scripts/tests.
 6. Keep the module server-only.
 

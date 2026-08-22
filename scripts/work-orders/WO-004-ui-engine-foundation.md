@@ -2,7 +2,7 @@
 
 Owner: PM/TL
 Executor type: deterministic coding executor
-Status: READY after WO-001 and Core contract lock
+Status: READY FOR EXTERNAL EXECUTOR — WO-001 complete and Core/UI contracts locked
 
 ## Scope
 
@@ -43,6 +43,7 @@ Legacy files are evidence only. Do not copy directories wholesale.
 ## Exact allowed changes
 
 1. Establish one CSS-custom-property token source using the exact locked typography, color, radius, spacing, dialog-width, and shadow values.
+   - Inputs and buttons use the locked `radius-action` value (4px); do not substitute `radius-control` (6px) for inputs.
 2. Make TypeScript token exports semantic references to CSS variables; remove duplicate literal token values.
 3. Configure Lora and Inter once at the root and expose the locked semantic typography roles.
 4. Implement only:
@@ -58,6 +59,7 @@ Legacy files are evidence only. Do not copy directories wholesale.
    - generic row-action menu presentation.
 5. Export the deliberate stable public surface from `@platform/ui_engine`.
 6. Keep navigation items, route semantics, columns, calculations, validation, persistence, and domain actions in consumer apps.
+   - At narrow widths, shell navigation/utility content may reflow or collapse through an accessible app-controlled mechanism, but must not be hidden or made unreachable by the shared CSS.
 7. Add focused tests for public exports, token-source uniqueness, accessibility-critical labels/roles, dialog sizes, table overflow, and state separation.
 
 ## Forbidden changes
@@ -78,6 +80,8 @@ Legacy files are evidence only. Do not copy directories wholesale.
 - UI Engine has zero imports from `src/apps/**` or generated Prisma code.
 - Wide tables scroll instead of squeezing below their app-provided minimum width.
 - Loading, empty, and error are visually and semantically distinct.
+- Input/button radius resolves to the locked 4px action radius.
+- Narrow-layout shell utility/actions remain visible or otherwise accessibly reachable; shared CSS does not remove them.
 - Dialog/Drawer variants match the locked widths and viewport-height rule.
 - `npm test`, `npm run typecheck`, `npm run check:boundaries`, and the production build succeed.
 

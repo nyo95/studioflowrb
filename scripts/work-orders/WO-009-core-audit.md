@@ -2,7 +2,7 @@
 
 Owner: PM/TL
 Executor type: deterministic coding executor
-Status: READY after WO-001, WO-005, and WO-006
+Status: BLOCKED — becomes READY FOR EXTERNAL EXECUTOR only after external WO-005 and WO-006 outputs pass PM/TL review
 
 ## Scope
 
