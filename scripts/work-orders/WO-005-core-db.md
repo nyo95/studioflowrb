@@ -1,0 +1,50 @@
+# WO-005 — Core DB / Prisma Runtime
+
+Owner: PM/TL
+Executor type: deterministic coding executor
+Status: READY after WO-001
+
+## Scope
+
+Implement only the Prisma 7 client, PostgreSQL adapter/pool, transaction client type, and stable public DB surface locked in `CORE.md` §2.
+
+## Source evidence
+
+- `../studioflow/src/core/platform/db.ts`
+- `../studioflow/prisma.config.ts`
+- current `prisma/schema.prisma`
+
+## Target files
+
+- `src/platform/core/db/**`
+- `.env.example` for non-secret pool settings only
+- focused DB construction/type tests that do not require a live database
+
+## Exact allowed changes
+
+1. Construct the generated Prisma client only in Core DB.
+2. Use `@prisma/adapter-pg` and one `pg.Pool`.
+3. Cache the client/pool safely across development hot reload; do not cache duplicate instances in production.
+4. Support explicit non-secret pool limit/timeouts from environment with conservative documented defaults.
+5. Export the shared client, transaction-client type, and an explicit close helper for short-lived scripts/tests.
+6. Keep the module server-only.
+
+## Forbidden changes
+
+- No schema model/enum/migration changes.
+- No delegate sentinel/version signature.
+- No hardcoded table/column preflight.
+- No repository abstraction, query helper, app adapter, or seed logic.
+- No import from any app.
+
+## Acceptance criteria
+
+- Only Core DB constructs `PrismaClient`, `PrismaPg`, or `Pool` in production source.
+- Importing the module does not connect until Prisma performs work.
+- Type tests prove transaction clients are accepted without unsafe app-local aliases.
+- Unit tests, typecheck, boundary checks, Prisma generate/validate, and build pass.
+
+## Stop conditions
+
+- WO-001 has not produced the declared generated-client output or adapter dependencies.
+- Prisma/adapter runtime behavior differs from the locked convention.

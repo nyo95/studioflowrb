@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  schemas   = ["master_data", "bq", "studioflow"]
+}
+
+// ============================================================================
+// ENUMS — master_data
+// ============================================================================
+
+/// CategoryKind distinguishes the two controlled dictionaries in the same table.
+/// PRODUCT: for SKU classification and Brand discovery.
+/// WORK: for WorkPrice classification (may be hierarchical).
+/// Owner-confirmed 2026-08-22. See docs/06-DATA-OWNERSHIP.md §Category.
+enum CategoryKind {
+  PRODUCT
+  WORK
+
+  @@schema("master_data")
+}
+
+// ============================================================================
+// MASTER DATA — Category
+// ============================================================================
+
+/// Global controlled dictionary — owned by Master Data, consumed by StudioFlow
+/// and BQ (via snapshot). See docs/06-DATA-OWNERSHIP.md §Category for full
+/// contract, including the two distinct relations (Brand discovery vs SKU
+/// classification) and BQ snapshot semantics.
+///
+/// Soft-delete: deleted_at (consistent with Party/Brand).
+/// Uniqueness: partial index (kind, slug) WHERE deleted_at IS NULL — see migration.
+///
+/// PRODUCT categories are flat for MVP: parent_id is present in schema for
+/// future expansion but the UI does not expose it for PRODUCT entries.
+/// WORK categories may be hierarchical: path is auto-maintained by
+/// infrastructure/category-tree-service.ts for WORK only.
+model Category {
+  id   String       @id @default(uuid())
+  kind CategoryKind
+
+  name String
+  /// Lowercase kebab-case. Uniqueness per kind enforced by partial index.
+  /// Do not call findUnique({ where: { slug } }) — use findFirst with deleted_at: null.
+  slug String
+
+  /// WORK: parent category for hierarchy. PRODUCT: null in MVP.
+  parent_id String?
+  parent    Category?  @relation("CategoryTree", fields: [parent_id], references: [id], onDelete: Restrict)
+  children  Category[] @relation("CategoryTree")
+
+  /// Materialized path (e.g. "pekerjaan-dinding/cat-dinding").
+  /// Auto-maintained by infrastructure/category-tree-service.ts.
+  /// PRODUCT: always null (flat). WORK: populated.
+  /// Do not write this column outside that service.
+  path String?
+
+  /// Search synonyms for discovery — not authority labels, not display values.
+  /// Example: Category "HPL" → ["high pressure laminate", "laminasi hpl"]
+  search_synonyms String[] @default([])
+
+  sort_order  Int     @default(0)
+  description String?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime? @updatedAt
+  deleted_at DateTime?
+
+  // ── Relations ────────────────────────────────────────────────────────────
+  /// Brand discovery: explicit staff assignment. Never auto-derived from SKU.
+  /// A brand with no SKUs must still be discoverable by category.
+  brands BrandCategory[]
+
+  /// SKU classification: populated via Sku.category_id (direct FK on Sku model).
+  skus Sku[]
+
+  /// WorkPrice classification: direct FK on WorkPrice model.
+  work_prices WorkPrice[]
+
+  // (kind, slug) uniqueness enforced by partial index WHERE deleted_at IS NULL.
+  @@index([kind, slug])
+  @@index([kind, parent_id, sort_order])
+  @@index([path])
+  @@index([deleted_at])
+  @@schema("master_data")
+}
+
+// ============================================================================
+// MASTER DATA — BrandCategory
+// ============================================================================
+
+/// Brand ↔ Category discovery relation.
+///
+/// Explicit assignment only — never auto-derived from SKU category assignments.
+/// Semantics: "this brand is classifiable under this category for discovery."
+///
+/// Business rule (application layer): brand creation requires ≥ 1 PRODUCT
+/// category. Enforced in masterdata/application/brand-service.ts, not here.
+///
+/// The old `source: CategorySource` field and `CategorySource` enum are removed.
+/// Every BrandCategory row is now always an explicit staff decision.
+model BrandCategory {
+  id          String   @id @default(uuid())
+  brand_id    String
+  category_id String
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now())
+
+  brand    Brand    @relation(fields: [brand_id], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [category_id], references: [id], onDelete: Restrict)
+
+  @@unique([brand_id, category_id])
+  @@index([category_id])
+  @@index([brand_id, sort_order])
+  @@schema("master_data")
+}
+
+// ============================================================================
+// MASTER DATA — Brand (stub — full model to be added with Brand domain work)
+// ============================================================================
+
+/// Stub placeholder so BrandCategory relations resolve. Full Brand model is
+/// added when Brand domain is migrated. See migration-inventory.md.
+model Brand {
+  id String @id @default(uuid())
+
+  // Full fields added in Brand domain work order.
+
+  categories BrandCategory[]
+  skus       Sku[]
+
+  @@schema("master_data")
+}
+
+// ============================================================================
+// MASTER DATA — Sku (stub)
+// ============================================================================
+
+/// Stub placeholder so Sku.category relation resolves. Full Sku model is
+/// added when SKU domain is migrated. See migration-inventory.md.
+///
+/// category_id: direct FK replacing the old SkuCategory junction table.
+/// One primary PRODUCT category per SKU.
+/// Nullable: SKU may be DRAFT without a category; must be set before ACTIVE.
+/// Business rule enforced in masterdata/application/sku-service.ts.
+///
+/// BQ snapshot: category.name → snapshot_category_name;
+///              category.path → snapshot_category_path (PRODUCT: same as name).
+model Sku {
+  id String @id @default(uuid())
+
+  brand_id String?
+  brand    Brand?  @relation(fields: [brand_id], references: [id], onDelete: Restrict)
+
+  category_id String?
+  category    Category? @relation(fields: [category_id], references: [id], onDelete: Restrict)
+
+  // Full fields added in SKU domain work order.
+
+  work_prices WorkPrice[]
+
+  @@schema("master_data")
+}
+
+// ============================================================================
+// MASTER DATA — WorkPrice (stub)
+// ============================================================================
+
+/// Stub placeholder so WorkPrice.category relation resolves.
+/// Full WorkPrice model is added when WorkPrice domain is migrated.
+model WorkPrice {
+  id String @id @default(uuid())
+
+  category_id String
+  category    Category @relation(fields: [category_id], references: [id], onDelete: Restrict)
+
+  sku_id String?
+  sku    Sku?    @relation(fields: [sku_id], references: [id])
+
+  // Full fields added in WorkPrice domain work order.
+
+  @@index([category_id])
+  @@schema("master_data")
+}
