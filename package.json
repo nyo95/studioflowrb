@@ -12,7 +12,10 @@
     "typecheck": "tsc --noEmit",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check:legacy": "node scripts/check-legacy-link.mjs",
-    "check": "npm run typecheck && npm run check:boundaries"
+    "check:legacy-runtime": "node scripts/check-legacy-runtime.mjs",
+    "test:boundaries": "node scripts/test-boundaries-checker.mjs",
+    "test:legacy-runtime": "node scripts/test-legacy-runtime-checker.mjs",
+    "check": "npm run typecheck && npm run check:boundaries && npm run check:legacy-runtime"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.5.0",
