@@ -42,8 +42,8 @@ Deterministic implementation may follow these contracts but may not change them.
 
 Execute sequentially:
 
-1. WO-003A — correct the unapproved WO-003 parser/test integration in commit `d55c62d`.
-2. PM/TL review of WO-003 plus WO-003A.
+1. WO-003 + WO-003A — COMPLETE; commits `d55c62d` and `3ad33e6` passed PM/TL review.
+2. WO-003 enforcement is the accepted dependency/legacy-runtime baseline.
 3. WO-005 — Core DB / Prisma Runtime.
 4. PM/TL review of WO-005.
 5. WO-006 — Shared Errors and Validation.
