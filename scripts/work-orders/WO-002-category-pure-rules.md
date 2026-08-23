@@ -2,7 +2,7 @@
 
 Owner: PM/TL
 Executor type: deterministic coding executor
-Status: READY FOR EXTERNAL EXECUTOR — baseline dependencies complete
+Status: COMPLETE — PM/TL approved; implementation commit `d72b72a`
 
 Mandatory shared context: `scripts/work-orders/00-EXTERNAL-EXECUTOR-CONTEXT.md`
 

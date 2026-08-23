@@ -1,18 +1,18 @@
 # 08 — Current Rebuild Status
 
-Status: ACTIVE
+Status: FOUNDATION LOCKED — PRODUCT IMPLEMENTATION NEXT
 Audit date: 2026-08-23
 Owner: PM / Technical Lead
 
 ## Approved repository state
 
 - The reproducible foundation baseline is commit `eb58f5ef7995aad22c4170d234ca84bc830eef08` (`chore: establish rebuild baseline`).
-- The current PM/TL-approved implementation head is commit `4cbdf43` (`feat: implement Core DB Prisma runtime (WO-005)`).
+- The current PM/TL-approved Foundation implementation head is commit `4ff3353` (`feat: implement UI Engine foundation (WO-004)`).
 - The rebuild is an independent Git repository on `main` with no configured runtime dependency on `../studioflow`.
 - WO-001, WO-001A, WO-001B, WO-001C, and WO-001D are complete and PM/TL-approved.
 - The baseline has a reproducible npm lockfile, Prisma 7 configuration/client generation, TypeScript test runner, typecheck, boundary check, and production build.
-- WO-003, WO-003A, and WO-005 are complete and PM/TL-approved on `main`.
-- No implementation from WO-002, WO-004, or WO-006 through WO-009 is approved on `main` yet.
+- WO-002 through WO-009, including WO-003A and the convergence correction `10d3881`, are complete and PM/TL-approved on `main`.
+- Platform Core, shared utilities, dependency enforcement, Category pure rules, and UI Engine Foundation are locked for the product phase.
 
 ## Quarantined unapproved work
 
@@ -43,33 +43,20 @@ The quarantine is not an implementation source of truth, is not approved code, a
 - `BrandCategory` remains explicit discovery metadata; `Sku.category_id` is the direct nullable primary-category relation.
 - Only `categorySlug`, `buildCategoryPath`, and `splitCategoryInput` survive the legacy Category pure-rule extraction.
 
-## READY FOR EXTERNAL EXECUTOR
+## Foundation convergence
 
-- WO-002 — Category Pure Rules.
-- WO-006 — Shared Errors and Validation.
-
-External implementation is performed by owner-operated OpenCode executors. Codex remains PM/TL and does not spawn or act as a deterministic executor.
-
-## Blocked work
-
-- WO-004 becomes ready only after external WO-002 output passes PM/TL review.
-- WO-007 becomes ready only after external WO-006 output passes PM/TL review.
-- WO-008 becomes ready only after external WO-006 output passes PM/TL review.
-- WO-009 becomes ready only after external WO-005 and WO-006 outputs pass PM/TL review.
-- Full Master Data schema/CRUD/UI implementation remains blocked until the two active lanes pass convergence review.
+- COMPLETE: no retired PRODUCT hierarchy symbols, app imports, generated Prisma imports, or feature-specific tokens exist in shared UI Engine.
+- COMPLETE: shared date validation is single-sourced; error transport is fail-closed and DB-runtime-free; auth preserves infrastructure failures.
+- COMPLETE: 110 tests, typecheck, dependency/legacy checks, Prisma validate/generate, and production build pass.
+- No additional Core/Foundation work is planned unless product implementation exposes a concrete blocker.
 
 ## Current execution policy
 
-Use two small external executor lanes:
-
-1. Lane A — Infrastructure/Core: WO-003/WO-003A complete → WO-005 complete → WO-006 ready.
-2. Lane B — Domain/UI foundation: WO-002 → WO-004.
-
-After both lanes complete, stop for PM/TL convergence review. Do not unlock WO-007 through WO-009 or full Master Data implementation early.
+The two Foundation lanes and PM/TL convergence gate are complete. The next manager task is MD-00: lock the full Master Data domain/schema/permission/audit/discovery contract before deterministic product implementation.
 
 ## Deferred manager decisions
 
-These do not block WO-002 through WO-006:
+These are product-phase manager decisions; Foundation is complete:
 
 1. Persisted identity provider, user lifecycle/schema, canonical roles, and grants.
 2. Audit persistence schema, retention, and read/query policy.

@@ -1,6 +1,6 @@
 # 09 — Execution Plan
 
-Status: ACTIVE
+Status: FOUNDATION COMPLETE — MASTER DATA NEXT
 Updated: 2026-08-23
 Owner: PM / Technical Lead
 
@@ -34,9 +34,9 @@ Deterministic implementation may follow these contracts but may not change them.
 - Every external executor reads `scripts/work-orders/00-EXTERNAL-EXECUTOR-CONTEXT.md` before its assigned WO.
 - Every executor reads its complete work order and stops on ambiguity or repository/contract mismatch.
 - Work remains unapproved until PM/TL reviews its diff/commit and acceptance evidence.
-- Do not create one executor per tiny task; retain context within the two approved lanes.
+- Do not create one executor per tiny task; retain context within each approved product slice.
 
-## Current two-lane execution
+## Foundation execution — COMPLETE
 
 ### Lane A — Infrastructure / Core
 
@@ -46,21 +46,19 @@ Execute sequentially:
 2. WO-003 enforcement is the accepted dependency/legacy-runtime baseline.
 3. WO-005 — Core DB / Prisma Runtime — COMPLETE; commit `4cbdf43` passed PM/TL review.
 4. PM/TL review of WO-005 — COMPLETE.
-5. WO-006 — Shared Errors and Validation — READY FOR EXTERNAL EXECUTOR.
-6. PM/TL review of WO-006.
+5. WO-006 through WO-009 — COMPLETE and PM/TL-approved.
+6. Convergence correction `10d3881` — COMPLETE.
 
 ### Lane B — Domain / UI Foundation
 
 Execute sequentially:
 
-1. WO-002 — Category Pure Rules.
-2. PM/TL review of WO-002.
-3. WO-004 — UI Engine Foundation.
-4. PM/TL review of WO-004.
+1. WO-002 — COMPLETE; commit `d72b72a`.
+2. PM/TL review of WO-002 — COMPLETE.
+3. WO-004 — COMPLETE; commit `4ff3353`.
+4. PM/TL review of WO-004 — COMPLETE.
 
-Lane A and Lane B may run concurrently in separate owner-managed external executor checkouts. Work inside each lane remains sequential.
-
-## Convergence gate — REQUIRED STOP
+## Convergence gate — COMPLETE
 
 After both lanes complete, do not begin further deterministic implementation. PM/TL reviews:
 
@@ -73,15 +71,7 @@ After both lanes complete, do not begin further deterministic implementation. PM
 - Category pure-rule compliance and absence of retired PRODUCT hierarchy inference;
 - tests, typecheck, boundary checks, Prisma checks, and production build.
 
-Only this review may unlock the next work.
-
-## Dependency-locked work
-
-- WO-007 — after WO-006 approval.
-- WO-008 — after WO-006 approval.
-- WO-009 — after WO-005 and WO-006 approval.
-
-WO-007 and WO-008 may run in parallel after being unlocked. WO-009 may run when both of its dependencies are approved. A further PM/TL review is required before full Master Data implementation.
+The review passed. Core + UI Engine are locked for product implementation. Do not add Foundation work without a concrete product blocker.
 
 ## Product implementation sequence after Core convergence
 
