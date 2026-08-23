@@ -4,6 +4,10 @@ Owner: PM/TL
 Executor type: deterministic coding executor
 Status: BLOCKED — becomes READY FOR EXTERNAL EXECUTOR only after external WO-005 and WO-006 outputs pass PM/TL review
 
+Mandatory shared context: `scripts/work-orders/00-EXTERNAL-EXECUTOR-CONTEXT.md`
+
+Rebuild context: merge/rewrite the domain-neutral audit envelope and transactional port only. Legacy action vocabulary, read models, persistence, and undo behavior remain app-owned or deferred.
+
 ## Scope
 
 Implement the domain-neutral audit envelope, safe serializer/diff helper, and transactional writer port locked in `CORE.md` §5. Do not add persistence schema or read models.

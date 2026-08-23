@@ -2,7 +2,11 @@
 
 Owner: PM/TL
 Executor type: deterministic coding executor
-Status: READY FOR EXTERNAL EXECUTOR — baseline dependencies complete
+Status: BLOCKED — becomes READY FOR EXTERNAL EXECUTOR after WO-003/WO-003A passes PM/TL review
+
+Mandatory shared context: `scripts/work-orders/00-EXTERNAL-EXECUTOR-CONTEXT.md`
+
+Rebuild context: rewrite only the proven Prisma adapter/pool/singleton lessons against `CORE.md`; legacy schema sentinels, preflight tables, and app-specific DB behavior are intentionally purged.
 
 ## Scope
 

@@ -2,7 +2,11 @@
 
 Owner: PM/TL
 Executor type: deterministic coding executor
-Status: READY FOR EXTERNAL EXECUTOR — baseline dependencies complete
+Status: CORRECTION REQUIRED — commit `d55c62d` awaits WO-003A
+
+Mandatory shared context: `scripts/work-orders/00-EXTERNAL-EXECUTOR-CONTEXT.md`
+
+Rebuild context: this enforcement protects the clean rebuild from legacy runtime coupling and ownership leakage. The legacy repository may be available for manual evidence extraction but is never a runtime source.
 
 ## Scope
 

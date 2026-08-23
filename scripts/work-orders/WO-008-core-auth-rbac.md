@@ -4,6 +4,10 @@ Owner: PM/TL
 Executor type: deterministic coding executor
 Status: BLOCKED — becomes READY FOR EXTERNAL EXECUTOR only after external WO-006 output passes PM/TL review
 
+Mandatory shared context: `scripts/work-orders/00-EXTERNAL-EXECUTOR-CONTEXT.md`
+
+Rebuild context: rewrite provider-neutral session and pure permission mechanics only. Legacy providers, roles, matrices, route policy, and StudioFlow contextual authorization are not approved rebuild authority.
+
 ## Scope
 
 Implement only the provider-neutral session boundary types/guards and pure grant evaluator locked in `CORE.md` §§3–4.

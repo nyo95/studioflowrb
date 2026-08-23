@@ -44,15 +44,16 @@ The quarantine is not an implementation source of truth, is not approved code, a
 ## READY FOR EXTERNAL EXECUTOR
 
 - WO-002 — Category Pure Rules.
-- WO-003 — Dependency and Legacy-Runtime Enforcement.
-- WO-004 — UI Engine Foundation.
-- WO-005 — Core DB / Prisma Runtime.
-- WO-006 — Shared Errors and Validation.
+- WO-003A — correction for the unapproved WO-003 enforcement parser/test integration.
 
 External implementation is performed by owner-operated OpenCode executors. Codex remains PM/TL and does not spawn or act as a deterministic executor.
 
 ## Blocked work
 
+- WO-003 remains unapproved until WO-003A passes PM/TL review.
+- WO-004 becomes ready only after external WO-002 output passes PM/TL review.
+- WO-005 becomes ready only after WO-003/WO-003A passes PM/TL review.
+- WO-006 becomes ready only after external WO-005 output passes PM/TL review.
 - WO-007 becomes ready only after external WO-006 output passes PM/TL review.
 - WO-008 becomes ready only after external WO-006 output passes PM/TL review.
 - WO-009 becomes ready only after external WO-005 and WO-006 outputs pass PM/TL review.
@@ -62,7 +63,7 @@ External implementation is performed by owner-operated OpenCode executors. Codex
 
 Use two small external executor lanes:
 
-1. Lane A — Infrastructure/Core: WO-003 → WO-005 → WO-006.
+1. Lane A — Infrastructure/Core: WO-003A correction/review → WO-005 → WO-006.
 2. Lane B — Domain/UI foundation: WO-002 → WO-004.
 
 After both lanes complete, stop for PM/TL convergence review. Do not unlock WO-007 through WO-009 or full Master Data implementation early.

@@ -4,6 +4,10 @@ Owner: PM/TL
 Executor type: deterministic coding executor
 Status: BLOCKED — becomes READY FOR EXTERNAL EXECUTOR only after external WO-006 output passes PM/TL review
 
+Mandatory shared context: `scripts/work-orders/00-EXTERNAL-EXECUTOR-CONTEXT.md`
+
+Rebuild context: implement only the locked representation/formatting contract; legacy date and numeric helpers containing app policy are negative evidence and must not be migrated.
+
 ## Scope
 
 Implement representation, parsing/normalization, comparison, and display helpers locked in `CORE.md` §§8–10. Do not implement domain arithmetic or conversion policy.

@@ -84,3 +84,21 @@ A coding executor is an **executor, not a decision maker**. An executor agent mu
 **Principles: no hallucinated requirements. No autonomous product decisions. No opportunistic refactor. Execute the approved plan only.**
 
 PM/TL reviews executor output before any task is marked complete.
+
+### Workforce routing
+
+- Codex PM/TL owns audits, legacy classification, architecture/domain/schema/calculation decisions, contracts, work orders, and executor review.
+- Codex internal subagents may assist only with bounded manager analysis such as read-only audits, evidence comparison, and independent risk review. They are not the default implementation workforce.
+- Deterministic implementation is handed to owner-operated external OpenCode executors through self-contained work orders.
+- OpenCode executors must also read `scripts/work-orders/00-EXTERNAL-EXECUTOR-CONTEXT.md` and may not make product or architecture decisions.
+- Direct Codex implementation remains limited to genuinely architecture/domain-critical work that cannot yet be safely externalized.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

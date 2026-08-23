@@ -28,8 +28,10 @@ Deterministic implementation may follow these contracts but may not change them.
 ## External executor policy
 
 - Codex acts only as PM/TL.
+- Codex may use internal subagents for bounded manager-owned, read-only audit/evidence/risk analysis; their findings are advisory and the PM/TL remains the decision owner.
 - Deterministic work is executed by owner-operated external OpenCode agents.
 - Codex does not create executor tasks, agents, or worktrees.
+- Every external executor reads `scripts/work-orders/00-EXTERNAL-EXECUTOR-CONTEXT.md` before its assigned WO.
 - Every executor reads its complete work order and stops on ambiguity or repository/contract mismatch.
 - Work remains unapproved until PM/TL reviews its diff/commit and acceptance evidence.
 - Do not create one executor per tiny task; retain context within the two approved lanes.
@@ -40,8 +42,8 @@ Deterministic implementation may follow these contracts but may not change them.
 
 Execute sequentially:
 
-1. WO-003 — Dependency and Legacy-Runtime Enforcement.
-2. PM/TL review of WO-003.
+1. WO-003A — correct the unapproved WO-003 parser/test integration in commit `d55c62d`.
+2. PM/TL review of WO-003 plus WO-003A.
 3. WO-005 — Core DB / Prisma Runtime.
 4. PM/TL review of WO-005.
 5. WO-006 — Shared Errors and Validation.

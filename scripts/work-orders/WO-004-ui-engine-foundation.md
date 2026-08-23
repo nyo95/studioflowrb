@@ -2,7 +2,11 @@
 
 Owner: PM/TL
 Executor type: deterministic coding executor
-Status: READY FOR EXTERNAL EXECUTOR — WO-001 complete and Core/UI contracts locked
+Status: BLOCKED — becomes READY FOR EXTERNAL EXECUTOR after external WO-002 output passes PM/TL review
+
+Mandatory shared context: `scripts/work-orders/00-EXTERNAL-EXECUTOR-CONTEXT.md`
+
+Rebuild context: selectively rewrite proven legacy UI patterns into the clean domain-neutral engine. Do not copy the legacy UI folders or promote StudioFlow/Master Data/BQ vocabulary into shared UI.
 
 ## Scope
 

@@ -2,7 +2,11 @@
 
 Owner: PM/TL
 Executor type: deterministic coding executor
-Status: READY FOR EXTERNAL EXECUTOR — baseline dependencies complete
+Status: BLOCKED — becomes READY FOR EXTERNAL EXECUTOR after external WO-005 output passes PM/TL review
+
+Mandatory shared context: `scripts/work-orders/00-EXTERNAL-EXECUTOR-CONTEXT.md`
+
+Rebuild context: merge/rewrite only cross-app-safe error and validation behavior. Legacy wrappers are evidence, not a framework to port wholesale.
 
 ## Scope
 

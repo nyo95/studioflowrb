@@ -4,6 +4,10 @@ Owner: PM/TL
 Executor type: deterministic coding executor
 Status: READY FOR EXTERNAL EXECUTOR — baseline dependencies complete
 
+Mandatory shared context: `scripts/work-orders/00-EXTERNAL-EXECUTOR-CONTEXT.md`
+
+Rebuild context: extract only the proven legacy pure helpers classified `REWRITE`; the rebuild architecture and locked flat-PRODUCT decision are authoritative. Do not port the legacy Category service or hierarchy model.
+
 ## Scope
 
 Finish the interrupted pure Category helper extraction using the locked flat PRODUCT / hierarchical WORK decision.
