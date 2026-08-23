@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
 export const RULE_APP_TO_OTHER_APP_INTERNAL = "app -> other-app/<internal>";
 export const RULE_PLATFORM_TO_APP = "platform -> app";
@@ -145,18 +146,39 @@ export function classifyTarget(targetPath, projectRoot, apps) {
   return { kind: "other" };
 }
 
-export function extractImportSpecifiers(source) {
-  const patterns = [
-    /\bfrom\s*["']([^"'\n]+)["']/g,
-    /\bimport\s*\(\s*["']([^"'\n]+)["']/g,
-    /\brequire\s*\(\s*["']([^"'\n]+)["']/g,
-    /\bimport\s+["']([^"'\n]+)["']/g,
-  ];
-  const found = new Set();
-  for (const pattern of patterns) {
-    for (const match of source.matchAll(pattern)) found.add(match[1]);
-  }
-  return [...found];
+function scriptKindFor(fileName) {
+  const lower = String(fileName).toLowerCase();
+  if (lower.endsWith(".tsx")) return ts.ScriptKind.TSX;
+  if (lower.endsWith(".ts") || lower.endsWith(".mts") || lower.endsWith(".cts")) return ts.ScriptKind.TS;
+  if (lower.endsWith(".jsx")) return ts.ScriptKind.JSX;
+  if (lower.endsWith(".json")) return ts.ScriptKind.JSON;
+  return ts.ScriptKind.JS;
+}
+
+export function extractImportSpecifiers(source, fileName = "module.ts") {
+  const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, scriptKindFor(fileName));
+  const specifiers = new Set();
+  const addModuleSpecifier = (node) => {
+    if (node && ts.isStringLiteral(node)) specifiers.add(node.text);
+  };
+  const visit = (node) => {
+    if (ts.isImportDeclaration(node)) {
+      addModuleSpecifier(node.moduleSpecifier);
+    } else if (ts.isExportDeclaration(node)) {
+      addModuleSpecifier(node.moduleSpecifier);
+    } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) {
+      addModuleSpecifier(node.moduleReference.expression);
+    } else if (ts.isCallExpression(node)) {
+      if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+        addModuleSpecifier(node.arguments[0]);
+      } else if (ts.isIdentifier(node.expression) && node.expression.text === "require") {
+        addModuleSpecifier(node.arguments[0]);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return [...specifiers];
 }
 
 export async function collectBoundaryViolations({ projectRoot = process.cwd(), srcDir } = {}) {
@@ -176,7 +198,7 @@ export async function collectBoundaryViolations({ projectRoot = process.cwd(), s
     const importer = classifyTarget(file, projectRoot, apps);
     if (importer.kind !== "app" && importer.kind !== "platform") continue;
     const source = await readFile(file, "utf8");
-    for (const specifier of extractImportSpecifiers(source)) {
+    for (const specifier of extractImportSpecifiers(source, file)) {
       const targetPath = resolveSpecifier(specifier, file, aliasMap, projectRoot);
       if (!targetPath) continue;
       const target = classifyTarget(targetPath, projectRoot, apps);

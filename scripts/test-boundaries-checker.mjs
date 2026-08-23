@@ -49,6 +49,12 @@ const FILES = {
   "src/apps/alpha/reject-infrastructure-relative.ts": `import { betaDb } from "../beta/infrastructure/db";\nexport const bad3 = betaDb;\n`,
   "src/apps/alpha/reject-ui.ts": `import { Widget } from "@beta/ui/widget";\nexport const bad4 = Widget;\n`,
   "src/apps/alpha/reject-ui-dynamic.ts": `export async function load() {\n  return import("@beta/ui/widget");\n}\n`,
+  "src/apps/alpha/reject-export-from.ts": `export { betaRule } from "@beta/domain/rule";\n`,
+  "src/apps/alpha/reject-require.ts": `const useCase = require("@beta/application/use-case");\nexport const bad5 = useCase;\n`,
+  "src/apps/alpha/reject-import-equals.ts": `import betaDb = require("../beta/infrastructure/db");\nexport const bad6 = betaDb;\n`,
+
+  "src/apps/alpha/commented-imports.ts": `// import { betaRule } from "@beta/domain/rule";\n/* import { Widget } from "@beta/ui/widget"; */\nexport const clean1 = 1;\n`,
+  "src/apps/alpha/import-like-strings.ts": `const doc = 'import { betaRule } from "@beta/domain/rule"';\nconst doc2 = "from '@beta/application/use-case'";\nconst doc3 = \`require("@beta/infrastructure/db")\`;\nconst doc4 = 'import "@beta/ui/widget"';\nconst doc5 = 'await import("@beta/domain/rule")';\nexport const docs = [doc, doc2, doc3, doc4, doc5];\n`,
   "src/generated/prisma/must-be-ignored.ts": `import { Widget } from "@beta/ui/widget";\nexport const ignored = Widget;\n`,
 };
 
@@ -76,6 +82,9 @@ try {
     `src/apps/alpha/reject-infrastructure-relative.ts | ${RULE_APP_TO_OTHER_APP_INTERNAL} | beta/infrastructure`,
     `src/apps/alpha/reject-ui.ts | ${RULE_APP_TO_OTHER_APP_INTERNAL} | beta/ui`,
     `src/apps/alpha/reject-ui-dynamic.ts | ${RULE_APP_TO_OTHER_APP_INTERNAL} | beta/ui`,
+    `src/apps/alpha/reject-export-from.ts | ${RULE_APP_TO_OTHER_APP_INTERNAL} | beta/domain`,
+    `src/apps/alpha/reject-require.ts | ${RULE_APP_TO_OTHER_APP_INTERNAL} | beta/application`,
+    `src/apps/alpha/reject-import-equals.ts | ${RULE_APP_TO_OTHER_APP_INTERNAL} | beta/infrastructure`,
     `src/platform/core/auth.ts | ${RULE_PLATFORM_TO_APP} | alpha/public`,
   ].sort();
 
@@ -87,6 +96,8 @@ try {
     "src/apps/alpha/app-to-platform.ts",
     "src/apps/alpha/cross-app-public-alias.ts",
     "src/apps/alpha/cross-app-public-relative.ts",
+    "src/apps/alpha/commented-imports.ts",
+    "src/apps/alpha/import-like-strings.ts",
     "src/apps/beta/public/index.ts",
     "src/platform/utilities/slug/index.ts",
     "src/generated/prisma/must-be-ignored.ts",
@@ -96,7 +107,7 @@ try {
     assert.ok(!flagged.has(file), `legal fixture must not be flagged: ${file}`);
   }
 
-  console.log("PASS boundary fixtures: 6 rejections + all legal cases pass");
+  console.log("PASS boundary fixtures: 9 rejections, all legal cases and comment/string false-positive cases clean");
 } finally {
   await rm(projectRoot, { recursive: true, force: true });
 }

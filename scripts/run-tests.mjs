@@ -2,6 +2,11 @@ import { readdir } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 
+const fixtureSuites = [
+  join("scripts", "test-boundaries-checker.mjs"),
+  join("scripts", "test-legacy-runtime-checker.mjs"),
+];
+
 const testFiles = [];
 
 async function discoverTests(directory) {
@@ -27,7 +32,7 @@ await discoverTests("src");
 
 const result = spawnSync(
   process.execPath,
-  ["--import", "tsx", "--test", ...testFiles],
+  ["--import", "tsx", "--test", ...testFiles, ...fixtureSuites],
   { stdio: "inherit" },
 );
 

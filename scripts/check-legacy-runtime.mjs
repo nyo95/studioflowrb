@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
 export const RULE_LEGACY_RUNTIME_REFERENCE = "runtime-reference-to-legacy-repo";
 
@@ -67,6 +68,51 @@ function extendTokenFromMatch(line, startIndex) {
   return line.slice(begin, endIndex);
 }
 
+function scriptKindFor(fileName) {
+  const lower = String(fileName).toLowerCase();
+  if (lower.endsWith(".tsx")) return ts.ScriptKind.TSX;
+  if (lower.endsWith(".ts") || lower.endsWith(".mts") || lower.endsWith(".cts")) return ts.ScriptKind.TS;
+  if (lower.endsWith(".jsx")) return ts.ScriptKind.JSX;
+  if (lower.endsWith(".json")) return ts.ScriptKind.JSON;
+  return ts.ScriptKind.JS;
+}
+
+function isStringLikeLiteral(node) {
+  return (
+    ts.isStringLiteral(node) ||
+    node.kind === ts.SyntaxKind.NoSubstitutionTemplateLiteral ||
+    node.kind === ts.SyntaxKind.TemplateHead ||
+    node.kind === ts.SyntaxKind.TemplateMiddle ||
+    node.kind === ts.SyntaxKind.TemplateTail
+  );
+}
+
+function collectActiveStringValues(fileName, content) {
+  const sourceFile = ts.createSourceFile(fileName, content, ts.ScriptTarget.Latest, true, scriptKindFor(fileName));
+  const values = [];
+  const visit = (node) => {
+    if (isStringLikeLiteral(node) && typeof node.text === "string") {
+      values.push({
+        text: node.text,
+        line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
+      });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return values;
+}
+
+function collectActiveEnvValues(content) {
+  const values = [];
+  const lines = content.split("\n");
+  for (let index = 0; index < lines.length; index++) {
+    if (lines[index].trim().startsWith("#")) continue;
+    values.push({ text: lines[index], line: index + 1 });
+  }
+  return values;
+}
+
 export async function collectLegacyRuntimeReferences({ projectRoot = process.cwd(), srcDir } = {}) {
   projectRoot = resolve(projectRoot);
   srcDir = srcDir ? resolve(srcDir) : join(projectRoot, "src");
@@ -84,17 +130,21 @@ export async function collectLegacyRuntimeReferences({ projectRoot = process.cwd
     } catch {
       continue;
     }
-    const lines = content.split("\n");
-    for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-      const line = lines[lineIndex];
+    const isEnvFile = basename(file).startsWith(".env");
+    const activeValues = isEnvFile
+      ? collectActiveEnvValues(content)
+      : collectActiveStringValues(file, content);
+
+    for (const value of activeValues) {
       LEGACY_PATH_PATTERN.lastIndex = 0;
-      for (const match of line.matchAll(LEGACY_PATH_PATTERN)) {
-        const token = extendTokenFromMatch(line, match.index);
+      for (const match of value.text.matchAll(LEGACY_PATH_PATTERN)) {
+        const token = extendTokenFromMatch(value.text, match.index);
         if (isInside(projectRoot, resolve(dirname(file), token))) continue;
+        const newlinesBeforeMatch = value.text.slice(0, match.index).split("\n").length - 1;
         violations.push({
           rule: RULE_LEGACY_RUNTIME_REFERENCE,
           file,
-          line: lineIndex + 1,
+          line: value.line + newlinesBeforeMatch,
           reference: token,
         });
       }

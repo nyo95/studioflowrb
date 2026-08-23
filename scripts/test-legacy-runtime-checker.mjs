@@ -6,11 +6,13 @@ import { collectLegacyRuntimeReferences, RULE_LEGACY_RUNTIME_REFERENCE } from ".
 
 const FILES = {
   "package.json": `{\n  "name": "legacy-fixture",\n  "private": true\n}\n`,
-  "tsconfig.json": `{\n  "compilerOptions": {\n    "paths": {\n      "@/*": ["./src/*"]\n    }\n  }\n}\n`,
+  "tsconfig.json": `{\n  "compilerOptions": {\n    // keep legacy out: "../studioflow/commented"\n    "paths": {\n      "@/*": ["./src/*"]\n    }\n  }\n}\n`,
   "next.config.mjs": `export default {\n  outputFileTracingRoot: "../studioflow/shared"\n};\n`,
-  ".env.example": `# example env\nLEGACY_TOOLS_PATH=../studioflow/tools\nDATABASE_URL=postgres://localhost/studioflow_rebuild\n`,
+  ".env.example": `# example env\n# LEGACY_COMMENT_PATH=../studioflow/old-tools\nLEGACY_TOOLS_PATH=../studioflow/tools\nDATABASE_URL=postgres://localhost/studioflow_rebuild\n`,
 
   "src/apps/bq/offender.ts": `import { pricing } from "../../../../studioflow/pricing";\nexport const p = pricing;\n`,
+  "src/apps/bq/active-string-legacy.ts": `export const legacyPath = "../../../../studioflow/pricing";\n`,
+  "src/apps/bq/deep/nested/commented-legacy.ts": `// extracted from ../../../../../../studioflow/old-tools\n/* original: ../../../../../../studioflow/pricing-legacy */\nexport const ok = true;\n`,
   "src/apps/masterdata/intra-repo-sibling-shaped.ts": `import { something } from "../../studioflow/public";\nexport const s = something;\n`,
   "src/apps/masterdata/domain/clean.ts": `import { helper } from "./helper";\nexport const c = helper;\n`,
   "src/apps/masterdata/domain/helper.ts": `export const helper = () => "ok";\n`,
@@ -35,14 +37,28 @@ try {
     .sort();
   const expectedKeys = [
     "src/apps/bq/offender.ts:1",
+    "src/apps/bq/active-string-legacy.ts:1",
     "next.config.mjs:2",
-    ".env.example:2",
+    ".env.example:3",
   ].sort();
 
   assert.equal(violations.every((v) => v.rule === RULE_LEGACY_RUNTIME_REFERENCE), true);
   assert.deepEqual(actualKeys, expectedKeys);
 
-  console.log("PASS legacy-runtime fixtures: source + config references rejected; intra-repo and generated files clean");
+  const cleanFiles = [
+    "src/apps/bq/deep/nested/commented-legacy.ts",
+    "src/apps/masterdata/intra-repo-sibling-shaped.ts",
+    "src/apps/masterdata/domain/clean.ts",
+    "src/apps/masterdata/domain/helper.ts",
+    "package.json",
+    "tsconfig.json",
+  ];
+  const flagged = new Set(violations.map((v) => relative(projectRoot, v.file)));
+  for (const file of cleanFiles) {
+    assert.ok(!flagged.has(file), `clean fixture must not be flagged: ${file}`);
+  }
+
+  console.log("PASS legacy-runtime fixtures: active import/string/config/env values rejected; comments, intra-repo, and generated files clean");
 } finally {
   await rm(projectRoot, { recursive: true, force: true });
 }
