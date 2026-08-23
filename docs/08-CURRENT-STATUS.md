@@ -52,12 +52,12 @@ The quarantine is not an implementation source of truth, is not approved code, a
 
 ## Current execution policy
 
-The two Foundation lanes and PM/TL convergence gate are complete. MD-00 manager audit is complete in `MASTER_DATA.md` as a lock candidate awaiting owner approval. No Master Data schema, migration, CRUD, UI, import/export, discovery, or public-contract implementation is authorized before that approval and separate deterministic work orders.
+The two Foundation lanes and PM/TL convergence gate are complete. MD-00 manager audit and owner-requested pricing/seed correction are complete in `MASTER_DATA.md` and `docs/12-MASTER-DATA-SEED-INVENTORY.md` as a lock candidate awaiting final owner approval. No Master Data schema, migration, CRUD, UI, import/export, discovery, or public-contract implementation is authorized before that approval and separate deterministic work orders.
 
 ## Deferred owner / later-phase decisions
 
 1. Persisted identity provider, user lifecycle/schema, canonical roles, and role-to-permission grants.
-2. Initial curated unit/category/business seed data and any production audit-retention policy beyond the MD-00 MVP default.
+2. Production audit-retention policy beyond the MD-00 MVP default.
 3. BQ calculation migration and regression contract.
 
 Master Data lifecycle, uniqueness, relation, pricing, permission, audit-persistence, discovery, public-read, and import/export decisions are resolved in the MD-00 lock candidate; they are no longer architecture-discovery items.
