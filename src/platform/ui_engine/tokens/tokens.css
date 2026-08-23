@@ -1,0 +1,7 @@
+:root {
+  --ui-canvas:#f8fafc;--ui-surface:#fff;--ui-surface-raised:#fff;--ui-border-subtle:#f1f5f9;--ui-border-default:#e2e8f0;--ui-border-focus:#94a3b8;
+  --ui-text-primary:#0f172a;--ui-text-secondary:#475569;--ui-text-tertiary:#94a3b8;--ui-text-inverse:#fff;--ui-action-primary:#0f172a;--ui-action-primary-hover:#1e293b;
+  --ui-danger-fg:#b91c1c;--ui-danger-bg:#fef2f2;--ui-danger-border:#fecaca;--ui-success-fg:#047857;--ui-success-bg:#ecfdf5;--ui-success-border:#a7f3d0;--ui-warning-fg:#b45309;--ui-warning-bg:#fffbeb;--ui-warning-border:#fde68a;
+  --ui-radius-card:8px;--ui-radius-control:6px;--ui-radius-action:4px;--ui-radius-pill:9999px;--ui-section-px:20px;--ui-section-py:20px;--ui-section-gap:20px;--ui-page-padding:24px;--ui-page-max:1440px;
+  --ui-dialog-sm:420px;--ui-dialog-md:560px;--ui-dialog-lg:760px;--ui-dialog-xl:980px;--ui-dialog-full:1180px;--ui-dialog-max-height:90vh;--ui-shadow-card:0 1px 2px rgb(0 0 0/.03);--ui-shadow-elevated:0 2px 8px rgb(0 0 0/.06),0 1px 3px rgb(0 0 0/.04);
+}

@@ -1,0 +1,2 @@
+"use client";
+import type{ReactNode}from"react";import{DropdownMenu}from"radix-ui";export function RowActionMenu({label="Row actions",children}:{label?:string;children:ReactNode}){return <DropdownMenu.Root><DropdownMenu.Trigger className="ui-button" aria-label={label}>•••</DropdownMenu.Trigger><DropdownMenu.Portal><DropdownMenu.Content className="ui-surface ui-section" sideOffset={4}>{children}</DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root>}
