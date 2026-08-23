@@ -1,5 +1,10 @@
-import { normalizeText } from "../normalization";
-
-export function toSlug(value: string) {
-  return normalizeText(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+/** Canonical NFKD slug normalization shared across the platform. */
+export function toSlug(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
