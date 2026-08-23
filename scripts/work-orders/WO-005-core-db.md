@@ -2,7 +2,7 @@
 
 Owner: PM/TL
 Executor type: deterministic coding executor
-Status: READY FOR EXTERNAL EXECUTOR — WO-003/WO-003A passed PM/TL review
+Status: COMPLETE — PM/TL approved 2026-08-23; implementation commit `4cbdf43`
 
 Mandatory shared context: `scripts/work-orders/00-EXTERNAL-EXECUTOR-CONTEXT.md`
 

@@ -2,7 +2,7 @@
 
 Owner: PM/TL
 Executor type: deterministic coding executor
-Status: BLOCKED — becomes READY FOR EXTERNAL EXECUTOR after external WO-005 output passes PM/TL review
+Status: READY FOR EXTERNAL EXECUTOR — WO-005 implementation commit `4cbdf43` passed PM/TL review
 
 Mandatory shared context: `scripts/work-orders/00-EXTERNAL-EXECUTOR-CONTEXT.md`
 

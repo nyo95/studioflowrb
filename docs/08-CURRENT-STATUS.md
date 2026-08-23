@@ -6,11 +6,13 @@ Owner: PM / Technical Lead
 
 ## Approved repository state
 
-- The approved implementation baseline is commit `eb58f5ef7995aad22c4170d234ca84bc830eef08` (`chore: establish rebuild baseline`).
+- The reproducible foundation baseline is commit `eb58f5ef7995aad22c4170d234ca84bc830eef08` (`chore: establish rebuild baseline`).
+- The current PM/TL-approved implementation head is commit `4cbdf43` (`feat: implement Core DB Prisma runtime (WO-005)`).
 - The rebuild is an independent Git repository on `main` with no configured runtime dependency on `../studioflow`.
 - WO-001, WO-001A, WO-001B, WO-001C, and WO-001D are complete and PM/TL-approved.
 - The baseline has a reproducible npm lockfile, Prisma 7 configuration/client generation, TypeScript test runner, typecheck, boundary check, and production build.
-- No implementation from WO-002 through WO-009 is approved on `main` yet.
+- WO-003, WO-003A, and WO-005 are complete and PM/TL-approved on `main`.
+- No implementation from WO-002, WO-004, or WO-006 through WO-009 is approved on `main` yet.
 
 ## Quarantined unapproved work
 
@@ -44,14 +46,13 @@ The quarantine is not an implementation source of truth, is not approved code, a
 ## READY FOR EXTERNAL EXECUTOR
 
 - WO-002 — Category Pure Rules.
-- WO-005 — Core DB / Prisma Runtime.
+- WO-006 — Shared Errors and Validation.
 
 External implementation is performed by owner-operated OpenCode executors. Codex remains PM/TL and does not spawn or act as a deterministic executor.
 
 ## Blocked work
 
 - WO-004 becomes ready only after external WO-002 output passes PM/TL review.
-- WO-006 becomes ready only after external WO-005 output passes PM/TL review.
 - WO-007 becomes ready only after external WO-006 output passes PM/TL review.
 - WO-008 becomes ready only after external WO-006 output passes PM/TL review.
 - WO-009 becomes ready only after external WO-005 and WO-006 outputs pass PM/TL review.
@@ -61,7 +62,7 @@ External implementation is performed by owner-operated OpenCode executors. Codex
 
 Use two small external executor lanes:
 
-1. Lane A — Infrastructure/Core: WO-003/WO-003A complete → WO-005 → WO-006.
+1. Lane A — Infrastructure/Core: WO-003/WO-003A complete → WO-005 complete → WO-006 ready.
 2. Lane B — Domain/UI foundation: WO-002 → WO-004.
 
 After both lanes complete, stop for PM/TL convergence review. Do not unlock WO-007 through WO-009 or full Master Data implementation early.

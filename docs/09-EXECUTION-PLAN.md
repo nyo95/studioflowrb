@@ -44,9 +44,9 @@ Execute sequentially:
 
 1. WO-003 + WO-003A — COMPLETE; commits `d55c62d` and `3ad33e6` passed PM/TL review.
 2. WO-003 enforcement is the accepted dependency/legacy-runtime baseline.
-3. WO-005 — Core DB / Prisma Runtime.
-4. PM/TL review of WO-005.
-5. WO-006 — Shared Errors and Validation.
+3. WO-005 — Core DB / Prisma Runtime — COMPLETE; commit `4cbdf43` passed PM/TL review.
+4. PM/TL review of WO-005 — COMPLETE.
+5. WO-006 — Shared Errors and Validation — READY FOR EXTERNAL EXECUTOR.
 6. PM/TL review of WO-006.
 
 ### Lane B — Domain / UI Foundation
