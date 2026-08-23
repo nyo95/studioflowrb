@@ -1,6 +1,6 @@
 # 08 — Current Rebuild Status
 
-Status: FOUNDATION LOCKED — PRODUCT IMPLEMENTATION NEXT
+Status: FOUNDATION LOCKED — MD-00 CONTRACT UNDER OWNER REVIEW
 Audit date: 2026-08-23
 Owner: PM / Technical Lead
 
@@ -52,13 +52,12 @@ The quarantine is not an implementation source of truth, is not approved code, a
 
 ## Current execution policy
 
-The two Foundation lanes and PM/TL convergence gate are complete. The next manager task is MD-00: lock the full Master Data domain/schema/permission/audit/discovery contract before deterministic product implementation.
+The two Foundation lanes and PM/TL convergence gate are complete. MD-00 manager audit is complete in `MASTER_DATA.md` as a lock candidate awaiting owner approval. No Master Data schema, migration, CRUD, UI, import/export, discovery, or public-contract implementation is authorized before that approval and separate deterministic work orders.
 
-## Deferred manager decisions
+## Deferred owner / later-phase decisions
 
-These are product-phase manager decisions; Foundation is complete:
+1. Persisted identity provider, user lifecycle/schema, canonical roles, and role-to-permission grants.
+2. Initial curated unit/category/business seed data and any production audit-retention policy beyond the MD-00 MVP default.
+3. BQ calculation migration and regression contract.
 
-1. Persisted identity provider, user lifecycle/schema, canonical roles, and grants.
-2. Audit persistence schema, retention, and read/query policy.
-3. Complete Master Data lifecycle, uniqueness, permission, audit, and import/export contracts.
-4. BQ calculation migration and regression contract.
+Master Data lifecycle, uniqueness, relation, pricing, permission, audit-persistence, discovery, public-read, and import/export decisions are resolved in the MD-00 lock candidate; they are no longer architecture-discovery items.

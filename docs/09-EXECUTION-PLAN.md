@@ -1,6 +1,6 @@
 # 09 — Execution Plan
 
-Status: FOUNDATION COMPLETE — MASTER DATA NEXT
+Status: FOUNDATION COMPLETE — MD-00 OWNER APPROVAL GATE
 Updated: 2026-08-23
 Owner: PM / Technical Lead
 
@@ -75,11 +75,13 @@ The review passed. Core + UI Engine are locked for product implementation. Do no
 
 ## Product implementation sequence after Core convergence
 
-1. Complete Master Data domain contracts and full schema decisions.
-2. Issue deterministic Master Data schema/application/UI work orders.
+1. Approve the manager-complete MD-00 contract in `MASTER_DATA.md`.
+2. Issue deterministic MD-01 through MD-09 work orders in the locked dependency order; do not implement from the summary plan alone.
 3. Lock and implement the Master Data public contract.
 4. Lock BQ readiness, provenance, snapshot, refresh, duplicate, library, and calculation contracts.
 5. Issue BQ schema/domain/application/UI work orders.
 6. Run cross-app boundary, migration, and smoke verification.
 
 StudioFlow remains outside active implementation scope except for shared-boundary verification.
+
+The MD-01 through MD-09 dependency plan is canonical in `MASTER_DATA.md`. Until MD-00 owner approval, none is READY for an external executor.
