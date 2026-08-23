@@ -9,7 +9,8 @@ Owner: PM / Technical Lead
 
 - Rebuild repository: `D:\Projects\studioflow-rebuild`
 - Legacy evidence repository: `D:\Projects\studioflow`
-- Approved implementation baseline: `eb58f5ef7995aad22c4170d234ca84bc830eef08`
+- Reproducible implementation baseline: `eb58f5ef7995aad22c4170d234ca84bc830eef08`
+- Required execution head: the exact work-order-specific starting commit/ref declared by PM/TL. Do not reset a later approved package back to the reproducible baseline.
 - Unapproved Codex comparison only: branch `codex/quarantine-unapproved-20260823`
 
 The rebuild establishes a clean architecture and then selectively extracts legacy capabilities that are still valid. Legacy code is evidence, never authority, and must never become a runtime dependency.

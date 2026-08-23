@@ -1,6 +1,6 @@
 # 12 — Master Data MVP Seed Inventory
 
-Status: **MD-00 LOCK CANDIDATE — implementation-ready seed inventory (2026-08-23)**
+Status: **LOCKED — owner-approved implementation-ready seed inventory (2026-08-23)**
 
 This inventory is subordinate to `MASTER_DATA.md`. It was produced from a read-only audit of the legacy StudioFlow workbook, curated category configuration, pricing/BQ rules and tests, and archived import staging. Legacy values are evidence, not authority.
 

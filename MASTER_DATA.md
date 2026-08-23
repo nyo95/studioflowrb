@@ -1,6 +1,6 @@
 # MASTER_DATA.md — MD-00 Master Data Contract
 
-Status: **LOCK CANDIDATE — manager-complete, awaiting owner approval (2026-08-23)**  
+Status: **LOCKED — owner-approved canonical Master Data contract (2026-08-23)**
 Scope: the minimum product/domain contract required to make MD-01 through MD-09 deterministic.
 
 Authority: this contract specializes `docs/00-SOFTWARE-SSOT.md`, `docs/03-MASTERDATA-PRD.md`, `docs/06-DATA-OWNERSHIP.md`, `docs/07-ENGINEERING-CONVENTIONS.md`, and `CORE.md`. Explicit current owner instructions remain higher authority. The legacy `../studioflow` repository is evidence only and is never a runtime dependency or implementation base.
@@ -475,4 +475,4 @@ After MD-09, PM/TL performs one Master Data convergence review. Only an approved
 - broad StudioFlow migration beyond the public Brand Discovery/catalog consumer;
 - BQ UI/calculation migration, which starts only after Master Data and its public contract pass convergence.
 
-MD-00 ends here. No schema, migration, CRUD, UI, or product implementation is authorized by this contract file until owner approval and issuance of a separate deterministic work order.
+MD-00 ends here. Implementation is authorized only through the manager-issued `MASTER DATA FULL BUILD` package; this contract itself may not be changed by an executor.

@@ -1,6 +1,6 @@
 # 08 — Current Rebuild Status
 
-Status: FOUNDATION LOCKED — MD-00 CONTRACT UNDER OWNER REVIEW
+Status: FOUNDATION + MD-00 LOCKED — MASTER DATA FULL BUILD NEXT
 Audit date: 2026-08-23
 Owner: PM / Technical Lead
 
@@ -28,6 +28,8 @@ The quarantine is not an implementation source of truth, is not approved code, a
 - `CORE.md` — minimum shared Platform Core contract.
 - `DESIGN.md` — canonical shared visual contract.
 - `UI_ENGINE.md` — canonical shared UI architecture contract.
+- `MASTER_DATA.md` — canonical MD-00 domain, lifecycle, pricing, permission, audit, discovery, public-read, and import/export contract.
+- `docs/12-MASTER-DATA-SEED-INVENTORY.md` — canonical MVP Unit, PRODUCT/WORK Category, operational-role, and BusinessType seed/mapping inventory.
 - `docs/00-SOFTWARE-SSOT.md` — platform ownership and dependency constitution, subject to explicit current owner instructions.
 - `docs/06-DATA-OWNERSHIP.md` — domain/data ownership and Category contract.
 - `docs/03-MASTERDATA-PRD.md`, `docs/04-STUDIOFLOW-PRD.md`, and `docs/05-BQ-PRD.md` — current app intent.
@@ -52,7 +54,7 @@ The quarantine is not an implementation source of truth, is not approved code, a
 
 ## Current execution policy
 
-The two Foundation lanes and PM/TL convergence gate are complete. MD-00 manager audit and owner-requested pricing/seed correction are complete in `MASTER_DATA.md` and `docs/12-MASTER-DATA-SEED-INVENTORY.md` as a lock candidate awaiting final owner approval. No Master Data schema, migration, CRUD, UI, import/export, discovery, or public-contract implementation is authorized before that approval and separate deterministic work orders.
+The two Foundation lanes and PM/TL convergence gate are complete. Revised MD-00 and its seed inventory are owner-approved and LOCKED. Deterministic Master Data implementation is delegated as one external OpenCode program through `scripts/work-orders/MASTER-DATA-FULL-BUILD.md`; MD-01–MD-09 remain reviewable checkpoints inside that program.
 
 ## Deferred owner / later-phase decisions
 
