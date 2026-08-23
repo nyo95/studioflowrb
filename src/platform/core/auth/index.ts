@@ -28,13 +28,13 @@ export type RawSessionIdentity = {
 
 /**
  * Port resolving the current request's raw identity. Returns `null` when no
- * valid identity exists (absent, deleted, disabled, or unknown role), or when
- * the underlying provider fails — failing closed either way.
+ * valid identity exists (absent, deleted, disabled, or unknown role).
+ * Provider/infrastructure failures throw and are not authentication failures.
  */
 export type SessionReader = () => Promise<RawSessionIdentity | null> | RawSessionIdentity | null;
 
 function nonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0;
+  return typeof value === "string" && value.length > 0 && value.trim() === value;
 }
 
 function validatePrincipal(raw: RawSessionIdentity): SessionPrincipal | null {
@@ -55,12 +55,7 @@ function validatePrincipal(raw: RawSessionIdentity): SessionPrincipal | null {
 
 /** Resolves the current principal, or `null` when unauthenticated or malformed. */
 export async function getPrincipal(readSession: SessionReader): Promise<SessionPrincipal | null> {
-  let raw: RawSessionIdentity | null;
-  try {
-    raw = await readSession();
-  } catch {
-    return null;
-  }
+  const raw = await readSession();
   if (!raw) return null;
   return validatePrincipal(raw);
 }

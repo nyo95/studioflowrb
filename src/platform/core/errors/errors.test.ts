@@ -107,6 +107,14 @@ describe("safe transport mapping", () => {
       safeMessage: "Please sign in.",
     });
   });
+
+  it("drops unsafe details and reports unknown errors through an injected hook", () => {
+    const unsafe = new AppError("INTERNAL", "X", "safe", { details: { sql: "SELECT secret" } });
+    assert.equal(toSafeErrorPayload(unsafe).details, undefined);
+    const reported: unknown[] = [];
+    toSafeErrorPayload(new Error("boom"), { reportUnknownError: (error) => reported.push(error) });
+    assert.equal(reported.length, 1);
+  });
 });
 
 describe("central Prisma known-error mapping", () => {
@@ -151,18 +159,20 @@ describe("central Prisma known-error mapping", () => {
 
 describe("framework control-flow preservation", () => {
   it("detects documented redirect and HTTP-fallback digests only", () => {
-    assert.equal(isFrameworkControlFlowError({ digest: "NEXT_REDIRECT;replace;/login;" }), true);
+    assert.equal(isFrameworkControlFlowError({ digest: "NEXT_REDIRECT;replace;/login;307;" }), true);
     assert.equal(isFrameworkControlFlowError({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" }), true);
     assert.equal(isFrameworkControlFlowError(new Error("NEXT_REDIRECT")), false);
     assert.equal(isFrameworkControlFlowError({ digest: 123 }), false);
     assert.equal(isFrameworkControlFlowError({ digest: "OTHER_DIGEST" }), false);
+    assert.equal(isFrameworkControlFlowError({ digest: "NEXT_REDIRECTED;replace;/login;307;" }), false);
+    assert.equal(isFrameworkControlFlowError({ digest: "NEXT_HTTP_ERROR_FALLBACK;500" }), false);
     assert.equal(isFrameworkControlFlowError(null), false);
     assert.equal(isFrameworkControlFlowError(undefined), false);
     assert.equal(isFrameworkControlFlowError("NEXT_REDIRECT"), false);
   });
 
   it("rethrows framework control-flow errors instead of converting them", () => {
-    const controlFlow = { digest: "NEXT_REDIRECT;replace;/login;" };
+    const controlFlow = { digest: "NEXT_REDIRECT;replace;/login;307;" };
     let rethrown: unknown;
     try {
       toSafeErrorPayload(controlFlow);

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { AppError } from "@platform/core/errors";
+import { isDateOnlyString, isIsoInstantString } from "@platform/utilities/date";
 
 /**
  * Platform Core boundary-validation convention (CORE.md §7).
@@ -33,7 +34,7 @@ export function validationError(error: z.ZodError): AppError {
 export const UuidSchema = z.uuid();
 
 /** ISO-8601 instant; accepts UTC `Z` form, rejects date-only and explicit offsets. */
-export const IsoInstantSchema = z.iso.datetime();
+export const IsoInstantSchema = z.string().refine(isIsoInstantString);
 
 /** Date-only calendar value as `YYYY-MM-DD`; never converted through an instant. */
-export const DateOnlySchema = z.iso.date();
+export const DateOnlySchema = z.string().refine(isDateOnlyString);

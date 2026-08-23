@@ -48,17 +48,19 @@ describe("getPrincipal", () => {
       { userId: "user-1", roleId: null, displayName: "x" },
       { userId: "user-1", roleId: "role-1", displayName: "x", email: "" },
       { userId: "user-1", roleId: "role-1", displayName: "x", email: 7 },
+      { userId: " ", roleId: "role-1", displayName: "x" },
+      { userId: "user-1", roleId: " role-1", displayName: "x" },
     ];
     for (const raw of malformed) {
       assert.equal(await getPrincipal(readerReturning(raw)), null);
     }
   });
 
-  it("treats a failing provider adapter as unauthenticated", async () => {
+  it("propagates provider failures instead of misclassifying them as unauthenticated", async () => {
     const failingReader: SessionReader = () => {
       throw new Error("provider exploded");
     };
-    assert.equal(await getPrincipal(failingReader), null);
+    await assert.rejects(() => getPrincipal(failingReader), /provider exploded/);
   });
 });
 

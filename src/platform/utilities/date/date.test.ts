@@ -12,6 +12,7 @@ import {
 
 describe("instant and date-only validation", () => {
   it("accepts strict UTC instants including fractional seconds", () => {
+    assert.equal(isIsoInstantString("0000-01-01T00:00:00Z"), true);
     assert.equal(isIsoInstantString("2026-08-23T10:00:00Z"), true);
     assert.equal(isIsoInstantString("2026-08-23T10:00:00.123456789Z"), true);
   });
@@ -34,6 +35,8 @@ describe("instant and date-only validation", () => {
   });
 
   it("accepts only real YYYY-MM-DD calendar dates", () => {
+    assert.equal(isDateOnlyString("0000-01-01"), true);
+    assert.equal(isDateOnlyString("0099-12-31"), true);
     assert.equal(isDateOnlyString("2026-08-23"), true);
     assert.equal(isDateOnlyString("2028-02-29"), true);
     assert.equal(isDateOnlyString("2026-02-30"), false);

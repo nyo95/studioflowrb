@@ -15,10 +15,9 @@ const ISO_INSTANT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:
 
 function isValidUtcCalendarDate(year: number, month: number, day: number): boolean {
   if (month < 1 || month > 12 || day < 1 || day > 31) return false;
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return (
-    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
-  );
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day <= days[month - 1];
 }
 
 /** Strict `YYYY-MM-DD` calendar date; rollover dates like `2026-02-30` are rejected. */
@@ -50,12 +49,15 @@ function assertDateOnly(value: string): void {
 export function formatDateOnly(value: string, options: { locale?: string } = {}): string {
   assertDateOnly(value);
   const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(0);
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCFullYear(year, month - 1, day);
   return new Intl.DateTimeFormat(options.locale ?? DEFAULT_DISPLAY_LOCALE, {
     timeZone: "UTC",
     year: "numeric",
     month: "long",
     day: "numeric",
-  }).format(Date.UTC(year, month - 1, day));
+  }).format(date);
 }
 
 export type InstantDisplayOptions = {

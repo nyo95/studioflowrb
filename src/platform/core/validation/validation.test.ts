@@ -15,6 +15,7 @@ describe("shared scalar schemas", () => {
   });
 
   it("accepts UTC ISO instants including fractional seconds", () => {
+    assert.equal(IsoInstantSchema.safeParse("0000-01-01T00:00:00Z").success, true);
     assert.equal(IsoInstantSchema.safeParse("2026-08-23T10:00:00Z").success, true);
     assert.equal(IsoInstantSchema.safeParse("2026-08-23T10:00:00.123Z").success, true);
   });
@@ -26,6 +27,7 @@ describe("shared scalar schemas", () => {
   });
 
   it("accepts only strict YYYY-MM-DD date-only values", () => {
+    assert.equal(DateOnlySchema.safeParse("0099-12-31").success, true);
     assert.equal(DateOnlySchema.safeParse("2026-08-23").success, true);
     assert.equal(DateOnlySchema.safeParse("2026-08-23T10:00:00Z").success, false);
     assert.equal(DateOnlySchema.safeParse("2026-8-23").success, false);
