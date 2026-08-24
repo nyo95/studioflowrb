@@ -8,12 +8,14 @@ Owner: PM / Technical Lead
 `studioflow-rebuild` is a clean rebuild of the legacy `studioflow` repository. It is not an incremental feature branch and not a folder-by-folder port.
 
 - Rebuild repository: `D:\Projects\studioflow-rebuild`
-- Legacy evidence repository: `D:\Projects\studioflow`
+- Canonical legacy evidence: `https://github.com/nyo95/studioflow/commit/548fbd6bd00ef9fd7d53df66a3561a32fbb56944`
+- Legacy path convention: every legacy path in a work order is relative to that immutable GitHub snapshot.
+- Local `D:\Projects\studioflow`: optional untrusted cache only; do not use it unless its commit and inspected files are proven identical to the canonical snapshot.
 - Reproducible implementation baseline: `eb58f5ef7995aad22c4170d234ca84bc830eef08`
 - Required execution head: the exact work-order-specific starting commit/ref declared by PM/TL. Do not reset a later approved package back to the reproducible baseline.
 - Unapproved Codex comparison only: branch `codex/quarantine-unapproved-20260823`
 
-The rebuild establishes a clean architecture and then selectively extracts legacy capabilities that are still valid. Legacy code is evidence, never authority, and must never become a runtime dependency.
+The rebuild establishes a clean architecture and then selectively extracts legacy capabilities that are still valid. Legacy code is evidence, never authority, and must never become a runtime dependency. Do not replace the locked GitHub evidence commit with a branch tip or a local working tree.
 
 ## Mandatory rebuild method
 
@@ -52,7 +54,7 @@ Read `AGENTS.md` and its mandatory documents in order. Authority is:
 4. relevant app PRD;
 5. current Prisma schema for implemented persisted shape;
 6. other manager contracts/docs;
-7. legacy repository evidence.
+7. the locked GitHub legacy evidence snapshot.
 
 Key boundaries:
 
@@ -93,7 +95,7 @@ OpenCode is an executor, not a product or architecture decision-maker.
 ## Executor prohibitions
 
 - Do not copy a legacy directory wholesale.
-- Do not create runtime imports, filesystem reads, or fallbacks to `../studioflow`.
+- Do not create runtime imports, filesystem reads, network reads, build inputs, or fallbacks to any local or remote legacy repository.
 - Do not preserve legacy behavior merely because it exists.
 - Do not redesign approved contracts, schema, UI language, or calculations.
 - Do not add abstractions, fields, relations, dependencies, fallbacks, cleanup, or features outside the WO.

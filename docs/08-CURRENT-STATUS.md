@@ -1,7 +1,7 @@
 # 08 — Current Rebuild Status
 
 Status: FOUNDATION + MD-00 LOCKED — MASTER DATA FULL BUILD NEXT
-Audit date: 2026-08-23
+Audit date: 2026-08-25
 Owner: PM / Technical Lead
 
 ## Approved repository state
@@ -13,6 +13,8 @@ Owner: PM / Technical Lead
 - The baseline has a reproducible npm lockfile, Prisma 7 configuration/client generation, TypeScript test runner, typecheck, boundary check, and production build.
 - WO-002 through WO-009, including WO-003A and the convergence correction `10d3881`, are complete and PM/TL-approved on `main`.
 - Platform Core, shared utilities, dependency enforcement, Category pure rules, and UI Engine Foundation are locked for the product phase.
+- Platform Core was revalidated on 2026-08-25 against the immutable GitHub legacy evidence commit `548fbd6bd00ef9fd7d53df66a3561a32fbb56944`; all Foundation acceptance checks remain green and no Core contract change is required.
+- Canonical legacy evidence is now that GitHub commit. `D:\Projects\studioflow` is not a source of truth and may be used only as a verified optional cache.
 
 ## Quarantined unapproved work
 
@@ -54,7 +56,7 @@ The quarantine is not an implementation source of truth, is not approved code, a
 
 ## Current execution policy
 
-The two Foundation lanes and PM/TL convergence gate are complete. Revised MD-00 and its seed inventory are owner-approved and LOCKED. Deterministic Master Data implementation is delegated as one external OpenCode program through `scripts/work-orders/MASTER-DATA-FULL-BUILD.md`; MD-01–MD-09 remain reviewable checkpoints inside that program.
+The two Foundation lanes and PM/TL convergence gate are complete. Revised MD-00 and its seed inventory are owner-approved and LOCKED. Deterministic Master Data implementation is delegated as one external OpenCode program through `scripts/work-orders/MASTER-DATA-FULL-BUILD.md`; MD-01–MD-09 remain reviewable checkpoints inside that program. The earlier `masterdata-full-build-start` tag is superseded by the work order's GitHub-evidence start tag.
 
 ## Deferred owner / later-phase decisions
 

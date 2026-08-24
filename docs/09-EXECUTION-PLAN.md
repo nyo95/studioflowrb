@@ -1,7 +1,7 @@
 # 09 — Execution Plan
 
 Status: FOUNDATION + MD-00 COMPLETE — EXTERNAL MASTER DATA FULL BUILD NEXT
-Updated: 2026-08-23
+Updated: 2026-08-25
 Owner: PM / Technical Lead
 
 ## Gate 0 — Reproducible baseline — COMPLETE
@@ -72,6 +72,8 @@ After both lanes complete, do not begin further deterministic implementation. PM
 - tests, typecheck, boundary checks, Prisma checks, and production build.
 
 The review passed. Core + UI Engine are locked for product implementation. Do not add Foundation work without a concrete product blocker.
+
+PM/TL revalidated Core on 2026-08-25 against canonical legacy evidence from GitHub commit `548fbd6bd00ef9fd7d53df66a3561a32fbb56944`. The contract and implementation remain locked; the snapshot changes evidence provenance, not Core responsibilities.
 
 ## Product implementation sequence after Core convergence
 

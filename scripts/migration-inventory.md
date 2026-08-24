@@ -1,6 +1,8 @@
 # Legacy Migration Inventory
 
-Legacy source: `../studioflow`
+Canonical legacy evidence: `https://github.com/nyo95/studioflow/commit/548fbd6bd00ef9fd7d53df66a3561a32fbb56944`
+
+All paths below are relative to that immutable snapshot. A local checkout is not evidence authority.
 
 Use only these decisions:
 

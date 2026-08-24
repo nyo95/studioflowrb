@@ -4,7 +4,7 @@ Owner: PM/TL
 Executor: one external OpenCode coding session
 Status: **READY FOR EXTERNAL EXECUTOR after PM/TL reports the resolved start-tag hash**
 Program checkpoints: MD-01 through MD-09
-Required starting ref: `masterdata-full-build-start`
+Required starting ref: `masterdata-full-build-start-github-548fbd6`
 
 This file is the complete executor prompt. Read it in full before editing. Execute MD-01 through MD-09 sequentially in the same OpenCode session. Each MD checkpoint remains a separate, logically reviewable commit even though the owner starts only one implementation session.
 
@@ -24,18 +24,18 @@ Do not implement BQ, broad StudioFlow migration, or any capability outside the l
 
 ## 1. Required start state
 
-1. Checkout `main` at tag `masterdata-full-build-start`.
+1. Checkout `main` at tag `masterdata-full-build-start-github-548fbd6`.
 2. Resolve and record the tag hash:
 
 ```powershell
-git rev-parse masterdata-full-build-start
+git rev-parse masterdata-full-build-start-github-548fbd6
 git status --short
 ```
 
 3. The resolved hash must equal the exact starting commit reported by PM/TL.
 4. The working tree must be clean. Existing unexpected changes are not yours: STOP and report them.
 5. Never start from:
-   - legacy `D:\Projects\studioflow`;
+   - any legacy StudioFlow checkout or commit;
    - quarantine branch `codex/quarantine-unapproved-20260823`;
    - the old reproducible baseline if it would discard later approved Foundation/manager commits.
 
@@ -64,7 +64,11 @@ Authority order remains owner instruction → Software SSOT → Data Ownership �
 
 ## 3. Legacy evidence policy
 
-Read `D:\Projects\studioflow` only as evidence. Relevant starting evidence includes:
+The only canonical legacy evidence is:
+
+`https://github.com/nyo95/studioflow/commit/548fbd6bd00ef9fd7d53df66a3561a32fbb56944`
+
+Resolve every legacy file from that immutable snapshot. Do not substitute the current GitHub branch tip or `D:\Projects\studioflow`. A temporary clone/fetch may be used only to read the exact locked commit and must remain outside the rebuild repository. Relevant starting evidence includes:
 
 - `prisma/schema.prisma` Master Data models;
 - `src/subapps/master-data/services/**`;
@@ -80,7 +84,7 @@ Read `D:\Projects\studioflow` only as evidence. Relevant starting evidence inclu
 
 Use the KEEP/MIGRATE/MERGE/REWRITE/PURGE classifications already locked in `MASTER_DATA.md`. Do not invent or change a classification. Every checkpoint report must state which legacy evidence was used and how its locked classification was applied.
 
-No source file, runtime import, file read, database connection, fallback, symlink, build step, or generated artifact may depend on the legacy repository.
+No source file, runtime import, runtime network/file read, database connection, fallback, symlink, build step, or generated artifact may depend on any local or remote legacy repository.
 
 ## 4. Program-wide allowed areas
 
@@ -879,8 +883,8 @@ PM/TL will verify:
 
 ```powershell
 git status --short
-git log --oneline masterdata-full-build-start..HEAD
-git diff --check masterdata-full-build-start..HEAD
+git log --oneline masterdata-full-build-start-github-548fbd6..HEAD
+git diff --check masterdata-full-build-start-github-548fbd6..HEAD
 npm test
 npm run check
 npx prisma validate
@@ -921,6 +925,7 @@ Manual usability smoke review must cover:
 STOP only the affected checkpoint, preserve the last valid checkpoint commit, and report exact evidence when:
 
 - current code/schema differs materially from this package;
+- the exact canonical GitHub evidence commit cannot be resolved or read; do not fall back to a local checkout or a different remote ref;
 - a locked rule is contradictory or impossible to implement;
 - a new field/entity/relation/status/permission/action/dependency is required;
 - a migration would be destructive or cannot be verified on a disposable DB;

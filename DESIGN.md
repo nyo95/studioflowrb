@@ -2,7 +2,7 @@
 
 Status: **LOCKED — canonical shared visual contract (PM/TL, 2026-08-23)**
 Scope: Shared visual language for StudioFlow, Master Data, BQ, and future subapps.
-Source basis: legacy `../studioflow` UI engine, design tokens, shared shells/components, and current Master Data UI/UX rules.
+Source basis: the UI engine, design tokens, shared shells/components, and Master Data UI/UX rules in the locked GitHub legacy snapshot `548fbd6bd00ef9fd7d53df66a3561a32fbb56944`.
 
 Authority: this file specializes `docs/02-UI-ENGINE-PRD.md`. Product/domain ownership remains governed by the Software SSOT, Data Ownership contract, and app PRDs.
 

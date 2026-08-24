@@ -5,6 +5,8 @@ Consumers: StudioFlow, Master Data, BQ, future apps.
 
 Authority: this file specializes `docs/02-UI-ENGINE-PRD.md` and `DESIGN.md`. It does not override domain ownership or app PRDs.
 
+Legacy evidence provenance: all legacy UI references mean the immutable GitHub snapshot `nyo95/studioflow@548fbd6bd00ef9fd7d53df66a3561a32fbb56944`, never a local working tree or moving branch tip.
+
 ## 1. Purpose
 
 `ui_engine` is shared UI infrastructure, not only a token collection.

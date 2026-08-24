@@ -10,6 +10,8 @@ Owner: PM / Technical Lead
 
 ## Evidence reviewed
 
+All legacy paths below are relative to canonical GitHub evidence commit `548fbd6bd00ef9fd7d53df66a3561a32fbb56944`; no local checkout is authoritative.
+
 ### Rebuild authority and state
 
 - `docs/00-SOFTWARE-SSOT.md`
@@ -21,26 +23,26 @@ Owner: PM / Technical Lead
 
 ### Legacy implementation evidence
 
-- `../studioflow/src/styles/designTokens.css`
-- `../studioflow/src/ui_engine/design-system.config.ts`
-- `../studioflow/src/ui_engine/tokens/**`
-- `../studioflow/src/ui_engine/components/heading.tsx`
-- `../studioflow/src/ui_engine/layout/page-header.tsx`
-- `../studioflow/src/ui_engine/layout/shells/**`
-- `../studioflow/src/ui_engine/components/section-card.tsx`
-- `../studioflow/src/ui_engine/components/table-card.tsx`
-- `../studioflow/src/ui_engine/components/status-badge.tsx`
-- `../studioflow/src/ui_engine/components/phase-reading.tsx`
-- `../studioflow/src/ui_engine/components/ProjectLiveProvider.tsx`
-- relevant Radix-backed primitives under `../studioflow/src/components/ui/**`
+- `src/styles/designTokens.css`
+- `src/ui_engine/design-system.config.ts`
+- `src/ui_engine/tokens/**`
+- `src/ui_engine/components/heading.tsx`
+- `src/ui_engine/layout/page-header.tsx`
+- `src/ui_engine/layout/shells/**`
+- `src/ui_engine/components/section-card.tsx`
+- `src/ui_engine/components/table-card.tsx`
+- `src/ui_engine/components/status-badge.tsx`
+- `src/ui_engine/components/phase-reading.tsx`
+- `src/ui_engine/components/ProjectLiveProvider.tsx`
+- relevant Radix-backed primitives under `src/components/ui/**`
 - representative Master Data navigation, table, detail, loading, error, dialog, and drawer components
 
 ### Legacy UI/UX documentation
 
-- `../studioflow/docs/MASTERDATA_UIUX_REVISION.md`
-- `../studioflow/docs/PLAN-MASTERDATA-UX-2026-08-12.md`
-- `../studioflow/docs/archive/REVIEWUIUX.md`
-- `../studioflow/docs/archive/AUDIT-UX-2026-08-10.md`
+- `docs/MASTERDATA_UIUX_REVISION.md`
+- `docs/PLAN-MASTERDATA-UX-2026-08-12.md`
+- `docs/archive/REVIEWUIUX.md`
+- `docs/archive/AUDIT-UX-2026-08-10.md`
 
 Legacy documentation was treated as evidence, not authority. Domain-specific or superseded Master Data rules were not promoted into the shared UI contract.
 

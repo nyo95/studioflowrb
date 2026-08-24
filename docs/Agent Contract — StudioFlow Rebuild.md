@@ -121,7 +121,7 @@ Cross-app access harus melalui public contract/service yang jelas.
 
 ## 7. Rebuild Rule
 
-Repo lama `../studioflow` adalah source material, bukan authority architecture.
+Canonical legacy source material adalah GitHub commit immutable `nyo95/studioflow@548fbd6bd00ef9fd7d53df66a3561a32fbb56944`, bukan checkout lokal dan bukan authority architecture.
 
 Setiap logic lama harus diklasifikasikan:
 

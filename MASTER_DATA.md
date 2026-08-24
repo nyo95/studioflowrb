@@ -3,7 +3,7 @@
 Status: **LOCKED — owner-approved canonical Master Data contract (2026-08-23)**
 Scope: the minimum product/domain contract required to make MD-01 through MD-09 deterministic.
 
-Authority: this contract specializes `docs/00-SOFTWARE-SSOT.md`, `docs/03-MASTERDATA-PRD.md`, `docs/06-DATA-OWNERSHIP.md`, `docs/07-ENGINEERING-CONVENTIONS.md`, and `CORE.md`. Explicit current owner instructions remain higher authority. The legacy `../studioflow` repository is evidence only and is never a runtime dependency or implementation base.
+Authority: this contract specializes `docs/00-SOFTWARE-SSOT.md`, `docs/03-MASTERDATA-PRD.md`, `docs/06-DATA-OWNERSHIP.md`, `docs/07-ENGINEERING-CONVENTIONS.md`, and `CORE.md`. Explicit current owner instructions remain higher authority. Only GitHub commit `548fbd6bd00ef9fd7d53df66a3561a32fbb56944` of `nyo95/studioflow` is canonical legacy evidence; it is never authority, a runtime dependency, or an implementation base.
 
 ## Locked Decisions
 
@@ -379,7 +379,7 @@ The following operational choices remain owner-owned but do not alter this contr
 
 ## Implementation Invariants
 
-1. No runtime import, generated client import, data copy, or database dependency points to `../studioflow`.
+1. No runtime import, generated-client import, automated data copy, build step, or database dependency points to any local or remote legacy repository.
 2. Master Data domain code is pure; Prisma stays in `masterdata/infrastructure`; transactions start in application use cases.
 3. Other apps import only `masterdata/public`; Platform imports no app.
 4. No entity or relation outside the locked graph is added without a manager correction to MD-00.

@@ -23,9 +23,9 @@ When documents conflict:
 4. Relevant app PRD
 5. `prisma/schema.prisma` for implemented DB shape
 6. Other docs
-7. Legacy repo `../studioflow`
+7. Immutable legacy evidence snapshot: `https://github.com/nyo95/studioflow/commit/548fbd6bd00ef9fd7d53df66a3561a32fbb56944`
 
-Legacy code is evidence, never authority.
+Legacy code is evidence, never authority. The local `../studioflow` checkout is not a source of truth; it may be used only as an optional cache after proving that its resolved commit and files match the locked GitHub snapshot.
 
 ---
 

@@ -22,7 +22,7 @@ Otherwise keep it local.
 `src/shared` is quarantine, not a destination. New production logic should almost never start there.
 
 ## Legacy extraction
-Do not copy whole folders from `../studioflow`.
+Use only the immutable legacy evidence snapshot at `https://github.com/nyo95/studioflow/commit/548fbd6bd00ef9fd7d53df66a3561a32fbb56944`. Do not treat a local `../studioflow` checkout as authority and do not copy whole folders from any legacy source.
 For every capability:
 1. identify current behavior
 2. identify business owner
