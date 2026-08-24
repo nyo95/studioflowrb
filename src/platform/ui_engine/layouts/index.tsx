@@ -1,8 +1,3 @@
-"use client";
-import type{CSSProperties,ReactNode}from"react";import{Dialog as RDialog}from"radix-ui";import{Heading}from"../primitives";
-type ModalProps={open:boolean;title:string;size?:"sm"|"md"|"lg"|"xl"|"full";children:ReactNode;footer?:ReactNode;onClose?:()=>void};
-export function AppShell({navigation,utility,children,navigationLabel="Application navigation"}:{navigation:ReactNode;utility?:ReactNode;children:ReactNode;navigationLabel?:string}){return <div className="ui-app-shell"><aside className="ui-app-nav" aria-label={navigationLabel}>{navigation}{utility}</aside><main className="ui-app-content">{children}</main></div>}
-export function PageShell({children}:{children:ReactNode}){return <div className="ui-page ui-stack">{children}</div>}
-export function PageHeader({eyebrow,title,description,meta,action,divider=false}:{eyebrow?:ReactNode;title:string;description?:ReactNode;meta?:ReactNode;action?:ReactNode;divider?:boolean}){return <header className="ui-page-header" style={divider?{borderBottom:"1px solid var(--ui-border-default)",paddingBottom:"var(--ui-section-gap)"}:undefined}><div>{eyebrow&&<div className="ui-meta">{eyebrow}</div>}<Heading level={1}>{title}</Heading>{description&&<p className="ui-field-description">{description}</p>}{meta}</div>{action&&<div className="ui-page-header-actions">{action}</div>}</header>}
-function Modal({drawer=false,...p}:ModalProps&{drawer?:boolean}){return <RDialog.Root open={p.open} onOpenChange={(open)=>{if(!open)p.onClose?.()}}><RDialog.Portal><RDialog.Overlay className="ui-overlay"/><RDialog.Content className={`ui-dialog ui-section ui-stack${drawer?" ui-drawer":""}`} style={{"--dialog-width":`var(--ui-dialog-${p.size??"md"})`}as CSSProperties}><div className="ui-page-header"><RDialog.Title asChild><Heading level={3}>{p.title}</Heading></RDialog.Title><RDialog.Close className="ui-button" aria-label={drawer?"Close drawer":"Close dialog"}>×</RDialog.Close></div>{p.children}{p.footer}</RDialog.Content></RDialog.Portal></RDialog.Root>}
-export function Dialog(p:ModalProps){return <Modal {...p}/>}export function Drawer(p:ModalProps){return <Modal {...p} drawer/>}
+export * from "./overlays";
+export * from "./shells";
+export * from "./templates";
