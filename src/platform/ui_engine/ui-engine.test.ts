@@ -24,6 +24,21 @@ describe("UI Engine foundation", () => {
       "Spinner",
       "Skeleton",
       "Surface",
+      "Field",
+      "FormSection",
+      "FormActions",
+      "TableHeader",
+      "TableBody",
+      "TableRow",
+      "TableHead",
+      "TableCell",
+      "TableToolbar",
+      "SearchField",
+      "Pagination",
+      "DescriptionList",
+      "DescriptionItem",
+      "StatusBadge",
+      "Notice",
       "Dialog",
       "Drawer",
       "AppShell",
@@ -32,7 +47,6 @@ describe("UI Engine foundation", () => {
       "PageSection",
       "SectionCard",
       "DataTable",
-      "FormSection",
       "LoadingState",
       "EmptyState",
       "ErrorState",
@@ -52,6 +66,25 @@ describe("UI Engine foundation", () => {
     assert.match(renderToStaticMarkup(createElement(ui.ErrorState, { title: "Failed" })), /role="alert"/);
     assert.doesNotMatch(renderToStaticMarkup(createElement(ui.EmptyState, { title: "None" })), /role="alert"/);
     assert.equal(typeof ui.Dialog, "function");
+  });
+
+  it("connects field labels, descriptions, and errors to their control", () => {
+    const field = renderToStaticMarkup(
+      createElement(
+        ui.Field,
+        {
+          id: "record-name",
+          label: "Name",
+          description: "Use a clear label.",
+          error: "Required",
+          children: createElement(ui.Input, {}),
+        },
+      ),
+    );
+    assert.match(field, /for="record-name"/);
+    assert.match(field, /id="record-name"/);
+    assert.match(field, /aria-describedby="record-name-description record-name-error"/);
+    assert.match(field, /aria-invalid="true"/);
   });
 
   it("locks token source, action radius, widths, and horizontal overflow", () => {
