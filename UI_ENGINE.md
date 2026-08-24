@@ -1,6 +1,6 @@
 # UI_ENGINE.md — Shared UI Architecture Contract
 
-Status: **LOCKED — canonical shared UI architecture contract (PM/TL, 2026-08-23)**
+Status: **LOCKED — canonical minimalist shared UI architecture contract (PM/TL, revised by owner direction 2026-08-25)**
 Consumers: StudioFlow, Master Data, BQ, future apps.
 
 Authority: this file specializes `docs/02-UI-ENGINE-PRD.md` and `DESIGN.md`. It does not override domain ownership or app PRDs.
@@ -20,6 +20,8 @@ It owns:
 - shared interaction patterns.
 
 Its purpose is to stop StudioFlow, Master Data, and BQ from independently recreating the same UI structures.
+
+The engine optimizes for composability, low visual noise, concise copy, accessible behavior, and stable generic props. It does not optimize for the largest possible component catalog.
 
 ## 2. Dependency Rule
 
@@ -276,7 +278,23 @@ Canonical default:
 - blur commits only where explicitly enabled;
 - failed save restores prior value and displays error.
 
-## 13. Legacy Migration Classification
+## 13. Document & Print Pattern
+
+UI Engine may own:
+- `DocumentSheet` preview frame and print-safe surface;
+- generic document header/body/footer slots;
+- neutral document table/section styling;
+- print visibility helpers and base `@media print` rules.
+
+Apps own:
+- document/PDF content and vocabulary;
+- schema-to-view mapping;
+- calculations, totals, numbering, signatures, legal copy, page breaks, and export adapters;
+- PDF renderer/library selection when a product slice actually needs one.
+
+UI Engine must not become a generic report builder, schema-form generator, or PDF engine.
+
+## 14. Legacy Migration Classification
 
 ### KEEP / MIGRATE
 - semantic token approach;
@@ -306,7 +324,7 @@ Canonical default:
 - business-status behavior;
 - aliases retained solely for legacy compatibility.
 
-## 14. Public API Rule
+## 15. Public API Rule
 
 Apps should import from deliberate stable entry points:
 
@@ -322,7 +340,7 @@ import {
 
 Avoid arbitrary deep imports. Keep the public export surface small.
 
-## 15. Promotion Rule
+## 16. Promotion Rule
 
 Promote a UI pattern into UI Engine only when:
 1. multiple apps clearly need it; or
@@ -332,7 +350,7 @@ Promote a UI pattern into UI Engine only when:
 
 Do not promote something because it might be reusable someday.
 
-## 16. Executor Agent Contract
+## 17. Executor Agent Contract
 
 Before UI work, executor agents must read:
 1. `DESIGN.md`
@@ -351,7 +369,7 @@ They must not:
 
 If a required shared pattern is missing: STOP and report to PM/TL.
 
-## 17. PM/TL Responsibility
+## 18. PM/TL Responsibility
 
 Claude/Codex owns:
 - deciding whether a pattern belongs in UI Engine;
@@ -362,30 +380,62 @@ Claude/Codex owns:
 
 Mechanical implementation should be delegated after decisions are deterministic.
 
-## 18. Initial Implementation Scope
+## 19. Product Kit Implementation Scope
 
-For Master Data + BQ, implement only:
-- canonical tokens;
-- Heading/text semantics;
-- AppShell frame with app-provided navigation configuration;
-- PageShell;
-- PageHeader;
-- SectionCard/PageSection;
-- DataTable presentation shell;
-- FormSection/common field states;
-- Dialog/Drawer sizing/layout;
-- Empty/Loading/Error;
-- row action menu pattern.
+The pre-product UI kit is one bounded implementation program with four checkpoints. Public exports are limited to this approved inventory.
 
-Expand only when a proven shared need appears.
+### UI-A — tokens and primitives
 
-## 19. Definition of Done
+- `Heading`, `Text`, `Button`, `IconButton`;
+- `Input`, `Textarea`, `Select`, `Checkbox`, `RadioGroup`, `Switch`;
+- `Divider`, `Badge`, `Spinner`, `Skeleton`, `Surface`;
+- semantic tokens and typography/print base styles.
+
+### UI-B — forms, data, and state components
+
+- `Field`, `FormSection`, `FormActions`;
+- `SectionCard`, `PageSection`;
+- `DataTable`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`, `TableCell`;
+- `TableToolbar`, `SearchField`, `Pagination`;
+- `DescriptionList`, `DescriptionItem`;
+- `StatusBadge`, `Notice`, `LoadingState`, `EmptyState`, `ErrorState`, `InlineError`.
+
+### UI-C — overlays, navigation, and layouts
+
+- `Dialog`, `Drawer`, `ConfirmDialog`, `Tooltip`;
+- `AppShell`, `PageShell`, `PageHeader`;
+- `DirectoryShell`, `DetailShell`, `SettingsShell`, `WorkspaceShell`, `SplitPane`;
+- `Tabs`.
+
+### UI-D — shared interaction/document patterns and showcase
+
+- `RowActionMenu`, `FilterBar`, `SelectionBar`;
+- `Combobox`, `InlineEdit`, `ReorderHandle`, `FileDropZone`;
+- `DocumentSheet` and print helpers;
+- one internal UI Engine showcase route demonstrating realistic compositions without app/domain imports.
+
+### Behavioral boundaries
+
+- Components accept generic values, slots, callbacks, and semantic variants; they never fetch or mutate domain data.
+- DataTable owns table presentation/accessibility/overflow, not columns, sorting policy, query state, or calculations.
+- Combobox owns generic selection/search interaction, not remote fetching, entity vocabulary, or authorization.
+- InlineEdit owns editing states and keyboard behavior, not validation/business saving rules.
+- FileDropZone owns input/drop interaction and file-list presentation, not storage/upload policy.
+- StatusBadge receives an explicit semantic tone and never infers meaning from a domain status string.
+- Layouts accept app-provided navigation/content and never hardcode Master Data, BQ, or StudioFlow routes.
+- No component reads Prisma/Zod schemas to generate UI.
+- No additional dependency is allowed unless PM/TL issues a correction decision.
+
+## 20. Definition of Done
 
 UI Engine foundation implementation is complete when:
 - `DESIGN.md` is approved;
 - global tokens have one clear source;
 - feature-specific tokens are absent from global UI Engine;
-- basic page/table/form/dialog templates exist;
+- the UI-A through UI-D public inventory is implemented without parallel/duplicate primitives;
 - Master Data and BQ can build new screens without inventing page structure;
 - dependency rules block UI Engine from importing app domains;
-- executor-agent UI skill references these contracts.
+- the internal showcase covers actions, forms, data, states, overlays, layouts, responsive behavior, and document/print presentation;
+- desktop and narrow viewport visual review passes with keyboard/focus/accessibility checks;
+- component tests, repository checks, and production build pass;
+- PM/TL and owner approve the showcase before Master Data implementation starts.

@@ -1,6 +1,6 @@
 # DESIGN.md — StudioFlow Rebuild Design Contract
 
-Status: **LOCKED — canonical shared visual contract (PM/TL, 2026-08-23)**
+Status: **LOCKED — canonical minimalist shared visual contract (PM/TL, revised by owner direction 2026-08-25)**
 Scope: Shared visual language for StudioFlow, Master Data, BQ, and future subapps.
 Source basis: the UI engine, design tokens, shared shells/components, and Master Data UI/UX rules in the locked GitHub legacy snapshot `548fbd6bd00ef9fd7d53df66a3561a32fbb56944`.
 
@@ -8,34 +8,34 @@ Authority: this file specializes `docs/02-UI-ENGINE-PRD.md`. Product/domain owne
 
 ## 1. Design Intent
 
-StudioFlow uses a restrained professional UI:
+StudioFlow uses a quiet, restrained professional UI:
 - neutral slate palette;
 - white working surfaces over a light canvas;
 - compact, information-dense layouts;
 - serif typography for major page headings;
 - sans-serif typography for controls, tables, forms, and operational UI;
-- subtle borders and shadows;
+- border-led surfaces with shadow reserved for overlays or true elevation;
 - status color only when meaning is functional.
 
 All apps must feel like one product. Do not create a separate visual language per app.
 
 ## 2. Canonical Typography
 
-- Major headings: `Lora` / `font-serif`
+- Page and major-view headings: `Lora` / `font-serif`
 - Operational UI/body: `Inter` / `font-sans`
 
 | Role | Default |
 |---|---|
-| H1 | serif, `text-4xl`, bold, tight |
-| H2 | serif, `text-3xl`, bold, tight |
-| H3 | serif, `text-2xl`, bold, tight |
-| H4 | sans, `text-lg`, semibold |
-| H5 | sans, `text-base`, semibold |
-| H6 | sans, `text-sm`, medium |
+| H1 | serif, 32px, semibold/bold, tight |
+| H2 | serif, 24px, semibold/bold, tight |
+| H3 | sans, 18px, semibold |
+| H4 | sans, 16px, semibold |
+| H5 | sans, 14px, semibold |
+| H6 | sans, 12px, semibold |
 | Body | sans, `text-sm`, normal |
 | UI Meta | sans, `10px`, bold, uppercase, wide tracking |
 
-H1–H3 are for page/section hierarchy. Tables, controls, labels, menus, and data use sans-serif. Do not invent arbitrary sizes when an existing semantic role fits.
+H1–H2 provide restrained product identity. H3–H6, tables, controls, labels, menus, and data use sans-serif. Do not invent arbitrary sizes when an existing semantic role fits.
 
 ## 3. Color Semantics
 
@@ -66,15 +66,15 @@ Do not introduce app-specific accent colors for ordinary navigation, cards, or b
 - Action/button/input: 4px
 - Pill: only for badges/chips where appropriate
 
-Primary surfaces are white with 1px subtle/default border and very light shadow. Avoid deep elevation and card-inside-card layouts.
+Primary surfaces are white with a 1px subtle/default border and no shadow by default. Shadow is reserved for dialogs, drawers, menus, floating toolbars, or genuinely elevated content. Avoid deep elevation and card-inside-card layouts.
 
 ## 5. Spacing & Density
 
 Canonical base:
-- section padding X: 20px
-- section padding Y: 20px
-- section gap: 20px
-- page padding: ~24px
+- section padding X: 16px
+- section padding Y: 16px
+- section gap: 16px
+- page padding: 20–24px
 - max page width: ~1440px
 
 This is an operational tool, not a marketing site. Optimize for scanning and repeated daily use. BQ may be denser because spreadsheet-like efficiency is a product requirement.
@@ -98,6 +98,7 @@ AppShell
 Rules:
 - one clear H1 per page;
 - primary action belongs in PageHeader or main toolbar;
+- descriptions and metadata are optional, never filler;
 - reuse shared shells instead of creating custom page wrappers;
 - apps may provide navigation configuration, not separate shell styling.
 
@@ -201,7 +202,25 @@ Do not improve mobile by removing core information.
 - drag/reorder shows source/target clearly;
 - no hidden automatic mutation across domain boundaries.
 
-## 14. Design Governance
+## 14. Content Economy
+
+- Prefer a clear label over a label plus explanatory paragraph.
+- PageHeader descriptions are optional and normally one short sentence.
+- Field help appears only when the input is ambiguous, risky, or constrained in a non-obvious way.
+- Empty, loading, and error states use a short title and at most one actionable sentence; no decorative prose or oversized illustration is required.
+- Buttons use concise verb-first labels. Icon-only actions require an accessible label and tooltip.
+- Do not repeat the same instruction in PageHeader, section description, field help, and empty state.
+- Progressive disclosure is preferred for rare metadata and advanced settings.
+
+## 15. Document & Print Presentation
+
+UI Engine may provide a generic `DocumentSheet`/print surface with A4-like preview proportions, print-safe typography, neutral tables, header/footer slots, and `@media print` behavior.
+
+Apps own document meaning, data mapping, calculations, legal copy, page-break decisions, numbering, signatures, export adapters, and PDF generation. UI Engine must not import a PDF library, Prisma model, or app schema, and must not infer a form or document directly from Prisma/Zod metadata.
+
+The on-screen document preview and exported document should share visual primitives where practical, while remaining independently testable.
+
+## 16. Design Governance
 
 Before UI implementation:
 1. read this file;
@@ -217,10 +236,11 @@ Forbidden without PM/TL approval:
 - duplicate shared primitives;
 - one-off page shells;
 - changing shared tokens to solve one screen.
+- schema-driven UI frameworks or app-specific PDF templates inside UI Engine.
 
 If a shared pattern is missing, report it rather than creating a parallel design system.
 
-## 15. Legacy Evidence Used
+## 17. Legacy Evidence Used
 
 - `src/ui_engine/design-system.config.ts`
 - `src/ui_engine/tokens/**`

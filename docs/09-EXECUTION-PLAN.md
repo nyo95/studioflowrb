@@ -1,6 +1,6 @@
 # 09 — Execution Plan
 
-Status: FOUNDATION + MD-00 COMPLETE — EXTERNAL MASTER DATA FULL BUILD NEXT
+Status: FOUNDATION + MD-00 COMPLETE — UI ENGINE PRODUCT KIT GATE NEXT
 Updated: 2026-08-25
 Owner: PM / Technical Lead
 
@@ -77,13 +77,15 @@ PM/TL revalidated Core on 2026-08-25 against canonical legacy evidence from GitH
 
 ## Product implementation sequence after Core convergence
 
-1. Execute the owner-approved `scripts/work-orders/MASTER-DATA-FULL-BUILD.md` in one external OpenCode session.
-2. Preserve MD-01 through MD-09 as sequential checkpoint commits and review at Gate 1, Gate 2, Gate 3, and Final Gate.
-3. Lock and implement the Master Data public contract.
-4. Lock BQ readiness, provenance, snapshot, refresh, duplicate, library, and calculation contracts.
-5. Issue BQ schema/domain/application/UI work orders.
-6. Run cross-app boundary, migration, and smoke verification.
+1. Execute `scripts/work-orders/UI-01-UI-ENGINE-PRODUCT-KIT.md` as one external OpenCode session with UI-A through UI-D checkpoint commits.
+2. PM/TL reviews diff, tests, accessibility, responsive screenshots, and `/ui-engine`; owner approves the visual direction.
+3. PM/TL issues a new Master Data starting ref and reactivates `scripts/work-orders/MASTER-DATA-FULL-BUILD.md`.
+4. Execute MD-01 through MD-09 sequentially and review at Gate 1, Gate 2, Gate 3, and Final Gate.
+5. Lock and implement the Master Data public contract.
+6. Lock BQ readiness, provenance, snapshot, refresh, duplicate, library, and calculation contracts.
+7. Issue BQ schema/domain/application/UI work orders.
+8. Run cross-app boundary, migration, and smoke verification.
 
 StudioFlow remains outside active implementation scope except for shared-boundary verification.
 
-The MD-01 through MD-09 dependency plan is canonical in `MASTER_DATA.md`; the complete executable scope, gates, acceptance commands, and stop conditions are in `scripts/work-orders/MASTER-DATA-FULL-BUILD.md`.
+The MD-01 through MD-09 dependency plan remains canonical in `MASTER_DATA.md`, but its executor package is PAUSED until the explicit UI Product Kit gate passes. UI-01 does not authorize Master Data schema, CRUD, or domain implementation.

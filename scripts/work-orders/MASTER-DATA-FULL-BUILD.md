@@ -2,9 +2,9 @@
 
 Owner: PM/TL
 Executor: one external OpenCode coding session
-Status: **READY FOR EXTERNAL EXECUTOR after PM/TL reports the resolved start-tag hash**
+Status: **PAUSED — owner-requested UI Engine Product Kit must be implemented and approved first**
 Program checkpoints: MD-01 through MD-09
-Required starting ref: `masterdata-full-build-start-github-548fbd6`
+Required starting ref: **TO BE ISSUED BY PM/TL AFTER UI-01 APPROVAL**
 
 This file is the complete executor prompt. Read it in full before editing. Execute MD-01 through MD-09 sequentially in the same OpenCode session. Each MD checkpoint remains a separate, logically reviewable commit even though the owner starts only one implementation session.
 
@@ -24,11 +24,13 @@ Do not implement BQ, broad StudioFlow migration, or any capability outside the l
 
 ## 1. Required start state
 
-1. Checkout `main` at tag `masterdata-full-build-start-github-548fbd6`.
+This package is not executable while its status is PAUSED. Existing `masterdata-full-build-start*` tags are superseded for future execution. After UI-01 visual/convergence approval, PM/TL will update this section and issue one new exact starting tag/hash.
+
+1. Checkout `main` at the new PM/TL-issued Master Data start tag.
 2. Resolve and record the tag hash:
 
 ```powershell
-git rev-parse masterdata-full-build-start-github-548fbd6
+git rev-parse <new-master-data-start-tag>
 git status --short
 ```
 
@@ -883,8 +885,8 @@ PM/TL will verify:
 
 ```powershell
 git status --short
-git log --oneline masterdata-full-build-start-github-548fbd6..HEAD
-git diff --check masterdata-full-build-start-github-548fbd6..HEAD
+git log --oneline <new-master-data-start-tag>..HEAD
+git diff --check <new-master-data-start-tag>..HEAD
 npm test
 npm run check
 npx prisma validate
