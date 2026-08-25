@@ -55,9 +55,9 @@ select {
 
 .ui-meta {
   color: var(--ui-text-tertiary);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -98,6 +98,30 @@ select {
 .ui-tone-success { color: var(--ui-success-fg); background: var(--ui-success-bg); border-color: var(--ui-success-border); }
 .ui-tone-warning { color: var(--ui-warning-fg); background: var(--ui-warning-bg); border-color: var(--ui-warning-border); }
 .ui-tone-danger { color: var(--ui-danger-fg); background: var(--ui-danger-bg); border-color: var(--ui-danger-border); }
+
+/* Status marker. A filled pill per row turns a status column into colour noise;
+   a small marker lets the eye scan by colour while the label stays plain ink.
+   Meaning is carried by the text, so colour is never the only channel. */
+.ui-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ui-text-primary);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.ui-status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 2px;
+  background: var(--ui-status-marker, var(--ui-text-tertiary));
+}
+.ui-status-success { --ui-status-marker: var(--ui-success-fg); }
+.ui-status-warning { --ui-status-marker: var(--ui-warning-fg); }
+.ui-status-danger { --ui-status-marker: var(--ui-danger-fg); }
 
 .ui-button {
   display: inline-flex;
@@ -294,28 +318,58 @@ select {
 }
 
 .ui-table-scroll { overflow-x: auto; }
-.ui-table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: left; }
+.ui-table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: left; font-variant-numeric: tabular-nums; }
 .ui-table th,
 .ui-table td { border-bottom: 1px solid var(--ui-border-subtle); vertical-align: middle; }
 .ui-table th {
   height: 36px;
   padding: 8px 12px;
-  background: var(--ui-canvas);
-  color: var(--ui-text-secondary);
-  font-size: 0.625rem;
-  font-weight: 700;
-  letter-spacing: 0.11em;
+  border-bottom: 0;
+  background: var(--ui-table-header-bg);
+  color: var(--ui-table-header-fg);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 .ui-table td { padding: 10px 12px; }
 .ui-table-surface[data-density="compact"] .ui-table th { height: 32px; padding-block: 6px; }
 .ui-table-surface[data-density="compact"] .ui-table td { padding-block: 7px; }
 .ui-table tbody tr:last-child td { border-bottom: 0; }
-.ui-table tbody tr:hover { background: color-mix(in srgb, var(--ui-canvas) 65%, transparent); }
+.ui-table tbody tr:hover { background: color-mix(in srgb, var(--ui-surface-muted) 75%, transparent); }
 .ui-table tr[data-selected="true"] { background: var(--ui-surface-muted); }
 .ui-table [data-align="center"] { text-align: center; }
+.ui-table [data-column="identifier"] { color: var(--ui-text-secondary); font-family: var(--ui-font-mono); font-size: 0.8125rem; letter-spacing: -0.01em; }
 .ui-table [data-align="end"] { text-align: right; font-variant-numeric: tabular-nums; }
 .ui-table-surface[data-sticky-header="true"] thead { position: sticky; top: 0; z-index: 1; }
+
+/* Sort control. The engine renders the affordance; the app does the comparing. */
+.ui-table-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.ui-table-sort svg { width: 13px; height: 13px; flex: 0 0 auto; opacity: 0.4; transition: opacity 120ms ease; }
+.ui-table-sort:hover svg { opacity: 0.85; }
+.ui-table-sort[data-active] svg { opacity: 1; }
+/* The header band is near-black, so the global focus colour would be invisible
+   on it. Focus is drawn in the band's own foreground instead. */
+.ui-table th .ui-table-sort:focus-visible {
+  outline: 2px solid var(--ui-table-header-fg);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-table-sort svg { transition: none; }
+}
 
 .ui-table-toolbar {
   display: flex;
@@ -342,9 +396,10 @@ select {
 .ui-pagination-actions { display: flex; gap: 6px; }
 
 .ui-description-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; margin: 0; }
+.ui-description-list[data-columns="1"] { grid-template-columns: minmax(0, 1fr); }
 .ui-description-item { display: grid; grid-template-columns: minmax(110px, 0.55fr) minmax(0, 1fr); gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--ui-border-subtle); }
 .ui-description-item dt { color: var(--ui-text-secondary); }
-.ui-description-item dd { margin: 0; color: var(--ui-text-primary); font-weight: 500; overflow-wrap: anywhere; }
+.ui-description-item dd { min-width: 0; margin: 0; color: var(--ui-text-primary); font-weight: 500; overflow-wrap: break-word; font-variant-numeric: tabular-nums; }
 
 @media (max-width: 720px) {
   .ui-form-grid > * { grid-column: 1 / -1; }
@@ -414,13 +469,91 @@ select {
 }
 .ui-tooltip-arrow { fill: var(--ui-text-primary); }
 
-.ui-app-shell { min-height: 100vh; display: grid; grid-template-columns: 232px minmax(0, 1fr); }
-.ui-app-rail { position: sticky; top: 0; display: flex; min-width: 0; height: 100vh; flex-direction: column; border-right: 1px solid var(--ui-border-default); background: var(--ui-surface); }
-.ui-app-brand { min-height: 64px; display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--ui-border-subtle); }
+.ui-app-shell { min-height: 100vh; display: grid; grid-template-columns: var(--ui-rail-width, 232px) minmax(0, 1fr); transition: grid-template-columns 160ms ease; }
+.ui-app-shell[data-collapsed] { --ui-rail-width: 60px; }
+/* The rail is divided from the work area by a drawn rule, not by a tone. It is one
+   step stronger than an ordinary border because it separates navigation from work —
+   a major division, unlike the hairlines inside a card. */
+.ui-app-rail { position: sticky; top: 0; display: flex; min-width: 0; height: 100vh; flex-direction: column; border-right: 1px solid var(--ui-border-strong); background: var(--ui-surface); }
+.ui-app-brand { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--ui-border-subtle); }
+.ui-app-brand-mark { min-width: 0; overflow: hidden; }
+
+/* Collapsed rail. Apps mark their nav label text with .ui-nav-label; the engine
+   hides it here so a nav item degrades to its icon without the app re-rendering. */
+/* At 60px the mark and the toggle cannot sit side by side, so they stack. */
+.ui-app-rail[data-collapsed] .ui-app-brand { flex-direction: column; justify-content: center; gap: 6px; padding: 10px 8px; }
+.ui-app-rail[data-collapsed] .ui-app-brand-mark { display: grid; place-items: center; }
+.ui-app-rail[data-collapsed] .ui-app-nav,
+.ui-app-rail[data-collapsed] .ui-app-utility { padding-inline: 6px; }
+/* Utility copy has no room at 60px; it returns when the rail expands. */
+.ui-app-rail[data-collapsed] .ui-app-utility { display: none; }
+/* Visually hidden, NOT display:none. display:none also strips the label from the
+   accessibility tree, which leaves every collapsed nav item with no accessible
+   name at all (WCAG 4.1.2 / 2.4.4). The label must survive for screen readers. */
+.ui-app-rail[data-collapsed] .ui-nav-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.ui-app-rail[data-collapsed] .ui-app-nav a,
+.ui-app-rail[data-collapsed] .ui-app-nav button { justify-content: center; padding-inline: 0; text-align: center; }
+.ui-app-rail[data-collapsed] .ui-nav-item { gap: 0; }
+.ui-app-rail-toggle { flex: 0 0 auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-app-shell { transition: none; }
+}
 .ui-app-nav { min-width: 0; flex: 1; overflow: auto; padding: 10px; }
+
+.ui-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--ui-radius-action);
+  background: transparent;
+  color: var(--ui-text-secondary);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+.ui-nav-icon { display: inline-flex; flex: 0 0 auto; }
+.ui-nav-icon svg { width: 16px; height: 16px; }
+
+.ui-nav-item:hover { background: var(--ui-surface-muted); color: var(--ui-text-primary); }
+
+/* Current location. Hover already owns the muted fill, so "active" cannot rely on
+   fill alone or the two become indistinguishable. It is marked on three channels
+   at once: an ink rule, ink-weight text, and heavier type. */
+.ui-nav-item[data-active] {
+  background: var(--ui-surface-muted);
+  color: var(--ui-text-primary);
+  font-weight: 500;
+}
+.ui-nav-item[data-active]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 18px;
+  transform: translateY(-50%);
+  border-radius: 0 2px 2px 0;
+  background: var(--ui-action-primary);
+}
 .ui-app-utility { padding: 10px; border-top: 1px solid var(--ui-border-subtle); }
 .ui-app-viewport { min-width: 0; }
-.ui-app-topbar { position: sticky; top: 0; z-index: 10; min-height: 52px; display: flex; align-items: center; border-bottom: 1px solid var(--ui-border-default); background: rgb(255 255 255 / 0.94); backdrop-filter: blur(10px); }
+.ui-app-topbar { position: sticky; top: 0; z-index: 10; min-height: 52px; display: flex; align-items: center; border-bottom: 1px solid var(--ui-border-default); background: rgb(255 255 255 / 0.88); backdrop-filter: blur(10px); }
 .ui-app-content { min-width: 0; }
 
 .ui-page-shell { display: grid; width: 100%; max-width: 1200px; margin: 0 auto; gap: 24px; padding: var(--ui-page-padding); }

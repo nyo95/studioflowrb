@@ -132,6 +132,49 @@ Feature-specific globals such as `--ui-brand-table-col-*`, `--ui-pricing-materia
 ### AppShell
 Owns global navigation frame, content viewport, and responsive shell behavior. Apps provide navigation configuration.
 
+**Collapsible rail.** `collapsible` opts the rail into a 232px <-> 60px icon rail.
+State is controlled (`collapsed` + `onCollapsedChange`) or uncontrolled
+(`defaultCollapsed`). UI Engine owns the affordance, the widths, the transition,
+and `aria-expanded`; it does not persist the choice — persistence is app state.
+
+| Prop | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `collapsible` | `boolean` | `false` | Off by default, so existing shells are unchanged |
+| `collapsed` | `boolean` | — | Controlled state; omit to let the shell manage it |
+| `defaultCollapsed` | `boolean` | `false` | Uncontrolled initial state |
+| `onCollapsedChange` | `(collapsed: boolean) => void` | — | Fires on toggle in both modes |
+| `collapsedBrand` | `ReactNode` | falls back to `brand` | Compact mark for the 60px rail |
+| `expandLabel` / `collapseLabel` | `string` | "Expand/Collapse navigation" | Accessible name for the toggle |
+
+### NavItem
+
+Nav entries are engine-owned, not app-owned. "Where am I" must look and announce
+identically in StudioFlow, Master Data and BQ, and an active state re-implemented
+three times will drift three ways.
+
+```tsx
+<NavItem href="/skus" icon={<Table2 />} active={pathname === "/skus"}>SKUs</NavItem>
+```
+
+| Prop | Type | Notes |
+| --- | --- | --- |
+| `active` | `boolean` | Marks the current location; sets `aria-current="page"` |
+| `icon` | `ReactNode` | Required in practice — the collapsed rail shows only this |
+| `href`, and any anchor attribute | — | Apps decide routing; the engine decides appearance |
+
+The app decides *what* is current (route, pathname, scroll position). The engine
+decides how current *looks and announces*.
+
+Active is marked on **three channels at once** — an ink rule, a muted fill, and
+heavier ink-coloured type. This is deliberate: hover already owns the muted fill,
+so a fill-only active state is indistinguishable from "my cursor happens to be
+here". Never reduce it to fill alone.
+
+Collapsed behaviour is handled by the engine: the label is hidden *visually* —
+never with `display: none`, which would strip it from the accessibility tree and
+leave every item unnamed — and a `Tooltip` restores it on hover for sighted users.
+Apps do not wire either of these.
+
 ### PageShell
 Owns canvas, max width, page padding, responsive container behavior.
 
@@ -193,17 +236,54 @@ UI Engine owns:
 - horizontal overflow;
 - empty/loading/error presentation;
 - generic row action slot;
+- the sort **affordance** (see below);
 - shared resize mechanism only if truly reused.
 
 Apps own:
 - columns;
 - values;
 - calculations;
-- sort/filter semantics;
+- sort/filter **semantics** (see below);
 - domain actions;
 - minimum width and column widths.
 
 Do not promote one screen's table geometry to global tokens.
+
+### Sorting — where the line falls
+
+Sorting is split, and the split is the whole point. The engine renders the control
+and the state; it never compares two values.
+
+| UI Engine | App |
+| --- | --- |
+| The header renders as a `<button>` | Which columns are sortable at all |
+| Direction indicator (unsorted / asc / desc) | The comparator for each column |
+| `aria-sort` on the `<th>` | Whether sorting is client-side or a server query |
+| Keyboard activation and focus ring | Tie-breaking and default sort order |
+
+```tsx
+<TableHead
+  sortable
+  align="end"
+  sortDirection={sort?.key === "amount" ? sort.direction : null}
+  onSortChange={(direction) => setSort({ key: "amount", direction })}
+  sortLabel={(d) => `Amount, sort ${d === "asc" ? "ascending" : "descending"}`}
+>
+  Amount
+</TableHead>
+```
+
+`onSortChange` receives the direction to apply next; clicking toggles asc/desc.
+The engine holds no sort state, so a server-sorted table and a client-sorted one
+use the identical markup.
+
+Why the comparator cannot live here: a date column sorts by its timestamp, not by
+its printed label, and an amount sorts by its number, not by its formatted string.
+Only the app knows which of a row's fields is the sortable one. A generic
+comparator in the engine would silently sort `"12,880.00"` before `"18.00"`.
+
+Focus note: the header band is near-black, so the sort control draws its focus
+ring in `--ui-table-header-fg`. The global focus colour is invisible there.
 
 ## 8. Form Contract
 
@@ -417,7 +497,7 @@ The pre-product UI kit is one bounded implementation program with four checkpoin
 ### Behavioral boundaries
 
 - Components accept generic values, slots, callbacks, and semantic variants; they never fetch or mutate domain data.
-- DataTable owns table presentation/accessibility/overflow, not columns, sorting policy, query state, or calculations.
+- DataTable owns table presentation/accessibility/overflow and the sort affordance, not columns, sort comparators, query state, or calculations.
 - Combobox owns generic selection/search interaction, not remote fetching, entity vocabulary, or authorization.
 - InlineEdit owns editing states and keyboard behavior, not validation/business saving rules.
 - FileDropZone owns input/drop interaction and file-list presentation, not storage/upload policy.

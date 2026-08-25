@@ -1,7 +1,14 @@
-import type { HTMLAttributes, ReactNode } from "react";
+"use client";
+
+import { createContext, useContext, useState, type AnchorHTMLAttributes, type HTMLAttributes, type ReactNode } from "react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import { cx } from "../internal/cx";
 import { Heading, Text } from "../primitives";
+import { IconButton } from "../primitives";
+import { Tooltip } from "./overlays";
+
+const RailContext = createContext<{ collapsed: boolean }>({ collapsed: false });
 
 export type AppShellProps = {
   brand: ReactNode;
@@ -11,6 +18,16 @@ export type AppShellProps = {
   children: ReactNode;
   navigationLabel?: string;
   className?: string;
+  /** Show the rail collapse control. Off by default so existing shells are unchanged. */
+  collapsible?: boolean;
+  /** Controlled collapsed state. Omit to let the shell manage it. */
+  collapsed?: boolean;
+  defaultCollapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
+  /** Compact mark rendered in place of `brand` while collapsed. Falls back to `brand`. */
+  collapsedBrand?: ReactNode;
+  expandLabel?: string;
+  collapseLabel?: string;
 };
 
 export function AppShell({
@@ -21,11 +38,41 @@ export function AppShell({
   children,
   navigationLabel = "Application navigation",
   className,
+  collapsible = false,
+  collapsed,
+  defaultCollapsed = false,
+  onCollapsedChange,
+  collapsedBrand,
+  expandLabel = "Expand navigation",
+  collapseLabel = "Collapse navigation",
 }: AppShellProps) {
+  const [internalCollapsed, setInternalCollapsed] = useState(defaultCollapsed);
+  const isCollapsed = collapsible && (collapsed ?? internalCollapsed);
+
+  const toggle = () => {
+    const next = !isCollapsed;
+    if (collapsed === undefined) setInternalCollapsed(next);
+    onCollapsedChange?.(next);
+  };
+
   return (
-    <div className={cx("ui-app-shell", className)}>
-      <aside className="ui-app-rail" aria-label={navigationLabel}>
-        <div className="ui-app-brand">{brand}</div>
+    <RailContext.Provider value={{ collapsed: isCollapsed }}>
+    <div className={cx("ui-app-shell", className)} data-collapsed={isCollapsed || undefined}>
+      <aside className="ui-app-rail" aria-label={navigationLabel} data-collapsed={isCollapsed || undefined}>
+        <div className="ui-app-brand">
+          <div className="ui-app-brand-mark">{isCollapsed ? (collapsedBrand ?? brand) : brand}</div>
+          {collapsible ? (
+            <IconButton
+              className="ui-app-rail-toggle"
+              size="sm"
+              variant="ghost"
+              label={isCollapsed ? expandLabel : collapseLabel}
+              aria-expanded={!isCollapsed}
+              onClick={toggle}
+              icon={isCollapsed ? <PanelLeftOpen aria-hidden="true" /> : <PanelLeftClose aria-hidden="true" />}
+            />
+          ) : null}
+        </div>
         <nav className="ui-app-nav">{navigation}</nav>
         {utility ? <div className="ui-app-utility">{utility}</div> : null}
       </aside>
@@ -34,7 +81,39 @@ export function AppShell({
         <main className="ui-app-content">{children}</main>
       </div>
     </div>
+    </RailContext.Provider>
   );
+}
+
+export type NavItemProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "children"> & {
+  icon?: ReactNode;
+  /** Marks the current location. Sets aria-current="page". */
+  active?: boolean;
+  children: ReactNode;
+};
+
+/**
+ * A single navigation entry. Owned by the engine rather than each app so that
+ * "where am I" looks and announces the same in every StudioFlow surface.
+ * When the rail is collapsed the label is hidden visually but kept for assistive
+ * tech, and a tooltip restores it for sighted users.
+ */
+export function NavItem({ icon, active = false, children, className, ...props }: NavItemProps) {
+  const { collapsed } = useContext(RailContext);
+
+  const item = (
+    <a
+      className={cx("ui-nav-item", className)}
+      data-active={active || undefined}
+      aria-current={active ? "page" : undefined}
+      {...props}
+    >
+      {icon ? <span className="ui-nav-icon" aria-hidden="true">{icon}</span> : null}
+      <span className="ui-nav-label">{children}</span>
+    </a>
+  );
+
+  return collapsed ? <Tooltip content={children} side="right">{item}</Tooltip> : item;
 }
 
 export function PageShell({

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, Search, X } from "lucide-react";
 import {
   forwardRef,
   type CSSProperties,
@@ -68,12 +68,69 @@ export function TableRow({ selected, className, ...props }: HTMLAttributes<HTMLT
   return <tr className={cx(className)} data-selected={selected || undefined} {...props} />;
 }
 
+export type SortDirection = "asc" | "desc";
+
+export type TableHeadProps = Omit<ThHTMLAttributes<HTMLTableCellElement>, "align"> & {
+  align?: "start" | "center" | "end";
+  /** Render the column label as a sort control. */
+  sortable?: boolean;
+  /** This column's current direction, or null when another column is sorted. */
+  sortDirection?: SortDirection | null;
+  /** Receives the direction the app should apply next. The engine never compares values. */
+  onSortChange?: (direction: SortDirection) => void;
+  /** Accessible suffix for the control, e.g. "Name, sort ascending". */
+  sortLabel?: (direction: SortDirection) => string;
+};
+
+/**
+ * Column header. With `sortable`, the engine owns the affordance only — the
+ * control, the direction indicator, `aria-sort`, keyboard and focus. Comparing
+ * values stays with the app, which knows that a date is not its label and that
+ * an amount is not its formatted string.
+ */
 export function TableHead({
   align = "start",
+  sortable = false,
+  sortDirection = null,
+  onSortChange,
+  sortLabel,
+  children,
   className,
   ...props
-}: Omit<ThHTMLAttributes<HTMLTableCellElement>, "align"> & { align?: "start" | "center" | "end" }) {
-  return <th className={cx(className)} data-align={align} scope="col" {...props} />;
+}: TableHeadProps) {
+  const ariaSort = !sortable
+    ? undefined
+    : sortDirection === "asc"
+      ? "ascending"
+      : sortDirection === "desc"
+        ? "descending"
+        : "none";
+
+  if (!sortable) {
+    return (
+      <th className={cx(className)} data-align={align} scope="col" {...props}>
+        {children}
+      </th>
+    );
+  }
+
+  const next: SortDirection = sortDirection === "asc" ? "desc" : "asc";
+  const Indicator = sortDirection === "asc" ? ChevronUp : sortDirection === "desc" ? ChevronDown : ChevronsUpDown;
+
+  return (
+    <th className={cx(className)} data-align={align} scope="col" aria-sort={ariaSort} {...props}>
+      <button
+        type="button"
+        className="ui-table-sort"
+        data-active={sortDirection ? true : undefined}
+        aria-label={sortLabel?.(next)}
+        onClick={() => onSortChange?.(next)}
+      >
+        <span>{children}</span>
+        <Indicator aria-hidden="true" />
+      </button>
+    </th>
+  );
 }
 
 export function TableCell({
@@ -174,8 +231,13 @@ export function Pagination({
   );
 }
 
-export function DescriptionList({ className, ...props }: HTMLAttributes<HTMLDListElement>) {
-  return <dl className={cx("ui-description-list", className)} {...props} />;
+export type DescriptionListProps = HTMLAttributes<HTMLDListElement> & {
+  /** Pair columns. Use 1 in narrow containers such as a detail aside. */
+  columns?: 1 | 2;
+};
+
+export function DescriptionList({ columns = 2, className, ...props }: DescriptionListProps) {
+  return <dl className={cx("ui-description-list", className)} data-columns={columns} {...props} />;
 }
 
 export type DescriptionItemProps = HTMLAttributes<HTMLDivElement> & {

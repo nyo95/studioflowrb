@@ -6,12 +6,17 @@ import {
   CircleHelp,
   Copy,
   FileText,
+  Layers,
+  LayoutGrid,
+  MousePointerClick,
   Plus,
   Save,
   Settings2,
+  SlidersHorizontal,
+  Table2,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   AppShell,
@@ -41,6 +46,7 @@ import {
   InlineEdit,
   Input,
   LoadingState,
+  NavItem,
   Notice,
   PageHeader,
   PageSection,
@@ -75,10 +81,60 @@ import {
 import styles from "./showcase.module.css";
 
 const records = [
-  { id: "R-014", name: "Sample record", group: "General", updated: "Today", status: "Active" },
-  { id: "R-013", name: "Reference item", group: "Archive", updated: "Yesterday", status: "Review" },
-  { id: "R-012", name: "Working draft", group: "General", updated: "22 Aug", status: "Draft" },
-] as const;
+  { id: "R-1048", name: "Sample record", group: "General", updatedAt: "2026-08-25", items: 12, amount: 1240, status: "Active" },
+  { id: "R-1047", name: "Reference item with a longer descriptive label", group: "Archive", updatedAt: "2026-08-25", items: 3, amount: 96.5, status: "Review" },
+  { id: "R-1046", name: "Working draft", group: "General", updatedAt: "2026-08-24", items: 148, amount: 12880, status: "Draft" },
+  { id: "R-1045", name: "Second sample", group: "General", updatedAt: "2026-08-24", items: 7, amount: 412.75, status: "Active" },
+  { id: "R-1044", name: "Archived reference", group: "Archive", updatedAt: "2026-08-23", items: 1, amount: 18, status: "Draft" },
+  { id: "R-1043", name: "Pending entry", group: "Review", updatedAt: "2026-08-23", items: 64, amount: 5309.2, status: "Review" },
+  { id: "R-1042", name: "Third sample", group: "General", updatedAt: "2026-08-22", items: 22, amount: 2104, status: "Active" },
+  { id: "R-1041", name: "Short", group: "Archive", updatedAt: "2026-08-22", items: 9, amount: 735.4, status: "Draft" },
+  { id: "R-1040", name: "Fourth sample", group: "General", updatedAt: "2026-08-21", items: 310, amount: 27650, status: "Active" },
+  { id: "R-1039", name: "Secondary reference", group: "Review", updatedAt: "2026-08-21", items: 5, amount: 268.9, status: "Review" },
+  { id: "R-1038", name: "Fifth sample", group: "General", updatedAt: "2026-08-20", items: 41, amount: 3472.15, status: "Active" },
+  { id: "R-1037", name: "Older draft", group: "Archive", updatedAt: "2026-08-19", items: 2, amount: 54, status: "Draft" },
+];
+
+type Record_ = (typeof records)[number];
+type SortKey = "id" | "name" | "group" | "updatedAt" | "items" | "amount" | "status";
+
+/**
+ * Sort semantics live here, in the app — not in the UI Engine. Only this side
+ * knows that `updatedAt` sorts as a date rather than as its printed label, and
+ * that `amount` sorts as a number rather than as its formatted string.
+ */
+const compare: Record<SortKey, (a: Record_, b: Record_) => number> = {
+  id: (a, b) => a.id.localeCompare(b.id),
+  name: (a, b) => a.name.localeCompare(b.name),
+  group: (a, b) => a.group.localeCompare(b.group),
+  status: (a, b) => a.status.localeCompare(b.status),
+  updatedAt: (a, b) => a.updatedAt.localeCompare(b.updatedAt),
+  items: (a, b) => a.items - b.items,
+  amount: (a, b) => a.amount - b.amount,
+};
+
+const navSections = [
+  { id: "foundations", label: "Foundations", icon: <Layers /> },
+  { id: "controls", label: "Controls", icon: <SlidersHorizontal /> },
+  { id: "data", label: "Data", icon: <Table2 /> },
+  { id: "layouts", label: "Layouts", icon: <LayoutGrid /> },
+  { id: "patterns", label: "Patterns", icon: <MousePointerClick /> },
+  { id: "document", label: "Document", icon: <FileText /> },
+];
+
+const sortableColumns: { key: SortKey; label: string; align?: "start" | "end" }[] = [
+  { key: "id", label: "Reference" },
+  { key: "name", label: "Name" },
+  { key: "group", label: "Group" },
+  { key: "updatedAt", label: "Updated" },
+  { key: "items", label: "Items", align: "end" },
+  { key: "amount", label: "Amount", align: "end" },
+  { key: "status", label: "Status" },
+];
+
+const money = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const day = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
+const formatDate = (iso: string) => day.format(new Date(`${iso}T00:00:00Z`));
 
 const options = [
   { id: "alpha", label: "Option alpha", description: "Primary choice", keywords: ["one"] },
@@ -89,8 +145,43 @@ const options = [
 export function UiEngineShowcase() {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<{ key: SortKey; direction: "asc" | "desc" } | null>(null);
+  const [section, setSection] = useState("foundations");
+
+  // Track the section actually in view rather than the last hash the user clicked.
+  // A hash goes stale the moment someone scrolls; what the rail should answer is
+  // "where am I", not "what did I last press".
+  useEffect(() => {
+    const targets = navSections
+      .map(({ id }) => document.getElementById(id))
+      .filter((el): el is HTMLElement => el !== null);
+    if (!targets.length) return;
+
+    const visible = new Map<string, number>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) visible.set(entry.target.id, entry.boundingClientRect.top);
+          else visible.delete(entry.target.id);
+        }
+        if (!visible.size) return;
+        const [topmost] = [...visible.entries()].sort((a, b) => a[1] - b[1]);
+        setSection(topmost[0]);
+      },
+      { rootMargin: "-72px 0px -55% 0px", threshold: 0 },
+    );
+
+    targets.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
+  const sortedRecords = useMemo(() => {
+    if (!sort) return records;
+    const factor = sort.direction === "asc" ? 1 : -1;
+    return [...records].sort((a, b) => compare[sort.key](a, b) * factor);
+  }, [sort]);
   const [filterActive, setFilterActive] = useState(true);
-  const [selectedRows, setSelectedRows] = useState<string[]>(["R-014"]);
+  const [selectedRows, setSelectedRows] = useState<string[]>(["R-1048"]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -108,6 +199,8 @@ export function UiEngineShowcase() {
 
   return (
     <AppShell
+      collapsible
+      collapsedBrand={<span className={styles.brandMark}>SF</span>}
       brand={(
         <a className={styles.brand} href="#top">
           <span>SF</span>
@@ -116,12 +209,11 @@ export function UiEngineShowcase() {
       )}
       navigation={(
         <div className={styles.navigation}>
-          <a href="#foundations">Foundations</a>
-          <a href="#controls">Controls</a>
-          <a href="#data">Data</a>
-          <a href="#layouts">Layouts</a>
-          <a href="#patterns">Patterns</a>
-          <a href="#document">Document</a>
+          {navSections.map(({ id, label, icon }) => (
+            <NavItem key={id} href={`#${id}`} icon={icon} active={section === id}>
+              {label}
+            </NavItem>
+          ))}
         </div>
       )}
       utility={<Text size="sm" tone="tertiary">Internal style lab</Text>}
@@ -153,16 +245,25 @@ export function UiEngineShowcase() {
               <Heading level={2}>Heading two</Heading>
               <Heading level={3}>Heading three</Heading>
               <Heading level={4}>Heading four</Heading>
+              <Heading level={5}>Heading five</Heading>
+              <Heading level={6}>Heading six</Heading>
               <Text>Operational body text at the compact base size.</Text>
               <Text size="sm" tone="secondary">Secondary supporting text.</Text>
             </SectionCard>
             <SectionCard className={styles.stack}>
-              <Text meta>Semantic tones</Text>
+              <Text meta>Status &mdash; record state</Text>
               <div className={styles.rowWrap}>
                 <StatusBadge tone="neutral">Neutral</StatusBadge>
                 <StatusBadge tone="success">Success</StatusBadge>
                 <StatusBadge tone="warning">Warning</StatusBadge>
                 <StatusBadge tone="danger">Danger</StatusBadge>
+              </div>
+              <Text meta>Badge &mdash; chips, tags, counts</Text>
+              <div className={styles.rowWrap}>
+                <Badge>Neutral</Badge>
+                <Badge tone="success">Success</Badge>
+                <Badge tone="warning">Warning</Badge>
+                <Badge tone="danger">Danger</Badge>
               </div>
               <div className={styles.swatches} aria-label="Surface tokens">
                 <div><span className={styles.canvasSwatch} /><Text size="sm">Canvas</Text></div>
@@ -282,20 +383,27 @@ export function UiEngineShowcase() {
                 <Button size="sm" variant="ghost" onClick={() => setSelectedRows([])}>Clear</Button>
               </SelectionBar>
             ) : null}
-            <DataTable minWidth={720} density="compact" stickyHeader>
+            <DataTable minWidth={880} density="compact" stickyHeader>
               <TableHeader>
                 <TableRow>
                   <TableHead><span className={styles.visuallyHidden}>Select</span></TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Group</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead>Status</TableHead>
+                  {sortableColumns.map(({ key, label, align }) => (
+                    <TableHead
+                      key={key}
+                      align={align}
+                      sortable
+                      sortDirection={sort?.key === key ? sort.direction : null}
+                      onSortChange={(direction) => setSort({ key, direction })}
+                      sortLabel={(direction) => `${label}, sort ${direction === "asc" ? "ascending" : "descending"}`}
+                    >
+                      {label}
+                    </TableHead>
+                  ))}
                   <TableHead align="end"><span className={styles.visuallyHidden}>Actions</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {records.map((record) => {
+                {sortedRecords.map((record) => {
                   const selected = selectedRows.includes(record.id);
                   return (
                     <TableRow key={record.id} selected={selected}>
@@ -306,10 +414,12 @@ export function UiEngineShowcase() {
                           onCheckedChange={(checked) => toggleRow(record.id, checked)}
                         />
                       </TableCell>
-                      <TableCell><Text size="sm" tone="secondary">{record.id}</Text></TableCell>
+                      <TableCell data-column="identifier">{record.id}</TableCell>
                       <TableCell><Text weight="medium">{record.name}</Text></TableCell>
                       <TableCell>{record.group}</TableCell>
-                      <TableCell>{record.updated}</TableCell>
+                      <TableCell>{formatDate(record.updatedAt)}</TableCell>
+                      <TableCell align="end">{record.items}</TableCell>
+                      <TableCell align="end">{money.format(record.amount)}</TableCell>
                       <TableCell>
                         <StatusBadge tone={record.status === "Active" ? "success" : record.status === "Review" ? "warning" : "neutral"}>
                           {record.status}
@@ -351,9 +461,12 @@ export function UiEngineShowcase() {
                     aside={(
                       <SectionCard className={styles.stack}>
                         <Text meta>Summary</Text>
-                        <DescriptionList>
+                        <DescriptionList columns={1}>
+                          <DescriptionItem label="Reference">R-1048</DescriptionItem>
                           <DescriptionItem label="Owner">Example user</DescriptionItem>
-                          <DescriptionItem label="Updated">Today</DescriptionItem>
+                          <DescriptionItem label="Group">General</DescriptionItem>
+                          <DescriptionItem label="Items">12</DescriptionItem>
+                          <DescriptionItem label="Updated">25 Aug 2026</DescriptionItem>
                         </DescriptionList>
                       </SectionCard>
                     )}

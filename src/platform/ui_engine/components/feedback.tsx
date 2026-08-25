@@ -2,13 +2,18 @@ import { AlertTriangle, Inbox, type LucideIcon } from "lucide-react";
 import type { HTMLAttributes, ReactNode } from "react";
 
 import { cx } from "../internal/cx";
-import { Badge, Heading, Spinner, type SemanticTone, Text } from "../primitives";
+import { Heading, Spinner, type SemanticTone, Text } from "../primitives";
 
+/**
+ * Record/row status. Renders a small semantic marker plus a plain-ink label.
+ * For chips, tags and counts use `Badge` (pill) instead.
+ */
 export function StatusBadge({
   tone,
+  className,
   ...props
 }: HTMLAttributes<HTMLSpanElement> & { tone: SemanticTone }) {
-  return <Badge tone={tone} {...props} />;
+  return <span className={cx("ui-status", `ui-status-${tone}`, className)} {...props} />;
 }
 
 export type NoticeProps = HTMLAttributes<HTMLDivElement> & {

@@ -1,18 +1,18 @@
 :root {
-  --ui-canvas: #f8fafc;
+  --ui-canvas: #fbfbfb;
   --ui-surface: #ffffff;
   --ui-surface-raised: #ffffff;
-  --ui-surface-muted: #f1f5f9;
-  --ui-border-subtle: #f1f5f9;
-  --ui-border-default: #e2e8f0;
-  --ui-border-strong: #cbd5e1;
-  --ui-border-focus: #64748b;
-  --ui-text-primary: #0f172a;
-  --ui-text-secondary: #475569;
-  --ui-text-tertiary: #94a3b8;
+  --ui-surface-muted: #f5f4f2;
+  --ui-border-subtle: #eeedeb;
+  --ui-border-default: #e0dfdc;
+  --ui-border-strong: #c2c0bc;
+  --ui-border-focus: #57534e;
+  --ui-text-primary: #1c1a18;
+  --ui-text-secondary: #55524d;
+  --ui-text-tertiary: #6e6a65;
   --ui-text-inverse: #ffffff;
-  --ui-action-primary: #0f172a;
-  --ui-action-primary-hover: #1e293b;
+  --ui-action-primary: #1c1a18;
+  --ui-action-primary-hover: #332f2b;
   --ui-danger-fg: #b91c1c;
   --ui-danger-bg: #fef2f2;
   --ui-danger-border: #fecaca;
@@ -22,6 +22,9 @@
   --ui-warning-fg: #b45309;
   --ui-warning-bg: #fffbeb;
   --ui-warning-border: #fde68a;
+  --ui-table-header-bg: #1c1a18;
+  --ui-table-header-fg: #ffffff;
+  --ui-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   --ui-radius-card: 8px;
   --ui-radius-control: 6px;
   --ui-radius-action: 4px;
@@ -39,5 +42,5 @@
   --ui-dialog-xl: 980px;
   --ui-dialog-full: 1180px;
   --ui-dialog-max-height: 90vh;
-  --ui-shadow-elevated: 0 18px 48px rgb(15 23 42 / 0.12), 0 3px 12px rgb(15 23 42 / 0.06);
+  --ui-shadow-elevated: 0 18px 48px rgb(28 26 24 / 0.13), 0 3px 12px rgb(28 26 24 / 0.06);
 }
