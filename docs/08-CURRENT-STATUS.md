@@ -1,6 +1,6 @@
 # 08 — Current Rebuild Status
 
-Status: FOUNDATION + MD-00 LOCKED — UI ENGINE IMPLEMENTED — OWNER VISUAL APPROVAL PENDING
+Status: FOUNDATION + MD-00 LOCKED — UI ENGINE IMPLEMENTED — CLAUDE DESIGN REVIEW NEXT
 Audit date: 2026-08-25
 Owner: PM / Technical Lead
 
@@ -36,6 +36,7 @@ The quarantine is not an implementation source of truth, is not approved code, a
 - `docs/06-DATA-OWNERSHIP.md` — domain/data ownership and Category contract.
 - `docs/03-MASTERDATA-PRD.md`, `docs/04-STUDIOFLOW-PRD.md`, and `docs/05-BQ-PRD.md` — current app intent.
 - `docs/10-UI-CONTRACT-AUDIT.md` and `docs/11-CORE-CONTRACT-AUDIT.md` — manager audit records.
+- `docs/13-CLAUDE-UI-DESIGN-REVIEW-HANDOVER.md` — self-contained independent design-review context, procedure, evidence, and stop conditions.
 
 ## Locked domain decisions relevant to current work
 
@@ -58,7 +59,7 @@ The quarantine is not an implementation source of truth, is not approved code, a
 
 ## Current execution policy
 
-The two original Foundation lanes, PM/TL convergence gate, and UI-01 implementation/review are complete. Revised MD-00 and its seed inventory are owner-approved and LOCKED. The owner explicitly directed Codex to take over this one UI implementation; that exception does not change the external-executor policy for later deterministic product work. `MASTER-DATA-FULL-BUILD.md` remains PAUSED only until the owner approves the `/ui-engine` visual direction and PM/TL issues a new Master Data starting ref; all existing Master Data start tags remain superseded.
+The two original Foundation lanes, PM/TL convergence gate, and UI-01 implementation/technical review are complete. Revised MD-00 and its seed inventory are owner-approved and LOCKED. The owner explicitly directed Codex to take over this one UI implementation; that exception does not change the external-executor policy for later deterministic product work. Independent Claude design review now follows `docs/13-CLAUDE-UI-DESIGN-REVIEW-HANDOVER.md`. `MASTER-DATA-FULL-BUILD.md` remains PAUSED until design findings are resolved, the owner approves the `/ui-engine` visual direction, and PM/TL issues a new Master Data starting ref; all existing Master Data start tags remain superseded.
 
 ## Deferred owner / later-phase decisions
 

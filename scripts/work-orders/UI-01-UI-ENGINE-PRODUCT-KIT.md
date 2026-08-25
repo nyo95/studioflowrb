@@ -1,10 +1,25 @@
 # UI-01 — UI Engine Product Kit and Showcase
 
 Owner: PM/TL
-Executor: one external OpenCode coding session
-Status: **READY FOR EXTERNAL EXECUTOR after PM/TL reports the resolved start-tag hash**
+Planned executor: one external OpenCode coding session
+Actual executor: Codex under explicit one-time owner takeover instruction
+Status: **COMPLETE — IMPLEMENTED AND PM/TL-REVIEWED; INDEPENDENT DESIGN/OWNER VISUAL APPROVAL PENDING**
 Required starting ref: `ui-engine-product-kit-start`
 Execution shape: UI-A → UI-B → UI-C → UI-D as four sequential commits in one session
+
+## Completion record
+
+- Start ref: `288c642f7f78b8f560ca19258e0d7439681d87a1`
+- UI-A: `628a77c` — tokens and primitives
+- UI-B: `ad8d564` — forms, data, and shared states
+- UI-C: `27becfa` — overlays, navigation, and layouts
+- UI-D: `4354c4f` — interaction/document patterns and `/ui-engine`
+- Automated acceptance: 114 tests, repository checks, Prisma validate/generate, boundary fixtures, legacy-runtime fixtures, and production build passed.
+- PM/TL responsive/interaction review: passed at 1440×900, 1024×768, 768×1024, and 390×844 after bounded corrections.
+- Independent review handover: `docs/13-CLAUDE-UI-DESIGN-REVIEW-HANDOVER.md`.
+- Master Data remains paused until independent design review findings are resolved and the owner approves the visual direction.
+
+The original external-executor instructions below are retained as the historical implementation contract. Do not rerun UI-01 as a new implementation work order.
 
 ## Objective
 
