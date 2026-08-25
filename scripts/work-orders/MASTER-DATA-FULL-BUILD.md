@@ -4,7 +4,7 @@ Owner: PM/TL
 Executor: one external OpenCode coding session
 Status: **ACTIVE — UI Engine approved; ready for owner-operated external OpenCode execution**
 Program checkpoints: MD-01 through MD-09
-Required starting ref: **`masterdata-full-build-start-ui-approved`**
+Required starting ref: **`masterdata-full-build-start-ui-approved-v2`**
 
 This file is the complete executor prompt. Read it in full before editing. Execute MD-01 through MD-09 sequentially in the same OpenCode session. Each MD checkpoint remains a separate, logically reviewable commit even though the owner starts only one implementation session.
 
@@ -24,13 +24,13 @@ Do not implement BQ, broad StudioFlow migration, or any capability outside the l
 
 ## 1. Required start state
 
-This package is executable only from `masterdata-full-build-start-ui-approved`. Earlier `masterdata-full-build-start*` tags are superseded and must not be used.
+This package is executable only from `masterdata-full-build-start-ui-approved-v2`. Earlier `masterdata-full-build-start*` tags, including the first UI-approved ref, are superseded and must not be used.
 
 1. Checkout `main` at the new PM/TL-issued Master Data start tag.
 2. Resolve and record the tag hash:
 
 ```powershell
-git rev-parse masterdata-full-build-start-ui-approved
+git rev-parse masterdata-full-build-start-ui-approved-v2
 git status --short
 ```
 
@@ -885,8 +885,8 @@ PM/TL will verify:
 
 ```powershell
 git status --short
-git log --oneline masterdata-full-build-start-ui-approved..HEAD
-git diff --check masterdata-full-build-start-ui-approved..HEAD
+git log --oneline masterdata-full-build-start-ui-approved-v2..HEAD
+git diff --check masterdata-full-build-start-ui-approved-v2..HEAD
 npm test
 npm run check
 npx prisma validate

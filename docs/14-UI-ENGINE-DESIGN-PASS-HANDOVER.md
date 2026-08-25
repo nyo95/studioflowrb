@@ -345,3 +345,27 @@ available and is not treated as a blocker for this gate.
 UI Engine is final for product implementation. A later change requires concrete
 product evidence and a new PM/TL decision; Master Data must compose the locked
 public inventory rather than redesign it.
+
+---
+
+## 10. Owner browser-feedback refinement (2026-08-25)
+
+Before Master Data execution began, the owner supplied three concrete comments on
+the live Data Directory. Commit `160d2f6` resolves them as a final contract-level
+refinement:
+
+- selection count and batch actions now use `SelectionBar variant="inline"`
+  beside Export in the shared toolbar instead of consuming a separate full-width
+  strip;
+- rail, brand, utility identity, and sticky topbar were redesigned as one quiet
+  application frame; the table header moved from a repeated near-black band to a
+  warm-neutral structural surface with a strong lower rule;
+- `TableCell wrap` plus `TableCellContent` now provide consistent one/two-line
+  primary content and optional secondary metadata, including end-aligned numeric
+  content.
+
+Live browser evidence at 1184×912 showed no page overflow, a 64px topbar, the
+232px expanded rail, selection and Export aligned in one toolbar row, and stable
+35px two-tier cell content. Sort affordances and semantic status markers remain
+independent and unchanged. This refinement supersedes the first UI-approved
+Master Data tag; execution starts from `masterdata-full-build-start-ui-approved-v2`.

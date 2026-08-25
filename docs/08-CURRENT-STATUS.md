@@ -7,8 +7,8 @@ Owner: PM / Technical Lead
 ## Approved repository state
 
 - The reproducible foundation baseline is commit `eb58f5ef7995aad22c4170d234ca84bc830eef08` (`chore: establish rebuild baseline`).
-- The current PM/TL-approved UI implementation head is commit `8f1ca0b` (`fix(ui-engine): close interaction and responsive regressions`), following Claude's independent design-pass commit `1ab1a82`.
-- The approved Master Data execution ref is `masterdata-full-build-start-ui-approved`; it includes the final manager records layered over the approved UI implementation.
+- The current PM/TL-approved UI implementation head is commit `160d2f6` (`feat(ui-engine): refine application chrome and table hierarchy`), following Claude's independent design-pass commit `1ab1a82` and convergence correction `8f1ca0b`.
+- The approved Master Data execution ref is `masterdata-full-build-start-ui-approved-v2`; it supersedes the pre-feedback UI tag and includes the final manager records layered over the approved UI implementation.
 - The rebuild is an independent Git repository on `main` with no configured runtime dependency on `../studioflow`.
 - WO-001, WO-001A, WO-001B, WO-001C, and WO-001D are complete and PM/TL-approved.
 - The baseline has a reproducible npm lockfile, Prisma 7 configuration/client generation, TypeScript test runner, typecheck, boundary check, and production build.
@@ -58,6 +58,7 @@ The quarantine is not an implementation source of truth, is not approved code, a
 - COMPLETE: Claude's design pass `1ab1a82` introduced the warm-neutral palette, dark data-table band, explicit navigation current state, collapsible rail, generic sortable headers, and refined status treatment; PM/TL ratified those changes with the bounded corrections in `8f1ca0b`.
 - COMPLETE: selected rows now retain a checked control plus a restrained ink leading rule while semantic status remains independent; all seven showcase data columns are sortable and selection/action columns remain intentionally non-sortable.
 - COMPLETE: narrow navigation always retains labels while preserving the desktop collapse preference; Combobox Arrow/Home/End/Enter/Escape behavior skips disabled options and returns focus correctly.
+- COMPLETE: owner feedback moved selection state/actions inline beside Export, replaced the repeated dark table band with a warm-neutral header surface, redesigned rail/topbar hierarchy, and added canonical one/two-line `TableCellContent` treatment; commit `160d2f6`.
 - COMPLETE: 117 tests, typecheck, dependency/legacy checks, Prisma validate/generate, boundary/legacy fixtures, production build, and diff checks pass.
 - COMPLETE: PM/TL visual/accessibility review passed at 1440×900, 1024×768, 768×1024, 390×844, and the 720×450 effective viewport corresponding to 1440×900 at 200% layout scale. Page-wide overflow, isolated mobile-nav/table overflow, sorting, selection/status coexistence, focus return, dialogs, drawer, menus, and keyboard behavior were verified; browser console errors/warnings were zero.
 - COMPLETE: DocumentSheet retains its A4 screen ratio and the loaded stylesheet contains the isolated `@media print` contract. Native OS print-preview automation was unavailable; source/test/CSSOM evidence is accepted for this gate.
@@ -65,7 +66,7 @@ The quarantine is not an implementation source of truth, is not approved code, a
 
 ## Current execution policy
 
-The Foundation lanes, convergence gate, UI-01 implementation, independent design pass, owner visual gate, and PM/TL ratification are complete. Revised MD-00 and its seed inventory remain owner-approved and LOCKED. The owner's direct UI takeover instruction does not change the external-executor policy for deterministic Master Data work. `scripts/work-orders/MASTER-DATA-FULL-BUILD.md` is ACTIVE from `masterdata-full-build-start-ui-approved`; older Master Data start tags remain superseded.
+The Foundation lanes, convergence gate, UI-01 implementation, independent design pass, owner feedback refinements, and PM/TL ratification are complete. Revised MD-00 and its seed inventory remain owner-approved and LOCKED. The owner's direct UI takeover instruction does not change the external-executor policy for deterministic Master Data work. `scripts/work-orders/MASTER-DATA-FULL-BUILD.md` is ACTIVE from `masterdata-full-build-start-ui-approved-v2`; every older Master Data start tag remains superseded.
 
 ## Deferred owner / later-phase decisions
 

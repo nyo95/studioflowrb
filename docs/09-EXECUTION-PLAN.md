@@ -83,13 +83,14 @@ PM/TL revalidated Core on 2026-08-25 against canonical legacy evidence from GitH
 2. PM/TL diff, test, accessibility, responsive, interaction, and `/ui-engine` review — COMPLETE.
 3. Independent Claude design review and owner-directed design pass — COMPLETE; commit `1ab1a82` reviewed through `docs/14-UI-ENGINE-DESIGN-PASS-HANDOVER.md`.
 4. PM/TL convergence correction and contract ratification — COMPLETE; commit `8f1ca0b`, 117 tests, full repository acceptance, responsive/keyboard/sort/selection review, and owner visual approval passed.
-5. Master Data starting ref `masterdata-full-build-start-ui-approved` issued; `scripts/work-orders/MASTER-DATA-FULL-BUILD.md` is ACTIVE.
-6. Execute MD-01 through MD-09 sequentially and review at Gate 1, Gate 2, Gate 3, and Final Gate.
-7. Lock and implement the Master Data public contract.
-8. Lock BQ readiness, provenance, snapshot, refresh, duplicate, library, and calculation contracts.
-9. Issue BQ schema/domain/application/UI work orders.
-10. Run cross-app boundary, migration, and smoke verification.
+5. Owner browser-feedback refinement — COMPLETE; commit `160d2f6` moves batch selection into the toolbar, refines rail/topbar/table hierarchy, and adds canonical tiered cell content.
+6. Master Data starting ref `masterdata-full-build-start-ui-approved-v2` issued; `scripts/work-orders/MASTER-DATA-FULL-BUILD.md` is ACTIVE. The earlier UI-approved tag is superseded.
+7. Execute MD-01 through MD-09 sequentially and review at Gate 1, Gate 2, Gate 3, and Final Gate.
+8. Lock and implement the Master Data public contract.
+9. Lock BQ readiness, provenance, snapshot, refresh, duplicate, library, and calculation contracts.
+10. Issue BQ schema/domain/application/UI work orders.
+11. Run cross-app boundary, migration, and smoke verification.
 
 StudioFlow remains outside active implementation scope except for shared-boundary verification.
 
-The MD-01 through MD-09 dependency plan remains canonical in `MASTER_DATA.md`. Its executor package is active only from `masterdata-full-build-start-ui-approved`; all older Master Data start tags are superseded. UI-01 and its convergence pass introduced no Master Data schema, CRUD, or domain implementation.
+The MD-01 through MD-09 dependency plan remains canonical in `MASTER_DATA.md`. Its executor package is active only from `masterdata-full-build-start-ui-approved-v2`; all older Master Data start tags are superseded. UI-01 and its convergence/refinement passes introduced no Master Data schema, CRUD, or domain implementation.
