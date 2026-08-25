@@ -1,6 +1,6 @@
 # 09 — Execution Plan
 
-Status: FOUNDATION + MD-00 COMPLETE — UI ENGINE PRODUCT KIT GATE NEXT
+Status: FOUNDATION + MD-00 COMPLETE — UI ENGINE PM REVIEW COMPLETE — OWNER VISUAL GATE PENDING
 Updated: 2026-08-25
 Owner: PM / Technical Lead
 
@@ -35,6 +35,8 @@ Deterministic implementation may follow these contracts but may not change them.
 - Every executor reads its complete work order and stops on ambiguity or repository/contract mismatch.
 - Work remains unapproved until PM/TL reviews its diff/commit and acceptance evidence.
 - Do not create one executor per tiny task; retain context within each approved product slice.
+
+UI-01 was completed directly by Codex under an explicit one-time owner takeover instruction. This does not authorize Codex to replace external OpenCode executors for later deterministic Master Data work.
 
 ## Foundation execution — COMPLETE
 
@@ -77,9 +79,9 @@ PM/TL revalidated Core on 2026-08-25 against canonical legacy evidence from GitH
 
 ## Product implementation sequence after Core convergence
 
-1. Execute `scripts/work-orders/UI-01-UI-ENGINE-PRODUCT-KIT.md` as one external OpenCode session with UI-A through UI-D checkpoint commits.
-2. PM/TL reviews diff, tests, accessibility, responsive screenshots, and `/ui-engine`; owner approves the visual direction.
-3. PM/TL issues a new Master Data starting ref and reactivates `scripts/work-orders/MASTER-DATA-FULL-BUILD.md`.
+1. UI-01 UI-A through UI-D — COMPLETE; commits `628a77c`, `ad8d564`, `27becfa`, and `4354c4f`.
+2. PM/TL diff, test, accessibility, responsive, interaction, and `/ui-engine` review — COMPLETE; owner visual approval remains pending.
+3. After owner approval, PM/TL issues a new Master Data starting ref and reactivates `scripts/work-orders/MASTER-DATA-FULL-BUILD.md`.
 4. Execute MD-01 through MD-09 sequentially and review at Gate 1, Gate 2, Gate 3, and Final Gate.
 5. Lock and implement the Master Data public contract.
 6. Lock BQ readiness, provenance, snapshot, refresh, duplicate, library, and calculation contracts.
@@ -88,4 +90,4 @@ PM/TL revalidated Core on 2026-08-25 against canonical legacy evidence from GitH
 
 StudioFlow remains outside active implementation scope except for shared-boundary verification.
 
-The MD-01 through MD-09 dependency plan remains canonical in `MASTER_DATA.md`, but its executor package is PAUSED until the explicit UI Product Kit gate passes. UI-01 does not authorize Master Data schema, CRUD, or domain implementation.
+The MD-01 through MD-09 dependency plan remains canonical in `MASTER_DATA.md`, but its executor package is PAUSED until the owner visual approval gate passes and a new starting ref is issued. UI-01 did not authorize or introduce Master Data schema, CRUD, or domain implementation.
