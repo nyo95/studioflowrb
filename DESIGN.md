@@ -42,9 +42,12 @@ H1–H2 provide restrained product identity. H3–H6, tables, controls, labels, 
 Three tones, in a fixed relationship:
 
 - **Near-white ground** `#fbfbfb` — the page. Nothing sits *on* it directly except spacing.
-- **White planes** `#ffffff` — the rail, cards, tables, toolbars. Everything the
+- **White planes** `#ffffff` — cards, tables, toolbars. Everything the
   operator actually reads or acts on.
-- **Near-black band** `#1c1a18` — table headers, and the primary action.
+- **Warm chrome** — the rail uses a controlled mix of Surface Muted and Surface;
+  the sticky topbar remains a translucent white plane.
+- **Near-black emphasis** `#1c1a18` — reserved for the primary action and compact
+  identity marks, not repeated across every table.
 
 The ground is what separates the white rail from the white content surfaces, but it
 is deliberately shallow — 1.035:1 against white, close to the perceptual floor. It
@@ -61,7 +64,7 @@ Base:
 - Canvas (page ground): `#fbfbfb`
 - Surface (rail, cards, tables, toolbars): `#ffffff`
 - Surface muted (hover, selected, disabled): `#f5f4f2`
-- Table header band: `#1c1a18` on `#ffffff` label
+- Table header surface: `#f5f4f2` on `#55524d` label
 - Primary text: `#1c1a18`
 - Secondary text: `#55524d`
 - Tertiary/meta: `#6e6a65`
@@ -99,16 +102,19 @@ Do not introduce app-specific accent colors for ordinary navigation, cards, or b
 
 Primary surfaces are white with a 1px subtle/default border and no shadow by default. Shadow is reserved for dialogs, drawers, menus, floating toolbars, or genuinely elevated content. Avoid deep elevation and card-inside-card layouts.
 
-Elevation model — two physical planes plus one emphasis band:
+Elevation model — two physical planes plus restrained emphasis:
 
 | Plane | What sits there | Treatment |
 | --- | --- | --- |
 | Ground | Page background behind everything | Near-white `#fbfbfb`, never bordered |
-| Plane | Rail, cards, tables, toolbars, topbar | White + 1px border, no shadow |
-| Band | Table header, primary action | Near-black `#1c1a18` |
+| Plane | Cards, tables, toolbars, topbar | White + 1px border, no shadow |
+| Chrome | Rail | Warm muted surface + 1px border, no shadow |
+| Emphasis | Primary action, compact identity mark | Near-black `#1c1a18` |
 
-The rail is a white plane on the ground, not part of it. Every white plane still
-carries its border — at 1.035:1 the ground alone cannot define an edge.
+The rail is quiet application chrome, not another content card. Its warm-muted
+surface separates navigation from work while the border retains the exact edge.
+Every white content plane still carries its border — at 1.035:1 the ground alone
+cannot define an edge.
 
 Application chrome belongs to the ground plane, not the content plane. If the rail,
 the page background, and the cards all render white, nothing has altitude and the
@@ -156,7 +162,7 @@ Tables are first-class UI in Master Data and BQ.
 Default:
 - white surface;
 - subtle border;
-- near-black header band, the way a drawing title block carries one;
+- warm-muted header surface with a strong lower rule;
 - compact rows;
 - metadata-style headings, quieter than the data they label;
 - subtle row hover that reads as a scan line;
@@ -165,6 +171,13 @@ Default:
 - horizontal scroll when useful widths cannot fit.
 
 Never squeeze columns until content overlaps.
+
+Operational values stay on one line by default. When a value genuinely needs
+more context, use the shared two-tier cell treatment: primary content may wrap to
+at most two lines and optional secondary metadata sits below in tertiary type.
+Do not insert ad-hoc `<br>` elements, shrink the column until every row wraps, or
+mix two unrelated values without hierarchy. Numeric two-tier cells remain
+right-aligned as one unit.
 
 Figures — non-negotiable in a table:
 - `font-variant-numeric: tabular-nums` applies to the whole table, not only to
@@ -198,11 +211,10 @@ contrast; the marker lets the eye scan the column by colour while the label stay
 at full ink contrast. The text always carries the meaning, so colour is never the
 only channel.
 
-The header is a band, not a tinted row. `--ui-table-header-bg` / `--ui-table-header-fg`
-carry it, so BQ or a future dense mode can retune the pair without touching every
-table. The band earns its weight by being the only dark element in the data region:
-if a page stacks several tables, give the secondary ones a light header instead, or
-the page turns into stripes.
+The header is a quiet structural surface, not a second primary action.
+`--ui-table-header-bg` / `--ui-table-header-fg` carry the warm-neutral pair, while
+the strong lower rule defines the transition into data. Sort focus uses the shared
+focus border so it remains visible without turning the whole header into a dark band.
 
 BQ may add inline editing and greater density while keeping the same typography, colors, borders, focus states, and action language.
 

@@ -88,15 +88,18 @@ export function FilterBar({
 export function SelectionBar({
   count,
   label,
+  variant = "bar",
   children,
   className,
   ...props
 }: HTMLAttributes<HTMLDivElement> & {
   count: number;
   label?: (count: number) => ReactNode;
+  /** `inline` composes selection state inside a table toolbar. */
+  variant?: "bar" | "inline";
 }) {
   return (
-    <div className={cx("ui-selection-bar", className)} role="status" {...props}>
+    <div className={cx("ui-selection-bar", className)} data-variant={variant} role="status" {...props}>
       <strong>{label ? label(count) : `${count} selected`}</strong>
       <div className="ui-selection-actions">{children}</div>
     </div>

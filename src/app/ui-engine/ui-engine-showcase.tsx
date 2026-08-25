@@ -67,6 +67,7 @@ import {
   Switch,
   TableBody,
   TableCell,
+  TableCellContent,
   TableHead,
   TableHeader,
   TableRow,
@@ -81,8 +82,8 @@ import {
 import styles from "./showcase.module.css";
 
 const records = [
-  { id: "R-1048", name: "Sample record", group: "General", updatedAt: "2026-08-25", items: 12, amount: 1240, status: "Active" },
-  { id: "R-1047", name: "Reference item with a longer descriptive label", group: "Archive", updatedAt: "2026-08-25", items: 3, amount: 96.5, status: "Review" },
+  { id: "R-1048", name: "Sample record", detail: "Primary workspace record", group: "General", updatedAt: "2026-08-25", items: 12, amount: 1240, status: "Active" },
+  { id: "R-1047", name: "Reference item with a longer descriptive label", detail: "Long labels may wrap to a second line", group: "Archive", updatedAt: "2026-08-25", items: 3, amount: 96.5, status: "Review" },
   { id: "R-1046", name: "Working draft", group: "General", updatedAt: "2026-08-24", items: 148, amount: 12880, status: "Draft" },
   { id: "R-1045", name: "Second sample", group: "General", updatedAt: "2026-08-24", items: 7, amount: 412.75, status: "Active" },
   { id: "R-1044", name: "Archived reference", group: "Archive", updatedAt: "2026-08-23", items: 1, amount: 18, status: "Draft" },
@@ -204,11 +205,15 @@ export function UiEngineShowcase() {
       brand={(
         <a className={styles.brand} href="#top">
           <span>SF</span>
-          <strong>UI Engine</strong>
+          <span className={styles.brandCopy}>
+            <strong>StudioFlow</strong>
+            <small>UI system</small>
+          </span>
         </a>
       )}
       navigation={(
         <div className={styles.navigation}>
+          <Text className={styles.navigationLabel} meta>Workspace</Text>
           {navSections.map(({ id, label, icon }) => (
             <NavItem key={id} href={`#${id}`} icon={icon} active={section === id}>
               {label}
@@ -216,11 +221,22 @@ export function UiEngineShowcase() {
           ))}
         </div>
       )}
-      utility={<Text size="sm" tone="tertiary">Internal style lab</Text>}
+      utility={(
+        <div className={styles.utilityCard}>
+          <span>N</span>
+          <span><strong>Internal lab</strong><small>Local preview</small></span>
+        </div>
+      )}
       topbar={(
         <div className={styles.topbar}>
-          <Text weight="medium">Shared product kit</Text>
-          <Badge tone="success">Foundation</Badge>
+          <div className={styles.topbarContext}>
+            <span aria-hidden="true" />
+            <div><Text meta>Workspace</Text><Text weight="medium">Shared product kit</Text></div>
+          </div>
+          <div className={styles.topbarMeta}>
+            <Text size="sm" tone="tertiary">System preview</Text>
+            <Badge tone="success">Foundation</Badge>
+          </div>
         </div>
       )}
     >
@@ -372,17 +388,21 @@ export function UiEngineShowcase() {
                     </Select>
                   </FilterBar>
                 )}
-                actions={<Button size="sm" variant="secondary">Export</Button>}
+                actions={(
+                  <>
+                    {selectedRows.length ? (
+                      <SelectionBar count={selectedRows.length} variant="inline">
+                        <Button size="sm" variant="ghost" leadingIcon={<Archive aria-hidden="true" />}>Archive</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setSelectedRows([])}>Clear</Button>
+                      </SelectionBar>
+                    ) : null}
+                    <Button size="sm" variant="secondary">Export</Button>
+                  </>
+                )}
               />
             )}
             pagination={<Pagination page={page} pageCount={4} onPageChange={setPage} />}
           >
-            {selectedRows.length ? (
-              <SelectionBar count={selectedRows.length}>
-                <Button size="sm" variant="ghost" leadingIcon={<Archive aria-hidden="true" />}>Archive</Button>
-                <Button size="sm" variant="ghost" onClick={() => setSelectedRows([])}>Clear</Button>
-              </SelectionBar>
-            ) : null}
             <DataTable minWidth={880} density="compact" stickyHeader>
               <TableHeader>
                 <TableRow>
@@ -415,10 +435,20 @@ export function UiEngineShowcase() {
                         />
                       </TableCell>
                       <TableCell data-column="identifier">{record.id}</TableCell>
-                      <TableCell><Text weight="medium">{record.name}</Text></TableCell>
+                      <TableCell wrap>
+                        <TableCellContent
+                          primary={<Text weight="medium">{record.name}</Text>}
+                          secondary={record.detail}
+                          primaryLines={2}
+                        />
+                      </TableCell>
                       <TableCell>{record.group}</TableCell>
                       <TableCell>{formatDate(record.updatedAt)}</TableCell>
-                      <TableCell align="end">{record.items}</TableCell>
+                      <TableCell align="end">
+                        {record.id === "R-1048" ? (
+                          <TableCellContent primary={record.items} secondary="line items" align="end" />
+                        ) : record.items}
+                      </TableCell>
                       <TableCell align="end">{money.format(record.amount)}</TableCell>
                       <TableCell>
                         <StatusBadge tone={record.status === "Active" ? "success" : record.status === "Review" ? "warning" : "neutral"}>

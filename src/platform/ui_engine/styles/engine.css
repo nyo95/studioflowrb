@@ -324,7 +324,7 @@ select {
 .ui-table th {
   height: 36px;
   padding: 8px 12px;
-  border-bottom: 0;
+  border-bottom: 1px solid var(--ui-border-strong);
   background: var(--ui-table-header-bg);
   color: var(--ui-table-header-fg);
   font-size: 0.6875rem;
@@ -332,7 +332,8 @@ select {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.ui-table td { padding: 10px 12px; }
+.ui-table td { padding: 10px 12px; white-space: nowrap; }
+.ui-table td[data-wrap] { white-space: normal; }
 .ui-table-surface[data-density="compact"] .ui-table th { height: 32px; padding-block: 6px; }
 .ui-table-surface[data-density="compact"] .ui-table td { padding-block: 7px; }
 .ui-table tbody tr:last-child td { border-bottom: 0; }
@@ -342,6 +343,19 @@ select {
 .ui-table [data-align="center"] { text-align: center; }
 .ui-table [data-column="identifier"] { color: var(--ui-text-secondary); font-family: var(--ui-font-mono); font-size: 0.8125rem; letter-spacing: -0.01em; }
 .ui-table [data-align="end"] { text-align: right; font-variant-numeric: tabular-nums; }
+.ui-table-cell-content { display: grid; min-width: 0; gap: 2px; line-height: 1.3; }
+.ui-table-cell-content[data-align="center"] { justify-items: center; text-align: center; }
+.ui-table-cell-content[data-align="end"] { justify-items: end; text-align: right; }
+.ui-table-cell-primary {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+.ui-table-cell-content[data-primary-lines="2"] .ui-table-cell-primary { -webkit-line-clamp: 2; }
+.ui-table-cell-secondary { color: var(--ui-text-tertiary); font-size: 0.75rem; line-height: 1.25; white-space: normal; }
 .ui-table-surface[data-sticky-header="true"] thead { position: sticky; top: 0; z-index: 1; }
 
 /* Sort control. The engine renders the affordance; the app does the comparing. */
@@ -361,10 +375,9 @@ select {
 .ui-table-sort svg { width: 13px; height: 13px; flex: 0 0 auto; opacity: 0.4; transition: opacity 120ms ease; }
 .ui-table-sort:hover svg { opacity: 0.85; }
 .ui-table-sort[data-active] svg { opacity: 1; }
-/* The header band is near-black, so the global focus colour would be invisible
-   on it. Focus is drawn in the band's own foreground instead. */
+/* Header focus stays strong against the warm-neutral header surface. */
 .ui-table th .ui-table-sort:focus-visible {
-  outline: 2px solid var(--ui-table-header-fg);
+  outline: 2px solid var(--ui-border-focus);
   outline-offset: 3px;
   border-radius: 2px;
 }
@@ -387,7 +400,7 @@ select {
 .ui-table-toolbar-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .ui-table-toolbar-main { flex: 1; min-width: 0; }
 
-.ui-search-field { position: relative; width: min(100%, 300px); }
+.ui-search-field { position: relative; width: min(100%, 260px); }
 .ui-search-field > svg:first-child { position: absolute; z-index: 1; left: 10px; top: 50%; width: 15px; height: 15px; transform: translateY(-50%); color: var(--ui-text-tertiary); }
 .ui-search-field .ui-input { padding-left: 32px; padding-right: 34px; }
 .ui-search-field .ui-icon-button { position: absolute; right: 2px; top: 2px; }
@@ -475,8 +488,8 @@ select {
 /* The rail is divided from the work area by a drawn rule, not by a tone. It is one
    step stronger than an ordinary border because it separates navigation from work —
    a major division, unlike the hairlines inside a card. */
-.ui-app-rail { position: sticky; top: 0; display: flex; min-width: 0; height: 100vh; flex-direction: column; border-right: 1px solid var(--ui-border-strong); background: var(--ui-surface); }
-.ui-app-brand { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--ui-border-subtle); }
+.ui-app-rail { position: sticky; top: 0; display: flex; min-width: 0; height: 100vh; flex-direction: column; border-right: 1px solid var(--ui-border-default); background: color-mix(in srgb, var(--ui-surface-muted) 52%, var(--ui-surface)); }
+.ui-app-brand { min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 16px; }
 .ui-app-brand-mark { min-width: 0; overflow: hidden; }
 
 /* Collapsed rail. Apps mark their nav label text with .ui-nav-label; the engine
@@ -510,7 +523,7 @@ select {
 @media (prefers-reduced-motion: reduce) {
   .ui-app-shell { transition: none; }
 }
-.ui-app-nav { min-width: 0; flex: 1; overflow: auto; padding: 10px; }
+.ui-app-nav { min-width: 0; flex: 1; overflow: auto; padding: 8px 12px 14px; }
 
 .ui-nav-item {
   position: relative;
@@ -518,10 +531,10 @@ select {
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 34px;
-  padding: 7px 10px;
-  border: 0;
-  border-radius: var(--ui-radius-action);
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-control);
   background: transparent;
   color: var(--ui-text-secondary);
   font: inherit;
@@ -531,20 +544,21 @@ select {
 .ui-nav-icon { display: inline-flex; flex: 0 0 auto; }
 .ui-nav-icon svg { width: 16px; height: 16px; }
 
-.ui-nav-item:hover { background: var(--ui-surface-muted); color: var(--ui-text-primary); }
+.ui-nav-item:hover { border-color: var(--ui-border-subtle); background: rgb(255 255 255 / 0.62); color: var(--ui-text-primary); }
 
 /* Current location. Hover already owns the muted fill, so "active" cannot rely on
    fill alone or the two become indistinguishable. It is marked on three channels
    at once: an ink rule, ink-weight text, and heavier type. */
 .ui-nav-item[data-active] {
-  background: var(--ui-surface-muted);
+  border-color: var(--ui-border-default);
+  background: var(--ui-surface);
   color: var(--ui-text-primary);
-  font-weight: 500;
+  font-weight: 600;
 }
 .ui-nav-item[data-active]::before {
   content: "";
   position: absolute;
-  left: 0;
+  left: -1px;
   top: 50%;
   width: 3px;
   height: 18px;
@@ -552,9 +566,9 @@ select {
   border-radius: 0 2px 2px 0;
   background: var(--ui-action-primary);
 }
-.ui-app-utility { padding: 10px; border-top: 1px solid var(--ui-border-subtle); }
+.ui-app-utility { padding: 14px 16px; border-top: 1px solid var(--ui-border-default); }
 .ui-app-viewport { min-width: 0; }
-.ui-app-topbar { position: sticky; top: 0; z-index: 10; min-height: 52px; display: flex; align-items: center; border-bottom: 1px solid var(--ui-border-default); background: rgb(255 255 255 / 0.88); backdrop-filter: blur(10px); }
+.ui-app-topbar { position: sticky; top: 0; z-index: 10; min-height: 64px; display: flex; align-items: center; border-bottom: 1px solid var(--ui-border-default); background: rgb(255 255 255 / 0.94); backdrop-filter: blur(12px); }
 .ui-app-content { min-width: 0; }
 
 .ui-page-shell { display: grid; width: 100%; max-width: 1200px; margin: 0 auto; gap: 24px; padding: var(--ui-page-padding); }
@@ -666,6 +680,8 @@ select {
 .ui-filter-bar[data-active="true"] { border-color: var(--ui-border-strong); }
 
 .ui-selection-bar { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 8px 6px 12px; border: 1px solid var(--ui-border-strong); border-radius: var(--ui-radius-control); background: var(--ui-surface-muted); }
+.ui-selection-bar[data-variant="inline"] { min-height: 34px; gap: 8px; padding: 0 3px 0 10px; border-color: var(--ui-border-default); background: var(--ui-surface-muted); }
+.ui-selection-bar[data-variant="inline"] > strong { white-space: nowrap; font-size: 0.75rem; }
 .ui-selection-actions { display: flex; align-items: center; gap: 6px; }
 .ui-reorder-handle { cursor: grab; color: var(--ui-text-tertiary); }
 .ui-reorder-handle:active { cursor: grabbing; }

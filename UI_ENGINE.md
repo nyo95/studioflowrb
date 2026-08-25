@@ -137,6 +137,11 @@ Feature-specific globals such as `--ui-brand-table-col-*`, `--ui-pricing-materia
 ### AppShell
 Owns global navigation frame, content viewport, and responsive shell behavior. Apps provide navigation configuration.
 
+The expanded rail is warm application chrome rather than a white content card.
+The sticky topbar aligns to the page content and carries app-supplied context/status.
+Active navigation uses a bordered white plane plus the retained leading ink rule;
+hover remains a lighter transient state.
+
 **Collapsible rail.** `collapsible` opts the rail into a 232px <-> 60px icon rail.
 State is controlled (`collapsed` + `onCollapsedChange`) or uncontrolled
 (`defaultCollapsed`). UI Engine owns the affordance, the widths, the transition,
@@ -291,11 +296,34 @@ its printed label, and an amount sorts by its number, not by its formatted strin
 Only the app knows which of a row's fields is the sortable one. A generic
 comparator in the engine would silently sort `"12,880.00"` before `"18.00"`.
 
-Focus note: the header band is near-black, so the sort control draws its focus
-ring in `--ui-table-header-fg`. The global focus colour is invisible there.
+Focus note: the warm-neutral header uses the shared focus border. The header token
+pair remains canonical so applications never restyle individual tables.
 
 Selection note: selected rows retain their explicit selection control and add a
 leading ink rule. Selection never replaces or recolors app-supplied status markers.
+
+### Multi-line cell content
+
+`TableCell` is single-line by default and accepts `wrap` when prose must flow.
+`TableCellContent` provides the canonical two-tier treatment:
+
+```tsx
+<TableCell wrap>
+  <TableCellContent
+    primary="Long record name"
+    secondary="Optional supporting context"
+    primaryLines={2}
+  />
+</TableCell>
+```
+
+Primary content may be clamped to one or two lines; secondary context is tertiary
+metadata. `align="end"` keeps numeric primary/secondary values aligned together.
+Apps must not insert manual line breaks or invent table-local metadata typography.
+
+Selection state may use `SelectionBar variant="inline"` inside `TableToolbar`
+beside export/secondary actions. The default `bar` variant remains available when
+a full-width batch-action region is genuinely required.
 
 ## 8. Form Contract
 
@@ -487,7 +515,7 @@ The pre-product UI kit is one bounded implementation program with four checkpoin
 
 - `Field`, `FormSection`, `FormActions`;
 - `SectionCard`, `PageSection`;
-- `DataTable`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`, `TableCell`;
+- `DataTable`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`, `TableCell`, `TableCellContent`;
 - `TableToolbar`, `SearchField`, `Pagination`;
 - `DescriptionList`, `DescriptionItem`;
 - `StatusBadge`, `Notice`, `LoadingState`, `EmptyState`, `ErrorState`, `InlineError`.

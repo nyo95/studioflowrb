@@ -22,8 +22,8 @@
   --ui-warning-fg: #b45309;
   --ui-warning-bg: #fffbeb;
   --ui-warning-border: #fde68a;
-  --ui-table-header-bg: #1c1a18;
-  --ui-table-header-fg: #ffffff;
+  --ui-table-header-bg: #f5f4f2;
+  --ui-table-header-fg: #55524d;
   --ui-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   --ui-radius-card: 8px;
   --ui-radius-control: 6px;

@@ -37,6 +37,7 @@ describe("UI Engine foundation", () => {
       "TableRow",
       "TableHead",
       "TableCell",
+      "TableCellContent",
       "TableToolbar",
       "SearchField",
       "Pagination",
@@ -147,6 +148,27 @@ describe("UI Engine foundation", () => {
 
     const css = readFileSync(new URL("./styles/engine.css", import.meta.url), "utf8");
     assert.match(css, /tr\[data-selected="true"\] td:first-child/);
+
+    const tieredCell = renderToStaticMarkup(createElement(
+      "table",
+      null,
+      createElement("tbody", null, createElement("tr", null,
+        createElement(ui.TableCell, { wrap: true }, createElement(ui.TableCellContent, {
+          primary: "Long value",
+          secondary: "Supporting context",
+          primaryLines: 2,
+        })),
+      )),
+    ));
+    assert.match(tieredCell, /data-wrap="true"/);
+    assert.match(tieredCell, /data-primary-lines="2"/);
+    assert.match(tieredCell, /ui-table-cell-secondary/);
+
+    const inlineSelection = renderToStaticMarkup(createElement(ui.SelectionBar, {
+      count: 2,
+      variant: "inline",
+    }));
+    assert.match(inlineSelection, /data-variant="inline"/);
   });
 
   it("keeps desktop rail preference while forcing labeled narrow navigation", () => {

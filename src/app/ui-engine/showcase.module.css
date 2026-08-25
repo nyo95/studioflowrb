@@ -6,7 +6,18 @@
   text-decoration: none;
 }
 
-.brand > span {
+.brandCopy,
+.utilityCard > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.brandCopy strong { font-size: 0.8125rem; line-height: 1.2; }
+.brandCopy small,
+.utilityCard small { color: var(--ui-text-tertiary); font-size: 0.6875rem; line-height: 1.2; }
+
+.brand > span:first-child {
   display: inline-grid;
   width: 30px;
   height: 30px;
@@ -24,6 +35,29 @@
   display: grid;
   gap: 3px;
 }
+
+.navigationLabel { margin: 8px 10px 6px; }
+
+.utilityCard {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.utilityCard > span:first-child {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ui-action-primary);
+  color: var(--ui-text-inverse);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.utilityCard strong { font-size: 0.75rem; line-height: 1.2; }
 
 /* Rail nav items now come from the engine (.ui-nav-item). Only the settings
    sub-nav is still styled locally. */
@@ -59,8 +93,19 @@
 
 .topbar {
   width: 100%;
-  padding: 0 20px;
+  padding: 0 var(--ui-page-padding);
 }
+
+.topbarContext,
+.topbarMeta { display: flex; align-items: center; gap: 10px; }
+.topbarContext > span {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--ui-action-primary);
+}
+.topbarContext > div { display: grid; gap: 1px; }
 
 .foundationGrid,
 .twoColumn,
@@ -171,6 +216,8 @@
   }
 
   .navigation a { white-space: nowrap; }
+  .navigationLabel { display: none; }
+  .topbarMeta > :first-child { display: none; }
 }
 
 @media (max-width: 840px) {

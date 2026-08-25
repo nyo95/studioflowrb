@@ -135,10 +135,49 @@ export function TableHead({
 
 export function TableCell({
   align = "start",
+  wrap = false,
   className,
   ...props
-}: Omit<TdHTMLAttributes<HTMLTableCellElement>, "align"> & { align?: "start" | "center" | "end" }) {
-  return <td className={cx(className)} data-align={align} {...props} />;
+}: Omit<TdHTMLAttributes<HTMLTableCellElement>, "align"> & {
+  align?: "start" | "center" | "end";
+  /** Allow prose in this cell to wrap instead of forcing a single operational line. */
+  wrap?: boolean;
+}) {
+  return <td className={cx(className)} data-align={align} data-wrap={wrap || undefined} {...props} />;
+}
+
+export type TableCellContentProps = HTMLAttributes<HTMLDivElement> & {
+  primary: ReactNode;
+  secondary?: ReactNode;
+  align?: "start" | "center" | "end";
+  /** Maximum visible lines for the primary value before truncation. */
+  primaryLines?: 1 | 2;
+};
+
+/**
+ * Intentional two-tier table content. Use this instead of inserting manual line
+ * breaks so row height, muted metadata, wrapping and numeric alignment remain
+ * consistent across applications.
+ */
+export function TableCellContent({
+  primary,
+  secondary,
+  align = "start",
+  primaryLines = 1,
+  className,
+  ...props
+}: TableCellContentProps) {
+  return (
+    <div
+      className={cx("ui-table-cell-content", className)}
+      data-align={align}
+      data-primary-lines={primaryLines}
+      {...props}
+    >
+      <span className="ui-table-cell-primary">{primary}</span>
+      {secondary ? <span className="ui-table-cell-secondary">{secondary}</span> : null}
+    </div>
+  );
 }
 
 export type TableToolbarProps = HTMLAttributes<HTMLDivElement> & {
