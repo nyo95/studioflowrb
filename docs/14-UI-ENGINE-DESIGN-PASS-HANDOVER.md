@@ -367,5 +367,20 @@ refinement:
 Live browser evidence at 1184×912 showed no page overflow, a 64px topbar, the
 232px expanded rail, selection and Export aligned in one toolbar row, and stable
 35px two-tier cell content. Sort affordances and semantic status markers remain
-independent and unchanged. This refinement supersedes the first UI-approved
-Master Data tag; execution starts from `masterdata-full-build-start-ui-approved-v2`.
+independent and unchanged. This refinement initially produced the now-superseded
+`masterdata-full-build-start-ui-approved-v2` ref; §10.1 records the final follow-up.
+
+### 10.1 Compact toolbar follow-up
+
+The owner then identified the remaining overlap risk in the combined toolbar.
+Commit `41903e3` converts clear-filter, archive-selection, clear-selection, and
+export utilities to symbol-only `IconButton` controls with explicit accessible
+names and tooltips. The active filter value remains visible text, while selection
+state remains a visible icon-plus-number indicator rather than becoming
+hover-only information.
+
+At 1280×720 the toolbar remained one row with no page overflow; the complete
+right-side action group measured 163px and exposed accessible names for all four
+utilities. The final Master Data execution ref is therefore
+`masterdata-full-build-start-ui-approved-v3`; both earlier UI-approved refs are
+superseded.

@@ -17,11 +17,12 @@ Execution shape: UI-A → UI-B → UI-C → UI-D as four sequential commits in o
 - Independent design pass: `1ab1a82` — warm-neutral visual convergence, sortable data headers, explicit current navigation, collapsible rail, and status treatment.
 - PM/TL convergence correction: `8f1ca0b` — selected-row signal, narrow-navigation behavior, Combobox keyboard contract, token/document corrections, and regression tests.
 - Owner-feedback refinement: `160d2f6` — inline selection toolbar, redesigned application chrome, warm-neutral table header, and canonical one/two-line table cell content.
+- Compact-toolbar refinement: `41903e3` — symbol-only secondary utilities with accessible names/tooltips while filter value and selection count stay visible.
 - Automated acceptance: 117 tests, repository checks, Prisma validate/generate, boundary fixtures, legacy-runtime fixtures, production build, and diff checks passed.
 - PM/TL responsive/interaction review: passed at 1440×900, 1024×768, 768×1024, and 390×844 after bounded corrections.
 - 200% layout-equivalent review passed at 720×450; DocumentSheet print isolation was verified by source, tests, and loaded CSSOM.
 - Independent review records: `docs/13-CLAUDE-UI-DESIGN-REVIEW-HANDOVER.md` and `docs/14-UI-ENGINE-DESIGN-PASS-HANDOVER.md`.
-- The owner approved the refined warm-neutral, Programa-influenced visual direction. Master Data proceeds from `masterdata-full-build-start-ui-approved-v2`; the earlier UI-approved tag is superseded.
+- The owner approved the refined warm-neutral, Programa-influenced visual direction. Master Data proceeds from `masterdata-full-build-start-ui-approved-v3`; both earlier UI-approved tags are superseded.
 
 The original external-executor instructions below are retained as the historical implementation contract. Do not rerun UI-01 as a new implementation work order.
 
