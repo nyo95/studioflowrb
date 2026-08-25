@@ -1,3 +1,4 @@
 @import "tailwindcss";
 @import "../platform/ui_engine/tokens/tokens.css";
 @import "../platform/ui_engine/styles/engine.css";
+@import "../platform/ui_engine/styles/print.css";
