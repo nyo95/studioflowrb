@@ -1,14 +1,29 @@
 "use client";
 
-import { createContext, useContext, useState, type AnchorHTMLAttributes, type HTMLAttributes, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type AnchorHTMLAttributes, type HTMLAttributes, type ReactNode } from "react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import { cx } from "../internal/cx";
+import { getEffectiveRailCollapsed } from "../internal/rail-state";
 import { Heading, Text } from "../primitives";
 import { IconButton } from "../primitives";
 import { Tooltip } from "./overlays";
 
 const RailContext = createContext<{ collapsed: boolean }>({ collapsed: false });
+
+function useNarrowNavigation(): boolean {
+  const [narrow, setNarrow] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 840px)");
+    const update = () => setNarrow(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  return narrow;
+}
 
 export type AppShellProps = {
   brand: ReactNode;
@@ -47,7 +62,11 @@ export function AppShell({
   collapseLabel = "Collapse navigation",
 }: AppShellProps) {
   const [internalCollapsed, setInternalCollapsed] = useState(defaultCollapsed);
-  const isCollapsed = collapsible && (collapsed ?? internalCollapsed);
+  const narrowNavigation = useNarrowNavigation();
+  const storedCollapsed = collapsed ?? internalCollapsed;
+  // Narrow layouts always retain visible labels. The desktop preference remains
+  // untouched and returns when the viewport widens again.
+  const isCollapsed = getEffectiveRailCollapsed(collapsible, narrowNavigation, storedCollapsed);
 
   const toggle = () => {
     const next = !isCollapsed;
@@ -61,7 +80,7 @@ export function AppShell({
       <aside className="ui-app-rail" aria-label={navigationLabel} data-collapsed={isCollapsed || undefined}>
         <div className="ui-app-brand">
           <div className="ui-app-brand-mark">{isCollapsed ? (collapsedBrand ?? brand) : brand}</div>
-          {collapsible ? (
+          {collapsible && !narrowNavigation ? (
             <IconButton
               className="ui-app-rail-toggle"
               size="sm"

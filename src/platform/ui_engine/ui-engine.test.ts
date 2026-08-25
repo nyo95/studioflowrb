@@ -7,6 +7,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import * as ui from "./index";
+import { getComboboxNavigationIndex } from "./internal/combobox-navigation";
+import { getEffectiveRailCollapsed } from "./internal/rail-state";
 import { getInlineEditKeyAction } from "./patterns/inline-edit";
 
 describe("UI Engine foundation", () => {
@@ -47,6 +49,7 @@ describe("UI Engine foundation", () => {
       "ConfirmDialog",
       "Tooltip",
       "AppShell",
+      "NavItem",
       "PageShell",
       "PageHeader",
       "DirectoryShell",
@@ -120,6 +123,47 @@ describe("UI Engine foundation", () => {
     const table = renderToStaticMarkup(createElement(ui.DataTable, { minWidth: "900px" }));
     assert.match(table, /data-table-overflow="horizontal"/);
     assert.match(table, /min-width:900px/);
+  });
+
+  it("exposes generic navigation, description columns, sorting, and selected-row presentation", () => {
+    const nav = renderToStaticMarkup(createElement(ui.NavItem, { href: "/records", active: true, children: "Records" }));
+    assert.match(nav, /aria-current="page"/);
+
+    const descriptions = renderToStaticMarkup(createElement(ui.DescriptionList, { columns: 1 }));
+    assert.match(descriptions, /data-columns="1"/);
+
+    const header = renderToStaticMarkup(createElement(
+      "table",
+      null,
+      createElement("thead", null, createElement("tr", null, createElement(ui.TableHead, {
+        sortable: true,
+        sortDirection: "asc",
+        onSortChange: () => undefined,
+        sortLabel: (direction) => `Name, sort ${direction}`,
+      }, "Name"))),
+    ));
+    assert.match(header, /aria-sort="ascending"/);
+    assert.match(header, /aria-label="Name, sort desc"/);
+
+    const css = readFileSync(new URL("./styles/engine.css", import.meta.url), "utf8");
+    assert.match(css, /tr\[data-selected="true"\] td:first-child/);
+  });
+
+  it("keeps desktop rail preference while forcing labeled narrow navigation", () => {
+    assert.equal(getEffectiveRailCollapsed(true, false, true), true);
+    assert.equal(getEffectiveRailCollapsed(true, true, true), false);
+    assert.equal(getEffectiveRailCollapsed(false, false, true), false);
+  });
+
+  it("moves combobox focus across enabled options without landing on disabled choices", () => {
+    const disabled = [false, true, false, false];
+    assert.equal(getComboboxNavigationIndex(disabled, -1, "ArrowDown"), 0);
+    assert.equal(getComboboxNavigationIndex(disabled, -1, "ArrowUp"), 3);
+    assert.equal(getComboboxNavigationIndex(disabled, 0, "ArrowDown"), 2);
+    assert.equal(getComboboxNavigationIndex(disabled, 2, "ArrowUp"), 0);
+    assert.equal(getComboboxNavigationIndex(disabled, 2, "End"), 3);
+    assert.equal(getComboboxNavigationIndex(disabled, 2, "Home"), 0);
+    assert.equal(getComboboxNavigationIndex([true, true], -1, "ArrowDown"), null);
   });
 
   it("locks inline edit keyboard behavior and document print hooks", () => {

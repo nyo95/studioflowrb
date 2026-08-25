@@ -9,7 +9,7 @@ Authority: this file specializes `docs/02-UI-ENGINE-PRD.md`. Product/domain owne
 ## 1. Design Intent
 
 StudioFlow uses a quiet, restrained professional UI:
-- neutral slate palette;
+- warm-neutral palette with near-black ink;
 - white working surfaces over a light canvas;
 - compact, information-dense layouts;
 - serif typography for major page headings;
@@ -77,7 +77,7 @@ loaded for it. Use it for identifiers and reference codes so a reference reads a
 a reference rather than as prose. Do not use it for running text.
 
 Contrast floor: every text token must clear WCAG AA (4.5:1) against both Surface
-and Canvas. Tertiary/meta text is held at `#656f75` for this reason — it carries
+and Canvas. Tertiary/meta text is held at `#6e6a65` for this reason — it carries
 table headers, eyebrows, placeholders, and disabled labels, all of which are small.
 Do not lighten it.
 
@@ -99,7 +99,7 @@ Do not introduce app-specific accent colors for ordinary navigation, cards, or b
 
 Primary surfaces are white with a 1px subtle/default border and no shadow by default. Shadow is reserved for dialogs, drawers, menus, floating toolbars, or genuinely elevated content. Avoid deep elevation and card-inside-card layouts.
 
-Elevation model — two planes, no more:
+Elevation model — two physical planes plus one emphasis band:
 
 | Plane | What sits there | Treatment |
 | --- | --- | --- |
@@ -179,6 +179,11 @@ Navigation always answers "where am I". Every rail marks its current entry, and
 marks it on more than one channel — a fill alone collides with hover and reads as
 nothing. The mark survives the collapsed rail, where it is the only orientation
 cue left once labels are gone.
+
+Row selection also uses more than hover fill: the selection control remains
+checked and the row receives a restrained ink rule at its leading edge. Status
+meaning remains independent, so an ACTIVE selected row keeps its semantic marker
+without turning the whole row green.
 
 Sortable columns carry their control in the header itself: the label becomes the
 button, with an unsorted / ascending / descending indicator beside it. Do not add a
@@ -270,6 +275,11 @@ Desktop operational use is primary, but narrower layouts must remain functional:
 - actions remain reachable.
 
 Do not improve mobile by removing core information.
+
+The collapsible icon rail is a desktop behavior. At `840px` and below, navigation
+always returns to labeled horizontal form even when the stored desktop preference
+is collapsed. The preference is preserved and may resume when the viewport widens;
+UI Engine does not persist it.
 
 ## 13. Interaction Contract
 

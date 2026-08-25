@@ -92,8 +92,10 @@ Keep only shared semantic tokens:
 canvas
 surface
 surface-raised
+surface-muted
 border-subtle
 border-default
+border-strong
 border-focus
 text-primary
 text-secondary
@@ -101,6 +103,9 @@ text-tertiary
 text-inverse
 action-primary
 action-primary-hover
+table-header-bg
+table-header-fg
+font-mono
 state-danger-foreground
 state-danger-surface
 state-danger-border
@@ -136,6 +141,10 @@ Owns global navigation frame, content viewport, and responsive shell behavior. A
 State is controlled (`collapsed` + `onCollapsedChange`) or uncontrolled
 (`defaultCollapsed`). UI Engine owns the affordance, the widths, the transition,
 and `aria-expanded`; it does not persist the choice — persistence is app state.
+
+At `840px` and below, the effective presentation is always expanded and labeled.
+The desktop preference is retained rather than overwritten, the collapse control
+is not shown, and the stored state resumes only when the viewport widens.
 
 | Prop | Type | Default | Notes |
 | --- | --- | --- | --- |
@@ -284,6 +293,9 @@ comparator in the engine would silently sort `"12,880.00"` before `"18.00"`.
 
 Focus note: the header band is near-black, so the sort control draws its focus
 ring in `--ui-table-header-fg`. The global focus colour is invisible there.
+
+Selection note: selected rows retain their explicit selection control and add a
+leading ink rule. Selection never replaces or recolors app-supplied status markers.
 
 ## 8. Form Contract
 
@@ -498,7 +510,10 @@ The pre-product UI kit is one bounded implementation program with four checkpoin
 
 - Components accept generic values, slots, callbacks, and semantic variants; they never fetch or mutate domain data.
 - DataTable owns table presentation/accessibility/overflow and the sort affordance, not columns, sort comparators, query state, or calculations.
-- Combobox owns generic selection/search interaction, not remote fetching, entity vocabulary, or authorization.
+- Combobox owns generic selection/search interaction, including ArrowUp/ArrowDown
+  movement across enabled options, Home/End movement within the option list,
+  Enter selection, Escape close/focus return, and visible keyboard focus. It does
+  not own remote fetching, entity vocabulary, authorization, or business ranking.
 - InlineEdit owns editing states and keyboard behavior, not validation/business saving rules.
 - FileDropZone owns input/drop interaction and file-list presentation, not storage/upload policy.
 - StatusBadge receives an explicit semantic tone and never infers meaning from a domain status string.

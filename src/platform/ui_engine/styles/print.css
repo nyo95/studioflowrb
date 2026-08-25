@@ -7,7 +7,7 @@
   padding: 18mm 16mm;
   border: 1px solid var(--ui-border-default);
   background: var(--ui-surface);
-  box-shadow: 0 12px 32px rgb(15 23 42 / 0.08);
+  box-shadow: 0 12px 32px rgb(28 26 24 / 0.08);
   color: var(--ui-text-primary);
 }
 
