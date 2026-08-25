@@ -3,9 +3,12 @@
 import {
   Archive,
   Check,
+  CheckSquare2,
   CircleHelp,
   Copy,
+  Download,
   FileText,
+  FilterX,
   Layers,
   LayoutGrid,
   MousePointerClick,
@@ -15,6 +18,7 @@ import {
   SlidersHorizontal,
   Table2,
   Trash2,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -381,22 +385,66 @@ export function UiEngineShowcase() {
                   />
                 )}
                 filters={(
-                  <FilterBar active={filterActive} onClear={() => setFilterActive(false)}>
+                  <FilterBar active={filterActive}>
                     <Select aria-label="Record group" defaultValue="all">
                       <option value="all">All groups</option>
                       <option value="general">General</option>
                     </Select>
+                    {filterActive ? (
+                      <Tooltip content="Clear filters">
+                        <IconButton
+                          size="sm"
+                          variant="ghost"
+                          label="Clear filters"
+                          icon={<FilterX aria-hidden="true" />}
+                          onClick={() => setFilterActive(false)}
+                        />
+                      </Tooltip>
+                    ) : null}
                   </FilterBar>
                 )}
                 actions={(
                   <>
                     {selectedRows.length ? (
-                      <SelectionBar count={selectedRows.length} variant="inline">
-                        <Button size="sm" variant="ghost" leadingIcon={<Archive aria-hidden="true" />}>Archive</Button>
-                        <Button size="sm" variant="ghost" onClick={() => setSelectedRows([])}>Clear</Button>
+                      <SelectionBar
+                        count={selectedRows.length}
+                        variant="inline"
+                        label={(count) => (
+                          <Tooltip content={`${count} ${count === 1 ? "record" : "records"} selected`}>
+                            <span className={styles.selectionCount} aria-label={`${count} ${count === 1 ? "record" : "records"} selected`}>
+                              <CheckSquare2 aria-hidden="true" />
+                              <span>{count}</span>
+                            </span>
+                          </Tooltip>
+                        )}
+                      >
+                        <Tooltip content="Archive selected">
+                          <IconButton
+                            size="sm"
+                            variant="ghost"
+                            label="Archive selected"
+                            icon={<Archive aria-hidden="true" />}
+                          />
+                        </Tooltip>
+                        <Tooltip content="Clear selection">
+                          <IconButton
+                            size="sm"
+                            variant="ghost"
+                            label="Clear selection"
+                            icon={<X aria-hidden="true" />}
+                            onClick={() => setSelectedRows([])}
+                          />
+                        </Tooltip>
                       </SelectionBar>
                     ) : null}
-                    <Button size="sm" variant="secondary">Export</Button>
+                    <Tooltip content="Export records">
+                      <IconButton
+                        size="sm"
+                        variant="secondary"
+                        label="Export records"
+                        icon={<Download aria-hidden="true" />}
+                      />
+                    </Tooltip>
                   </>
                 )}
               />

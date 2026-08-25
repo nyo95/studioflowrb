@@ -198,6 +198,12 @@ checked and the row receives a restrained ink rule at its leading edge. Status
 meaning remains independent, so an ACTIVE selected row keeps its semantic marker
 without turning the whole row green.
 
+In a constrained directory toolbar, secondary utility actions use icon buttons
+with explicit accessible names and visible-on-hover/focus tooltips. This applies
+to reset filters, archive selection, clear selection, and export. Keep the active
+filter value itself visible as text, and keep the selection count visible as a
+compact icon-plus-number indicator; neither may be hidden entirely in a tooltip.
+
 Sortable columns carry their control in the header itself: the label becomes the
 button, with an unsorted / ascending / descending indicator beside it. Do not add a
 separate sort icon column, and do not make the whole header row a single control —

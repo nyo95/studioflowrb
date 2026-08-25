@@ -325,6 +325,12 @@ Selection state may use `SelectionBar variant="inline"` inside `TableToolbar`
 beside export/secondary actions. The default `bar` variant remains available when
 a full-width batch-action region is genuinely required.
 
+When inline toolbar width is constrained, secondary utilities (clear filters,
+archive selection, clear selection, export) use `IconButton` with an explicit
+accessible label and `Tooltip`. Current filter values remain textual, and the
+selection count remains visible as a compact icon-plus-number indicator. Icon-only
+presentation must never make state discoverable only by hovering.
+
 ## 8. Form Contract
 
 UI Engine may own:

@@ -107,6 +107,18 @@
 }
 .topbarContext > div { display: grid; gap: 1px; }
 
+.selectionCount {
+  display: inline-flex;
+  min-width: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--ui-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.selectionCount svg { width: 14px; height: 14px; }
+
 .foundationGrid,
 .twoColumn,
 .patternGrid,
