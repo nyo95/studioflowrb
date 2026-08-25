@@ -1,6 +1,6 @@
 # 09 — Execution Plan
 
-Status: FOUNDATION + MD-00 COMPLETE — UI ENGINE TECHNICAL REVIEW COMPLETE — CLAUDE DESIGN REVIEW NEXT
+Status: FOUNDATION + UI ENGINE + MD-00 COMPLETE — MASTER DATA EXECUTION NEXT
 Updated: 2026-08-25
 Owner: PM / Technical Lead
 
@@ -81,14 +81,15 @@ PM/TL revalidated Core on 2026-08-25 against canonical legacy evidence from GitH
 
 1. UI-01 UI-A through UI-D — COMPLETE; commits `628a77c`, `ad8d564`, `27becfa`, and `4354c4f`.
 2. PM/TL diff, test, accessibility, responsive, interaction, and `/ui-engine` review — COMPLETE.
-3. Independent Claude design review using `docs/13-CLAUDE-UI-DESIGN-REVIEW-HANDOVER.md` — NEXT; review-only first pass, followed by owner decision or a bounded correction WO.
-4. After design findings are resolved and owner approval is recorded, PM/TL issues a new Master Data starting ref and reactivates `scripts/work-orders/MASTER-DATA-FULL-BUILD.md`.
-5. Execute MD-01 through MD-09 sequentially and review at Gate 1, Gate 2, Gate 3, and Final Gate.
-6. Lock and implement the Master Data public contract.
-7. Lock BQ readiness, provenance, snapshot, refresh, duplicate, library, and calculation contracts.
-8. Issue BQ schema/domain/application/UI work orders.
-9. Run cross-app boundary, migration, and smoke verification.
+3. Independent Claude design review and owner-directed design pass — COMPLETE; commit `1ab1a82` reviewed through `docs/14-UI-ENGINE-DESIGN-PASS-HANDOVER.md`.
+4. PM/TL convergence correction and contract ratification — COMPLETE; commit `8f1ca0b`, 117 tests, full repository acceptance, responsive/keyboard/sort/selection review, and owner visual approval passed.
+5. Master Data starting ref `masterdata-full-build-start-ui-approved` issued; `scripts/work-orders/MASTER-DATA-FULL-BUILD.md` is ACTIVE.
+6. Execute MD-01 through MD-09 sequentially and review at Gate 1, Gate 2, Gate 3, and Final Gate.
+7. Lock and implement the Master Data public contract.
+8. Lock BQ readiness, provenance, snapshot, refresh, duplicate, library, and calculation contracts.
+9. Issue BQ schema/domain/application/UI work orders.
+10. Run cross-app boundary, migration, and smoke verification.
 
 StudioFlow remains outside active implementation scope except for shared-boundary verification.
 
-The MD-01 through MD-09 dependency plan remains canonical in `MASTER_DATA.md`, but its executor package is PAUSED until independent design findings are resolved, the owner visual approval gate passes, and a new starting ref is issued. UI-01 did not authorize or introduce Master Data schema, CRUD, or domain implementation.
+The MD-01 through MD-09 dependency plan remains canonical in `MASTER_DATA.md`. Its executor package is active only from `masterdata-full-build-start-ui-approved`; all older Master Data start tags are superseded. UI-01 and its convergence pass introduced no Master Data schema, CRUD, or domain implementation.

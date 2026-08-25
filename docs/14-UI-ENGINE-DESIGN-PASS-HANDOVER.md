@@ -3,7 +3,7 @@
 Author: Claude (independent design reviewer, then implementer under owner instruction)
 Branch: `ui-engine-design-pass`
 Base: `1c28100` (tag `ui-engine-design-review-ready`)
-Status: implemented, verified, **contract changes pending PM/TL ratification**
+Status: implemented, verified, **PM/TL-ratified with bounded convergence corrections**
 
 ---
 
@@ -300,18 +300,48 @@ Recorded because that review may be read on its own:
 
 ---
 
-## 8. Open decisions for PM/TL
+## 8. PM/TL decision record
 
-1. **Ratify or reject the contract changes in §3 and §4.**
-2. **Border weight vs ground depth.** The ground sits at 1.035:1 by owner
-   preference. If any surface reads as merged in real use, the smallest correction
-   is one token: `--ui-canvas` to a deeper value. Do not solve it by thickening
-   borders piecemeal.
-3. **Radius.** The reference product (Programa) uses ~10-12px card radius against
-   our 8px. Untouched, because it changes the whole radius system.
-4. **Density lane.** 14px base / 36px control is a middle setting that commits to
-   neither comfortable nor dense. `DESIGN.md` already allows BQ to be denser; that
-   decision is unmade.
-5. **Nothing here blocks Master Data.** The design gate that doc 13 opened is, in
-   this reviewer's judgement, closed — subject to §8.1 and the responsive check in
-   §6.
+1. **Contract changes in §3 and §4: ratified**, subject to the convergence
+   corrections recorded in §9.
+2. **Border weight vs ground depth: retained.** The ground remains at 1.035:1 by
+   owner preference; live viewport review found the 1px surface edges sufficient.
+3. **Radius: retained at 8px.** Programa is directional visual evidence, not a
+   literal component specification.
+4. **Density: retained.** The 14px base / 36px control remains the shared default;
+   BQ may use the already-authorized denser composition when its product evidence
+   requires it.
+5. **Master Data gate: closed.** Responsive checks and owner approval passed.
+
+---
+
+## 9. PM/TL ratification and final convergence (2026-08-25)
+
+The owner explicitly approved the current visual direction over the superseded
+initial `DESIGN.md` interpretation and asked PM/TL to close remaining regressions.
+PM/TL therefore ratifies the additive contract changes in §3 and §4, with the
+following bounded corrections in commit `8f1ca0b`:
+
+- `DESIGN.md` now records the warm-neutral direction, correct tertiary token,
+  selected-row treatment, and narrow-navigation rule;
+- selected rows retain a checked control plus a restrained ink leading rule,
+  while ACTIVE/WARNING/DANGER remain independent semantic status markers;
+- all seven showcase data columns were exercised as sortable; selection and
+  action columns remain intentionally non-sortable;
+- narrow layouts always expose navigation labels while preserving the stored
+  desktop collapse preference;
+- Combobox ArrowUp/ArrowDown/Home/End navigation skips disabled options, and
+  Enter/Escape selection/closure returns focus to the trigger;
+- warm-neutral focus/overlay/print literals replace the remaining slate literals.
+
+Final evidence: 117 tests, typecheck, boundary and legacy-runtime fixtures,
+Prisma validate/generate, production build, and diff checks pass. Live review
+passed at 1440×900, 1024×768, 768×1024, 390×844, and a 720×450 effective
+viewport representing the 1440×900 layout at 200% scale. The console remained
+free of warnings/errors. DocumentSheet retained A4 proportion and loaded its
+isolated `@media print` contract; native OS print-preview automation was not
+available and is not treated as a blocker for this gate.
+
+UI Engine is final for product implementation. A later change requires concrete
+product evidence and a new PM/TL decision; Master Data must compose the locked
+public inventory rather than redesign it.

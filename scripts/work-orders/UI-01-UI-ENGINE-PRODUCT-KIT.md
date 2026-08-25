@@ -3,7 +3,7 @@
 Owner: PM/TL
 Planned executor: one external OpenCode coding session
 Actual executor: Codex under explicit one-time owner takeover instruction
-Status: **COMPLETE — IMPLEMENTED AND PM/TL-REVIEWED; INDEPENDENT DESIGN/OWNER VISUAL APPROVAL PENDING**
+Status: **COMPLETE — IMPLEMENTED, INDEPENDENTLY REVIEWED, OWNER-APPROVED, AND PM/TL-RATIFIED**
 Required starting ref: `ui-engine-product-kit-start`
 Execution shape: UI-A → UI-B → UI-C → UI-D as four sequential commits in one session
 
@@ -14,10 +14,13 @@ Execution shape: UI-A → UI-B → UI-C → UI-D as four sequential commits in o
 - UI-B: `ad8d564` — forms, data, and shared states
 - UI-C: `27becfa` — overlays, navigation, and layouts
 - UI-D: `4354c4f` — interaction/document patterns and `/ui-engine`
-- Automated acceptance: 114 tests, repository checks, Prisma validate/generate, boundary fixtures, legacy-runtime fixtures, and production build passed.
+- Independent design pass: `1ab1a82` — warm-neutral visual convergence, sortable data headers, explicit current navigation, collapsible rail, and status treatment.
+- PM/TL convergence correction: `8f1ca0b` — selected-row signal, narrow-navigation behavior, Combobox keyboard contract, token/document corrections, and regression tests.
+- Automated acceptance: 117 tests, repository checks, Prisma validate/generate, boundary fixtures, legacy-runtime fixtures, production build, and diff checks passed.
 - PM/TL responsive/interaction review: passed at 1440×900, 1024×768, 768×1024, and 390×844 after bounded corrections.
-- Independent review handover: `docs/13-CLAUDE-UI-DESIGN-REVIEW-HANDOVER.md`.
-- Master Data remains paused until independent design review findings are resolved and the owner approves the visual direction.
+- 200% layout-equivalent review passed at 720×450; DocumentSheet print isolation was verified by source, tests, and loaded CSSOM.
+- Independent review records: `docs/13-CLAUDE-UI-DESIGN-REVIEW-HANDOVER.md` and `docs/14-UI-ENGINE-DESIGN-PASS-HANDOVER.md`.
+- The owner approved the current warm-neutral, Programa-influenced visual direction. Master Data proceeds from `masterdata-full-build-start-ui-approved`.
 
 The original external-executor instructions below are retained as the historical implementation contract. Do not rerun UI-01 as a new implementation work order.
 

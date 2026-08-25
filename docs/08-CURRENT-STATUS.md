@@ -1,18 +1,19 @@
 # 08 — Current Rebuild Status
 
-Status: FOUNDATION + MD-00 LOCKED — UI ENGINE IMPLEMENTED — CLAUDE DESIGN REVIEW NEXT
+Status: FOUNDATION + UI ENGINE + MD-00 LOCKED — MASTER DATA READY FOR EXECUTION
 Audit date: 2026-08-25
 Owner: PM / Technical Lead
 
 ## Approved repository state
 
 - The reproducible foundation baseline is commit `eb58f5ef7995aad22c4170d234ca84bc830eef08` (`chore: establish rebuild baseline`).
-- The current PM/TL-approved Foundation/UI implementation head is commit `4354c4f` (`feat(ui-engine): add product kit showcase (UI-D)`).
+- The current PM/TL-approved UI implementation head is commit `8f1ca0b` (`fix(ui-engine): close interaction and responsive regressions`), following Claude's independent design-pass commit `1ab1a82`.
+- The approved Master Data execution ref is `masterdata-full-build-start-ui-approved`; it includes the final manager records layered over the approved UI implementation.
 - The rebuild is an independent Git repository on `main` with no configured runtime dependency on `../studioflow`.
 - WO-001, WO-001A, WO-001B, WO-001C, and WO-001D are complete and PM/TL-approved.
 - The baseline has a reproducible npm lockfile, Prisma 7 configuration/client generation, TypeScript test runner, typecheck, boundary check, and production build.
 - WO-002 through WO-009, including WO-003A and the convergence correction `10d3881`, are complete and PM/TL-approved on `main`.
-- Platform Core, shared utilities, dependency enforcement, Category pure rules, and the minimalist UI Engine Product Kit are implemented and PM/TL-approved. Owner visual approval of `/ui-engine` is the final UI gate before Master Data.
+- Platform Core, shared utilities, dependency enforcement, Category pure rules, and the minimalist UI Engine Product Kit are implemented and PM/TL-approved. The owner approved the current warm-neutral, Programa-influenced visual direction over the superseded initial `DESIGN.md` interpretation.
 - Platform Core was revalidated on 2026-08-25 against the immutable GitHub legacy evidence commit `548fbd6bd00ef9fd7d53df66a3561a32fbb56944`; all Foundation acceptance checks remain green and no Core contract change is required.
 - Canonical legacy evidence is now that GitHub commit. `D:\Projects\studioflow` is not a source of truth and may be used only as a verified optional cache.
 
@@ -37,6 +38,7 @@ The quarantine is not an implementation source of truth, is not approved code, a
 - `docs/03-MASTERDATA-PRD.md`, `docs/04-STUDIOFLOW-PRD.md`, and `docs/05-BQ-PRD.md` — current app intent.
 - `docs/10-UI-CONTRACT-AUDIT.md` and `docs/11-CORE-CONTRACT-AUDIT.md` — manager audit records.
 - `docs/13-CLAUDE-UI-DESIGN-REVIEW-HANDOVER.md` — self-contained independent design-review context, procedure, evidence, and stop conditions.
+- `docs/14-UI-ENGINE-DESIGN-PASS-HANDOVER.md` — independent design-pass record plus PM/TL ratification and convergence corrections.
 
 ## Locked domain decisions relevant to current work
 
@@ -53,13 +55,17 @@ The quarantine is not an implementation source of truth, is not approved code, a
 - COMPLETE: no retired PRODUCT hierarchy symbols, app imports, generated Prisma imports, or feature-specific tokens exist in shared UI Engine.
 - COMPLETE: shared date validation is single-sourced; error transport is fail-closed and DB-runtime-free; auth preserves infrastructure failures.
 - COMPLETE: UI-A through UI-D commits `628a77c`, `ad8d564`, `27becfa`, and `4354c4f` implement the locked shared inventory and `/ui-engine` showcase.
-- COMPLETE: 114 tests, typecheck, dependency/legacy checks, Prisma validate/generate, and production build pass.
-- COMPLETE: PM/TL visual/accessibility review passed at 1440×900, 1024×768, 768×1024, and 390×844; page-wide overflow, mobile navigation, table overflow, dialogs, drawer, menus, focus visibility, and Enter/Escape behavior were verified.
+- COMPLETE: Claude's design pass `1ab1a82` introduced the warm-neutral palette, dark data-table band, explicit navigation current state, collapsible rail, generic sortable headers, and refined status treatment; PM/TL ratified those changes with the bounded corrections in `8f1ca0b`.
+- COMPLETE: selected rows now retain a checked control plus a restrained ink leading rule while semantic status remains independent; all seven showcase data columns are sortable and selection/action columns remain intentionally non-sortable.
+- COMPLETE: narrow navigation always retains labels while preserving the desktop collapse preference; Combobox Arrow/Home/End/Enter/Escape behavior skips disabled options and returns focus correctly.
+- COMPLETE: 117 tests, typecheck, dependency/legacy checks, Prisma validate/generate, boundary/legacy fixtures, production build, and diff checks pass.
+- COMPLETE: PM/TL visual/accessibility review passed at 1440×900, 1024×768, 768×1024, 390×844, and the 720×450 effective viewport corresponding to 1440×900 at 200% layout scale. Page-wide overflow, isolated mobile-nav/table overflow, sorting, selection/status coexistence, focus return, dialogs, drawer, menus, and keyboard behavior were verified; browser console errors/warnings were zero.
+- COMPLETE: DocumentSheet retains its A4 screen ratio and the loaded stylesheet contains the isolated `@media print` contract. Native OS print-preview automation was unavailable; source/test/CSSOM evidence is accepted for this gate.
 - No additional Core/Foundation work is planned unless product implementation exposes a concrete blocker.
 
 ## Current execution policy
 
-The two original Foundation lanes, PM/TL convergence gate, and UI-01 implementation/technical review are complete. Revised MD-00 and its seed inventory are owner-approved and LOCKED. The owner explicitly directed Codex to take over this one UI implementation; that exception does not change the external-executor policy for later deterministic product work. Independent Claude design review now follows `docs/13-CLAUDE-UI-DESIGN-REVIEW-HANDOVER.md`. `MASTER-DATA-FULL-BUILD.md` remains PAUSED until design findings are resolved, the owner approves the `/ui-engine` visual direction, and PM/TL issues a new Master Data starting ref; all existing Master Data start tags remain superseded.
+The Foundation lanes, convergence gate, UI-01 implementation, independent design pass, owner visual gate, and PM/TL ratification are complete. Revised MD-00 and its seed inventory remain owner-approved and LOCKED. The owner's direct UI takeover instruction does not change the external-executor policy for deterministic Master Data work. `scripts/work-orders/MASTER-DATA-FULL-BUILD.md` is ACTIVE from `masterdata-full-build-start-ui-approved`; older Master Data start tags remain superseded.
 
 ## Deferred owner / later-phase decisions
 
