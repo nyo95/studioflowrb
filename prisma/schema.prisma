@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
-  schemas   = ["master_data", "bq", "studioflow"]
+  schemas   = ["master_data", "platform", "bq", "studioflow"]
 }
 
 // ============================================================================
@@ -23,6 +23,369 @@ enum CategoryKind {
   @@schema("master_data")
 }
 
+/// Structural party kind. Legacy `COMPANY` normalizes to ORGANIZATION.
+/// No default: quick entry never guesses the Party type.
+enum PartyType {
+  ORGANIZATION
+  INDIVIDUAL
+
+  @@schema("master_data")
+}
+
+/// Locked operational role vocabulary (MD-00 §4). Drives commercial
+/// eligibility only. The legacy six-value mixed role enum is purged;
+/// business nature is editable BusinessType data instead.
+enum PartyRoleKind {
+  MATERIAL_SUPPLIER
+  WORK_VENDOR
+
+  @@schema("master_data")
+}
+
+/// Proven link vocabulary shared by PartyLink and BrandLink (MD-00 §4).
+enum LinkKind {
+  WEBSITE
+  INSTAGRAM
+  FACEBOOK
+  TIKTOK
+  YOUTUBE
+  LINKEDIN
+  WHATSAPP
+  MARKETPLACE
+  DRIVE
+  CATALOG
+  PRICE_LIST
+  OTHER
+
+  @@schema("master_data")
+}
+
+/// Small code-owned vocabulary restricting where a Unit may be picked.
+/// It performs no conversion semantics (MD-00 §1).
+enum UnitUsage {
+  DIMENSION
+  QUANTITY
+  USAGE
+  PURCHASE
+  RATE
+
+  @@schema("master_data")
+}
+
+/// SKU commercial kind. Legacy `SERVICE` is purged: canonical quoted work
+/// belongs to WorkPrice (MD-00 §7).
+enum SkuKind {
+  MATERIAL
+  FURNITURE
+  FIXTURE
+
+  @@schema("master_data")
+}
+
+/// SKU commercial status, additional to soft deletion. New SKU defaults to
+/// DRAFT; only DRAFT -> ACTIVE, ACTIVE -> DISCONTINUED, and
+/// DISCONTINUED -> ACTIVE are valid transitions (application-enforced).
+enum SkuStatus {
+  DRAFT
+  ACTIVE
+  DISCONTINUED
+
+  @@schema("master_data")
+}
+
+/// Proven media kind vocabulary (MD-00 §7). Storage/upload mechanics remain
+/// infrastructure concerns.
+enum MediaKind {
+  IMAGE
+  THUMBNAIL
+  ORIGINAL
+  REFERENCE
+  FOLDER
+
+  @@schema("master_data")
+}
+
+/// The three user-facing commercial modes map onto two persistence types.
+/// MATERIAL_LABOR is one indivisible quotation; LABOR_ONLY excludes material.
+enum WorkPriceKind {
+  MATERIAL_LABOR
+  LABOR_ONLY
+
+  @@schema("master_data")
+}
+
+// ============================================================================
+// MASTER DATA — Unit (controlled dictionary)
+// ============================================================================
+
+/// Controlled editable/extensible dictionary seeded from
+/// docs/12-MASTER-DATA-SEED-INVENTORY.md. Data, not an evolving enum.
+///
+/// - `code` is immutable and globally unique including deleted rows
+///   (simple unique index, race-safe authority).
+/// - Soft deletion uses deleted_at only; there is no competing is_active flag.
+/// - Persisted business records reference Unit by ID; public/import contracts
+///   use its canonical code. No conversion semantics live here.
+model Unit {
+  id String @id @default(uuid())
+
+  /// Immutable canonical code (e.g. "pcs", "m2"). Globally unique including
+  /// soft-deleted rows.
+  code String @unique
+  label String
+  symbol String?
+
+  /// Known import aliases normalized into this code. Search hints only.
+  aliases String[] @default([])
+
+  /// Where this unit may be selected. Restricts picker context; no conversion.
+  usages UnitUsage[] @default([])
+
+  sort_order Int @default(0)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  base_unit_skus     Sku[]       @relation("SkuBaseUnit")
+  purchase_unit_skus Sku[]       @relation("SkuPurchaseUnit")
+  dim_unit_skus      Sku[]       @relation("SkuDimUnit")
+  sku_prices         SkuPrice[]  @relation("SkuPriceUnit")
+  work_prices        WorkPrice[] @relation("WorkPriceUnit")
+
+  @@index([deleted_at])
+  @@schema("master_data")
+}
+
+// ============================================================================
+// MASTER DATA — BusinessType (controlled dictionary)
+// ============================================================================
+
+/// Editable controlled business-nature dictionary seeded from
+/// docs/12-MASTER-DATA-SEED-INVENTORY.md. Descriptive data only; it never
+/// grants operational eligibility implicitly (MD-00 §4).
+model BusinessType {
+  id String @id @default(uuid())
+
+  /// Immutable canonical code. Globally unique including soft-deleted rows.
+  code String @unique
+  label String
+  description String?
+
+  sort_order Int @default(0)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  parties PartyBusinessType[]
+
+  @@index([deleted_at])
+  @@schema("master_data")
+}
+
+// ============================================================================
+// MASTER DATA — Party graph
+// ============================================================================
+
+/// One identity with non-exclusive operational roles. There are no separate
+/// Supplier/Vendor/Company tables (MD-00 §4).
+///
+/// Soft deletion via deleted_at only (no is_active). Live uniqueness of
+/// lower(name) and slug is enforced by partial expression indexes in SQL —
+/// see migration (`Party_live_name_uniq`, `Party_live_slug_uniq`).
+/// Do not call findUnique({ where: { name } }); use findFirst with
+/// deleted_at: null.
+model Party {
+  id String @id @default(uuid())
+
+  name String
+  slug String
+
+  /// Structural kind. Required with no default so quick entry cannot guess it.
+  type PartyType
+
+  legal_name String?
+  address    String?
+  notes      String?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  roles          PartyRole[]
+  business_types PartyBusinessType[]
+  contacts       PartyContact[]
+  links          PartyLink[]
+
+  owned_brands    Brand[]         @relation("BrandOwner")
+  supplied_brands BrandSupplier[]
+  supplied_prices SkuPrice[]      @relation("SkuPriceSupplier")
+  work_prices     WorkPrice[]     @relation("WorkPriceVendor")
+
+  @@index([slug])
+  @@index([type])
+  @@index([deleted_at])
+  @@schema("master_data")
+}
+
+/// Operational role assignment. Unique per (party_id, role); roles are
+/// non-exclusive and drive application eligibility checks on every write
+/// use case (MD-00 §4).
+model PartyRole {
+  id String @id @default(uuid())
+  party_id String
+  role     PartyRoleKind
+
+  party Party @relation(fields: [party_id], references: [id], onDelete: Cascade)
+
+  @@unique([party_id, role])
+  @@index([role])
+  @@schema("master_data")
+}
+
+/// Many-to-many assignment between Party and the controlled BusinessType
+/// dictionary. Contains the two IDs and the assignment timestamp only.
+model PartyBusinessType {
+  id              String @id @default(uuid())
+  party_id        String
+  business_type_id String
+
+  created_at DateTime @default(now())
+
+  party        Party        @relation(fields: [party_id], references: [id], onDelete: Cascade)
+  businessType BusinessType @relation(fields: [business_type_id], references: [id], onDelete: Restrict)
+
+  @@unique([party_id, business_type_id])
+  @@index([business_type_id])
+  @@schema("master_data")
+}
+
+/// Owned contact child. A general contact or an optional Brand scope; a
+/// brand-scoped contact is validated against ownership/live BrandSupplier at
+/// the application layer (MD-00 §4). Multiple contacts allowed; is_primary is
+/// a display preference, not a uniqueness guarantee.
+model PartyContact {
+  id String @id @default(uuid())
+  party_id String
+
+  person_name String
+  job_title   String?
+
+  phone String?
+  email String?
+
+  is_primary Boolean @default(false)
+  notes      String?
+
+  /// Optional Brand scope. NULL = general contact for the Party.
+  brand_id String?
+  brand    Brand?  @relation(fields: [brand_id], references: [id], onDelete: SetNull)
+
+  party Party @relation(fields: [party_id], references: [id], onDelete: Cascade)
+
+  @@index([party_id])
+  @@index([brand_id])
+  @@schema("master_data")
+}
+
+/// Owned link child using the proven LinkKind vocabulary.
+model PartyLink {
+  id       String   @id @default(uuid())
+  party_id String
+  kind     LinkKind
+  url      String
+
+  archive_url String?
+  label       String?
+  sort_order  Int     @default(0)
+
+  party Party @relation(fields: [party_id], references: [id], onDelete: Cascade)
+
+  @@unique([party_id, url])
+  @@index([party_id, kind])
+  @@schema("master_data")
+}
+
+// ============================================================================
+// MASTER DATA — Brand graph
+// ============================================================================
+
+/// Brand identity. Live uniqueness of lower(name) and slug is enforced by
+/// partial expression indexes in SQL — see migration
+/// (`Brand_live_name_uniq`, `Brand_live_slug_uniq`).
+///
+/// A live Brand must always retain at least one live PRODUCT BrandCategory
+/// (application-enforced on create/update/remove). Brand tags are purged from
+/// the contract; discovery aliases belong to Category.search_synonyms.
+model Brand {
+  id String @id @default(uuid())
+
+  name String
+  slug String
+
+  owner_party_id String?
+  owner          Party?  @relation("BrandOwner", fields: [owner_party_id], references: [id], onDelete: SetNull)
+
+  notes String?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  categories BrandCategory[]
+  skus       Sku[]
+  links      BrandLink[]
+  suppliers  BrandSupplier[]
+
+  scoped_contacts PartyContact[]
+
+  @@index([slug])
+  @@index([owner_party_id])
+  @@index([deleted_at])
+  @@schema("master_data")
+}
+
+/// Owned brand link child using the proven LinkKind vocabulary.
+model BrandLink {
+  id       String   @id @default(uuid())
+  brand_id String
+  kind     LinkKind
+  url      String
+
+  archive_url String?
+  label       String?
+  sort_order  Int     @default(0)
+
+  brand Brand @relation(fields: [brand_id], references: [id], onDelete: Cascade)
+
+  /// Canonical price provenance: a SkuPrice may reference one live link of its
+  /// SKU's own Brand (validated at the application layer).
+  price_sources SkuPrice[] @relation("SkuPriceSourceLink")
+
+  @@unique([brand_id, url])
+  @@index([brand_id, kind])
+  @@schema("master_data")
+}
+
+/// Brand-level sourcing fact: a Party known source for a Brand. Never a price,
+/// never SKU-specific availability, never a software permission (MD-00 §1).
+model BrandSupplier {
+  id       String @id @default(uuid())
+  brand_id String
+  party_id String
+
+  is_authorized Boolean @default(false)
+  notes         String?
+
+  brand Brand @relation(fields: [brand_id], references: [id], onDelete: Cascade)
+  party Party @relation(fields: [party_id], references: [id], onDelete: Cascade)
+
+  @@unique([brand_id, party_id])
+  @@index([party_id])
+  @@schema("master_data")
+}
+
 // ============================================================================
 // MASTER DATA — Category
 // ============================================================================
@@ -33,12 +396,12 @@ enum CategoryKind {
 /// classification) and BQ snapshot semantics.
 ///
 /// Soft-delete: deleted_at (consistent with Party/Brand).
-/// Uniqueness: partial index (kind, slug) WHERE deleted_at IS NULL — see migration.
+/// Uniqueness: partial index (kind, slug) WHERE deleted_at IS NULL — see
+/// migration (`Category_kind_slug_live_uniq`).
 ///
-/// PRODUCT categories are flat for MVP: parent_id is present in schema for
-/// future expansion but the UI does not expose it for PRODUCT entries.
-/// WORK categories may be hierarchical: path is auto-maintained by
-/// infrastructure/category-tree-service.ts for WORK only.
+/// PRODUCT categories are flat for MVP: parent_id stays null in MVP and the UI
+/// does not expose it for PRODUCT entries. WORK categories may be
+/// hierarchical: path is maintained transactionally by the category service.
 model Category {
   id   String       @id @default(uuid())
   kind CategoryKind
@@ -54,9 +417,8 @@ model Category {
   children  Category[] @relation("CategoryTree")
 
   /// Materialized path (e.g. "pekerjaan-dinding/cat-dinding").
-  /// Auto-maintained by infrastructure/category-tree-service.ts.
-  /// PRODUCT: always null (flat). WORK: populated.
-  /// Do not write this column outside that service.
+  /// Maintained transactionally by the category service for WORK only.
+  /// PRODUCT: always null (flat).
   path String?
 
   /// Search synonyms for discovery — not authority labels, not display values.
@@ -67,7 +429,7 @@ model Category {
   description String?
 
   created_at DateTime  @default(now())
-  updated_at DateTime? @updatedAt
+  updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
   // ── Relations ────────────────────────────────────────────────────────────
@@ -95,14 +457,14 @@ model Category {
 
 /// Brand ↔ Category discovery relation.
 ///
-/// Explicit assignment only — never auto-derived from SKU category assignments.
+/// Explicit staff assignment only — never auto-derived from SKU assignments.
 /// Semantics: "this brand is classifiable under this category for discovery."
 ///
 /// Business rule (application layer): brand creation requires ≥ 1 PRODUCT
-/// category. Enforced in masterdata/application/brand-service.ts, not here.
+/// category, and removing a live Brand's final category is rejected.
 ///
 /// The old `source: CategorySource` field and `CategorySource` enum are removed.
-/// Every BrandCategory row is now always an explicit staff decision.
+/// Every BrandCategory row is always an explicit staff decision.
 model BrandCategory {
   id          String   @id @default(uuid())
   brand_id    String
@@ -120,69 +482,240 @@ model BrandCategory {
 }
 
 // ============================================================================
-// MASTER DATA — Brand (stub — full model to be added with Brand domain work)
+// MASTER DATA — Sku / material
 // ============================================================================
 
-/// Stub placeholder so BrandCategory relations resolve. Full Brand model is
-/// added when Brand domain is migrated. See migration-inventory.md.
-model Brand {
-  id String @id @default(uuid())
-
-  // Full fields added in Brand domain work order.
-
-  categories BrandCategory[]
-  skus       Sku[]
-
-  @@schema("master_data")
-}
-
-// ============================================================================
-// MASTER DATA — Sku (stub)
-// ============================================================================
-
-/// Stub placeholder so Sku.category relation resolves. Full Sku model is
-/// added when SKU domain is migrated. See migration-inventory.md.
+/// Material/Furniture/Fixture SKU identity. One direct optional PRODUCT
+/// Category (no SkuCategory join table), optional Brand, required base Unit.
 ///
-/// category_id: direct FK replacing the old SkuCategory junction table.
-/// One primary PRODUCT category per SKU.
-/// Nullable: SKU may be DRAFT without a category; must be set before ACTIVE.
-/// Business rule enforced in masterdata/application/sku-service.ts.
+/// Slug/code live uniqueness is enforced by partial expression indexes in SQL:
+/// branded SKUs are unique within their Brand; unbranded SKUs globally —
+/// see migration (`Sku_brand_slug_live_uniq`, `Sku_slug_nobrand_live_uniq`,
+/// `Sku_brand_code_live_uniq`, `Sku_code_nobrand_live_uniq`).
 ///
-/// BQ snapshot: category.name → snapshot_category_name;
-///              category.path → snapshot_category_path (PRODUCT: same as name).
+/// ACTIVE readiness (live PRODUCT Category + live base Unit + exactly one
+/// canonical SkuPrice + live Brand when brand_id present) is enforced at the
+/// application layer.
 model Sku {
   id String @id @default(uuid())
 
+  /// Manufacturer article code. Nullable; live uniqueness case-insensitive
+  /// within its Brand (equivalent unbranded partial index) when present.
+  code String?
+
+  name String
+  slug String
+
+  /// Optional: generic materials remain representable without a Brand.
   brand_id String?
   brand    Brand?  @relation(fields: [brand_id], references: [id], onDelete: Restrict)
 
+  /// One direct nullable PRODUCT Category. Replaces the legacy SkuCategory
+  /// junction table. Nullable while DRAFT; required before ACTIVE.
   category_id String?
   category    Category? @relation(fields: [category_id], references: [id], onDelete: Restrict)
 
-  // Full fields added in SKU domain work order.
+  kind   SkuKind
+  status SkuStatus @default(DRAFT)
 
-  work_prices WorkPrice[]
+  spec Json?
 
+  dim_length  Decimal? @db.Decimal(12, 3)
+  dim_width   Decimal? @db.Decimal(12, 3)
+  dim_height  Decimal? @db.Decimal(12, 3)
+  dim_unit_id String?
+  dim_unit    Unit?    @relation("SkuDimUnit", fields: [dim_unit_id], references: [id], onDelete: Restrict)
+  dim_display String?
+
+  /// Required usage Unit.
+  base_unit_id String
+  base_unit    Unit   @relation("SkuBaseUnit", fields: [base_unit_id], references: [id], onDelete: Restrict)
+
+  /// Optional purchasing Unit.
+  purchase_unit_id String?
+  purchase_unit    Unit?   @relation("SkuPurchaseUnit", fields: [purchase_unit_id], references: [id], onDelete: Restrict)
+
+  /// Required and > 0 when purchase_unit differs from base_unit:
+  /// one purchase unit equals `conversion` base units.
+  conversion         Decimal? @db.Decimal(18, 6)
+  default_waste_pct  Decimal? @db.Decimal(9, 6)
+  minimum_order      Decimal? @db.Decimal(18, 6)
+  rounding_increment Decimal? @db.Decimal(18, 6)
+
+  notes String?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  media SkuMedia[]
+  price SkuPrice?
+
+  @@index([brand_id])
+  @@index([category_id])
+  @@index([base_unit_id])
+  @@index([kind, status])
+  @@index([deleted_at])
+  @@schema("master_data")
+}
+
+/// Owned media child. Storage/upload mechanics remain infrastructure concerns.
+model SkuMedia {
+  id      String    @id @default(uuid())
+  sku_id  String
+  kind    MediaKind
+  url     String
+  label   String?
+  sort_order Int    @default(0)
+  created_at DateTime @default(now())
+
+  sku Sku @relation(fields: [sku_id], references: [id], onDelete: Cascade)
+
+  @@unique([sku_id, url])
+  @@index([sku_id, kind, sort_order])
   @@schema("master_data")
 }
 
 // ============================================================================
-// MASTER DATA — WorkPrice (stub)
+// MASTER DATA — Pricing (current canonical values)
 // ============================================================================
 
-/// Stub placeholder so WorkPrice.category relation resolves.
-/// Full WorkPrice model is added when WorkPrice domain is migrated.
-model WorkPrice {
+/// The single current canonical commercial price for one exact SKU.
+/// One-to-one by unique sku_id; updated in place preserving row identity.
+///
+/// There is deliberately NO is_current/valid_from/valid_to, no temporal rows,
+/// no supplier partitions, and no preferred/cheapest/latest selection logic.
+/// Change history lives in platform AuditEvent; BQ snapshots own project-time
+/// truth (MD-00 §8).
+///
+/// Blank price means "no row yet" for DRAFT and never becomes zero; explicit
+/// zero is valid; negative is invalid (application-enforced).
+model SkuPrice {
   id String @id @default(uuid())
 
+  /// At most one canonical price row per SKU (race-safe simple unique).
+  sku_id String @unique
+  sku    Sku    @relation(fields: [sku_id], references: [id], onDelete: Cascade)
+
+  /// Optional supplier provenance. NULL means no specific supplier provenance,
+  /// not a separate supplier partition.
+  supplier_party_id String?
+  supplier          Party?  @relation("SkuPriceSupplier", fields: [supplier_party_id], references: [id], onDelete: SetNull)
+
+  amount   Decimal @db.Decimal(16, 2)
+  currency String
+
+  /// Must equal the SKU purchase Unit when set, otherwise the SKU base Unit
+  /// (validated at the application layer).
+  unit_id String
+  unit    Unit   @relation("SkuPriceUnit", fields: [unit_id], references: [id], onDelete: Restrict)
+
+  /// Optional provenance link; when present must reference a live link
+  /// belonging to the SKU's own Brand (validated at the application layer).
+  source_link_id String?
+  source_link    BrandLink? @relation("SkuPriceSourceLink", fields: [source_link_id], references: [id], onDelete: SetNull)
+
+  notes String?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime @updatedAt
+
+  /// Current-value updater snapshot without cross-schema FKs; the full
+  /// actor/change trail remains platform AuditEvent.
+  updated_by_user_id String?
+  updated_by_label   String
+
+  @@index([supplier_party_id])
+  @@schema("master_data")
+}
+
+/// One current canonical rate per live immutable code, updated in place.
+/// Live case-insensitive code uniqueness is enforced by a partial expression
+/// index — see migration (`WorkPrice_live_code_uniq`). Correcting identity
+/// creates a replacement row and soft-deletes the erroneous row.
+///
+/// MATERIAL_LABOR is one indivisible vendor quotation whose included-material
+/// meaning is recorded in scope_note/spec — never a BOM, component split, or
+/// generated total. There is no SKU relation and no project relation (MD-00 §9).
+model WorkPrice {
+  id   String @id @default(uuid())
+  code String
+  name String
+
+  /// Required, live, kind WORK Category.
   category_id String
   category    Category @relation(fields: [category_id], references: [id], onDelete: Restrict)
 
-  sku_id String?
-  sku    Sku?    @relation(fields: [sku_id], references: [id])
+  /// Optional eligible vendor; when present must be live with WORK_VENDOR role
+  /// (validated at the application layer).
+  vendor_party_id String?
+  vendor          Party?  @relation("WorkPriceVendor", fields: [vendor_party_id], references: [id], onDelete: SetNull)
 
-  // Full fields added in WorkPrice domain work order.
+  spec        Json?
+  dim_display String?
+
+  unit_id String
+  unit    Unit   @relation("WorkPriceUnit", fields: [unit_id], references: [id], onDelete: Restrict)
+
+  amount   Decimal @db.Decimal(16, 2)
+  kind     WorkPriceKind
+  currency String
+
+  scope_note String?
+  notes      String?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  /// Current-value updater snapshot without cross-schema FKs; change history
+  /// remains platform AuditEvent.
+  updated_by_user_id String?
+  updated_by_label   String
 
   @@index([category_id])
+  @@index([vendor_party_id])
+  @@index([kind])
+  @@index([deleted_at])
   @@schema("master_data")
+}
+
+// ============================================================================
+// PLATFORM — AuditEvent (append-only, domain-neutral Core envelope)
+// ============================================================================
+
+/// Platform-owned append-only persistence of the locked Core audit envelope
+/// (CORE.md §5, MD-00 §11) for all apps. Master Data does not recreate
+/// MasterDataAudit; StudioFlow AuditLog is not reused.
+///
+/// - entityType/entityId and actor_user_id are polymorphic references with NO
+///   foreign keys by contract.
+/// - app_id/actor_kind persist as plain strings: the envelope is domain-neutral
+///   and must not couple to per-app enum evolution.
+/// - changes/metadata follow Core serialization/redaction rules (canonical
+///   decimal strings, ISO-8601 UTC instants, no secrets/blobs).
+/// - Append-only: no product revert/delete use case exists; retained
+///   indefinitely in MVP.
+model AuditEvent {
+  id String @id @default(uuid())
+
+  app_id     String
+  action     String
+  entity_type String
+  entity_id   String
+
+  actor_kind    String
+  actor_user_id String?
+  actor_label   String
+
+  occurred_at DateTime @default(now())
+
+  request_id String?
+  changes    Json?
+  metadata   Json?
+
+  @@index([app_id, entity_type, entity_id, occurred_at])
+  @@index([actor_user_id, occurred_at])
+  @@index([occurred_at])
+  @@schema("platform")
 }
