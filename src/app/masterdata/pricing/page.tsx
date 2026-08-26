@@ -1,0 +1,247 @@
+import Link from "next/link";
+import { skuService, pricingService, unitService, partyService } from "@/apps/masterdata/infrastructure/runtime";
+import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/application/masterdata-permissions";
+import { clearSkuPriceAction, deleteWorkPriceAction, restoreWorkPriceAction } from "./actions";
+
+const CTX = {
+  grants: [...MASTERDATA_PERMISSIONS] as string[],
+  actor: { kind: "SYSTEM" as const, label: "Dev session" },
+};
+
+export default async function PricingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; archived?: string }>;
+}) {
+  const { tab = "sku", archived } = await searchParams;
+  const showArchived = archived === "1";
+
+  const [skus, workPrices, units] = await Promise.all([
+    skuService.list(CTX, { includeDeleted: false }),
+    pricingService.listWorkPrices(CTX, showArchived),
+    unitService.list(CTX),
+  ]);
+
+  // Fetch SKU prices concurrently
+  const skuPrices = await Promise.all(
+    skus.map((sku) => pricingService.getSkuPrice(CTX, sku.id).then((p) => ({ skuId: sku.id, price: p })))
+  );
+  const priceBySkuId = new Map(skuPrices.map((sp) => [sp.skuId, sp.price]));
+
+  const unitsById = new Map(units.map((u) => [u.id, u]));
+
+  return (
+    <div className="ui-layout-page">
+      <div className="ui-layout-page-header">
+        <div>
+          <h1 className="ui-heading" data-size="xl">Pricing</h1>
+          <p className="ui-text" data-tone="secondary">Canonical SKU prices and Work prices.</p>
+        </div>
+        {tab === "work" && (
+          <div className="ui-toolbar">
+            <Link href="/masterdata/pricing/work/new" className="ui-button" data-variant="primary" data-size="md">
+              <span>New Work Price</span>
+            </Link>
+          </div>
+        )}
+      </div>
+
+      <div className="ui-toolbar" style={{ marginBottom: "var(--space-3)" }}>
+        <Link
+          href="/masterdata/pricing?tab=sku"
+          className="ui-button"
+          data-variant={tab === "sku" ? "primary" : "secondary"}
+          data-size="sm"
+        >
+          <span>SKU Prices</span>
+        </Link>
+        <Link
+          href="/masterdata/pricing?tab=work"
+          className="ui-button"
+          data-variant={tab === "work" ? "primary" : "secondary"}
+          data-size="sm"
+        >
+          <span>Work Prices</span>
+        </Link>
+      </div>
+
+      {tab === "sku" && (
+        <div className="ui-table-container">
+          <table className="ui-table">
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Status</th>
+                <th>Price</th>
+                <th>Unit</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {skus.length === 0 && (
+                <tr>
+                  <td colSpan={5}>
+                    <span className="ui-text" data-tone="secondary">No SKUs found.</span>
+                  </td>
+                </tr>
+              )}
+              {skus.map((sku) => {
+                const price = priceBySkuId.get(sku.id);
+                const unit = price ? unitsById.get(price.unitId) : null;
+                return (
+                  <tr key={sku.id}>
+                    <td>
+                      <div className="ui-table-cell-content">
+                        <span className="ui-text" data-weight="medium">{sku.name}</span>
+                        <span className="ui-text" data-tone="secondary" data-size="sm">{sku.code ?? sku.slug}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span
+                        className="ui-badge"
+                        data-tone={sku.status === "ACTIVE" ? "positive" : sku.status === "DISCONTINUED" ? "warning" : "neutral"}
+                      >
+                        {sku.status}
+                      </span>
+                    </td>
+                    <td>
+                      {price ? (
+                        <span className="ui-text">
+                          {price.currency} {price.amount}
+                        </span>
+                      ) : (
+                        <span className="ui-text" data-tone="secondary">—</span>
+                      )}
+                    </td>
+                    <td>
+                      <span className="ui-text" data-tone="secondary">
+                        {unit ? `${unit.label} (${unit.code})` : price ? price.unitId : "—"}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="ui-toolbar" data-size="sm">
+                        <Link
+                          href={`/masterdata/pricing/sku/${sku.id}`}
+                          className="ui-button"
+                          data-variant="secondary"
+                          data-size="sm"
+                        >
+                          <span>{price ? "Update" : "Set Price"}</span>
+                        </Link>
+                        {price && (
+                          <form action={clearSkuPriceAction.bind(null, sku.id)}>
+                            <button type="submit" className="ui-button" data-variant="danger" data-size="sm">
+                              <span>Clear</span>
+                            </button>
+                          </form>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === "work" && (
+        <>
+          <div className="ui-toolbar" style={{ marginBottom: "var(--space-3)" }}>
+            <Link
+              href="/masterdata/pricing?tab=work"
+              className="ui-button"
+              data-variant={showArchived ? "secondary" : "primary"}
+              data-size="sm"
+            >
+              <span>Active</span>
+            </Link>
+            <Link
+              href="/masterdata/pricing?tab=work&archived=1"
+              className="ui-button"
+              data-variant={showArchived ? "primary" : "secondary"}
+              data-size="sm"
+            >
+              <span>Archived</span>
+            </Link>
+          </div>
+
+          <div className="ui-table-container">
+            <table className="ui-table">
+              <thead>
+                <tr>
+                  <th>Code / Name</th>
+                  <th>Kind</th>
+                  <th>Price</th>
+                  <th>Unit</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {workPrices.length === 0 && (
+                  <tr>
+                    <td colSpan={5}>
+                      <span className="ui-text" data-tone="secondary">No work prices found.</span>
+                    </td>
+                  </tr>
+                )}
+                {workPrices.map((wp) => {
+                  const unit = unitsById.get(wp.unitId);
+                  return (
+                    <tr key={wp.id}>
+                      <td>
+                        <div className="ui-table-cell-content">
+                          <span className="ui-text" data-weight="medium">{wp.name}</span>
+                          <span className="ui-text" data-tone="secondary" data-size="sm">{wp.code}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="ui-badge">{wp.kind}</span>
+                      </td>
+                      <td>
+                        <span className="ui-text">{wp.currency} {wp.amount}</span>
+                      </td>
+                      <td>
+                        <span className="ui-text" data-tone="secondary">
+                          {unit ? `${unit.label} (${unit.code})` : wp.unitId}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="ui-toolbar" data-size="sm">
+                          {!wp.deletedAt && (
+                            <Link
+                              href={`/masterdata/pricing/work/${wp.id}/edit`}
+                              className="ui-button"
+                              data-variant="secondary"
+                              data-size="sm"
+                            >
+                              <span>Edit</span>
+                            </Link>
+                          )}
+                          {!wp.deletedAt && (
+                            <form action={deleteWorkPriceAction.bind(null, wp.id)}>
+                              <button type="submit" className="ui-button" data-variant="danger" data-size="sm">
+                                <span>Archive</span>
+                              </button>
+                            </form>
+                          )}
+                          {wp.deletedAt && (
+                            <form action={restoreWorkPriceAction.bind(null, wp.id)}>
+                              <button type="submit" className="ui-button" data-variant="secondary" data-size="sm">
+                                <span>Restore</span>
+                              </button>
+                            </form>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
