@@ -18,6 +18,7 @@ describe("permission-id namespace validation", () => {
     assert.equal(isValidPermissionId("studioflow.project.read"), true);
     assert.equal(isValidPermissionId("platform.user.manage"), true);
     assert.equal(isValidPermissionId("masterdata.price.read"), true);
+    assert.equal(isValidPermissionId("masterdata.access"), true);
   });
 
   it("rejects malformed or non-namespaced ids", () => {
@@ -25,6 +26,7 @@ describe("permission-id namespace validation", () => {
       "",
       "read",
       "project.read",
+      "masterdata.access.extra.more",
       "studioflow.project.read.extra",
       "StudioFlow.Project.Read",
       "studio flow.project.read",

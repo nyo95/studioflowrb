@@ -15,9 +15,10 @@ import { AppError } from "@platform/core/errors";
 export type PermissionId = string;
 
 const PERMISSION_ID_PATTERN = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/;
+const APP_ACCESS_PERMISSION_PATTERN = /^[a-z][a-z0-9-]*\.access$/;
 
 export function isValidPermissionId(permission: PermissionId): boolean {
-  return PERMISSION_ID_PATTERN.test(permission);
+  return PERMISSION_ID_PATTERN.test(permission) || APP_ACCESS_PERMISSION_PATTERN.test(permission);
 }
 
 /** Resolved grants for the current principal, composed server-side by the app. */

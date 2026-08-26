@@ -16,6 +16,8 @@ import type { PermissionGrants } from "@platform/core/rbac";
 export type MasterDataExecutionContext = {
   grants: PermissionGrants;
   actor: AuditActor;
+  /** Internal orchestration scope used by atomic multi-resource operations. */
+  transaction?: TransactionClient;
 };
 
 /**
@@ -32,3 +34,12 @@ export type MasterDataUseCasePorts = {
   generateId: () => string;
   now: () => Date;
 };
+
+/** Reuses an orchestrator-owned transaction or opens a command transaction. */
+export function runInMasterDataTransaction<T>(
+  context: MasterDataExecutionContext,
+  runner: TransactionRunner,
+  work: (tx: TransactionClient) => Promise<T>,
+): Promise<T> {
+  return context.transaction ? work(context.transaction) : runner(work);
+}
