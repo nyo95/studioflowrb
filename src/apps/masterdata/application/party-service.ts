@@ -20,13 +20,17 @@ import { PARTY_LINK_KINDS, type PartyContactRecord, type PartyLinkKind, type Par
 export type PartyContactInput = Omit<PartyContactRecord, "id"> & { id?: string };
 export type PartyLinkInput = Omit<PartyLinkRecord, "id"> & { id?: string };
 export type PartyWriteInput = {
+  /** Import-only stable identity; ordinary UI creation leaves this blank. */
+  requestedId?: string;
   name: string;
   type: PartyType | "COMPANY";
   legalName?: string | null;
   address?: string | null;
   notes?: string | null;
   roles: readonly PartyRole[];
+  roleAssignments?: readonly { id: string; role: PartyRole }[];
   businessTypeIds?: readonly string[];
+  businessTypeAssignments?: readonly { id: string; businessTypeId: string }[];
   contacts?: readonly PartyContactInput[];
   links?: readonly PartyLinkInput[];
 };
@@ -97,7 +101,9 @@ export class PartyService {
         address: input.address === undefined ? current.address : input.address,
         notes: input.notes === undefined ? current.notes : input.notes,
         roles: input.roles ?? current.roles,
+        roleAssignments: input.roleAssignments,
         businessTypeIds: input.businessTypeIds ?? current.businessTypeIds,
+        businessTypeAssignments: input.businessTypeAssignments,
         contacts: input.contacts ?? current.contacts,
         links: input.links ?? current.links,
       });
@@ -141,7 +147,7 @@ export class PartyService {
       }
     }
 
-    const partyId = current?.id ?? this.ports.generateId();
+    const partyId = current?.id ?? input.requestedId ?? this.ports.generateId();
     const contacts: PartyContactRecord[] = [];
     for (const contact of input.contacts ?? []) {
       const personName = normalizeText(contact.personName);
@@ -173,7 +179,7 @@ export class PartyService {
 
     const graph = {
       id: partyId, name, slug, type, legalName: optionalText(input.legalName), address: optionalText(input.address), notes: optionalText(input.notes),
-      roles, businessTypeIds, contacts, links,
+      roles, roleAssignments: input.roleAssignments, businessTypeIds, businessTypeAssignments: input.businessTypeAssignments, contacts, links,
     };
     const nextShape = partyAuditShape({ ...graph, createdAt: current?.createdAt ?? this.ports.now(), updatedAt: this.ports.now(), deletedAt: null });
     const changes = diffAuditChanges(current ? partyAuditShape(current) : {}, nextShape);
@@ -181,7 +187,7 @@ export class PartyService {
     const saved = current ? await this.ports.parties.update(tx, current.id, graph) : await this.ports.parties.create(tx, graph);
     await this.ports.auditWriter.write(prepareAuditEvent({
       appId: "masterdata", action: current ? "party.updated" : "party.created", entityType: "party", entityId: saved.id,
-      actor: context.actor, changes, occurredAt: this.ports.now(),
+      actor: context.actor, requestId: context.requestId, changes, occurredAt: this.ports.now(),
     }), tx);
     return saved;
   }
@@ -194,7 +200,7 @@ export class PartyService {
       assertPartyCanBeDeleted(await this.ports.parties.countDeleteReferences(tx, id));
       const deletedAt = this.ports.now();
       const saved = await this.ports.parties.setDeletedAt(tx, id, deletedAt);
-      await this.ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "party.deleted", entityType: "party", entityId: id, actor: context.actor, occurredAt: deletedAt, changes: { deletedAt: { from: null, to: deletedAt } } }), tx);
+      await this.ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "party.deleted", entityType: "party", entityId: id, actor: context.actor, requestId: context.requestId, occurredAt: deletedAt, changes: { deletedAt: { from: null, to: deletedAt } } }), tx);
       return saved;
     });
   }
@@ -217,7 +223,7 @@ export class PartyService {
         assertBrandScopedContactAllowed(scope);
       }
       const saved = await this.ports.parties.setDeletedAt(tx, id, null);
-      await this.ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "party.restored", entityType: "party", entityId: id, actor: context.actor, occurredAt: this.ports.now(), changes: { deletedAt: { from: current.deletedAt, to: null } } }), tx);
+      await this.ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "party.restored", entityType: "party", entityId: id, actor: context.actor, requestId: context.requestId, occurredAt: this.ports.now(), changes: { deletedAt: { from: current.deletedAt, to: null } } }), tx);
       return saved;
     });
   }

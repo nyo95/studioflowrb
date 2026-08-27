@@ -13,6 +13,7 @@ const ALL_ROLES: readonly PartyRole[] = ["MATERIAL_SUPPLIER", "WORK_VENDOR"];
 function parseRoles(formData: FormData): readonly PartyRole[] {
   return ALL_ROLES.filter((r) => formData.get(`role_${r}`) === "on");
 }
+const parseBusinessTypes = (formData: FormData) => formData.getAll("businessTypeIds").map(String);
 
 export async function createPartyAction(formData: FormData) {
   await partyService.create(CTX, {
@@ -22,7 +23,7 @@ export async function createPartyAction(formData: FormData) {
     address: (formData.get("address") as string) || null,
     notes: (formData.get("notes") as string) || null,
     roles: parseRoles(formData),
-    businessTypeIds: [],
+    businessTypeIds: parseBusinessTypes(formData),
     contacts: [],
     links: [],
   });
@@ -38,6 +39,7 @@ export async function updatePartyAction(formData: FormData) {
     address: (formData.get("address") as string) || null,
     notes: (formData.get("notes") as string) || null,
     roles: parseRoles(formData),
+    businessTypeIds: parseBusinessTypes(formData),
   });
   revalidatePath("/masterdata/parties");
 }

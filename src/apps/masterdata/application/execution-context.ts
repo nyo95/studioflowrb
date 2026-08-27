@@ -16,6 +16,8 @@ import type { PermissionGrants } from "@platform/core/rbac";
 export type MasterDataExecutionContext = {
   grants: PermissionGrants;
   actor: AuditActor;
+  /** Shared correlation ID for one request/import batch. */
+  requestId?: string;
   /** Internal orchestration scope used by atomic multi-resource operations. */
   transaction?: TransactionClient;
 };

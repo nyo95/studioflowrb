@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { AppShell, Text } from "@/platform/ui_engine";
 import { MasterDataNavigation, MasterDataUtilityNavigation } from "./masterdata-navigation";
+import { MasterDataTopbar } from "./masterdata-topbar";
 
 // Master Data reads request-scoped identity and live database state. It must
 // never be evaluated as static build-time content.
@@ -19,6 +20,7 @@ export default function MasterDataLayout({ children }: { children: ReactNode }) 
       navigationLabel="Master Data navigation"
       navigation={<MasterDataNavigation />}
       utility={<MasterDataUtilityNavigation />}
+      topbar={<MasterDataTopbar />}
     >
       {children}
     </AppShell>

@@ -19,6 +19,7 @@ import {
 } from "@/platform/ui_engine";
 
 import { deleteBrandAction, restoreBrandAction } from "./actions";
+import { SortableTableHead } from "../sortable-table-head";
 
 const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
@@ -29,7 +30,9 @@ export default async function BrandsPage({
 }) {
   const sp = await searchParams;
   const showDeleted = sp["deleted"] === "1";
-  const brands = await brandService.list(CTX, { includeDeleted: showDeleted });
+  const query = typeof sp["q"] === "string" ? sp["q"].trim() : "";
+  const sort = typeof sp["sort"] === "string" ? sp["sort"] : "name"; const direction = sp["dir"] === "desc" ? -1 : 1;
+  const brands = (await brandService.list(CTX, { includeDeleted: showDeleted, query: query || undefined })).toSorted((a, b) => direction * String(sort === "categories" ? a.categories.length : sort === "suppliers" ? a.suppliers.length : sort === "status" ? Boolean(a.deletedAt) : a.name).localeCompare(String(sort === "categories" ? b.categories.length : sort === "suppliers" ? b.suppliers.length : sort === "status" ? Boolean(b.deletedAt) : b.name), "id-ID", { numeric: true }));
 
   return (
     <PageShell>
@@ -45,7 +48,7 @@ export default async function BrandsPage({
       />
 
       <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.25rem" }}>
-        <Link href={`/masterdata/brands${showDeleted ? "" : "?deleted=1"}`} className="ui-button" data-variant="secondary" data-size="sm">
+        <Link href={`/masterdata/brands?${new URLSearchParams({ ...(query ? { q: query } : {}), ...(showDeleted ? {} : { deleted: "1" }) })}`} className="ui-button" data-variant="secondary" data-size="sm">
           <span>{showDeleted ? "Hide archived" : "Show archived"}</span>
         </Link>
       </div>
@@ -53,10 +56,10 @@ export default async function BrandsPage({
       <DataTable>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Categories</TableHead>
-            <TableHead>Suppliers</TableHead>
-            <TableHead>Status</TableHead>
+            <SortableTableHead column="name">Name</SortableTableHead>
+            <SortableTableHead column="categories">Categories</SortableTableHead>
+            <SortableTableHead column="suppliers">Suppliers</SortableTableHead>
+            <SortableTableHead column="status">Status</SortableTableHead>
             <TableHead aria-label="Actions" />
           </TableRow>
         </TableHeader>
@@ -64,7 +67,7 @@ export default async function BrandsPage({
           {brands.length === 0 ? (
             <TableRow>
               <TableCell colSpan={5}>
-                <EmptyState icon={Tag} title="No brands" />
+                <EmptyState icon={Tag} title={query ? `No brands match “${query}”` : "No brands"} />
               </TableCell>
             </TableRow>
           ) : (

@@ -1,8 +1,18 @@
 # 08 — Current Rebuild Status
 
-Status: FOUNDATION + UI ENGINE + MD-00 LOCKED — MASTER DATA READY FOR EXECUTION
-Audit date: 2026-08-25
+Status: FOUNDATION + UI ENGINE + MASTER DATA MD-01–MD-09 IMPLEMENTED — PRODUCTION IDENTITY DEFERRED
+Audit date: 2026-08-27
 Owner: PM / Technical Lead
+
+## 2026-08-27 implementation convergence
+
+- MD-01 through MD-07 persistence, application rules, permissions/audit, and usable CRUD surfaces are implemented on local `main`; MD-08 whole-schema XLSX and MD-09 discovery/public reads are implemented and under final convergence review.
+- Master Data navigation is grouped by operator workflow: Brand & Catalog, Vendor & Supplier, Pricing, and a visibly unavailable Samples boundary. General Settings owns Units, Categories, Import & Export, and Audit Log.
+- The collapsed rail now uses a compact `MD` mark, clips its own contents, retains utility navigation, and produces no page-wide horizontal overflow. Browser checks passed in collapsed desktop and 390px labeled navigation modes.
+- `BrandCategory` remains explicit catalog/discovery classification. `Sku.category_id` remains a separate manual exact PRODUCT classification: optional for DRAFT, mandatory for ACTIVE and BQ candidate truth, never propagated back into the Brand catalog. The SKU editor prioritizes Brand categories and warns on an intentional mismatch.
+- Schema re-audit found no `SkuCategory`, Category source/derived flag, Sample placeholder, temporal SkuPrice, supplier-price partition, price selector/history, project relation, or split WorkPrice schema.
+- Protected Master Data screens and actions fail closed. The temporary local operator adapter requires explicit server configuration and is unavailable in production; persisted identity/grant ownership remains deferred.
+- Typecheck, architecture checks, legacy-runtime checks, production build, browser rail/reorder checks, and the complete 234-test suite pass. The suite includes PostgreSQL schema/seed/audit/transaction contracts plus whole-workbook relationship preservation and rollback against the dedicated disposable test database; no test is failed, canceled, or skipped.
 
 ## Approved repository state
 

@@ -160,6 +160,15 @@ is not shown, and the stored state resumes only when the viewport widens.
 | `collapsedBrand` | `ReactNode` | falls back to `brand` | Compact mark for the 60px rail |
 | `expandLabel` / `collapseLabel` | `string` | "Expand/Collapse navigation" | Accessible name for the toggle |
 
+The `brand` fallback is backward compatibility only. A product that enables
+collapse must pass a mark that inherently fits the 60px rail. The rail clips its
+own visual contents and must never create document-level horizontal overflow;
+utility navigation stays mounted and reachable when collapsed.
+
+Apps group entries by user workflow rather than mirroring entity tables. Secondary
+governance destinations may be supplied in the persistent rail utility area, but
+the engine does not hardcode any app's grouping or routes.
+
 ### NavItem
 
 Nav entries are engine-owned, not app-owned. "Where am I" must look and announce

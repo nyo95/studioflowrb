@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { partyService } from "@/apps/masterdata/infrastructure/runtime";
+import { businessTypeService, partyService } from "@/apps/masterdata/infrastructure/runtime";
 import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 import { PARTY_ROLES, PARTY_TYPES } from "@/apps/masterdata/domain/party-rules";
 import {
@@ -22,7 +22,7 @@ const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function EditPartyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const parties = await partyService.list(CTX, { includeDeleted: true });
+  const [parties, businessTypes] = await Promise.all([partyService.list(CTX, { includeDeleted: true }), businessTypeService.list(CTX)]);
   const party = parties.find((p) => p.id === id);
   if (!party || party.deletedAt) notFound();
 
@@ -62,6 +62,9 @@ export default async function EditPartyPage({ params }: { params: Promise<{ id: 
           {PARTY_ROLES.map((role) => (
             <Checkbox key={role} id={`role_${role}`} name={`role_${role}`} label={role} defaultChecked={party.roles.includes(role)} />
           ))}
+        </FormSection>
+        <FormSection title="Business types" description="Optional commercial classifications; these do not grant supplier/vendor eligibility.">
+          {businessTypes.map((type) => <Checkbox key={type.id} id={`business-type-${type.id}`} name="businessTypeIds" value={type.id} label={type.label} defaultChecked={party.businessTypeIds.includes(type.id)} />)}
         </FormSection>
         <FormActions>
           <Button type="submit" variant="primary">Save changes</Button>

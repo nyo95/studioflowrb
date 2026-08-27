@@ -125,10 +125,10 @@ describe("Master Data audit persistence and convergence", () => {
 
   // ── Permission ────────────────────────────────────────────────────────────
 
-  it("audit list requires masterdata.audit.read — forbidden without it", async () => {
-    await assert.rejects(
+  it("audit list requires masterdata.audit.read — forbidden without it", () => {
+    assert.throws(
       () => auditQuery().list(noAuditContext),
-      (e: unknown) => e instanceof AppError && (e as AppError).code === "FORBIDDEN",
+      (e: unknown) => e instanceof AppError && e.kind === "FORBIDDEN" && e.code === "PERMISSION_DENIED",
     );
   });
 

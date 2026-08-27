@@ -15,6 +15,8 @@ import {
   Textarea,
 } from "@/platform/ui_engine";
 import { createPartyAction } from "../actions";
+import { businessTypeService } from "@masterdata/infrastructure/runtime";
+import { MASTER_DATA_REQUEST_CONTEXT as CTX } from "@masterdata/infrastructure/request-context";
 
 async function handleCreate(formData: FormData) {
   "use server";
@@ -22,7 +24,8 @@ async function handleCreate(formData: FormData) {
   redirect("/masterdata/parties");
 }
 
-export default function NewPartyPage() {
+export default async function NewPartyPage() {
+  const businessTypes = await businessTypeService.list(CTX);
   return (
     <PageShell>
       <PageHeader eyebrow="Parties" title="New party" />
@@ -52,6 +55,9 @@ export default function NewPartyPage() {
           {PARTY_ROLES.map((role) => (
             <Checkbox key={role} id={`role_${role}`} name={`role_${role}`} label={role} />
           ))}
+        </FormSection>
+        <FormSection title="Business types" description="Optional commercial classifications; these do not grant supplier/vendor eligibility.">
+          {businessTypes.map((type) => <Checkbox key={type.id} id={`business-type-${type.id}`} name="businessTypeIds" value={type.id} label={type.label} />)}
         </FormSection>
         <FormActions>
           <Button type="submit" variant="primary">Create party</Button>

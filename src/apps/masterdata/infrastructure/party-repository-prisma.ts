@@ -41,8 +41,8 @@ async function readParty(tx: TransactionClient, id: string): Promise<PartyRecord
 
 function childWrites(input: PartyGraphInput) {
   return {
-    roles: input.roles.map((role) => ({ role })),
-    businessTypes: input.businessTypeIds.map((businessTypeId) => ({ business_type_id: businessTypeId })),
+    roles: input.roleAssignments?.map(({ id, role }) => ({ id, role })) ?? input.roles.map((role) => ({ role })),
+    businessTypes: input.businessTypeAssignments?.map(({ id, businessTypeId }) => ({ id, business_type_id: businessTypeId })) ?? input.businessTypeIds.map((businessTypeId) => ({ business_type_id: businessTypeId })),
     contacts: input.contacts.map((contact) => ({ id: contact.id, person_name: contact.personName, job_title: contact.jobTitle, phone: contact.phone, email: contact.email, is_primary: contact.isPrimary, notes: contact.notes, brand_id: contact.brandId })),
     links: input.links.map((link) => ({ id: link.id, kind: link.kind, url: link.url, archive_url: link.archiveUrl, label: link.label, sort_order: link.sortOrder })),
   };

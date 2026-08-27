@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { NavItem } from "@/platform/ui_engine";
 
 const items = [
-  { href: "/masterdata/brands", label: "Brand & Catalog", icon: Tags, matches: ["/masterdata/brands", "/masterdata/categories", "/masterdata/skus"] },
+  { href: "/masterdata/catalog", label: "Brand & Catalog", icon: Tags, matches: ["/masterdata/catalog", "/masterdata/brands", "/masterdata/categories", "/masterdata/skus"] },
   { href: "/masterdata/parties", label: "Vendor & Supplier", icon: Building2, matches: ["/masterdata/parties"] },
   { href: "/masterdata/pricing", label: "Pricing", icon: Boxes, matches: ["/masterdata/pricing"] },
 ] as const;

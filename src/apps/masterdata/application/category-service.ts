@@ -24,6 +24,8 @@ export type CategoryListInput = {
 };
 
 export type CategoryCreateInput = {
+  /** Import-only stable identity; ordinary UI creation leaves this blank. */
+  requestedId?: string;
   kind: CategoryKind;
   name: string;
   parentId?: string | null;
@@ -128,7 +130,7 @@ export class CategoryService {
       }
 
       const record = await this.ports.categories.create(tx, {
-        id: this.ports.generateId(),
+        id: input.requestedId ?? this.ports.generateId(),
         kind: input.kind,
         name,
         slug,
@@ -145,7 +147,7 @@ export class CategoryService {
           action: "category.created",
           entityType: "category",
           entityId: record.id,
-          actor: context.actor,
+          actor: context.actor, requestId: context.requestId,
           changes: diffAuditChanges({}, categoryAuditShape(record)),
           occurredAt: this.ports.now(),
         }),
@@ -261,7 +263,7 @@ export class CategoryService {
           action: "category.updated",
           entityType: "category",
           entityId: current.id,
-          actor: context.actor,
+          actor: context.actor, requestId: context.requestId,
           changes,
           occurredAt: this.ports.now(),
         }),
@@ -291,7 +293,7 @@ export class CategoryService {
           action: "category.deleted",
           entityType: "category",
           entityId: current.id,
-          actor: context.actor,
+          actor: context.actor, requestId: context.requestId,
           changes: { deletedAt: { from: null, to: deletedAt } },
           occurredAt: deletedAt,
         }),
@@ -365,7 +367,7 @@ export class CategoryService {
           action: "category.restored",
           entityType: "category",
           entityId: current.id,
-          actor: context.actor,
+          actor: context.actor, requestId: context.requestId,
           changes: { deletedAt: { from: current.deletedAt, to: null } },
           occurredAt: this.ports.now(),
         }),

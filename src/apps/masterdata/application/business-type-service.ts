@@ -7,7 +7,7 @@ import { runInMasterDataTransaction, type MasterDataExecutionContext, type Maste
 import { MASTERDATA_DICTIONARY_MANAGE, MASTERDATA_DICTIONARY_READ } from "./masterdata-permissions";
 import type { BusinessTypeRecord, BusinessTypeRepository } from "./party-repository";
 
-export type BusinessTypeCreateInput = { code: string; label: string; description?: string | null; sortOrder?: number };
+export type BusinessTypeCreateInput = { requestedId?: string; code: string; label: string; description?: string | null; sortOrder?: number };
 export type BusinessTypeUpdateInput = { id: string; code: string; label?: string; description?: string | null; sortOrder?: number };
 
 function normalizeCode(value: string): string {
@@ -39,8 +39,8 @@ export class BusinessTypeService {
     if (!label) throw new AppError("VALIDATION", "BUSINESS_TYPE_LABEL_REQUIRED", "Business Type label is required.");
     return runInMasterDataTransaction(context, this.ports.runTransaction, async (tx) => {
       if (await this.ports.businessTypes.findByCode(tx, code)) throw new AppError("CONFLICT", "BUSINESS_TYPE_CODE_TAKEN", "This Business Type code already exists.");
-      const row = await this.ports.businessTypes.create(tx, { id: this.ports.generateId(), code, label, description: optionalText(input.description), sortOrder: input.sortOrder ?? 0 });
-      await this.ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "business-type.created", entityType: "business-type", entityId: row.id, actor: context.actor, occurredAt: this.ports.now(), changes: diffAuditChanges({}, auditShape(row)) }), tx);
+      const row = await this.ports.businessTypes.create(tx, { id: input.requestedId ?? this.ports.generateId(), code, label, description: optionalText(input.description), sortOrder: input.sortOrder ?? 0 });
+      await this.ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "business-type.created", entityType: "business-type", entityId: row.id, actor: context.actor, requestId: context.requestId, occurredAt: this.ports.now(), changes: diffAuditChanges({}, auditShape(row)) }), tx);
       return row;
     });
   }
@@ -57,7 +57,7 @@ export class BusinessTypeService {
       const changes = diffAuditChanges(auditShape(current), next);
       if (!Object.keys(changes).length) return current;
       const row = await this.ports.businessTypes.update(tx, current.id, { label: next.label, description: next.description, sortOrder: next.sortOrder });
-      await this.ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "business-type.updated", entityType: "business-type", entityId: row.id, actor: context.actor, occurredAt: this.ports.now(), changes }), tx);
+      await this.ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "business-type.updated", entityType: "business-type", entityId: row.id, actor: context.actor, requestId: context.requestId, occurredAt: this.ports.now(), changes }), tx);
       return row;
     });
   }
@@ -70,7 +70,7 @@ export class BusinessTypeService {
       if ((await this.ports.businessTypes.countLivePartyAssignments(tx, id)) > 0) throw new AppError("CONFLICT", "BUSINESS_TYPE_STILL_ASSIGNED", "This Business Type is assigned to a live Party.");
       const deletedAt = this.ports.now();
       const row = await this.ports.businessTypes.setDeletedAt(tx, id, deletedAt);
-      await this.ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "business-type.deleted", entityType: "business-type", entityId: id, actor: context.actor, occurredAt: deletedAt, changes: { deletedAt: { from: null, to: deletedAt } } }), tx);
+      await this.ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "business-type.deleted", entityType: "business-type", entityId: id, actor: context.actor, requestId: context.requestId, occurredAt: deletedAt, changes: { deletedAt: { from: null, to: deletedAt } } }), tx);
       return row;
     });
   }
@@ -84,7 +84,7 @@ export class BusinessTypeService {
       const conflict = await this.ports.businessTypes.findByCode(tx, current.code);
       if (conflict && conflict.id !== current.id) throw new AppError("CONFLICT", "BUSINESS_TYPE_CODE_TAKEN", "This Business Type code is already used.");
       const row = await this.ports.businessTypes.setDeletedAt(tx, id, null);
-      await this.ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "business-type.restored", entityType: "business-type", entityId: id, actor: context.actor, occurredAt: this.ports.now(), changes: { deletedAt: { from: current.deletedAt, to: null } } }), tx);
+      await this.ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "business-type.restored", entityType: "business-type", entityId: id, actor: context.actor, requestId: context.requestId, occurredAt: this.ports.now(), changes: { deletedAt: { from: current.deletedAt, to: null } } }), tx);
       return row;
     });
   }

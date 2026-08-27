@@ -193,6 +193,13 @@ marks it on more than one channel — a fill alone collides with hover and reads
 nothing. The mark survives the collapsed rail, where it is the only orientation
 cue left once labels are gone.
 
+Application navigation is grouped by operator workflow, not by tables or schema
+inventory. Master Data's primary groups are Brand & Catalog, Vendor & Supplier,
+Pricing, and Samples; governance tools such as controlled dictionaries, import /
+export, and audit live under General Settings as a persistent utility destination.
+An unavailable cross-app workflow remains visibly disabled with a clear reason;
+it must not acquire placeholder persistence merely to make the menu look complete.
+
 Row selection also uses more than hover fill: the selection control remains
 checked and the row receives a restrained ink rule at its leading edge. Status
 meaning remains independent, so an ACTIVE selected row keeps its semantic marker
@@ -298,6 +305,11 @@ The collapsible icon rail is a desktop behavior. At `840px` and below, navigatio
 always returns to labeled horizontal form even when the stored desktop preference
 is collapsed. The preference is preserved and may resume when the viewport widens;
 UI Engine does not persist it.
+
+Every collapsible app supplies a genuinely compact `collapsedBrand`; the full
+brand is not a safe 60px fallback. Rail content is clipped to the rail plane,
+never creates page-level horizontal overflow, and its utility navigation remains
+reachable in both expanded and collapsed desktop presentations.
 
 ## 13. Interaction Contract
 

@@ -1,4 +1,5 @@
 import type { TransactionClient } from "@platform/core/db";
+import { prepareAuditEvent, type AuditWriter } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission } from "@platform/core/rbac";
 import type { MasterDataExecutionContext, TransactionRunner } from "./execution-context";
@@ -29,8 +30,8 @@ export const WORKBOOK_COLUMNS: Readonly<Record<MasterDataWorkbookSheet, readonly
   Unit: ["id", "code", "label", "symbol", "aliases", "usages", "sort_order", "updated_at"],
   BusinessType: ["id", "code", "label", "description", "sort_order", "updated_at"],
   Party: ["id", "name", "slug", "type", "legal_name", "address", "notes", "updated_at"],
-  PartyRole: ["party_id", "role", "updated_at"],
-  PartyBusinessType: ["party_id", "business_type_id", "updated_at"],
+  PartyRole: ["id", "party_id", "role", "updated_at"],
+  PartyBusinessType: ["id", "party_id", "business_type_id", "updated_at"],
   PartyContact: ["id", "party_id", "person_name", "job_title", "phone", "email", "is_primary", "notes", "brand_id", "updated_at"],
   PartyLink: ["id", "party_id", "kind", "url", "archive_url", "label", "sort_order", "updated_at"],
   Brand: ["id", "name", "slug", "owner_party_id", "notes", "updated_at"],
@@ -77,8 +78,12 @@ export function validateWorkbookStructure(data: WorkbookData, versions: Readonly
     data.sheets[sheet].forEach((row, index) => {
       for (const field of Object.keys(row)) if (!allowed.has(field)) issues.push({ sheet, row: index + 2, field, code: "UNKNOWN_COLUMN", message: "Unknown workbook column." });
       const id = typeof row.id === "string" ? row.id : null;
+      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (id && !uuid.test(id)) issues.push({ sheet, row: index + 2, field: "id", code: "INVALID_ID", message: "IDs must be valid UUIDs." });
+      for (const [field, value] of Object.entries(row)) if (field.endsWith("_id") && typeof value === "string" && value && !uuid.test(value)) issues.push({ sheet, row: index + 2, field, code: "INVALID_REFERENCE_ID", message: "Reference IDs must be valid UUIDs." });
       const updatedAt = typeof row.updated_at === "string" ? row.updated_at : null;
       if (id && Object.hasOwn(versions, `${sheet}:${id}`) && versions[`${sheet}:${id}`] !== updatedAt) issues.push({ sheet, row: index + 2, field: "updated_at", code: "STALE_ROW", message: "The database row changed after this workbook was exported." });
+      if (id && updatedAt && !Object.hasOwn(versions, `${sheet}:${id}`)) issues.push({ sheet, row: index + 2, field: "updated_at", code: "STALE_ROW", message: "The referenced database row no longer exists." });
       if (sheet === "SkuPrice") {
         const skuId = typeof row.sku_id === "string" ? row.sku_id : "";
         if (!skuId) issues.push({ sheet, row: index + 2, field: "sku_id", code: "REQUIRED", message: "SKU ID is required." });
@@ -91,11 +96,19 @@ export function validateWorkbookStructure(data: WorkbookData, versions: Readonly
 }
 
 export class ImportExportService {
-  constructor(private readonly ports: { runTransaction: TransactionRunner; codec: WorkbookCodec; store: WorkbookStore; applier: WorkbookApplier; now: () => Date }) {}
+  constructor(private readonly ports: { runTransaction: TransactionRunner; codec: WorkbookCodec; store: WorkbookStore; applier: WorkbookApplier; auditWriter?: AuditWriter; now: () => Date; generateId?: () => string }) {}
 
   async export(context: MasterDataExecutionContext): Promise<Uint8Array> {
     requirePermission(context.grants, MASTERDATA_EXPORT_READ); requireEvery(context.grants, readPermissions);
-    const data = await this.ports.runTransaction((tx) => this.ports.store.exportAll(tx, this.ports.now()));
+    const data = await this.ports.runTransaction(async (tx) => {
+      const exportedAt = this.ports.now();
+      const value = await this.ports.store.exportAll(tx, exportedAt);
+      if (this.ports.auditWriter) {
+        const counts = Object.fromEntries(MASTERDATA_WORKBOOK_SHEETS.map((sheet) => [sheet, value.sheets[sheet].length]));
+        await this.ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "masterdata.exported", entityType: "workbook", entityId: this.ports.generateId?.() ?? "export", actor: context.actor, requestId: context.requestId, occurredAt: exportedAt, metadata: { scope: value.manifest.scope, counts } }), tx);
+      }
+      return value;
+    });
     return this.ports.codec.encode(data);
   }
 
@@ -120,7 +133,7 @@ export class ImportExportService {
       const versions = await this.ports.store.currentVersions(tx, preview.data!);
       const issues = validateWorkbookStructure(preview.data!, versions);
       if (issues.length) throw new AppError("CONFLICT", "WORKBOOK_STALE", "The workbook changed or is stale; preview it again.", { details: { issues } });
-      return this.ports.applier.apply(tx, { ...context, transaction: tx }, preview.data!);
+      return this.ports.applier.apply(tx, { ...context, requestId: context.requestId ?? this.ports.generateId?.(), transaction: tx }, preview.data!);
     });
   }
 }

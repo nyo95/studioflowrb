@@ -14,6 +14,7 @@ import {
 } from "@/platform/ui_engine";
 import { auditQueryService } from "@/apps/masterdata/infrastructure/runtime";
 import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { SortableTableHead } from "../sortable-table-head";
 
 /**
  * Development execution context.
@@ -22,7 +23,7 @@ import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/re
 const DEV_CONTEXT = MASTER_DATA_REQUEST_CONTEXT;
 
 type Props = {
-  searchParams: Promise<{ entity?: string; action?: string; limit?: string }>;
+  searchParams: Promise<{ entity?: string; action?: string; limit?: string; sort?: string; dir?: string }>;
 };
 
 export const metadata = { title: "Audit log — Master Data" };
@@ -33,11 +34,12 @@ export default async function AuditPage({ searchParams }: Props) {
   const action = params.action ?? undefined;
   const limit = Math.min(parseInt(params.limit ?? "100", 10) || 100, 500);
 
-  const events = await auditQueryService.list(DEV_CONTEXT, {
+  const sort = params.sort ?? "occurred"; const direction = params.dir === "asc" ? 1 : -1;
+  const events = (await auditQueryService.list(DEV_CONTEXT, {
     entityType,
     action,
     limit,
-  });
+  })).toSorted((a, b) => direction * String(sort === "action" ? a.action : sort === "entity" ? a.entityType : sort === "id" ? a.entityId : sort === "actor" ? a.actorLabel : a.occurredAt.toISOString()).localeCompare(String(sort === "action" ? b.action : sort === "entity" ? b.entityType : sort === "id" ? b.entityId : sort === "actor" ? b.actorLabel : b.occurredAt.toISOString()), "id-ID", { numeric: true }));
 
   return (
     <PageShell>
@@ -52,11 +54,11 @@ export default async function AuditPage({ searchParams }: Props) {
         <DataTable aria-label="Audit events">
           <TableHeader>
             <TableRow>
-              <TableHead>Occurred at</TableHead>
-              <TableHead>Action</TableHead>
-              <TableHead>Entity</TableHead>
-              <TableHead>Entity ID</TableHead>
-              <TableHead>Actor</TableHead>
+              <SortableTableHead column="occurred">Occurred at</SortableTableHead>
+              <SortableTableHead column="action">Action</SortableTableHead>
+              <SortableTableHead column="entity">Entity</SortableTableHead>
+              <SortableTableHead column="id">Entity ID</SortableTableHead>
+              <SortableTableHead column="actor">Actor</SortableTableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

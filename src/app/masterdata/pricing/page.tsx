@@ -2,15 +2,16 @@ import Link from "next/link";
 import { skuService, pricingService, unitService, partyService } from "@/apps/masterdata/infrastructure/runtime";
 import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 import { clearSkuPriceAction, deleteWorkPriceAction, restoreWorkPriceAction } from "./actions";
+import { SortableTableHead } from "../sortable-table-head";
 
 const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function PricingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; archived?: string }>;
+  searchParams: Promise<{ tab?: string; archived?: string; sort?: string; dir?: string }>;
 }) {
-  const { tab = "sku", archived } = await searchParams;
+  const { tab = "sku", archived, sort = "name", dir } = await searchParams;
   const showArchived = archived === "1";
 
   const [skus, workPrices, units] = await Promise.all([
@@ -26,6 +27,9 @@ export default async function PricingPage({
   const priceBySkuId = new Map(skuPrices.map((sp) => [sp.skuId, sp.price]));
 
   const unitsById = new Map(units.map((u) => [u.id, u]));
+  const direction = dir === "desc" ? -1 : 1;
+  const sortedSkus = skus.toSorted((a, b) => { const ap = priceBySkuId.get(a.id); const bp = priceBySkuId.get(b.id); return direction * String(sort === "status" ? a.status : sort === "price" ? ap?.amount ?? "" : sort === "unit" ? unitsById.get(ap?.unitId ?? "")?.label ?? "" : a.name).localeCompare(String(sort === "status" ? b.status : sort === "price" ? bp?.amount ?? "" : sort === "unit" ? unitsById.get(bp?.unitId ?? "")?.label ?? "" : b.name), "id-ID", { numeric: true }); });
+  const sortedWorkPrices = workPrices.toSorted((a, b) => direction * String(sort === "kind" ? a.kind : sort === "price" ? a.amount : sort === "unit" ? unitsById.get(a.unitId)?.label ?? "" : a.code).localeCompare(String(sort === "kind" ? b.kind : sort === "price" ? b.amount : sort === "unit" ? unitsById.get(b.unitId)?.label ?? "" : b.code), "id-ID", { numeric: true }));
 
   return (
     <div className="ui-layout-page">
@@ -67,10 +71,10 @@ export default async function PricingPage({
           <table className="ui-table">
             <thead>
               <tr>
-                <th>SKU</th>
-                <th>Status</th>
-                <th>Price</th>
-                <th>Unit</th>
+                <SortableTableHead column="name">SKU</SortableTableHead>
+                <SortableTableHead column="status">Status</SortableTableHead>
+                <SortableTableHead column="price">Price</SortableTableHead>
+                <SortableTableHead column="unit">Unit</SortableTableHead>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -82,7 +86,7 @@ export default async function PricingPage({
                   </td>
                 </tr>
               )}
-              {skus.map((sku) => {
+              {sortedSkus.map((sku) => {
                 const price = priceBySkuId.get(sku.id);
                 const unit = price ? unitsById.get(price.unitId) : null;
                 return (
@@ -167,10 +171,10 @@ export default async function PricingPage({
             <table className="ui-table">
               <thead>
                 <tr>
-                  <th>Code / Name</th>
-                  <th>Kind</th>
-                  <th>Price</th>
-                  <th>Unit</th>
+                  <SortableTableHead column="name">Code / Name</SortableTableHead>
+                  <SortableTableHead column="kind">Kind</SortableTableHead>
+                  <SortableTableHead column="price">Price</SortableTableHead>
+                  <SortableTableHead column="unit">Unit</SortableTableHead>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -182,7 +186,7 @@ export default async function PricingPage({
                     </td>
                   </tr>
                 )}
-                {workPrices.map((wp) => {
+                {sortedWorkPrices.map((wp) => {
                   const unit = unitsById.get(wp.unitId);
                   return (
                     <tr key={wp.id}>

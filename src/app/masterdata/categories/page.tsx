@@ -19,6 +19,7 @@ import {
 } from "@/platform/ui_engine";
 
 import { deleteCategoryAction, restoreCategoryAction } from "./actions";
+import { SortableTableHead } from "../sortable-table-head";
 
 const DEV_CONTEXT = MASTER_DATA_REQUEST_CONTEXT;
 
@@ -31,10 +32,11 @@ export default async function CategoriesPage({
   const kind = sp["kind"] === "WORK" ? ("WORK" as const) : ("PRODUCT" as const);
   const showDeleted = sp["deleted"] === "1";
 
-  const categories = await categoryService.list(DEV_CONTEXT, {
+  const sort = typeof sp["sort"] === "string" ? sp["sort"] : "name"; const direction = sp["dir"] === "desc" ? -1 : 1;
+  const categories = (await categoryService.list(DEV_CONTEXT, {
     kind,
     includeDeleted: showDeleted,
-  });
+  })).toSorted((a, b) => direction * String(sort === "path" ? a.path ?? a.slug : sort === "status" ? Boolean(a.deletedAt) : sort === "order" ? a.sortOrder : a.name).localeCompare(String(sort === "path" ? b.path ?? b.slug : sort === "status" ? Boolean(b.deletedAt) : sort === "order" ? b.sortOrder : b.name), "id-ID", { numeric: true }));
 
   return (
     <PageShell>
@@ -65,10 +67,10 @@ export default async function CategoriesPage({
       <DataTable>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Path / Slug</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Sort</TableHead>
+            <SortableTableHead column="name">Name</SortableTableHead>
+            <SortableTableHead column="path">Path / Slug</SortableTableHead>
+            <SortableTableHead column="status">Status</SortableTableHead>
+            <SortableTableHead column="order">Sort</SortableTableHead>
             <TableHead aria-label="Actions" />
           </TableRow>
         </TableHeader>

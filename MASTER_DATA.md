@@ -142,6 +142,7 @@ Brand fields are `name`, `slug`, timestamps, and `deleted_at`, with optional `ow
 - A live Brand must always retain at least one live PRODUCT `BrandCategory`; removing its final category is rejected.
 - `BrandCategory` is an explicit staff classification for discovery. It contains `brand_id`, `category_id`, `sort_order`, and `created_at`; it has no source/derived flag.
 - BrandCategory accepts PRODUCT Categories only and is never created, removed, or refreshed from SKU assignments.
+- The Brand catalog and an SKU's exact Category are intentionally allowed to differ. SKU entry prioritizes the selected Brand's catalog Categories, but staff may select another live PRODUCT Category with an explicit mismatch warning. Saving that SKU never expands the Brand catalog implicitly; catalog maintenance is a separate audited Brand action.
 - A Brand does not require a supplier or SKU to be considered valid.
 - Brand `tags` are not part of the rebuild contract. Discovery aliases belong to Category `search_synonyms`; introducing a second free-form authority is deferred.
 - A Brand with a non-deleted SKU cannot be soft-deleted. Its SKUs must be reassigned or soft-deleted first.
@@ -171,6 +172,7 @@ SkuMedia contains `sku_id`, `kind`, `url`, optional `label`, `sort_order`, and `
 - Brand is optional so generic materials remain representable.
 - `category_id` is one direct nullable FK to a live PRODUCT Category. There is no `SkuCategory` join table.
 - DRAFT may have no category or price. ACTIVE requires a live PRODUCT Category, a live canonical base Unit, exactly one canonical SkuPrice, and a live Brand when `brand_id` is present.
+- BQ needs this direct SKU Category because it snapshots the exact material classification used by a selected SKU. It does not substitute the broader Brand catalog classification and does not make DRAFT classification mandatory.
 - ACTIVE is the only SKU status exposed by normal Master Data public candidate searches. DISCONTINUED remains readable by ID for history but is not offered for new selections.
 - A SKU with a SkuPrice is soft-deleted rather than hard-deleted; its canonical price row remains attached but is excluded from live/public reads.
 - Changing Brand or Category on an ACTIVE SKU is allowed only through an explicit update use case and is audited. It never mutates existing BQ snapshots.
@@ -335,7 +337,7 @@ Master Data owns workbook generation, parsing, validation, conflict detection, a
 The MVP workbook is versioned and contains a manifest (`format_version`, `exported_at`, scope) plus separate sheets for Unit, BusinessType, Party, PartyRole, PartyBusinessType, PartyContact, PartyLink, Brand, BrandLink, BrandSupplier, Category, BrandCategory, Sku, SkuMedia, SkuPrice, and WorkPrice. AuditEvent is exportable only through a separate audit export and is never importable.
 
 - Every entity/relationship row carries stable ID and `updated_at` (or equivalent exported version). Human-readable names are helpers, never identity.
-- Known ID means update; blank ID means create; a database row absent from the workbook means no action. Import never infers deletion.
+- Known ID means update; blank ID means create; a database row absent from the workbook means no action. Import never infers deletion. For a new aggregate graph whose child sheets must reference the parent in the same offline workbook, the operator may supply a new valid UUID with blank `updated_at`; that UUID is create-only and is rejected as stale when paired with an exported version. This is an import identity mechanism, not a user-editable runtime identity.
 - Foreign keys use IDs. Import never silently creates a missing Party, Brand, Category, role, SKU, or unit from a display name.
 - Unit, Category, and BusinessType dictionary sheets use canonical immutable codes/slugs and require their dedicated manage permission. Ordinary Party/SKU/price sheets reject unknown dictionary values rather than extending dictionaries implicitly.
 - SkuPrice imports contain at most one row per resolved SKU and upsert that canonical row by `sku_id`. Duplicate rows for one SKU fail preflight; row order, timestamp, cheapest price, and supplier preference never choose a winner.

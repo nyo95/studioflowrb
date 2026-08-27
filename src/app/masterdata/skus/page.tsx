@@ -2,18 +2,20 @@ import Link from "next/link";
 import { skuService } from "@/apps/masterdata/infrastructure/runtime";
 import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 import { activateSkuAction, discontinueSkuAction, deleteSkuAction, restoreSkuAction } from "./actions";
+import { SortableTableHead } from "../sortable-table-head";
 
 const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function SkusPage({
   searchParams,
 }: {
-  searchParams: Promise<{ archived?: string }>;
+  searchParams: Promise<{ archived?: string; sort?: string; dir?: string }>;
 }) {
-  const { archived } = await searchParams;
+  const { archived, sort = "name", dir } = await searchParams;
   const showArchived = archived === "1";
 
-  const skus = await skuService.list(CTX, { includeDeleted: showArchived });
+  const direction = dir === "desc" ? -1 : 1;
+  const skus = (await skuService.list(CTX, { includeDeleted: showArchived })).toSorted((a, b) => direction * String(sort === "code" ? a.code ?? "" : sort === "kind" ? a.kind : sort === "status" ? a.status : a.name).localeCompare(String(sort === "code" ? b.code ?? "" : sort === "kind" ? b.kind : sort === "status" ? b.status : b.name), "id-ID", { numeric: true }));
 
   return (
     <div className="ui-layout-page">
@@ -52,10 +54,10 @@ export default async function SkusPage({
         <table className="ui-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Code</th>
-              <th>Kind</th>
-              <th>Status</th>
+              <SortableTableHead column="name">Name</SortableTableHead>
+              <SortableTableHead column="code">Code</SortableTableHead>
+              <SortableTableHead column="kind">Kind</SortableTableHead>
+              <SortableTableHead column="status">Status</SortableTableHead>
               <th>Actions</th>
             </tr>
           </thead>

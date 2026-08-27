@@ -21,8 +21,8 @@ export const prismaWorkbookStore: WorkbookStore = {
     sheets.Unit = units.map((x) => ({ id: x.id, code: x.code, label: x.label, symbol: x.symbol, aliases: json(x.aliases), usages: json(x.usages), sort_order: x.sort_order, updated_at: iso(x.updated_at) }));
     sheets.BusinessType = businessTypes.map((x) => ({ id: x.id, code: x.code, label: x.label, description: x.description, sort_order: x.sort_order, updated_at: iso(x.updated_at) }));
     sheets.Party = parties.map((x) => ({ id: x.id, name: x.name, slug: x.slug, type: x.type, legal_name: x.legal_name, address: x.address, notes: x.notes, updated_at: iso(x.updated_at) }));
-    sheets.PartyRole = parties.flatMap((p) => p.roles.map((x) => ({ party_id: p.id, role: x.role, updated_at: iso(p.updated_at) })));
-    sheets.PartyBusinessType = parties.flatMap((p) => p.business_types.map((x) => ({ party_id: p.id, business_type_id: x.business_type_id, updated_at: iso(p.updated_at) })));
+    sheets.PartyRole = parties.flatMap((p) => p.roles.map((x) => ({ id: x.id, party_id: p.id, role: x.role, updated_at: iso(p.updated_at) })));
+    sheets.PartyBusinessType = parties.flatMap((p) => p.business_types.map((x) => ({ id: x.id, party_id: p.id, business_type_id: x.business_type_id, updated_at: iso(p.updated_at) })));
     sheets.PartyContact = parties.flatMap((p) => p.contacts.map((x) => ({ id: x.id, party_id: p.id, person_name: x.person_name, job_title: x.job_title, phone: x.phone, email: x.email, is_primary: x.is_primary, notes: x.notes, brand_id: x.brand_id, updated_at: iso(p.updated_at) })));
     sheets.PartyLink = parties.flatMap((p) => p.links.map((x) => ({ id: x.id, party_id: p.id, kind: x.kind, url: x.url, archive_url: x.archive_url, label: x.label, sort_order: x.sort_order, updated_at: iso(p.updated_at) })));
     sheets.Brand = brands.map((x) => ({ id: x.id, name: x.name, slug: x.slug, owner_party_id: x.owner_party_id, notes: x.notes, updated_at: iso(x.updated_at) }));
@@ -39,18 +39,29 @@ export const prismaWorkbookStore: WorkbookStore = {
 
   async currentVersions(tx: TransactionClient, data: WorkbookData) {
     const wanted = (sheet: keyof WorkbookData["sheets"]) => data.sheets[sheet].map((row) => row.id).filter((id): id is string => typeof id === "string" && id.length > 0);
-    const [units, businessTypes, parties, brands, categories, skus, prices, workPrices] = await Promise.all([
+    const [units, businessTypes, parties, partyRoles, partyBusinessTypes, partyContacts, partyLinks, brands, brandLinks, brandSuppliers, brandCategories, categories, skus, skuMedia, prices, workPrices] = await Promise.all([
       tx.unit.findMany({ where: { id: { in: wanted("Unit") } }, select: { id: true, updated_at: true } }),
       tx.businessType.findMany({ where: { id: { in: wanted("BusinessType") } }, select: { id: true, updated_at: true } }),
       tx.party.findMany({ where: { id: { in: wanted("Party") } }, select: { id: true, updated_at: true } }),
+      tx.partyRole.findMany({ where: { id: { in: wanted("PartyRole") } }, select: { id: true, party: { select: { updated_at: true } } } }),
+      tx.partyBusinessType.findMany({ where: { id: { in: wanted("PartyBusinessType") } }, select: { id: true, party: { select: { updated_at: true } } } }),
+      tx.partyContact.findMany({ where: { id: { in: wanted("PartyContact") } }, select: { id: true, party: { select: { updated_at: true } } } }),
+      tx.partyLink.findMany({ where: { id: { in: wanted("PartyLink") } }, select: { id: true, party: { select: { updated_at: true } } } }),
       tx.brand.findMany({ where: { id: { in: wanted("Brand") } }, select: { id: true, updated_at: true } }),
+      tx.brandLink.findMany({ where: { id: { in: wanted("BrandLink") } }, select: { id: true, brand: { select: { updated_at: true } } } }),
+      tx.brandSupplier.findMany({ where: { id: { in: wanted("BrandSupplier") } }, select: { id: true, brand: { select: { updated_at: true } } } }),
+      tx.brandCategory.findMany({ where: { id: { in: wanted("BrandCategory") } }, select: { id: true, brand: { select: { updated_at: true } } } }),
       tx.category.findMany({ where: { id: { in: wanted("Category") } }, select: { id: true, updated_at: true } }),
       tx.sku.findMany({ where: { id: { in: wanted("Sku") } }, select: { id: true, updated_at: true } }),
+      tx.skuMedia.findMany({ where: { id: { in: wanted("SkuMedia") } }, select: { id: true, sku: { select: { updated_at: true } } } }),
       tx.skuPrice.findMany({ where: { id: { in: wanted("SkuPrice") } }, select: { id: true, updated_at: true } }),
       tx.workPrice.findMany({ where: { id: { in: wanted("WorkPrice") } }, select: { id: true, updated_at: true } }),
     ]);
     const out: Record<string, string | null> = {};
     for (const [sheet, rows] of [["Unit", units], ["BusinessType", businessTypes], ["Party", parties], ["Brand", brands], ["Category", categories], ["Sku", skus], ["SkuPrice", prices], ["WorkPrice", workPrices]] as const) for (const row of rows) out[`${sheet}:${row.id}`] = iso(row.updated_at);
+    for (const [sheet, rows] of [["PartyRole", partyRoles], ["PartyBusinessType", partyBusinessTypes], ["PartyContact", partyContacts], ["PartyLink", partyLinks]] as const) for (const row of rows) out[`${sheet}:${row.id}`] = iso(row.party.updated_at);
+    for (const [sheet, rows] of [["BrandLink", brandLinks], ["BrandSupplier", brandSuppliers], ["BrandCategory", brandCategories]] as const) for (const row of rows) out[`${sheet}:${row.id}`] = iso(row.brand.updated_at);
+    for (const row of skuMedia) out[`SkuMedia:${row.id}`] = iso(row.sku.updated_at);
     return out;
   },
 };

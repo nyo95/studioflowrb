@@ -24,6 +24,8 @@ export type UnitListInput = {
 };
 
 export type UnitCreateInput = {
+  /** Import-only stable identity; ordinary UI creation leaves this blank. */
+  requestedId?: string;
   code: string;
   label: string;
   symbol?: string | null;
@@ -116,7 +118,7 @@ export class UnitService {
       }
 
       const record = await this.ports.units.create(tx, {
-        id: this.ports.generateId(),
+        id: input.requestedId ?? this.ports.generateId(),
         code,
         label,
         symbol,
@@ -131,7 +133,7 @@ export class UnitService {
           action: "unit.created",
           entityType: "unit",
           entityId: record.id,
-          actor: context.actor,
+          actor: context.actor, requestId: context.requestId,
           changes: diffAuditChanges({}, unitAuditShape(record)),
           occurredAt: this.ports.now(),
         }),
@@ -186,7 +188,7 @@ export class UnitService {
           action: "unit.updated",
           entityType: "unit",
           entityId: current.id,
-          actor: context.actor,
+          actor: context.actor, requestId: context.requestId,
           changes,
           occurredAt: this.ports.now(),
         }),
@@ -216,7 +218,7 @@ export class UnitService {
           action: "unit.deleted",
           entityType: "unit",
           entityId: current.id,
-          actor: context.actor,
+          actor: context.actor, requestId: context.requestId,
           changes: { deletedAt: { from: null, to: deletedAt } },
           occurredAt: deletedAt,
         }),
@@ -256,7 +258,7 @@ export class UnitService {
           action: "unit.restored",
           entityType: "unit",
           entityId: current.id,
-          actor: context.actor,
+          actor: context.actor, requestId: context.requestId,
           changes: { deletedAt: { from: current.deletedAt, to: null } },
           occurredAt: this.ports.now(),
         }),

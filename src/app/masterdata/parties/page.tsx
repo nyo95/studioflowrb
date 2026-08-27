@@ -19,6 +19,7 @@ import {
 } from "@/platform/ui_engine";
 
 import { deletePartyAction, restorePartyAction } from "./actions";
+import { SortableTableHead } from "../sortable-table-head";
 
 const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
@@ -29,7 +30,8 @@ export default async function PartiesPage({
 }) {
   const sp = await searchParams;
   const showDeleted = sp["deleted"] === "1";
-  const parties = await partyService.list(CTX, { includeDeleted: showDeleted });
+  const sort = typeof sp["sort"] === "string" ? sp["sort"] : "name"; const direction = sp["dir"] === "desc" ? -1 : 1;
+  const parties = (await partyService.list(CTX, { includeDeleted: showDeleted })).toSorted((a, b) => direction * String(sort === "type" ? a.type : sort === "roles" ? a.roles.join(" ") : sort === "status" ? Boolean(a.deletedAt) : a.name).localeCompare(String(sort === "type" ? b.type : sort === "roles" ? b.roles.join(" ") : sort === "status" ? Boolean(b.deletedAt) : b.name), "id-ID", { numeric: true }));
 
   return (
     <PageShell>
@@ -53,10 +55,10 @@ export default async function PartiesPage({
       <DataTable>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Roles</TableHead>
-            <TableHead>Status</TableHead>
+            <SortableTableHead column="name">Name</SortableTableHead>
+            <SortableTableHead column="type">Type</SortableTableHead>
+            <SortableTableHead column="roles">Roles</SortableTableHead>
+            <SortableTableHead column="status">Status</SortableTableHead>
             <TableHead aria-label="Actions" />
           </TableRow>
         </TableHeader>

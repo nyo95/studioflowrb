@@ -195,6 +195,11 @@ export function UiEngineShowcase() {
   const [inlineDraft, setInlineDraft] = useState(inlineValue);
   const [inlineEditing, setInlineEditing] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const [reorderItems, setReorderItems] = useState(["First item", "Second item", "Third item"]);
+  function moveReorderItem(from: number, to: number) {
+    if (from === to || to < 0 || to >= reorderItems.length) return;
+    setReorderItems((current) => { const next = [...current]; const [item] = next.splice(from, 1); next.splice(to, 0, item!); return next; });
+  }
 
   const toggleRow = (id: string, checked: boolean | "indeterminate") => {
     setSelectedRows((current) => checked === true
@@ -619,12 +624,13 @@ export function UiEngineShowcase() {
             </SectionCard>
             <SectionCard className={styles.stack}>
               <Text meta>Reorder</Text>
-              {["First item", "Second item", "Third item"].map((item) => (
-                <div className={styles.reorderRow} key={item}>
-                  <ReorderHandle label={`Reorder ${item.toLowerCase()}`} />
+              {reorderItems.map((item, index) => (
+                <div className={styles.reorderRow} key={item} draggable onDragStart={(event) => event.dataTransfer.setData("text/plain", String(index))} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); moveReorderItem(Number(event.dataTransfer.getData("text/plain")), index); }}>
+                  <ReorderHandle label={`Move ${item.toLowerCase()}`} onClick={() => moveReorderItem(index, index === reorderItems.length - 1 ? 0 : index + 1)} onKeyDown={(event) => { if (event.key === "ArrowUp") { event.preventDefault(); moveReorderItem(index, index - 1); } if (event.key === "ArrowDown") { event.preventDefault(); moveReorderItem(index, index + 1); } }} />
                   <Text>{item}</Text>
                 </div>
               ))}
+              <Text size="sm" tone="secondary">Drag a row, click its handle, or use Arrow Up / Arrow Down while the handle is focused.</Text>
             </SectionCard>
             <SectionCard className={styles.fileCard}>
               <Text meta>Files</Text>

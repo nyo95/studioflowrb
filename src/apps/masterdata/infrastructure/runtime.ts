@@ -12,6 +12,7 @@ import { PartyService } from "../application/party-service";
 import { SkuService } from "../application/sku-service";
 import { PricingService } from "../application/pricing-service";
 import { UnitService } from "../application/unit-service";
+import { ImportExportService } from "../application/import-export";
 import { prismaCategoryRepository } from "./category-repository-prisma";
 import { createTransactionRunner } from "./transaction";
 import { prismaBusinessTypeRepository, prismaPartyRepository } from "./party-repository-prisma";
@@ -20,6 +21,9 @@ import { prismaSkuRepository } from "./sku-repository-prisma";
 import { prismaPricingRepository } from "./pricing-repository-prisma";
 import { prismaAuditQueryRepository } from "./audit-query-prisma";
 import { prismaUnitRepository } from "./unit-repository-prisma";
+import { createWorkbookApplier } from "./workbook-applier";
+import { prismaWorkbookStore } from "./workbook-store-prisma";
+import { xlsxWorkbookCodec } from "./xlsx-workbook";
 
 const commonPorts: MasterDataUseCasePorts = {
   runTransaction: createTransactionRunner(prisma),
@@ -66,4 +70,22 @@ export const pricingService = new PricingService({
 export const auditQueryService = new AuditQueryService({
   runTransaction: commonPorts.runTransaction,
   auditEvents: prismaAuditQueryRepository,
+});
+
+export const importExportService = new ImportExportService({
+  runTransaction: commonPorts.runTransaction,
+  codec: xlsxWorkbookCodec,
+  store: prismaWorkbookStore,
+  applier: createWorkbookApplier({
+    units: unitService,
+    businessTypes: businessTypeService,
+    categories: categoryService,
+    parties: partyService,
+    brands: brandService,
+    skus: skuService,
+    pricing: pricingService,
+  }),
+  auditWriter: commonPorts.auditWriter,
+  now: commonPorts.now,
+  generateId: commonPorts.generateId,
 });

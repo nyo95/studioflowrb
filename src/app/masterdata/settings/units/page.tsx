@@ -19,6 +19,7 @@ import {
 } from "@/platform/ui_engine";
 
 import { deleteUnitAction, restoreUnitAction } from "./actions";
+import { SortableTableHead } from "../../sortable-table-head";
 
 const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
@@ -29,7 +30,8 @@ export default async function UnitsPage({
 }) {
   const sp = await searchParams;
   const showDeleted = sp["deleted"] === "1";
-  const units = await unitService.list(CTX, { includeDeleted: showDeleted });
+  const sort = typeof sp["sort"] === "string" ? sp["sort"] : "code"; const direction = sp["dir"] === "desc" ? -1 : 1;
+  const units = (await unitService.list(CTX, { includeDeleted: showDeleted })).toSorted((a, b) => direction * String(sort === "symbol" ? a.symbol ?? "" : sort === "usages" ? a.usages.join(" ") : sort === "status" ? Boolean(a.deletedAt) : a.code).localeCompare(String(sort === "symbol" ? b.symbol ?? "" : sort === "usages" ? b.usages.join(" ") : sort === "status" ? Boolean(b.deletedAt) : b.code), "id-ID", { numeric: true }));
 
   return (
     <PageShell>
@@ -53,10 +55,10 @@ export default async function UnitsPage({
       <DataTable>
         <TableHeader>
           <TableRow>
-            <TableHead>Code / Label</TableHead>
-            <TableHead>Symbol</TableHead>
-            <TableHead>Usages</TableHead>
-            <TableHead>Status</TableHead>
+            <SortableTableHead column="code">Code / Label</SortableTableHead>
+            <SortableTableHead column="symbol">Symbol</SortableTableHead>
+            <SortableTableHead column="usages">Usages</SortableTableHead>
+            <SortableTableHead column="status">Status</SortableTableHead>
             <TableHead aria-label="Actions" />
           </TableRow>
         </TableHeader>

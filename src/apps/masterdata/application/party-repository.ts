@@ -53,7 +53,10 @@ export type PartyListFilter = {
   sortDirection?: "asc" | "desc";
 };
 
-export type PartyGraphInput = Omit<PartyRecord, "createdAt" | "updatedAt" | "deletedAt">;
+export type PartyGraphInput = Omit<PartyRecord, "createdAt" | "updatedAt" | "deletedAt"> & {
+  roleAssignments?: readonly { id: string; role: PartyRole }[];
+  businessTypeAssignments?: readonly { id: string; businessTypeId: string }[];
+};
 
 export type BrandContactScopeRecord = {
   brandId: string;
