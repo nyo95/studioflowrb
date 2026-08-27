@@ -13,7 +13,7 @@ import {
   type PartyRole,
   type PartyType,
 } from "../domain/party-rules";
-import type { MasterDataExecutionContext, MasterDataUseCasePorts } from "./execution-context";
+import { runInMasterDataTransaction, type MasterDataExecutionContext, type MasterDataUseCasePorts } from "./execution-context";
 import { MASTERDATA_PARTY_MANAGE, MASTERDATA_PARTY_READ } from "./masterdata-permissions";
 import { PARTY_LINK_KINDS, type PartyContactRecord, type PartyLinkKind, type PartyLinkRecord, type PartyRecord, type PartyRepository } from "./party-repository";
 
@@ -72,12 +72,12 @@ export class PartyService {
 
   list(context: MasterDataExecutionContext, filter: Parameters<PartyRepository["list"]>[1] = {}) {
     requirePermission(context.grants, MASTERDATA_PARTY_READ);
-    return this.ports.runTransaction((tx) => this.ports.parties.list(tx, filter));
+    return runInMasterDataTransaction(context, this.ports.runTransaction, (tx) => this.ports.parties.list(tx, filter));
   }
 
   listEligible(context: MasterDataExecutionContext, role: PartyRole) {
     requirePermission(context.grants, MASTERDATA_PARTY_READ);
-    return this.ports.runTransaction((tx) => this.ports.parties.listEligible(tx, role));
+    return runInMasterDataTransaction(context, this.ports.runTransaction, (tx) => this.ports.parties.listEligible(tx, role));
   }
 
   create(context: MasterDataExecutionContext, input: PartyWriteInput): Promise<PartyRecord> {
@@ -87,7 +87,7 @@ export class PartyService {
 
   update(context: MasterDataExecutionContext, input: PartyUpdateInput): Promise<PartyRecord> {
     requirePermission(context.grants, MASTERDATA_PARTY_MANAGE);
-    return this.ports.runTransaction(async (tx) => {
+    return runInMasterDataTransaction(context, this.ports.runTransaction, async (tx) => {
       const current = await this.ports.parties.findById(tx, input.id);
       if (!current || current.deletedAt !== null) throw new AppError("NOT_FOUND", "PARTY_NOT_FOUND", "This Party no longer exists.");
       return this.writeInTransaction(context, tx, current, {
@@ -105,7 +105,7 @@ export class PartyService {
   }
 
   private write(context: MasterDataExecutionContext, current: null, input: PartyWriteInput): Promise<PartyRecord> {
-    return this.ports.runTransaction((tx) => this.writeInTransaction(context, tx, current, input));
+    return runInMasterDataTransaction(context, this.ports.runTransaction, (tx) => this.writeInTransaction(context, tx, current, input));
   }
 
   private async writeInTransaction(
@@ -188,7 +188,7 @@ export class PartyService {
 
   softDelete(context: MasterDataExecutionContext, id: string): Promise<PartyRecord> {
     requirePermission(context.grants, MASTERDATA_PARTY_MANAGE);
-    return this.ports.runTransaction(async (tx) => {
+    return runInMasterDataTransaction(context, this.ports.runTransaction, async (tx) => {
       const current = await this.ports.parties.findById(tx, id);
       if (!current || current.deletedAt !== null) throw new AppError("NOT_FOUND", "PARTY_NOT_FOUND", "This Party no longer exists.");
       assertPartyCanBeDeleted(await this.ports.parties.countDeleteReferences(tx, id));
@@ -201,7 +201,7 @@ export class PartyService {
 
   restore(context: MasterDataExecutionContext, id: string): Promise<PartyRecord> {
     requirePermission(context.grants, MASTERDATA_PARTY_MANAGE);
-    return this.ports.runTransaction(async (tx) => {
+    return runInMasterDataTransaction(context, this.ports.runTransaction, async (tx) => {
       const current = await this.ports.parties.findById(tx, id);
       if (!current) throw new AppError("NOT_FOUND", "PARTY_NOT_FOUND", "This Party no longer exists.");
       if (current.deletedAt === null) throw new AppError("CONFLICT", "PARTY_NOT_DELETED", "Only a deleted Party can be restored.");

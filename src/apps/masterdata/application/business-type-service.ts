@@ -3,7 +3,7 @@ import { AppError } from "@platform/core/errors";
 import { requirePermission } from "@platform/core/rbac";
 import { normalizeText } from "@platform/utilities/normalization";
 
-import type { MasterDataExecutionContext, MasterDataUseCasePorts } from "./execution-context";
+import { runInMasterDataTransaction, type MasterDataExecutionContext, type MasterDataUseCasePorts } from "./execution-context";
 import { MASTERDATA_DICTIONARY_MANAGE, MASTERDATA_DICTIONARY_READ } from "./masterdata-permissions";
 import type { BusinessTypeRecord, BusinessTypeRepository } from "./party-repository";
 
@@ -29,7 +29,7 @@ export class BusinessTypeService {
 
   list(context: MasterDataExecutionContext, includeDeleted = false) {
     requirePermission(context.grants, MASTERDATA_DICTIONARY_READ);
-    return this.ports.runTransaction((tx) => this.ports.businessTypes.list(tx, includeDeleted));
+    return runInMasterDataTransaction(context, this.ports.runTransaction, (tx) => this.ports.businessTypes.list(tx, includeDeleted));
   }
 
   create(context: MasterDataExecutionContext, input: BusinessTypeCreateInput): Promise<BusinessTypeRecord> {
@@ -37,7 +37,7 @@ export class BusinessTypeService {
     const code = normalizeCode(input.code);
     const label = normalizeText(input.label);
     if (!label) throw new AppError("VALIDATION", "BUSINESS_TYPE_LABEL_REQUIRED", "Business Type label is required.");
-    return this.ports.runTransaction(async (tx) => {
+    return runInMasterDataTransaction(context, this.ports.runTransaction, async (tx) => {
       if (await this.ports.businessTypes.findByCode(tx, code)) throw new AppError("CONFLICT", "BUSINESS_TYPE_CODE_TAKEN", "This Business Type code already exists.");
       const row = await this.ports.businessTypes.create(tx, { id: this.ports.generateId(), code, label, description: optionalText(input.description), sortOrder: input.sortOrder ?? 0 });
       await this.ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "business-type.created", entityType: "business-type", entityId: row.id, actor: context.actor, occurredAt: this.ports.now(), changes: diffAuditChanges({}, auditShape(row)) }), tx);
@@ -47,7 +47,7 @@ export class BusinessTypeService {
 
   update(context: MasterDataExecutionContext, input: BusinessTypeUpdateInput): Promise<BusinessTypeRecord> {
     requirePermission(context.grants, MASTERDATA_DICTIONARY_MANAGE);
-    return this.ports.runTransaction(async (tx) => {
+    return runInMasterDataTransaction(context, this.ports.runTransaction, async (tx) => {
       const current = await this.ports.businessTypes.findById(tx, input.id);
       if (!current || current.deletedAt !== null) throw new AppError("NOT_FOUND", "BUSINESS_TYPE_NOT_FOUND", "This Business Type no longer exists.");
       if (normalizeCode(input.code) !== current.code) throw new AppError("INVARIANT", "BUSINESS_TYPE_CODE_IMMUTABLE", "Business Type code cannot be changed.");
@@ -64,7 +64,7 @@ export class BusinessTypeService {
 
   softDelete(context: MasterDataExecutionContext, id: string): Promise<BusinessTypeRecord> {
     requirePermission(context.grants, MASTERDATA_DICTIONARY_MANAGE);
-    return this.ports.runTransaction(async (tx) => {
+    return runInMasterDataTransaction(context, this.ports.runTransaction, async (tx) => {
       const current = await this.ports.businessTypes.findById(tx, id);
       if (!current || current.deletedAt !== null) throw new AppError("NOT_FOUND", "BUSINESS_TYPE_NOT_FOUND", "This Business Type no longer exists.");
       if ((await this.ports.businessTypes.countLivePartyAssignments(tx, id)) > 0) throw new AppError("CONFLICT", "BUSINESS_TYPE_STILL_ASSIGNED", "This Business Type is assigned to a live Party.");
@@ -77,7 +77,7 @@ export class BusinessTypeService {
 
   restore(context: MasterDataExecutionContext, id: string): Promise<BusinessTypeRecord> {
     requirePermission(context.grants, MASTERDATA_DICTIONARY_MANAGE);
-    return this.ports.runTransaction(async (tx) => {
+    return runInMasterDataTransaction(context, this.ports.runTransaction, async (tx) => {
       const current = await this.ports.businessTypes.findById(tx, id);
       if (!current) throw new AppError("NOT_FOUND", "BUSINESS_TYPE_NOT_FOUND", "This Business Type no longer exists.");
       if (current.deletedAt === null) throw new AppError("CONFLICT", "BUSINESS_TYPE_NOT_DELETED", "Only a deleted Business Type can be restored.");

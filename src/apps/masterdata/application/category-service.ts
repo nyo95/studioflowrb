@@ -12,7 +12,7 @@ import {
   type CategoryKind,
 } from "../domain/category-rules";
 import type { CategoryRepository, CategoryRecord } from "./category-repository";
-import type { MasterDataExecutionContext, MasterDataUseCasePorts } from "./execution-context";
+import { runInMasterDataTransaction, type MasterDataExecutionContext, type MasterDataUseCasePorts } from "./execution-context";
 import { MASTERDATA_CATEGORY_MANAGE, MASTERDATA_CATEGORY_READ } from "./masterdata-permissions";
 
 export type CategoryListInput = {
@@ -74,7 +74,7 @@ export class CategoryService {
   list(context: MasterDataExecutionContext, input: CategoryListInput = {}): Promise<CategoryRecord[]> {
     requirePermission(context.grants, MASTERDATA_CATEGORY_READ);
     const query = normalizeText(input.query ?? "");
-    return this.ports.runTransaction((tx) =>
+    return runInMasterDataTransaction(context, this.ports.runTransaction, (tx) =>
       this.ports.categories.list(tx, {
         kind: input.kind,
         query: query ? query : undefined,
@@ -103,7 +103,7 @@ export class CategoryService {
     const sortOrder = input.sortOrder ?? 0;
     const description = normalizeDescription(input.description ?? null);
 
-    return this.ports.runTransaction(async (tx) => {
+    return runInMasterDataTransaction(context, this.ports.runTransaction, async (tx) => {
       const parent =
         input.parentId === undefined || input.parentId === null
           ? null
@@ -158,7 +158,7 @@ export class CategoryService {
   update(context: MasterDataExecutionContext, input: CategoryUpdateInput): Promise<CategoryRecord> {
     requirePermission(context.grants, MASTERDATA_CATEGORY_MANAGE);
 
-    return this.ports.runTransaction(async (tx) => {
+    return runInMasterDataTransaction(context, this.ports.runTransaction, async (tx) => {
       const current = await this.ports.categories.findById(tx, input.id);
       if (!current || current.deletedAt !== null) {
         throw new AppError("NOT_FOUND", "CATEGORY_NOT_FOUND", "This category no longer exists.");
@@ -274,7 +274,7 @@ export class CategoryService {
   softDelete(context: MasterDataExecutionContext, id: string): Promise<CategoryRecord> {
     requirePermission(context.grants, MASTERDATA_CATEGORY_MANAGE);
 
-    return this.ports.runTransaction(async (tx) => {
+    return runInMasterDataTransaction(context, this.ports.runTransaction, async (tx) => {
       const current = await this.ports.categories.findById(tx, id);
       if (!current || current.deletedAt !== null) {
         throw new AppError("NOT_FOUND", "CATEGORY_NOT_FOUND", "This category no longer exists.");
@@ -304,7 +304,7 @@ export class CategoryService {
   restore(context: MasterDataExecutionContext, id: string): Promise<CategoryRecord> {
     requirePermission(context.grants, MASTERDATA_CATEGORY_MANAGE);
 
-    return this.ports.runTransaction(async (tx) => {
+    return runInMasterDataTransaction(context, this.ports.runTransaction, async (tx) => {
       const current = await this.ports.categories.findById(tx, id);
       if (!current) {
         throw new AppError("NOT_FOUND", "CATEGORY_NOT_FOUND", "This category no longer exists.");

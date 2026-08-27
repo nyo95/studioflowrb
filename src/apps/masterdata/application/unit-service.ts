@@ -12,7 +12,7 @@ import {
   normalizeUnitUsages,
   type UnitUsage,
 } from "../domain/unit-rules";
-import type { MasterDataExecutionContext, MasterDataUseCasePorts } from "./execution-context";
+import { runInMasterDataTransaction, type MasterDataExecutionContext, type MasterDataUseCasePorts } from "./execution-context";
 import { MASTERDATA_DICTIONARY_MANAGE, MASTERDATA_DICTIONARY_READ } from "./masterdata-permissions";
 import type { UnitRecord, UnitRepository } from "./unit-repository";
 
@@ -86,7 +86,7 @@ export class UnitService {
   async list(context: MasterDataExecutionContext, input: UnitListInput = {}): Promise<UnitRecord[]> {
     requirePermission(context.grants, MASTERDATA_DICTIONARY_READ);
     const query = normalizeText(input.query ?? "");
-    const units = await this.ports.runTransaction((tx) =>
+    const units = await runInMasterDataTransaction(context, this.ports.runTransaction, (tx) =>
       this.ports.units.list(tx, { query: query ? query : undefined, includeDeleted: input.includeDeleted ?? false }),
     );
     if (input.usage === undefined) return units;
@@ -104,7 +104,7 @@ export class UnitService {
     const usages = normalizeUnitUsages(input.usages ?? []);
     const sortOrder = input.sortOrder ?? 0;
 
-    return this.ports.runTransaction(async (tx) => {
+    return runInMasterDataTransaction(context, this.ports.runTransaction, async (tx) => {
       const aliases = normalizeAliases(input.aliases ?? [], code);
       const conflict = await this.ports.units.findByCode(tx, code);
       if (conflict) {
@@ -144,7 +144,7 @@ export class UnitService {
   update(context: MasterDataExecutionContext, input: UnitUpdateInput): Promise<UnitRecord> {
     requirePermission(context.grants, MASTERDATA_DICTIONARY_MANAGE);
 
-    return this.ports.runTransaction(async (tx) => {
+    return runInMasterDataTransaction(context, this.ports.runTransaction, async (tx) => {
       const current = await this.ports.units.findById(tx, input.id);
       if (!current || current.deletedAt !== null) {
         throw new AppError("NOT_FOUND", "UNIT_NOT_FOUND", "This unit no longer exists.");
@@ -199,7 +199,7 @@ export class UnitService {
   softDelete(context: MasterDataExecutionContext, id: string): Promise<UnitRecord> {
     requirePermission(context.grants, MASTERDATA_DICTIONARY_MANAGE);
 
-    return this.ports.runTransaction(async (tx) => {
+    return runInMasterDataTransaction(context, this.ports.runTransaction, async (tx) => {
       const current = await this.ports.units.findById(tx, id);
       if (!current || current.deletedAt !== null) {
         throw new AppError("NOT_FOUND", "UNIT_NOT_FOUND", "This unit no longer exists.");
@@ -229,7 +229,7 @@ export class UnitService {
   restore(context: MasterDataExecutionContext, id: string): Promise<UnitRecord> {
     requirePermission(context.grants, MASTERDATA_DICTIONARY_MANAGE);
 
-    return this.ports.runTransaction(async (tx) => {
+    return runInMasterDataTransaction(context, this.ports.runTransaction, async (tx) => {
       const current = await this.ports.units.findById(tx, id);
       if (!current) {
         throw new AppError("NOT_FOUND", "UNIT_NOT_FOUND", "This unit no longer exists.");
