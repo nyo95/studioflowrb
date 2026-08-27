@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { partyService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/application/masterdata-permissions";
+import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 import { PARTY_ROLES, PARTY_TYPES } from "@/apps/masterdata/domain/party-rules";
 import {
   Button,
@@ -18,10 +18,7 @@ import {
 } from "@/platform/ui_engine";
 import { updatePartyAction } from "../../actions";
 
-const CTX = {
-  grants: [...MASTERDATA_PERMISSIONS] as string[],
-  actor: { kind: "SYSTEM" as const, label: "Dev session" },
-};
+const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function EditPartyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

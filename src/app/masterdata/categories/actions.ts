@@ -3,12 +3,9 @@
 import { revalidatePath } from "next/cache";
 
 import { categoryService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/application/masterdata-permissions";
+import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 
-const DEV_CONTEXT = {
-  grants: [...MASTERDATA_PERMISSIONS] as string[],
-  actor: { kind: "SYSTEM" as const, label: "Dev session" },
-};
+const DEV_CONTEXT = MASTER_DATA_REQUEST_CONTEXT;
 
 export async function createCategoryAction(formData: FormData) {
   await categoryService.create(DEV_CONTEXT, {

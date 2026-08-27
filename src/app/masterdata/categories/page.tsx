@@ -2,7 +2,7 @@ import Link from "next/link";
 import { FolderTree } from "lucide-react";
 
 import { categoryService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/application/masterdata-permissions";
+import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 import {
   Badge,
   DataTable,
@@ -20,10 +20,7 @@ import {
 
 import { deleteCategoryAction, restoreCategoryAction } from "./actions";
 
-const DEV_CONTEXT = {
-  grants: [...MASTERDATA_PERMISSIONS] as string[],
-  actor: { kind: "SYSTEM" as const, label: "Dev session" },
-};
+const DEV_CONTEXT = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function CategoriesPage({
   searchParams,

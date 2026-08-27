@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { categoryService, partyService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/application/masterdata-permissions";
+import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 import {
   Button,
   Field,
@@ -17,10 +17,7 @@ import {
 } from "@/platform/ui_engine";
 import { createBrandAction } from "../actions";
 
-const CTX = {
-  grants: [...MASTERDATA_PERMISSIONS] as string[],
-  actor: { kind: "SYSTEM" as const, label: "Dev session" },
-};
+const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 async function handleCreate(formData: FormData) {
   "use server";

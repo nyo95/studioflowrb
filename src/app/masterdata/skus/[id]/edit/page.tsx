@@ -1,15 +1,12 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { skuService, unitService, brandService, categoryService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/application/masterdata-permissions";
+import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 import { SKU_KINDS } from "@/apps/masterdata/domain/sku-rules";
 import { updateSkuAction } from "../../actions";
 import { SkuClassificationFields } from "../../sku-classification-fields";
 
-const CTX = {
-  grants: [...MASTERDATA_PERMISSIONS] as string[],
-  actor: { kind: "SYSTEM" as const, label: "Dev session" },
-};
+const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function EditSkuPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

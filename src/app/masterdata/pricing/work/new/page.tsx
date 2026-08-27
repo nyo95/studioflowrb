@@ -1,14 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { categoryService, unitService, partyService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/application/masterdata-permissions";
+import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 import { WORK_PRICE_KINDS } from "@/apps/masterdata/domain/pricing-rules";
 import { createWorkPriceAction } from "../../actions";
 
-const CTX = {
-  grants: [...MASTERDATA_PERMISSIONS] as string[],
-  actor: { kind: "SYSTEM" as const, label: "Dev session" },
-};
+const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function NewWorkPricePage() {
   const [categories, units, parties] = await Promise.all([

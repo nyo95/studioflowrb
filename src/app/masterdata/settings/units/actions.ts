@@ -3,14 +3,11 @@
 import { revalidatePath } from "next/cache";
 
 import { unitService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/application/masterdata-permissions";
+import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 import { UNIT_USAGES } from "@/apps/masterdata/domain/unit-rules";
 import type { UnitUsage } from "@/apps/masterdata/domain/unit-rules";
 
-const CTX = {
-  grants: [...MASTERDATA_PERMISSIONS] as string[],
-  actor: { kind: "SYSTEM" as const, label: "Dev session" },
-};
+const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 function parseUsages(formData: FormData): readonly UnitUsage[] {
   return UNIT_USAGES.filter((u) => formData.get(`usage_${u}`) === "on");

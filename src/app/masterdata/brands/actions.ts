@@ -3,12 +3,9 @@
 import { revalidatePath } from "next/cache";
 
 import { brandService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/application/masterdata-permissions";
+import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 
-const CTX = {
-  grants: [...MASTERDATA_PERMISSIONS] as string[],
-  actor: { kind: "SYSTEM" as const, label: "Dev session" },
-};
+const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 /** categoryIds is a newline-separated list of IDs from the form textarea */
 function parseCategories(raw: string): { categoryId: string; sortOrder: number }[] {

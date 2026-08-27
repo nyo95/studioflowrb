@@ -3,15 +3,12 @@ import { redirect } from "next/navigation";
 import { unitService } from "@/apps/masterdata/infrastructure/runtime";
 import { brandService } from "@/apps/masterdata/infrastructure/runtime";
 import { categoryService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/application/masterdata-permissions";
+import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 import { SKU_KINDS } from "@/apps/masterdata/domain/sku-rules";
 import { createSkuAction } from "../actions";
 import { SkuClassificationFields } from "../sku-classification-fields";
 
-const CTX = {
-  grants: [...MASTERDATA_PERMISSIONS] as string[],
-  actor: { kind: "SYSTEM" as const, label: "Dev session" },
-};
+const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function NewSkuPage() {
   const [units, brands, categories] = await Promise.all([

@@ -2,13 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { pricingService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/application/masterdata-permissions";
+import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 import type { WorkPriceKind } from "@/apps/masterdata/domain/pricing-rules";
 
-const CTX = {
-  grants: [...MASTERDATA_PERMISSIONS] as string[],
-  actor: { kind: "SYSTEM" as const, label: "Dev session" },
-};
+const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export async function setSkuPriceAction(formData: FormData) {
   await pricingService.setSkuPrice(CTX, {

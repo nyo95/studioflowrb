@@ -13,16 +13,13 @@ import {
   Text,
 } from "@/platform/ui_engine";
 import { auditQueryService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/application/masterdata-permissions";
+import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 
 /**
  * Development execution context.
  * Replaced when the identity provider is wired (deferred — MD-00 §Deferred).
  */
-const DEV_CONTEXT = {
-  grants: [...MASTERDATA_PERMISSIONS] as string[],
-  actor: { kind: "SYSTEM" as const, label: "Dev session" },
-};
+const DEV_CONTEXT = MASTER_DATA_REQUEST_CONTEXT;
 
 type Props = {
   searchParams: Promise<{ entity?: string; action?: string; limit?: string }>;
