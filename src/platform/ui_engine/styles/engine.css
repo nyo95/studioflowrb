@@ -483,12 +483,12 @@ select {
 }
 .ui-tooltip-arrow { fill: var(--ui-text-primary); }
 
-.ui-app-shell { min-height: 100vh; display: grid; grid-template-columns: var(--ui-rail-width, 232px) minmax(0, 1fr); transition: grid-template-columns 160ms ease; }
+.ui-app-shell { min-height: 100vh; display: grid; grid-template-columns: var(--ui-rail-width, 232px) minmax(0, 1fr); overflow-x: clip; transition: grid-template-columns 160ms ease; }
 .ui-app-shell[data-collapsed] { --ui-rail-width: 60px; }
 /* The rail is divided from the work area by a drawn rule, not by a tone. It is one
    step stronger than an ordinary border because it separates navigation from work —
    a major division, unlike the hairlines inside a card. */
-.ui-app-rail { position: sticky; top: 0; display: flex; min-width: 0; height: 100vh; flex-direction: column; border-right: 1px solid var(--ui-border-default); background: color-mix(in srgb, var(--ui-surface-muted) 52%, var(--ui-surface)); }
+.ui-app-rail { position: sticky; top: 0; display: flex; min-width: 0; width: var(--ui-rail-width, 232px); max-width: 100vw; height: 100vh; overflow: hidden; flex-direction: column; border-right: 1px solid var(--ui-border-default); background: color-mix(in srgb, var(--ui-surface-muted) 52%, var(--ui-surface)); }
 .ui-app-brand { min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 16px; }
 .ui-app-brand-mark { min-width: 0; overflow: hidden; }
 
@@ -499,8 +499,7 @@ select {
 .ui-app-rail[data-collapsed] .ui-app-brand-mark { display: grid; place-items: center; }
 .ui-app-rail[data-collapsed] .ui-app-nav,
 .ui-app-rail[data-collapsed] .ui-app-utility { padding-inline: 6px; }
-/* Utility copy has no room at 60px; it returns when the rail expands. */
-.ui-app-rail[data-collapsed] .ui-app-utility { display: none; }
+.ui-app-rail[data-collapsed] .ui-app-utility { display: grid; }
 /* Visually hidden, NOT display:none. display:none also strips the label from the
    accessibility tree, which leaves every collapsed nav item with no accessible
    name at all (WCAG 4.1.2 / 2.4.4). The label must survive for screen readers. */
@@ -566,7 +565,7 @@ select {
   border-radius: 0 2px 2px 0;
   background: var(--ui-action-primary);
 }
-.ui-app-utility { padding: 14px 16px; border-top: 1px solid var(--ui-border-default); }
+.ui-app-utility { display: grid; gap: 4px; padding: 10px 12px 14px; border-top: 1px solid var(--ui-border-default); }
 .ui-app-viewport { min-width: 0; }
 .ui-app-topbar { position: sticky; top: 0; z-index: 10; min-height: 64px; display: flex; align-items: center; border-bottom: 1px solid var(--ui-border-default); background: rgb(255 255 255 / 0.94); backdrop-filter: blur(12px); }
 .ui-app-content { min-width: 0; }

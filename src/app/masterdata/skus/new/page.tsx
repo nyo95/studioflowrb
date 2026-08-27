@@ -6,6 +6,7 @@ import { categoryService } from "@/apps/masterdata/infrastructure/runtime";
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/application/masterdata-permissions";
 import { SKU_KINDS } from "@/apps/masterdata/domain/sku-rules";
 import { createSkuAction } from "../actions";
+import { SkuClassificationFields } from "../sku-classification-fields";
 
 const CTX = {
   grants: [...MASTERDATA_PERMISSIONS] as string[],
@@ -73,26 +74,7 @@ export default async function NewSkuPage() {
           )}
         </div>
 
-        <div className="ui-form-field">
-          <label className="ui-label" htmlFor="brandId">Brand (optional)</label>
-          <select id="brandId" name="brandId" className="ui-select">
-            <option value="">— none —</option>
-            {liveBrands.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="ui-form-field">
-          <label className="ui-label" htmlFor="categoryId">Product Category (optional)</label>
-          <select id="categoryId" name="categoryId" className="ui-select">
-            <option value="">— none —</option>
-            {liveCategories.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-          <span className="ui-text" data-tone="secondary" data-size="sm">Required to activate this SKU.</span>
-        </div>
+        <SkuClassificationFields brands={liveBrands.map((brand) => ({ id: brand.id, name: brand.name, categoryIds: brand.categories.map(({ categoryId }) => categoryId) }))} categories={liveCategories.map(({ id, name }) => ({ id, name }))} />
 
         <div className="ui-form-field">
           <label className="ui-label" htmlFor="notes">Notes (optional)</label>
