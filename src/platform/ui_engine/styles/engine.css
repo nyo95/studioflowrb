@@ -544,6 +544,7 @@ select {
 .ui-nav-icon svg { width: 16px; height: 16px; }
 
 .ui-nav-item:hover { border-color: var(--ui-border-subtle); background: rgb(255 255 255 / 0.62); color: var(--ui-text-primary); }
+.ui-nav-item:disabled { cursor: not-allowed; opacity: 0.48; }
 
 /* Current location. Hover already owns the muted fill, so "active" cannot rely on
    fill alone or the two become indistinguishable. It is marked on three channels

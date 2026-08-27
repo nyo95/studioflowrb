@@ -5,6 +5,7 @@ import { brandService, categoryService, partyService } from "@/apps/masterdata/i
 import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 import {
   Button,
+  Checkbox,
   Field,
   FormActions,
   FormSection,
@@ -34,7 +35,7 @@ export default async function EditBrandPage({ params }: { params: Promise<{ id: 
     redirect("/masterdata/brands");
   }
 
-  const existingCategoryIds = brand.categories.map((c) => c.categoryId).join("\n");
+  const existingCategoryIds = new Set(brand.categories.map((c) => c.categoryId));
 
   return (
     <PageShell>
@@ -57,25 +58,10 @@ export default async function EditBrandPage({ params }: { params: Promise<{ id: 
             <Textarea id="notes" name="notes" rows={2} defaultValue={brand.notes ?? ""} />
           </Field>
         </FormSection>
-        <FormSection title="PRODUCT categories">
-          <Field id="categoryIds" label="Category IDs — one per line" required>
-            <Textarea id="categoryIds" name="categoryIds" rows={4} required defaultValue={existingCategoryIds} />
-          </Field>
-          {categories.length > 0 && (
-            <details style={{ marginTop: "0.5rem" }}>
-              <summary style={{ cursor: "pointer", fontSize: "0.875rem", color: "var(--ui-color-text-secondary)" }}>
-                Available PRODUCT categories ({categories.length})
-              </summary>
-              <ul style={{ marginTop: "0.5rem", fontSize: "0.8125rem", listStyle: "none", padding: 0 }}>
-                {categories.map((c) => (
-                  <li key={c.id} style={{ display: "flex", gap: "0.5rem", padding: "0.125rem 0" }}>
-                    <code style={{ fontFamily: "monospace" }}>{c.id}</code>
-                    <span>{c.name}</span>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
+        <FormSection title="PRODUCT categories" description="Explicit catalog classifications for this Brand. At least one must remain selected.">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
+            {categories.map((category) => <Checkbox key={category.id} id={`category-${category.id}`} name="categoryIds" value={category.id} defaultChecked={existingCategoryIds.has(category.id)} label={category.name} />)}
+          </div>
         </FormSection>
         <FormActions>
           <Button type="submit" variant="primary">Save changes</Button>

@@ -33,5 +33,5 @@ export function MasterDataNavigation() {
 export function MasterDataUtilityNavigation() {
   const pathname = usePathname();
   const matches = ["/masterdata/settings", "/masterdata/audit", "/masterdata/data"];
-  return <NavItem href="/masterdata/settings/units" icon={<Settings size={16} />} active={isCurrent(pathname, matches)}>General Settings</NavItem>;
+  return <NavItem href="/masterdata/settings" icon={<Settings size={16} />} active={isCurrent(pathname, matches)}>General Settings</NavItem>;
 }
