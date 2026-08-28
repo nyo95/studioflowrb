@@ -19,12 +19,17 @@ import { cx } from "../internal/cx";
 
 type InvalidProp = { invalid?: boolean };
 
+/* Shared control chrome. Hover/focus/invalid/disabled states mirror the locked
+   interaction contract: warm border ladder, soft focus ring, no surprise. */
+const CONTROL_CLASSES =
+  "w-full min-h-(--ui-control-height-md) rounded-control border border-line bg-surface text-ink px-2.5 py-[7px] transition-[border-color,box-shadow] duration-[120ms] placeholder:text-ink-tertiary enabled:hover:border-line-strong focus:border-line-focus focus:outline-0 focus:shadow-[0_0_0_3px_rgb(87_83_78/0.12)] aria-invalid:border-danger disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-ink-tertiary";
+
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & InvalidProp>(
   function Input({ className, invalid, ...props }, ref) {
     return (
       <input
         ref={ref}
-        className={cx("ui-control", "ui-input", className)}
+        className={cx(CONTROL_CLASSES, className)}
         aria-invalid={invalid || undefined}
         {...props}
       />
@@ -39,7 +44,7 @@ export const Textarea = forwardRef<
   return (
     <textarea
       ref={ref}
-      className={cx("ui-control", "ui-textarea", className)}
+      className={cx(CONTROL_CLASSES, "min-h-[88px] resize-y", className)}
       aria-invalid={invalid || undefined}
       {...props}
     />
@@ -51,16 +56,19 @@ export const Select = forwardRef<
   SelectHTMLAttributes<HTMLSelectElement> & InvalidProp
 >(function Select({ className, invalid, children, ...props }, ref) {
   return (
-    <span className={cx("ui-select-wrap", className)}>
+    <span className={cx("relative block", className)}>
       <select
         ref={ref}
-        className="ui-control ui-select"
+        className={cx(CONTROL_CLASSES, "appearance-none pr-8")}
         aria-invalid={invalid || undefined}
         {...props}
       >
         {children}
       </select>
-      <ChevronDown aria-hidden="true" />
+      <ChevronDown
+        aria-hidden="true"
+        className="pointer-events-none absolute right-2.5 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-ink-tertiary"
+      />
     </span>
   );
 });
@@ -77,14 +85,21 @@ export type CheckboxProps = {
   value?: string;
 };
 
+const CHOICE_CLASSES =
+  "inline-flex items-start gap-[9px] text-ink cursor-pointer has-data-disabled:cursor-not-allowed has-data-disabled:opacity-50";
+
 export function Checkbox({ id, label, className, ...props }: CheckboxProps) {
   const generatedId = useId();
   const controlId = id ?? generatedId;
   return (
-    <label className={cx("ui-choice", className)} htmlFor={controlId}>
-      <RCheckbox.Root id={controlId} className="ui-checkbox" {...props}>
+    <label className={cx(CHOICE_CLASSES, className)} htmlFor={controlId}>
+      <RCheckbox.Root
+        id={controlId}
+        className="mt-[2px] inline-flex h-[17px] w-[17px] shrink-0 items-center justify-center rounded-[4px] border border-line-strong bg-surface p-0 text-ink-inverse data-[state=checked]:border-action data-[state=checked]:bg-action data-[state=indeterminate]:border-action data-[state=indeterminate]:bg-action"
+        {...props}
+      >
         <RCheckbox.Indicator>
-          <Check aria-hidden="true" />
+          <Check aria-hidden="true" className="h-3 w-3 stroke-[3]" />
         </RCheckbox.Indicator>
       </RCheckbox.Root>
       {label ? <span>{label}</span> : null}
@@ -120,26 +135,25 @@ export function RadioGroup({
 }: RadioGroupProps) {
   return (
     <RRadioGroup.Root
-      className={cx("ui-radio-group", className)}
+      className={cx("flex gap-3", orientation === "vertical" ? "flex-col" : "flex-row flex-wrap", className)}
       aria-label={label}
-      data-orientation={orientation}
       {...props}
     >
       {options.map((option) => (
-        <label className="ui-choice ui-radio-choice" key={option.value}>
+        <label className={CHOICE_CLASSES} key={option.value}>
           <RRadioGroup.Item
-            className="ui-radio"
+            className="mt-[2px] inline-flex h-[17px] w-[17px] shrink-0 items-center justify-center rounded-full border border-line-strong bg-surface p-0 text-ink-inverse data-[state=checked]:border-action data-[state=checked]:bg-action"
             value={option.value}
             disabled={option.disabled}
           >
             <RRadioGroup.Indicator>
-              <Circle aria-hidden="true" />
+              <Circle aria-hidden="true" className="h-[7px] w-[7px] fill-current stroke-[0]" />
             </RRadioGroup.Indicator>
           </RRadioGroup.Item>
           <span>
-            <span className="ui-choice-label">{option.label}</span>
+            <span className="block font-medium">{option.label}</span>
             {option.description ? (
-              <span className="ui-choice-description">{option.description}</span>
+              <span className="mt-px block text-xs text-ink-secondary">{option.description}</span>
             ) : null}
           </span>
         </label>
@@ -164,9 +178,13 @@ export function Switch({ id, label, className, ...props }: SwitchProps) {
   const generatedId = useId();
   const controlId = id ?? generatedId;
   return (
-    <label className={cx("ui-choice", className)} htmlFor={controlId}>
-      <RSwitch.Root id={controlId} className="ui-switch" {...props}>
-        <RSwitch.Thumb className="ui-switch-thumb" />
+    <label className={cx(CHOICE_CLASSES, className)} htmlFor={controlId}>
+      <RSwitch.Root
+        id={controlId}
+        className="inline-flex h-5 w-[34px] shrink-0 rounded-pill border-0 bg-line-strong p-0.5 data-[state=checked]:bg-action"
+        {...props}
+      >
+        <RSwitch.Thumb className="block h-4 w-4 rounded-full bg-surface transition-transform duration-[120ms] data-[state=checked]:translate-x-[14px]" />
       </RSwitch.Root>
       {label ? <span>{label}</span> : null}
     </label>

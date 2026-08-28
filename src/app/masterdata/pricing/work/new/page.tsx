@@ -3,6 +3,17 @@ import { redirect } from "next/navigation";
 import { categoryService, unitService, partyService } from "@/apps/masterdata/infrastructure/runtime";
 import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 import { WORK_PRICE_KINDS } from "@/apps/masterdata/domain/pricing-rules";
+import {
+  Button,
+  Field,
+  Input,
+  PageHeader,
+  PageShell,
+  Select,
+  Text,
+  Textarea,
+  buttonClasses,
+} from "@/platform/ui_engine";
 import { createWorkPriceAction } from "../../actions";
 
 const CTX = MASTER_DATA_REQUEST_CONTEXT;
@@ -25,103 +36,84 @@ export default async function NewWorkPricePage() {
   }
 
   return (
-    <div className="ui-layout-page">
-      <div className="ui-layout-page-header">
-        <div>
-          <h1 className="ui-heading" data-size="xl">New Work Price</h1>
-          <p className="ui-text" data-tone="secondary">Add a work or labour price entry.</p>
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader title="New Work Price" description="Add a work or labour price entry." />
 
-      <form action={handleCreate} className="ui-form">
-        <div className="ui-form-field">
-          <label className="ui-label" htmlFor="code">Code *</label>
-          <input id="code" name="code" type="text" className="ui-input" required autoFocus />
-          <span className="ui-text" data-tone="secondary" data-size="sm">Unique identifier. Immutable after creation.</span>
-        </div>
+      <form action={handleCreate} className="grid gap-4">
+        <Field label="Code" required description="Unique identifier. Immutable after creation.">
+          <Input name="code" type="text" required autoFocus />
+        </Field>
 
-        <div className="ui-form-field">
-          <label className="ui-label" htmlFor="name">Name *</label>
-          <input id="name" name="name" type="text" className="ui-input" required />
-        </div>
+        <Field label="Name" required>
+          <Input name="name" type="text" required />
+        </Field>
 
-        <div className="ui-form-field">
-          <label className="ui-label" htmlFor="kind">Kind *</label>
-          <select id="kind" name="kind" className="ui-select" required>
+        <Field label="Kind" required>
+          <Select name="kind" required>
             {WORK_PRICE_KINDS.map((k) => (
               <option key={k} value={k}>{k}</option>
             ))}
-          </select>
-        </div>
+          </Select>
+        </Field>
 
-        <div className="ui-form-field">
-          <label className="ui-label" htmlFor="categoryId">Work Category *</label>
+        <Field label="Work Category" required>
           {liveCategories.length === 0 ? (
-            <p className="ui-text" data-tone="warning">No Work Categories available. Create a Work Category first.</p>
+            <Text as="p" className="text-warning">No Work Categories available. Create a Work Category first.</Text>
           ) : (
-            <select id="categoryId" name="categoryId" className="ui-select" required>
+            <Select name="categoryId" required>
               <option value="">— select —</option>
               {liveCategories.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
-            </select>
+            </Select>
           )}
-        </div>
+        </Field>
 
-        <div className="ui-form-field">
-          <label className="ui-label" htmlFor="unitId">Unit *</label>
+        <Field label="Unit" required>
           {liveUnits.length === 0 ? (
-            <p className="ui-text" data-tone="warning">No units available. Create units first.</p>
+            <Text as="p" className="text-warning">No units available. Create units first.</Text>
           ) : (
-            <select id="unitId" name="unitId" className="ui-select" required>
+            <Select name="unitId" required>
               <option value="">— select —</option>
               {liveUnits.map((u) => (
                 <option key={u.id} value={u.id}>{u.label} ({u.code})</option>
               ))}
-            </select>
+            </Select>
           )}
-        </div>
+        </Field>
 
-        <div className="ui-form-field">
-          <label className="ui-label" htmlFor="currency">Currency *</label>
-          <input id="currency" name="currency" type="text" className="ui-input" required defaultValue="IDR" style={{ maxWidth: "8rem" }} />
-        </div>
+        <Field label="Currency" required>
+          <Input name="currency" type="text" required defaultValue="IDR" style={{ maxWidth: "8rem" }} />
+        </Field>
 
-        <div className="ui-form-field">
-          <label className="ui-label" htmlFor="amount">Amount *</label>
-          <input id="amount" name="amount" type="text" className="ui-input" required placeholder="0.00" style={{ maxWidth: "14rem" }} />
-        </div>
+        <Field label="Amount" required>
+          <Input name="amount" type="text" required placeholder="0.00" style={{ maxWidth: "14rem" }} />
+        </Field>
 
-        <div className="ui-form-field">
-          <label className="ui-label" htmlFor="vendorPartyId">Vendor (optional)</label>
-          <select id="vendorPartyId" name="vendorPartyId" className="ui-select">
+        <Field label="Vendor (optional)">
+          <Select name="vendorPartyId">
             <option value="">— none —</option>
             {vendors.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
-          </select>
-        </div>
+          </Select>
+        </Field>
 
-        <div className="ui-form-field">
-          <label className="ui-label" htmlFor="scopeNote">Scope Note</label>
-          <input id="scopeNote" name="scopeNote" type="text" className="ui-input" />
-          <span className="ui-text" data-tone="secondary" data-size="sm">Required when kind is MATERIAL_LABOR.</span>
-        </div>
+        <Field label="Scope Note" description="Required when kind is MATERIAL_LABOR.">
+          <Input name="scopeNote" type="text" />
+        </Field>
 
-        <div className="ui-form-field">
-          <label className="ui-label" htmlFor="notes">Notes (optional)</label>
-          <textarea id="notes" name="notes" className="ui-textarea" rows={2} />
-        </div>
+        <Field label="Notes (optional)">
+          <Textarea name="notes" rows={2} />
+        </Field>
 
-        <div className="ui-toolbar">
-          <button type="submit" className="ui-button" data-variant="primary" data-size="md">
-            <span>Create Work Price</span>
-          </button>
-          <Link href="/masterdata/pricing?tab=work" className="ui-button" data-variant="secondary" data-size="md">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="submit" variant="primary">Create Work Price</Button>
+          <Link href="/masterdata/pricing?tab=work" className={buttonClasses("secondary", "md")}>
             <span>Cancel</span>
           </Link>
         </div>
       </form>
-    </div>
+    </PageShell>
   );
 }

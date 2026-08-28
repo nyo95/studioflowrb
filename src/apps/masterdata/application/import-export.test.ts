@@ -12,11 +12,21 @@ function data(): WorkbookData {
 }
 
 describe("Master Data workbook application", () => {
-  it("rejects unknown versions, columns, duplicate prices, and stale rows", () => {
+  it("rejects unknown versions, columns, duplicate price pairs, and stale rows", () => {
     const source = data();
     const invalid = { ...source, manifest: { ...source.manifest, formatVersion: "99" }, sheets: { ...source.sheets, SkuPrice: [...source.sheets.SkuPrice, { ...source.sheets.SkuPrice[0]!, unexpected: "x" }] } };
     const issues = validateWorkbookStructure(invalid, { "SkuPrice:00000000-0000-4000-8000-000000000001": "2026-08-28T00:00:00.000Z" });
     assert.deepEqual(new Set(issues.map(({ code }) => code)), new Set(["UNKNOWN_VERSION", "UNKNOWN_COLUMN", "DUPLICATE_SKU_PRICE", "STALE_ROW"]));
+  });
+
+  it("allows several supplier pairs per SKU and rejects repeating one pair", () => {
+    const source = data();
+    const secondSupplierRow = { ...source.sheets.SkuPrice[0]!, id: "00000000-0000-4000-8000-000000000003", supplier_party_id: "00000000-0000-4000-8000-000000000004", updated_at: null };
+    const baseVersions = { "SkuPrice:00000000-0000-4000-8000-000000000001": "2026-08-27T00:00:00.000Z" };
+    const ok = { ...source, sheets: { ...source.sheets, SkuPrice: [...source.sheets.SkuPrice, secondSupplierRow] } };
+    assert.deepEqual(validateWorkbookStructure(ok, baseVersions).map((issue) => issue.code), []);
+    const duplicatedPair = { ...source, sheets: { ...source.sheets, SkuPrice: [...source.sheets.SkuPrice, secondSupplierRow, { ...secondSupplierRow, id: "00000000-0000-4000-8000-000000000005" }] } };
+    assert.deepEqual(validateWorkbookStructure(duplicatedPair, baseVersions).map((issue) => issue.code), ["DUPLICATE_SKU_PRICE"]);
   });
 
   it("rechecks conflicts and runs apply inside one supplied transaction", async () => {

@@ -146,8 +146,10 @@ describe("UI Engine foundation", () => {
     assert.match(header, /aria-sort="ascending"/);
     assert.match(header, /aria-label="Name, sort desc"/);
 
-    const css = readFileSync(new URL("./styles/engine.css", import.meta.url), "utf8");
-    assert.match(css, /tr\[data-selected="true"\] td:first-child/);
+    const dataSource = readFileSync(new URL("./components/data.tsx", import.meta.url), "utf8");
+    /* Selected rows keep the leading ink rule on their first cell and stay filled. */
+    assert.match(dataSource, /first:shadow-\[inset_3px_0_0_var\(--ui-row-marker,transparent\)\]/);
+    assert.match(dataSource, /--ui-row-marker:var\(--ui-action-primary\)/);
 
     const tieredCell = renderToStaticMarkup(createElement(
       "table",
@@ -162,7 +164,7 @@ describe("UI Engine foundation", () => {
     ));
     assert.match(tieredCell, /data-wrap="true"/);
     assert.match(tieredCell, /data-primary-lines="2"/);
-    assert.match(tieredCell, /ui-table-cell-secondary/);
+    assert.match(tieredCell, /text-ink-tertiary/);
 
     const inlineSelection = renderToStaticMarkup(createElement(ui.SelectionBar, {
       count: 2,

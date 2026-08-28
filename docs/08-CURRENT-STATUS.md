@@ -1,88 +1,49 @@
 # 08 — Current Rebuild Status
 
-Status: FOUNDATION + UI ENGINE + MASTER DATA MD-01–MD-09 IMPLEMENTED — PRODUCTION IDENTITY DEFERRED
-Audit date: 2026-08-27
-Owner: PM / Technical Lead
+Status date: 2026-08-28 (updated after Gate B pricing correction)
+Repository head at audit start: `7472377`
+Branch for documentation consolidation: `codex/documentation-consolidation`
 
-## 2026-08-27 implementation convergence
+## Executive state
 
-- MD-01 through MD-07 persistence, application rules, permissions/audit, and usable CRUD surfaces are implemented on local `main`; MD-08 whole-schema XLSX and MD-09 discovery/public reads are implemented and under final convergence review.
-- Master Data navigation is grouped by operator workflow: Brand & Catalog, Vendor & Supplier, Pricing, and a visibly unavailable Samples boundary. General Settings owns Units, Categories, Import & Export, and Audit Log.
-- The collapsed rail now uses a compact `MD` mark, clips its own contents, retains utility navigation, and produces no page-wide horizontal overflow. Browser checks passed in collapsed desktop and 390px labeled navigation modes.
-- `BrandCategory` remains explicit catalog/discovery classification. `Sku.category_id` remains a separate manual exact PRODUCT classification: optional for DRAFT, mandatory for ACTIVE and BQ candidate truth, never propagated back into the Brand catalog. The SKU editor prioritizes Brand categories and warns on an intentional mismatch.
-- Schema re-audit found no `SkuCategory`, Category source/derived flag, Sample placeholder, temporal SkuPrice, supplier-price partition, price selector/history, project relation, or split WorkPrice schema.
-- Protected Master Data screens and actions fail closed. The temporary local operator adapter requires explicit server configuration and is unavailable in production; persisted identity/grant ownership remains deferred.
-- Typecheck, architecture checks, legacy-runtime checks, production build, browser rail/reorder checks, and the complete 234-test suite pass. The suite includes PostgreSQL schema/seed/audit/transaction contracts plus whole-workbook relationship preservation and rollback against the dedicated disposable test database; no test is failed, canceled, or skipped.
+The rebuild is the future implementation home. The current StudioFlow project is read-only reference evidence.
 
-## Approved repository state
+| Area | State | Honest interpretation |
+|---|---|---|
+| Platform Core | IMPLEMENTED / CHECKED | Strong reusable foundation. No broad rewrite is justified. Extend only for proven cross-app technical needs. |
+| UI Engine | IMPLEMENTED / CHECKED (Tailwind conversion 2026-08-28) | Tokens, primitives, reusable components/patterns/layouts and showcase exist. Styling now follows the §5 baseline: Tailwind 4 utilities with `tokens/tokens.css` as the single token source via an `@theme inline` bridge; Radix unchanged; engine.css removed; all app pages consume engine components (RA-13 resolved). |
+| Master Data | IMPLEMENTED (pricing contract converged 2026-08-28) | Pair pricing per SKU × supplier is now schema-enforced, applied across services, workbook, UI, and the public `prices[]` DTO. Remaining open items: production identity, Samples slice. |
+| BQ | CONTRACTED / NOT IMPLEMENTED | Rebuild app folders are shells. Final workflow, snapshot, calculation, hierarchy, and UI contracts are documented. Gate D may start against the converged Master Data contract. |
+| StudioFlow | CONTRACTED / NOT IMPLEMENTED | Rebuild app folders are shells. Reference capabilities are inventoried at product level; migration must proceed by vertical slice. |
+| Production identity/RBAC persistence | OPEN | Current temporary adapter is not a production identity solution. |
+| Legacy runtime coupling | CHECKED ABSENT | Rebuild is independent; the reference remains read-only evidence. |
 
-- The reproducible foundation baseline is commit `eb58f5ef7995aad22c4170d234ca84bc830eef08` (`chore: establish rebuild baseline`).
-- The current PM/TL-approved UI implementation head is commit `41903e3` (`refactor(ui-engine): compact directory utility actions`), following application-chrome/table refinement `160d2f6`.
-- The approved Master Data execution ref is `masterdata-full-build-start-ui-approved-v3`; it supersedes both earlier UI-approved tags and includes the final manager records layered over the approved UI implementation.
-- The rebuild is an independent Git repository on `main` with no configured runtime dependency on `../studioflow`.
-- WO-001, WO-001A, WO-001B, WO-001C, and WO-001D are complete and PM/TL-approved.
-- The baseline has a reproducible npm lockfile, Prisma 7 configuration/client generation, TypeScript test runner, typecheck, boundary check, and production build.
-- WO-002 through WO-009, including WO-003A and the convergence correction `10d3881`, are complete and PM/TL-approved on `main`.
-- Platform Core, shared utilities, dependency enforcement, Category pure rules, and the minimalist UI Engine Product Kit are implemented and PM/TL-approved. The owner approved the current warm-neutral, Programa-influenced visual direction over the superseded initial `DESIGN.md` interpretation.
-- Platform Core was revalidated on 2026-08-25 against the immutable GitHub legacy evidence commit `548fbd6bd00ef9fd7d53df66a3561a32fbb56944`; all Foundation acceptance checks remain green and no Core contract change is required.
-- Canonical legacy evidence is now that GitHub commit. `D:\Projects\studioflow` is not a source of truth and may be used only as a verified optional cache.
+## Verification observed after Gate B and the UI Engine Tailwind conversion (2026-08-28)
 
-## Quarantined unapproved work
+- `npm test` pure-only (no integration DB): 188 passed, 52 canceled — integration tests fail closed without the disposable database.
+- `npm test` with `DATABASE_URL` = `MASTERDATA_TEST_DATABASE_URL` pointing at a disposable PostgreSQL 15 database (Docker container, created and discarded for this verification): 240 passed, 0 failed, 0 canceled.
+- `npx prisma validate`, `npx prisma generate`, `npx prisma migrate deploy` on a clean disposable database: both migrations apply; `migrate status` clean.
+- `npm run check` (typecheck, boundary checks, legacy-runtime checks): passed.
+- `npm run build` (production): passed; compiled CSS confirmed to emit token-referencing utilities (`bg-surface` → `var(--ui-surface)` etc.) and the `@keyframes` set.
+- Targeted UI verification (server against the disposable database): SKU pricing lists one row per supplier pair (named supplier, "No supplier", amounts, per-pair Update/Clear); the price form lists every current pair and preselects the pair being edited; skus/units/audit/home/`/ui-engine` showcase all render 200 with engine utility classes and zero legacy `ui-*` classes in markup.
 
-Uncommitted Codex-generated implementation was preserved for comparison only:
+The last result does not prove product failure; it proves the test command/environment contract is incomplete for a fresh checkout. PostgreSQL/Prisma tests need an explicit disposable database runner and separate reporting from pure tests. See RA-04.
 
-- branch: `codex/quarantine-unapproved-20260823`
-- commit: `cb5998070ee7c8ffa1ff7ff5ecbe01a63998e07a`
+## Blocking corrections before BQ
 
-The quarantine is not an implementation source of truth, is not approved code, and must not be merged wholesale. During later PM review it may be consulted only as evidence or comparison against an externally executed work order.
+1. ~~Replace singular `SkuPrice.sku_id` uniqueness with race-safe SKU × supplier-pair uniqueness.~~ DONE 2026-08-28 (migration `20260828000000_master_data_sku_pair_pricing`).
+2. ~~Change Master Data pricing service/repositories/UI/import from one price per SKU to current price per pair.~~ DONE 2026-08-28.
+3. ~~Change public material DTO from `price` to eligible `prices[]`.~~ DONE 2026-08-28.
+4. ~~Add integration and contract tests for multiple suppliers and null-supplier uniqueness.~~ DONE 2026-08-28.
+5. Keep BQ snapshots immutable; do not implement refresh/drift replacement. Still applies to Gate D.
 
-## Locked manager contracts
+## Documentation authority
 
-- `CORE.md` — minimum shared Platform Core contract.
-- `DESIGN.md` — canonical shared visual contract.
-- `UI_ENGINE.md` — canonical shared UI architecture contract.
-- `MASTER_DATA.md` — canonical MD-00 domain, lifecycle, pricing, permission, audit, discovery, public-read, and import/export contract.
-- `docs/12-MASTER-DATA-SEED-INVENTORY.md` — canonical MVP Unit, PRODUCT/WORK Category, operational-role, and BusinessType seed/mapping inventory.
-- `docs/00-SOFTWARE-SSOT.md` — platform ownership and dependency constitution, subject to explicit current owner instructions.
-- `docs/06-DATA-OWNERSHIP.md` — domain/data ownership and Category contract.
-- `docs/03-MASTERDATA-PRD.md`, `docs/04-STUDIOFLOW-PRD.md`, and `docs/05-BQ-PRD.md` — current app intent.
-- `docs/10-UI-CONTRACT-AUDIT.md` and `docs/11-CORE-CONTRACT-AUDIT.md` — manager audit records.
-- `docs/13-CLAUDE-UI-DESIGN-REVIEW-HANDOVER.md` — self-contained independent design-review context, procedure, evidence, and stop conditions.
-- `docs/14-UI-ENGINE-DESIGN-PASS-HANDOVER.md` — independent design-pass record plus PM/TL ratification and convergence corrections.
+Normative current truth is the reading order in `README.md`. Historical handovers, work orders, and root `MASTER_DATA.md` remain evidence of how the present implementation was produced; they do not override the corrected pricing and snapshot contracts.
 
-## Locked domain decisions relevant to current work
+## Open owner decisions
 
-- Master Data owns canonical Party/Supplier/Vendor, Brand, Category, SKU/Material, and all canonical pricing.
-- StudioFlow never implicitly creates or updates Master Data pricing.
-- StudioFlow Project and BqProject remain separate identities and lifecycles.
-- BQ may use Master Data or project-local inputs, stores immutable project snapshots, refreshes explicitly, and never writes to Master Data.
-- PRODUCT Category is flat for MVP; WORK Category may be hierarchical.
-- `BrandCategory` remains explicit discovery metadata; `Sku.category_id` is the direct nullable primary-category relation.
-- Only `categorySlug`, `buildCategoryPath`, and `splitCategoryInput` survive the legacy Category pure-rule extraction.
-
-## Foundation convergence
-
-- COMPLETE: no retired PRODUCT hierarchy symbols, app imports, generated Prisma imports, or feature-specific tokens exist in shared UI Engine.
-- COMPLETE: shared date validation is single-sourced; error transport is fail-closed and DB-runtime-free; auth preserves infrastructure failures.
-- COMPLETE: UI-A through UI-D commits `628a77c`, `ad8d564`, `27becfa`, and `4354c4f` implement the locked shared inventory and `/ui-engine` showcase.
-- COMPLETE: Claude's design pass `1ab1a82` introduced the warm-neutral palette, dark data-table band, explicit navigation current state, collapsible rail, generic sortable headers, and refined status treatment; PM/TL ratified those changes with the bounded corrections in `8f1ca0b`.
-- COMPLETE: selected rows now retain a checked control plus a restrained ink leading rule while semantic status remains independent; all seven showcase data columns are sortable and selection/action columns remain intentionally non-sortable.
-- COMPLETE: narrow navigation always retains labels while preserving the desktop collapse preference; Combobox Arrow/Home/End/Enter/Escape behavior skips disabled options and returns focus correctly.
-- COMPLETE: owner feedback moved selection state/actions inline beside Export, replaced the repeated dark table band with a warm-neutral header surface, redesigned rail/topbar hierarchy, and added canonical one/two-line `TableCellContent` treatment; commit `160d2f6`.
-- COMPLETE: constrained-toolbar utilities now use symbol-only actions with accessible names and tooltips; active filter value and compact selection count remain visible; commit `41903e3`.
-- COMPLETE: 117 tests, typecheck, dependency/legacy checks, Prisma validate/generate, boundary/legacy fixtures, production build, and diff checks pass.
-- COMPLETE: PM/TL visual/accessibility review passed at 1440×900, 1024×768, 768×1024, 390×844, and the 720×450 effective viewport corresponding to 1440×900 at 200% layout scale. Page-wide overflow, isolated mobile-nav/table overflow, sorting, selection/status coexistence, focus return, dialogs, drawer, menus, and keyboard behavior were verified; browser console errors/warnings were zero.
-- COMPLETE: DocumentSheet retains its A4 screen ratio and the loaded stylesheet contains the isolated `@media print` contract. Native OS print-preview automation was unavailable; source/test/CSSOM evidence is accepted for this gate.
-- No additional Core/Foundation work is planned unless product implementation exposes a concrete blocker.
-
-## Current execution policy
-
-The Foundation lanes, convergence gate, UI-01 implementation, independent design pass, owner feedback refinements, and PM/TL ratification are complete. Revised MD-00 and its seed inventory remain owner-approved and LOCKED. The owner's direct UI takeover instruction does not change the external-executor policy for deterministic Master Data work. `scripts/work-orders/MASTER-DATA-FULL-BUILD.md` is ACTIVE from `masterdata-full-build-start-ui-approved-v3`; every older Master Data start tag remains superseded.
-
-## Deferred owner / later-phase decisions
-
-1. Persisted identity provider, user lifecycle/schema, canonical roles, and role-to-permission grants.
-2. Production audit-retention policy beyond the MD-00 MVP default.
-3. BQ calculation migration and regression contract.
-
-Master Data lifecycle, uniqueness, relation, pricing, permission, audit-persistence, discovery, public-read, and import/export decisions are resolved in the MD-00 lock candidate; they are no longer architecture-discovery items.
+1. Rebuild coding/executor governance, because current governance sources conflict.
+2. Production identity, user lifecycle, and persisted grants.
+3. StudioFlow MVP cutoff among Schedule, MOM, SketchUp, and Render Board extensions.
+4. Production data/file migration and cutover plan.

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { Button, Field, Input } from "@/platform/ui_engine";
+
 type Result = { ok?: boolean; changedRows?: number; issues?: readonly { sheet: string; row?: number; field?: string; message: string }[]; safeMessage?: string };
 
 export function ImportWorkbook() {
@@ -24,14 +26,13 @@ export function ImportWorkbook() {
   }
 
   return (
-    <div className="ui-stack" style={{ gap: 12 }}>
-      <label className="ui-field">
-        <span className="ui-label">Workbook</span>
-        <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreviewedFile(null); setResult(null); }} />
-      </label>
-      <div className="ui-cluster">
-        <button className="ui-button ui-button--secondary" type="button" disabled={!file || pending} onClick={() => submit("preview")}>Validate & preview</button>
-        <button className="ui-button ui-button--primary" type="button" disabled={!file || file !== previewedFile || pending} onClick={() => submit("apply")}>Apply atomically</button>
+    <div className="flex flex-col gap-3">
+      <Field label="Workbook">
+        <Input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreviewedFile(null); setResult(null); }} />
+      </Field>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="secondary" disabled={!file || pending} onClick={() => submit("preview")}>Validate &amp; preview</Button>
+        <Button type="button" variant="primary" disabled={!file || file !== previewedFile || pending} onClick={() => submit("apply")}>Apply atomically</Button>
       </div>
       {result?.safeMessage ? <p role="alert">{result.safeMessage}</p> : null}
       {result?.ok ? <p role="status">{result.changedRows ?? 0} workbook rows validated{previewedFile ? ". Ready to apply." : " and applied."}</p> : null}

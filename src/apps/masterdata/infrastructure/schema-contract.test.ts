@@ -381,30 +381,44 @@ describe("SkuMedia uniqueness", () => {
 
 // ── Pricing cardinality ───────────────────────────────────────────────────
 
-describe("Canonical pricing cardinality", () => {
-  it("allows exactly one SkuPrice row per SKU", async () => {
+describe("Supplier pair pricing cardinality", () => {
+  it("allows several current supplier prices per SKU including a deterministic NULL-supplier pair", async () => {
     await resetAndSeedBaseRows();
     const sku = await createSku({ slug: "priced-sku" });
-    const price = await db.prisma.skuPrice.create({
-      data: {
-        sku_id: sku.id,
-        amount: "125000.00",
-        currency: "IDR",
-        unit_id: unitId,
-        updated_by_label: "staff",
-      },
+    const supplierA = await createParty("PT Alpha");
+    const supplierB = await createParty("PT Beta");
+    const nullPrice = await db.prisma.skuPrice.create({
+      data: { sku_id: sku.id, amount: "0", currency: "IDR", unit_id: unitId, updated_by_label: "staff" },
     });
-    assert.ok(price.id);
+    const priceA = await db.prisma.skuPrice.create({
+      data: { sku_id: sku.id, supplier_party_id: supplierA.id, amount: "125000.00", currency: "IDR", unit_id: unitId, updated_by_label: "staff" },
+    });
+    const priceB = await db.prisma.skuPrice.create({
+      data: { sku_id: sku.id, supplier_party_id: supplierB.id, amount: "99000.00", currency: "IDR", unit_id: unitId, updated_by_label: "staff" },
+    });
+    assert.notEqual(nullPrice.id, priceA.id);
+    assert.notEqual(priceA.id, priceB.id);
+    assert.equal(await db.prisma.skuPrice.count({ where: { sku_id: sku.id } }), 3);
+  });
 
+  it("enforces one row per SKU x supplier pair, including the NULL-supplier partition", async () => {
+    await resetAndSeedBaseRows();
+    const sku = await createSku({ slug: "pair-uniq-sku" });
+    const supplier = await createParty("PT Gamma");
+    await db.prisma.skuPrice.create({
+      data: { sku_id: sku.id, supplier_party_id: supplier.id, amount: "125000.00", currency: "IDR", unit_id: unitId, updated_by_label: "staff" },
+    });
     await expectUniqueViolation(() =>
       db.prisma.skuPrice.create({
-        data: {
-          sku_id: sku.id,
-          amount: "99000.00",
-          currency: "IDR",
-          unit_id: unitId,
-          updated_by_label: "staff",
-        },
+        data: { sku_id: sku.id, supplier_party_id: supplier.id, amount: "99000.00", currency: "IDR", unit_id: unitId, updated_by_label: "staff" },
+      }),
+    );
+    await db.prisma.skuPrice.create({
+      data: { sku_id: sku.id, amount: "1", currency: "IDR", unit_id: unitId, updated_by_label: "staff" },
+    });
+    await expectUniqueViolation(() =>
+      db.prisma.skuPrice.create({
+        data: { sku_id: sku.id, amount: "2", currency: "IDR", unit_id: unitId, updated_by_label: "staff" },
       }),
     );
   });
@@ -654,19 +668,29 @@ describe("Forbidden legacy shapes are absent", () => {
     assert.ok(indexes.rows.some((row) => /\(occurred_at\)/.test(row.indexdef)), "AuditEvent must have a standalone occurred_at index");
   });
 
-  it("enforces SkuPrice uniqueness through a simple unique index on sku_id", async () => {
+  it("enforces SkuPrice pair uniqueness through the two partial unique indexes without a simple sku_id unique index", async () => {
     await resetAndSeedBaseRows();
     const indexes = await db.pool.query<{ indexdef: string }>(
       `SELECT indexdef FROM pg_indexes WHERE schemaname = 'master_data' AND tablename = 'SkuPrice'`,
     );
-    const uniqueSkuIndex = indexes.rows.find(
-      (row) => /UNIQUE INDEX .*\( ?"?sku_id"?\)/.test(row.indexdef),
+    const defs = indexes.rows.map((row) => row.indexdef);
+    assert.ok(
+      defs.some((def) => /UNIQUE INDEX "SkuPrice_pair_supplier_uniq".*\( ?"?sku_id"?, ?"?supplier_party_id"?\).*IS NOT NULL/.test(def)),
+      "SkuPrice must have a partial unique index on (sku_id, supplier_party_id) for non-NULL suppliers",
     );
-    assert.ok(uniqueSkuIndex, "SkuPrice must have a simple unique index on sku_id");
+    assert.ok(
+      defs.some((def) => /UNIQUE INDEX "SkuPrice_pair_nosupplier_uniq".*\( ?"?sku_id"?\).*IS NULL/.test(def)),
+      "SkuPrice must have a partial unique index on sku_id for the NULL-supplier partition",
+    );
     assert.equal(
-      indexes.rows.some((row) => row.indexdef.includes(" WHERE ")),
+      defs.some((def) => /UNIQUE INDEX "SkuPrice_sku_id_key"/.test(def)),
       false,
-      "SkuPrice must have no temporal partial index",
+      "the singular sku_id unique index must be gone",
+    );
+    assert.equal(
+      defs.some((def) => def.includes(" WHERE ") && !def.includes("SkuPrice_pair_")),
+      false,
+      "SkuPrice must have no other partial (e.g. temporal) index",
     );
   });
 });

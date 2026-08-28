@@ -20,8 +20,8 @@ export async function setSkuPriceAction(formData: FormData) {
   revalidatePath("/masterdata/skus");
 }
 
-export async function clearSkuPriceAction(skuId: string) {
-  await pricingService.clearSkuPrice(CTX, skuId);
+export async function clearSkuPriceAction(skuId: string, supplierPartyId: string | null) {
+  await pricingService.clearSkuPrice(CTX, skuId, supplierPartyId);
   revalidatePath("/masterdata/pricing");
   revalidatePath("/masterdata/skus");
 }

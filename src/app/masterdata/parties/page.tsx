@@ -5,6 +5,7 @@ import { partyService } from "@/apps/masterdata/infrastructure/runtime";
 import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 import {
   Badge,
+  Button,
   DataTable,
   EmptyState,
   PageHeader,
@@ -16,6 +17,7 @@ import {
   TableHeader,
   TableRow,
   Text,
+  buttonClasses,
 } from "@/platform/ui_engine";
 
 import { deletePartyAction, restorePartyAction } from "./actions";
@@ -40,14 +42,14 @@ export default async function PartiesPage({
         title="Parties"
         description="Suppliers, vendors, and other business entities."
         actions={
-          <Link href="/masterdata/parties/new" className="ui-button" data-variant="primary" data-size="md">
+          <Link href="/masterdata/parties/new" className={buttonClasses("primary", "md")}>
             <span>New party</span>
           </Link>
         }
       />
 
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.25rem" }}>
-        <Link href={`/masterdata/parties${showDeleted ? "" : "?deleted=1"}`} className="ui-button" data-variant="secondary" data-size="sm">
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        <Link href={`/masterdata/parties${showDeleted ? "" : "?deleted=1"}`} className={buttonClasses("secondary", "sm")}>
           <span>{showDeleted ? "Hide archived" : "Show archived"}</span>
         </Link>
       </div>
@@ -85,17 +87,17 @@ export default async function PartiesPage({
                   <Badge tone={p.deletedAt ? "warning" : "success"}>{p.deletedAt ? "Archived" : "Active"}</Badge>
                 </TableCell>
                 <TableCell>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <div className="flex flex-wrap items-center gap-2">
                     {!p.deletedAt && (
-                      <Link href={`/masterdata/parties/${p.id}/edit`} className="ui-button" data-variant="ghost" data-size="sm"><span>Edit</span></Link>
+                      <Link href={`/masterdata/parties/${p.id}/edit`} className={buttonClasses("ghost", "sm")}><span>Edit</span></Link>
                     )}
                     {p.deletedAt ? (
                       <form action={restorePartyAction.bind(null, p.id)}>
-                        <button type="submit" className="ui-button" data-variant="ghost" data-size="sm"><span>Restore</span></button>
+                        <Button type="submit" variant="ghost" size="sm">Restore</Button>
                       </form>
                     ) : (
                       <form action={deletePartyAction.bind(null, p.id)}>
-                        <button type="submit" className="ui-button" data-variant="danger" data-size="sm"><span>Archive</span></button>
+                        <Button type="submit" variant="danger" size="sm">Archive</Button>
                       </form>
                     )}
                   </div>

@@ -6,6 +6,7 @@ import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/re
 import { UNIT_USAGES } from "@/apps/masterdata/domain/unit-rules";
 import {
   Button,
+  buttonClasses,
   Checkbox,
   Field,
   FormActions,
@@ -61,7 +62,7 @@ export default async function EditUnitPage({ params }: { params: Promise<{ id: s
         </FormSection>
         <FormActions>
           <Button type="submit" variant="primary">Save changes</Button>
-          <Link href="/masterdata/settings/units" className="ui-button" data-variant="secondary" data-size="md"><span>Cancel</span></Link>
+          <Link href="/masterdata/settings/units" className={buttonClasses("secondary")}>Cancel</Link>
         </FormActions>
       </form>
     </PageShell>

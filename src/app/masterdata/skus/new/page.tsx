@@ -5,6 +5,17 @@ import { brandService } from "@/apps/masterdata/infrastructure/runtime";
 import { categoryService } from "@/apps/masterdata/infrastructure/runtime";
 import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 import { SKU_KINDS } from "@/apps/masterdata/domain/sku-rules";
+import {
+  Button,
+  Field,
+  Input,
+  PageHeader,
+  PageShell,
+  Select,
+  Text,
+  Textarea,
+  buttonClasses,
+} from "@/platform/ui_engine";
 import { createSkuAction } from "../actions";
 import { SkuClassificationFields } from "../sku-classification-fields";
 
@@ -28,65 +39,52 @@ export default async function NewSkuPage() {
   }
 
   return (
-    <div className="ui-layout-page">
-      <div className="ui-layout-page-header">
-        <div>
-          <h1 className="ui-heading" data-size="xl">New SKU</h1>
-          <p className="ui-text" data-tone="secondary">Add a new material, furniture, or fixture.</p>
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader title="New SKU" description="Add a new material, furniture, or fixture." />
 
-      <form action={handleCreate} className="ui-form">
-        <div className="ui-form-field">
-          <label className="ui-label" htmlFor="name">Name *</label>
-          <input id="name" name="name" type="text" className="ui-input" required autoFocus />
-        </div>
+      <form action={handleCreate} className="grid gap-4">
+        <Field label="Name" required>
+          <Input name="name" type="text" required autoFocus />
+        </Field>
 
-        <div className="ui-form-field">
-          <label className="ui-label" htmlFor="code">Code (optional)</label>
-          <input id="code" name="code" type="text" className="ui-input" />
-          <span className="ui-text" data-tone="secondary" data-size="sm">Internal reference code. Immutable after creation.</span>
-        </div>
+        <Field label="Code (optional)" description="Internal reference code. Immutable after creation.">
+          <Input name="code" type="text" />
+        </Field>
 
-        <div className="ui-form-field">
-          <label className="ui-label" htmlFor="kind">Kind *</label>
-          <select id="kind" name="kind" className="ui-select" required>
+        <Field label="Kind" required>
+          <Select name="kind" required>
             {SKU_KINDS.map((k) => (
               <option key={k} value={k}>{k}</option>
             ))}
-          </select>
-        </div>
+          </Select>
+        </Field>
 
-        <div className="ui-form-field">
-          <label className="ui-label" htmlFor="baseUnitId">Base Unit *</label>
+        <Field label="Base Unit" required>
           {liveUnits.length === 0 ? (
-            <p className="ui-text" data-tone="warning">No units available. Create units first.</p>
+            <Text as="p" className="text-warning">No units available. Create units first.</Text>
           ) : (
-            <select id="baseUnitId" name="baseUnitId" className="ui-select" required>
+            <Select name="baseUnitId" required>
               <option value="">— select —</option>
               {liveUnits.map((u) => (
                 <option key={u.id} value={u.id}>{u.label} ({u.code})</option>
               ))}
-            </select>
+            </Select>
           )}
-        </div>
+        </Field>
 
         <SkuClassificationFields brands={liveBrands.map((brand) => ({ id: brand.id, name: brand.name, categoryIds: brand.categories.map(({ categoryId }) => categoryId) }))} categories={liveCategories.map(({ id, name }) => ({ id, name }))} />
 
-        <div className="ui-form-field">
-          <label className="ui-label" htmlFor="notes">Notes (optional)</label>
-          <textarea id="notes" name="notes" className="ui-textarea" rows={3} />
-        </div>
+        <Field label="Notes (optional)">
+          <Textarea name="notes" rows={3} />
+        </Field>
 
-        <div className="ui-toolbar">
-          <button type="submit" className="ui-button" data-variant="primary" data-size="md">
-            <span>Create SKU</span>
-          </button>
-          <Link href="/masterdata/skus" className="ui-button" data-variant="secondary" data-size="md">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="submit" variant="primary">Create SKU</Button>
+          <Link href="/masterdata/skus" className={buttonClasses("secondary", "md")}>
             <span>Cancel</span>
           </Link>
         </div>
       </form>
-    </div>
+    </PageShell>
   );
 }

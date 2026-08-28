@@ -1,97 +1,79 @@
-# 09 — Execution Plan
+# 09 — Rebuild Execution Plan
 
-Status: FOUNDATION + UI ENGINE + MD-00 COMPLETE — MASTER DATA EXECUTION NEXT
-Updated: 2026-08-25
-Owner: PM / Technical Lead
+Status: ACTIVE DIRECTION
+Updated: 2026-08-28
 
-## Gate 0 — Reproducible baseline — COMPLETE
+This plan replaces dated “Master Data execution next” work-order sequencing. Completed work-order records remain historical evidence in Git.
 
-WO-001, WO-001A, WO-001B, WO-001C, and WO-001D passed PM/TL review.
+## Gate A — Documentation and boundary lock
 
-Approved implementation baseline:
+- Keep `docs/README.md`, 00–07, the three app dossiers, rule audit, and migration playbook mutually consistent.
+- Treat `CORE.md`, `DESIGN.md`, and `UI_ENGINE.md` as the implemented shared baseline.
+- Do not start product implementation from a contradicted rule.
 
-`eb58f5ef7995aad22c4170d234ca84bc830eef08`
+Exit: documentation links/checks pass and every known contradiction has an owner or explicit gap.
 
-All external executors start from the clean approved `main` implementation state plus current manager documentation/work orders. The quarantine branch `codex/quarantine-unapproved-20260823` is comparison evidence only and is never an implementation base.
+## Gate B — Master Data pricing correction
 
-## Gate 1 — Contract lock — COMPLETE
+Status: COMPLETED 2026-08-28 (same date as plan; see `docs/08-CURRENT-STATUS.md` for evidence).
 
-Manager-owned contracts are locked in:
+1. ~~Write regression tests for multiple supplier prices, null-supplier pair uniqueness, unit readiness, audit, workbook round-trip, and `prices[]` public DTO.~~ Done: pure tests (`pricing-service`, `masterdata-public`, `import-export`, `sku-rules`, `sku-service`, `xlsx-roundtrip`) plus disposable-PostgreSQL tests (`schema-contract` pair uniqueness/indexes, `workbook-applier` full-pair round-trip).
+2. ~~Design and rehearse the Prisma migration from singular pricing to pair pricing without inventing supplier provenance.~~ Done: `20260828000000_master_data_sku_pair_pricing` drops `SkuPrice_sku_id_key` and adds partial unique indexes `SkuPrice_pair_supplier_uniq` and `SkuPrice_pair_nosupplier_uniq`; existing rows (including NULL suppliers) migrate unchanged; applied and verified on a clean disposable database.
+3. ~~Update domain/application/infrastructure/public/UI in one bounded vertical correction.~~ Done: pair-aware pricing service/repositories, SKU relation state, workbook validation/applier/export, pricing list + form UI, and the `prices[]` public DTO.
+4. ~~Run pure and disposable-PostgreSQL suites, boundary checks, build, and pricing UI checks.~~ Done: 240/240 tests with the disposable database, 188 pass / 52 fail-closed cancellations without it; `npm run check` and `npm run build` pass; targeted pricing UI verified against the disposable database.
+5. ~~Reconcile any existing price rows and produce a migration exception report.~~ Done: because the previous schema enforced one row per SKU, no pair conflicts can exist in migrated data; the migration changes indexes only, keeps every row's supplier exactly as stored (NULL stays NULL, no supplier invented), and therefore produces zero rejected rows by construction.
 
-- `CORE.md`;
-- `DESIGN.md`;
-- `UI_ENGINE.md`;
-- the Software SSOT, Data Ownership contract, and app PRDs.
+Exit: Master Data exposes all eligible current supplier options and no singular-price assumption remains in active code/tests/docs. (Verified 2026-08-28.)
 
-Deterministic implementation may follow these contracts but may not change them.
+## Gate C — Test isolation and production identity
 
-## External executor policy
+- Split pure `npm test` from fail-closed disposable PostgreSQL integration tests.
+- Document required test environment and teardown.
+- Resolve the production principal/user/grant model and enforce it at application boundaries.
 
-- Codex acts only as PM/TL.
-- Codex may use internal subagents for bounded manager-owned, read-only audit/evidence/risk analysis; their findings are advisory and the PM/TL remains the decision owner.
-- Deterministic work is executed by owner-operated external OpenCode agents.
-- Codex does not create executor tasks, agents, or worktrees.
-- Every external executor reads `scripts/work-orders/00-EXTERNAL-EXECUTOR-CONTEXT.md` before its assigned WO.
-- Every executor reads its complete work order and stops on ambiguity or repository/contract mismatch.
-- Work remains unapproved until PM/TL reviews its diff/commit and acceptance evidence.
-- Do not create one executor per tiny task; retain context within each approved product slice.
+These can be designed alongside Gate B, but production authorization cannot be claimed before completion.
 
-UI-01 was completed directly by Codex under an explicit one-time owner takeover instruction. This does not authorize Codex to replace external OpenCode executors for later deterministic Master Data work.
+## Gate D — BQ vertical migration
 
-## Foundation execution — COMPLETE
+Recommended order:
 
-### Lane A — Infrastructure / Core
+1. pure calculation and post-order section rollup contract;
+2. BQ project + two-level grouping + Works schema/use cases;
+3. material/service snapshot lines with explicit supplier selection;
+4. worksheet UI, quick-add/context actions, keyboard and lock behavior;
+5. project-local lines and manual override;
+6. recipe library using references/coefficients without stored prices;
+7. legacy data rehearsal and parity report.
 
-Execute sequentially:
+No refresh/drift-replacement feature is in scope.
 
-1. WO-003 + WO-003A — COMPLETE; commits `d55c62d` and `3ad33e6` passed PM/TL review.
-2. WO-003 enforcement is the accepted dependency/legacy-runtime baseline.
-3. WO-005 — Core DB / Prisma Runtime — COMPLETE; commit `4cbdf43` passed PM/TL review.
-4. PM/TL review of WO-005 — COMPLETE.
-5. WO-006 through WO-009 — COMPLETE and PM/TL-approved.
-6. Convergence correction `10d3881` — COMPLETE.
+## Gate E — StudioFlow vertical migration
 
-### Lane B — Domain / UI Foundation
+Recommended order:
 
-Execute sequentially:
+1. identity/RBAC prerequisite and Client/Project foundation;
+2. Phase transition engine and review/revision evidence;
+3. deliverables/files/comments;
+4. activities/tasks/checklists and saved filters;
+5. Master Data-backed catalog/schedule snapshots;
+6. owner-selected extensions: MOM, SketchUp, Render Board, supervision tooling;
+7. operational data/file rehearsal and cutover.
 
-1. WO-002 — COMPLETE; commit `d72b72a`.
-2. PM/TL review of WO-002 — COMPLETE.
-3. WO-004 — COMPLETE; commit `4ff3353`.
-4. PM/TL review of WO-004 — COMPLETE.
+Each capability follows `16-LEGACY-MIGRATION-PLAYBOOK.md` and ends in a runnable product slice.
 
-## Convergence gate — COMPLETE
+## Ongoing Core/UI Engine rule
 
-After both lanes complete, do not begin further deterministic implementation. PM/TL reviews:
+Core/UI Engine are extended only when a concrete product slice proves a reusable gap. App-specific business logic is not preemptively centralized. Shared additions require a second real consumer or an explicit platform-level requirement, boundary tests, and showcase/documentation where visual.
 
-- every diff against its work order;
-- forbidden-file and scope compliance;
-- Core/UI dependency direction;
-- absence of runtime coupling to `../studioflow`;
-- UI Engine public exports and absence of domain vocabulary;
-- single-source design tokens and absence of feature-specific globals;
-- Category pure-rule compliance and absence of retired PRODUCT hierarchy inference;
-- tests, typecheck, boundary checks, Prisma checks, and production build.
+## Release gates
 
-The review passed. Core + UI Engine are locked for product implementation. Do not add Foundation work without a concrete product blocker.
+Every releasable slice states:
 
-PM/TL revalidated Core on 2026-08-25 against canonical legacy evidence from GitHub commit `548fbd6bd00ef9fd7d53df66a3561a32fbb56944`. The contract and implementation remain locked; the snapshot changes evidence provenance, not Core responsibilities.
-
-## Product implementation sequence after Core convergence
-
-1. UI-01 UI-A through UI-D — COMPLETE; commits `628a77c`, `ad8d564`, `27becfa`, and `4354c4f`.
-2. PM/TL diff, test, accessibility, responsive, interaction, and `/ui-engine` review — COMPLETE.
-3. Independent Claude design review and owner-directed design pass — COMPLETE; commit `1ab1a82` reviewed through `docs/14-UI-ENGINE-DESIGN-PASS-HANDOVER.md`.
-4. PM/TL convergence correction and contract ratification — COMPLETE; commit `8f1ca0b`, 117 tests, full repository acceptance, responsive/keyboard/sort/selection review, and owner visual approval passed.
-5. Owner browser-feedback refinement — COMPLETE; commit `160d2f6` moves batch selection into the toolbar, refines rail/topbar/table hierarchy, and adds canonical tiered cell content.
-6. Constrained-toolbar icon/tooltip refinement — COMPLETE; commit `41903e3` preserves visible filter/selection state while compacting secondary actions.
-7. Master Data starting ref `masterdata-full-build-start-ui-approved-v3` issued; `scripts/work-orders/MASTER-DATA-FULL-BUILD.md` is ACTIVE. Both earlier UI-approved tags are superseded.
-8. Execute MD-01 through MD-09 sequentially and review at Gate 1, Gate 2, Gate 3, and Final Gate.
-9. Lock and implement the Master Data public contract.
-10. Lock BQ readiness, provenance, snapshot, refresh, duplicate, library, and calculation contracts.
-11. Issue BQ schema/domain/application/UI work orders.
-12. Run cross-app boundary, migration, and smoke verification.
-
-StudioFlow remains outside active implementation scope except for shared-boundary verification.
-
-The MD-01 through MD-09 dependency plan remains canonical in `MASTER_DATA.md`. Its executor package is active only from `masterdata-full-build-start-ui-approved-v3`; all older Master Data start tags are superseded. UI-01 and its convergence/refinement passes introduced no Master Data schema, CRUD, or domain implementation.
+- product contract and classification;
+- schema/data migration impact;
+- server-side permissions and audit;
+- pure and integration test evidence;
+- dependency/build result;
+- critical browser/accessibility result;
+- rollback/cutover considerations;
+- remaining open decisions.

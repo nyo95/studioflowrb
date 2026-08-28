@@ -4,14 +4,16 @@ This file is intentionally short.
 
 ## Mandatory reading order
 
-1. `docs/00-SOFTWARE-SSOT.md`
-2. `docs/06-DATA-OWNERSHIP.md`
-3. `docs/07-ENGINEERING-CONVENTIONS.md`
-4. The relevant app PRD:
+1. `docs/README.md`
+2. `docs/00-SOFTWARE-SSOT.md`
+3. `docs/06-DATA-OWNERSHIP.md`
+4. `docs/07-ENGINEERING-CONVENTIONS.md`
+5. The relevant app PRD and its `docs/apps/` dossier:
    - `docs/03-MASTERDATA-PRD.md`
    - `docs/04-STUDIOFLOW-PRD.md`
    - `docs/05-BQ-PRD.md`
-5. `prisma/schema.prisma` for actual persisted shape.
+6. `docs/15-RULE-AUDIT.md` for known contract/implementation conflicts.
+7. `prisma/schema.prisma` for actual persisted shape.
 
 ## Authority order
 
@@ -25,7 +27,7 @@ When documents conflict:
 6. Other docs
 7. Immutable legacy evidence snapshot: `https://github.com/nyo95/studioflow/commit/548fbd6bd00ef9fd7d53df66a3561a32fbb56944`
 
-Legacy code is evidence, never authority. The local `../studioflow` checkout is not a source of truth; it may be used only as an optional cache after proving that its resolved commit and files match the locked GitHub snapshot.
+Legacy code is evidence, never authority. By owner direction dated 2026-08-28, `D:\Misc\ProjectsHUB\studioflow` is the read-only migration reference. Record its resolved commit and dirty state before using it; never create a runtime dependency or copy its folder structure wholesale.
 
 ---
 

@@ -4,6 +4,20 @@ import { requirePermission } from "@platform/core/rbac";
 import type { MasterDataExecutionContext, TransactionRunner } from "./execution-context";
 import { MASTERDATA_PRICE_READ, MASTERDATA_SKU_READ } from "./masterdata-permissions";
 
+export type MaterialPriceOptionRecord = {
+  id: string;
+  amount: string;
+  currency: string;
+  unitCode: string;
+  supplierPartyId: string | null;
+  supplierName: string | null;
+  sourceUrl: string | null;
+  updatedByUserId: string | null;
+  updatedByLabel: string;
+  updatedAt: Date;
+  provenanceValid: boolean;
+};
+
 export type MaterialReadRecord = {
   id: string;
   code: string | null;
@@ -13,18 +27,10 @@ export type MaterialReadRecord = {
   brand: { id: string; name: string } | null;
   category: { id: string; name: string; path: string | null };
   baseUnit: { id: string; code: string; label: string };
-  price: null | {
-    id: string;
-    amount: string;
-    currency: string;
-    unitCode: string;
-    supplierName: string | null;
-    sourceUrl: string | null;
-    updatedByUserId: string | null;
-    updatedByLabel: string;
-    updatedAt: Date;
-    provenanceValid: boolean;
-  };
+  /// Every eligible current supplier price of this SKU, deterministically
+  /// ordered. BQ must select one option explicitly and snapshot it; there is
+  /// no preferred/cheapest/latest fallback.
+  prices: MaterialPriceOptionRecord[];
 };
 
 export type WorkPriceReadRecord = {
@@ -51,9 +57,9 @@ export interface PublicReadRepository {
 }
 
 function materialDto(record: MaterialReadRecord) {
-  const notReadyReasons = !record.price
+  const notReadyReasons = record.prices.length === 0
     ? ["MISSING_CANONICAL_PRICE"]
-    : record.price.provenanceValid ? [] : ["INVALID_PRICE_PROVENANCE"];
+    : record.prices.every((price) => price.provenanceValid) ? [] : ["INVALID_PRICE_PROVENANCE"];
   return Object.freeze({
     id: record.id,
     code: record.code,
@@ -62,17 +68,18 @@ function materialDto(record: MaterialReadRecord) {
     brand: record.brand ? Object.freeze({ ...record.brand }) : null,
     category: Object.freeze({ ...record.category }),
     baseUnit: Object.freeze({ ...record.baseUnit }),
-    price: record.price && record.price.provenanceValid ? Object.freeze({
-      id: record.price.id,
-      amount: record.price.amount,
-      currency: record.price.currency,
-      unitCode: record.price.unitCode,
-      supplierName: record.price.supplierName,
-      sourceUrl: record.price.sourceUrl,
-      updatedByUserId: record.price.updatedByUserId,
-      updatedByLabel: record.price.updatedByLabel,
-      updatedAt: record.price.updatedAt.toISOString(),
-    }) : null,
+    prices: Object.freeze(record.prices.filter((price) => price.provenanceValid).map((price) => Object.freeze({
+      id: price.id,
+      amount: price.amount,
+      currency: price.currency,
+      unitCode: price.unitCode,
+      supplierPartyId: price.supplierPartyId,
+      supplierName: price.supplierName,
+      sourceUrl: price.sourceUrl,
+      updatedByUserId: price.updatedByUserId,
+      updatedByLabel: price.updatedByLabel,
+      updatedAt: price.updatedAt.toISOString(),
+    }))),
     ready: notReadyReasons.length === 0,
     notReadyReasons: Object.freeze(notReadyReasons),
     updatedAt: record.updatedAt.toISOString(),

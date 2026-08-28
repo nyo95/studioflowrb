@@ -52,10 +52,10 @@ export function Field({
     : children;
 
   return (
-    <div className={cx("ui-field", className)} {...props}>
-      <label className="ui-field-label" htmlFor={controlId}>
+    <div className={cx("grid min-w-0 gap-[5px]", className)} {...props}>
+      <label className="inline-flex w-fit items-baseline gap-1 font-semibold text-ink" htmlFor={controlId}>
         {label}
-        {required ? <span className="ui-field-required" aria-hidden="true">*</span> : null}
+        {required ? <span className="text-danger" aria-hidden="true">*</span> : null}
       </label>
       {description ? (
         <Text id={descriptionId} tone="secondary" size="sm">
@@ -64,7 +64,7 @@ export function Field({
       ) : null}
       {control}
       {error ? (
-        <span id={errorId} className="ui-field-error" role="alert">
+        <span id={errorId} className="text-xs text-danger" role="alert">
           {error}
         </span>
       ) : null}
@@ -80,20 +80,34 @@ export type FormSectionProps = HTMLAttributes<HTMLElement> & {
 
 export function FormSection({ title, description, children, className, ...props }: FormSectionProps) {
   return (
-    <section className={cx("ui-form-section", className)} {...props}>
-      <div className="ui-section-heading">
+    <section className={cx("grid gap-(--ui-section-gap)", className)} {...props}>
+      <div className="grid gap-[3px]">
         <Heading level={3}>{title}</Heading>
         {description ? <Text as="p" tone="secondary">{description}</Text> : null}
       </div>
-      <div className="ui-form-grid">{children}</div>
+      <div className="grid grid-cols-12 gap-x-4 gap-y-3.5 max-[720px]:[&>*]:col-span-1 max-[720px]:grid-cols-1 [&>*]:col-span-6">
+        {children}
+      </div>
     </section>
   );
 }
+
+const FORM_ACTIONS_ALIGN_CLASSES = {
+  start: "justify-start",
+  end: "justify-end",
+  between: "justify-between",
+} as const;
 
 export function FormActions({
   align = "end",
   className,
   ...props
 }: HTMLAttributes<HTMLDivElement> & { align?: "start" | "end" | "between" }) {
-  return <div className={cx("ui-form-actions", className)} data-align={align} {...props} />;
+  return (
+    <div
+      className={cx("flex flex-wrap items-center gap-2 border-t border-line pt-3", FORM_ACTIONS_ALIGN_CLASSES[align], className)}
+      data-align={align}
+      {...props}
+    />
+  );
 }

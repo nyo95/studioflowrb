@@ -4,16 +4,31 @@ import type { HTMLAttributes, ReactNode } from "react";
 import { cx } from "../internal/cx";
 import { Heading, Spinner, type SemanticTone, Text } from "../primitives";
 
-/**
- * Record/row status. Renders a small semantic marker plus a plain-ink label.
- * For chips, tags and counts use `Badge` (pill) instead.
- */
+/* Status marker. A filled pill per row turns a status column into colour noise;
+   a small marker lets the eye scan by colour while the label stays plain ink.
+   Meaning is carried by the text, so colour is never the only channel. */
+const STATUS_TONE_MARKER_CLASSES: Record<SemanticTone, string> = {
+  neutral: "before:bg-ink-tertiary",
+  success: "before:bg-success",
+  warning: "before:bg-warning",
+  danger: "before:bg-danger",
+};
+
 export function StatusBadge({
   tone,
   className,
   ...props
 }: HTMLAttributes<HTMLSpanElement> & { tone: SemanticTone }) {
-  return <span className={cx("ui-status", `ui-status-${tone}`, className)} {...props} />;
+  return (
+    <span
+      className={cx(
+        "inline-flex items-center gap-[7px] text-ink text-[0.8125rem] leading-[1.3] whitespace-nowrap before:h-[7px] before:w-[7px] before:shrink-0 before:content-[''] before:rounded-[2px]",
+        STATUS_TONE_MARKER_CLASSES[tone],
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
 export type NoticeProps = HTMLAttributes<HTMLDivElement> & {
@@ -22,10 +37,21 @@ export type NoticeProps = HTMLAttributes<HTMLDivElement> & {
   children?: ReactNode;
 };
 
+const NOTICE_TONE_CLASSES: Record<SemanticTone, string> = {
+  neutral: "border-line bg-surface-muted text-ink-secondary",
+  success: "border-success-line bg-success-surface text-success",
+  warning: "border-warning-line bg-warning-surface text-warning",
+  danger: "border-danger-line bg-danger-surface text-danger",
+};
+
 export function Notice({ tone = "neutral", title, children, className, ...props }: NoticeProps) {
   return (
     <div
-      className={cx("ui-notice", `ui-tone-${tone}`, className)}
+      className={cx(
+        "flex items-start gap-1.5 rounded-control border px-[11px] py-[9px] text-[0.8125rem] [&_strong]:text-inherit",
+        NOTICE_TONE_CLASSES[tone],
+        className,
+      )}
       role={tone === "danger" ? "alert" : "status"}
       {...props}
     >
@@ -53,16 +79,20 @@ function State({
 }: StateProps & { kind: "loading" | "empty" | "error" }) {
   return (
     <div
-      className={cx("ui-state", `ui-state-${kind}`, className)}
+      className={cx(
+        "grid min-h-[156px] place-content-center justify-items-center gap-1.5 p-6 text-center",
+        kind === "error" && "bg-danger-surface text-danger",
+        className,
+      )}
       role={kind === "error" ? "alert" : kind === "loading" ? "status" : undefined}
       aria-live={kind === "loading" ? "polite" : undefined}
       {...props}
     >
       {kind === "loading" ? <Spinner label={typeof title === "string" ? title : "Loading"} /> : null}
-      {kind !== "loading" && Icon ? <Icon className="ui-state-icon" aria-hidden="true" /> : null}
+      {kind !== "loading" && Icon ? <Icon className="mb-0.5 h-[22px] w-[22px] text-ink-tertiary" aria-hidden="true" /> : null}
       {title ? <Heading level={4}>{title}</Heading> : null}
       {description ? <Text as="p" tone="secondary">{description}</Text> : null}
-      {action ? <div className="ui-state-action">{action}</div> : null}
+      {action ? <div className="mt-1.5">{action}</div> : null}
     </div>
   );
 }
@@ -80,5 +110,5 @@ export function ErrorState({ icon = AlertTriangle, title = "Unable to load", ...
 }
 
 export function InlineError({ className, ...props }: HTMLAttributes<HTMLSpanElement>) {
-  return <span className={cx("ui-inline-error", className)} role="alert" {...props} />;
+  return <span className={cx("text-xs text-danger", className)} role="alert" {...props} />;
 }

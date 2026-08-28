@@ -6,6 +6,10 @@ export type WorkPriceRecord={id:string;code:string;name:string;categoryId:string
 export type WorkPriceWrite=Omit<WorkPriceRecord,"createdAt"|"updatedAt"|"deletedAt">;
 export type WorkPriceContext={category:{kind:"PRODUCT"|"WORK";deletedAt:Date|null}|null;unit:{deletedAt:Date|null}|null;vendor:PriceParty|null};
 export interface PricingRepository{
- loadSkuPriceContext(tx:TransactionClient,input:{skuId:string;unitId:string;supplierId:string|null;sourceId:string|null}):Promise<SkuPriceContext|null>;createSkuPrice(tx:TransactionClient,input:SkuPriceWrite):Promise<SkuPriceRecord>;updateSkuPrice(tx:TransactionClient,id:string,input:Omit<SkuPriceWrite,"id"|"skuId">):Promise<SkuPriceRecord>;deleteSkuPrice(tx:TransactionClient,id:string):Promise<void>;
+ /** `existing` is the current row for the (skuId, supplierId) pair being written. */
+ loadSkuPriceContext(tx:TransactionClient,input:{skuId:string;unitId:string;supplierId:string|null;sourceId:string|null}):Promise<SkuPriceContext|null>;
+ /** All current prices of one SKU, deterministically ordered (NULL supplier first, then id). */
+ listSkuPrices(tx:TransactionClient,skuId:string):Promise<SkuPriceRecord[]>;
+ createSkuPrice(tx:TransactionClient,input:SkuPriceWrite):Promise<SkuPriceRecord>;updateSkuPrice(tx:TransactionClient,id:string,input:Omit<SkuPriceWrite,"id"|"skuId">):Promise<SkuPriceRecord>;deleteSkuPrice(tx:TransactionClient,id:string):Promise<void>;
  listWorkPrices(tx:TransactionClient,includeDeleted:boolean):Promise<WorkPriceRecord[]>;findWorkPrice(tx:TransactionClient,id:string):Promise<WorkPriceRecord|null>;findLiveWorkCode(tx:TransactionClient,code:string,excludeId?:string):Promise<WorkPriceRecord|null>;loadWorkContext(tx:TransactionClient,input:{categoryId:string;unitId:string;vendorId:string|null}):Promise<WorkPriceContext>;createWorkPrice(tx:TransactionClient,input:WorkPriceWrite):Promise<WorkPriceRecord>;updateWorkPrice(tx:TransactionClient,id:string,input:Omit<WorkPriceWrite,"id"|"code">):Promise<WorkPriceRecord>;setWorkDeletedAt(tx:TransactionClient,id:string,value:Date|null):Promise<WorkPriceRecord>;
 }

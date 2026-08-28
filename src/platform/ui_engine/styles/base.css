@@ -1,0 +1,31 @@
+/*
+ * Engine base layer. Only genuinely global concerns live here: the document
+ * ground, the shared focus rule, and the reduced-motion contract. Everything
+ * component-shaped is a Tailwind utility on the component itself.
+ */
+@layer base {
+  body {
+    margin: 0;
+    background: var(--ui-canvas);
+    color: var(--ui-text-primary);
+    font-family: var(--font-inter), sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ui-border-focus);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

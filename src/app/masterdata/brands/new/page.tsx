@@ -5,6 +5,7 @@ import { categoryService, partyService } from "@/apps/masterdata/infrastructure/
 import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 import {
   Button,
+  buttonClasses,
   Checkbox,
   Field,
   FormActions,
@@ -64,7 +65,7 @@ export default async function NewBrandPage() {
         </FormSection>
         <FormActions>
           <Button type="submit" variant="primary" disabled={categories.length === 0}>Create brand</Button>
-          <Link href="/masterdata/brands" className="ui-button" data-variant="secondary" data-size="md"><span>Cancel</span></Link>
+          <Link href="/masterdata/brands" className={buttonClasses("secondary")}>Cancel</Link>
         </FormActions>
       </form>
     </PageShell>

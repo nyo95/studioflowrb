@@ -64,18 +64,23 @@ export function InlineEdit({
 
   return (
     <div
-      className={cx("ui-inline-edit", className)}
+      className={cx("grid min-w-0 gap-1", pending && "opacity-70", className)}
       data-editing={active || undefined}
       data-pending={pending || undefined}
       onKeyDown={handleKeyDown}
     >
       {active ? (
-        <div className="ui-inline-edit-editor">
+        <div className="flex items-center gap-1.5 [&>input]:min-w-[120px]">
           {editor}
           {pending ? <Spinner label="Saving" /> : null}
         </div>
       ) : (
-        <button type="button" className="ui-inline-edit-value" aria-label={editLabel} onClick={() => setEditing(true)}>
+        <button
+          type="button"
+          className="w-fit min-w-8 max-w-full cursor-pointer rounded-action border border-transparent bg-transparent px-[5px] py-[3px] [text-align:inherit] text-inherit hover:border-line hover:bg-surface-muted"
+          aria-label={editLabel}
+          onClick={() => setEditing(true)}
+        >
           {value}
         </button>
       )}
