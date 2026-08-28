@@ -1,6 +1,6 @@
 # 00 — Software SSOT / Constitution
 
-Status: DRAFT — becomes authoritative after owner approval.
+Status: ACTIVE — owner designated this rebuild as the future implementation home on 2026-08-28.
 
 ## Product shape
 
@@ -32,6 +32,8 @@ Apps
 8. Legacy behavior is migrated only when it still serves the approved product.
 9. Dead code and obsolete documents are removed or archived deliberately.
 10. Every feature must identify domain owner, data owner, permission owner, and lifecycle.
+11. An implemented schema is evidence of current code, not authority to override a newer product decision.
+12. Product migration preserves verified behavior and invariants, not legacy source structure.
 
 ## App boundaries
 
@@ -52,4 +54,6 @@ Owns BQ projects, object/sub-object breakdown, estimator working state, project 
 
 ## Legacy migration rule
 
-Every migrated item is classified as KEEP / MERGE / REWRITE / PURGE / LEGACY before code is copied.
+The current StudioFlow project is a read-only behavioral reference. Every migrated capability is classified as KEEP / MERGE / REWRITE / PURGE / LEGACY / OPEN before implementation. Source files are inspected; business behavior is reimplemented in the rebuild layers. Whole folders and source text are not copied.
+
+See `README.md`, `15-RULE-AUDIT.md`, and `16-LEGACY-MIGRATION-PLAYBOOK.md`.

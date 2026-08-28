@@ -11,7 +11,7 @@
 | SKU/Product | Master Data | StudioFlow, BQ |
 | Category (PRODUCT + WORK) | Master Data | StudioFlow (discovery), BQ (snapshot) |
 | Supplier/Party | Master Data | Master Data, BQ reads |
-| Material price | Master Data | BQ |
+| Material price per SKU × supplier | Master Data | BQ |
 | Labor price | Master Data | BQ |
 | Material+Labor price | Master Data | BQ |
 | Project | StudioFlow | StudioFlow |
@@ -43,7 +43,13 @@ platform -> app
 
 ## Snapshot law
 
-A snapshot copies the minimum fields necessary to preserve business meaning at a point in time. It is immutable by upstream changes unless the user explicitly refreshes/re-resolves it.
+A snapshot copies the minimum fields necessary to preserve business meaning at one acquisition point. Upstream changes never mutate it. If a workflow allows the user to acquire a newer source value, that action creates/reselects a new explicit snapshot; it does not refresh the existing historical snapshot.
+
+For BQ specifically, refresh-all, refresh-selected, drift replacement, and automatic propagation are forbidden.
+
+### Supplier-price ownership
+
+Master Data owns current `SkuPrice` state per `(sku_id, supplier_party_id)`. BQ reads every eligible option through `masterdata/public`, requires explicit estimator selection, and freezes exactly one option into a project line. BQ does not own a preferred supplier rule and never writes the selection back.
 
 ---
 

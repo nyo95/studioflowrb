@@ -22,7 +22,7 @@ Otherwise keep it local.
 `src/shared` is quarantine, not a destination. New production logic should almost never start there.
 
 ## Legacy extraction
-Use only the immutable legacy evidence snapshot at `https://github.com/nyo95/studioflow/commit/548fbd6bd00ef9fd7d53df66a3561a32fbb56944`. Do not treat a local `../studioflow` checkout as authority and do not copy whole folders from any legacy source.
+Use `D:\Misc\ProjectsHUB\studioflow` as the owner-designated read-only behavioral reference. Before citing it, record its branch, commit, and dirty state; distinguish committed evidence from uncommitted evidence. It remains evidence, not authority, and no runtime/build/test dependency may point to it. Do not copy whole folders or source text wholesale.
 For every capability:
 1. identify current behavior
 2. identify business owner
@@ -32,8 +32,12 @@ For every capability:
 6. migrate implementation
 7. remove accidental dependency on legacy structure
 
+The detailed procedure and stop conditions are in `16-LEGACY-MIGRATION-PLAYBOOK.md`.
+
 ## Schema rule
 No Prisma model is added until its ownership is present in `06-DATA-OWNERSHIP.md` and its business purpose exists in the relevant PRD.
 
 ## Documentation rule
 PRDs describe current intended product. Changelog/history should never be mixed into normative PRDs.
+
+Use the evidence labels from `README.md`. When schema/code conflicts with a current PRD, record an implementation gap; do not rewrite the PRD to match the accident.

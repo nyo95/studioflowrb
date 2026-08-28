@@ -1,9 +1,11 @@
 # MASTER_DATA.md — MD-00 Master Data Contract
 
-Status: **LOCKED — owner-approved canonical Master Data contract (2026-08-23)**
+Status: **HISTORICAL IMPLEMENTATION BASELINE — pricing sections superseded 2026-08-28**
 Scope: the minimum product/domain contract required to make MD-01 through MD-09 deterministic.
 
-Authority: this contract specializes `docs/00-SOFTWARE-SSOT.md`, `docs/03-MASTERDATA-PRD.md`, `docs/06-DATA-OWNERSHIP.md`, `docs/07-ENGINEERING-CONVENTIONS.md`, and `CORE.md`. Explicit current owner instructions remain higher authority. Only GitHub commit `548fbd6bd00ef9fd7d53df66a3561a32fbb56944` of `nyo95/studioflow` is canonical legacy evidence; it is never authority, a runtime dependency, or an implementation base.
+> This file explains the implemented MD-01–MD-09 baseline. Its singular-SkuPrice decisions are no longer normative. Current product truth is `docs/03-MASTERDATA-PRD.md`, `docs/apps/masterdata.md`, and RA-01/RA-07 in `docs/15-RULE-AUDIT.md`: one current price per SKU × supplier and a public `prices[]` contract. Do not extend the singular implementation; migrate it explicitly before BQ work.
+
+Authority: explicit current owner instructions and the active PRD/app dossier outrank this historical implementation record. The owner-designated local StudioFlow checkout is read-only evidence; it is never authority, a runtime dependency, or an implementation base.
 
 ## Locked Decisions
 
