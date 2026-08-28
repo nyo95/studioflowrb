@@ -37,6 +37,6 @@ Consumes pricing candidates for material, labor, and material+labor.
 ## MVP question checklist
 Each entity must answer: identity, uniqueness, owner, lifecycle, soft delete, pricing relationship, audit, permission, import/export need.
 
-## Known implementation gap
+## Former implementation gap — resolved 2026-08-28
 
-The current rebuild implements a singular global SKU price and singular public `price`. This is not the final product contract. RA-01 in `15-RULE-AUDIT.md` blocks BQ implementation until the schema, services, workbook, UI, tests, and public DTO converge on supplier-pair pricing and `prices[]`.
+The rebuild previously implemented a singular global SKU price and singular public `price`. Gate B corrected this (migration `20260828000000_master_data_sku_pair_pricing`): the schema, pricing service, workbook import/export, UI, tests, and public DTO now converge on supplier-pair pricing and `prices[]`. BQ implementation may proceed against this contract.

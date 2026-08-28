@@ -129,7 +129,7 @@ The server enforces them. Object lock is an additional invariant, not a substitu
 ## Rebuild state and migration gaps
 
 - `IMPLEMENTED`: only empty BQ architecture folders exist in the rebuild; no BQ product slice is complete.
-- `BLOCKING CONFLICT`: current Master Data public contract returns singular `price`; BQ requires supplier-specific `prices[]` and explicit selection.
+- `BLOCKING CONFLICT` — RESOLVED 2026-08-28: Master Data now returns supplier-specific `prices[]` (Gate B); BQ implementation must require explicit estimator selection from these options.
 - `DECIDED`: snapshots never refresh.
 - `REWRITE`: legacy actions/services/components into the rebuild app layers and UI Engine composition.
 - `PURGE`: new `BqSubObject` features, refresh/drift replacement, automatic supplier choice, duplicated calculations, deep write nesting, drag/drop dependency, and automatic costing extras.

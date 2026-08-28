@@ -1,13 +1,21 @@
 import Link from "next/link";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { skuService, pricingService, unitService, partyService } from "@/apps/masterdata/infrastructure/runtime";
 import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 import { setSkuPriceAction } from "../../actions";
 
 const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
-export default async function SetSkuPricePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function SetSkuPricePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ supplier?: string }>;
+}) {
   const { id } = await params;
+  const { supplier: supplierParam } = await searchParams;
+  const selectedSupplierId = supplierParam ? supplierParam : null;
 
   const [allSkus, units, parties] = await Promise.all([
     skuService.list(CTX, { includeDeleted: false }),
@@ -18,7 +26,12 @@ export default async function SetSkuPricePage({ params }: { params: Promise<{ id
   const sku = allSkus.find((s) => s.id === id);
   if (!sku) notFound();
 
-  const existingPrice = await pricingService.getSkuPrice(CTX, id);
+  const [currentPrices, allParties] = await Promise.all([
+    pricingService.getSkuPrices(CTX, id),
+    partyService.list(CTX),
+  ]);
+  const supplierNamesById = new Map(allParties.map((p) => [p.id, p.name]));
+  const existingPrice = currentPrices.find((p) => p.supplierPartyId === selectedSupplierId) ?? null;
 
   // Price unit must match sku's purchaseUnitId or baseUnitId
   const priceUnitId = sku.purchaseUnitId ?? sku.baseUnitId;
@@ -27,12 +40,6 @@ export default async function SetSkuPricePage({ params }: { params: Promise<{ id
   const suppliers = parties.filter(
     (p) => !p.deletedAt && p.roles.includes("MATERIAL_SUPPLIER")
   );
-
-  async function handleSet(formData: FormData) {
-    "use server";
-    await setSkuPriceAction(formData);
-    redirect("/masterdata/pricing?tab=sku");
-  }
 
   return (
     <div className="ui-layout-page">
@@ -43,15 +50,30 @@ export default async function SetSkuPricePage({ params }: { params: Promise<{ id
         </div>
       </div>
 
-      {existingPrice && (
+      {currentPrices.length > 0 && (
         <div className="ui-notice" data-tone="info" style={{ marginBottom: "var(--space-4)" }}>
-          <p className="ui-text">
-            Current price: <strong>{existingPrice.currency} {existingPrice.amount}</strong> per {priceUnit?.label ?? priceUnitId}
+          <p className="ui-text" data-weight="medium">Current prices for this SKU</p>
+          {currentPrices.map((price) => (
+            <p key={price.id} className="ui-text" data-tone="secondary">
+              {price.supplierPartyId
+                ? supplierNamesById.get(price.supplierPartyId) ?? price.supplierPartyId
+                : "No supplier"}
+              : <strong>{price.currency} {price.amount}</strong> per {priceUnit?.label ?? priceUnitId}
+              {!(price.supplierPartyId === selectedSupplierId) && (
+                <>
+                  {" · "}
+                  <Link href={`/masterdata/pricing/sku/${sku.id}?supplier=${price.supplierPartyId ?? ""}`}>Update</Link>
+                </>
+              )}
+            </p>
+          ))}
+          <p className="ui-text" data-tone="secondary" data-size="sm">
+            Each supplier holds its own current price. Saving with the same supplier updates that pair in place.
           </p>
         </div>
       )}
 
-      <form action={handleSet} className="ui-form">
+      <form action={setSkuPriceAction} className="ui-form">
         <input type="hidden" name="skuId" value={sku.id} />
         <input type="hidden" name="unitId" value={priceUnitId} />
 
@@ -61,7 +83,7 @@ export default async function SetSkuPricePage({ params }: { params: Promise<{ id
             {priceUnit ? `${priceUnit.label} (${priceUnit.code})` : priceUnitId}
           </p>
           <span className="ui-text" data-size="sm" data-tone="secondary">
-            Price unit is derived from the SKU's purchase or base unit. Change SKU units to change this.
+            Price unit is derived from the SKU&apos;s purchase or base unit. Change SKU units to change this.
           </span>
         </div>
 
@@ -95,12 +117,15 @@ export default async function SetSkuPricePage({ params }: { params: Promise<{ id
 
         <div className="ui-form-field">
           <label className="ui-label" htmlFor="supplierPartyId">Supplier (optional)</label>
-          <select id="supplierPartyId" name="supplierPartyId" className="ui-select" defaultValue={existingPrice?.supplierPartyId ?? ""}>
+          <select id="supplierPartyId" name="supplierPartyId" className="ui-select" defaultValue={selectedSupplierId ?? ""}>
             <option value="">— none —</option>
             {suppliers.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
+          <span className="ui-text" data-size="sm" data-tone="secondary">
+            One current price is kept per supplier. Choosing a different supplier adds a separate price.
+          </span>
         </div>
 
         <div className="ui-form-field">

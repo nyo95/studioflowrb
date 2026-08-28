@@ -493,8 +493,8 @@ model BrandCategory {
 /// see migration (`Sku_brand_slug_live_uniq`, `Sku_slug_nobrand_live_uniq`,
 /// `Sku_brand_code_live_uniq`, `Sku_code_nobrand_live_uniq`).
 ///
-/// ACTIVE readiness (live PRODUCT Category + live base Unit + exactly one
-/// canonical SkuPrice + live Brand when brand_id present) is enforced at the
+/// ACTIVE readiness (live PRODUCT Category + live base Unit + at least one
+/// current SkuPrice + live Brand when brand_id present) is enforced at the
 /// application layer.
 model Sku {
   id String @id @default(uuid())
@@ -549,7 +549,7 @@ model Sku {
   deleted_at DateTime?
 
   media SkuMedia[]
-  price SkuPrice?
+  prices SkuPrice[]
 
   @@index([brand_id])
   @@index([category_id])
@@ -580,25 +580,36 @@ model SkuMedia {
 // MASTER DATA — Pricing (current canonical values)
 // ============================================================================
 
-/// The single current canonical commercial price for one exact SKU.
-/// One-to-one by unique sku_id; updated in place preserving row identity.
+/// One current canonical commercial price for one exact SKU × supplier pair.
+/// A SKU may hold several current supplier prices; every pair is updated in
+/// place preserving row identity.
 ///
 /// There is deliberately NO is_current/valid_from/valid_to, no temporal rows,
-/// no supplier partitions, and no preferred/cheapest/latest selection logic.
-/// Change history lives in platform AuditEvent; BQ snapshots own project-time
-/// truth (MD-00 §8).
+/// no preferred/cheapest/latest selection logic, and no automatic fallback
+/// between supplier prices. Change history lives in platform AuditEvent;
+/// BQ snapshots own project-time truth (MD-00 §8).
+///
+/// Race-safe pair uniqueness is enforced by partial expression indexes in SQL
+/// (plain UNIQUE treats NULLs as distinct, so the NULL supplier partition
+/// needs its own partial index) — see migration
+/// (`SkuPrice_pair_supplier_uniq`, `SkuPrice_pair_nosupplier_uniq`).
+/// NULL supplier means "no specific supplier provenance" and is a deterministic
+/// pair member: at most one NULL-supplier row per SKU.
 ///
 /// Blank price means "no row yet" for DRAFT and never becomes zero; explicit
 /// zero is valid; negative is invalid (application-enforced).
 model SkuPrice {
   id String @id @default(uuid())
 
-  /// At most one canonical price row per SKU (race-safe simple unique).
-  sku_id String @unique
+  /// Part of the (sku_id, supplier_party_id) pair identity. Pair uniqueness
+  /// including the NULL-supplier partition is enforced by the SQL partial
+  /// unique indexes documented above.
+  sku_id String
   sku    Sku    @relation(fields: [sku_id], references: [id], onDelete: Cascade)
 
-  /// Optional supplier provenance. NULL means no specific supplier provenance,
-  /// not a separate supplier partition.
+  /// Optional supplier provenance and part of the pair identity. NULL means
+  /// no specific supplier provenance (never a legacy row to invent a supplier
+  /// for); at most one NULL-supplier row per SKU.
   supplier_party_id String?
   supplier          Party?  @relation("SkuPriceSupplier", fields: [supplier_party_id], references: [id], onDelete: SetNull)
 
@@ -625,6 +636,7 @@ model SkuPrice {
   updated_by_user_id String?
   updated_by_label   String
 
+  @@index([sku_id])
   @@index([supplier_party_id])
   @@schema("master_data")
 }

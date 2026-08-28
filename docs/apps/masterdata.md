@@ -137,7 +137,7 @@ The rebuild currently has a granular `masterdata.*` vocabulary. Before identity 
 ## Rebuild state and migration gaps
 
 - `IMPLEMENTED`: Party/Brand/Category/SKU/price/work-price foundations, UI Engine surfaces, audit, workbook, and public reads exist.
-- `CONFLICTED`: current rebuild schema and public DTO enforce one global `SkuPrice` per SKU. This must migrate to one price per SKU × supplier and `prices[]` before BQ implementation.
+- `IMPLEMENTED` (Gate B, 2026-08-28): current price per SKU × supplier pair with race-safe pair uniqueness including a deterministic NULL-supplier partition; pricing UI, workbook import/export, and the public `prices[]` DTO converge on this contract. No preferred/cheapest/latest fallback exists; BQ must select one option explicitly.
 - `OPEN`: production identity and persisted grants.
 - `OPEN`: Samples UI/application slice.
 - `PURGE`: temporal price offers, inferred vendor/Brand equivalence, legacy v1 candidate tables, dummy samples, and implicit project-to-master promotion.

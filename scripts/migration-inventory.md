@@ -26,7 +26,7 @@ Use only these decisions:
 | `SkuCategory` query logic in `master-data-service.ts` | REWRITE | Use `Sku.category` (direct relation) | SkuCategory junction removed; single join now |
 | `ProjectProductRequest.vendor_quoted_price` upsert to MD | PURGE | — | Ownership violation: Gate #1 resolved. StudioFlow cannot write to MD pricing |
 | `BqProject` standalone (no FK to StudioFlow Project) | KEEP | `prisma/schema.prisma` → `bq.BqProject` | Gate #3 resolved: BQ and StudioFlow projects are separate domains, no FK |
-| Singular rebuild `Sku.price` / unique `SkuPrice.sku_id` | REWRITE | Master Data schema/application/public/UI | Final law is current price per SKU × supplier pair; expose eligible `prices[]`. See RA-01. |
+| Singular rebuild `Sku.price` / unique `SkuPrice.sku_id` | REWRITE — RESOLVED 2026-08-28 | Master Data schema/application/public/UI | Final law is current price per SKU × supplier pair; expose eligible `prices[]`. Implemented by migration `20260828000000_master_data_sku_pair_pricing` (pair partial unique indexes, NULL supplier kept deterministic, no supplier invented for legacy rows) and the `prices[]` public DTO. See RA-01 (resolved) and `docs/09-EXECUTION-PLAN.md` Gate B. |
 | Temporal supplier offers / cheapest/latest/preferred fallback | PURGE | — | Current pair rows hold truth; audit holds change history; consumers select explicitly. |
 | BQ snapshot refresh/drift replacement | PURGE | — | Existing snapshots never refresh. A deliberate new acquisition creates a new snapshot. |
 | `BqSubObject` as a new feature foundation | LEGACY + REWRITE | BQ Works with L3 material/service lines | Existing data may need compatibility migration, but new hierarchy is L0/L1 grouping → L2 Works → L3 lines. |

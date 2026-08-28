@@ -15,15 +15,15 @@ Exit: documentation links/checks pass and every known contradiction has an owner
 
 ## Gate B — Master Data pricing correction
 
-This is the first code migration because BQ depends on it.
+Status: COMPLETED 2026-08-28 (same date as plan; see `docs/08-CURRENT-STATUS.md` for evidence).
 
-1. Write regression tests for multiple supplier prices, null-supplier pair uniqueness, unit readiness, audit, workbook round-trip, and `prices[]` public DTO.
-2. Design and rehearse the Prisma migration from singular pricing to pair pricing without inventing supplier provenance.
-3. Update domain/application/infrastructure/public/UI in one bounded vertical correction.
-4. Run pure and disposable-PostgreSQL suites, boundary checks, build, and pricing UI checks.
-5. Reconcile any existing price rows and produce a migration exception report.
+1. ~~Write regression tests for multiple supplier prices, null-supplier pair uniqueness, unit readiness, audit, workbook round-trip, and `prices[]` public DTO.~~ Done: pure tests (`pricing-service`, `masterdata-public`, `import-export`, `sku-rules`, `sku-service`, `xlsx-roundtrip`) plus disposable-PostgreSQL tests (`schema-contract` pair uniqueness/indexes, `workbook-applier` full-pair round-trip).
+2. ~~Design and rehearse the Prisma migration from singular pricing to pair pricing without inventing supplier provenance.~~ Done: `20260828000000_master_data_sku_pair_pricing` drops `SkuPrice_sku_id_key` and adds partial unique indexes `SkuPrice_pair_supplier_uniq` and `SkuPrice_pair_nosupplier_uniq`; existing rows (including NULL suppliers) migrate unchanged; applied and verified on a clean disposable database.
+3. ~~Update domain/application/infrastructure/public/UI in one bounded vertical correction.~~ Done: pair-aware pricing service/repositories, SKU relation state, workbook validation/applier/export, pricing list + form UI, and the `prices[]` public DTO.
+4. ~~Run pure and disposable-PostgreSQL suites, boundary checks, build, and pricing UI checks.~~ Done: 240/240 tests with the disposable database, 188 pass / 52 fail-closed cancellations without it; `npm run check` and `npm run build` pass; targeted pricing UI verified against the disposable database.
+5. ~~Reconcile any existing price rows and produce a migration exception report.~~ Done: because the previous schema enforced one row per SKU, no pair conflicts can exist in migrated data; the migration changes indexes only, keeps every row's supplier exactly as stored (NULL stays NULL, no supplier invented), and therefore produces zero rejected rows by construction.
 
-Exit: Master Data exposes all eligible current supplier options and no singular-price assumption remains in active code/tests/docs.
+Exit: Master Data exposes all eligible current supplier options and no singular-price assumption remains in active code/tests/docs. (Verified 2026-08-28.)
 
 ## Gate C — Test isolation and production identity
 

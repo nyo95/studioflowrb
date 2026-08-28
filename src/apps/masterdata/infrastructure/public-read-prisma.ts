@@ -6,27 +6,32 @@ const materialInclude = {
   brand: true,
   category: true,
   base_unit: true,
-  price: { include: { unit: true, supplier: { include: { roles: true } }, source_link: true } },
+  prices: {
+    include: { unit: true, supplier: { include: { roles: true } }, source_link: true },
+    orderBy: [{ supplier_party_id: "asc" }, { id: "asc" }],
+  },
 } satisfies Prisma.SkuInclude;
 const workInclude = { category: true, unit: true, vendor: { include: { roles: true } } } satisfies Prisma.WorkPriceInclude;
 type MaterialRow = Prisma.SkuGetPayload<{ include: typeof materialInclude }>;
 type WorkRow = Prisma.WorkPriceGetPayload<{ include: typeof workInclude }>;
 
 function mapMaterial(row: MaterialRow): MaterialReadRecord {
-  const supplierValid = !row.price?.supplier || (row.price.supplier.deleted_at === null && row.price.supplier.roles.some(({ role }) => role === "MATERIAL_SUPPLIER"));
-  const sourceValid = !row.price?.source_link || row.brand_id !== null && row.price.source_link.brand_id === row.brand_id;
   return {
     id: row.id, code: row.code, name: row.name, kind: row.kind, updatedAt: row.updated_at,
     brand: row.brand ? { id: row.brand.id, name: row.brand.name } : null,
     category: { id: row.category!.id, name: row.category!.name, path: row.category!.path },
     baseUnit: { id: row.base_unit.id, code: row.base_unit.code, label: row.base_unit.label },
-    price: row.price ? {
-      id: row.price.id, amount: row.price.amount.toFixed(), currency: row.price.currency,
-      unitCode: row.price.unit.code, supplierName: row.price.supplier?.name ?? null,
-      sourceUrl: row.price.source_link?.url ?? null, updatedByUserId: row.price.updated_by_user_id,
-      updatedByLabel: row.price.updated_by_label, updatedAt: row.price.updated_at,
-      provenanceValid: supplierValid && sourceValid,
-    } : null,
+    prices: row.prices.map((price) => {
+      const supplierValid = !price.supplier || (price.supplier.deleted_at === null && price.supplier.roles.some(({ role }) => role === "MATERIAL_SUPPLIER"));
+      const sourceValid = !price.source_link || row.brand_id !== null && price.source_link.brand_id === row.brand_id;
+      return {
+        id: price.id, amount: price.amount.toFixed(), currency: price.currency,
+        unitCode: price.unit.code, supplierPartyId: price.supplier_party_id, supplierName: price.supplier?.name ?? null,
+        sourceUrl: price.source_link?.url ?? null, updatedByUserId: price.updated_by_user_id,
+        updatedByLabel: price.updated_by_label, updatedAt: price.updated_at,
+        provenanceValid: supplierValid && sourceValid,
+      };
+    }),
   };
 }
 

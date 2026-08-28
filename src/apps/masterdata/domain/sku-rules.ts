@@ -14,8 +14,9 @@ export type SkuRelationState = {
   baseUnit: { id: string; deletedAt: Date | null } | null;
   purchaseUnit: { id: string; deletedAt: Date | null } | null;
   dimensionUnit: { id: string; deletedAt: Date | null } | null;
-  hasCanonicalPrice: boolean;
-  canonicalPriceUnitId: string | null;
+  /// Current price rows of this SKU, one per supplier pair. Every row must
+  /// stay aligned with the SKU's required price Unit.
+  skuPrices: readonly { unitId: string }[];
 };
 
 export function assertSkuKind(value: string): asserts value is SkuKind { if (!SKU_KINDS.includes(value as SkuKind)) throw new AppError("VALIDATION", "SKU_KIND_INVALID", "SKU kind must be Material, Furniture, or Fixture."); }
@@ -35,10 +36,10 @@ export function assertSkuRelations(input: { status: SkuStatus; baseUnitId: strin
   if (input.categoryId && (!r.category || r.category.id !== input.categoryId || r.category.deletedAt || r.category.kind !== "PRODUCT")) throw new AppError("VALIDATION", "SKU_CATEGORY_INVALID", "SKU Category must be a live Product Category.");
   if (input.purchaseUnitId && input.purchaseUnitId !== input.baseUnitId && input.conversion === null) throw new AppError("VALIDATION", "SKU_CONVERSION_REQUIRED", "Conversion is required when purchase and base Units differ.");
   const requiredPriceUnit = input.purchaseUnitId ?? input.baseUnitId;
-  if (r.canonicalPriceUnitId && r.canonicalPriceUnitId !== requiredPriceUnit) throw new AppError("CONFLICT", "SKU_PRICE_UNIT_MISMATCH", "Update the canonical price Unit atomically before changing SKU Units.");
+  if (r.skuPrices.some((price) => price.unitId !== requiredPriceUnit)) throw new AppError("CONFLICT", "SKU_PRICE_UNIT_MISMATCH", "Update every SKU price Unit atomically before changing SKU Units.");
   if (input.status === "ACTIVE") {
     if (!input.categoryId) throw new AppError("INVARIANT", "SKU_ACTIVE_CATEGORY_REQUIRED", "An active SKU requires a live Product Category.");
-    if (!r.hasCanonicalPrice) throw new AppError("INVARIANT", "SKU_ACTIVE_PRICE_REQUIRED", "An active SKU requires one canonical price.");
+    if (r.skuPrices.length === 0) throw new AppError("INVARIANT", "SKU_ACTIVE_PRICE_REQUIRED", "An active SKU requires at least one current supplier price.");
   }
 }
 

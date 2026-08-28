@@ -178,15 +178,23 @@ export function createWorkbookApplier(services: Services): WorkbookApplier {
       }
 
       const skuMedia = rowsBy(data.sheets.SkuMedia, "sku_id");
-      const skuPriceBySku = new Map(data.sheets.SkuPrice.map((row) => [text(row, "sku_id"), row]));
-      const appliedPriceSkuIds = new Set<string>();
+      const skuPricesBySku = new Map<string, WorkbookRow[]>();
+      for (const row of data.sheets.SkuPrice) {
+        const skuId = text(row, "sku_id");
+        const bucket = skuPricesBySku.get(skuId) ?? [];
+        bucket.push(row);
+        skuPricesBySku.set(skuId, bucket);
+      }
+      const appliedPricePairKeys = new Set<string>();
+      const pricePairKey = (skuId: string, supplierPartyId: string | null) => `${skuId}\u0000${supplierPartyId ?? ""}`;
       const applySkuPrice = async (row: WorkbookRow, coordinatedSku?: { canonicalUnitId: string; brandId: string | null }) => {
         const skuId = text(row, "sku_id");
-        const existing = await tx.skuPrice.findUnique({ where: { sku_id: skuId }, select: { id: true } });
+        const supplierPartyId = optional(row, "supplier_party_id");
+        const existing = await tx.skuPrice.findFirst({ where: { sku_id: skuId, supplier_party_id: supplierPartyId }, select: { id: true } });
         const requestedId = optional(row, "id");
-        if (existing && requestedId && existing.id !== requestedId) throw new AppError("CONFLICT", "WORKBOOK_SKU_PRICE_ID_MISMATCH", "SkuPrice ID does not match the canonical row for this SKU.");
-        await services.pricing.setSkuPrice(ctx, { requestedId: requestedId ?? undefined, skuId, supplierPartyId: optional(row, "supplier_party_id"), amount: text(row, "amount"), currency: text(row, "currency"), unitId: text(row, "unit_id"), sourceLinkId: optional(row, "source_link_id"), notes: optional(row, "notes"), coordinatedSku });
-        appliedPriceSkuIds.add(skuId);
+        if (existing && requestedId && existing.id !== requestedId) throw new AppError("CONFLICT", "WORKBOOK_SKU_PRICE_ID_MISMATCH", "SkuPrice ID does not match the current row for this SKU and supplier pair.");
+        await services.pricing.setSkuPrice(ctx, { requestedId: requestedId ?? undefined, skuId, supplierPartyId, amount: text(row, "amount"), currency: text(row, "currency"), unitId: text(row, "unit_id"), sourceLinkId: optional(row, "source_link_id"), notes: optional(row, "notes"), coordinatedSku });
+        appliedPricePairKeys.add(pricePairKey(skuId, supplierPartyId));
       };
       const desiredStatuses = new Map<string, string>();
       for (const row of data.sheets.Sku) {
@@ -203,8 +211,7 @@ export function createWorkbookApplier(services: Services): WorkbookApplier {
           const current = await tx.sku.findUnique({ where: { id }, select: { base_unit_id: true, purchase_unit_id: true } });
           const intendedUnit = input.purchaseUnitId ?? input.baseUnitId;
           if (current && (current.purchase_unit_id ?? current.base_unit_id) !== intendedUnit) {
-            const priceRow = skuPriceBySku.get(id);
-            if (priceRow) await applySkuPrice(priceRow, { canonicalUnitId: intendedUnit, brandId: input.brandId });
+            for (const priceRow of skuPricesBySku.get(id) ?? []) await applySkuPrice(priceRow, { canonicalUnitId: intendedUnit, brandId: input.brandId });
           }
         }
         const saved = id && await exists(tx, "sku", id) ? await services.skus.update(ctx, { id, ...input }) : await services.skus.create(ctx, input);
@@ -212,7 +219,7 @@ export function createWorkbookApplier(services: Services): WorkbookApplier {
         changed++;
       }
       for (const row of data.sheets.SkuPrice) {
-        if (!appliedPriceSkuIds.has(text(row, "sku_id"))) await applySkuPrice(row);
+        if (!appliedPricePairKeys.has(pricePairKey(text(row, "sku_id"), optional(row, "supplier_party_id")))) await applySkuPrice(row);
         changed++;
       }
       for (const row of data.sheets.WorkPrice) {

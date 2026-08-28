@@ -72,7 +72,7 @@ export interface WorkbookApplier {
 export function validateWorkbookStructure(data: WorkbookData, versions: Readonly<Record<string, string | null>> = {}): WorkbookIssue[] {
   const issues: WorkbookIssue[] = [];
   if (data.manifest.formatVersion !== MASTERDATA_WORKBOOK_VERSION) issues.push({ sheet: "Manifest", field: "format_version", code: "UNKNOWN_VERSION", message: "Unsupported workbook format version." });
-  const seenPriceSkus = new Set<string>();
+  const seenPricePairs = new Set<string>();
   for (const sheet of MASTERDATA_WORKBOOK_SHEETS) {
     const allowed = new Set(WORKBOOK_COLUMNS[sheet]);
     data.sheets[sheet].forEach((row, index) => {
@@ -80,15 +80,19 @@ export function validateWorkbookStructure(data: WorkbookData, versions: Readonly
       const id = typeof row.id === "string" ? row.id : null;
       const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       if (id && !uuid.test(id)) issues.push({ sheet, row: index + 2, field: "id", code: "INVALID_ID", message: "IDs must be valid UUIDs." });
-      for (const [field, value] of Object.entries(row)) if (field.endsWith("_id") && typeof value === "string" && value && !uuid.test(value)) issues.push({ sheet, row: index + 2, field, code: "INVALID_REFERENCE_ID", message: "Reference IDs must be valid UUIDs." });
+      for (const [field, value] of Object.entries(row)) if (field.endsWith("_id") && field !== "updated_by_user_id" && typeof value === "string" && value && !uuid.test(value)) issues.push({ sheet, row: index + 2, field: "id", code: "INVALID_REFERENCE_ID", message: "Reference IDs must be valid UUIDs." });
       const updatedAt = typeof row.updated_at === "string" ? row.updated_at : null;
       if (id && Object.hasOwn(versions, `${sheet}:${id}`) && versions[`${sheet}:${id}`] !== updatedAt) issues.push({ sheet, row: index + 2, field: "updated_at", code: "STALE_ROW", message: "The database row changed after this workbook was exported." });
       if (id && updatedAt && !Object.hasOwn(versions, `${sheet}:${id}`)) issues.push({ sheet, row: index + 2, field: "updated_at", code: "STALE_ROW", message: "The referenced database row no longer exists." });
       if (sheet === "SkuPrice") {
         const skuId = typeof row.sku_id === "string" ? row.sku_id : "";
         if (!skuId) issues.push({ sheet, row: index + 2, field: "sku_id", code: "REQUIRED", message: "SKU ID is required." });
-        else if (seenPriceSkus.has(skuId)) issues.push({ sheet, row: index + 2, field: "sku_id", code: "DUPLICATE_SKU_PRICE", message: "Only one canonical price row is allowed per SKU." });
-        else seenPriceSkus.add(skuId);
+        else {
+          const supplierId = typeof row.supplier_party_id === "string" ? row.supplier_party_id : "";
+          const pairKey = `${skuId}\u0000${supplierId}`;
+          if (seenPricePairs.has(pairKey)) issues.push({ sheet, row: index + 2, field: "sku_id", code: "DUPLICATE_SKU_PRICE", message: "Only one current price row is allowed per SKU and supplier pair." });
+          else seenPricePairs.add(pairKey);
+        }
       }
     });
   }
