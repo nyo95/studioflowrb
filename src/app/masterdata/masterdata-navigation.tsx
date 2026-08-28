@@ -22,10 +22,7 @@ export function MasterDataNavigation() {
       {items.map(({ href, label, icon: Icon, matches }) => (
         <NavItem key={href} href={href} icon={<Icon size={16} />} active={isCurrent(pathname, matches)}>{label}</NavItem>
       ))}
-      <button className="ui-nav-item" type="button" disabled title="Sample ownership is not yet approved">
-        <span className="ui-nav-icon" aria-hidden="true"><FlaskConical size={16} /></span>
-        <span className="ui-nav-label">Samples</span>
-      </button>
+      <NavItem disabled icon={<FlaskConical size={16} />} title="Sample ownership is not yet approved">Samples</NavItem>
     </>
   );
 }

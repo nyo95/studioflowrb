@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { PageHeader, PageShell, SectionCard, Text } from "@/platform/ui_engine";
+import { PageHeader, PageShell, SectionCard, Text, buttonClasses } from "@/platform/ui_engine";
 
 export default function HomePage() {
   return (
@@ -12,7 +12,7 @@ export default function HomePage() {
       />
       <SectionCard>
         <Text as="p" tone="secondary">Review the shared interface foundations before product work begins.</Text>
-        <Link className="ui-button ui-home-entry" data-size="md" data-variant="primary" href="/ui-engine">
+        <Link className={buttonClasses("primary") + " mt-4"} href="/ui-engine">
           <span>Open UI Engine</span>
         </Link>
       </SectionCard>

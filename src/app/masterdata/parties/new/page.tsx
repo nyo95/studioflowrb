@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { PARTY_ROLES, PARTY_TYPES } from "@/apps/masterdata/domain/party-rules";
 import {
   Button,
+  buttonClasses,
   Checkbox,
   Field,
   FormActions,
@@ -61,7 +62,7 @@ export default async function NewPartyPage() {
         </FormSection>
         <FormActions>
           <Button type="submit" variant="primary">Create party</Button>
-          <Link href="/masterdata/parties" className="ui-button" data-variant="secondary" data-size="md"><span>Cancel</span></Link>
+          <Link href="/masterdata/parties" className={buttonClasses("secondary")}>Cancel</Link>
         </FormActions>
       </form>
     </PageShell>

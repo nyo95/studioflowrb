@@ -34,12 +34,18 @@ export function RowActionMenu({
         />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content className="ui-menu" sideOffset={5} align="end">
+        <DropdownMenu.Content
+          className="z-[65] min-w-[190px] overflow-hidden rounded-control border border-line bg-surface-raised shadow-elevated p-[5px]"
+          sideOffset={5}
+          align="end"
+        >
           {items.map((item) => (
             <Fragment key={item.label}>
-              {item.separatorBefore ? <DropdownMenu.Separator className="ui-menu-separator" /> : null}
+              {item.separatorBefore ? (
+                <DropdownMenu.Separator className="-mx-px my-1 h-px bg-line" />
+              ) : null}
               <DropdownMenu.Item
-                className="ui-menu-item"
+                className="flex min-h-8 cursor-pointer items-center gap-2 rounded-action px-2 py-1.5 text-[0.8125rem] text-ink outline-0 [&_svg]:h-[15px] [&_svg]:w-[15px] [&_svg]:text-ink-tertiary data-[danger=true]:text-danger data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-surface-muted"
                 data-danger={item.danger || undefined}
                 disabled={item.disabled}
                 onSelect={item.onSelect}
@@ -68,9 +74,17 @@ export function FilterBar({
   clearLabel?: string;
 }) {
   return (
-    <div className={cx("ui-filter-bar", className)} data-active={active || undefined} {...props}>
-      <Filter aria-hidden="true" />
-      <div className="ui-filter-content">{children}</div>
+    <div
+      className={cx(
+        "inline-flex min-h-(--ui-control-height-md) items-center gap-2 rounded-control border bg-surface py-[3px] pl-2.5 pr-1",
+        active ? "border-line-strong" : "border-line",
+        className,
+      )}
+      data-active={active || undefined}
+      {...props}
+    >
+      <Filter aria-hidden="true" className="h-[15px] w-[15px] text-ink-tertiary" />
+      <div className="flex flex-wrap items-center gap-1.5">{children}</div>
       {active && onClear ? (
         <Button
           size="sm"
@@ -99,9 +113,20 @@ export function SelectionBar({
   variant?: "bar" | "inline";
 }) {
   return (
-    <div className={cx("ui-selection-bar", className)} data-variant={variant} role="status" {...props}>
+    <div
+      className={cx(
+        "flex items-center justify-between rounded-control",
+        variant === "inline"
+          ? "min-h-[34px] gap-2 border border-line bg-surface-muted py-0 pl-2.5 pr-[3px] [&>strong]:whitespace-nowrap [&>strong]:text-xs"
+          : "min-h-[44px] gap-3 border border-line-strong bg-surface-muted py-1.5 pl-3 pr-2",
+        className,
+      )}
+      data-variant={variant}
+      role="status"
+      {...props}
+    >
       <strong>{label ? label(count) : `${count} selected`}</strong>
-      <div className="ui-selection-actions">{children}</div>
+      <div className="flex items-center gap-1.5">{children}</div>
     </div>
   );
 }
@@ -113,7 +138,7 @@ export function ReorderHandle({
 }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & { label?: string }) {
   return (
     <IconButton
-      className={cx("ui-reorder-handle", className)}
+      className={cx("cursor-grab text-ink-tertiary active:cursor-grabbing", className)}
       size="sm"
       variant="ghost"
       label={label}

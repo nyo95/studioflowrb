@@ -10,8 +10,9 @@ import {
 
 import { cx } from "../internal/cx";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
-export type ButtonSize = "sm" | "md";
+import { buttonClasses, BUTTON_BASE_CLASSES, BUTTON_SIZE_CLASSES, BUTTON_VARIANT_CLASSES, type ButtonSize, type ButtonVariant } from "./button-classes";
+
+export type { ButtonVariant, ButtonSize } from "./button-classes";
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
@@ -40,14 +41,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       type={type}
-      className={cx("ui-button", className)}
-      data-variant={variant}
-      data-size={size}
+      className={cx(BUTTON_BASE_CLASSES, BUTTON_SIZE_CLASSES[size], BUTTON_VARIANT_CLASSES[variant], className)}
       aria-busy={pending || undefined}
       disabled={disabled || pending}
       {...props}
     >
-      {pending ? <LoaderCircle className="ui-button-spinner" aria-hidden="true" /> : leadingIcon}
+      {pending ? <LoaderCircle className="animate-ui-spin" aria-hidden="true" /> : leadingIcon}
       <span>{children}</span>
       {!pending && trailingIcon}
     </button>
@@ -60,13 +59,14 @@ export type IconButtonProps = Omit<ButtonProps, "children" | "leadingIcon" | "tr
 };
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  { label, icon, className, title, ...props },
+  { label, icon, className, title, size = "md", ...props },
   ref,
 ) {
   return (
     <Button
       ref={ref}
-      className={cx("ui-icon-button", className)}
+      size={size}
+      className={cx("w-(--ui-control-height-md) !p-0", size === "sm" && "w-(--ui-control-height-sm)", className)}
       aria-label={label}
       title={title ?? label}
       {...props}
@@ -82,7 +82,12 @@ export function Spinner({
   ...props
 }: HTMLAttributes<HTMLSpanElement> & { label?: string }) {
   return (
-    <span className={cx("ui-spinner", className)} role="status" aria-label={label} {...props}>
+    <span
+      className={cx("inline-flex text-ink-secondary [&_svg]:h-[18px] [&_svg]:w-[18px] [&_svg]:animate-ui-spin", className)}
+      role="status"
+      aria-label={label}
+      {...props}
+    >
       <LoaderCircle aria-hidden="true" />
     </span>
   );

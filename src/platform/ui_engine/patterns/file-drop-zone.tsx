@@ -46,9 +46,13 @@ export function FileDropZone({
   };
 
   return (
-    <div className={cx("ui-file-zone-wrap", className)}>
+    <div className={cx("grid gap-2", className)}>
       <div
-        className="ui-file-zone"
+        className={cx(
+          "grid min-h-[150px] place-content-center justify-items-center gap-2 rounded-card border border-dashed border-line-strong bg-canvas p-5 text-center transition-[border-color,background-color] duration-[120ms]",
+          dragging ? "border-line-focus bg-surface-muted" : "border-line-strong bg-canvas",
+          disabled && "opacity-50",
+        )}
         data-dragging={dragging || undefined}
         data-disabled={disabled || undefined}
         onDragEnter={(event) => { event.preventDefault(); if (!disabled) setDragging(true); }}
@@ -56,7 +60,7 @@ export function FileDropZone({
         onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDragging(false); }}
         onDrop={onDrop}
       >
-        <UploadCloud aria-hidden="true" />
+        <UploadCloud aria-hidden="true" className="h-6 w-6 text-ink-tertiary" />
         <div>
           <strong>{label}</strong>
           {description ? <Text as="p" tone="secondary" size="sm">{description}</Text> : null}
@@ -67,7 +71,7 @@ export function FileDropZone({
         <input
           ref={inputRef}
           id={inputId}
-          className="ui-visually-hidden"
+          className="sr-only"
           type="file"
           accept={accept}
           multiple={multiple}
@@ -77,9 +81,12 @@ export function FileDropZone({
         />
       </div>
       {files.length ? (
-        <ul className="ui-file-list">
+        <ul className="m-0 grid list-none gap-1 p-0 [&_svg]:h-[15px] [&_svg]:w-[15px] [&_svg]:text-ink-tertiary">
           {files.map((file) => (
-            <li key={`${file.name}-${file.size}`}>
+            <li
+              key={`${file.name}-${file.size}`}
+              className="grid grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2 rounded-control border border-line-subtle bg-surface px-[9px] py-[7px]"
+            >
               <FileIcon aria-hidden="true" />
               <span>{file.name}</span>
               <Text size="sm" tone="tertiary">{formatFileSize(file.size)}</Text>

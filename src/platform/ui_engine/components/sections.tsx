@@ -4,7 +4,7 @@ import { cx } from "../internal/cx";
 import { Heading, Surface, Text } from "../primitives";
 
 export function SectionCard({ className, ...props }: HTMLAttributes<HTMLElement>) {
-  return <Surface as="section" className={cx("ui-section-card", className)} {...props} />;
+  return <Surface as="section" className={cx("px-(--ui-section-px) py-(--ui-section-py)", className)} {...props} />;
 }
 
 export type PageSectionProps = HTMLAttributes<HTMLElement> & {
@@ -22,14 +22,14 @@ export function PageSection({
   ...props
 }: PageSectionProps) {
   return (
-    <section className={cx("ui-page-section", className)} {...props}>
+    <section className={cx("grid gap-(--ui-section-gap)", className)} {...props}>
       {title || description || action ? (
-        <div className="ui-section-header">
-          <div className="ui-section-heading">
+        <div className="flex items-start justify-between gap-4">
+          <div className="grid gap-[3px]">
             {title ? <Heading level={3}>{title}</Heading> : null}
             {description ? <Text as="p" tone="secondary">{description}</Text> : null}
           </div>
-          {action ? <div className="ui-section-action">{action}</div> : null}
+          {action ? <div className="shrink-0">{action}</div> : null}
         </div>
       ) : null}
       {children}

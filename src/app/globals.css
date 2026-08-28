@@ -1,4 +1,76 @@
 @import "tailwindcss";
 @import "../platform/ui_engine/tokens/tokens.css";
-@import "../platform/ui_engine/styles/engine.css";
+@import "../platform/ui_engine/styles/base.css";
 @import "../platform/ui_engine/styles/print.css";
+
+/*
+ * Tailwind 4 token bridge (UI_ENGINE.md §5). Engine-owned: tokens/tokens.css
+ * stays the single runtime source of token values; this mapping only binds
+ * those variables into Tailwind's theme namespaces so components can use
+ * semantic utilities (bg-surface, text-ink, rounded-card). `@theme inline`
+ * emits var(--ui-*) references directly — no literal value is duplicated.
+ */
+@theme inline {
+  --color-canvas: var(--ui-canvas);
+  --color-surface: var(--ui-surface);
+  --color-surface-raised: var(--ui-surface-raised);
+  --color-surface-muted: var(--ui-surface-muted);
+  --color-line-subtle: var(--ui-border-subtle);
+  --color-line: var(--ui-border-default);
+  --color-line-strong: var(--ui-border-strong);
+  --color-line-focus: var(--ui-border-focus);
+  --color-ink: var(--ui-text-primary);
+  --color-ink-secondary: var(--ui-text-secondary);
+  --color-ink-tertiary: var(--ui-text-tertiary);
+  --color-ink-inverse: var(--ui-text-inverse);
+  --color-action: var(--ui-action-primary);
+  --color-action-hover: var(--ui-action-primary-hover);
+  --color-danger: var(--ui-danger-fg);
+  --color-danger-surface: var(--ui-danger-bg);
+  --color-danger-line: var(--ui-danger-border);
+  --color-success: var(--ui-success-fg);
+  --color-success-surface: var(--ui-success-bg);
+  --color-success-line: var(--ui-success-border);
+  --color-warning: var(--ui-warning-fg);
+  --color-warning-surface: var(--ui-warning-bg);
+  --color-warning-line: var(--ui-warning-border);
+  --color-thead-surface: var(--ui-table-header-bg);
+  --color-thead: var(--ui-table-header-fg);
+
+  --radius-card: var(--ui-radius-card);
+  --radius-control: var(--ui-radius-control);
+  --radius-action: var(--ui-radius-action);
+  --radius-pill: var(--ui-radius-pill);
+
+  --shadow-elevated: var(--ui-shadow-elevated);
+
+  --font-display: var(--font-lora), serif;
+  --font-ui-mono: var(--ui-font-mono);
+
+  --animate-ui-spin: ui-spin 800ms linear infinite;
+  --animate-ui-skeleton: ui-skeleton 1.3s ease-in-out infinite;
+  --animate-ui-fade-in: ui-fade-in 120ms ease-out;
+  --animate-ui-dialog-in: ui-dialog-in 140ms ease-out;
+
+  @keyframes ui-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes ui-skeleton {
+    to {
+      background-position: -200% 0;
+    }
+  }
+  @keyframes ui-fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes ui-dialog-in {
+    from {
+      opacity: 0;
+      transform: translate(-50%, calc(-50% + 8px));
+    }
+  }
+}

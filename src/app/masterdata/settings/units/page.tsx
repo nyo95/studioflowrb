@@ -5,6 +5,8 @@ import { unitService } from "@/apps/masterdata/infrastructure/runtime";
 import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
 import {
   Badge,
+  Button,
+  buttonClasses,
   DataTable,
   EmptyState,
   PageHeader,
@@ -40,15 +42,15 @@ export default async function UnitsPage({
         title="Units"
         description="Controlled unit dictionary — codes and usages are locked after creation."
         actions={
-          <Link href="/masterdata/settings/units/new" className="ui-button" data-variant="primary" data-size="md">
-            <span>New unit</span>
+          <Link href="/masterdata/settings/units/new" className={buttonClasses("primary")}>
+            New unit
           </Link>
         }
       />
 
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.25rem" }}>
-        <Link href={`/masterdata/settings/units${showDeleted ? "" : "?deleted=1"}`} className="ui-button" data-variant="secondary" data-size="sm">
-          <span>{showDeleted ? "Hide archived" : "Show archived"}</span>
+      <div className="flex gap-2 mb-5">
+        <Link href={`/masterdata/settings/units${showDeleted ? "" : "?deleted=1"}`} className={buttonClasses("secondary", "sm")}>
+          {showDeleted ? "Hide archived" : "Show archived"}
         </Link>
       </div>
 
@@ -85,17 +87,17 @@ export default async function UnitsPage({
                   <Badge tone={u.deletedAt ? "warning" : "success"}>{u.deletedAt ? "Archived" : "Active"}</Badge>
                 </TableCell>
                 <TableCell>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <div className="flex gap-2">
                     {!u.deletedAt && (
-                      <Link href={`/masterdata/settings/units/${u.id}/edit`} className="ui-button" data-variant="ghost" data-size="sm"><span>Edit</span></Link>
+                      <Link href={`/masterdata/settings/units/${u.id}/edit`} className={buttonClasses("ghost", "sm")}>Edit</Link>
                     )}
                     {u.deletedAt ? (
                       <form action={restoreUnitAction.bind(null, u.id)}>
-                        <button type="submit" className="ui-button" data-variant="ghost" data-size="sm"><span>Restore</span></button>
+                        <Button type="submit" variant="ghost" size="sm">Restore</Button>
                       </form>
                     ) : (
                       <form action={deleteUnitAction.bind(null, u.id)}>
-                        <button type="submit" className="ui-button" data-variant="danger" data-size="sm"><span>Archive</span></button>
+                        <Button type="submit" variant="danger" size="sm">Archive</Button>
                       </form>
                     )}
                   </div>

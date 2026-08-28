@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type AnchorHTMLAttributes, type HTMLAttributes, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from "react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import { cx } from "../internal/cx";
@@ -76,13 +76,40 @@ export function AppShell({
 
   return (
     <RailContext.Provider value={{ collapsed: isCollapsed }}>
-    <div className={cx("ui-app-shell", className)} data-collapsed={isCollapsed || undefined}>
-      <aside className="ui-app-rail" aria-label={navigationLabel} data-collapsed={isCollapsed || undefined}>
-        <div className="ui-app-brand">
-          <div className="ui-app-brand-mark">{isCollapsed ? (collapsedBrand ?? brand) : brand}</div>
+    <div
+      className={cx(
+        "grid min-h-screen overflow-x-clip transition-[grid-template-columns] duration-[160ms] motion-reduce:transition-none",
+        "grid-cols-[var(--ui-rail-width,232px)_minmax(0,1fr)] max-[840px]:grid-cols-1",
+        isCollapsed && "[--ui-rail-width:60px]",
+        className,
+      )}
+      data-collapsed={isCollapsed || undefined}
+    >
+      {/* The rail is divided from the work area by a drawn rule, not by a tone. It is one
+          step stronger than an ordinary border because it separates navigation from work —
+          a major division, unlike the hairlines inside a card. */}
+      <aside
+        className={cx(
+          "group sticky top-0 flex h-screen max-w-screen min-w-0 flex-col overflow-hidden border-r border-line",
+          "bg-[color-mix(in_srgb,var(--ui-surface-muted)_52%,var(--ui-surface))]",
+          "max-[840px]:static max-[840px]:h-auto max-[840px]:border-b max-[840px]:border-r-0",
+        )}
+        aria-label={navigationLabel}
+        data-collapsed={isCollapsed || undefined}
+      >
+        <div
+          className={cx(
+            "flex min-h-[72px] items-center justify-between gap-2 px-4 py-3.5 max-[840px]:min-h-[52px]",
+            isCollapsed && "flex-col justify-center gap-1.5 px-2 py-2.5",
+          )}
+        >
+          {/* At 60px the mark and the toggle cannot sit side by side, so they stack. */}
+          <div className={cx("min-w-0 overflow-hidden", isCollapsed && "grid place-items-center")}>
+            {isCollapsed ? (collapsedBrand ?? brand) : brand}
+          </div>
           {collapsible && !narrowNavigation ? (
             <IconButton
-              className="ui-app-rail-toggle"
+              className="shrink-0"
               size="sm"
               variant="ghost"
               label={isCollapsed ? expandLabel : collapseLabel}
@@ -92,12 +119,33 @@ export function AppShell({
             />
           ) : null}
         </div>
-        <nav className="ui-app-nav">{navigation}</nav>
-        {utility ? <div className="ui-app-utility">{utility}</div> : null}
+        <nav
+          className={cx(
+            "min-w-0 flex-1 overflow-auto px-3 pt-2 pb-3.5",
+            isCollapsed && "px-1.5",
+            "max-[840px]:flex max-[840px]:overflow-x-auto max-[840px]:p-2.5 max-[840px]:[scrollbar-width:none] max-[840px]:[&::-webkit-scrollbar]:hidden",
+          )}
+        >
+          {navigation}
+        </nav>
+        {utility ? (
+          <div
+            className={cx(
+              "grid gap-1 border-t border-line px-3 pt-2.5 pb-3.5 max-[840px]:hidden",
+              isCollapsed && "px-1.5",
+            )}
+          >
+            {utility}
+          </div>
+        ) : null}
       </aside>
-      <div className="ui-app-viewport">
-        {topbar ? <header className="ui-app-topbar">{topbar}</header> : null}
-        <main className="ui-app-content">{children}</main>
+      <div className="min-w-0">
+        {topbar ? (
+          <header className="sticky top-0 z-10 flex min-h-16 items-center border-b border-line bg-white/94 backdrop-blur-[12px]">
+            {topbar}
+          </header>
+        ) : null}
+        <main className="min-w-0">{children}</main>
       </div>
     </div>
     </RailContext.Provider>
@@ -108,8 +156,24 @@ export type NavItemProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "childr
   icon?: ReactNode;
   /** Marks the current location. Sets aria-current="page". */
   active?: boolean;
+  /** An unavailable destination stays visible and disabled with its reason in `title`. */
+  disabled?: boolean;
   children: ReactNode;
 };
+
+const NAV_ITEM_BASE_CLASSES =
+  "relative flex w-full min-h-[38px] items-center gap-2.5 rounded-control border border-transparent bg-transparent px-2.5 py-2 text-left font-[inherit] text-ink-secondary no-underline";
+
+const NAV_ITEM_STATE_CLASSES = {
+  idle: "hover:border-line-subtle hover:bg-white/62 hover:text-ink",
+  active:
+    "border-line bg-surface text-ink font-semibold " +
+    /* Current location. Hover already owns the muted fill, so "active" cannot rely on
+       fill alone or the two become indistinguishable. It is marked on three channels
+       at once: an ink rule, ink-weight text, and heavier type. */
+    "before:absolute before:-left-px before:top-1/2 before:h-[18px] before:w-[3px] before:-translate-y-1/2 before:rounded-r-[2px] before:bg-action before:content-['']",
+  disabled: "cursor-not-allowed opacity-48",
+} as const;
 
 /**
  * A single navigation entry. Owned by the engine rather than each app so that
@@ -117,18 +181,41 @@ export type NavItemProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "childr
  * When the rail is collapsed the label is hidden visually but kept for assistive
  * tech, and a tooltip restores it for sighted users.
  */
-export function NavItem({ icon, active = false, children, className, ...props }: NavItemProps) {
+export function NavItem({ icon, active = false, disabled = false, children, className, ...props }: NavItemProps) {
   const { collapsed } = useContext(RailContext);
 
-  const item = (
-    <a
-      className={cx("ui-nav-item", className)}
-      data-active={active || undefined}
-      aria-current={active ? "page" : undefined}
-      {...props}
-    >
-      {icon ? <span className="ui-nav-icon" aria-hidden="true">{icon}</span> : null}
-      <span className="ui-nav-label">{children}</span>
+  /* Visually hidden, NOT display:none. display:none also strips the label from the
+     accessibility tree, which leaves every collapsed nav item with no accessible
+     name at all (WCAG 4.1.2 / 2.4.4). The label must survive for screen readers. */
+  const labelClasses = cx(
+    "group-data-collapsed:sr-only",
+    /* CSS also forces labels during the first hydrated frame. Runtime state then
+       preserves the desktop preference without allowing an icon-only mobile rail. */
+    "max-[840px]:group-data-collapsed:not-sr-only",
+  );
+  const itemClasses = cx(
+    NAV_ITEM_BASE_CLASSES,
+    disabled ? NAV_ITEM_STATE_CLASSES.disabled : active ? NAV_ITEM_STATE_CLASSES.active : NAV_ITEM_STATE_CLASSES.idle,
+    /* Collapsed rail degrades the item to its icon without the app re-rendering. */
+    "group-data-collapsed:justify-center group-data-collapsed:gap-0 group-data-collapsed:px-0 group-data-collapsed:text-center",
+    "max-[840px]:group-data-collapsed:justify-start max-[840px]:group-data-collapsed:gap-2.5 max-[840px]:group-data-collapsed:px-2.5 max-[840px]:group-data-collapsed:py-[7px] max-[840px]:group-data-collapsed:text-left",
+    className,
+  );
+
+  const content = (
+    <>
+      {icon ? <span className="inline-flex shrink-0 [&_svg]:h-4 [&_svg]:w-4" aria-hidden="true">{icon}</span> : null}
+      <span className={labelClasses}>{children}</span>
+    </>
+  );
+
+  const item = disabled ? (
+    <button type="button" className={itemClasses} disabled {...(props as ButtonHTMLAttributes<HTMLButtonElement>)}>
+      {content}
+    </button>
+  ) : (
+    <a className={itemClasses} data-active={active || undefined} aria-current={active ? "page" : undefined} {...props}>
+      {content}
     </a>
   );
 
@@ -140,7 +227,17 @@ export function PageShell({
   className,
   ...props
 }: HTMLAttributes<HTMLDivElement> & { size?: "default" | "wide" }) {
-  return <div className={cx("ui-page-shell", className)} data-size={size} {...props} />;
+  return (
+    <div
+      className={cx(
+        "mx-auto grid w-full max-w-[1200px] gap-6 p-(--ui-page-padding) max-[560px]:gap-5",
+        size === "wide" && "max-w-(--ui-page-max)",
+        className,
+      )}
+      data-size={size}
+      {...props}
+    />
+  );
 }
 
 export type PageHeaderProps = HTMLAttributes<HTMLElement> & {
@@ -163,14 +260,22 @@ export function PageHeader({
   ...props
 }: PageHeaderProps) {
   return (
-    <header className={cx("ui-page-header", className)} data-divider={divider || undefined} {...props}>
-      <div className="ui-page-header-copy">
+    <header
+      className={cx(
+        "flex items-start justify-between gap-5 max-[560px]:flex-col",
+        divider && "border-b border-line pb-4",
+        className,
+      )}
+      data-divider={divider || undefined}
+      {...props}
+    >
+      <div className="grid min-w-0 gap-1">
         {eyebrow ? <Text meta>{eyebrow}</Text> : null}
         <Heading level={1}>{title}</Heading>
         {description ? <Text as="p" tone="secondary">{description}</Text> : null}
-        {meta ? <div className="ui-page-header-meta">{meta}</div> : null}
+        {meta ? <div className="mt-1">{meta}</div> : null}
       </div>
-      {actions ? <div className="ui-page-header-actions">{actions}</div> : null}
+      {actions ? <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 max-[560px]:justify-start">{actions}</div> : null}
     </header>
   );
 }

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import {
   Button,
+  buttonClasses,
   Field,
   FormActions,
   FormSection,
@@ -49,11 +50,9 @@ export default async function NewCategoryPage({
           <Button type="submit" variant="primary">Create category</Button>
           <Link
             href={`/masterdata/categories?kind=${kind}`}
-            className="ui-button"
-            data-variant="secondary"
-            data-size="md"
+            className={buttonClasses("secondary")}
           >
-            <span>Cancel</span>
+            Cancel
           </Link>
         </FormActions>
       </form>
