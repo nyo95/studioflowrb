@@ -2,13 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { pricingService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 import type { WorkPriceKind } from "@/apps/masterdata/domain/pricing-rules";
 
-const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export async function setSkuPriceAction(formData: FormData) {
-  await pricingService.setSkuPrice(CTX, {
+  await pricingService.setSkuPrice((await requireMasterDataRequestContext()), {
     skuId: formData.get("skuId") as string,
     amount: formData.get("amount") as string,
     currency: formData.get("currency") as string,
@@ -21,13 +20,13 @@ export async function setSkuPriceAction(formData: FormData) {
 }
 
 export async function clearSkuPriceAction(skuId: string, supplierPartyId: string | null) {
-  await pricingService.clearSkuPrice(CTX, skuId, supplierPartyId);
+  await pricingService.clearSkuPrice((await requireMasterDataRequestContext()), skuId, supplierPartyId);
   revalidatePath("/masterdata/pricing");
   revalidatePath("/masterdata/skus");
 }
 
 export async function createWorkPriceAction(formData: FormData) {
-  await pricingService.createWorkPrice(CTX, {
+  await pricingService.createWorkPrice((await requireMasterDataRequestContext()), {
     code: formData.get("code") as string,
     name: formData.get("name") as string,
     categoryId: formData.get("categoryId") as string,
@@ -43,7 +42,7 @@ export async function createWorkPriceAction(formData: FormData) {
 }
 
 export async function updateWorkPriceAction(formData: FormData) {
-  await pricingService.updateWorkPrice(CTX, {
+  await pricingService.updateWorkPrice((await requireMasterDataRequestContext()), {
     id: formData.get("id") as string,
     code: formData.get("code") as string,
     name: formData.get("name") as string,
@@ -60,11 +59,11 @@ export async function updateWorkPriceAction(formData: FormData) {
 }
 
 export async function deleteWorkPriceAction(id: string) {
-  await pricingService.softDeleteWorkPrice(CTX, id);
+  await pricingService.softDeleteWorkPrice((await requireMasterDataRequestContext()), id);
   revalidatePath("/masterdata/pricing");
 }
 
 export async function restoreWorkPriceAction(id: string) {
-  await pricingService.restoreWorkPrice(CTX, id);
+  await pricingService.restoreWorkPrice((await requireMasterDataRequestContext()), id);
   revalidatePath("/masterdata/pricing");
 }

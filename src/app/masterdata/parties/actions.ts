@@ -3,10 +3,9 @@
 import { revalidatePath } from "next/cache";
 
 import { partyService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 import type { PartyRole } from "@/apps/masterdata/domain/party-rules";
 
-const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 const ALL_ROLES: readonly PartyRole[] = ["MATERIAL_SUPPLIER", "WORK_VENDOR"];
 
@@ -16,7 +15,7 @@ function parseRoles(formData: FormData): readonly PartyRole[] {
 const parseBusinessTypes = (formData: FormData) => formData.getAll("businessTypeIds").map(String);
 
 export async function createPartyAction(formData: FormData) {
-  await partyService.create(CTX, {
+  await partyService.create((await requireMasterDataRequestContext()), {
     name: formData.get("name") as string,
     type: formData.get("type") as "ORGANIZATION" | "INDIVIDUAL",
     legalName: (formData.get("legalName") as string) || null,
@@ -31,7 +30,7 @@ export async function createPartyAction(formData: FormData) {
 }
 
 export async function updatePartyAction(formData: FormData) {
-  await partyService.update(CTX, {
+  await partyService.update((await requireMasterDataRequestContext()), {
     id: formData.get("id") as string,
     name: formData.get("name") as string,
     type: formData.get("type") as "ORGANIZATION" | "INDIVIDUAL",
@@ -45,11 +44,11 @@ export async function updatePartyAction(formData: FormData) {
 }
 
 export async function deletePartyAction(id: string) {
-  await partyService.softDelete(CTX, id);
+  await partyService.softDelete((await requireMasterDataRequestContext()), id);
   revalidatePath("/masterdata/parties");
 }
 
 export async function restorePartyAction(id: string) {
-  await partyService.restore(CTX, id);
+  await partyService.restore((await requireMasterDataRequestContext()), id);
   revalidatePath("/masterdata/parties");
 }

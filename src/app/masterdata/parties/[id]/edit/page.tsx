@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { businessTypeService, partyService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 import { PARTY_ROLES, PARTY_TYPES } from "@/apps/masterdata/domain/party-rules";
 import {
   Button,
@@ -18,11 +18,10 @@ import {
 } from "@/platform/ui_engine";
 import { updatePartyAction } from "../../actions";
 
-const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function EditPartyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [parties, businessTypes] = await Promise.all([partyService.list(CTX, { includeDeleted: true }), businessTypeService.list(CTX)]);
+  const [parties, businessTypes] = await Promise.all([partyService.list((await requireMasterDataRequestContext()), { includeDeleted: true }), businessTypeService.list((await requireMasterDataRequestContext()))]);
   const party = parties.find((p) => p.id === id);
   if (!party || party.deletedAt) notFound();
 

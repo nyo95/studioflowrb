@@ -9,7 +9,7 @@ export type DocumentSheetProps = Omit<HTMLAttributes<HTMLElement>, "title"> & {
   title?: ReactNode;
   header?: ReactNode;
   footer?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   size?: "a4" | "letter";
 };
 

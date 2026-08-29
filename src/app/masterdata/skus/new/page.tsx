@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { unitService } from "@/apps/masterdata/infrastructure/runtime";
 import { brandService } from "@/apps/masterdata/infrastructure/runtime";
 import { categoryService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 import { SKU_KINDS } from "@/apps/masterdata/domain/sku-rules";
 import {
   Button,
@@ -19,13 +19,12 @@ import {
 import { createSkuAction } from "../actions";
 import { SkuClassificationFields } from "../sku-classification-fields";
 
-const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function NewSkuPage() {
   const [units, brands, categories] = await Promise.all([
-    unitService.list(CTX),
-    brandService.list(CTX),
-    categoryService.list(CTX, { kind: "PRODUCT" }),
+    unitService.list((await requireMasterDataRequestContext())),
+    brandService.list((await requireMasterDataRequestContext())),
+    categoryService.list((await requireMasterDataRequestContext()), { kind: "PRODUCT" }),
   ]);
 
   const liveUnits = units.filter((u) => !u.deletedAt);

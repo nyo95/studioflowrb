@@ -1,70 +1,68 @@
-import { AppError } from "@platform/core/errors";
-
 /**
- * Provider-neutral session boundary (CORE.md §3).
+ * Provider-neutral identity boundary — public barrel (CORE.md §3, §12).
  *
- * Core defines the session contract only; authentication-provider details stay
- * behind an injected reader adapter. Missing, malformed, deleted, disabled,
- * and unknown-role identities must be resolved to `null` by the adapter —
- * Core never supplies a fallback role and never persists identity state.
- * Session data is presentation-only; every protected use case performs its own
- * server-side permission check.
+ * Core defines the stable principal/session contract; provider details stay
+ * inside `src/platform/core/auth`. Identity resolution is request-bound:
+ * `getPrincipal()`/`requirePrincipal()` resolve live database state on every
+ * call and never trust cookie/JWT claims for status, roles, or grants.
+ * Missing, malformed, expired, revoked, deleted, disabled, and role-less
+ * identities resolve to `null` — Core never supplies a fallback role.
  */
 
-export type SessionPrincipal = {
-  userId: string;
-  roleId: string;
-  displayName: string;
-  email?: string;
-};
+export type { SessionPrincipal } from "./principal";
+export { isSessionPrincipal } from "./principal";
 
-/** Unvalidated identity claims as returned by a provider adapter. */
-export type RawSessionIdentity = {
-  userId?: unknown;
-  roleId?: unknown;
-  displayName?: unknown;
-  email?: unknown;
-};
+export {
+  SESSION_COOKIE_NAME,
+  getPrincipal,
+  requirePrincipal,
+  getPrincipalGrants,
+  requirePrincipalGrants,
+  getSessionCookieValue,
+  setSessionCookie,
+  clearSessionCookie,
+  startSession,
+  logoutCurrentSession,
+  logoutAllSessions,
+  currentSessionId,
+  type PrincipalGrants,
+} from "./request";
+
+/** Password hashing policy — deliberate stable exports. */
+export {
+  PASSWORD_MIN_CODE_POINTS,
+  PASSWORD_MAX_CODE_POINTS,
+  countCodePoints,
+  isValidPasswordLength,
+  hashPassword,
+  verifyPassword,
+} from "./password";
+
+/** Opaque token primitives. Only the SHA-256 digest ever reaches persistence. */
+export { generateSessionToken, hashSessionToken } from "./token";
+
+/** Revocable database session service primitives (injectable for tests/composition). */
+export {
+  DEFAULT_SESSION_WINDOW,
+  createSession,
+  resolveSession,
+  revokeSessionById,
+  revokeSessionByToken,
+  revokeAllUserSessions,
+  listUserSessions,
+  type CreatedSession,
+  type SessionListItem,
+  type SessionWindowConfig,
+} from "./session-service";
+
+/** One-time first-owner bootstrap command (server-side only, never HTTP). */
+export { bootstrapFirstOwner, type BootstrapInput, type BootstrapResult } from "./bootstrap";
+
+/** Authenticated login composition (rate limiting + verification + session). */
+export { performLogin, type LoginOutcome } from "./login";
 
 /**
- * Port resolving the current request's raw identity. Returns `null` when no
- * valid identity exists (absent, deleted, disabled, or unknown role).
- * Provider/infrastructure failures throw and are not authentication failures.
+ * The single generic login failure. Unknown email, disabled user, malformed
+ * input, and wrong password are indistinguishable to the client.
  */
-export type SessionReader = () => Promise<RawSessionIdentity | null> | RawSessionIdentity | null;
-
-function nonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.trim() === value;
-}
-
-function validatePrincipal(raw: RawSessionIdentity): SessionPrincipal | null {
-  if (!nonEmptyString(raw.userId) || !nonEmptyString(raw.roleId) || !nonEmptyString(raw.displayName)) {
-    return null;
-  }
-  if (!("email" in raw) || raw.email === undefined) {
-    return { userId: raw.userId, roleId: raw.roleId, displayName: raw.displayName };
-  }
-  if (!nonEmptyString(raw.email)) return null;
-  return {
-    userId: raw.userId,
-    roleId: raw.roleId,
-    displayName: raw.displayName,
-    email: raw.email,
-  };
-}
-
-/** Resolves the current principal, or `null` when unauthenticated or malformed. */
-export async function getPrincipal(readSession: SessionReader): Promise<SessionPrincipal | null> {
-  const raw = await readSession();
-  if (!raw) return null;
-  return validatePrincipal(raw);
-}
-
-/** Resolves the current principal or throws shared `UNAUTHENTICATED`. */
-export async function requirePrincipal(readSession: SessionReader): Promise<SessionPrincipal> {
-  const principal = await getPrincipal(readSession);
-  if (!principal) {
-    throw new AppError("UNAUTHENTICATED", "NO_SESSION", "Please sign in to continue.");
-  }
-  return principal;
-}
+export { loginFailureError } from "./failure";

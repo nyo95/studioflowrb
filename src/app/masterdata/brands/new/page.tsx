@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { categoryService, partyService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 import {
   Button,
   buttonClasses,
@@ -19,7 +19,6 @@ import {
 } from "@/platform/ui_engine";
 import { createBrandAction } from "../actions";
 
-const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 async function handleCreate(formData: FormData) {
   "use server";
@@ -29,8 +28,8 @@ async function handleCreate(formData: FormData) {
 
 export default async function NewBrandPage() {
   const [categories, parties] = await Promise.all([
-    categoryService.list(CTX, { kind: "PRODUCT" }),
-    partyService.list(CTX, { role: "MATERIAL_SUPPLIER" }),
+    categoryService.list((await requireMasterDataRequestContext()), { kind: "PRODUCT" }),
+    partyService.list((await requireMasterDataRequestContext()), { role: "MATERIAL_SUPPLIER" }),
   ]);
 
   return (

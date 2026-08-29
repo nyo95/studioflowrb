@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { categoryService, unitService, partyService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 import { WORK_PRICE_KINDS } from "@/apps/masterdata/domain/pricing-rules";
 import {
   Button,
@@ -16,13 +16,12 @@ import {
 } from "@/platform/ui_engine";
 import { createWorkPriceAction } from "../../actions";
 
-const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function NewWorkPricePage() {
   const [categories, units, parties] = await Promise.all([
-    categoryService.list(CTX, { kind: "WORK" }),
-    unitService.list(CTX),
-    partyService.list(CTX),
+    categoryService.list((await requireMasterDataRequestContext()), { kind: "WORK" }),
+    unitService.list((await requireMasterDataRequestContext())),
+    partyService.list((await requireMasterDataRequestContext())),
   ]);
 
   const liveCategories = categories.filter((c) => !c.deletedAt);

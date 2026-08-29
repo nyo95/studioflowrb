@@ -105,8 +105,8 @@ describe("UI Engine foundation", () => {
           label: "Name",
           description: "Use a clear label.",
           error: "Required",
-          children: createElement(ui.Input, {}),
         },
+        createElement(ui.Input, {}),
       ),
     );
     assert.match(field, /for="record-name"/);
@@ -127,7 +127,7 @@ describe("UI Engine foundation", () => {
   });
 
   it("exposes generic navigation, description columns, sorting, and selected-row presentation", () => {
-    const nav = renderToStaticMarkup(createElement(ui.NavItem, { href: "/records", active: true, children: "Records" }));
+    const nav = renderToStaticMarkup(createElement(ui.NavItem, { href: "/records", active: true }, "Records"));
     assert.match(nav, /aria-current="page"/);
 
     const descriptions = renderToStaticMarkup(createElement(ui.DescriptionList, { columns: 1 }));
@@ -195,7 +195,7 @@ describe("UI Engine foundation", () => {
     assert.equal(getInlineEditKeyAction("Escape"), "cancel");
     assert.equal(getInlineEditKeyAction("Tab"), null);
     const document = renderToStaticMarkup(
-      createElement(ui.DocumentSheet, { title: "Summary", children: createElement("p", null, "Content") }),
+      createElement(ui.DocumentSheet, { title: "Summary" }, createElement("p", null, "Content")),
     );
     assert.match(document, /ui-document-sheet/);
     assert.match(document, /data-size="a4"/);

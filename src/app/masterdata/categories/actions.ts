@@ -3,12 +3,11 @@
 import { revalidatePath } from "next/cache";
 
 import { categoryService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 
-const DEV_CONTEXT = MASTER_DATA_REQUEST_CONTEXT;
 
 export async function createCategoryAction(formData: FormData) {
-  await categoryService.create(DEV_CONTEXT, {
+  await categoryService.create((await requireMasterDataRequestContext()), {
     kind: formData.get("kind") as "PRODUCT" | "WORK",
     name: formData.get("name") as string,
     parentId: (formData.get("parentId") as string) || null,
@@ -18,7 +17,7 @@ export async function createCategoryAction(formData: FormData) {
 }
 
 export async function updateCategoryAction(formData: FormData) {
-  await categoryService.update(DEV_CONTEXT, {
+  await categoryService.update((await requireMasterDataRequestContext()), {
     id: formData.get("id") as string,
     name: (formData.get("name") as string) || undefined,
     description: (formData.get("description") as string) || null,
@@ -27,11 +26,11 @@ export async function updateCategoryAction(formData: FormData) {
 }
 
 export async function deleteCategoryAction(id: string) {
-  await categoryService.softDelete(DEV_CONTEXT, id);
+  await categoryService.softDelete((await requireMasterDataRequestContext()), id);
   revalidatePath("/masterdata/categories");
 }
 
 export async function restoreCategoryAction(id: string) {
-  await categoryService.restore(DEV_CONTEXT, id);
+  await categoryService.restore((await requireMasterDataRequestContext()), id);
   revalidatePath("/masterdata/categories");
 }

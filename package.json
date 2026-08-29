@@ -18,6 +18,7 @@
     "check": "npm run typecheck && npm run check:boundaries && npm run check:legacy-runtime"
   },
   "dependencies": {
+    "@node-rs/argon2": "2.1.0",
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "class-variance-authority": "^0.7.1",
@@ -29,6 +30,7 @@
     "next": "16.3.2",
     "pg": "^8.20.0",
     "radix-ui": "^1.4.3",
+    "rate-limiter-flexible": "11.2.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "tailwind-merge": "^3.5.0",

@@ -1,21 +1,20 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { skuService, unitService, brandService, categoryService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 import { SKU_KINDS } from "@/apps/masterdata/domain/sku-rules";
 import { updateSkuAction } from "../../actions";
 import { SkuClassificationFields } from "../../sku-classification-fields";
 
-const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function EditSkuPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
   const [allSkus, units, brands, categories] = await Promise.all([
-    skuService.list(CTX, { includeDeleted: true }),
-    unitService.list(CTX),
-    brandService.list(CTX),
-    categoryService.list(CTX, { kind: "PRODUCT" }),
+    skuService.list((await requireMasterDataRequestContext()), { includeDeleted: true }),
+    unitService.list((await requireMasterDataRequestContext())),
+    brandService.list((await requireMasterDataRequestContext())),
+    categoryService.list((await requireMasterDataRequestContext()), { kind: "PRODUCT" }),
   ]);
 
   const sku = allSkus.find((s) => s.id === id);

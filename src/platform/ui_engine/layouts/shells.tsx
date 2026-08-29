@@ -158,7 +158,7 @@ export type NavItemProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "childr
   active?: boolean;
   /** An unavailable destination stays visible and disabled with its reason in `title`. */
   disabled?: boolean;
-  children: ReactNode;
+  children?: ReactNode;
 };
 
 const NAV_ITEM_BASE_CLASSES =

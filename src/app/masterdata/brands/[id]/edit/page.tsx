@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { brandService, categoryService, partyService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 import {
   Button,
   Checkbox,
@@ -17,14 +17,13 @@ import {
 } from "@/platform/ui_engine";
 import { updateBrandAction } from "../../actions";
 
-const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function EditBrandPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [brands, categories, parties] = await Promise.all([
-    brandService.list(CTX, { includeDeleted: true }),
-    categoryService.list(CTX, { kind: "PRODUCT" }),
-    partyService.list(CTX, { role: "MATERIAL_SUPPLIER" }),
+    brandService.list((await requireMasterDataRequestContext()), { includeDeleted: true }),
+    categoryService.list((await requireMasterDataRequestContext()), { kind: "PRODUCT" }),
+    partyService.list((await requireMasterDataRequestContext()), { role: "MATERIAL_SUPPLIER" }),
   ]);
   const brand = brands.find((b) => b.id === id);
   if (!brand || brand.deletedAt) notFound();

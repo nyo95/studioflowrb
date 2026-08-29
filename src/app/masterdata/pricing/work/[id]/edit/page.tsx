@@ -1,20 +1,19 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { pricingService, categoryService, unitService, partyService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 import { WORK_PRICE_KINDS } from "@/apps/masterdata/domain/pricing-rules";
 import { updateWorkPriceAction } from "../../../actions";
 
-const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function EditWorkPricePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
   const [allWork, categories, units, parties] = await Promise.all([
-    pricingService.listWorkPrices(CTX, true),
-    categoryService.list(CTX, { kind: "WORK" }),
-    unitService.list(CTX),
-    partyService.list(CTX),
+    pricingService.listWorkPrices((await requireMasterDataRequestContext()), true),
+    categoryService.list((await requireMasterDataRequestContext()), { kind: "WORK" }),
+    unitService.list((await requireMasterDataRequestContext())),
+    partyService.list((await requireMasterDataRequestContext())),
   ]);
 
   const wp = allWork.find((w) => w.id === id);

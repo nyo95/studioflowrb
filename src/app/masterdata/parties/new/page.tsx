@@ -17,7 +17,7 @@ import {
 } from "@/platform/ui_engine";
 import { createPartyAction } from "../actions";
 import { businessTypeService } from "@masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT as CTX } from "@masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@masterdata/infrastructure/request-context";
 
 async function handleCreate(formData: FormData) {
   "use server";
@@ -26,7 +26,7 @@ async function handleCreate(formData: FormData) {
 }
 
 export default async function NewPartyPage() {
-  const businessTypes = await businessTypeService.list(CTX);
+  const businessTypes = await businessTypeService.list((await requireMasterDataRequestContext()));
   return (
     <PageShell>
       <PageHeader eyebrow="Parties" title="New party" />

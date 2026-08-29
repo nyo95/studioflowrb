@@ -1,10 +1,10 @@
 import { importExportService } from "@masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@masterdata/infrastructure/request-context";
 import { toSafeErrorPayload } from "@platform/core/errors";
 
 export async function GET() {
   try {
-    const bytes = await importExportService.export(MASTER_DATA_REQUEST_CONTEXT);
+    const bytes = await importExportService.export((await requireMasterDataRequestContext()));
     return new Response(bytes as BodyInit, {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

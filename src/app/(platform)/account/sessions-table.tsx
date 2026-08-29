@@ -1,0 +1,125 @@
+"use client";
+
+import { useActionState, useState } from "react";
+
+import {
+  Button,
+  DataTable,
+  EmptyState,
+  InlineError,
+  StatusBadge,
+  TableCell,
+  TableCellContent,
+  TableHead,
+  TableHeader,
+  TableRow,
+  buttonClasses,
+} from "@/platform/ui_engine";
+import type { ActionResult } from "@platform/core/actions";
+import { revokeSessionAction } from "./actions";
+
+const INITIAL: ActionResult<{ revoked: boolean }> | null = null;
+
+export type SessionRow = {
+  id: string;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  revoked: boolean;
+  userAgent: string | null;
+};
+
+export function SessionsTable({
+  sessions,
+  currentSessionId,
+  onLogoutAll,
+}: {
+  sessions: SessionRow[];
+  currentSessionId: string | null;
+  onLogoutAll: () => Promise<void>;
+}) {
+  const [state, action, pending] = useActionState(
+    async (_prev: ActionResult<{ revoked: boolean }> | null, formData: FormData) =>
+      revokeSessionAction(String(formData.get("sessionId") ?? "")),
+    INITIAL,
+  );
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+
+  if (sessions.length === 0) {
+    return <EmptyState title="No sessions" description="Sessions appear here when you sign in." />;
+  }
+
+  return (
+    <div>
+      {state && !state.ok ? (
+        <div role="alert" style={{ marginBottom: 8 }}>
+          <InlineError>{state.error.safeMessage}</InlineError>
+        </div>
+      ) : null}
+      <DataTable minWidth={720}>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Started</TableHead>
+            <TableHead>Last seen</TableHead>
+            <TableHead>Expires</TableHead>
+            <TableHead>Device</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead align="end">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <tbody>
+          {sessions.map((session) => {
+            const isCurrent = session.id === currentSessionId;
+            return (
+              <TableRow key={session.id}>
+                <TableCell data-column="identifier">{session.createdAt}</TableCell>
+                <TableCell>{session.lastSeenAt}</TableCell>
+                <TableCell>{session.expiresAt}</TableCell>
+                <TableCell wrap>
+                  <TableCellContent
+                    primary={isCurrent ? "This browser" : "Other device"}
+                    secondary={session.userAgent ?? undefined}
+                  />
+                </TableCell>
+                <TableCell>
+                  {session.revoked ? (
+                    <StatusBadge tone="danger">Revoked</StatusBadge>
+                  ) : isCurrent ? (
+                    <StatusBadge tone="success">Current</StatusBadge>
+                  ) : (
+                    <StatusBadge tone="neutral">Active</StatusBadge>
+                  )}
+                </TableCell>
+                <TableCell align="end">
+                  {!session.revoked ? (
+                    <form
+                      action={action}
+                      onSubmit={() => setRevokingId(session.id)}
+                      style={{ display: "inline-flex" }}
+                    >
+                      <input type="hidden" name="sessionId" value={session.id} />
+                      <button
+                        type="submit"
+                        className={buttonClasses("secondary", "sm")}
+                        disabled={pending && revokingId === session.id}
+                      >
+                        {pending && revokingId === session.id ? "Revoking…" : "Revoke"}
+                      </button>
+                    </form>
+                  ) : (
+                    <span aria-hidden="true">—</span>
+                  )}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </tbody>
+      </DataTable>
+      <form action={onLogoutAll} style={{ marginTop: 12 }}>
+        <Button type="submit" variant="secondary">
+          Sign out all devices
+        </Button>
+      </form>
+    </div>
+  );
+}

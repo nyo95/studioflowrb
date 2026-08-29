@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Tag } from "lucide-react";
 
 import { brandService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 import {
   Badge,
   Button,
@@ -23,7 +23,6 @@ import {
 import { deleteBrandAction, restoreBrandAction } from "./actions";
 import { SortableTableHead } from "../sortable-table-head";
 
-const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function BrandsPage({
   searchParams,
@@ -34,7 +33,7 @@ export default async function BrandsPage({
   const showDeleted = sp["deleted"] === "1";
   const query = typeof sp["q"] === "string" ? sp["q"].trim() : "";
   const sort = typeof sp["sort"] === "string" ? sp["sort"] : "name"; const direction = sp["dir"] === "desc" ? -1 : 1;
-  const brands = (await brandService.list(CTX, { includeDeleted: showDeleted, query: query || undefined })).toSorted((a, b) => direction * String(sort === "categories" ? a.categories.length : sort === "suppliers" ? a.suppliers.length : sort === "status" ? Boolean(a.deletedAt) : a.name).localeCompare(String(sort === "categories" ? b.categories.length : sort === "suppliers" ? b.suppliers.length : sort === "status" ? Boolean(b.deletedAt) : b.name), "id-ID", { numeric: true }));
+  const brands = (await brandService.list((await requireMasterDataRequestContext()), { includeDeleted: showDeleted, query: query || undefined })).toSorted((a, b) => direction * String(sort === "categories" ? a.categories.length : sort === "suppliers" ? a.suppliers.length : sort === "status" ? Boolean(a.deletedAt) : a.name).localeCompare(String(sort === "categories" ? b.categories.length : sort === "suppliers" ? b.suppliers.length : sort === "status" ? Boolean(b.deletedAt) : b.name), "id-ID", { numeric: true }));
 
   return (
     <PageShell>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { FolderTree } from "lucide-react";
 
 import { categoryService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 import {
   Badge,
   Button,
@@ -23,7 +23,6 @@ import {
 import { deleteCategoryAction, restoreCategoryAction } from "./actions";
 import { SortableTableHead } from "../sortable-table-head";
 
-const DEV_CONTEXT = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function CategoriesPage({
   searchParams,
@@ -35,7 +34,7 @@ export default async function CategoriesPage({
   const showDeleted = sp["deleted"] === "1";
 
   const sort = typeof sp["sort"] === "string" ? sp["sort"] : "name"; const direction = sp["dir"] === "desc" ? -1 : 1;
-  const categories = (await categoryService.list(DEV_CONTEXT, {
+  const categories = (await categoryService.list((await requireMasterDataRequestContext()), {
     kind,
     includeDeleted: showDeleted,
   })).toSorted((a, b) => direction * String(sort === "path" ? a.path ?? a.slug : sort === "status" ? Boolean(a.deletedAt) : sort === "order" ? a.sortOrder : a.name).localeCompare(String(sort === "path" ? b.path ?? b.slug : sort === "status" ? Boolean(b.deletedAt) : sort === "order" ? b.sortOrder : b.name), "id-ID", { numeric: true }));

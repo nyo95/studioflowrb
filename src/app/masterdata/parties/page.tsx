@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Users } from "lucide-react";
 
 import { partyService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 import {
   Badge,
   Button,
@@ -23,7 +23,6 @@ import {
 import { deletePartyAction, restorePartyAction } from "./actions";
 import { SortableTableHead } from "../sortable-table-head";
 
-const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function PartiesPage({
   searchParams,
@@ -33,7 +32,7 @@ export default async function PartiesPage({
   const sp = await searchParams;
   const showDeleted = sp["deleted"] === "1";
   const sort = typeof sp["sort"] === "string" ? sp["sort"] : "name"; const direction = sp["dir"] === "desc" ? -1 : 1;
-  const parties = (await partyService.list(CTX, { includeDeleted: showDeleted })).toSorted((a, b) => direction * String(sort === "type" ? a.type : sort === "roles" ? a.roles.join(" ") : sort === "status" ? Boolean(a.deletedAt) : a.name).localeCompare(String(sort === "type" ? b.type : sort === "roles" ? b.roles.join(" ") : sort === "status" ? Boolean(b.deletedAt) : b.name), "id-ID", { numeric: true }));
+  const parties = (await partyService.list((await requireMasterDataRequestContext()), { includeDeleted: showDeleted })).toSorted((a, b) => direction * String(sort === "type" ? a.type : sort === "roles" ? a.roles.join(" ") : sort === "status" ? Boolean(a.deletedAt) : a.name).localeCompare(String(sort === "type" ? b.type : sort === "roles" ? b.roles.join(" ") : sort === "status" ? Boolean(b.deletedAt) : b.name), "id-ID", { numeric: true }));
 
   return (
     <PageShell>

@@ -25,7 +25,7 @@ export type FieldProps = Omit<HTMLAttributes<HTMLDivElement>, "children" | "id">
   description?: ReactNode;
   error?: ReactNode;
   required?: boolean;
-  children: ReactElement<ControlElementProps>;
+  children?: ReactElement<ControlElementProps>;
 };
 
 export function Field({
@@ -39,7 +39,7 @@ export function Field({
   ...props
 }: FieldProps) {
   const generatedId = useId();
-  const controlId = id ?? children.props.id ?? `field-${generatedId}`;
+  const controlId = id ?? children?.props.id ?? `field-${generatedId}`;
   const descriptionId = description ? `${controlId}-description` : undefined;
   const errorId = error ? `${controlId}-error` : undefined;
   const describedBy = [descriptionId, errorId].filter(Boolean).join(" ") || undefined;

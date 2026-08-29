@@ -1,5 +1,5 @@
 import { importExportService } from "@masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@masterdata/infrastructure/request-context";
 import { AppError, toSafeErrorPayload } from "@platform/core/errors";
 
 export async function POST(request: Request) {
@@ -8,9 +8,9 @@ export async function POST(request: Request) {
     const file = form.get("workbook");
     if (!(file instanceof File) || file.size === 0) throw new AppError("VALIDATION", "WORKBOOK_REQUIRED", "Select an XLSX workbook.");
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const preview = await importExportService.preview(MASTER_DATA_REQUEST_CONTEXT, bytes);
+    const preview = await importExportService.preview((await requireMasterDataRequestContext()), bytes);
     if (new URL(request.url).searchParams.get("mode") === "apply") {
-      const changedRows = await importExportService.apply(MASTER_DATA_REQUEST_CONTEXT, preview);
+      const changedRows = await importExportService.apply((await requireMasterDataRequestContext()), preview);
       return Response.json({ ok: true, changedRows });
     }
     return Response.json({ ok: preview.issues.length === 0, changedRows: preview.changedRows, issues: preview.issues });

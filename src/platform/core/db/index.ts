@@ -67,6 +67,13 @@ function getDbRuntime(): DbRuntime {
 export const prisma: PrismaClient = getDbRuntime().prisma;
 
 /**
+ * The one process-level PostgreSQL pool. Shared infrastructure adapters that
+ * need raw pool access (e.g. the PostgreSQL login limiter) consume this —
+ * they must never construct their own pool.
+ */
+export const pool: Pool = getDbRuntime().pool;
+
+/**
  * Closes the shared client and pool for short-lived scripts and tests.
  * Server processes must not call this. After closing, the current runtime is
  * discarded so a later import rebuilds instead of handing out closed handles.

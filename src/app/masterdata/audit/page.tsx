@@ -13,14 +13,9 @@ import {
   Text,
 } from "@/platform/ui_engine";
 import { auditQueryService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 import { SortableTableHead } from "../sortable-table-head";
 
-/**
- * Development execution context.
- * Replaced by the real request identity during locked Foundation F0.
- */
-const DEV_CONTEXT = MASTER_DATA_REQUEST_CONTEXT;
 
 type Props = {
   searchParams: Promise<{ entity?: string; action?: string; limit?: string; sort?: string; dir?: string }>;
@@ -35,7 +30,7 @@ export default async function AuditPage({ searchParams }: Props) {
   const limit = Math.min(parseInt(params.limit ?? "100", 10) || 100, 500);
 
   const sort = params.sort ?? "occurred"; const direction = params.dir === "asc" ? 1 : -1;
-  const events = (await auditQueryService.list(DEV_CONTEXT, {
+  const events = (await auditQueryService.list((await requireMasterDataRequestContext()), {
     entityType,
     action,
     limit,

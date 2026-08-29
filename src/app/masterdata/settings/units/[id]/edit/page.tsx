@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { unitService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 import { UNIT_USAGES } from "@/apps/masterdata/domain/unit-rules";
 import {
   Button,
@@ -18,11 +18,10 @@ import {
 } from "@/platform/ui_engine";
 import { updateUnitAction } from "../../actions";
 
-const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function EditUnitPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const units = await unitService.list(CTX, { includeDeleted: true });
+  const units = await unitService.list((await requireMasterDataRequestContext()), { includeDeleted: true });
   const unit = units.find((u) => u.id === id);
   if (!unit || unit.deletedAt) notFound();
 

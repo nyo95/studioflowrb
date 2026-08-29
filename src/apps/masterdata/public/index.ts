@@ -14,6 +14,12 @@ import { createTransactionRunner } from "../infrastructure/transaction";
 export type { BrandDiscoveryResult } from "../application/brand-discovery";
 export type { MasterDataExecutionContext } from "../application/execution-context";
 
+/**
+ * The app-owned permission vocabulary, exposed through the public boundary
+ * for registration with the platform permission registry (Foundation F0 §9).
+ */
+export { MASTERDATA_PERMISSIONS } from "../application/masterdata-permissions";
+
 const runTransaction = createTransactionRunner(prisma);
 const discovery = new BrandDiscoveryService({ runTransaction, brands: prismaBrandDiscoveryRepository });
 const reads = new PublicReadService({ runTransaction, reads: prismaPublicReadRepository });

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { skuService, pricingService, unitService, partyService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 import {
   Badge,
   Button,
@@ -20,7 +20,6 @@ import {
 import { clearSkuPriceAction, deleteWorkPriceAction, restoreWorkPriceAction } from "./actions";
 import { SortableTableHead } from "../sortable-table-head";
 
-const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function PricingPage({
   searchParams,
@@ -31,15 +30,15 @@ export default async function PricingPage({
   const showArchived = archived === "1";
 
   const [skus, workPrices, units, parties] = await Promise.all([
-    skuService.list(CTX, { includeDeleted: false }),
-    pricingService.listWorkPrices(CTX, showArchived),
-    unitService.list(CTX),
-    partyService.list(CTX),
+    skuService.list((await requireMasterDataRequestContext()), { includeDeleted: false }),
+    pricingService.listWorkPrices((await requireMasterDataRequestContext()), showArchived),
+    unitService.list((await requireMasterDataRequestContext())),
+    partyService.list((await requireMasterDataRequestContext())),
   ]);
 
   // Fetch all current supplier prices per SKU concurrently.
   const skuPrices = await Promise.all(
-    skus.map((sku) => pricingService.getSkuPrices(CTX, sku.id).then((prices) => ({ skuId: sku.id, prices })))
+    skus.map((sku) => pricingService.getSkuPrices((await requireMasterDataRequestContext()), sku.id).then((prices) => ({ skuId: sku.id, prices })))
   );
   const pricesBySkuId = new Map(skuPrices.map((sp) => [sp.skuId, sp.prices]));
 

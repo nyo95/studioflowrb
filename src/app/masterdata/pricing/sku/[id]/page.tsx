@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { skuService, pricingService, unitService, partyService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 import { setSkuPriceAction } from "../../actions";
 
-const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function SetSkuPricePage({
   params,
@@ -18,17 +17,17 @@ export default async function SetSkuPricePage({
   const selectedSupplierId = supplierParam ? supplierParam : null;
 
   const [allSkus, units, parties] = await Promise.all([
-    skuService.list(CTX, { includeDeleted: false }),
-    unitService.list(CTX),
-    partyService.list(CTX),
+    skuService.list((await requireMasterDataRequestContext()), { includeDeleted: false }),
+    unitService.list((await requireMasterDataRequestContext())),
+    partyService.list((await requireMasterDataRequestContext())),
   ]);
 
   const sku = allSkus.find((s) => s.id === id);
   if (!sku) notFound();
 
   const [currentPrices, allParties] = await Promise.all([
-    pricingService.getSkuPrices(CTX, id),
-    partyService.list(CTX),
+    pricingService.getSkuPrices((await requireMasterDataRequestContext()), id),
+    partyService.list((await requireMasterDataRequestContext())),
   ]);
   const supplierNamesById = new Map(allParties.map((p) => [p.id, p.name]));
   const existingPrice = currentPrices.find((p) => p.supplierPartyId === selectedSupplierId) ?? null;

@@ -694,6 +694,158 @@ model WorkPrice {
 }
 
 // ============================================================================
+// PLATFORM — Identity and access (Foundation F0, CORE.md §3/§4)
+// ============================================================================
+
+/// Operational account status. There is no deleted state: accounts are
+/// disabled (DISABLED + disabled_at) and restoring is an explicit command.
+enum UserStatus {
+  ACTIVE
+  DISABLED
+
+  @@schema("platform")
+}
+
+/// Platform user identity. Email is stored already normalized (trimmed,
+/// lowercase); race-safe uniqueness is the unique index itself.
+///
+/// Password material is only the encoded Argon2id PHC hash — plaintext,
+/// session tokens, and hashes never appear in logs, audit rows, or client
+/// results. Users are disabled, never hard-deleted, so historical AuditEvent
+/// actor references stay readable.
+model User {
+  id String @id @default(uuid())
+
+  /// Canonical normalized email (trimmed, lowercase). Unique index is the
+  /// race-safe authority; the application validates format before insert.
+  email String @unique
+  display_name String
+  password_hash String
+  status UserStatus @default(ACTIVE)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  disabled_at DateTime?
+
+  sessions   Session[]
+  user_roles UserRole[]
+
+  @@index([status])
+  @@schema("platform")
+}
+
+/// Access role. `code` is immutable and normalized; rename of `name` and
+/// `description` is allowed. Archiving (archived_at) revokes all effective
+/// grants and blocks new assignments; there is no hard delete, so
+/// UserRole/RolePermission history is never silently destroyed.
+model Role {
+  id String @id @default(uuid())
+
+  /// Immutable normalized role code (e.g. "platform-owner"). Unique index is
+  /// the race-safe authority, including archived rows.
+  code String @unique
+  name String
+  description String?
+  is_system Boolean @default(false)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  archived_at DateTime?
+
+  user_roles       UserRole[]
+  role_permissions RolePermission[]
+
+  @@index([archived_at])
+  @@schema("platform")
+}
+
+/// Unique User × Role assignment. Restrict on both sides: assignment rows are
+/// historical facts; users are disabled (never deleted) and roles are archived
+/// (never deleted).
+model UserRole {
+  id String @id @default(uuid())
+  user_id String
+  role_id String
+
+  assigned_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  role Role @relation(fields: [role_id], references: [id], onDelete: Restrict)
+
+  @@unique([user_id, role_id])
+  @@index([role_id])
+  @@schema("platform")
+}
+
+/// Unique Role × registered permission ID grant. `permission_id` must be a
+/// permission in the code-owned registry (application-enforced on write);
+/// unknown persisted IDs grant nothing and surface as integrity failures.
+model RolePermission {
+  id String @id @default(uuid())
+  role_id String
+  permission_id String
+
+  granted_at DateTime @default(now())
+
+  role Role @relation(fields: [role_id], references: [id], onDelete: Restrict)
+
+  @@unique([role_id, permission_id])
+  @@index([permission_id])
+  @@schema("platform")
+}
+
+/// Revocable database session. Only the SHA-256 hash of the opaque browser
+/// token is persisted — never the raw token. `token_hash` unique index is the
+/// live-lookup authority; user/revocation/expiry indexes support revocation
+/// and cleanup.
+model Session {
+  id String @id @default(uuid())
+
+  /// SHA-256 hex digest of the raw session token. Lookup authority.
+  token_hash String @unique
+  user_id String
+
+  created_at DateTime @default(now())
+  last_seen_at DateTime
+  idle_expires_at DateTime
+  absolute_expires_at DateTime
+  revoked_at DateTime?
+
+  /// Bounded client metadata (truncated to 255 chars), best-effort only and
+  /// never used for authorization.
+  user_agent String?
+  client_address String?
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Restrict)
+
+  @@index([user_id, revoked_at])
+  @@index([idle_expires_at])
+  @@index([absolute_expires_at])
+  @@schema("platform")
+}
+
+/// Typed platform General Settings singleton (CORE.md §11). Exactly one row
+/// exists: the SQL check constraint below pins the singleton ID, so no
+/// application code can create a second settings row.
+model PlatformGeneralSettings {
+  /// Constant singleton identity, enforced by CHECK (id = 'platform_general_settings').
+  id String @id @default("platform_general_settings")
+
+  organization_name String
+  app_title String
+  locale String
+  timezone String
+  currency String
+  /// Weekday number the week starts on (0 = Sunday … 6 = Saturday).
+  week_starts_on Int
+  brand_mark_url String?
+
+  updated_at DateTime @updatedAt
+
+  @@schema("platform")
+}
+
+// ============================================================================
 // PLATFORM — AuditEvent (append-only, domain-neutral Core envelope)
 // ============================================================================
 

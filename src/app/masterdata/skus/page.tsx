@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { skuService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 import {
   Badge,
   Button,
@@ -20,7 +20,6 @@ import {
 import { activateSkuAction, discontinueSkuAction, deleteSkuAction, restoreSkuAction } from "./actions";
 import { SortableTableHead } from "../sortable-table-head";
 
-const CTX = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function SkusPage({
   searchParams,
@@ -31,7 +30,7 @@ export default async function SkusPage({
   const showArchived = archived === "1";
 
   const direction = dir === "desc" ? -1 : 1;
-  const skus = (await skuService.list(CTX, { includeDeleted: showArchived })).toSorted((a, b) => direction * String(sort === "code" ? a.code ?? "" : sort === "kind" ? a.kind : sort === "status" ? a.status : a.name).localeCompare(String(sort === "code" ? b.code ?? "" : sort === "kind" ? b.kind : sort === "status" ? b.status : b.name), "id-ID", { numeric: true }));
+  const skus = (await skuService.list((await requireMasterDataRequestContext()), { includeDeleted: showArchived })).toSorted((a, b) => direction * String(sort === "code" ? a.code ?? "" : sort === "kind" ? a.kind : sort === "status" ? a.status : a.name).localeCompare(String(sort === "code" ? b.code ?? "" : sort === "kind" ? b.kind : sort === "status" ? b.status : b.name), "id-ID", { numeric: true }));
 
   return (
     <PageShell>

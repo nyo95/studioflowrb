@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { categoryService } from "@/apps/masterdata/infrastructure/runtime";
-import { MASTER_DATA_REQUEST_CONTEXT } from "@/apps/masterdata/infrastructure/request-context";
+import { requireMasterDataRequestContext } from "@/apps/masterdata/infrastructure/request-context";
 import {
   Button,
   Field,
@@ -15,7 +15,6 @@ import {
 } from "@/platform/ui_engine";
 import { updateCategoryAction } from "../../actions";
 
-const DEV_CONTEXT = MASTER_DATA_REQUEST_CONTEXT;
 
 export default async function EditCategoryPage({
   params,
@@ -23,7 +22,7 @@ export default async function EditCategoryPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const categories = await categoryService.list(DEV_CONTEXT, { includeDeleted: true });
+  const categories = await categoryService.list((await requireMasterDataRequestContext()), { includeDeleted: true });
   const cat = categories.find((c) => c.id === id);
   if (!cat || cat.deletedAt) notFound();
 
