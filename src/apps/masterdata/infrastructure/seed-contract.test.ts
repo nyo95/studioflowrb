@@ -22,8 +22,8 @@ import {
 /**
  * MD-01 seed contract tests.
  *
- * Prove that seeding applies exactly the locked docs/12 inventory, that WORK
- * paths follow the locked path rules, and that re-seeding is idempotent without
+ * Prove that seeding applies exactly the executable seed inventory, that WORK
+ * paths follow the implemented path rules, and that re-seeding is idempotent without
  * overwriting later staff edits.
  */
 

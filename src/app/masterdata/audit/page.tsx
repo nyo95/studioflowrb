@@ -18,7 +18,7 @@ import { SortableTableHead } from "../sortable-table-head";
 
 /**
  * Development execution context.
- * Replaced when the identity provider is wired (deferred — MD-00 §Deferred).
+ * Replaced by the real request identity during locked Foundation F0.
  */
 const DEV_CONTEXT = MASTER_DATA_REQUEST_CONTEXT;
 

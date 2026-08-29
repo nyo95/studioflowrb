@@ -2,9 +2,9 @@
 
 Status: **LOCKED — canonical minimalist shared visual contract (PM/TL, revised by owner direction 2026-08-25)**
 Scope: Shared visual language for StudioFlow, Master Data, BQ, and future subapps.
-Source basis: the UI engine, design tokens, shared shells/components, and Master Data UI/UX rules in the locked GitHub legacy snapshot `548fbd6bd00ef9fd7d53df66a3561a32fbb56944`.
+Source basis: current owner direction plus the legacy UI engine, design tokens, shared shells/components, and proven app workflows. Every visual migration must record the exact legacy commit and distinguish committed evidence from working-tree-only evidence; no moving branch or prose summary is an implicit design authority.
 
-Authority: this file specializes `docs/02-UI-ENGINE-PRD.md`. Product/domain ownership remains governed by the Software SSOT, Data Ownership contract, and app PRDs.
+Authority: this is the single shared visual contract. Product/domain policy remains owned by an owner-approved app contract; none is executable in the current foundation-only phase.
 
 ## 1. Design Intent
 
@@ -362,6 +362,8 @@ If a shared pattern is missing, report it rather than creating a parallel design
 
 ## 17. Legacy Evidence Used
 
+All paths below are committed code evidence from `D:\Projects\studioflow` at commit `6377ac0971e7a7cc0fd8fb58a8360c069675f9a5`; legacy Markdown and dirty working-tree styling are not authority.
+
 - `src/ui_engine/design-system.config.ts`
 - `src/ui_engine/tokens/**`
 - `src/styles/designTokens.css`
@@ -370,6 +372,6 @@ If a shared pattern is missing, report it rather than creating a parallel design
 - `src/ui_engine/layout/shells/settings-shell.tsx`
 - `src/ui_engine/components/section-card.tsx`
 - `src/ui_engine/components/table-card.tsx`
-- `docs/MASTERDATA_UIUX_REVISION.md`
+- committed Master Data screens at the exact legacy commit recorded by the active app contract
 
 This contract preserves the proven visual DNA while deliberately excluding feature-specific legacy tokens from the global design system.

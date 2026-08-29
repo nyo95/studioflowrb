@@ -12,7 +12,7 @@ import {
 /**
  * MD-01 schema contract tests.
  *
- * Prove that the locked persisted shape (MASTER_DATA.md §1–§3, §11) exists and
+ * Prove that the currently implemented persisted Master Data shape exists and
  * that every declared race-safe database constraint rejects its negative
  * fixture: live/partial uniqueness, cardinality, enum vocabularies, FK
  * behavior, and the absence of forbidden legacy fields/relations.

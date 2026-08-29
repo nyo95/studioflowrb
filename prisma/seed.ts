@@ -1,7 +1,7 @@
 /**
  * Master Data MVP seed runner (MD-01).
  *
- * Applies docs/12-MASTER-DATA-SEED-INVENTORY.md to the database:
+ * Applies the canonical inventory from prisma/seed-inventory.ts to the database:
  * - Idempotent by immutable canonical code/slug: applying seeds twice produces
  *   no duplicate rows.
  * - Create-if-missing only: existing rows are never updated, so later staff
@@ -80,7 +80,7 @@ async function seedBusinessTypes(prisma: SeedClient): Promise<void> {
 }
 
 async function seedCategories(prisma: SeedClient): Promise<void> {
-  // PRODUCT rows are flat: parent_id and path stay null (docs/12).
+  // PRODUCT rows are flat: parent_id and path stay null in the implemented seed shape.
   for (const [index, category] of PRODUCT_CATEGORY_SEEDS.entries()) {
     const slug = categorySlug(category.name);
     const existing = await prisma.category.findFirst({

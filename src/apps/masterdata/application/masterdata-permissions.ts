@@ -1,7 +1,7 @@
 /**
- * Master Data permission IDs (MD-00 §10). The exact locked vocabulary is
- * app-owned; Core RBAC only evaluates grants. `dictionary` covers Unit and
- * BusinessType. MD-07 exports the complete catalog and coverage.
+ * Master Data permission IDs. The vocabulary is app-owned; Core RBAC only
+ * evaluates grants. `dictionary` covers Unit and BusinessType. Foundation F0
+ * exposes this catalog through the app's public boundary for registration.
  */
 export const MASTERDATA_CATEGORY_READ = "masterdata.category.read";
 export const MASTERDATA_CATEGORY_MANAGE = "masterdata.category.manage";

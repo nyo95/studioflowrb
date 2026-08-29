@@ -64,7 +64,7 @@ function normalizeDescription(value: string | null | undefined): string | null {
 }
 
 /**
- * Category dictionary use cases (MD-00 §6, docs/06 §Category). Every mutation
+ * Category dictionary use cases. Every mutation
  * checks permissions, runs in one application transaction, and writes its
  * audit event inside the same transaction; no-op updates emit nothing.
  */

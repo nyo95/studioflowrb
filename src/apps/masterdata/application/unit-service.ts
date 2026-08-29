@@ -77,7 +77,7 @@ function unitAuditShape(record: UnitRecord): Record<string, unknown> {
 }
 
 /**
- * Unit controlled-dictionary use cases (MD-00 §1). Codes are immutable and
+ * Unit controlled-dictionary use cases. Codes are immutable and
  * globally unique including soft-deleted rows; usage filters restrict picker
  * context without converting values. Ordinary workflows never invent units —
  * creation is an explicit dictionary manage action only.

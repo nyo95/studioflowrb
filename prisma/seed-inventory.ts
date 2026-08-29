@@ -1,5 +1,6 @@
 /**
- * Locked Master Data MVP seed inventory (docs/12-MASTER-DATA-SEED-INVENTORY.md).
+ * Executable Master Data MVP seed inventory. This file is the canonical list;
+ * current owner direction is recorded in docs/apps/masterdata.md.
  *
  * This module is a pure transcription of the owner-approved inventory. It
  * contains no I/O so both the seed runner and the seed contract tests consume

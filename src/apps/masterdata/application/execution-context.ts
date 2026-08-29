@@ -4,14 +4,14 @@ import type { PermissionGrants } from "@platform/core/rbac";
 
 /**
  * Per-request execution context injected into every Master Data use case
- * (MD-00 §10/§11, CORE.md §3/§4):
+ * (CORE.md §§3–5):
  *
  * - `grants`: server-side resolved permission grants for the current principal;
  * - `actor`: snapshotted audit actor for the same principal.
  *
  * Use cases never resolve identity themselves and never fall back to a
  * default grant. Identity provider and grant composition remain explicit
- * platform/owner decisions (docs/08 deferred item 1).
+ * platform Core identity and RBAC activated by Foundation F0.
  */
 export type MasterDataExecutionContext = {
   grants: PermissionGrants;

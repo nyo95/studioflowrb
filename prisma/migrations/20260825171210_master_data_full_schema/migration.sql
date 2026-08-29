@@ -508,7 +508,7 @@ ALTER TABLE "master_data"."WorkPrice" ADD CONSTRAINT "WorkPrice_vendor_party_id_
 ALTER TABLE "master_data"."WorkPrice" ADD CONSTRAINT "WorkPrice_unit_id_fkey" FOREIGN KEY ("unit_id") REFERENCES "master_data"."Unit"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- ============================================================================
--- Live-identity partial/expression unique indexes (MASTER_DATA.md Â§3).
+-- Live-identity partial/expression unique indexes (current persisted shape).
 -- Prisma cannot express partial or expression unique indexes; these are the
 -- race-safe database authority for live uniqueness while allowing soft-deleted
 -- rows to release their identity for reuse.
@@ -522,7 +522,7 @@ CREATE UNIQUE INDEX "Party_live_slug_uniq" ON "master_data"."Party"("slug") WHER
 CREATE UNIQUE INDEX "Brand_live_name_uniq" ON "master_data"."Brand"(lower("name")) WHERE "deleted_at" IS NULL;
 CREATE UNIQUE INDEX "Brand_live_slug_uniq" ON "master_data"."Brand"("slug") WHERE "deleted_at" IS NULL;
 
--- Category: partial unique (kind, slug) where deleted_at IS NULL (docs/06 Â§Category).
+-- Category: partial unique (kind, slug) where deleted_at IS NULL.
 CREATE UNIQUE INDEX "Category_kind_slug_live_uniq" ON "master_data"."Category"("kind", "slug") WHERE "deleted_at" IS NULL;
 
 -- Live branded SKU: unique (brand_id, lower(slug)); live unbranded SKU: unique lower(slug).

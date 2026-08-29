@@ -3,9 +3,9 @@
 Status: **LOCKED — canonical minimalist shared UI architecture contract (PM/TL, revised by owner direction 2026-08-25)**
 Consumers: StudioFlow, Master Data, BQ, future apps.
 
-Authority: this file specializes `docs/02-UI-ENGINE-PRD.md` and `DESIGN.md`. It does not override domain ownership or app PRDs.
+Authority: this is the single shared UI architecture contract and specializes `DESIGN.md`. App-specific UI policy remains owned by an owner-approved app contract; none is executable in the current foundation-only phase.
 
-Legacy evidence provenance: all legacy UI references mean the immutable GitHub snapshot `nyo95/studioflow@548fbd6bd00ef9fd7d53df66a3561a32fbb56944`, never a local working tree or moving branch tip.
+Legacy evidence provenance: every UI capability ledger records an exact commit from the owner-designated read-only checkout at `D:\Projects\studioflow`. Committed evidence is read from that commit; working-tree-only evidence is named separately. A moving branch tip and prose-only summary are never sufficient evidence.
 
 ## 1. Purpose
 
@@ -359,6 +359,41 @@ Apps own:
 - business conditionals;
 - entity pickers.
 
+### Search, select, and create
+
+The engine distinguishes three interaction shapes instead of overloading one ambiguous control:
+
+- `Combobox` — search and select one existing option;
+- `CreatableSearch` — search/select one option plus an explicit create intent and optional explicit clear intent;
+- a future creatable tag input — create/select multiple values, only when a real multi-value consumer is approved.
+
+`CreatableSearch` owns generic interaction only:
+
+- flat or grouped options, descriptions/keywords, disabled rows, and app-supplied badges;
+- query filtering and controlled remote-query callbacks;
+- external value reset without leaving stale search text;
+- explicit clear row/button with app-supplied copy;
+- exact-match suppression and an app-supplied create label;
+- ArrowUp/ArrowDown/Home/End navigation, Enter select/create, Escape close with focus return;
+- busy, disabled, empty, and creation-error presentation;
+- accessible combobox/listbox relationships and active-option announcement.
+
+It does not create entities, call server actions, choose permissions, reuse records, assign roles, guess defaults, write audit events, or own optimistic server data. Apps provide the command and may use a generic option-overlay helper only if that helper remains persistence- and domain-neutral.
+
+The legacy component is behavior evidence, not source to copy: its clear/create/reset/group behavior is retained, while incomplete keyboard navigation, hardcoded visual values, overloaded free-text ID semantics, and untested async behavior are fixed or split.
+
+### Shared interaction hooks
+
+The engine also owns the React-specific mechanics repeatedly needed by forms across apps:
+
+- `useDebouncedValue(value, delay)` — cancels stale timers and exposes no search/business policy;
+- `useOptionOverlay(serverOptions)` — merges newly returned options by stable ID until the server refresh includes them; server data wins conflicts;
+- `useConfirm()` plus one accessible `ConfirmDialog` renderer — resolves superseded/unmounted requests safely and optionally requires exact typed text;
+- `useUnsavedChangesGuard()` plus prompt — guards close/navigation only after real edits, supports an explicit custom dirty comparator, and closes without prompting after a successful save;
+- pending-submit and action-feedback presentation that accepts state as props and owns no server action, permission, redirect, or revalidation policy.
+
+These hooks must not contain entity names, toast copy, default roles, persistence calls, cache paths, or app imports. Browser unload protection is allowed only while dirty and must be removed on cleanup. In-app navigation/overlay close behavior is covered by focused interaction tests.
+
 ## 9. Dialog & Drawer Contract
 
 UI Engine owns:
@@ -475,15 +510,18 @@ import {
 
 Avoid arbitrary deep imports. Keep the public export surface small.
 
-## 16. Promotion Rule
+## 16. Promotion and gap-completion rule
 
 Promote a UI pattern into UI Engine only when:
 1. multiple apps clearly need it; or
 2. it enforces a global design/interaction rule; or
 3. it is a canonical page/app template; or
-4. duplication already exists and the abstraction is obvious.
+4. duplication already exists and the abstraction is obvious; or
+5. exact legacy code evidence plus the approved app roadmap proves the interaction is a reusable platform capability.
 
 Do not promote something because it might be reusable someday.
+
+Conversely, do not implement a known generic interaction privately inside an app because the current engine catalog lacks it. The PM/TL must classify the gap, define the domain-neutral API, add it to the same vertical work order, and require the app to consume the shared implementation.
 
 ## 17. Executor Agent Contract
 
@@ -515,18 +553,16 @@ Claude/Codex owns:
 
 Mechanical implementation should be delegated after decisions are deterministic.
 
-## 19. Product Kit Implementation Scope
+## 19. Staged Foundation Scope
 
-The pre-product UI kit is one bounded implementation program with four checkpoints. Public exports are limited to this approved inventory.
+The UI contract is broader than the code required today. Public code is added by stage; documented deferred candidates must not become empty or speculative exports.
 
-### UI-A — tokens and primitives
+### UI-F0 — required for login, access, and General Settings
 
 - `Heading`, `Text`, `Button`, `IconButton`;
 - `Input`, `Textarea`, `Select`, `Checkbox`, `RadioGroup`, `Switch`;
 - `Divider`, `Badge`, `Spinner`, `Skeleton`, `Surface`;
 - semantic tokens and typography/print base styles.
-
-### UI-B — forms, data, and state components
 
 - `Field`, `FormSection`, `FormActions`;
 - `SectionCard`, `PageSection`;
@@ -535,19 +571,31 @@ The pre-product UI kit is one bounded implementation program with four checkpoin
 - `DescriptionList`, `DescriptionItem`;
 - `StatusBadge`, `Notice`, `LoadingState`, `EmptyState`, `ErrorState`, `InlineError`.
 
-### UI-C — overlays, navigation, and layouts
-
 - `Dialog`, `Drawer`, `ConfirmDialog`, `Tooltip`;
 - `AppShell`, `PageShell`, `PageHeader`;
-- `DirectoryShell`, `DetailShell`, `SettingsShell`, `WorkspaceShell`, `SplitPane`;
+- `DirectoryShell`, `DetailShell`, `SettingsShell`;
 - `Tabs`.
 
-### UI-D — shared interaction/document patterns and showcase
+This stage includes a real login page, authenticated app launcher, user directory/editor, role/grant directory/editor, and General Settings form. Those workflows prove the shared components; the `/ui-engine` showcase alone is not acceptance.
+
+### UI-F1 — activate immediately before Master Data resumes
 
 - `RowActionMenu`, `FilterBar`, `SelectionBar`;
-- `Combobox`, `InlineEdit`, `ReorderHandle`, `FileDropZone`;
-- `DocumentSheet` and print helpers;
+- `Combobox`, `CreatableSearch`;
+- `useDebouncedValue`, `useOptionOverlay`, `useConfirm`, `useUnsavedChangesGuard`, their accessible prompts, and generic pending/action feedback;
 - one internal UI Engine showcase route demonstrating realistic compositions without app/domain imports.
+
+### Deferred candidates
+
+| Pattern | Activation trigger |
+|---|---|
+| `WorkspaceShell`, `SplitPane` | first approved StudioFlow/BQ workspace requiring the layout |
+| `InlineEdit` | a locked app workflow proves inline editing is preferable to form/dialog editing |
+| `ReorderHandle` | first persisted manual-order workflow with keyboard requirements |
+| `FileDropZone` | approved file/media storage flow and its security contract |
+| `DocumentSheet` and print helpers | first approved document/print workflow |
+
+Deferred patterns may remain in design prose as routing memory. They are not required for the active closure gate and should not remain public implementation without a real approved consumer.
 
 ### Behavioral boundaries
 
@@ -557,6 +605,7 @@ The pre-product UI kit is one bounded implementation program with four checkpoin
   movement across enabled options, Home/End movement within the option list,
   Enter selection, Escape close/focus return, and visible keyboard focus. It does
   not own remote fetching, entity vocabulary, authorization, or business ranking.
+- CreatableSearch builds on the same navigation/accessibility contract and adds only explicit clear/create interaction. Persistence, authorization, validation, reuse semantics, role assignment, audit, and app option shaping remain app-owned.
 - InlineEdit owns editing states and keyboard behavior, not validation/business saving rules.
 - FileDropZone owns input/drop interaction and file-list presentation, not storage/upload policy.
 - StatusBadge receives an explicit semantic tone and never infers meaning from a domain status string.
@@ -570,10 +619,24 @@ UI Engine foundation implementation is complete when:
 - `DESIGN.md` is approved;
 - global tokens have one clear source;
 - feature-specific tokens are absent from global UI Engine;
-- the UI-A through UI-D public inventory is implemented without parallel/duplicate primitives;
-- Master Data and BQ can build new screens without inventing page structure;
+- every component in the activated UI stage is implemented without parallel/duplicate primitives;
+- UI-F0 login/settings/access workflows can ship without inventing page structure or interaction mechanics;
+- before Master Data resumes, UI-F1 passes and Master Data can build its first approved slice without a private generic substitute;
 - dependency rules block UI Engine from importing app domains;
-- the internal showcase covers actions, forms, data, states, overlays, layouts, responsive behavior, and document/print presentation;
+- the internal showcase covers the activated patterns and states; deferred document/file/workspace patterns are not faked;
 - desktop and narrow viewport visual review passes with keyboard/focus/accessibility checks;
 - component tests, repository checks, and production build pass;
-- PM/TL and owner approve the showcase before Master Data implementation starts.
+- one authenticated platform Settings workflow consumes UI-F0 successfully in the real browser; UI-F1 later requires one approved Master Data workflow;
+- no active page uses obsolete raw `ui-*` classes when a shared component or token exists.
+
+## 21. Code-derived legacy evidence
+
+All paths refer to committed legacy code at `D:\Projects\studioflow`, commit `6377ac0971e7a7cc0fd8fb58a8360c069675f9a5`.
+
+| Exact code evidence | Decision | Shared intent |
+|---|---|---|
+| `src/ui_engine/design-system.config.ts`, `tokens/**`, `src/styles/designTokens.css` | **MERGE + FIX** | Keep semantic design DNA; use one canonical token source and purge feature-specific global tokens. |
+| `src/ui_engine/layout/page-header.tsx`, `layout/shells/dashboard-page-shell.tsx`, `settings-shell.tsx` | **KEEP + FIX** | Preserve useful hierarchy/shell composition; remove StudioFlow route/vocabulary assumptions. |
+| `src/ui_engine/components/section-card.tsx`, `table-card.tsx` | **MERGE + FIX** | Preserve shared surfaces/table containment and standardize density/overflow/accessibility. |
+| `src/components/ui/creatable-search.tsx#CreatableSearch` | **KEEP + FIX (UI-F1)** | Preserve grouped search, create/clear, reset, filter, exact-match suppression, and Enter. Fix full keyboard navigation, focus return, async/error state, free-text ID overloading, and hardcoded styling. |
+| `src/hooks/use-debounce.ts#useDebounce`, `use-app-confirm.tsx#useAppConfirm`, `use-unsaved-changes-guard.tsx#useUnsavedChangesGuard` | **MERGE + FIX (UI-F1)** | Preserve timer cleanup, awaited confirm, safe supersede/unmount, pristine baseline, custom dirty comparator, and close-after-save; remove app copy/persistence. |

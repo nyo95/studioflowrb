@@ -15,7 +15,7 @@ datasource db {
 /// CategoryKind distinguishes the two controlled dictionaries in the same table.
 /// PRODUCT: for SKU classification and Brand discovery.
 /// WORK: for WorkPrice classification (may be hierarchical).
-/// Owner-confirmed 2026-08-22. See docs/06-DATA-OWNERSHIP.md §Category.
+/// Current owner direction is recorded in docs/apps/masterdata.md.
 enum CategoryKind {
   PRODUCT
   WORK
@@ -32,7 +32,7 @@ enum PartyType {
   @@schema("master_data")
 }
 
-/// Locked operational role vocabulary (MD-00 §4). Drives commercial
+/// Operational role vocabulary in the current persisted shape. Drives commercial
 /// eligibility only. The legacy six-value mixed role enum is purged;
 /// business nature is editable BusinessType data instead.
 enum PartyRoleKind {
@@ -42,7 +42,7 @@ enum PartyRoleKind {
   @@schema("master_data")
 }
 
-/// Proven link vocabulary shared by PartyLink and BrandLink (MD-00 §4).
+/// Proven link vocabulary shared by PartyLink and BrandLink.
 enum LinkKind {
   WEBSITE
   INSTAGRAM
@@ -61,7 +61,7 @@ enum LinkKind {
 }
 
 /// Small code-owned vocabulary restricting where a Unit may be picked.
-/// It performs no conversion semantics (MD-00 §1).
+/// It performs no conversion semantics.
 enum UnitUsage {
   DIMENSION
   QUANTITY
@@ -73,7 +73,7 @@ enum UnitUsage {
 }
 
 /// SKU commercial kind. Legacy `SERVICE` is purged: canonical quoted work
-/// belongs to WorkPrice (MD-00 §7).
+/// belongs to WorkPrice in the current persisted shape.
 enum SkuKind {
   MATERIAL
   FURNITURE
@@ -93,7 +93,7 @@ enum SkuStatus {
   @@schema("master_data")
 }
 
-/// Proven media kind vocabulary (MD-00 §7). Storage/upload mechanics remain
+/// Proven media kind vocabulary. Storage/upload mechanics remain
 /// infrastructure concerns.
 enum MediaKind {
   IMAGE
@@ -118,8 +118,8 @@ enum WorkPriceKind {
 // MASTER DATA — Unit (controlled dictionary)
 // ============================================================================
 
-/// Controlled editable/extensible dictionary seeded from
-/// docs/12-MASTER-DATA-SEED-INVENTORY.md. Data, not an evolving enum.
+/// Controlled editable/extensible dictionary seeded from the executable
+/// prisma/seed-inventory.ts inventory. Data, not an evolving enum.
 ///
 /// - `code` is immutable and globally unique including deleted rows
 ///   (simple unique index, race-safe authority).
@@ -161,9 +161,9 @@ model Unit {
 // MASTER DATA — BusinessType (controlled dictionary)
 // ============================================================================
 
-/// Editable controlled business-nature dictionary seeded from
-/// docs/12-MASTER-DATA-SEED-INVENTORY.md. Descriptive data only; it never
-/// grants operational eligibility implicitly (MD-00 §4).
+/// Editable controlled business-nature dictionary seeded from the executable
+/// prisma/seed-inventory.ts inventory. Descriptive data only; it never
+/// grants operational eligibility implicitly.
 model BusinessType {
   id String @id @default(uuid())
 
@@ -189,7 +189,7 @@ model BusinessType {
 // ============================================================================
 
 /// One identity with non-exclusive operational roles. There are no separate
-/// Supplier/Vendor/Company tables (MD-00 §4).
+/// Supplier/Vendor/Company tables.
 ///
 /// Soft deletion via deleted_at only (no is_active). Live uniqueness of
 /// lower(name) and slug is enforced by partial expression indexes in SQL —
@@ -231,7 +231,7 @@ model Party {
 
 /// Operational role assignment. Unique per (party_id, role); roles are
 /// non-exclusive and drive application eligibility checks on every write
-/// use case (MD-00 §4).
+/// use case in the current implementation.
 model PartyRole {
   id String @id @default(uuid())
   party_id String
@@ -263,7 +263,7 @@ model PartyBusinessType {
 
 /// Owned contact child. A general contact or an optional Brand scope; a
 /// brand-scoped contact is validated against ownership/live BrandSupplier at
-/// the application layer (MD-00 §4). Multiple contacts allowed; is_primary is
+/// the application layer. Multiple contacts allowed; is_primary is
 /// a display preference, not a uniqueness guarantee.
 model PartyContact {
   id String @id @default(uuid())
@@ -369,7 +369,7 @@ model BrandLink {
 }
 
 /// Brand-level sourcing fact: a Party known source for a Brand. Never a price,
-/// never SKU-specific availability, never a software permission (MD-00 §1).
+/// never SKU-specific availability, never a software permission.
 model BrandSupplier {
   id       String @id @default(uuid())
   brand_id String
@@ -391,9 +391,9 @@ model BrandSupplier {
 // ============================================================================
 
 /// Global controlled dictionary — owned by Master Data, consumed by StudioFlow
-/// and BQ (via snapshot). See docs/06-DATA-OWNERSHIP.md §Category for full
-/// contract, including the two distinct relations (Brand discovery vs SKU
-/// classification) and BQ snapshot semantics.
+/// and BQ through the public contract and snapshots. See
+/// docs/apps/masterdata.md for the distinct Brand-discovery and SKU-
+/// classification relations recorded in the deferred intake.
 ///
 /// Soft-delete: deleted_at (consistent with Party/Brand).
 /// Uniqueness: partial index (kind, slug) WHERE deleted_at IS NULL — see
@@ -493,9 +493,10 @@ model BrandCategory {
 /// see migration (`Sku_brand_slug_live_uniq`, `Sku_slug_nobrand_live_uniq`,
 /// `Sku_brand_code_live_uniq`, `Sku_code_nobrand_live_uniq`).
 ///
-/// ACTIVE readiness (live PRODUCT Category + live base Unit + at least one
-/// current SkuPrice + live Brand when brand_id present) is enforced at the
-/// application layer.
+/// ACTIVE catalog readiness (live PRODUCT Category + live canonical Units +
+/// live Brand when brand_id is present) is enforced at the application layer.
+/// Price availability is separate costing readiness and must never default to
+/// zero; see docs/apps/masterdata.md.
 model Sku {
   id String @id @default(uuid())
 
@@ -587,7 +588,7 @@ model SkuMedia {
 /// There is deliberately NO is_current/valid_from/valid_to, no temporal rows,
 /// no preferred/cheapest/latest selection logic, and no automatic fallback
 /// between supplier prices. Change history lives in platform AuditEvent;
-/// BQ snapshots own project-time truth (MD-00 §8).
+/// BQ snapshots own project-time truth.
 ///
 /// Race-safe pair uniqueness is enforced by partial expression indexes in SQL
 /// (plain UNIQUE treats NULLs as distinct, so the NULL supplier partition
@@ -648,7 +649,7 @@ model SkuPrice {
 ///
 /// MATERIAL_LABOR is one indivisible vendor quotation whose included-material
 /// meaning is recorded in scope_note/spec — never a BOM, component split, or
-/// generated total. There is no SKU relation and no project relation (MD-00 §9).
+/// generated total. There is no SKU relation and no project relation.
 model WorkPrice {
   id   String @id @default(uuid())
   code String
@@ -697,7 +698,7 @@ model WorkPrice {
 // ============================================================================
 
 /// Platform-owned append-only persistence of the locked Core audit envelope
-/// (CORE.md §5, MD-00 §11) for all apps. Master Data does not recreate
+/// (CORE.md §5 and docs/apps/masterdata.md) for all apps. Master Data does not recreate
 /// MasterDataAudit; StudioFlow AuditLog is not reused.
 ///
 /// - entityType/entityId and actor_user_id are polymorphic references with NO

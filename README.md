@@ -1,33 +1,24 @@
 # StudioFlow Rebuild
 
-Architecture-first rebuild of StudioFlow.
+A reusable modular core with application modules for Master Data, StudioFlow, and BQ.
 
-By owner direction dated 2026-08-28, the current StudioFlow project at `D:\Misc\ProjectsHUB\studioflow` is the read-only behavioral reference. It is evidence, not product authority. Rebuild code, builds, tests, generated artifacts, and runtime behavior must never depend on the local reference or remote legacy repository.
+Current delivery scope is foundation-first:
 
-## Goal
-
-Build a modular monolith with one shared platform and three explicit business apps:
-
-- StudioFlow — main project-management app
-- Master Data — global business-data SSOT
-- BQ — estimating/costing app
-
-## Core rule
-
-Master Data owns global business master data. StudioFlow and BQ consume it through public contracts. Project-specific mutable data is snapshotted explicitly when domain rules require independence from future master-data changes.
+1. lock and implement real login/session, persisted RBAC, Platform General Settings, Core/Utilities, Design, and the activated UI Engine stage;
+2. record likely future shared capabilities without prebuilding speculative helpers;
+3. use Master Data as the first consumer only after its full code-derived contract is approved;
+4. defer StudioFlow and BQ until the owner activates them.
 
 ## Start here
 
-1. Read `docs/README.md` and follow its authority order.
-2. Read `docs/00-SOFTWARE-SSOT.md` and `docs/06-DATA-OWNERSHIP.md`.
-3. Read the PRD and detailed dossier of the app you are changing.
-4. Read `docs/15-RULE-AUDIT.md` for known implementation conflicts.
-5. Use `docs/16-LEGACY-MIGRATION-PLAYBOOK.md` for every reference capability.
-6. Record every migrated capability in `scripts/migration-inventory.md` as KEEP / MERGE / REWRITE / PURGE / LEGACY / OPEN.
+Read [`docs/README.md`](docs/README.md) and [`CHANGELOG.md`](CHANGELOG.md), then the shared contract relevant to the change (`CORE.md`, `DESIGN.md`, or `UI_ENGINE.md`). Read an app contract only when that app is active, followed by `prisma/schema.prisma` and the real implementation path.
 
-## Non-goals
+The local `../studioflow` repository is stale behavioral evidence, not source of truth and never a runtime/build dependency. Inspect committed code at an exact recorded commit, preserve useful workflows, fix defects, merge duplicated shared capabilities, and purge contradicted behavior.
 
-- Do not reproduce legacy folder structure by default.
-- Do not migrate features simply because they exist.
-- Do not create app-to-app internal imports.
-- Do not make `shared/` a dumping ground.
+## Architecture rule
+
+Apps may depend on Platform and another app's explicit `public` surface. Platform never depends on an app, and apps never import another app's internals. Domain-neutral gaps are implemented once in Core, Utilities, or UI Engine before app code consumes them.
+
+## Current execution
+
+Foundation F0 is locked in [`scripts/work-orders/FOUNDATION.md`](scripts/work-orders/FOUNDATION.md). OpenCode executes that work order; Codex remains navigator/reviewer. Every completed change updates the changelog and receives a revisioned local commit. Nothing is pushed or published without a separate explicit owner instruction.
