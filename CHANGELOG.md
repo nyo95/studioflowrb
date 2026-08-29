@@ -5,9 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R1** — `c8e473702801510aa314bbed45242a71b600f733` on `origin/main`
-- Current local revision after this entry is committed: **R1.02**
-- Next local revision: **R1.03**
+- Current local revision after this entry is committed: **R1.03**
+- Next local revision: **R1.04**
 - Remote publication: **not authorized**
+
+## R1.03 — 2026-08-30 — fix(foundation): complete speculative module purge in committed tree
+
+Status: **executor correction — same run as R1.02, staged-deletion omissions**
+
+### Fixed
+
+- R1.02 accidentally left four stale paths in its committed tree because their deletions were not staged (`git rm --cached` failed silently behind a suppressed error): `src/app/page.tsx` (superseded by `src/app/(platform)/page.tsx`; both resolving to `/` would break the production build) and the speculative `src/platform/dictionary`, `src/platform/utilities/format`, `src/platform/utilities/id` stubs whose removal R1.02's changelog already claimed. The working tree already matched the intended state; this revision commits those deletions only. No other content changes.
+
+### Verification
+
+- `git ls-tree` confirmed the R1.02 tree contained both `/` pages and the three stub modules; this commit removes exactly those four paths.
+- Working-tree files unchanged by this correction; all reserved owner files remain unstaged and untouched.
 
 ## R1.02 — 2026-08-30 — feat(foundation): implement reusable platform foundation
 
