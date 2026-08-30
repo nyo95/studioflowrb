@@ -44,13 +44,11 @@ export function verifyPassword(encodedHash: string, password: string): Promise<b
 }
 
 /**
- * A valid non-user dummy hash. Unknown email, malformed credentials, and
- * wrong password all perform one equivalent Argon2 verification against this
- * hash so every failure path costs the same time and leaks nothing.
+ * Valid, precomputed, non-user Argon2id PHC hash using the locked parameters.
+ * It is deliberately constant so the first unknown-user attempt does not pay
+ * a one-off hash cost. The matching plaintext is not a credential and is not
+ * used by the login flow; credential attempts always verify their submitted
+ * candidate against either a real user hash or this hash exactly once.
  */
-let dummyHashPromise: Promise<string> | undefined;
-
-export function getDummyPasswordHash(): Promise<string> {
-  dummyHashPromise ??= hashPassword("T\u00A0\u200B".repeat(PASSWORD_MIN_CODE_POINTS + 4) + Math.random());
-  return dummyHashPromise;
-}
+export const DUMMY_PASSWORD_HASH =
+  "$argon2id$v=19$m=19456,t=2,p=1$jXNDXjtN4uGMKlpue0gvow$QSv2uZ7aZ8y4f837uFeXLNL4iJrEVaiLchwt9dYTAC4";

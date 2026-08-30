@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requirePrincipalGrants } from "@platform/core/auth";
+import { displayNameSchema, identityEmailSchema, passwordSchema, requirePrincipalGrants } from "@platform/core/auth";
 import { platformAccess } from "@platform/runtime";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { validationError } from "@platform/core/validation";
@@ -14,9 +14,9 @@ function revalidateUsers(): void {
 }
 
 const CreateUserSchema = z.object({
-  email: z.string().trim().toLowerCase().email(),
-  displayName: z.string().trim().min(1).max(120),
-  password: z.string().min(12).max(128),
+  email: identityEmailSchema,
+  displayName: displayNameSchema,
+  password: passwordSchema,
 });
 
 export async function createUserAction(_prev: ActionResult<{ changed?: boolean; userId?: string }> | null, formData: FormData): Promise<ActionResult<{ userId: string }>> {
@@ -49,7 +49,7 @@ export async function updateUserDisplayNameAction(
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
     const parsed = z
-      .object({ userId: z.string().uuid(), displayName: z.string().trim().min(1).max(120) })
+      .object({ userId: z.string().uuid(), displayName: displayNameSchema })
       .safeParse({
         userId: String(formData.get("userId") ?? ""),
         displayName: String(formData.get("displayName") ?? ""),
@@ -68,7 +68,7 @@ export async function updateUserDisplayNameAction(
 
 const SetPasswordSchema = z.object({
   userId: z.string().uuid(),
-  password: z.string().min(12).max(128),
+  password: passwordSchema,
 });
 
 export async function setUserPasswordAction(

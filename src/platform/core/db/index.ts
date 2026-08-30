@@ -88,3 +88,5 @@ export async function closePrismaConnection(): Promise<void> {
   await runtime.prisma.$disconnect();
   await runtime.pool.end();
 }
+
+export { runSerializableTransaction, SERIALIZABLE_TRANSACTION_MAX_ATTEMPTS } from "./transactions";

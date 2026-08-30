@@ -4,6 +4,7 @@ import { AppError, mapPrismaKnownError } from "@platform/core/errors";
 
 import { requirePermission, type PermissionGrants, type PermissionId } from "./index";
 import { getPermissionRegistry } from "./registry";
+import { parseDisplayName, parseIdentityEmail, parsePassword } from "../auth/identity-validation";
 
 /**
  * Persisted RBAC storage and access administration (CORE.md §3/§4, Foundation
@@ -384,11 +385,10 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
     }) {
       requirePermission(input.grants, USER_PERMISSION);
       userActorContext(input.actor);
-      const { hashPassword, isValidPasswordLength } = await import("../auth/password");
-      if (!isValidPasswordLength(input.password)) {
-        throw new AppError("VALIDATION", "PASSWORD_POLICY", "The password must contain between 12 and 128 characters.");
-      }
-      const email = input.email.trim().toLowerCase();
+      const { hashPassword } = await import("../auth/password");
+      const email = parseIdentityEmail(input.email);
+      const displayName = parseDisplayName(input.displayName);
+      const password = parsePassword(input.password);
       const roleIds = [...new Set(input.roleIds ?? [])];
 
       return runTransaction(async (tx) => {
@@ -398,14 +398,14 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
             throw new AppError("VALIDATION", "ROLE_NOT_ASSIGNABLE", "One or more selected roles cannot be assigned.");
           }
         }
-        const passwordHash = await hashPassword(input.password);
+        const passwordHash = await hashPassword(password);
         let user;
         try {
           user = await tx.user.create({
             data: {
               id: generateId(),
               email,
-              display_name: input.displayName.trim(),
+              display_name: displayName,
               password_hash: passwordHash,
               status: "ACTIVE",
               user_roles: roleIds.length > 0 ? { create: roleIds.map((role_id) => ({ id: generateId(), role_id })) } : undefined,
@@ -442,7 +442,7 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
           select: { id: true, display_name: true },
         });
         if (!user) throw new AppError("NOT_FOUND", "USER_NOT_FOUND", "This user no longer exists.");
-        const displayName = input.displayName.trim();
+        const displayName = parseDisplayName(input.displayName);
         if (user.display_name === displayName) return { changed: false };
         await tx.user.update({ where: { id: user.id }, data: { display_name: displayName } });
         await writeAudit(tx, {
@@ -466,14 +466,12 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
     }) {
       requirePermission(input.grants, USER_PERMISSION);
       userActorContext(input.actor);
-      const { hashPassword, isValidPasswordLength } = await import("../auth/password");
-      if (!isValidPasswordLength(input.password)) {
-        throw new AppError("VALIDATION", "PASSWORD_POLICY", "The password must contain between 12 and 128 characters.");
-      }
+      const { hashPassword } = await import("../auth/password");
+      const password = parsePassword(input.password);
       return runTransaction(async (tx) => {
         const user = await tx.user.findUnique({ where: { id: input.userId }, select: { id: true, status: true } });
         if (!user) throw new AppError("NOT_FOUND", "USER_NOT_FOUND", "This user no longer exists.");
-        const passwordHash = await hashPassword(input.password);
+        const passwordHash = await hashPassword(password);
         await tx.user.update({ where: { id: user.id }, data: { password_hash: passwordHash } });
         await tx.session.updateMany({
           where: { user_id: user.id, revoked_at: null },

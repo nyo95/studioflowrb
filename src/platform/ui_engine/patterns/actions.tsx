@@ -1,8 +1,8 @@
 "use client";
 
-import { Filter, GripVertical, MoreHorizontal, X } from "lucide-react";
+import { Filter, MoreHorizontal, X } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
-import { Fragment, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from "react";
+import { Fragment, type HTMLAttributes, type ReactNode } from "react";
 
 import { cx } from "../internal/cx";
 import { Button, IconButton } from "../primitives";
@@ -131,20 +131,3 @@ export function SelectionBar({
   );
 }
 
-export function ReorderHandle({
-  label = "Reorder item",
-  className,
-  ...props
-}: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & { label?: string }) {
-  return (
-    <IconButton
-      className={cx("cursor-grab text-ink-tertiary active:cursor-grabbing", className)}
-      size="sm"
-      variant="ghost"
-      label={label}
-      icon={<GripVertical aria-hidden="true" />}
-      aria-roledescription="sortable handle"
-      {...props}
-    />
-  );
-}

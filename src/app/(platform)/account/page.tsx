@@ -8,6 +8,7 @@ import {
 import { formatInstant } from "@platform/utilities/date";
 import { listUserSessions, logoutAllSessions, requirePrincipal, currentSessionId } from "@platform/core/auth";
 import { prisma } from "@platform/core/db";
+import { readPlatformGeneralSettings } from "@platform/core/settings";
 import { AccountForms } from "./account-forms";
 import { SessionsTable } from "./sessions-table";
 
@@ -24,9 +25,10 @@ export default async function AccountPage() {
   const principal = await requirePrincipal().catch(() => null);
   if (!principal) redirect("/login");
 
-  const [sessions, currentId] = await Promise.all([
+  const [sessions, currentId, settings] = await Promise.all([
     listUserSessions(prisma, principal.userId),
     currentSessionId(),
+    readPlatformGeneralSettings(prisma),
   ]);
 
   return (
@@ -48,9 +50,9 @@ export default async function AccountPage() {
         <SessionsTable
           sessions={sessions.map((session) => ({
             id: session.id,
-            createdAt: formatInstant(session.createdAt.toISOString()),
-            lastSeenAt: formatInstant(session.lastSeenAt.toISOString()),
-            expiresAt: formatInstant(session.absoluteExpiresAt.toISOString()),
+            createdAt: formatInstant(session.createdAt.toISOString(), { locale: settings.locale, timeZone: settings.timezone }),
+            lastSeenAt: formatInstant(session.lastSeenAt.toISOString(), { locale: settings.locale, timeZone: settings.timezone }),
+            expiresAt: formatInstant(session.absoluteExpiresAt.toISOString(), { locale: settings.locale, timeZone: settings.timezone }),
             revoked: session.revokedAt !== null,
             userAgent: session.userAgent,
           }))}

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { createAuditEventWriter } from "@platform/core/audit/persistence";
-import { prisma } from "@platform/core/db";
+import { prisma, runSerializableTransaction } from "@platform/core/db";
 import { createPlatformAccessService } from "@platform/core/rbac/services";
 import { createPlatformSettingsService } from "@platform/core/settings";
 import { createPlatformAccountService } from "@platform/core/auth/account";
@@ -15,7 +15,7 @@ import type { Prisma } from "@/generated/prisma/client";
  */
 
 export const runTransaction = <T>(work: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> =>
-  prisma.$transaction(work);
+  runSerializableTransaction(prisma, work);
 
 const commonPorts = {
   runTransaction,

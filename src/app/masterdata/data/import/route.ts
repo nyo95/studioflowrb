@@ -1,6 +1,6 @@
 import { importExportService } from "@masterdata/infrastructure/runtime";
 import { requireMasterDataRequestContext } from "@masterdata/infrastructure/request-context";
-import { AppError, toSafeErrorPayload } from "@platform/core/errors";
+import { AppError, createOperationalErrorReporter, toSafeErrorPayload } from "@platform/core/errors";
 
 export async function POST(request: Request) {
   try {
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     }
     return Response.json({ ok: preview.issues.length === 0, changedRows: preview.changedRows, issues: preview.issues });
   } catch (error) {
-    const payload = toSafeErrorPayload(error, { reportUnknownError: console.error });
+    const payload = toSafeErrorPayload(error, { reportUnknownError: createOperationalErrorReporter("masterdata.import") });
     return Response.json(payload, { status: payload.kind === "UNAUTHENTICATED" ? 401 : payload.kind === "FORBIDDEN" ? 403 : 400 });
   }
 }

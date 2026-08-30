@@ -6,6 +6,7 @@ import { normalizeEmail } from "@platform/utilities/normalization";
 
 import { closeTestDb, createTestDb, requireDisposableTestDatabaseUrl, truncatePlatformTables, type TestDb } from "../db/test-support";
 import { bootstrapFirstOwner } from "./bootstrap";
+import { PLATFORM_PERMISSIONS } from "@platform/core/rbac/registry";
 import { performLogin } from "./login";
 import { hashPassword, isValidPasswordLength, verifyPassword } from "./password";
 import {
@@ -260,7 +261,7 @@ describe("bootstrap command", () => {
         now: () => new Date(),
         generateId: () => crypto.randomUUID(),
       },
-      { email: "owner@example.com", displayName: "Platform Owner", password: "correct horse battery staple" },
+      { email: "owner@example.com", displayName: "Platform Owner", password: "correct horse battery staple", permissionIds: PLATFORM_PERMISSIONS },
     );
     const user = await db.prisma.user.findUnique({ where: { id: result.userId }, include: { user_roles: true } });
     assert.equal(user?.status, "ACTIVE");
@@ -281,7 +282,7 @@ describe("bootstrap command", () => {
             now: () => new Date(),
             generateId: () => crypto.randomUUID(),
           },
-          { email: "second@example.com", displayName: "Second", password: "another valid password here" },
+          { email: "second@example.com", displayName: "Second", password: "another valid password here", permissionIds: PLATFORM_PERMISSIONS },
         ),
       (error: unknown) => error instanceof AppError && error.kind === "CONFLICT" && error.code === "BOOTSTRAP_REFUSED",
     );
@@ -299,7 +300,7 @@ describe("bootstrap command", () => {
         now: () => new Date(),
         generateId: () => crypto.randomUUID(),
       },
-      { email: "owner2@example.com", displayName: "Owner Two", password: "another valid password here" },
+      { email: "owner2@example.com", displayName: "Owner Two", password: "another valid password here", permissionIds: PLATFORM_PERMISSIONS },
     );
     const grantsAfter = (await db.prisma.rolePermission.findMany({ where: { role_id: role!.id } })).length;
     assert.equal(grantsBefore, grantsAfter);

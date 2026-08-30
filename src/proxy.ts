@@ -24,9 +24,6 @@ export function proxy(request: NextRequest) {
     const url = new URL("/login", request.url);
     return NextResponse.redirect(url);
   }
-  if (isPublic && hasSessionCookie) {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
   return NextResponse.next();
 }
 

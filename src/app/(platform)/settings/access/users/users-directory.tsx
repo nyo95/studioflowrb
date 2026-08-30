@@ -196,10 +196,10 @@ export function UsersDirectory({
             <Input id="create-email" name="email" type="email" required autoComplete="off" />
           </Field>
           <Field id="create-display-name" label="Display name">
-            <Input id="create-display-name" name="displayName" required maxLength={120} />
+            <Input id="create-display-name" name="displayName" required />
           </Field>
           <Field id="create-password" label="Initial password" description="12–128 characters. The user should change it after signing in.">
-            <Input id="create-password" name="password" type="password" required minLength={12} maxLength={128} autoComplete="new-password" />
+            <Input id="create-password" name="password" type="password" required autoComplete="new-password" />
           </Field>
           <Field id="create-roles" label="Roles">
             <Select id="create-roles" name="roleIds" multiple size={Math.min(4, Math.max(2, roles.length))}>
@@ -235,7 +235,7 @@ export function UsersDirectory({
             }}
           >
             <Field id="edit-display-name" label="Display name">
-              <Input id="edit-display-name" name="displayName" defaultValue={editTarget.displayName} required maxLength={120} />
+              <Input id="edit-display-name" name="displayName" defaultValue={editTarget.displayName} required />
             </Field>
             {editState && !editState.ok ? <InlineError>{editState.error.safeMessage}</InlineError> : null}
             <FormActions>
@@ -262,7 +262,7 @@ export function UsersDirectory({
           >
             <input type="hidden" name="userId" value={passwordTarget.id} />
             <Field id="set-password" label="New password" description="12–128 characters.">
-              <Input id="set-password" name="password" type="password" required minLength={12} maxLength={128} autoComplete="new-password" />
+              <Input id="set-password" name="password" type="password" required autoComplete="new-password" />
             </Field>
             {passwordState && !passwordState.ok ? <InlineError>{passwordState.error.safeMessage}</InlineError> : null}
             <FormActions>

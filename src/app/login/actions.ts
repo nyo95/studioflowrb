@@ -3,7 +3,6 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 
-import { AppError } from "@platform/core/errors";
 import {
   performLogin,
   setSessionCookie,
@@ -12,7 +11,6 @@ import {
 import { prisma } from "@platform/core/db";
 import { createPostgresLoginLimiter } from "@platform/core/auth/limiter-postgres";
 import { getPermissionRegistry } from "@platform/core/rbac/registry";
-import { normalizeEmail } from "@platform/utilities/normalization";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 
 /**
@@ -34,12 +32,6 @@ export async function loginAction(_prev: ActionResult<{ redirectTo: string }> | 
   return runSafeAction(async () => {
     const email = String(formData.get("email") ?? "");
     const password = String(formData.get("password") ?? "");
-    const normalized = normalizeEmail(email);
-    if (normalized.length === 0 || !normalized.includes("@") || password.length === 0) {
-      // Same generic failure as any other credential problem.
-      throw new AppError("UNAUTHENTICATED", "LOGIN_FAILED", "Sign in failed. Check your email and password.");
-    }
-
     const networkKeySource = { forwardedClientIp: await forwardedHeaderValue() };
 
     const outcome = await performLogin(

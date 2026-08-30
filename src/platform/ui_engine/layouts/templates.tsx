@@ -63,63 +63,6 @@ export function SettingsShell({
   );
 }
 
-export function WorkspaceShell({
-  toolbar,
-  footer,
-  children,
-  className,
-  ...props
-}: HTMLAttributes<HTMLDivElement> & { toolbar?: ReactNode; footer?: ReactNode }) {
-  return (
-    <div
-      className={cx(
-        "grid min-h-[min(760px,calc(100vh-48px))] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-card border border-line bg-surface",
-        className,
-      )}
-      {...props}
-    >
-      {toolbar ? <div className="flex min-h-12 items-center gap-2 border-b border-line px-3 py-2">{toolbar}</div> : null}
-      <div className="min-h-0 min-w-0 overflow-auto">{children}</div>
-      {footer ? <div className="flex min-h-12 items-center gap-2 border-t border-line px-3 py-2">{footer}</div> : null}
-    </div>
-  );
-}
-
-const SPLIT_SECONDARY_WIDTH_CLASSES = {
-  sm: "[--ui-split-secondary:minmax(220px,280px)]",
-  md: "[--ui-split-secondary:minmax(280px,360px)]",
-  lg: "[--ui-split-secondary:minmax(360px,460px)]",
-} as const;
-
-export function SplitPane({
-  primary,
-  secondary,
-  secondaryWidth = "md",
-  className,
-  ...props
-}: HTMLAttributes<HTMLDivElement> & {
-  primary: ReactNode;
-  secondary: ReactNode;
-  secondaryWidth?: "sm" | "md" | "lg";
-}) {
-  return (
-    <div
-      className={cx(
-        "grid min-h-0 grid-cols-[minmax(0,1fr)_var(--ui-split-secondary)] max-[840px]:grid-cols-1",
-        SPLIT_SECONDARY_WIDTH_CLASSES[secondaryWidth],
-        className,
-      )}
-      data-secondary-width={secondaryWidth}
-      {...props}
-    >
-      <div className="min-h-0 min-w-0">{primary}</div>
-      <aside className="min-h-0 min-w-0 border-l border-line max-[840px]:border-l-0 max-[840px]:border-t">
-        {secondary}
-      </aside>
-    </div>
-  );
-}
-
 export type TabItem = {
   value: string;
   label: ReactNode;

@@ -2,6 +2,7 @@ import { ZodError } from "zod";
 
 import {
   AppError,
+  createOperationalErrorReporter,
   isFrameworkControlFlowError,
   toSafeErrorPayload,
   type SafeErrorPayload,
@@ -35,7 +36,7 @@ export type ActionReporter = (error: unknown) => void;
  */
 export async function runSafeAction<T>(
   command: () => Promise<T>,
-  options: { reportUnknownError?: ActionReporter } = {},
+  options: { reportUnknownError?: ActionReporter; context?: string; correlationId?: string } = {},
 ): Promise<ActionResult<T>> {
   try {
     return { ok: true, data: await command() };
@@ -43,7 +44,10 @@ export async function runSafeAction<T>(
     if (isFrameworkControlFlowError(error)) throw error;
     const payload = toSafeErrorPayload(
       error instanceof ZodError ? validationError(error) : error,
-      { reportUnknownError: options.reportUnknownError },
+      {
+        reportUnknownError: options.reportUnknownError ??
+          createOperationalErrorReporter(options.context ?? "server_action", options.correlationId),
+      },
     );
     return { ok: false, error: payload };
   }

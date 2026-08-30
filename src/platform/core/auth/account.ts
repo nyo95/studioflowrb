@@ -2,7 +2,8 @@ import type { Prisma } from "@/generated/prisma/client";
 import { prepareAuditEvent, type AuditWriter } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 
-import { hashPassword, isValidPasswordLength, verifyPassword } from "./password";
+import { hashPassword, verifyPassword } from "./password";
+import { parseDisplayName, parsePassword } from "./identity-validation";
 import { createSession, type CreatedSession, type DbClient } from "./session-service";
 
 /**
@@ -41,10 +42,7 @@ export function createPlatformAccountService(ports: AccountPorts) {
         if (!user || user.status !== "ACTIVE") {
           throw new AppError("UNAUTHENTICATED", "NO_SESSION", "Please sign in to continue.");
         }
-        const displayName = input.displayName.trim();
-        if (displayName.length === 0 || displayName.length > 120) {
-          throw new AppError("VALIDATION", "DISPLAY_NAME_INVALID", "Enter a display name of 1–120 characters.");
-        }
+        const displayName = parseDisplayName(input.displayName);
         if (user.display_name === displayName) return { changed: false };
         await tx.user.update({ where: { id: user.id }, data: { display_name: displayName } });
         await auditWriter.write(
@@ -73,9 +71,7 @@ export function createPlatformAccountService(ports: AccountPorts) {
       currentPassword: string;
       newPassword: string;
     }): Promise<{ rotated: CreatedSession }> {
-      if (!isValidPasswordLength(input.newPassword)) {
-        throw new AppError("VALIDATION", "PASSWORD_POLICY", "The password must contain between 12 and 128 characters.");
-      }
+      const newPassword = parsePassword(input.newPassword);
       const committed = await runTransaction(async (tx) => {
         const user = await tx.user.findUnique({
           where: { id: input.userId },
@@ -88,7 +84,7 @@ export function createPlatformAccountService(ports: AccountPorts) {
         if (!verified) {
           throw new AppError("VALIDATION", "CURRENT_PASSWORD_INCORRECT", "Your current password is incorrect.");
         }
-        const passwordHash = await hashPassword(input.newPassword);
+        const passwordHash = await hashPassword(newPassword);
         await tx.user.update({ where: { id: user.id }, data: { password_hash: passwordHash } });
         const revoked = await tx.session.updateMany({
           where: { user_id: user.id, revoked_at: null },

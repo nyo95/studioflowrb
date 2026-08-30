@@ -5,9 +5,49 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R1** — `c8e473702801510aa314bbed45242a71b600f733` on `origin/main`
-- Current local revision after this entry is committed: **R1.03**
-- Next local revision: **R1.04**
+- Current local revision after this entry is committed: **R1.04**
+- Next local revision: **R1.05**
 - Remote publication: **not authorized**
+
+## R1.04 — 2026-08-30 — fix(foundation): close identity shell and concurrency gaps
+
+Status: **executor correction — Foundation F0 follow-on fixes**
+
+Closes identity, shell, concurrency, and observability gaps left open after R1.02/R1.03.
+
+### Fixed
+
+- **Proxy redirect loop** — `/login` is no longer silently redirected to `/` just because a session cookie is present; the proxy performs only optimistic public-route gating and defers live session resolution to the login page itself.
+- **Login page live resolution** — `/login` now resolves the principal against the live database and reads General Settings (branding, locale) before rendering; valid sessions are forwarded to the single accessible app or the launcher.
+- **`loginAction` FormData extraction** — malformed credentials are no longer rejected before `performLogin`; all extraction happens first, then `performLogin` does the single Argon2 verify.
+- **Exactly-one Argon2 verify** — every login attempt (valid user, unknown email, malformed email, short/empty password, disabled user) resolves to exactly one `argon2.verify` call against the real hash or the precomputed PHC dummy hash; lazy/random dummy hashes removed.
+- **Dummy hash** — replaced with a precomputed Argon2id PHC string so timing properties are stable and the value is not generated at runtime.
+- **Limiter reset fail-closed** — limiter reset failures now produce `LOGIN_LIMITER_UNAVAILABLE` rather than silently succeeding.
+- **Shared validators** — common validators for email, display name, and password Unicode boundaries extracted to `src/platform/core/auth/identity-validation.ts`; create-user, admin-password, account-password, display-name, and bootstrap boundaries now use the shared validators.
+- **Serializable transaction runner** — `src/platform/core/db/transactions.ts` introduces a serializable transaction runner with up to three retry attempts; wired into the platform runtime and bootstrap CLI.
+- **Bootstrap permission registry** — bootstrap now receives the full permission registry from the composition root instead of the seven hardcoded platform permissions.
+- **General Settings `weekStartsOn`** — type narrowed to `0 | 1`; UI restricted to Sunday/Monday; seeding replaced with race-safe upsert; additive migration added.
+- **General Settings usage** — login branding, launcher, authenticated shell, and Account locale/timezone now read from live General Settings; settings updates revalidate the affected login and layout paths.
+- **Centralized safe reporter** — `src/platform/core/errors` gains a central operational reporter; raw `console.error` calls in import/export routes replaced.
+- **Reusable authenticated shell** — `src/platform/authenticated-shell/` provides a shared shell used by the platform and Master Data; app list filtered by live access grants; active navigation derived from actual pathname; `NavItem` emits correct `aria-current="page"`.
+- **Deferred surface removal** — `WorkspaceShell`, `SplitPane`, `InlineEdit`, `ReorderHandle`, `FileDropZone`, `DocumentSheet`, print-only helpers, and `/ui-engine` showcase removed (spec-deferred, no consumers).
+- **Test fix** — three `bootstrapFirstOwner` calls in `session-service.integration.test.ts` that were missing the required `permissionIds` field (introduced when bootstrap was extended to accept the full registry) are now supplied `PLATFORM_PERMISSIONS`.
+
+### Added
+
+- `prisma/migrations/20260830000000_foundation_identity_shell_concurrency/migration.sql` — additive migration for `week_starts_on` CHECK constraint and `PlatformGeneralSettings` upsert safety.
+- `src/platform/core/auth/identity-validation.ts` — shared Unicode boundary validators.
+- `src/platform/core/db/transactions.ts` — serializable transaction runner with retry.
+- `src/platform/authenticated-shell/index.tsx` — reusable authenticated shell.
+- `src/platform/authenticated-shell/navigation.tsx` — permission-filtered navigation with live active state.
+
+### Verification
+
+- `npm run typecheck`: passed (0 errors).
+- `npm run lint`: passed (0 warnings, 0 errors).
+- `npm run check:boundaries`: passed (Architecture boundaries OK).
+- `npm run check:legacy-runtime`: passed (No legacy runtime references OK).
+- `npm test`: 205 tests passed; 4 failures are pre-existing sandbox infrastructure (argon2 native binding missing for this arch, no DB configured) — not code regressions; 66 cancelled (DB integration, require disposable PostgreSQL).
 
 ## R1.03 — 2026-08-30 — fix(foundation): complete speculative module purge in committed tree
 

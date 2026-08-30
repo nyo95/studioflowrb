@@ -2,8 +2,9 @@ import type { Prisma } from "@/generated/prisma/client";
 import { prepareAuditEvent, type AuditWriter } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 
-import { hashPassword, isValidPasswordLength } from "./password";
-import { PLATFORM_PERMISSIONS } from "../rbac/registry";
+import { hashPassword } from "./password";
+import { parseDisplayName, parseIdentityEmail, parsePassword } from "./identity-validation";
+import { isValidPermissionId } from "../rbac";
 
 /**
  * One-time first-owner bootstrap command (CORE.md §3, Foundation F0 §6).
@@ -26,6 +27,8 @@ export type BootstrapInput = {
   email: string;
   displayName: string;
   password: string;
+  /** Full permission vocabulary supplied by the composition root. */
+  permissionIds: readonly string[];
 };
 
 export type BootstrapResult = {
@@ -45,13 +48,12 @@ export async function bootstrapFirstOwner(
   ports: BootstrapPorts,
   input: BootstrapInput,
 ): Promise<BootstrapResult> {
-  const email = input.email.trim().toLowerCase();
-  const displayName = input.displayName.trim();
-  if (email.length === 0 || displayName.length === 0) {
-    throw new AppError("VALIDATION", "BOOTSTRAP_INPUT_INVALID", "Email and display name are required.");
-  }
-  if (!isValidPasswordLength(input.password)) {
-    throw new AppError("VALIDATION", "PASSWORD_POLICY", "The password must contain between 12 and 128 characters.");
+  const email = parseIdentityEmail(input.email);
+  const displayName = parseDisplayName(input.displayName);
+  const password = parsePassword(input.password);
+  const permissionIds = [...new Set(input.permissionIds)];
+  if (permissionIds.length === 0 || permissionIds.some((permission) => !isValidPermissionId(permission))) {
+    throw new AppError("INVARIANT", "BOOTSTRAP_PERMISSION_REGISTRY_INVALID", "The permission registry is invalid.");
   }
 
   const { runTransaction, auditWriter, now, generateId } = ports;
@@ -76,13 +78,13 @@ export async function bootstrapFirstOwner(
           description: "Initial owner role created by bootstrap with explicit registry grants.",
           is_system: true,
           role_permissions: {
-            create: PLATFORM_PERMISSIONS.map((permission_id) => ({ id: generateId(), permission_id })),
+            create: permissionIds.map((permission_id) => ({ id: generateId(), permission_id })),
           },
         },
       });
     }
 
-    const passwordHash = await hashPassword(input.password);
+    const passwordHash = await hashPassword(password);
     const user = await tx.user.create({
       data: {
         id: generateId(),

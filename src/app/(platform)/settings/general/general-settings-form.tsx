@@ -70,11 +70,6 @@ export function GeneralSettingsForm({
             <Select id="settings-week-start" name="weekStartsOn" defaultValue={String(settings.weekStartsOn)} disabled={disabled}>
               <option value="0">Sunday</option>
               <option value="1">Monday</option>
-              <option value="2">Tuesday</option>
-              <option value="3">Wednesday</option>
-              <option value="4">Thursday</option>
-              <option value="5">Friday</option>
-              <option value="6">Saturday</option>
             </Select>
           </Field>
           <Field id="settings-brand-mark" label="Brand mark URL" description="Optional https URL or /path.">

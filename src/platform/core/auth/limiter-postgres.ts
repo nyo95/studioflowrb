@@ -95,9 +95,12 @@ export function createPostgresLoginLimiter(): LoginLimiter {
       try {
         await email.delete(emailKey);
       } catch (error) {
-        // A failed clear keeps a stale failure bucket but never invents an
-        // authentication outcome; the next window clears it automatically.
-        void error;
+        throw new AppError(
+          "INFRASTRUCTURE",
+          "LOGIN_LIMITER_UNAVAILABLE",
+          "Sign-in is temporarily unavailable. Try again shortly.",
+          { cause: error },
+        );
       }
     },
   };

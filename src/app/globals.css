@@ -1,7 +1,6 @@
 @import "tailwindcss";
 @import "../platform/ui_engine/tokens/tokens.css";
 @import "../platform/ui_engine/styles/base.css";
-@import "../platform/ui_engine/styles/print.css";
 
 /*
  * Tailwind 4 token bridge (UI_ENGINE.md §5). Engine-owned: tokens/tokens.css

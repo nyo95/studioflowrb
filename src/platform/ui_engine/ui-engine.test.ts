@@ -9,7 +9,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import * as ui from "./index";
 import { getComboboxNavigationIndex } from "./internal/combobox-navigation";
 import { getEffectiveRailCollapsed } from "./internal/rail-state";
-import { getInlineEditKeyAction } from "./patterns/inline-edit";
 
 describe("UI Engine foundation", () => {
   it("exports the deliberate shared surface", () => {
@@ -56,8 +55,6 @@ describe("UI Engine foundation", () => {
       "DirectoryShell",
       "DetailShell",
       "SettingsShell",
-      "WorkspaceShell",
-      "SplitPane",
       "Tabs",
       "PageSection",
       "SectionCard",
@@ -70,16 +67,15 @@ describe("UI Engine foundation", () => {
       "FilterBar",
       "SelectionBar",
       "Combobox",
-      "InlineEdit",
-      "ReorderHandle",
-      "FileDropZone",
-      "DocumentSheet",
     ]) {
       const exported = ui[name as keyof typeof ui];
       assert.ok(
         typeof exported === "function" || (typeof exported === "object" && exported !== null),
         name,
       );
+    }
+    for (const deferred of ["WorkspaceShell", "SplitPane", "InlineEdit", "ReorderHandle", "FileDropZone", "DocumentSheet"]) {
+      assert.equal(deferred in ui, false, `${deferred} must remain deferred`);
     }
   });
 
@@ -188,35 +184,6 @@ describe("UI Engine foundation", () => {
     assert.equal(getComboboxNavigationIndex(disabled, 2, "End"), 3);
     assert.equal(getComboboxNavigationIndex(disabled, 2, "Home"), 0);
     assert.equal(getComboboxNavigationIndex([true, true], -1, "ArrowDown"), null);
-  });
-
-  it("locks inline edit keyboard behavior and document print hooks", () => {
-    assert.equal(getInlineEditKeyAction("Enter"), "commit");
-    assert.equal(getInlineEditKeyAction("Escape"), "cancel");
-    assert.equal(getInlineEditKeyAction("Tab"), null);
-    const document = renderToStaticMarkup(
-      createElement(ui.DocumentSheet, { title: "Summary" }, createElement("p", null, "Content")),
-    );
-    assert.match(document, /ui-document-sheet/);
-    assert.match(document, /data-size="a4"/);
-    const printCss = readFileSync(new URL("./styles/print.css", import.meta.url), "utf8");
-    assert.match(printCss, /@media print/);
-    assert.doesNotMatch(printCss, /pdf|jspdf|puppeteer/i);
-  });
-
-  it("renders inline edit pending and error states without owning persistence", () => {
-    const markup = renderToStaticMarkup(createElement(ui.InlineEdit, {
-      value: "Current",
-      editor: createElement(ui.Input, { defaultValue: "Draft" }),
-      editing: true,
-      pending: true,
-      error: "Unable to save",
-      onCommit: () => undefined,
-      onCancel: () => undefined,
-    }));
-    assert.match(markup, /aria-label="Saving"/);
-    assert.match(markup, /role="alert"/);
-    assert.match(markup, /Unable to save/);
   });
 
   it("keeps app internals and domain vocabulary out of shared UI sources", () => {

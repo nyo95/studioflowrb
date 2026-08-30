@@ -1,4 +1,5 @@
 import type { Prisma } from "@/generated/prisma/client";
+import { randomUUID } from "node:crypto";
 
 /**
  * Platform Core shared error taxonomy and safe transport mapping (CORE.md §6).
@@ -33,6 +34,8 @@ export type SafeErrorPayload = {
 
 const INTERNAL_FALLBACK_CODE = "INTERNAL";
 const INTERNAL_FALLBACK_MESSAGE = "Something went wrong. Please try again.";
+
+const SAFE_OPERATION_CONTEXT = /^[a-z0-9_.:-]{1,80}$/i;
 
 export class AppError extends Error {
   readonly kind: ErrorKind;
@@ -126,6 +129,34 @@ function isPrismaKnownError(error: unknown): error is Prisma.PrismaClientKnownRe
     /^P\d{4}$/.test((error as { code: string }).code);
 }
 
+/**
+ * Central operational reporter. Only a safe classification, bounded context,
+ * and correlation identifier are recorded server-side. Error objects,
+ * messages, stacks, queries, environment, headers, FormData, and secrets are
+ * deliberately never serialized.
+ */
+export function reportOperationalError(input: {
+  context: string;
+  error: unknown;
+  correlationId?: string;
+}): string {
+  const correlationId = input.correlationId && /^[a-zA-Z0-9_-]{1,100}$/.test(input.correlationId)
+    ? input.correlationId
+    : randomUUID();
+  const context = SAFE_OPERATION_CONTEXT.test(input.context) ? input.context : "unknown_operation";
+  const classification = isAppError(input.error)
+    ? { category: "app_error", kind: input.error.kind, code: input.error.code }
+    : isPrismaKnownError(input.error)
+      ? { category: "prisma_error", code: input.error.code }
+      : { category: "unknown_error" };
+  console.error(JSON.stringify({ level: "error", context, correlationId, ...classification }));
+  return correlationId;
+}
+
+export function createOperationalErrorReporter(context: string, correlationId?: string): (error: unknown) => void {
+  return (error) => { reportOperationalError({ context, correlationId, error }); };
+}
+
 const FORBIDDEN_DETAIL_KEYS = /^(?:stack|sql|cause|constraint|query|environment)$/i;
 
 function safeDetails(details: ErrorDetails): ErrorDetails | undefined {
@@ -174,6 +205,6 @@ export function toSafeErrorPayload(error: unknown, options: { reportUnknownError
   if (isPrismaKnownError(error)) {
     return toPayload(mapPrismaKnownError(error));
   }
-  options.reportUnknownError?.(error);
+  (options.reportUnknownError ?? createOperationalErrorReporter("safe_error_boundary"))(error);
   return { kind: "INTERNAL", code: INTERNAL_FALLBACK_CODE, safeMessage: INTERNAL_FALLBACK_MESSAGE };
 }

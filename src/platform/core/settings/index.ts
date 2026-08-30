@@ -25,7 +25,7 @@ export type PlatformGeneralSettings = {
   locale: string;
   timezone: string;
   currency: string;
-  weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  weekStartsOn: 0 | 1;
   brandMarkUrl: string | null;
 };
 
@@ -93,7 +93,7 @@ export const PlatformGeneralSettingsSchema = z.strictObject({
   locale: z.string().refine(isSupportedLocale, "Unsupported locale"),
   timezone: z.string().refine(isSupportedTimezone, "Unsupported IANA timezone"),
   currency: z.string().refine(isSupportedCurrency, "Unsupported ISO-4217 currency code"),
-  weekStartsOn: z.number().int().min(0).max(6),
+  weekStartsOn: z.union([z.literal(0), z.literal(1)]),
   brandMarkUrl: z.string().refine(isSafeBrandMarkUrl, "Unsafe brand mark URL").nullable(),
 });
 
@@ -136,16 +136,16 @@ function rowToSettings(row: SettingsRow): PlatformGeneralSettings {
 }
 
 /**
- * Reads the singleton, lazily seeding the locked defaults when the row is
- * absent. Idempotent: concurrent seeding relies on the singleton primary key
- * conflict and re-reads.
+ * Reads the singleton, atomically seeding the locked defaults when absent.
+ * `upsert` is a single race-safe statement and remains valid inside a
+ * PostgreSQL transaction; it never catches a uniqueness error after the
+ * transaction has already been aborted.
  */
 export async function readPlatformGeneralSettings(db: DbClient): Promise<PlatformGeneralSettings> {
-  const row = await db.platformGeneralSettings.findUnique({ where: { id: PLATFORM_GENERAL_SETTINGS_ID } });
-  if (row) return rowToSettings(row);
   const defaults = DEFAULT_PLATFORM_GENERAL_SETTINGS;
-  await db.platformGeneralSettings.create({
-    data: {
+  const row = await db.platformGeneralSettings.upsert({
+    where: { id: PLATFORM_GENERAL_SETTINGS_ID },
+    create: {
       id: PLATFORM_GENERAL_SETTINGS_ID,
       organization_name: defaults.organizationName,
       app_title: defaults.appTitle,
@@ -155,12 +155,9 @@ export async function readPlatformGeneralSettings(db: DbClient): Promise<Platfor
       week_starts_on: defaults.weekStartsOn,
       brand_mark_url: defaults.brandMarkUrl,
     },
-  }).catch(() => undefined);
-  const seeded = await db.platformGeneralSettings.findUnique({ where: { id: PLATFORM_GENERAL_SETTINGS_ID } });
-  if (!seeded) {
-    throw new AppError("INFRASTRUCTURE", "SETTINGS_UNAVAILABLE", "Platform settings are temporarily unavailable.");
-  }
-  return rowToSettings(seeded);
+    update: {},
+  });
+  return rowToSettings(row);
 }
 
 export type SettingsUpdateResult = { changed: boolean; settings: PlatformGeneralSettings };

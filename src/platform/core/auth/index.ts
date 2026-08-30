@@ -60,6 +60,15 @@ export { bootstrapFirstOwner, type BootstrapInput, type BootstrapResult } from "
 
 /** Authenticated login composition (rate limiting + verification + session). */
 export { performLogin, type LoginOutcome } from "./login";
+export {
+  displayNameSchema,
+  identityEmailSchema,
+  isValidIdentityEmail,
+  parseDisplayName,
+  parseIdentityEmail,
+  parsePassword,
+  passwordSchema,
+} from "./identity-validation";
 
 /**
  * The single generic login failure. Unknown email, disabled user, malformed

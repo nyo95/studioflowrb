@@ -1,6 +1,6 @@
 import { importExportService } from "@masterdata/infrastructure/runtime";
 import { requireMasterDataRequestContext } from "@masterdata/infrastructure/request-context";
-import { toSafeErrorPayload } from "@platform/core/errors";
+import { createOperationalErrorReporter, toSafeErrorPayload } from "@platform/core/errors";
 
 export async function GET() {
   try {
@@ -13,7 +13,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    const payload = toSafeErrorPayload(error, { reportUnknownError: console.error });
+    const payload = toSafeErrorPayload(error, { reportUnknownError: createOperationalErrorReporter("masterdata.export") });
     return Response.json(payload, { status: payload.kind === "UNAUTHENTICATED" ? 401 : payload.kind === "FORBIDDEN" ? 403 : 400 });
   }
 }

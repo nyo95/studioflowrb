@@ -35,7 +35,6 @@ export function AccountForms({ displayName, email }: { displayName: string; emai
                 defaultValue={nameState?.ok ? displayName : undefined}
                 placeholder={nameState?.ok ? undefined : displayName}
                 required
-                maxLength={120}
               />
             </Field>
             {nameState && !nameState.ok ? (
@@ -68,7 +67,7 @@ export function AccountForms({ displayName, email }: { displayName: string; emai
               <Input id="account-current-password" name="currentPassword" type="password" autoComplete="current-password" required />
             </Field>
             <Field id="account-new-password" label="New password" description="12–128 characters.">
-              <Input id="account-new-password" name="newPassword" type="password" autoComplete="new-password" required minLength={12} maxLength={128} />
+              <Input id="account-new-password" name="newPassword" type="password" autoComplete="new-password" required />
             </Field>
             {passwordState && !passwordState.ok ? (
               <div role="alert" style={{ marginTop: 8 }}>

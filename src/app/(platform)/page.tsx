@@ -6,6 +6,8 @@ import { EmptyState, PageHeader, PageShell, SectionCard, Text, buttonClasses } f
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { getPermissionRegistry } from "@platform/core/rbac/registry";
 import { hasPermission } from "@platform/core/rbac";
+import { prisma } from "@platform/core/db";
+import { readPlatformGeneralSettings } from "@platform/core/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,7 @@ export default async function LauncherPage() {
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { grants } = principalGrants;
+  const settings = await readPlatformGeneralSettings(prisma);
 
   const registry = getPermissionRegistry();
   const accessible = registry.apps.filter((app) => hasPermission(grants, app.accessPermission));
@@ -26,9 +29,9 @@ export default async function LauncherPage() {
   return (
     <PageShell>
       <PageHeader
-        eyebrow="StudioFlow"
+        eyebrow={settings.organizationName}
         title="Workspace"
-        description="Open an application from your workspace."
+        description={`Open an application in ${settings.appTitle}.`}
       />
       {accessible.length === 0 ? (
         <SectionCard>

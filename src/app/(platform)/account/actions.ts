@@ -4,13 +4,13 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { AppError } from "@platform/core/errors";
-import { requirePrincipal, revokeSessionById, setSessionCookie } from "@platform/core/auth";
+import { displayNameSchema, passwordSchema, requirePrincipal, revokeSessionById, setSessionCookie } from "@platform/core/auth";
 import { prisma } from "@platform/core/db";
 import { platformAccount } from "@platform/runtime";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { validationError } from "@platform/core/validation";
 
-const DisplayNameSchema = z.object({ displayName: z.string().min(1).max(120) });
+const DisplayNameSchema = z.object({ displayName: displayNameSchema });
 
 export async function updateDisplayNameAction(
   _prev: ActionResult<{ changed: boolean }> | null,
@@ -31,7 +31,7 @@ export async function updateDisplayNameAction(
 
 const PasswordSchema = z.object({
   currentPassword: z.string().min(1),
-  newPassword: z.string().min(12).max(128),
+  newPassword: passwordSchema,
 });
 
 export async function changePasswordAction(

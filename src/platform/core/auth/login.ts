@@ -2,7 +2,8 @@ import { AppError } from "@platform/core/errors";
 import { normalizeEmail } from "@platform/utilities/normalization";
 
 import { loginFailureError } from "./failure";
-import { getDummyPasswordHash, isValidPasswordLength, verifyPassword } from "./password";
+import { isValidIdentityEmail } from "./identity-validation";
+import { DUMMY_PASSWORD_HASH, isValidPasswordLength, verifyPassword } from "./password";
 import { createSession, type CreatedSession, type DbClient, type SessionClientMetadata } from "./session-service";
 import {
   deriveLoginEmailKey,
@@ -38,6 +39,8 @@ export type LoginOutcome = {
 export type LoginPorts = {
   db: DbClient;
   limiter: LoginLimiter;
+  /** Focused test seam proving every attempt performs exactly one verify. */
+  verifyPassword?: typeof verifyPassword;
 };
 
 export async function performLogin(
@@ -63,25 +66,18 @@ export async function performLogin(
     );
   }
 
-  if (
-    typeof input.email !== "string" || input.email.length === 0 || normalizedEmail.length === 0 ||
-    typeof input.password !== "string" || !isValidPasswordLength(input.password)
-  ) {
-    // Malformed input consumes its verification budget via the dummy hash too.
-    await verifyAgainstDummy();
-    throw loginFailureError();
-  }
+  const credentialShapeValid = isValidIdentityEmail(input.email) && isValidPasswordLength(input.password);
+  const user = credentialShapeValid
+    ? await ports.db.user.findUnique({
+        where: { email: normalizedEmail },
+        select: { id: true, display_name: true, email: true, status: true, password_hash: true },
+      })
+    : null;
 
-  const user = await ports.db.user.findUnique({
-    where: { email: normalizedEmail },
-    select: { id: true, display_name: true, email: true, status: true, password_hash: true },
-  });
+  const verify = ports.verifyPassword ?? verifyPassword;
+  const verified = await verify(user?.password_hash ?? DUMMY_PASSWORD_HASH, input.password);
 
-  const verified = user
-    ? await verifyPassword(user.password_hash, input.password)
-    : await verifyAgainstDummy();
-
-  if (!user || !verified || user.status === "DISABLED") {
+  if (!credentialShapeValid || !user || !verified || user.status === "DISABLED") {
     throw loginFailureError();
   }
 
@@ -97,9 +93,4 @@ export async function performLogin(
     session,
     user: { id: user.id, displayName: user.display_name, email: user.email },
   };
-}
-
-async function verifyAgainstDummy(): Promise<boolean> {
-  const dummyHash = await getDummyPasswordHash();
-  return verifyPassword(dummyHash, "definitely-not-the-password".repeat(2));
 }
