@@ -9,6 +9,25 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Next local revision: **R3.02**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
+## R3.02 — 2026-08-31 — fix(ui-engine): harden narrow rail behavior
+
+Status: **navigator correction — UI-F1 browser finding**
+
+### Changed
+
+- Added a CSS breakpoint guard to the collapsible rail control so the collapse
+  button cannot flash or remain visible at `<=840px` during hydration or narrow
+  viewport transitions, matching the locked UI Engine contract.
+- Added a focused UI Engine assertion for the narrow rail control contract.
+
+### Verification
+
+- `npm run typecheck`: pending.
+- `node --import tsx --test src/platform/ui_engine/ui-engine.test.ts`: pending.
+- Browser review at `390px`: pending; the narrow rail must remain expanded,
+  labeled, and free of a collapse control.
+- No database, legacy repository, or remote state changed.
+
 ## R3.01 — 2026-08-31 — feat(ui-engine): raise shared shell quality and add public showcase
 
 Status: **navigator audit/correction — UI-F1 implementation**

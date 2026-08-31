@@ -109,7 +109,7 @@ export function AppShell({
             </div>
             {collapsible && !narrowNavigation ? (
               <IconButton
-                className="shrink-0"
+                className="shrink-0 max-[840px]:hidden"
                 size="sm"
                 variant="ghost"
                 label={isCollapsed ? expandLabel : collapseLabel}
