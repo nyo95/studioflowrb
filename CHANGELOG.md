@@ -5,9 +5,73 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.08**
-- Next local revision: **R3.09**
+- Current revision after this entry is committed: **R3.09**
+- Next local revision: **R3.10**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.09 — 2026-08-31 — feat(masterdata): harden lifecycle and test isolation
+
+Status: **local Master Data service slice — UI directories remain incomplete**
+
+### Changed
+
+- Completed transactional Unit, Category, Brand, Vendor, SKU, all-three-Pricing,
+  archive/restore, deletion-request, and deletion-approval service commands from
+  the interrupted executor diff, then separated runtime composition from the
+  testable service module.
+- Enforced the owner-locked SKU create invariant: name, active Unit, at least one
+  active Category, and at least one exact-decimal PriceMaterial from a materially
+  capable live Vendor, with duplicate Category and Vendor-price input rejected.
+- Corrected archive provenance so parent causes are attached to already-archived
+  dependents as well as live dependents. Directly archived SKU/price rows can no
+  longer be restored while their Brand, SKU, or Vendor parent remains archived.
+- Added restore validation for live identities, Brand/Vendor relationships,
+  VendorType capabilities, SKU Units/Categories, Pricing Units/Categories,
+  source Brand state, and exact live Pricing conflicts.
+- Replaced JavaScript number price input with canonical decimal strings before
+  Prisma persistence, preserving exact values and rejecting malformed or
+  negative amounts at the service boundary.
+- Hardened disposable-database protection: database names must explicitly carry
+  a test marker, `npm test` loads `PLATFORM_TEST_DATABASE_URL` into its child
+  process, and the application `DATABASE_URL` is no longer manually repointed.
+- Added regression tests for the disposable guard and focused Master Data
+  integration tests for SKU atomicity, exact decimals, overlapping causes,
+  failed-restore rollback, and approved permanent deletion.
+
+### Local environment recovery
+
+- Created rebuild-only database `masterdata_test` inside `masterdata-db` and
+  applied the existing eight migrations. Local `.env.test.local` is ignored by
+  Git and points tests to that database.
+- Restored persisted General Settings from leaked test fixture values (`Dapur
+  Sinyo`) to `StudioFlow`, cleared the fixture brand mark through the audited UI,
+  and restarted only this repository's Next.js dev server so its current Master
+  Data permission registry became active.
+- Verified the application database still contains one active owner, 8 Units,
+  and 6 VendorTypes. No legacy repository, database, or container was accessed.
+
+### Verification
+
+- `npm run check`: passed.
+- `npm test`: **191 passed, 0 failed, 0 cancelled** against `masterdata_test`.
+- `npm run build`: passed; `/masterdata` remains dynamic and routable.
+- Browser review: authenticated `/masterdata` redirects correctly from the
+  launcher, StudioFlow branding and Master Data navigation render, desktop and
+  390px layouts have no horizontal overflow, and no browser console error was
+  observed.
+- `git diff --check`: passed.
+- `npm run lint`: **not passing due to pre-existing UI Engine React Hooks errors**
+  in `creatable-search.tsx` and `patterns/hooks.tsx`; R3.09 does not modify those
+  files.
+
+### Remaining
+
+- Add update commands and complete VendorType/Brand relationship mutations.
+- Add public read DTOs and broader lifecycle matrices for Brand/Vendor/work-price
+  restore and deletion guards.
+- Build real Master Data directory/detail/form routes with search, filters,
+  sorting, pagination, quick entry, unsaved-state handling, confirmations, and
+  permission/archived/error states in `R3.10+`.
 
 ## R3.08 — 2026-08-31 — docs(handoff): package Master Data continuation context
 

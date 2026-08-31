@@ -12,9 +12,16 @@ import { PrismaClient } from "@/generated/prisma/client";
  * are both set and identical, so these tests can never truncate an ordinary
  * development database.
  */
-export function requireDisposableTestDatabaseUrl(): string {
-  const databaseUrl = process.env.DATABASE_URL;
-  const disposableUrl = process.env.PLATFORM_TEST_DATABASE_URL;
+type TestDatabaseEnvironment = {
+  DATABASE_URL?: string;
+  PLATFORM_TEST_DATABASE_URL?: string;
+};
+
+export function requireDisposableTestDatabaseUrl(
+  environment: TestDatabaseEnvironment = process.env as TestDatabaseEnvironment,
+): string {
+  const databaseUrl = environment.DATABASE_URL;
+  const disposableUrl = environment.PLATFORM_TEST_DATABASE_URL;
   if (!databaseUrl || !disposableUrl) {
     throw new Error(
       "Platform contract tests require a disposable database: set both DATABASE_URL and PLATFORM_TEST_DATABASE_URL to the same disposable PostgreSQL URL.",
@@ -23,6 +30,18 @@ export function requireDisposableTestDatabaseUrl(): string {
   if (databaseUrl !== disposableUrl) {
     throw new Error(
       "Platform contract tests refuse to run: DATABASE_URL does not equal PLATFORM_TEST_DATABASE_URL. Point both at the disposable test database.",
+    );
+  }
+
+  let databaseName: string;
+  try {
+    databaseName = decodeURIComponent(new URL(databaseUrl).pathname.slice(1));
+  } catch {
+    throw new Error("Platform contract tests refuse to run: the disposable PostgreSQL URL is invalid.");
+  }
+  if (!/(^|[_-])(test|testing)([_-]|$)/i.test(databaseName)) {
+    throw new Error(
+      "Platform contract tests refuse to run: the database name must explicitly contain a test marker (for example studioflow_rebuild_test).",
     );
   }
   return databaseUrl;

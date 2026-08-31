@@ -12,7 +12,8 @@ import {
   Text,
 } from "@/platform/ui_engine";
 
-import { MASTERDATA_PERMISSIONS, masterDataService } from "@/apps/masterdata/service";
+import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
+import { masterDataService } from "@/apps/masterdata/runtime";
 
 export const dynamic = "force-dynamic";
 
