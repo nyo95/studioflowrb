@@ -5,9 +5,71 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R1** — `c8e473702801510aa314bbed45242a71b600f733` on `origin/main`
-- Current local revision after this entry is committed: **R1.04**
-- Next local revision: **R1.05**
+- Current local revision after this entry is committed: **R1.05**
+- Next local revision: **R1.06**
 - Remote publication: **not authorized**
+
+## R1.05 — 2026-08-31 — docs(masterdata): reconcile brand vendor and pricing contracts
+
+Status: **navigator contract reconciliation — logic contracts only, no app work authorized**
+
+Reconciles the owner's curated Vendor and Pricing decisions with the shared
+contracts and implemented-state evidence, and records the already-locked Brand
+decisions as the third active Master Data logic contract. Product choices in the
+curated Vendor and Pricing contracts were preserved; this revision closes only
+cross-contract contradictions and implementation-critical gaps.
+
+### Changed
+
+- Replaced the deferred Master Data intake with an active contract index and
+  shared rules for archive-cause provenance, permanent-deletion approval,
+  cross-app snapshot boundaries, capability placement, and the remaining
+  undecided Master Data slices.
+- Added the Brand contract covering identity, optional owner Vendor, independent
+  suppliers, flat PRODUCT-category discovery, hashtags, SKU enrichment with
+  source provenance, resources, lifecycle, deletion, permissions/audit, UI/public
+  reads, and the KEEP/FIX/MERGE/PURGE implementation ledger.
+- Reconciled Vendor lifecycle and Pricing references to the approved three-table
+  model; required Pricing foreign keys remain Restrict, parent restore removes
+  only its own persisted archive cause, and restore conflicts never overwrite or
+  silently merge a live record.
+- Added the capability-integrity guard implied by the curated VendorType model:
+  assignment/type/flag changes cannot remove the last capability still required
+  by a live price or BrandSupplier relation.
+- Reconciled Pricing's exact identities: one live SKU × Vendor material price and
+  Vendor-scoped normalized name/slug identities for work prices. Exact matches
+  target the existing row; near-duplicate confirmation remains available only for
+  genuinely distinct work names.
+- Replaced Role-name `Admin` authorization language with the explicit
+  `masterdata.deletion.approve` grant. A seeded Admin Role may receive the grant,
+  but code has no Role-name bypass.
+- Removed unsafe legacy-import fallback language: missing suppliers/vendors are
+  reported for manual resolution and are never inferred from Brand ownership or
+  manufactured as a generic Vendor.
+- Updated the active documentation index. `docs/` now contains exactly its index,
+  Master Data shared index, and the Brand, Vendor, and Pricing contracts; no
+  obsolete document was retained or needed deletion.
+
+### Dependencies and migrations
+
+- Documentation only. No dependency, schema, migration, runtime code, or
+  executable work-order change is authorized by this revision.
+- The exact persisted archive-cause/deletion-request representation and recovery
+  migration remain inputs to a future owner-approved implementation work order.
+
+### Verification
+
+- Active Markdown relative-link scan: passed.
+- Contract contradiction scan for stale Admin bypass, global work-price identity,
+  old public DTO naming, and automatic Manufacturer fallback: passed.
+- `git diff --cached --check`: passed (line-ending conversion warnings only).
+- Runtime tests, lint, typecheck, and build were not run because this revision
+  changes documentation only.
+
+### Reserved owner state
+
+- Existing uncommitted Foundation/schema/bootstrap, money/decimal utility, and
+  pricing-page changes remain unstaged and untouched.
 
 ## R1.04 — 2026-08-30 — fix(foundation): close identity shell and concurrency gaps
 

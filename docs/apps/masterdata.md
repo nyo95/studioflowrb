@@ -1,60 +1,145 @@
-# Master Data — First-App Intake
+# Master Data — Contract Index and Shared Rules
 
-Status: **DEFERRED UNTIL FOUNDATION F0 + UI-F1 — not an executable app contract yet**
+Status: **PARTIALLY OWNER-APPROVED — not yet an executable work order**
 
-This short intake preserves only owner-approved direction needed to design the foundation. It is intentionally not a complete Master Data PRD or work order. A full code-derived contract is written after the shared foundation passes and before Master Data implementation resumes.
+Master Data is the first application built on the shared platform. This file is
+the active index for its approved domain slices and the cross-slice rules needed
+to keep those contracts consistent. It is not a substitute for the individual
+contracts and does not authorize implementation.
 
-## Product direction already locked
+## 1. Active owner-approved logic contracts
 
-- Master Data is the first app built on the reusable platform foundation.
-- It will own Party, Brand, Category, SKU, Unit, supplier/material prices, work prices, media, physical Samples, import/export, and its app audit behavior.
-- One SKU may be sold by many vendors at different current prices.
-- Price identity is therefore at least SKU × vendor/supplier, not one price column on SKU and not one global “current price”.
-- BQ must later receive all eligible price options and choose explicitly; no cheapest/latest/preferred fallback is invented in Master Data.
-- Master Data may consume Core, Utilities, and UI Engine but may not create private copies of a generic capability.
-- StudioFlow and BQ read Master Data through an explicit public contract; no cross-app internal import or implicit table write.
+| Contract | Owns |
+|---|---|
+| [`brand-contract.md`](brand-contract.md) | Brand identity, discovery, Vendor relations, resources, lifecycle, permissions, audit, and Library-facing behavior |
+| [`vendor-contract.md`](vendor-contract.md) | Vendor identity, VendorType capability model, contacts, links, Brand relations, lifecycle, permissions, and audit |
+| [`pricing-contract.md`](pricing-contract.md) | Material, material-plus-labor, and labor-only prices; lifecycle; permissions; and BQ-facing reads |
 
-## Foundation capabilities proven necessary
+These three contracts were reviewed together. Where an old name from the current
+implementation appears in code or migrations, the migration ledgers in the
+individual contracts define its approved destination.
 
-Before app work starts, the foundation must provide:
+## 2. Remaining Master Data scope
 
-- real login/session and persisted RBAC/grant resolution;
-- Platform General Settings and access-management UI;
-- DB/transaction, audit, safe error/action result, validation, decimal/money/date/Unit/text/slug/pagination utilities;
-- app shell, settings/directory/form/table/state/confirmation/unsaved patterns;
-- `CreatableSearch`, debounce, option overlay, and pending feedback in UI Engine.
+Master Data also owns Category, SKU, Unit, media, physical Samples, import/export,
+and its public read contracts. Their existing schema and code remain implemented-
+state evidence only until each slice receives an owner-approved logic contract.
 
-These are shared because their mechanics and meaning are the same for Master Data, StudioFlow, and BQ. Entity permissions, Party roles, pricing eligibility, SKU lifecycle, import policy, and route copy remain Master Data-owned.
+In particular, the following are not decided by the approved Brand/Vendor/Pricing
+contracts and must not be inferred during implementation:
 
-## Required contract workflow when Master Data is activated
+- final SKU identity and SKU–Brand cardinality;
+- full Category and Unit lifecycle/permission policy outside the decisions already
+  referenced by the active contracts;
+- media/file storage mechanics;
+- Samples behavior;
+- workbook/import/export policy;
+- the final BQ snapshot schema.
 
-The PM/TL must inspect committed legacy code end to end at the exact recorded commit:
+## 3. Product and dependency boundaries
 
-1. route/navigation and real UI interaction;
-2. action/API and input validation;
-3. service/domain rules;
-4. query, transaction, and persisted relations;
-5. permission, audit, import/export, and downstream BQ/StudioFlow reads;
-6. tests, migrations, error handling, and defect-explaining comments.
+- Master Data may consume Core, Utilities, and UI Engine. It may not create a
+  private substitute for a proven generic capability.
+- StudioFlow and BQ read Master Data only through an explicit `public/` contract.
+  Cross-app internal imports, implicit writes, and cross-schema foreign keys are
+  forbidden.
+- BQ snapshots the selected commercial facts at project time. A later Master Data
+  edit, archive, restore, or permanent deletion must not rewrite historical BQ
+  meaning.
+- No cheapest, newest, preferred, or manufacturer fallback is inferred. When
+  several eligible prices exist, the consumer selects one explicitly.
 
-Each behavior is recorded as **KEEP**, **FIX**, **MERGE**, or **PURGE**, with exact code path/symbol, intended replacement, schema constraints, public DTO, UI states, and acceptance tests. Legacy Markdown is never evidence.
+## 4. Shared lifecycle language
 
-Legacy baseline currently available:
+The active contracts use one vocabulary:
+
+- **archive**: reversible operational removal; represented by `deleted_at` in the
+  current design;
+- **restore**: remove the applicable archive cause after revalidating identity and
+  live dependencies;
+- **request permanent deletion**: create a persisted approval request for an
+  already archived record;
+- **approve and execute permanent deletion**: an authorized approver validates the
+  current graph and performs the hard deletion atomically;
+- **reject deletion**: close the pending request without deleting the entity.
+
+Calling archive `delete`, or using `*.deleted` for an archive audit event, is a
+**FIX** in every activated slice.
+
+### 4.1 Cascade provenance is mandatory
+
+The approved Brand, Vendor, SKU, and Pricing lifecycles contain overlapping direct
+and parent-driven archives. A single unqualified `deleted_at` timestamp is not
+enough to restore them safely.
+
+The implementation must persist archive-cause provenance with these semantics:
+
+1. direct archive creates a direct cause;
+2. parent archive creates a cause identifying that parent;
+3. archive is effective while at least one cause remains;
+4. restoring a parent removes only the cause created by that parent;
+5. a child is made live only when no direct or parent cause remains;
+6. a row archived independently before a parent archive is never revived by the
+   parent restore;
+7. overlapping Brand/SKU/Vendor causes are idempotent and transaction-safe.
+
+The exact persisted table/field layout is locked in the implementation work order,
+but audit history alone may not be queried as operational archive state. This is
+**APP-OWNED** Master Data policy, not a Core audit feature.
+
+### 4.2 Permanent-deletion approval
+
+The approval workflow is persisted inside Master Data, not inferred from a Role
+name and not added to Core. It records the target type/ID, requester snapshot,
+request time, pending/executed/rejected status, approver snapshot, decision time,
+and safe reason/notes when supplied. At most one pending request may exist for the
+same target.
+
+Resource `*.manage` permissions may request deletion. Approval and execution
+require the explicit app permission:
+
+```text
+masterdata.deletion.approve
+```
+
+An initial Admin Role may be seeded with this permission, but code must never use
+the string `Admin` as an authorization bypass. A deletion request produces one
+`<entity>.deletion-requested` audit event. Rejection produces
+`<entity>.deletion-rejected`. Successful approval and hard deletion are one atomic
+business operation represented by `<entity>.deleted`, with request and approver
+metadata. This preserves Core's one-operation/one-primary-event rule.
+
+## 5. Shared capability inventory
+
+| Disposition | Capability |
+|---|---|
+| **REUSE — Core** | request identity/live grants, permission evaluation, transaction boundary, audit envelope, safe errors/actions, Zod boundary convention |
+| **REUSE — Utilities** | text normalization, slug generation, canonical decimal/money/date/unit representation, pagination |
+| **REUSE — UI Engine** | App/Page/Directory shells, DataTable, sortable headers, StatusBadge, RowActionMenu, Dialog, ConfirmDialog, form/state patterns, Combobox/CreatableSearch, debounce, option overlay, unsaved guard |
+| **EXTEND — Utilities** | domain-neutral normalized similarity scoring; each app domain owns thresholds, warning copy, and the final allow/block decision |
+| **ACTIVATE — UI Engine** | generic accessible multi-value searchable/creatable input, proven by Brand Category/hashtag and VendorType assignments; it owns interaction only |
+| **APP-OWNED** | Vendor capability policy, Brand discovery/enrichment, price identity, lifecycle cascades/provenance, deletion requests, restore validation, public DTO composition |
+| **DEFER** | file storage/upload, internal catalog files, import/export codecs, BQ snapshot persistence, jobs/notifications |
+
+## 6. Evidence and activation gate
+
+Legacy behavior evidence is committed code at:
 
 ```text
 D:\Projects\studioflow
 commit 6377ac0971e7a7cc0fd8fb58a8360c069675f9a5
-dirty/stale checkout; committed code only is admissible evidence
 ```
 
-Known code paths that must be traced later include `src/subapps/master-data/**`, `src/extensions/library/**`, relevant `src/subapps/bq/**` consumers, schema/migrations, and the legacy shared UI/hooks cited by `CORE.md` and `UI_ENGINE.md`.
+The checkout is dirty and stale; only `git show` evidence at that commit is
+admissible. The active contracts record **KEEP**, **FIX**, **MERGE**, and **PURGE**
+destinations. Current schema, migrations, code, and tests remain evidence of the
+implemented state, not authority over owner-approved logic.
 
-## Activation gate
+No Master Data implementation work order may be issued until:
 
-Do not issue or execute a Master Data implementation work order until:
-
-- `CORE.md` Stage F0 passes;
-- `UI_ENGINE.md` UI-F1 passes;
-- the current schema/code is re-audited after those changes;
-- this intake is replaced by a complete owner-reviewable app contract;
-- the owner approves that logic contract.
+- Foundation F0 is accepted and UI-F1 is activated and verified;
+- Brand, Vendor, and Pricing contradictions identified in these contracts are
+  closed in one deterministic migration/work order;
+- the remaining consumer slice needed by that work order (especially SKU and
+  Category) has its required cardinalities and lifecycle locked;
+- the owner approves the exact migration/recovery plan and acceptance tests.

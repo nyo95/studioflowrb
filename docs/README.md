@@ -1,6 +1,8 @@
 # Active Documentation
 
-This repository keeps only contracts that affect the current foundation scope and the short intake for its first consumer.
+This repository keeps only the shared contracts and active app contracts that
+have been reviewed for the current rebuild. A contract is not an executable work
+order unless it says so explicitly.
 
 ## Active contracts
 
@@ -9,11 +11,19 @@ This repository keeps only contracts that affect the current foundation scope an
 | [`CORE.md`](../CORE.md) | staged foundation: database, real identity/login, persisted RBAC, General Settings, audit, errors, validation, shared utilities, capability registry, and public boundaries |
 | [`DESIGN.md`](../DESIGN.md) | shared visual language and density |
 | [`UI_ENGINE.md`](../UI_ENGINE.md) | reusable UI components, layouts, and interaction patterns |
-| [`apps/masterdata.md`](apps/masterdata.md) | deferred first-app intake and already approved owner direction; not an executable app contract yet |
+| [`apps/masterdata.md`](apps/masterdata.md) | Master Data contract index, shared lifecycle/deletion rules, capability placement, and remaining deferred decisions |
+| [`apps/brand-contract.md`](apps/brand-contract.md) | owner-approved Brand identity, relations, discovery, lifecycle, deletion, UI, and public boundary |
+| [`apps/vendor-contract.md`](apps/vendor-contract.md) | owner-approved Vendor identity, types/capabilities, contacts/links, Brand relations, lifecycle, deletion, and UI |
+| [`apps/pricing-contract.md`](apps/pricing-contract.md) | owner-approved three-table Pricing model, validation, lifecycle, permissions, UI, migration, and downstream reads |
 
 Execution and continuity are governed by [`AGENTS.md`](../AGENTS.md), [`CHANGELOG.md`](../CHANGELOG.md), and the locked [`Foundation F0 work order`](../scripts/work-orders/FOUNDATION.md).
 
-StudioFlow and BQ contracts are intentionally absent until those apps become active. Master Data is the first consumer, but its full code-derived contract is also deferred until Foundation F0 and UI-F1 pass. Legacy code may be inspected as evidence; it never authorizes implementation by itself.
+StudioFlow and BQ contracts are intentionally absent until those apps become
+active. Brand, Vendor, and Pricing are approved Master Data logic contracts, but
+they do not authorize implementation until their remaining dependencies and an
+explicit work order are locked. Category, SKU, Unit, media, Samples, import, and
+BQ snapshot details remain deferred as recorded in the Master Data index. Legacy
+code may be inspected as evidence; it never authorizes implementation by itself.
 
 ## Authority order
 
@@ -52,7 +62,11 @@ Forbidden: `platform -> app`, cross-app internal imports, implicit cross-app wri
 1. OpenCode implements the locked `CORE.md` Stage F0 plus `UI_ENGINE.md` UI-F0 in the assigned local revision;
 2. the Codex navigator reviews the implementation commit and real running workflows, issuing a new correction revision if required;
 3. activate and verify UI-F1 immediately before Master Data;
-4. replace the Master Data intake with a complete code-derived contract and obtain owner approval;
-5. only then issue Master Data implementation work; StudioFlow and BQ remain deferred.
+4. complete and approve the remaining Master Data domain contracts and exact
+   migration/recovery plan without reopening the approved Brand, Vendor, and
+   Pricing product decisions;
+5. issue a deterministic Master Data implementation work order only after its
+   dependencies and acceptance tests are locked; StudioFlow and BQ remain
+   deferred.
 
 Documented deferred capabilities are routing memory, not implementation scope. Do not create code, folders, dependencies, or placeholder exports until a stage/consumer activates them.

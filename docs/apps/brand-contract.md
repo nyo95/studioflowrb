@@ -1,0 +1,360 @@
+# Brand Contract — Master Data
+
+Status: **OWNER-APPROVED LOGIC CONTRACT — not yet an executable work order**
+
+Authority: owner decisions locked in the Brand navigator session, reconciled
+with the curated [`vendor-contract.md`](vendor-contract.md),
+[`pricing-contract.md`](pricing-contract.md), and the shared rules in
+[`masterdata.md`](masterdata.md). Current schema/code and legacy behavior are
+implementation evidence only.
+
+## 1. Domain identity
+
+A Brand is a product/maker identity, not a company, Vendor, category, SKU, or
+catalog file.
+
+| Field | Type | Rule |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `name` | String | Required; case-insensitive unique among live Brands |
+| `slug` | String | Generated from `name`, unique among live Brands, stable and not manually editable |
+| `owner_vendor_id` | FK → Vendor? | Optional; at most one owner company |
+| `notes` | String? | Internal only |
+| `created_at` | DateTime | UTC instant |
+| `updated_at` | DateTime | UTC instant |
+| `deleted_at` | DateTime? | Effective archive state; cause provenance follows `masterdata.md` §4.1 |
+
+`name` is the only required profile field. A Brand may exist before SKUs,
+catalogs, an owner company, suppliers, or categories are known. Logo/media upload
+is outside the current scope.
+
+## 2. Discovery: Category and hashtag are different
+
+### 2.1 Brand Categories
+
+A Brand may have zero or many live PRODUCT Categories. Categories are a controlled,
+flat discovery vocabulary for material families. Staff select from the seeded
+list and may create a missing Category through the approved creatable interaction.
+Once created, that Category remains available to later records.
+
+The current rule requiring every live Brand to retain at least one PRODUCT
+Category is **PURGE**. Brand CRUD must not depend on an SKU or a Category.
+
+### 2.2 Hashtags
+
+Hashtags are additional discovery keywords, not URL slugs and not a hierarchy.
+Examples include `#lantai`, `#dinding`, `#wallpanel`, `#wallfinish`, `#hpl`, and
+`#laminated`.
+
+Rules:
+
+- display retains the canonical label while comparison uses normalized,
+  case-insensitive text;
+- duplicate normalized values on one Brand are blocked;
+- `#` is presentation syntax, not part of identity storage;
+- hashtags can be suggested from values already used by other Brands;
+- near duplicates show a warning, but a confirmed distinct value may be kept;
+- hashtags never replace Categories in Library filtering and do not grant any
+  commercial capability.
+
+The current removal of Brand tags in favor of `Category.search_synonyms` is
+**FIX**: Category synonyms describe a Category; Brand hashtags describe one
+Brand. Both may participate in search but remain separately owned facts.
+
+## 3. Brand Category enrichment from SKU
+
+Brand Categories have two approved entry paths:
+
+1. explicit staff assignment on the Brand; and
+2. persistent enrichment when an SKU assigned to that Brand uses a PRODUCT
+   Category not yet linked to the Brand.
+
+Example: AICA initially has `HPL`. Staff later records an AICA SKU classified as
+`Toughtop`; `Toughtop` becomes a persistent AICA discovery Category and Library
+search can find AICA through it.
+
+Provenance is mandatory. One Brand–Category relation may have more than one
+origin, and removing an SKU must not erase an independently confirmed manual
+assignment. The persisted design must distinguish at least:
+
+- `MANUAL`, with actor/time; and
+- `SKU_ENRICHMENT`, with source SKU/time.
+
+Changing or archiving an SKU removes only that SKU's active enrichment evidence.
+The Brand–Category relation remains while another SKU origin or a manual origin
+exists. This provenance and roll-up policy is **APP-OWNED**; a single enum field
+that cannot represent both origins is insufficient.
+
+This contract does not decide whether every SKU must have a Brand. That cardinality
+belongs to the future SKU contract.
+
+## 4. Vendor relations
+
+### 4.1 Owner company
+
+`Brand.owner_vendor_id` is optional and points to one live Vendor. No new
+`owner_company` entity is created.
+
+- a Brand may have no owner Vendor;
+- ownership does not mean authorized distributor or seller;
+- an owner-only Vendor needs no material/labor capability merely to own a Brand;
+- a Vendor may own many Brands;
+- archiving either side does not archive the other.
+
+The FK uses `onDelete: SetNull` as a database safety behavior, while permanent
+Vendor deletion remains blocked by a live/archived ownership reference until the
+relationship is deliberately cleared.
+
+### 4.2 Suppliers
+
+`BrandSupplier` is the independent many-to-many statement “this Vendor supplies
+this Brand”. It is not a price, SKU availability record, software permission, or
+ownership relation.
+
+| Field | Type | Rule |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `brand_id` | FK → Brand | Required; `onDelete: Restrict` |
+| `vendor_id` | FK → Vendor | Required; `onDelete: Restrict` |
+| `is_authorized` | Boolean | Explicit official/authorized status; default false |
+| `notes` | String? | Internal relationship note |
+
+The pair `(brand_id, vendor_id)` is unique. A linked Vendor must be live and have
+at least one live VendorType with `can_supply_material = true`. Owner and supplier
+relations may point to the same Vendor, but neither relation implies the other.
+
+## 5. External resources
+
+A Brand may have many ordered external resources. They attach directly to the
+Brand, never to a Brand Category.
+
+The initial implementation reuses `BrandLink` and the approved `LinkKind`
+vocabulary. It supports HTTP(S) URLs for official websites, social pages, catalog
+pages, marketplace pages, Google Drive PDFs, price lists, and other external
+references. URLs are unique per Brand.
+
+Catalogs are consumed later by StudioFlow Library. Internal file storage, upload,
+malware/type/size policy, and internally hosted PDFs remain **DEFERRED** until the
+Library/media contract activates them. BrandLink deletion sets an optional
+PriceMaterial `source_link_id` to null; it does not delete a price.
+
+## 6. Lifecycle
+
+Brand and Vendor are independent roots. Brand lifecycle affects Brand-owned
+catalog data; it never archives an owner or supplier Vendor.
+
+| Operation | Authority | Result |
+|---|---|---|
+| Read/list | `masterdata.brand.read` | View active/authorized archived states |
+| Create/update | `masterdata.brand.manage` | Mutate profile, discovery, resources, and relationships |
+| Archive/restore | `masterdata.brand.manage` | Reversible operation with persisted causes |
+| Request permanent deletion | `masterdata.brand.manage` | Only an archived Brand; persisted request |
+| Approve/reject and execute | `masterdata.deletion.approve` | Explicit approval permission; never a Role-name bypass |
+
+### 6.1 Archive
+
+In one transaction:
+
+1. add the Brand's direct archive cause;
+2. add a Brand-parent cause to every live SKU of that Brand;
+3. through each affected SKU, add the corresponding parent cause to its live
+   PriceMaterial rows;
+4. preserve Categories/origins, hashtags, resources, owner, BrandSupplier, and
+   scoped contacts;
+5. write one `brand.archived` primary AuditEvent with safe cascade counts.
+
+Archived Brand/SKU/PriceMaterial records are excluded from operational pickers
+and public reads.
+
+### 6.2 Restore
+
+Restore removes only the causes created by this Brand archive. An SKU or price
+that still has a direct or another-parent cause remains archived. Before any row
+becomes live, validate:
+
+- Brand name/slug has no live conflict;
+- owner Vendor, when retained, is live;
+- BrandSupplier Vendors are live and materially eligible;
+- Category/resource relations still satisfy their live-target rules;
+- each SKU and PriceMaterial being reactivated satisfies its owning contract;
+- PriceMaterial has no live SKU × Vendor pair conflict.
+
+Price age never blocks restore. Price freshness/notification cadence is a separate
+future workflow and is not implemented as restore policy.
+
+### 6.3 Permanent deletion
+
+Permanent deletion requires an approved request and an archived Brand. It is
+blocked while BrandSupplier or Brand-scoped VendorContact references remain.
+Owner linkage is a field on the Brand and is removed with it.
+
+The owner-approved Brand deletion includes its owned SKUs. In the same approved
+transaction, the service explicitly deletes dependent PriceMaterial and SKU child
+rows, then the SKUs, Brand-owned Categories/origins/hashtags/resources, and finally
+the Brand. Restrict FKs require this explicit order; database Cascade is not used
+to hide the business operation. One `brand.deleted` AuditEvent survives in Core
+with safe counts. BQ historical snapshots remain independent.
+
+## 7. Permissions and audit
+
+Permissions:
+
+```text
+masterdata.access
+masterdata.brand.read
+masterdata.brand.manage
+masterdata.deletion.approve
+```
+
+Audit actions:
+
+```text
+brand.created
+brand.updated
+brand.archived
+brand.restored
+brand.deletion-requested
+brand.deletion-rejected
+brand.deleted
+```
+
+Category, hashtag, resource, owner, and supplier changes made in one Brand save
+are safe deltas inside one `brand.updated` event. No-op updates emit nothing.
+Approved permanent deletion is represented by `brand.deleted` with request and
+approver metadata as defined by `masterdata.md` §4.2.
+
+## 8. Duplicate detection and search
+
+- hard authority: partial unique indexes on `lower(name)` and `slug` where the
+  Brand is live;
+- create/update/restore repeat the friendly application check before relying on
+  the race-safe database constraint;
+- normalized near-duplicate search warns but does not block a confirmed distinct
+  Brand (for example `TOTOY` beside `TOTO`);
+- search is case-insensitive and typo-tolerant across Brand name, Categories, and
+  hashtags;
+- Library primarily filters by Category, while name and hashtag improve discovery
+  and explain why a Brand matched.
+
+## 9. UI/UX
+
+The primary view is a `DirectoryShell` + `DataTable`.
+
+Recommended visible columns are Brand name, Categories, hashtags/discovery hints,
+owner Vendor, supplier count, resource count, and Status. Status uses the shared
+marker-style `StatusBadge`; category/hashtag values may use tags. Rows are not
+generic navigation targets. A trailing `RowActionMenu` provides edit, archive,
+restore, and deletion-request actions according to permission/state.
+
+Create/edit uses the shared Dialog form pattern. Category and hashtag entry use
+the activated accessible multi-value searchable/creatable UI Engine control;
+persistence, normalization, provenance, and permissions remain in Master Data.
+Archive/restore/deletion use shared confirmation mechanics and display cascade
+impact. Unsaved, pending, success, validation, conflict, permission-denied,
+loading, empty, error, archived, long-content, narrow-viewport, and horizontal-
+overflow states are required.
+
+Bulk action and Excel/import-export behavior remain outside this contract.
+
+## 10. Public read behavior
+
+StudioFlow Library receives an explicit read-only DTO containing only live,
+authorized fields needed for discovery: Brand identity, Categories, hashtags,
+allowed external resources, and later sample availability when its contract is
+active. Vendor contacts, internal notes, authorization notes, and prices are not
+exposed merely because they are related.
+
+BQ obtains prices from Pricing's public contract, not by reading Brand internals.
+Consumers never write Brand tables directly.
+
+## 11. Capability placement
+
+| Disposition | Decision |
+|---|---|
+| **REUSE Core** | identity/grants, transaction, audit, safe error/action, validation convention |
+| **REUSE Utilities** | normalization and slug generation |
+| **EXTEND Utilities** | pure similarity scorer; Brand owns threshold and confirmation policy |
+| **REUSE/ACTIVATE UI Engine** | Directory/DataTable/Dialog/RowActionMenu/StatusBadge/confirm/unsaved plus generic multi-value creatable interaction |
+| **APP-OWNED** | Brand identity, Category/hashtag semantics, SKU enrichment provenance, Vendor relationship rules, archive/delete cascade, Library DTO |
+| **DEFER** | logo/media upload, internal catalog storage, freshness notification, import/export, sample DTO details |
+
+## 12. Implemented-state migration ledger
+
+### KEEP
+
+- Brand root identity, optional owner relation, notes, timestamps, soft-archive
+  field, live name/slug indexes;
+- `BrandLink`, `BrandSupplier`, and Brand–Category many-to-many intent;
+- case-insensitive exact search, transaction + audit pattern, public read boundary;
+- legacy Brand-first Library outcome: search a material/category and return Brands.
+
+### FIX
+
+- rename `owner_party_id` to `owner_vendor_id` and all Party references to the
+  curated Vendor vocabulary;
+- restore Brand hashtags as a separate discovery fact;
+- allow Brand without Category;
+- replace explicit-only BrandCategory with multi-origin manual/SKU enrichment;
+- replace role-based supplier eligibility with VendorType capability checks;
+- rename archive action/audit from `softDelete`/`brand.deleted` to
+  archive/`brand.archived`;
+- add provenance-safe cascade archive/restore and approved permanent deletion;
+- change both BrandSupplier FKs to Restrict and make destructive graph changes
+  explicit;
+- expand delete guards to BrandSupplier and scoped-contact references.
+
+### MERGE
+
+- merge duplicate legacy Brand/library search paths behind one Master Data public
+  contract while retaining app-specific presentation in StudioFlow;
+- use one shared multi-value creatable interaction instead of private category
+  and hashtag controls.
+
+### PURGE
+
+- Brand tags being collapsed into Category synonyms;
+- the invariant that a live Brand must have at least one Category;
+- archive being blocked by live SKUs rather than cascading;
+- implicit DB cascades that erase independent Vendor relationships;
+- raw legacy UI classes or private generic search/confirm/unsaved components.
+
+## 13. Evidence ledger
+
+Committed legacy evidence at `6377ac0971e7a7cc0fd8fb58a8360c069675f9a5`
+includes:
+
+- routes/navigation: `src/app/masterdata/materials/**`,
+  `src/subapps/master-data/components/MasterDataNavOuter.tsx`;
+- UI state: `MasterDataBrandDialog.tsx`, `BrandDetailClient.tsx`,
+  `MasterDataBrandPicker.tsx`;
+- actions/services: `src/extensions/library/actions/brand-library-actions.ts`,
+  `services/library-service.ts`, `brand-library-service.ts`, and
+  `src/subapps/master-data/actions/masterdata-actions.ts`;
+- persistence: legacy `Brand`, `BrandCategory`, `BrandLink`, `BrandSupplier`,
+  `PartyContact`, `Sku`, and `SkuPrice` schema/migrations;
+- downstream reads: `src/extensions/library/services/brand-library-service.ts`
+  and BQ Master Data services.
+
+Current rebuild evidence includes `brand-rules.ts`, `brand-service.ts`,
+`brand-repository-prisma.ts`, Brand tests, `prisma/schema.prisma`, and migrations
+`20260825171210_master_data_full_schema` / `20260828000000_master_data_sku_pair_pricing`.
+The migration ledger above records their approved destinations; it does not
+authorize code changes yet.
+
+## Locked decisions summary
+
+| Decision | Locked answer |
+|---|---|
+| Brand identity | Brand name; optional owner Vendor; stable generated slug |
+| Required profile fields | Name only |
+| Categories | Zero-to-many flat PRODUCT Categories; staff creatable |
+| SKU enrichment | Persistent and provenance-tracked |
+| Hashtags | Separate normalized discovery keywords |
+| Owner vs supplier | Independent relations; neither implies the other |
+| Resources | Many external URLs directly on Brand; internal storage deferred |
+| Archive | Staff; cascades to Brand SKUs and their Material Prices |
+| Restore | Removes only matching cascade causes; validates live graph |
+| Permanent delete | Staff request, explicit approver permission, includes Brand SKUs/prices |
+| Historical BQ | Protected by consumer snapshots |
+| UI | Directory table, trailing action menu, Dialog edit, explicit confirmations |
+| Import/export | Deferred |
