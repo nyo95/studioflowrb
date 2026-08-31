@@ -18,9 +18,9 @@ export function LoginForm() {
   }, [state, router]);
 
   return (
-    <SectionCard style={{ width: "100%", maxWidth: 380 }}>
+    <SectionCard className="w-full max-w-[420px]">
       <form action={formAction} noValidate>
-        <Text as="p" tone="secondary" style={{ marginBottom: 16 }}>
+        <Text as="p" tone="secondary" className="mb-4">
           Sign in to your StudioFlow account.
         </Text>
         <Field id="login-email" label="Email">
@@ -46,12 +46,12 @@ export function LoginForm() {
           />
         </Field>
         {state && !state.ok ? (
-          <div role="alert" style={{ marginBottom: 12 }}>
+          <div role="alert" className="mb-3">
             <InlineError>{state.error.safeMessage}</InlineError>
           </div>
         ) : null}
-        <FormActions>
-          <Button type="submit" variant="primary" disabled={pending} style={{ width: "100%" }}>
+        <FormActions className="w-full">
+          <Button type="submit" variant="primary" disabled={pending} className="w-full">
             {pending ? <Spinner aria-hidden="true" /> : null}
             <span>{pending ? "Signing in…" : "Sign in"}</span>
           </Button>

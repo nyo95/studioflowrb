@@ -24,17 +24,19 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
   const productMark = settings.appTitle.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "SF";
   return (
     <AppShell
-      brand={<div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+      brand={<div className="flex min-w-0 items-center gap-2.5">
         {settings.brandMarkUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- owner-configured URL/path has no fixed image host.
-          <img src={settings.brandMarkUrl} alt="" style={{ width: 28, height: 28, objectFit: "contain" }} />
+          <img src={settings.brandMarkUrl} alt="" className="h-7 w-7 object-contain" />
         ) : null}
-        <div style={{ minWidth: 0 }}>
-          <Text as="span" style={{ display: "block", fontWeight: 650, whiteSpace: "nowrap" }}>{settings.appTitle}</Text>
-          <Text as="span" tone="tertiary" style={{ display: "block", fontSize: 11, whiteSpace: "nowrap" }}>{appName ?? settings.organizationName}</Text>
+        <div className="min-w-0">
+          <Text as="span" className="block truncate font-semibold">{settings.appTitle}</Text>
+          <Text as="span" tone="tertiary" size="sm" className="block truncate">
+            {appName ?? settings.organizationName}
+          </Text>
         </div>
       </div>}
-      collapsedBrand={<Text as="span" style={{ fontWeight: 700 }}>{appAbbreviation ?? productMark}</Text>}
+      collapsedBrand={<Text as="span" weight="semibold">{appAbbreviation ?? productMark}</Text>}
       collapsible
       navigationLabel={`${settings.appTitle} navigation`}
       navigation={<AuthenticatedPlatformNavigation
@@ -47,14 +49,14 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
       utility={<>
         {domainUtilityNavigation}
         <form action={logoutAction}>
-          <button type="submit" className={buttonClasses("ghost")} style={{ width: "100%", justifyContent: "flex-start" }}>Sign out</button>
+          <button type="submit" className={buttonClasses("ghost") + " w-full justify-start"}>Sign out</button>
         </form>
       </>}
-      topbar={<div style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, paddingInline: 16 }}>
+      topbar={<div className="flex w-full items-center gap-3 px-(--ui-page-padding)">
         {contextSlot}
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, minWidth: 0 }} title={`Signed in as ${principal.displayName}`}>
+        <div className="ml-auto flex min-w-0 items-center gap-2" title={`Signed in as ${principal.displayName}`}>
           <UserRound size={17} aria-hidden="true" />
-          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 220 }}>{principal.displayName}</span>
+          <span className="max-w-[220px] truncate whitespace-nowrap">{principal.displayName}</span>
         </div>
       </div>}
     >

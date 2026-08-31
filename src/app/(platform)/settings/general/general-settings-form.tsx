@@ -12,6 +12,7 @@ import {
   SectionCard,
   Select,
   Spinner,
+  Text,
 } from "@/platform/ui_engine";
 import type { ActionResult } from "@platform/core/actions";
 import type { PlatformGeneralSettings } from "@platform/core/settings";
@@ -43,7 +44,7 @@ export function GeneralSettingsForm({
   return (
     <SectionCard>
       <form action={action}>
-        <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+        <div className="grid gap-4 md:grid-cols-2">
           <Field id="settings-organization" label="Organization name">
             <Input id="settings-organization" name="organizationName" defaultValue={settings.organizationName} required maxLength={120} disabled={disabled} />
           </Field>
@@ -64,7 +65,7 @@ export function GeneralSettingsForm({
             </Select>
           </Field>
           <Field id="settings-currency" label="Currency" description="Three-letter ISO-4217 code.">
-            <Input id="settings-currency" name="currency" defaultValue={settings.currency} required minLength={3} maxLength={3} disabled={disabled} style={{ textTransform: "uppercase" }} />
+            <Input id="settings-currency" name="currency" defaultValue={settings.currency} required minLength={3} maxLength={3} disabled={disabled} className="uppercase" />
           </Field>
           <Field id="settings-week-start" label="Week starts on">
             <Select id="settings-week-start" name="weekStartsOn" defaultValue={String(settings.weekStartsOn)} disabled={disabled}>
@@ -78,12 +79,12 @@ export function GeneralSettingsForm({
         </div>
 
         {state && !state.ok ? (
-          <div role="alert" style={{ marginTop: 12 }}>
+          <div role="alert" className="mt-3">
             <InlineError>{state.error.safeMessage}</InlineError>
           </div>
         ) : null}
         {state?.ok ? (
-          <div role="status" style={{ marginTop: 12 }}>
+          <div role="status" className="mt-3">
             <Notice tone="success" title={state.data.changed ? "Settings updated" : "No changes to save"} />
           </div>
         ) : null}
@@ -96,9 +97,9 @@ export function GeneralSettingsForm({
             </Button>
           </FormActions>
         ) : (
-          <p style={{ marginTop: 12, fontSize: 13 }}>
+          <Text as="p" tone="secondary" size="sm" className="mt-3">
             Read-only: managing settings requires <code>platform.settings.manage</code>.
-          </p>
+          </Text>
         )}
       </form>
     </SectionCard>

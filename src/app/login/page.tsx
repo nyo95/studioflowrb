@@ -27,18 +27,18 @@ export default async function LoginPage() {
   }
 
   return (
-    <PageShell style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
-      <div style={{ width: "100%", display: "grid", justifyItems: "center", gap: 24 }}>
+    <PageShell className="min-h-screen place-items-center">
+      <div className="grid w-full justify-items-center gap-6">
         {settings.brandMarkUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- owner-configured URL/path has no fixed image host.
-          <img src={settings.brandMarkUrl} alt="" style={{ maxWidth: 64, maxHeight: 64, objectFit: "contain" }} />
+          <img src={settings.brandMarkUrl} alt="" className="max-h-16 max-w-16 object-contain" />
         ) : null}
         <PageHeader
           eyebrow={settings.organizationName}
           title="Sign in"
           divider={false}
         />
-        <Text as="p" tone="secondary" style={{ margin: 0 }}>{settings.appTitle}</Text>
+        <Text as="p" tone="secondary" className="m-0">{settings.appTitle}</Text>
         <LoginForm />
       </div>
     </PageShell>

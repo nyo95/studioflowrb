@@ -27,7 +27,7 @@ export default async function LauncherPage() {
   }
 
   return (
-    <PageShell>
+    <PageShell size="wide">
       <PageHeader
         eyebrow={settings.organizationName}
         title="Workspace"
@@ -42,15 +42,15 @@ export default async function LauncherPage() {
           />
         </SectionCard>
       ) : (
-        <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
           {accessible.map((app) => (
-            <Link key={app.appId} href={app.rootPath} style={{ textDecoration: "none", color: "inherit" }}>
-              <SectionCard>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Link key={app.appId} href={app.rootPath} className="text-inherit no-underline">
+              <SectionCard className="h-full">
+                <div className="flex items-center gap-3">
                   <LayoutGrid size={20} aria-hidden="true" />
-                  <div style={{ minWidth: 0 }}>
-                    <Text as="span" style={{ fontWeight: 600 }}>{app.name}</Text>
-                    <Text as="p" tone="secondary" style={{ margin: 0, fontSize: 13 }}>
+                  <div className="min-w-0">
+                    <Text as="span" weight="semibold">{app.name}</Text>
+                    <Text as="p" tone="secondary" size="sm" className="m-0">
                       Open {app.name}
                     </Text>
                   </div>
@@ -60,7 +60,7 @@ export default async function LauncherPage() {
           ))}
         </div>
       )}
-      <Text as="p" tone="secondary" style={{ fontSize: 13 }}>
+      <Text as="p" tone="secondary" size="sm">
         More applications appear here automatically once you are granted access.
       </Text>
       <Link className={buttonClasses("secondary") + " mt-2"} href="/account">

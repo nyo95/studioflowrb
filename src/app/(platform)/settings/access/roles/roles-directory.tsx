@@ -74,7 +74,7 @@ export function RolesDirectory({
   return (
     <SectionCard>
       {integrityIssues.length > 0 ? (
-        <div role="status" style={{ marginBottom: 12 }}>
+        <div role="status" className="mb-3">
           <Notice
             tone="warning"
             title={`${integrityIssues.length} unknown persisted permission${integrityIssues.length === 1 ? "" : "s"}`}
@@ -86,7 +86,7 @@ export function RolesDirectory({
       ) : null}
 
       {canManage ? (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <div className="mb-3 flex justify-end">
           <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
             <ShieldPlus aria-hidden="true" />
             <span>New role</span>
@@ -130,7 +130,7 @@ export function RolesDirectory({
                 <TableCell align="end">{role.activeAssignmentCount}</TableCell>
                 {canManage ? (
                   <TableCell align="end">
-                    <div style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <div className="inline-flex flex-wrap justify-end gap-1.5">
                       {!role.archivedAt ? (
                         <>
                           <button type="button" className={buttonClasses("secondary", "sm")} onClick={() => setGrantsTarget(role)}>
@@ -276,17 +276,17 @@ function PermissionCheckboxes({
   checkedIds?: readonly string[];
 }) {
   return (
-    <div style={{ display: "grid", gap: 6, maxHeight: 240, overflow: "auto", padding: "4px 0" }}>
+    <div className="grid max-h-[240px] gap-1.5 overflow-auto py-1">
       {permissions.map((permission) => (
-        <label key={permission} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+        <label key={permission} className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
             name={name}
             value={permission}
             defaultChecked={checkedIds.includes(permission)}
-            style={{ width: 15, height: 15 }}
+            className="h-[15px] w-[15px]"
           />
-          <span style={{ fontFamily: "var(--ui-font-mono)", fontSize: 12 }}>{permission}</span>
+          <span className="font-mono text-xs">{permission}</span>
         </label>
       ))}
     </div>

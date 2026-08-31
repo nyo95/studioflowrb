@@ -5,8 +5,8 @@ import { NextResponse, type NextRequest } from "next/server";
 // globals, and performs NO database or identity resolution.
 const SESSION_COOKIE_NAME = "studioflow_session";
 
-/** The only public UI route. Everything else is optimistically gated. */
-const PUBLIC_PATHS = ["/login"];
+/** Public UI routes for unauthenticated review and sign-in. */
+const PUBLIC_PATHS = ["/login", "/ui-engine"];
 
 /**
  * Optimistic public-route/session-cookie presence gating ONLY (CORE.md §3).

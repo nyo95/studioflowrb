@@ -21,15 +21,15 @@ export function AuthenticatedPlatformNavigation({ apps, showGeneralSettings, sho
 }) {
   const pathname = usePathname();
   return (
-    <div style={{ display: "grid", gap: 4 }}>
+    <div className="grid gap-1">
       <NavItem href="/" icon={<LayoutGrid size={17} />} active={pathname === "/"}>Applications</NavItem>
       {apps.map((app) => (
         <NavItem key={app.appId} href={app.rootPath} icon={<AppWindow size={17} />} active={activePath(pathname, app.rootPath)}>
           {app.name}
         </NavItem>
       ))}
-      {domainNavigation ? <div style={{ display: "grid", gap: 4, marginTop: 8 }}>{domainNavigation}</div> : null}
-      <div style={{ display: "grid", gap: 4, marginTop: 8 }}>
+      {domainNavigation ? <div className="mt-2 grid gap-1">{domainNavigation}</div> : null}
+      <div className="mt-2 grid gap-1">
         <NavItem href="/account" icon={<UserRound size={17} />} active={activePath(pathname, "/account")}>Account</NavItem>
         {showGeneralSettings ? <NavItem href="/settings/general" icon={<Settings size={17} />} active={activePath(pathname, "/settings/general")}>General Settings</NavItem> : null}
         {showUsers ? <NavItem href="/settings/access/users" icon={<Users size={17} />} active={activePath(pathname, "/settings/access/users")}>Users</NavItem> : null}

@@ -23,7 +23,7 @@ export function AccountForms({ displayName, email }: { displayName: string; emai
   const [passwordState, passwordAction, passwordPending] = useActionState(changePasswordAction, INITIAL);
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div className="grid gap-4">
       <SectionCard>
         <FormSection title="Display name" description={`Signed in as ${email}`}>
           <form action={nameAction}>
@@ -38,12 +38,12 @@ export function AccountForms({ displayName, email }: { displayName: string; emai
               />
             </Field>
             {nameState && !nameState.ok ? (
-              <div role="alert" style={{ marginTop: 8 }}>
+              <div role="alert" className="mt-2">
                 <InlineError>{nameState.error.safeMessage}</InlineError>
               </div>
             ) : null}
             {nameState?.ok ? (
-              <div role="status" style={{ marginTop: 8 }}>
+              <div role="status" className="mt-2">
                 <Notice tone="success" title="Display name updated" />
               </div>
             ) : null}
@@ -70,12 +70,12 @@ export function AccountForms({ displayName, email }: { displayName: string; emai
               <Input id="account-new-password" name="newPassword" type="password" autoComplete="new-password" required />
             </Field>
             {passwordState && !passwordState.ok ? (
-              <div role="alert" style={{ marginTop: 8 }}>
+              <div role="alert" className="mt-2">
                 <InlineError>{passwordState.error.safeMessage}</InlineError>
               </div>
             ) : null}
             {passwordState?.ok ? (
-              <div role="status" style={{ marginTop: 8 }}>
+              <div role="status" className="mt-2">
                 <Notice tone="success" title="Password changed" />
               </div>
             ) : null}

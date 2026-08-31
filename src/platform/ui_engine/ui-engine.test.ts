@@ -67,6 +67,11 @@ describe("UI Engine foundation", () => {
       "FilterBar",
       "SelectionBar",
       "Combobox",
+      "CreatableSearch",
+      "useDebouncedValue",
+      "useOptionOverlay",
+      "useConfirm",
+      "useUnsavedChangesGuard",
     ]) {
       const exported = ui[name as keyof typeof ui];
       assert.ok(
@@ -167,6 +172,18 @@ describe("UI Engine foundation", () => {
       variant: "inline",
     }));
     assert.match(inlineSelection, /data-variant="inline"/);
+
+    const creatable = renderToStaticMarkup(createElement(ui.CreatableSearch, {
+      label: "Tag",
+      options: [
+        { id: "one", label: "One" },
+        { id: "two", label: "Two" },
+      ],
+      value: "one",
+      onValueChange: () => undefined,
+    }));
+    assert.match(creatable, /aria-haspopup="listbox"/);
+    assert.match(creatable, />One<\/span>/);
   });
 
   it("keeps desktop rail preference while forcing labeled narrow navigation", () => {

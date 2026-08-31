@@ -5,9 +5,34 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3**
-- Next local revision: **R3.01**
+- Current revision after this entry is committed: **R3.01**
+- Next local revision: **R3.02**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.01 — 2026-08-31 — feat(ui-engine): raise shared shell quality and add public showcase
+
+Status: **navigator audit/correction — UI-F1 implementation**
+
+### Changed
+
+- Added a public `/ui-engine` showcase route that stays outside app data and database dependencies so the shared engine can be reviewed even when platform auth data is unavailable.
+- Whitelisted `/ui-engine` in the proxy public-route gate so browser review no longer falls through to the DB-backed login page.
+- Extended the shared UI Engine surface with a generic creatable search control and reusable hooks for debounced values, overlay option staging, confirm dialogs, and unsaved-change guarding.
+- Raised the page shell max width to the locked design token, then used the showcase to exercise AppShell, PageShell, PageHeader, PageSection, tables, filters, selection, row actions, comboboxes, creatable search, dialogs, drawers, loading/empty/error states, and dirty-state handling.
+- Reworked the platform shell/navigation/launcher/account/settings chrome away from inline layout styling toward shared primitives and utility classes so the shared presentation is more reusable and less domain-shaped.
+- Updated the UI Engine test surface to lock the new exports and the creatable-search markup contract.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `node --import tsx --test src/platform/ui_engine/ui-engine.test.ts`: passed.
+- Browser review in Chrome headless on `http://127.0.0.1:3000/ui-engine`: passed. Desktop and narrow screenshots were captured and inspected; the showcase renders the shared shell, table directory, form controls, and state surfaces without database access.
+- `npm test`: still not a full pass in this environment because the disposable rebuild PostgreSQL URL is not available. The suite stops in DB-backed integration tests before any legacy resource is touched.
+- `git diff --cached --check`: not yet run for this revision; will be run before the local commit.
+
+### Remaining limitation
+
+- The full DB-backed test suites remain blocked until a disposable rebuild PostgreSQL target is available in this environment.
 
 ## R3 — 2026-08-31 — release: publish isolated foundation utilities baseline
 

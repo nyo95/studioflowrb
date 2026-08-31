@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow,
   TableToolbar,
+  Text,
   buttonClasses,
 } from "@/platform/ui_engine";
 import {
@@ -82,7 +83,7 @@ export function UsersDirectory({
   return (
     <SectionCard>
       <TableToolbar>
-        <div style={{ marginLeft: "auto" }}>
+        <div className="ml-auto">
           {canManage ? (
             <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
               <UserPlus aria-hidden="true" />
@@ -121,7 +122,7 @@ export function UsersDirectory({
                 </TableCell>
                 <TableCell wrap>
                   {user.roles.length === 0 ? (
-                    <span style={{ fontStyle: "italic" }}>No roles</span>
+                    <Text as="span" tone="secondary" className="italic">No roles</Text>
                   ) : (
                     <TableCellContent
                       primary={user.roles.filter((role) => !role.archived).map((role) => role.name).join(", ") || "—"}
@@ -134,7 +135,7 @@ export function UsersDirectory({
                   )}
                 </TableCell>
                 <TableCell align="end">
-                  <div style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                  <div className="inline-flex flex-wrap justify-end gap-1.5">
                     {canManage ? (
                       <>
                         <button type="button" className={buttonClasses("secondary", "sm")} onClick={() => setEditTarget(user)}>
@@ -335,13 +336,13 @@ function RoleAssignControl({
             if (roleId) onAssign(roleId);
             setRoleId("");
           }}
-          style={{ display: "inline-flex", gap: 6 }}
+          className="inline-flex gap-1.5"
         >
           <Select
             aria-label={`Assign a role to ${user.displayName}`}
             value={roleId}
             onChange={(event) => setRoleId(event.target.value)}
-            style={{ minWidth: 130 }}
+            className="min-w-[130px]"
           >
             <option value="">Assign role…</option>
             {roles.map((role) => (
@@ -362,7 +363,7 @@ function RoleAssignControl({
           onChange={(event) => {
             if (event.target.value) onRemove(event.target.value);
           }}
-          style={{ minWidth: 130 }}
+          className="min-w-[130px]"
         >
           <option value="">Remove role…</option>
           {user.roles.filter((role) => !role.archived).map((role) => (

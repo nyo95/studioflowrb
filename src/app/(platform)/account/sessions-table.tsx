@@ -52,7 +52,7 @@ export function SessionsTable({
   return (
     <div>
       {state && !state.ok ? (
-        <div role="alert" style={{ marginBottom: 8 }}>
+        <div role="alert" className="mb-2">
           <InlineError>{state.error.safeMessage}</InlineError>
         </div>
       ) : null}
@@ -95,7 +95,7 @@ export function SessionsTable({
                     <form
                       action={action}
                       onSubmit={() => setRevokingId(session.id)}
-                      style={{ display: "inline-flex" }}
+                      className="inline-flex"
                     >
                       <input type="hidden" name="sessionId" value={session.id} />
                       <button
@@ -115,7 +115,7 @@ export function SessionsTable({
           })}
         </tbody>
       </DataTable>
-      <form action={onLogoutAll} style={{ marginTop: 12 }}>
+      <form action={onLogoutAll} className="mt-3">
         <Button type="submit" variant="secondary">
           Sign out all devices
         </Button>
