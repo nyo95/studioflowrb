@@ -9,6 +9,40 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Next local revision: **R3.02**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
+## R3.03 — 2026-08-31 — docs(masterdata): record implementation readiness boundary
+
+Status: **navigator gate review — implementation blocked on missing domain decisions**
+
+### Changed
+
+- Confirmed that the curated Brand, Vendor, and Pricing contracts take priority
+  over the shared Master Data index whenever wording conflicts.
+- Recorded that those contracts still delegate final SKU identity and
+  SKU–Brand cardinality to a future SKU contract, and do not define the full
+  Category and Unit lifecycle/permission policy.
+- Kept Master Data implementation out of the active tree until those decisions
+  are locked; Pricing cannot safely create its required SKU, Category, and Unit
+  foreign keys by inference.
+- Corrected the R3.02 verification record after the browser retest: typecheck,
+  focused UI Engine tests, and the 390px browser check all passed.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `node --import tsx --test src/platform/ui_engine/ui-engine.test.ts`: passed.
+- Browser review at `390px`: passed; the narrow rail remains expanded and the
+  collapse control is hidden without horizontal overflow.
+- No Master Data schema, route, database, legacy repository, or remote state
+  changed.
+
+### Required owner decisions before Master Data work order
+
+- SKU identity fields and uniqueness rules.
+- SKU–Brand cardinality and whether Brand-less SKU is allowed.
+- Category lifecycle, permissions, and `PRODUCT`/`WORK` dictionary policy.
+- Unit lifecycle, permissions, identity, and seed policy.
+- Exact migration/recovery plan and acceptance tests for the first slice.
+
 ## R3.02 — 2026-08-31 — fix(ui-engine): harden narrow rail behavior
 
 Status: **navigator correction — UI-F1 browser finding**
@@ -22,10 +56,10 @@ Status: **navigator correction — UI-F1 browser finding**
 
 ### Verification
 
-- `npm run typecheck`: pending.
-- `node --import tsx --test src/platform/ui_engine/ui-engine.test.ts`: pending.
-- Browser review at `390px`: pending; the narrow rail must remain expanded,
-  labeled, and free of a collapse control.
+- `npm run typecheck`: passed.
+- `node --import tsx --test src/platform/ui_engine/ui-engine.test.ts`: passed.
+- Browser review at `390px`: passed; the narrow rail remains expanded, labeled,
+  and free of a collapse control.
 - No database, legacy repository, or remote state changed.
 
 ## R3.01 — 2026-08-31 — feat(ui-engine): raise shared shell quality and add public showcase
