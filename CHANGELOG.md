@@ -4,10 +4,29 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 ## Revision state
 
-- Published baseline: **R2** — `433a2cb502c3ae6569b6b7cd2fa21188dbf28c37` on `origin/main`
-- Current local revision after this entry is committed: **R2.02**
-- Next local revision: **R2.03**
+- Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
+- Current revision after this entry is committed: **R3**
+- Next local revision: **R3.01**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3 — 2026-08-31 — release: publish isolated foundation utilities baseline
+
+Status: **owner-authorized GitHub publication**
+
+Publishes `R2.01` and `R2.02` as the new remote baseline: StudioFlow legacy is
+isolated across home/office environments and treated only as owner-located,
+strictly read-only behavioral evidence; decimal and money display utilities are
+now locale-aware, arbitrary-precision, runtime-validated, and reusable across
+future apps. The repository remains Foundation-only, and UI Engine visual
+quality remains the next acknowledged audit/correction area.
+
+### Verification
+
+- Release content is exactly committed revisions `R2.01` and `R2.02` plus this
+  changelog-only promotion commit.
+- The complete checks and disposable-database limitation are recorded under
+  `R2.02`; no legacy repository or PostgreSQL resource was touched.
+- `git diff --cached --check`: passed.
 
 ## R2.02 — 2026-08-31 — feat(utilities): generalize decimal and money display
 
