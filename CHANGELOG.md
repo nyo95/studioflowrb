@@ -5,9 +5,72 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.07**
-- Next local revision: **R3.08**
+- Current revision after this entry is committed: **R3.08**
+- Next local revision: **R3.09**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.08 — 2026-08-31 — docs(handoff): package Master Data continuation context
+
+Status: **local handover checkpoint — implementation intentionally incomplete**
+
+### Current state
+
+- Published baseline remains `R3` at `origin/main` commit
+  `ca5db0b176fb6d4969615623b0f5e74243ff37f8`.
+- Current local HEAD before this checkpoint was `R3.07` commit
+  `54f5ba3479dcf6e66f563183d233be37e5688f22`; this checkpoint is local-only
+  and must not be pushed without separate owner instruction.
+- UI-F1 was corrected and browser-verified in `R3.02`: the collapse control is
+  hidden at `<=840px` and narrow layout has no horizontal overflow.
+- Owner decisions for Unit, Category, and SKU are recorded in
+  `docs/apps/masterdata.md`; Brand, Vendor, and Pricing contracts remain
+  authoritative for their own product rules.
+- The active implementation work order is
+  `scripts/work-orders/MASTERDATA.md`.
+
+### Implemented
+
+- Prisma `master_data` schema, archive-cause provenance table, deletion-request
+  table, live partial unique indexes, FK correction for `PriceMaterial.source_link_id`
+  `ON DELETE SET NULL`, and seed migration for 8 Units + 6 VendorTypes.
+- Master Data permission registration in `src/app/app-registrations.ts`.
+- `src/apps/masterdata/service.ts` with permission-checked summary/list reads and
+  audited transactional create commands for Unit, Category, Brand, and Vendor.
+- Authenticated dynamic `/masterdata` landing route.
+
+### Rebuild-only environment
+
+- Database target used for migration/tests:
+  `postgresql://masterdata:masterdata@localhost:5433/masterdata`.
+- Container: `masterdata-db`; never use `studioflow-db-1` or any legacy target.
+- `npx prisma migrate status`: up to date.
+- No legacy repository or legacy PostgreSQL resource was accessed during this
+  implementation.
+
+### Verification at handover
+
+- `npm run typecheck`: passed.
+- `npm run build`: passed with `/masterdata` routable.
+- `npm run check:boundaries`: passed.
+- `npm run check:legacy-runtime`: passed.
+- `npm test` with explicit rebuild database: **183 passed, 0 failed, 0
+  cancelled**.
+
+### Next deterministic work
+
+1. Add focused Master Data service tests and complete update/create validation.
+2. Implement archive/restore causes and parent cascades for Brand, Vendor, SKU,
+   and all Pricing tables.
+3. Implement Category deactivate/merge and persisted deletion request approval.
+4. Implement SKU creation invariant: name + Unit + Category + at least one
+   PriceMaterial, with Vendor only on PriceMaterial.
+5. Implement all three Pricing commands, capability checks, restore validation,
+   and public read DTOs.
+6. Build real directory/detail/form routes with UI Engine patterns and browser
+   test search, filters, sorting, pagination, quick entry, unsaved changes,
+   destructive confirmations, permissions, and narrow viewport behavior.
+7. Update this ledger under the next unused revision (`R3.09`) and commit one
+   cohesive local change set. Do not push.
 
 ## R3.07 — 2026-08-31 — feat(masterdata): add service boundary and landing route
 
