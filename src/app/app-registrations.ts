@@ -10,4 +10,26 @@ import type { AppPermissionRegistrationInput } from "@platform/core/rbac/registr
  * boundary; this file only hands the platform registry the already-public
  * lists plus launcher metadata.
  */
-export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [];
+export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [
+  {
+    appId: "masterdata",
+    name: "Master Data",
+    rootPath: "/masterdata",
+    permissions: [
+      "masterdata.access",
+      "masterdata.brand.read",
+      "masterdata.brand.manage",
+      "masterdata.vendor.read",
+      "masterdata.vendor.manage",
+      "masterdata.dictionary.read",
+      "masterdata.dictionary.manage",
+      "masterdata.sku.read",
+      "masterdata.sku.manage",
+      "masterdata.price-material.read",
+      "masterdata.price-material.manage",
+      "masterdata.price-work.read",
+      "masterdata.price-work.manage",
+      "masterdata.deletion.approve",
+    ],
+  },
+];

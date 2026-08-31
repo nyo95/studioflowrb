@@ -5,9 +5,38 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.05**
-- Next local revision: **R3.06**
+- Current revision after this entry is committed: **R3.06**
+- Next local revision: **R3.07**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.06 — 2026-08-31 — feat(masterdata): activate permissions and seed vocabulary
+
+Status: **Master Data implementation — application activation**
+
+### Changed
+
+- Registered the Master Data application and its curated Brand, Vendor,
+  dictionary, SKU, Pricing, and deletion-approval permission vocabulary.
+- Added idempotent rebuild-only seed migration for the six curated VendorTypes
+  and eight initial operational Units.
+- Removed stale deferred wording for Unit, Category, and SKU now that the owner
+  has locked their decisions.
+- Reconciled Unit hard-delete behavior with Pricing's restrictive required FKs:
+  referenced Unit rows remain available as archived historical dictionary data.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `npm run check:boundaries`: passed.
+- `npm run check:legacy-runtime`: passed.
+- Explicit rebuild target migration deploy: passed.
+- `prisma migrate status`: database schema is up to date.
+- Rebuild-only seed verification: 8 Units and 6 VendorTypes present.
+
+### Remaining
+
+- Domain service rules, transactional mutations, routes, UI, and behavior tests
+  continue in `R3.07+`.
 
 ## R3.05 — 2026-08-31 — feat(masterdata): add curated isolated schema
 

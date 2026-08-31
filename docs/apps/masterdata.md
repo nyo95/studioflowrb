@@ -62,18 +62,13 @@ These decisions supersede any earlier deferred wording in this index. If a
 decision conflicts with Brand, Vendor, or Pricing, the owner-curated contract
 for that entity remains authoritative.
 
-## 3. Remaining Master Data scope
+## 3. Deferred Master Data scope
 
-Master Data also owns Category, SKU, Unit, media, physical Samples, import/export,
-and its public read contracts. No active schema or code exists for those slices;
-each must receive an owner-approved logic contract before implementation.
+Master Data also owns media, physical Samples, import/export, and its public read
+contracts. Those slices remain outside the active implementation work order.
 
-In particular, the following are not decided by the approved Brand/Vendor/Pricing
-contracts and must not be inferred during implementation:
+The following remain deferred and must not be inferred during implementation:
 
-- final SKU identity and SKU–Brand cardinality;
-- full Category and Unit lifecycle/permission policy outside the decisions already
-  referenced by the active contracts;
 - media/file storage mechanics;
 - Samples behavior;
 - workbook/import/export policy;
