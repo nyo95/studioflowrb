@@ -5,9 +5,48 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.09**
-- Next local revision: **R3.10**
+- Current revision after this entry is committed: **R3.10**
+- Next local revision: **R3.11**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.10 — 2026-09-01 — chore(masterdata): checkpoint in-progress implementation
+
+Status: **local internal checkpoint — not accepted or complete**
+
+### Changed
+
+- Preserved and stabilized the interrupted Master Data implementation: expanded
+  service commands, integration coverage, public read composition, application
+  shell, and draft directories for Brand, Vendor, SKU, Unit, Category, and
+  Pricing.
+- Added the first Pricing directory with its three contract tabs and connected
+  archive, restore, and permanent-deletion-request actions to the service.
+- Corrected shared hooks/CreatableSearch lint issues and added actionable
+  password validation rendering plus explicit per-role removal controls in
+  platform access UI.
+- Applied the initial owner-review corrections: primary app navigation now
+  contains workflow destinations only; Unit usage counts were removed from the
+  directory; Unit input uppercases as typed and `M2`/`M3` display as `M²`/`M³`;
+  Brand create/edit no longer assigns material suppliers.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `npm test`: **196 passed, 0 failed, 0 cancelled** against the isolated
+  `masterdata_test` database.
+- `git diff --check`: passed before commit.
+
+### Remaining
+
+- Complete Pricing create/edit UI and the deletion-approval directory.
+- Move Unit, Category, VendorType, and deletion review into the locked Master
+  Data Settings tab shell; keep SKU within the Pricing workflow.
+- Add VendorType CRUD UI, Owner Vendor CreatableSearch/quick entry, and the
+  reviewed Brand/Vendor link interactions.
+- Apply consistent dialog success feedback and close behavior across every
+  Master Data mutation, complete admin password feedback, then run build and
+  full browser acceptance at desktop and narrow viewport.
 
 ## R3.09 — 2026-08-31 — feat(masterdata): harden lifecycle and test isolation
 

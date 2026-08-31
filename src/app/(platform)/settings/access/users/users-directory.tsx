@@ -61,7 +61,7 @@ export function UsersDirectory({
   const [editTarget, setEditTarget] = useState<UserRow | null>(null);
   const [passwordTarget, setPasswordTarget] = useState<UserRow | null>(null);
   const [confirmDisable, setConfirmDisable] = useState<UserRow | null>(null);
-  const [confirmRemoveRole, setConfirmRemoveRole] = useState<{ user: UserRow; roleId: string } | null>(null);
+  const [confirmRemoveRole, setConfirmRemoveRole] = useState<{ user: UserRow; roleId: string; roleName: string } | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -154,7 +154,10 @@ export function UsersDirectory({
                         onAssign={(roleId) =>
                           runRowAction(user.id, () => assignRoleAction(user.id, roleId))
                         }
-                        onRemove={(roleId) => setConfirmRemoveRole({ user, roleId })}
+                        onRemove={(roleId) => {
+                          const role = user.roles.find((assigned) => assigned.id === roleId);
+                          if (role) setConfirmRemoveRole({ user, roleId, roleName: role.name });
+                        }}
                       />
                     ) : null}
                     {canManage ? (
@@ -298,8 +301,8 @@ export function UsersDirectory({
       <ConfirmDialog
         open={confirmRemoveRole !== null}
         onOpenChange={() => setConfirmRemoveRole(null)}
-        title="Remove role assignment?"
-        description="The user loses this role's grants on their next request."
+        title={`Remove ${confirmRemoveRole?.roleName ?? "role"} from ${confirmRemoveRole?.user.displayName ?? "user"}?`}
+        description="The user loses this role's grants immediately. Last-administrator protection still applies."
         confirmLabel="Remove role"
         tone="danger"
         onConfirm={() => {
@@ -356,23 +359,21 @@ function RoleAssignControl({
           </button>
         </form>
       ) : null}
-      {user.roles.filter((role) => !role.archived).length > 0 ? (
-        <Select
-          aria-label={`Remove a role from ${user.displayName}`}
-          value=""
-          onChange={(event) => {
-            if (event.target.value) onRemove(event.target.value);
-          }}
-          className="min-w-[130px]"
-        >
-          <option value="">Remove role…</option>
-          {user.roles.filter((role) => !role.archived).map((role) => (
-            <option key={role.id} value={role.id}>
-              {role.name}
-            </option>
-          ))}
-        </Select>
-      ) : null}
+      {user.roles.filter((role) => !role.archived).map((role) => (
+        <span key={role.id} className="inline-flex items-center gap-1 rounded-control border border-line px-2 py-1 text-xs">
+          <span>{role.name}</span>
+          <button
+            type="button"
+            className="font-semibold text-ink-secondary hover:text-danger"
+            aria-label={`Remove ${role.name} from ${user.displayName}`}
+            title={`Remove ${role.name}`}
+            disabled={pending}
+            onClick={() => onRemove(role.id)}
+          >
+            ×
+          </button>
+        </span>
+      ))}
     </>
   );
 }

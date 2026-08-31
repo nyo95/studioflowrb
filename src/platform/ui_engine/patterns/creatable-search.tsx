@@ -157,9 +157,6 @@ export function CreatableSearch({
     focusOption(index, event.key as ComboboxNavigationKey);
   };
 
-  useEffect(() => {
-    if (selected) updateQuery(selected.label);
-  }, [selected]);
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>

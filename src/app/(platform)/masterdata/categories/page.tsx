@@ -1,0 +1,42 @@
+import { redirect } from "next/navigation";
+
+import { requirePrincipalGrants } from "@platform/core/auth";
+import { hasPermission } from "@platform/core/rbac";
+import { ErrorState, PageHeader, SectionCard } from "@/platform/ui_engine";
+import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
+import { masterDataService } from "@/apps/masterdata/runtime";
+
+import { CategoryDirectory } from "./category-directory";
+
+export const dynamic = "force-dynamic";
+
+export default async function CategoriesPage() {
+  const principalGrants = await requirePrincipalGrants().catch(() => null);
+  if (!principalGrants) redirect("/login");
+  const { grants } = principalGrants;
+
+  if (!hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryRead)) {
+    return (
+      <div className="grid gap-4">
+        <PageHeader eyebrow="Master Data" title="Categories" />
+        <SectionCard>
+          <ErrorState title="Access denied" description="You do not have permission to view categories." />
+        </SectionCard>
+      </div>
+    );
+  }
+
+  const categories = await masterDataService.listCategories({ grants, includeDeactivated: true });
+  const canManage = hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryManage);
+
+  return (
+    <div className="grid gap-6">
+      <PageHeader
+        eyebrow="Master Data"
+        title="Product &amp; Work Categories"
+        description="Structured taxonomy for catalog items, finishes, brands, and construction work rates."
+      />
+      <CategoryDirectory categories={categories} canManage={canManage} />
+    </div>
+  );
+}

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
@@ -7,7 +8,6 @@ import {
   Heading,
   PageHeader,
   PageSection,
-  PageShell,
   SectionCard,
   Text,
 } from "@/platform/ui_engine";
@@ -17,14 +17,15 @@ import { masterDataService } from "@/apps/masterdata/runtime";
 
 export const dynamic = "force-dynamic";
 
-const METRICS = [
-  ["brands", "Brands"],
-  ["vendors", "Vendors"],
-  ["skus", "SKUs"],
-  ["categories", "Categories"],
-  ["units", "Units"],
-  ["materialPrices", "Material prices"],
-  ["workPrices", "Work prices"],
+const SECTIONS = [
+  { key: "brands", label: "Brands", href: "/masterdata/brands", desc: "Catalog brands, discovery categories, and hashtags." },
+  { key: "vendors", label: "Vendors", href: "/masterdata/vendors", desc: "Suppliers, subcontractors, and capability assignments." },
+  { key: "skus", label: "SKUs", href: "/masterdata/skus", desc: "Product catalog items and purchase units." },
+  { key: "materialPrices", label: "Material prices", href: "/masterdata/pricing", desc: "SKU supplier pricing." },
+  { key: "workPrices", label: "Work prices", href: "/masterdata/pricing", desc: "Material + labor and labor-only unit prices." },
+  { key: "units", label: "Units", href: "/masterdata/units", desc: "Standard measurement units." },
+  { key: "categories", label: "Categories", href: "/masterdata/categories", desc: "Product & work categorization tree." },
+  { key: "deletionRequests", label: "Deletion requests", href: "/masterdata/deletions", desc: "Two-step permanent purge approvals." },
 ] as const;
 
 export default async function MasterDataPage() {
@@ -35,30 +36,33 @@ export default async function MasterDataPage() {
   const summary = await masterDataService.summary({ grants: principalGrants.grants });
 
   return (
-    <PageShell size="wide">
+    <div className="grid gap-6">
       <PageHeader
         eyebrow="Master Data"
-        title="Operational catalog"
+        title="Operational Catalog"
         description="Manage the shared product, vendor, unit, category, and pricing vocabulary used by downstream workflows."
         actions={<Badge tone="success">Connected</Badge>}
       />
-      <PageSection title="Overview" description="Live records in the rebuild database." >
-        <SectionCard>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {METRICS.map(([key, label]) => (
-              <div key={key} className="grid gap-1 border-b border-line-subtle pb-3 last:border-0 sm:last:border-b lg:nth-last-1:border-b-0">
-                <Text meta>{label}</Text>
-                <Heading level={3}>{summary[key]}</Heading>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
+
+      <PageSection title="Summary" description="Live catalog assets and dictionary entries.">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {SECTIONS.map((section) => (
+            <Link key={section.key} href={section.href} className="group block focus-visible:outline-none">
+              <SectionCard className="h-full transition-all group-hover:border-action/60 group-hover:shadow-sm">
+                <div className="flex items-baseline justify-between mb-1">
+                  <Text meta>{section.label}</Text>
+                  <Heading level={3} className="text-ink group-hover:text-action">
+                    {summary[section.key as keyof typeof summary]}
+                  </Heading>
+                </div>
+                <Text tone="tertiary" size="sm" className="line-clamp-2">
+                  {section.desc}
+                </Text>
+              </SectionCard>
+            </Link>
+          ))}
+        </div>
       </PageSection>
-      <PageSection title="Next actions" description="The first application slice is being activated from the curated contracts." >
-        <SectionCard>
-          <Text tone="secondary">Directory, detail, lifecycle, and pricing workflows will use the shared UI Engine and the transactional Master Data service.</Text>
-        </SectionCard>
-      </PageSection>
-    </PageShell>
+    </div>
   );
 }

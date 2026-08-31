@@ -79,13 +79,25 @@ function requiredAmount(value: string): string {
   return amount;
 }
 
+function normalizeHashtags(hashtags: readonly string[]): Array<{ label: string; normalized: string }> {
+  const seen = new Set<string>();
+  const result: Array<{ label: string; normalized: string }> = [];
+  for (const raw of hashtags) {
+    const clean = raw.trim().replace(/^#+/, "");
+    const normalized = normalizeText(clean).toLowerCase();
+    if (normalized && !seen.has(normalized)) {
+      seen.add(normalized);
+      result.push({ label: clean, normalized });
+    }
+  }
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // Archive-cause provenance helpers (masterdata.md §4.1)
 // ---------------------------------------------------------------------------
 
 async function addDirectCause(tx: TxClient, entityType: string, entityId: string): Promise<void> {
-  // PostgreSQL NULL != NULL so the DB unique index does NOT prevent duplicate DIRECT rows.
-  // Callers must verify the entity is not already archived before calling this.
   await tx.archiveCause.create({
     data: { id: randomUUID(), entity_type: entityType, entity_id: entityId, kind: "DIRECT", parent_type: null, parent_id: null },
   });
@@ -108,7 +120,7 @@ async function addParentCauses(
       parent_type: parentType,
       parent_id: parentId,
     })),
-    skipDuplicates: true, // non-null parent fields make the unique index effective
+    skipDuplicates: true,
   });
 }
 
@@ -118,8 +130,6 @@ async function removeDirectCause(tx: TxClient, entityType: string, entityId: str
   });
 }
 
-/** Removes all PARENT causes matching (parentType, parentId) for an entity type.
- *  Returns the IDs of entities that now have ZERO remaining causes (→ should be restored). */
 async function removeParentCausesAndFindRestored(
   tx: TxClient,
   entityType: string,
@@ -137,7 +147,6 @@ async function removeParentCausesAndFindRestored(
     where: { entity_type: entityType, kind: "PARENT", parent_type: parentType, parent_id: parentId },
   });
 
-  // Which of those entities still have at least one remaining cause?
   const stillCaused = await tx.archiveCause.findMany({
     where: { entity_type: entityType, entity_id: { in: affectedIds } },
     select: { entity_id: true },
@@ -174,6 +183,42 @@ async function assertVendorLaborCapable(tx: TxClient, vendorId: string): Promise
   });
   if (!capable) {
     throw new AppError("VALIDATION", "VENDOR_NOT_LABOR_CAPABLE", "Vendor is not eligible as a labor provider.");
+  }
+}
+
+async function assertVendorTypeRemovalSafe(tx: TxClient, vendorId: string, remainingTypeIds: string[]): Promise<void> {
+  const remainingTypes = await tx.vendorType.findMany({
+    where: { id: { in: remainingTypeIds }, deleted_at: null },
+  });
+  const hasMaterial = remainingTypes.some((t) => t.can_supply_material);
+  const hasLabor = remainingTypes.some((t) => t.can_supply_labor);
+
+  if (!hasMaterial) {
+    const [priceCount, supplierCount] = await Promise.all([
+      tx.priceMaterial.count({ where: { supplier_vendor_id: vendorId, deleted_at: null } }),
+      tx.brandSupplier.count({ where: { vendor_id: vendorId } }),
+    ]);
+    if (priceCount > 0 || supplierCount > 0) {
+      throw new AppError(
+        "CONFLICT",
+        "VENDOR_MATERIAL_CAPABILITY_IN_USE",
+        "Cannot remove material supply capability while live material prices or brand supplier relations exist.",
+      );
+    }
+  }
+
+  if (!hasLabor) {
+    const [mlCount, laborCount] = await Promise.all([
+      tx.priceMaterialLabor.count({ where: { vendor_id: vendorId, deleted_at: null } }),
+      tx.priceLabor.count({ where: { vendor_id: vendorId, deleted_at: null } }),
+    ]);
+    if (mlCount > 0 || laborCount > 0) {
+      throw new AppError(
+        "CONFLICT",
+        "VENDOR_LABOR_CAPABILITY_IN_USE",
+        "Cannot remove labor provision capability while live work prices exist.",
+      );
+    }
   }
 }
 
@@ -327,7 +372,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
 
     async summary(input: { grants: PermissionGrants }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.access);
-      const [brands, vendors, skus, materialPrices, workPrices, units, categories] = await Promise.all([
+      const [brands, vendors, skus, materialPrices, workPrices, units, categories, deletionRequests] = await Promise.all([
         db.brand.count({ where: { deleted_at: null } }),
         db.vendor.count({ where: { deleted_at: null } }),
         db.sku.count({ where: { deleted_at: null } }),
@@ -337,100 +382,39 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           .then((n) => db.priceLabor.count({ where: { deleted_at: null } }).then((m) => n + m)),
         db.unit.count({ where: { status: "ACTIVE" } }),
         db.category.count({ where: { status: "ACTIVE" } }),
+        db.deletionRequest.count({ where: { status: "PENDING" } }),
       ]);
-      return { brands, vendors, skus, materialPrices, workPrices, units, categories };
+      return { brands, vendors, skus, materialPrices, workPrices, units, categories, deletionRequests };
     },
 
-    // ── Dictionary reads ────────────────────────────────────────────────────
+    // ── Unit Dictionary ─────────────────────────────────────────────────────
 
-    async listUnits(input: { grants: PermissionGrants; includeArchived?: boolean }) {
+    async listUnits(input: { grants: PermissionGrants; search?: string; includeArchived?: boolean }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryRead);
+      const search = input.search?.trim();
       return db.unit.findMany({
-        where: input.includeArchived ? {} : { status: "ACTIVE" },
+        where: {
+          ...(input.includeArchived ? {} : { status: "ACTIVE" }),
+          ...(search
+            ? {
+                OR: [
+                  { name: { contains: search, mode: "insensitive" } },
+                  { code: { contains: search, mode: "insensitive" } },
+                ],
+              }
+            : {}),
+        },
         orderBy: [{ name: "asc" }, { code: "asc" }],
-        select: { id: true, code: true, name: true, status: true, archived_at: true },
-      });
-    },
-
-    async listCategories(input: {
-      grants: PermissionGrants;
-      kind?: "PRODUCT" | "WORK";
-      includeDeactivated?: boolean;
-    }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryRead);
-      return db.category.findMany({
-        where: {
-          ...(input.kind ? { kind: input.kind } : {}),
-          ...(input.includeDeactivated ? {} : { status: "ACTIVE" }),
-        },
-        orderBy: [{ kind: "asc" }, { name: "asc" }],
-        select: { id: true, name: true, slug: true, kind: true, status: true, merged_into_id: true },
-      });
-    },
-
-    // ── Brand / Vendor reads ─────────────────────────────────────────────────
-
-    async listBrands(input: { grants: PermissionGrants; search?: string; includeArchived?: boolean }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.brandRead);
-      const search = input.search?.trim();
-      return db.brand.findMany({
-        where: {
-          ...(input.includeArchived ? {} : { deleted_at: null }),
-          ...(search
-            ? {
-                OR: [
-                  { name: { contains: search, mode: "insensitive" } },
-                  { slug: { contains: search, mode: "insensitive" } },
-                ],
-              }
-            : {}),
-        },
-        orderBy: { name: "asc" },
         select: {
           id: true,
+          code: true,
           name: true,
-          slug: true,
-          notes: true,
-          deleted_at: true,
-          owner_vendor: { select: { id: true, name: true } },
-          _count: { select: { skus: true, suppliers: true, links: true, categories: true } },
-        },
-      });
-    },
-
-    async listVendors(input: { grants: PermissionGrants; search?: string; includeArchived?: boolean }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorRead);
-      const search = input.search?.trim();
-      return db.vendor.findMany({
-        where: {
-          ...(input.includeArchived ? {} : { deleted_at: null }),
-          ...(search
-            ? {
-                OR: [
-                  { name: { contains: search, mode: "insensitive" } },
-                  { legal_name: { contains: search, mode: "insensitive" } },
-                ],
-              }
-            : {}),
-        },
-        orderBy: { name: "asc" },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          legal_name: true,
-          deleted_at: true,
-          types: {
-            select: {
-              vendor_type: {
-                select: { code: true, name: true, can_supply_material: true, can_supply_labor: true },
-              },
-            },
-          },
+          status: true,
+          archived_at: true,
           _count: {
             select: {
-              owned_brands: true,
-              brand_suppliers: true,
+              base_skus: true,
+              purchase_skus: true,
               material_prices: true,
               material_labor_prices: true,
               labor_prices: true,
@@ -440,7 +424,23 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       });
     },
 
-    // ── Unit CRUD + lifecycle ─────────────────────────────────────────────────
+    async getUnit(input: { grants: PermissionGrants; unitId: string }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryRead);
+      return db.unit.findUniqueOrThrow({
+        where: { id: input.unitId },
+        include: {
+          _count: {
+            select: {
+              base_skus: true,
+              purchase_skus: true,
+              material_prices: true,
+              material_labor_prices: true,
+              labor_prices: true,
+            },
+          },
+        },
+      });
+    },
 
     async createUnit(input: { grants: PermissionGrants; actor: AuditActor; code: string; name: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
@@ -456,6 +456,29 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         }
         await writeAudit(tx, { action: "unit.created", entityType: "unit", entityId: unit!.id, actor: input.actor, metadata: { code } });
         return { unitId: unit!.id };
+      });
+    },
+
+    async updateUnit(input: { grants: PermissionGrants; actor: AuditActor; unitId: string; code: string; name: string }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
+      actorIsUsable(input.actor);
+      const code = requiredName(input.code, "UNIT_CODE_REQUIRED").toUpperCase();
+      const name = requiredName(input.name, "UNIT_NAME_REQUIRED");
+      return runTransaction(async (tx) => {
+        const existing = await tx.unit.findUniqueOrThrow({ where: { id: input.unitId } });
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        if (existing.code !== code) changes.code = { from: existing.code, to: code };
+        if (existing.name !== name) changes.name = { from: existing.name, to: name };
+
+        if (Object.keys(changes).length === 0) return { unitId: input.unitId };
+
+        try {
+          await tx.unit.update({ where: { id: input.unitId }, data: { code, name } });
+        } catch (error) {
+          mapWriteError(error);
+        }
+        await writeAudit(tx, { action: "unit.updated", entityType: "unit", entityId: input.unitId, actor: input.actor, changes });
+        return { unitId: input.unitId };
       });
     },
 
@@ -516,7 +539,67 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       });
     },
 
-    // ── Category CRUD + lifecycle ─────────────────────────────────────────────
+    // ── Category Dictionary ─────────────────────────────────────────────────
+
+    async listCategories(input: {
+      grants: PermissionGrants;
+      search?: string;
+      kind?: "PRODUCT" | "WORK";
+      includeDeactivated?: boolean;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryRead);
+      const search = input.search?.trim();
+      return db.category.findMany({
+        where: {
+          ...(input.kind ? { kind: input.kind } : {}),
+          ...(input.includeDeactivated ? {} : { status: "ACTIVE" }),
+          ...(search
+            ? {
+                OR: [
+                  { name: { contains: search, mode: "insensitive" } },
+                  { slug: { contains: search, mode: "insensitive" } },
+                ],
+              }
+            : {}),
+        },
+        orderBy: [{ kind: "asc" }, { name: "asc" }],
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          kind: true,
+          status: true,
+          merged_into_id: true,
+          merged_into: { select: { id: true, name: true } },
+          _count: {
+            select: {
+              sku_categories: true,
+              brand_categories: true,
+              material_labor_prices: true,
+              labor_prices: true,
+            },
+          },
+        },
+      });
+    },
+
+    async getCategory(input: { grants: PermissionGrants; categoryId: string }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryRead);
+      return db.category.findUniqueOrThrow({
+        where: { id: input.categoryId },
+        include: {
+          merged_into: { select: { id: true, name: true } },
+          _count: {
+            select: {
+              sku_categories: true,
+              brand_categories: true,
+              material_labor_prices: true,
+              labor_prices: true,
+            },
+          },
+        },
+      });
+    },
 
     async createCategory(input: { grants: PermissionGrants; actor: AuditActor; name: string; kind: "PRODUCT" | "WORK" }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
@@ -539,6 +622,30 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           metadata: { kind, slug },
         });
         return { categoryId: category!.id };
+      });
+    },
+
+    async updateCategory(input: { grants: PermissionGrants; actor: AuditActor; categoryId: string; name: string }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
+      actorIsUsable(input.actor);
+      const name = requiredName(input.name, "CATEGORY_NAME_REQUIRED");
+      const slug = requiredSlug(name);
+      return runTransaction(async (tx) => {
+        const existing = await tx.category.findUniqueOrThrow({ where: { id: input.categoryId } });
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        if (existing.name !== name) {
+          changes.name = { from: existing.name, to: name };
+          changes.slug = { from: existing.slug, to: slug };
+        }
+        if (Object.keys(changes).length === 0) return { categoryId: input.categoryId };
+
+        try {
+          await tx.category.update({ where: { id: input.categoryId }, data: { name, slug } });
+        } catch (error) {
+          mapWriteError(error);
+        }
+        await writeAudit(tx, { action: "category.updated", entityType: "category", entityId: input.categoryId, actor: input.actor, changes });
+        return { categoryId: input.categoryId };
       });
     },
 
@@ -593,7 +700,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
 
         const now = new Date();
 
-        // Transfer SkuCategory rows — skip any SKU already linked to target
+        // Transfer SkuCategory rows
         const existingSkuTargets = await tx.skuCategory.findMany({
           where: { category_id: input.targetCategoryId },
           select: { sku_id: true },
@@ -611,7 +718,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
             data: { category_id: input.targetCategoryId },
           });
         }
-        // Delete remaining source SkuCategory rows (duplicates that couldn't transfer)
         await tx.skuCategory.deleteMany({ where: { category_id: input.sourceCategoryId } });
 
         // Transfer BrandCategory rows (with origins)
@@ -629,19 +735,29 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         for (const sourceLink of sourceBrandLinks) {
           const existingTargetId = brandTargetMap.get(sourceLink.brand_id);
           if (existingTargetId) {
-            // Re-parent origins to the existing target BrandCategory
             await tx.brandCategoryOrigin.updateMany({
               where: { brand_category_id: sourceLink.id },
               data: { brand_category_id: existingTargetId },
             });
             await tx.brandCategory.delete({ where: { id: sourceLink.id } });
           } else {
-            // Transfer source BrandCategory to target category
             await tx.brandCategory.update({
               where: { id: sourceLink.id },
               data: { category_id: input.targetCategoryId },
             });
           }
+        }
+
+        // Transfer work prices if WORK category
+        if (source.kind === "WORK") {
+          await tx.priceMaterialLabor.updateMany({
+            where: { category_id: input.sourceCategoryId },
+            data: { category_id: input.targetCategoryId },
+          });
+          await tx.priceLabor.updateMany({
+            where: { category_id: input.sourceCategoryId },
+            data: { category_id: input.targetCategoryId },
+          });
         }
 
         // Deactivate source
@@ -692,22 +808,592 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       });
     },
 
-    // ── Brand CRUD + lifecycle ────────────────────────────────────────────────
+    // ── VendorType Dictionary ───────────────────────────────────────────────
 
-    async createBrand(input: { grants: PermissionGrants; actor: AuditActor; name: string; notes?: string }) {
+    async listVendorTypes(input: { grants: PermissionGrants; includeArchived?: boolean }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryRead);
+      return db.vendorType.findMany({
+        where: input.includeArchived ? {} : { deleted_at: null },
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          can_supply_material: true,
+          can_supply_labor: true,
+          deleted_at: true,
+          _count: { select: { vendor_types: true } },
+        },
+      });
+    },
+
+    async getVendorType(input: { grants: PermissionGrants; vendorTypeId: string }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryRead);
+      return db.vendorType.findUniqueOrThrow({
+        where: { id: input.vendorTypeId },
+        include: { _count: { select: { vendor_types: true } } },
+      });
+    },
+
+    async createVendorType(input: {
+      grants: PermissionGrants;
+      actor: AuditActor;
+      code: string;
+      name: string;
+      canSupplyMaterial?: boolean;
+      canSupplyLabor?: boolean;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
+      actorIsUsable(input.actor);
+      const code = requiredName(input.code, "VENDOR_TYPE_CODE_REQUIRED").toUpperCase();
+      const name = requiredName(input.name, "VENDOR_TYPE_NAME_REQUIRED");
+      return runTransaction(async (tx) => {
+        let vt;
+        try {
+          vt = await tx.vendorType.create({
+            data: {
+              id: randomUUID(),
+              code,
+              name,
+              can_supply_material: input.canSupplyMaterial ?? false,
+              can_supply_labor: input.canSupplyLabor ?? false,
+            },
+          });
+        } catch (error) {
+          mapWriteError(error);
+        }
+        await writeAudit(tx, {
+          action: "vendor-type.created",
+          entityType: "vendor_type",
+          entityId: vt!.id,
+          actor: input.actor,
+          metadata: { code },
+        });
+        return { vendorTypeId: vt!.id };
+      });
+    },
+
+    async updateVendorType(input: {
+      grants: PermissionGrants;
+      actor: AuditActor;
+      vendorTypeId: string;
+      name: string;
+      canSupplyMaterial: boolean;
+      canSupplyLabor: boolean;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
+      actorIsUsable(input.actor);
+      const name = requiredName(input.name, "VENDOR_TYPE_NAME_REQUIRED");
+      return runTransaction(async (tx) => {
+        const existing = await tx.vendorType.findUniqueOrThrow({ where: { id: input.vendorTypeId } });
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        if (existing.name !== name) changes.name = { from: existing.name, to: name };
+        if (existing.can_supply_material !== input.canSupplyMaterial) {
+          changes.can_supply_material = { from: existing.can_supply_material, to: input.canSupplyMaterial };
+        }
+        if (existing.can_supply_labor !== input.canSupplyLabor) {
+          changes.can_supply_labor = { from: existing.can_supply_labor, to: input.canSupplyLabor };
+        }
+        if (Object.keys(changes).length === 0) return { vendorTypeId: input.vendorTypeId };
+
+        // If turning off material capability, check affected live vendors
+        if (existing.can_supply_material && !input.canSupplyMaterial) {
+          const assignments = await tx.vendorVendorType.findMany({
+            where: { vendor_type_id: input.vendorTypeId, vendor: { deleted_at: null } },
+            select: { vendor_id: true },
+          });
+          for (const a of assignments) {
+            const otherTypes = await tx.vendorVendorType.findMany({
+              where: { vendor_id: a.vendor_id, vendor_type_id: { not: input.vendorTypeId }, vendor_type: { deleted_at: null } },
+              include: { vendor_type: true },
+            });
+            if (!otherTypes.some((o) => o.vendor_type.can_supply_material)) {
+              const priceCount = await tx.priceMaterial.count({ where: { supplier_vendor_id: a.vendor_id, deleted_at: null } });
+              const supplierCount = await tx.brandSupplier.count({ where: { vendor_id: a.vendor_id } });
+              if (priceCount > 0 || supplierCount > 0) {
+                throw new AppError(
+                  "CONFLICT",
+                  "VENDOR_TYPE_MATERIAL_CAPABILITY_IN_USE",
+                  "Cannot disable material capability while live vendors depend on this type for material pricing.",
+                );
+              }
+            }
+          }
+        }
+
+        // If turning off labor capability, check affected live vendors
+        if (existing.can_supply_labor && !input.canSupplyLabor) {
+          const assignments = await tx.vendorVendorType.findMany({
+            where: { vendor_type_id: input.vendorTypeId, vendor: { deleted_at: null } },
+            select: { vendor_id: true },
+          });
+          for (const a of assignments) {
+            const otherTypes = await tx.vendorVendorType.findMany({
+              where: { vendor_id: a.vendor_id, vendor_type_id: { not: input.vendorTypeId }, vendor_type: { deleted_at: null } },
+              include: { vendor_type: true },
+            });
+            if (!otherTypes.some((o) => o.vendor_type.can_supply_labor)) {
+              const mlCount = await tx.priceMaterialLabor.count({ where: { vendor_id: a.vendor_id, deleted_at: null } });
+              const laborCount = await tx.priceLabor.count({ where: { vendor_id: a.vendor_id, deleted_at: null } });
+              if (mlCount > 0 || laborCount > 0) {
+                throw new AppError(
+                  "CONFLICT",
+                  "VENDOR_TYPE_LABOR_CAPABILITY_IN_USE",
+                  "Cannot disable labor capability while live vendors depend on this type for labor pricing.",
+                );
+              }
+            }
+          }
+        }
+
+        try {
+          await tx.vendorType.update({
+            where: { id: input.vendorTypeId },
+            data: {
+              name,
+              can_supply_material: input.canSupplyMaterial,
+              can_supply_labor: input.canSupplyLabor,
+            },
+          });
+        } catch (error) {
+          mapWriteError(error);
+        }
+
+        await writeAudit(tx, {
+          action: "vendor-type.updated",
+          entityType: "vendor_type",
+          entityId: input.vendorTypeId,
+          actor: input.actor,
+          changes,
+        });
+        return { vendorTypeId: input.vendorTypeId };
+      });
+    },
+
+    async archiveVendorType(input: { grants: PermissionGrants; actor: AuditActor; vendorTypeId: string }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
+      actorIsUsable(input.actor);
+      return runTransaction(async (tx) => {
+        const vt = await tx.vendorType.findUniqueOrThrow({ where: { id: input.vendorTypeId } });
+        if (vt.deleted_at !== null) {
+          throw new AppError("CONFLICT", "VENDOR_TYPE_ALREADY_ARCHIVED", "Vendor type is already archived.");
+        }
+        await addDirectCause(tx, "vendor_type", input.vendorTypeId);
+        await tx.vendorType.update({ where: { id: input.vendorTypeId }, data: { deleted_at: new Date() } });
+        await writeAudit(tx, { action: "vendor-type.archived", entityType: "vendor_type", entityId: input.vendorTypeId, actor: input.actor });
+        return { vendorTypeId: input.vendorTypeId };
+      });
+    },
+
+    async restoreVendorType(input: { grants: PermissionGrants; actor: AuditActor; vendorTypeId: string }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
+      actorIsUsable(input.actor);
+      return runTransaction(async (tx) => {
+        const vt = await tx.vendorType.findUniqueOrThrow({ where: { id: input.vendorTypeId } });
+        if (vt.deleted_at === null) {
+          throw new AppError("CONFLICT", "VENDOR_TYPE_NOT_ARCHIVED", "Vendor type is not archived.");
+        }
+        await removeDirectCause(tx, "vendor_type", input.vendorTypeId);
+        await tx.vendorType.update({ where: { id: input.vendorTypeId }, data: { deleted_at: null } });
+        await writeAudit(tx, { action: "vendor-type.restored", entityType: "vendor_type", entityId: input.vendorTypeId, actor: input.actor });
+        return { vendorTypeId: input.vendorTypeId };
+      });
+    },
+
+    async requestVendorTypeDeletion(input: {
+      grants: PermissionGrants;
+      actor: AuditActor;
+      vendorTypeId: string;
+      reason?: string;
+      notes?: string;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
+      actorIsUsable(input.actor);
+      return runTransaction(async (tx) => {
+        const vt = await tx.vendorType.findUniqueOrThrow({ where: { id: input.vendorTypeId } });
+        if (vt.deleted_at === null) {
+          throw new AppError("VALIDATION", "VENDOR_TYPE_NOT_ARCHIVED", "Only archived vendor types may be submitted for deletion.");
+        }
+        const requestId = await createDeletionRequest(tx, {
+          targetType: "vendor_type",
+          targetId: input.vendorTypeId,
+          actor: input.actor,
+          reason: input.reason,
+          notes: input.notes,
+        });
+        await writeAudit(tx, {
+          action: "vendor-type.deletion-requested",
+          entityType: "vendor_type",
+          entityId: input.vendorTypeId,
+          actor: input.actor,
+        });
+        return { requestId };
+      });
+    },
+
+    // ── Brand Management ────────────────────────────────────────────────────
+
+    async listBrands(input: {
+      grants: PermissionGrants;
+      search?: string;
+      categoryId?: string;
+      hashtag?: string;
+      ownerVendorId?: string;
+      supplierVendorId?: string;
+      includeArchived?: boolean;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.brandRead);
+      const search = input.search?.trim();
+      const hashtag = input.hashtag?.trim().toLowerCase().replace(/^#+/, "");
+
+      return db.brand.findMany({
+        where: {
+          ...(input.includeArchived ? {} : { deleted_at: null }),
+          ...(input.ownerVendorId ? { owner_vendor_id: input.ownerVendorId } : {}),
+          ...(input.supplierVendorId ? { suppliers: { some: { vendor_id: input.supplierVendorId } } } : {}),
+          ...(input.categoryId ? { categories: { some: { category_id: input.categoryId } } } : {}),
+          ...(hashtag ? { hashtags: { some: { normalized: hashtag } } } : {}),
+          ...(search
+            ? {
+                OR: [
+                  { name: { contains: search, mode: "insensitive" } },
+                  { slug: { contains: search, mode: "insensitive" } },
+                  { hashtags: { some: { label: { contains: search, mode: "insensitive" } } } },
+                  { categories: { some: { category: { name: { contains: search, mode: "insensitive" } } } } },
+                ],
+              }
+            : {}),
+        },
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          notes: true,
+          deleted_at: true,
+          owner_vendor: { select: { id: true, name: true } },
+          categories: {
+            select: {
+              category: { select: { id: true, name: true, slug: true } },
+              origins: { select: { kind: true } },
+            },
+          },
+          hashtags: { select: { id: true, label: true, normalized: true } },
+          links: { select: { id: true, kind: true, url: true, label: true } },
+          suppliers: {
+            select: {
+              id: true,
+              vendor: { select: { id: true, name: true } },
+            },
+          },
+          _count: { select: { skus: true, suppliers: true, links: true, categories: true } },
+        },
+      });
+    },
+
+    async getBrand(input: { grants: PermissionGrants; brandId: string }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.brandRead);
+      return db.brand.findUniqueOrThrow({
+        where: { id: input.brandId },
+        include: {
+          owner_vendor: { select: { id: true, name: true, slug: true } },
+          categories: {
+            include: {
+              category: { select: { id: true, name: true, slug: true, kind: true, status: true } },
+              origins: true,
+            },
+          },
+          hashtags: true,
+          links: true,
+          suppliers: {
+            include: {
+              vendor: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  deleted_at: true,
+                  types: { select: { vendor_type: { select: { code: true, name: true } } } },
+                },
+              },
+            },
+          },
+          contacts: {
+            include: {
+              vendor: { select: { id: true, name: true } },
+            },
+          },
+          _count: { select: { skus: true } },
+        },
+      });
+    },
+
+    async createBrand(input: {
+      grants: PermissionGrants;
+      actor: AuditActor;
+      name: string;
+      ownerVendorId?: string;
+      notes?: string;
+      categoryIds?: string[];
+      hashtags?: string[];
+      links?: Array<{ kind: string; url: string; label?: string }>;
+      suppliers?: Array<{ vendorId: string }>;
+    }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.brandManage);
       actorIsUsable(input.actor);
       const name = requiredName(input.name, "BRAND_NAME_REQUIRED");
       const slug = requiredSlug(name);
+
       return runTransaction(async (tx) => {
+        if (input.ownerVendorId) {
+          const owner = await tx.vendor.findUniqueOrThrow({ where: { id: input.ownerVendorId } });
+          if (owner.deleted_at !== null) throw new AppError("VALIDATION", "BRAND_OWNER_ARCHIVED", "Owner vendor is archived.");
+        }
+
         let brand;
         try {
-          brand = await tx.brand.create({ data: { id: randomUUID(), name, slug, notes: input.notes?.trim() || null } });
+          brand = await tx.brand.create({
+            data: {
+              id: randomUUID(),
+              name,
+              slug,
+              owner_vendor_id: input.ownerVendorId || null,
+              notes: input.notes?.trim() || null,
+            },
+          });
         } catch (error) {
           mapWriteError(error);
         }
-        await writeAudit(tx, { action: "brand.created", entityType: "brand", entityId: brand!.id, actor: input.actor, metadata: { slug } });
-        return { brandId: brand!.id };
+        const brandId = brand!.id;
+
+        // Manual Categories
+        if (input.categoryIds && input.categoryIds.length > 0) {
+          for (const categoryId of input.categoryIds) {
+            const bc = await tx.brandCategory.create({
+              data: { id: randomUUID(), brand_id: brandId, category_id: categoryId },
+            });
+            await tx.brandCategoryOrigin.create({
+              data: {
+                id: randomUUID(),
+                brand_category_id: bc.id,
+                kind: "MANUAL",
+                actor_user_id: input.actor.userId,
+                actor_label: input.actor.label,
+              },
+            });
+          }
+        }
+
+        // Hashtags
+        if (input.hashtags && input.hashtags.length > 0) {
+          const normalizedTags = normalizeHashtags(input.hashtags);
+          await tx.brandHashtag.createMany({
+            data: normalizedTags.map((tag) => ({
+              id: randomUUID(),
+              brand_id: brandId,
+              label: tag.label,
+              normalized: tag.normalized,
+            })),
+          });
+        }
+
+        // Links
+        if (input.links && input.links.length > 0) {
+          await tx.brandLink.createMany({
+            data: input.links.map((link) => ({
+              id: randomUUID(),
+              brand_id: brandId,
+              kind: link.kind,
+              url: link.url.trim(),
+              label: link.label?.trim() || null,
+            })),
+          });
+        }
+
+        // Suppliers
+        if (input.suppliers && input.suppliers.length > 0) {
+          for (const s of input.suppliers) {
+            await assertVendorMaterialCapable(tx, s.vendorId);
+            await tx.brandSupplier.create({
+              data: {
+                id: randomUUID(),
+                brand_id: brandId,
+                vendor_id: s.vendorId,
+              },
+            });
+          }
+        }
+
+        await writeAudit(tx, {
+          action: "brand.created",
+          entityType: "brand",
+          entityId: brandId,
+          actor: input.actor,
+          metadata: { slug, owner_vendor_id: input.ownerVendorId ?? null },
+        });
+        return { brandId };
+      });
+    },
+
+    async updateBrand(input: {
+      grants: PermissionGrants;
+      actor: AuditActor;
+      brandId: string;
+      name: string;
+      ownerVendorId?: string | null;
+      notes?: string | null;
+      categoryIds?: string[];
+      hashtags?: string[];
+      links?: Array<{ kind: string; url: string; label?: string }>;
+      suppliers?: Array<{ vendorId: string }>;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.brandManage);
+      actorIsUsable(input.actor);
+      const name = requiredName(input.name, "BRAND_NAME_REQUIRED");
+      const slug = requiredSlug(name);
+
+      return runTransaction(async (tx) => {
+        const existing = await tx.brand.findUniqueOrThrow({
+          where: { id: input.brandId },
+          include: {
+            categories: { include: { origins: true } },
+            hashtags: true,
+            links: true,
+            suppliers: true,
+          },
+        });
+
+        if (input.ownerVendorId) {
+          const owner = await tx.vendor.findUniqueOrThrow({ where: { id: input.ownerVendorId } });
+          if (owner.deleted_at !== null) throw new AppError("VALIDATION", "BRAND_OWNER_ARCHIVED", "Owner vendor is archived.");
+        }
+
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        if (existing.name !== name) {
+          changes.name = { from: existing.name, to: name };
+          changes.slug = { from: existing.slug, to: slug };
+        }
+        if ((existing.owner_vendor_id || null) !== (input.ownerVendorId || null)) {
+          changes.owner_vendor_id = { from: existing.owner_vendor_id, to: input.ownerVendorId || null };
+        }
+        if ((existing.notes || null) !== (input.notes?.trim() || null)) {
+          changes.notes = { from: existing.notes, to: input.notes?.trim() || null };
+        }
+
+        try {
+          await tx.brand.update({
+            where: { id: input.brandId },
+            data: {
+              name,
+              slug,
+              owner_vendor_id: input.ownerVendorId || null,
+              notes: input.notes?.trim() || null,
+            },
+          });
+        } catch (error) {
+          mapWriteError(error);
+        }
+
+        // Update Categories with origin provenance
+        if (input.categoryIds !== undefined) {
+          const requestedCategorySet = new Set(input.categoryIds);
+          for (const categoryId of input.categoryIds) {
+            const existingBc = existing.categories.find((bc) => bc.category_id === categoryId);
+            if (!existingBc) {
+              const createdBc = await tx.brandCategory.create({
+                data: { id: randomUUID(), brand_id: input.brandId, category_id: categoryId },
+              });
+              await tx.brandCategoryOrigin.create({
+                data: {
+                  id: randomUUID(),
+                  brand_category_id: createdBc.id,
+                  kind: "MANUAL",
+                  actor_user_id: input.actor.userId,
+                  actor_label: input.actor.label,
+                },
+              });
+            } else if (!existingBc.origins.some((o) => o.kind === "MANUAL")) {
+              await tx.brandCategoryOrigin.create({
+                data: {
+                  id: randomUUID(),
+                  brand_category_id: existingBc.id,
+                  kind: "MANUAL",
+                  actor_user_id: input.actor.userId,
+                  actor_label: input.actor.label,
+                },
+              });
+            }
+          }
+          for (const existingBc of existing.categories) {
+            if (!requestedCategorySet.has(existingBc.category_id)) {
+              await tx.brandCategoryOrigin.deleteMany({
+                where: { brand_category_id: existingBc.id, kind: "MANUAL" },
+              });
+              const remainingOrigins = await tx.brandCategoryOrigin.count({
+                where: { brand_category_id: existingBc.id },
+              });
+              if (remainingOrigins === 0) {
+                await tx.brandCategory.delete({ where: { id: existingBc.id } });
+              }
+            }
+          }
+        }
+
+        // Update Hashtags
+        if (input.hashtags !== undefined) {
+          const normalizedList = normalizeHashtags(input.hashtags);
+          await tx.brandHashtag.deleteMany({ where: { brand_id: input.brandId } });
+          if (normalizedList.length > 0) {
+            await tx.brandHashtag.createMany({
+              data: normalizedList.map((tag) => ({
+                id: randomUUID(),
+                brand_id: input.brandId,
+                label: tag.label,
+                normalized: tag.normalized,
+              })),
+            });
+          }
+        }
+
+        // Update Links
+        if (input.links !== undefined) {
+          await tx.brandLink.deleteMany({ where: { brand_id: input.brandId } });
+          if (input.links.length > 0) {
+            await tx.brandLink.createMany({
+              data: input.links.map((link) => ({
+                id: randomUUID(),
+                brand_id: input.brandId,
+                kind: link.kind,
+                url: link.url.trim(),
+                label: link.label?.trim() || null,
+              })),
+            });
+          }
+        }
+
+        // Update Suppliers
+        if (input.suppliers !== undefined) {
+          await tx.brandSupplier.deleteMany({ where: { brand_id: input.brandId } });
+          for (const s of input.suppliers) {
+            await assertVendorMaterialCapable(tx, s.vendorId);
+            await tx.brandSupplier.create({
+              data: {
+                id: randomUUID(),
+                brand_id: input.brandId,
+                vendor_id: s.vendorId,
+              },
+            });
+          }
+        }
+
+        await writeAudit(tx, {
+          action: "brand.updated",
+          entityType: "brand",
+          entityId: input.brandId,
+          actor: input.actor,
+          changes: Object.keys(changes).length > 0 ? changes : undefined,
+        });
+        return { brandId: input.brandId };
       });
     },
 
@@ -721,13 +1407,9 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         }
         const now = new Date();
 
-        // 1. Archive brand
         await addDirectCause(tx, "brand", input.brandId);
         await tx.brand.update({ where: { id: input.brandId }, data: { deleted_at: now } });
 
-        // Every dependent receives the parent cause, including rows that were
-        // already archived directly. Otherwise they could be restored while
-        // this Brand remains archived.
         const skus = await tx.sku.findMany({
           where: { brand_id: input.brandId },
           select: { id: true, deleted_at: true },
@@ -740,7 +1422,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           await addParentCauses(tx, "sku", "brand", input.brandId, skuIds);
           await tx.sku.updateMany({ where: { id: { in: skuIds }, deleted_at: null }, data: { deleted_at: now } });
 
-          // Cascade through each SKU to every PriceMaterial for the same reason.
           for (const skuId of skuIds) {
             const prices = await tx.priceMaterial.findMany({
               where: { sku_id: skuId },
@@ -795,18 +1476,15 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         }
         for (const relation of supplierRelations) await assertVendorMaterialCapable(tx, relation.vendor_id);
 
-        // Remove DIRECT cause and restore brand
         await removeDirectCause(tx, "brand", input.brandId);
         await tx.brand.update({ where: { id: input.brandId }, data: { deleted_at: null } });
 
-        // Remove PARENT causes from SKUs and restore those with zero remaining causes
         const restoredSkuIds = await removeParentCausesAndFindRestored(tx, "sku", "brand", input.brandId);
         let priceCount = 0;
         if (restoredSkuIds.length > 0) {
           for (const skuId of restoredSkuIds) await assertSkuRestorable(tx, skuId);
           await tx.sku.updateMany({ where: { id: { in: restoredSkuIds } }, data: { deleted_at: null } });
 
-          // For each restored SKU, remove PARENT causes from PriceMaterials
           for (const skuId of restoredSkuIds) {
             const restoredPriceIds = await removeParentCausesAndFindRestored(tx, "price_material", "sku", skuId);
             if (restoredPriceIds.length > 0) {
@@ -859,19 +1537,134 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       });
     },
 
-    // ── Vendor CRUD + lifecycle ────────────────────────────────────────────────
+    // ── Vendor Management ───────────────────────────────────────────────────
+
+    async listVendors(input: {
+      grants: PermissionGrants;
+      search?: string;
+      vendorTypeId?: string;
+      canSupplyMaterial?: boolean;
+      canSupplyLabor?: boolean;
+      brandId?: string;
+      includeArchived?: boolean;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorRead);
+      const search = input.search?.trim();
+
+      return db.vendor.findMany({
+        where: {
+          ...(input.includeArchived ? {} : { deleted_at: null }),
+          ...(input.brandId ? { brand_suppliers: { some: { brand_id: input.brandId } } } : {}),
+          ...(input.vendorTypeId ? { types: { some: { vendor_type_id: input.vendorTypeId } } } : {}),
+          ...(input.canSupplyMaterial !== undefined
+            ? { types: { some: { vendor_type: { can_supply_material: input.canSupplyMaterial, deleted_at: null } } } }
+            : {}),
+          ...(input.canSupplyLabor !== undefined
+            ? { types: { some: { vendor_type: { can_supply_labor: input.canSupplyLabor, deleted_at: null } } } }
+            : {}),
+          ...(search
+            ? {
+                OR: [
+                  { name: { contains: search, mode: "insensitive" } },
+                  { legal_name: { contains: search, mode: "insensitive" } },
+                  { slug: { contains: search, mode: "insensitive" } },
+                  { contacts: { some: { name: { contains: search, mode: "insensitive" } } } },
+                ],
+              }
+            : {}),
+        },
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          legal_name: true,
+          address: true,
+          notes: true,
+          deleted_at: true,
+          types: {
+            select: {
+              vendor_type: {
+                select: { id: true, code: true, name: true, can_supply_material: true, can_supply_labor: true },
+              },
+            },
+          },
+          contacts: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              position: true,
+              brand_id: true,
+            },
+          },
+          links: {
+            select: { id: true, kind: true, url: true, label: true },
+          },
+          _count: {
+            select: {
+              owned_brands: true,
+              brand_suppliers: true,
+              material_prices: true,
+              material_labor_prices: true,
+              labor_prices: true,
+            },
+          },
+        },
+      });
+    },
+
+    async getVendor(input: { grants: PermissionGrants; vendorId: string }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorRead);
+      return db.vendor.findUniqueOrThrow({
+        where: { id: input.vendorId },
+        include: {
+          types: {
+            include: {
+              vendor_type: true,
+            },
+          },
+          contacts: {
+            include: {
+              brand: { select: { id: true, name: true, slug: true } },
+            },
+          },
+          links: true,
+          owned_brands: { select: { id: true, name: true, slug: true } },
+          brand_suppliers: {
+            include: {
+              brand: { select: { id: true, name: true, slug: true, deleted_at: true } },
+            },
+          },
+          _count: {
+            select: {
+              material_prices: true,
+              material_labor_prices: true,
+              labor_prices: true,
+            },
+          },
+        },
+      });
+    },
 
     async createVendor(input: {
       grants: PermissionGrants;
       actor: AuditActor;
       name: string;
       legalName?: string;
+      address?: string;
       notes?: string;
+      vendorTypeIds?: string[];
+      contacts?: Array<{ name: string; email?: string; phone?: string; position?: string; notes?: string; brandId?: string }>;
+      links?: Array<{ kind: string; url: string; label?: string }>;
+      brandSuppliers?: Array<{ brandId: string }>;
     }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
       actorIsUsable(input.actor);
       const name = requiredName(input.name, "VENDOR_NAME_REQUIRED");
       const slug = requiredSlug(name);
+
       return runTransaction(async (tx) => {
         let vendor;
         try {
@@ -881,20 +1674,222 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
               name,
               slug,
               legal_name: input.legalName?.trim() || null,
+              address: input.address?.trim() || null,
               notes: input.notes?.trim() || null,
             },
           });
         } catch (error) {
           mapWriteError(error);
         }
+        const vendorId = vendor!.id;
+
+        // VendorTypes
+        if (input.vendorTypeIds && input.vendorTypeIds.length > 0) {
+          await tx.vendorVendorType.createMany({
+            data: input.vendorTypeIds.map((vendorTypeId) => ({
+              id: randomUUID(),
+              vendor_id: vendorId,
+              vendor_type_id: vendorTypeId,
+            })),
+          });
+        }
+
+        // Contacts
+        if (input.contacts && input.contacts.length > 0) {
+          for (const c of input.contacts) {
+            if (c.brandId) {
+              const brand = await tx.brand.findUniqueOrThrow({ where: { id: c.brandId } });
+              if (brand.deleted_at !== null) throw new AppError("VALIDATION", "CONTACT_BRAND_ARCHIVED", "Brand is archived.");
+            }
+            await tx.vendorContact.create({
+              data: {
+                id: randomUUID(),
+                vendor_id: vendorId,
+                name: requiredName(c.name, "CONTACT_NAME_REQUIRED"),
+                email: c.email?.trim() || null,
+                phone: c.phone?.trim() || null,
+                position: c.position?.trim() || null,
+                notes: c.notes?.trim() || null,
+                brand_id: c.brandId || null,
+              },
+            });
+          }
+        }
+
+        // Links
+        if (input.links && input.links.length > 0) {
+          await tx.vendorLink.createMany({
+            data: input.links.map((l) => ({
+              id: randomUUID(),
+              vendor_id: vendorId,
+              kind: l.kind,
+              url: l.url.trim(),
+              label: l.label?.trim() || null,
+            })),
+          });
+        }
+
+        // BrandSuppliers
+        if (input.brandSuppliers && input.brandSuppliers.length > 0) {
+          await assertVendorMaterialCapable(tx, vendorId);
+          for (const bs of input.brandSuppliers) {
+            await tx.brandSupplier.create({
+              data: {
+                id: randomUUID(),
+                brand_id: bs.brandId,
+                vendor_id: vendorId,
+              },
+            });
+          }
+        }
+
         await writeAudit(tx, {
           action: "vendor.created",
           entityType: "vendor",
-          entityId: vendor!.id,
+          entityId: vendorId,
           actor: input.actor,
           metadata: { slug },
         });
-        return { vendorId: vendor!.id };
+        return { vendorId };
+      });
+    },
+
+    async updateVendor(input: {
+      grants: PermissionGrants;
+      actor: AuditActor;
+      vendorId: string;
+      name: string;
+      legalName?: string | null;
+      address?: string | null;
+      notes?: string | null;
+      vendorTypeIds?: string[];
+      contacts?: Array<{ id?: string; name: string; email?: string; phone?: string; position?: string; notes?: string; brandId?: string }>;
+      links?: Array<{ kind: string; url: string; label?: string }>;
+      brandSuppliers?: Array<{ brandId: string }>;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
+      actorIsUsable(input.actor);
+      const name = requiredName(input.name, "VENDOR_NAME_REQUIRED");
+      const slug = requiredSlug(name);
+
+      return runTransaction(async (tx) => {
+        const existing = await tx.vendor.findUniqueOrThrow({
+          where: { id: input.vendorId },
+          include: {
+            types: true,
+            contacts: true,
+            links: true,
+            brand_suppliers: true,
+          },
+        });
+
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        if (existing.name !== name) {
+          changes.name = { from: existing.name, to: name };
+          changes.slug = { from: existing.slug, to: slug };
+        }
+        if ((existing.legal_name || null) !== (input.legalName?.trim() || null)) {
+          changes.legal_name = { from: existing.legal_name, to: input.legalName?.trim() || null };
+        }
+        if ((existing.address || null) !== (input.address?.trim() || null)) {
+          changes.address = { from: existing.address, to: input.address?.trim() || null };
+        }
+        if ((existing.notes || null) !== (input.notes?.trim() || null)) {
+          changes.notes = { from: existing.notes, to: input.notes?.trim() || null };
+        }
+
+        try {
+          await tx.vendor.update({
+            where: { id: input.vendorId },
+            data: {
+              name,
+              slug,
+              legal_name: input.legalName?.trim() || null,
+              address: input.address?.trim() || null,
+              notes: input.notes?.trim() || null,
+            },
+          });
+        } catch (error) {
+          mapWriteError(error);
+        }
+
+        // Update VendorTypes with capability-integrity guard
+        if (input.vendorTypeIds !== undefined) {
+          await assertVendorTypeRemovalSafe(tx, input.vendorId, input.vendorTypeIds);
+          await tx.vendorVendorType.deleteMany({ where: { vendor_id: input.vendorId } });
+          if (input.vendorTypeIds.length > 0) {
+            await tx.vendorVendorType.createMany({
+              data: input.vendorTypeIds.map((vendorTypeId) => ({
+                id: randomUUID(),
+                vendor_id: input.vendorId,
+                vendor_type_id: vendorTypeId,
+              })),
+            });
+          }
+        }
+
+        // Update Contacts
+        if (input.contacts !== undefined) {
+          await tx.vendorContact.deleteMany({ where: { vendor_id: input.vendorId } });
+          for (const c of input.contacts) {
+            if (c.brandId) {
+              const brand = await tx.brand.findUniqueOrThrow({ where: { id: c.brandId } });
+              if (brand.deleted_at !== null) throw new AppError("VALIDATION", "CONTACT_BRAND_ARCHIVED", "Brand is archived.");
+            }
+            await tx.vendorContact.create({
+              data: {
+                id: c.id || randomUUID(),
+                vendor_id: input.vendorId,
+                name: requiredName(c.name, "CONTACT_NAME_REQUIRED"),
+                email: c.email?.trim() || null,
+                phone: c.phone?.trim() || null,
+                position: c.position?.trim() || null,
+                notes: c.notes?.trim() || null,
+                brand_id: c.brandId || null,
+              },
+            });
+          }
+        }
+
+        // Update Links
+        if (input.links !== undefined) {
+          await tx.vendorLink.deleteMany({ where: { vendor_id: input.vendorId } });
+          if (input.links.length > 0) {
+            await tx.vendorLink.createMany({
+              data: input.links.map((l) => ({
+                id: randomUUID(),
+                vendor_id: input.vendorId,
+                kind: l.kind,
+                url: l.url.trim(),
+                label: l.label?.trim() || null,
+              })),
+            });
+          }
+        }
+
+        // Update BrandSuppliers
+        if (input.brandSuppliers !== undefined) {
+          if (input.brandSuppliers.length > 0) await assertVendorMaterialCapable(tx, input.vendorId);
+          await tx.brandSupplier.deleteMany({ where: { vendor_id: input.vendorId } });
+          for (const bs of input.brandSuppliers) {
+            await tx.brandSupplier.create({
+              data: {
+                id: randomUUID(),
+                brand_id: bs.brandId,
+                vendor_id: input.vendorId,
+              },
+            });
+          }
+        }
+
+        await writeAudit(tx, {
+          action: "vendor.updated",
+          entityType: "vendor",
+          entityId: input.vendorId,
+          actor: input.actor,
+          changes: Object.keys(changes).length > 0 ? changes : undefined,
+        });
+        return { vendorId: input.vendorId };
       });
     },
 
@@ -1048,7 +2043,88 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       });
     },
 
-    // ── SKU CRUD + lifecycle ──────────────────────────────────────────────────
+    // ── SKU Management ──────────────────────────────────────────────────────
+
+    async listSkus(input: {
+      grants: PermissionGrants;
+      search?: string;
+      brandId?: string;
+      categoryId?: string;
+      includeArchived?: boolean;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuRead);
+      const search = input.search?.trim();
+
+      return db.sku.findMany({
+        where: {
+          ...(input.includeArchived ? {} : { deleted_at: null }),
+          ...(input.brandId ? { brand_id: input.brandId } : {}),
+          ...(input.categoryId ? { categories: { some: { category_id: input.categoryId } } } : {}),
+          ...(search
+            ? {
+                OR: [
+                  { name: { contains: search, mode: "insensitive" } },
+                  { slug: { contains: search, mode: "insensitive" } },
+                  { code: { contains: search, mode: "insensitive" } },
+                  { brand: { name: { contains: search, mode: "insensitive" } } },
+                ],
+              }
+            : {}),
+        },
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          code: true,
+          notes: true,
+          deleted_at: true,
+          brand: { select: { id: true, name: true, slug: true } },
+          base_unit: { select: { id: true, code: true, name: true } },
+          purchase_unit: { select: { id: true, code: true, name: true } },
+          categories: {
+            select: {
+              category: { select: { id: true, name: true, slug: true } },
+            },
+          },
+          material_prices: {
+            where: { deleted_at: null },
+            select: {
+              id: true,
+              amount: true,
+              currency: true,
+              supplier_vendor: { select: { id: true, name: true } },
+              unit: { select: { id: true, code: true, name: true } },
+            },
+          },
+          _count: { select: { material_prices: true } },
+        },
+      });
+    },
+
+    async getSku(input: { grants: PermissionGrants; skuId: string }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuRead);
+      return db.sku.findUniqueOrThrow({
+        where: { id: input.skuId },
+        include: {
+          brand: { select: { id: true, name: true, slug: true } },
+          base_unit: { select: { id: true, code: true, name: true } },
+          purchase_unit: { select: { id: true, code: true, name: true } },
+          categories: {
+            include: {
+              category: { select: { id: true, name: true, slug: true, kind: true } },
+            },
+          },
+          material_prices: {
+            include: {
+              supplier_vendor: { select: { id: true, name: true, slug: true } },
+              unit: { select: { id: true, code: true, name: true } },
+              source_link: true,
+            },
+          },
+        },
+      });
+    },
 
     async createSku(input: {
       grants: PermissionGrants;
@@ -1086,7 +2162,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       }
 
       return runTransaction(async (tx) => {
-        // Validate base unit is active
         const baseUnit = await tx.unit.findUniqueOrThrow({ where: { id: input.baseUnitId } });
         if (baseUnit.status !== "ACTIVE") {
           throw new AppError("VALIDATION", "SKU_BASE_UNIT_INACTIVE", "Base unit must be active.");
@@ -1098,7 +2173,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           }
         }
 
-        // Validate all categories are active
         const categories = await tx.category.findMany({
           where: { id: { in: input.categoryIds } },
           select: { id: true, kind: true, status: true },
@@ -1112,7 +2186,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           }
         }
 
-        // Validate brand if provided
         if (input.brandId) {
           const brand = await tx.brand.findUniqueOrThrow({ where: { id: input.brandId } });
           if (brand.deleted_at !== null) {
@@ -1120,7 +2193,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           }
         }
 
-        // Validate price materials
         const priceUnitId = input.purchaseUnitId ?? input.baseUnitId;
         for (const pm of input.priceMaterials) {
           requiredCurrency(pm.currency);
@@ -1132,7 +2204,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           await assertVendorMaterialCapable(tx, pm.supplierVendorId);
         }
 
-        // Create SKU
         let sku;
         try {
           sku = await tx.sku.create({
@@ -1152,12 +2223,11 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         }
         const skuId = sku!.id;
 
-        // Create SkuCategory links
         await tx.skuCategory.createMany({
           data: input.categoryIds.map((categoryId) => ({ id: randomUUID(), sku_id: skuId, category_id: categoryId })),
         });
 
-        // Brand Category enrichment: if brand + PRODUCT category, upsert BrandCategory with SKU_ENRICHMENT origin
+        // Brand Category SKU enrichment
         if (input.brandId) {
           const productCategoryIds = categories.filter((c) => c.kind === "PRODUCT").map((c) => c.id);
           for (const catId of productCategoryIds) {
@@ -1182,7 +2252,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           }
         }
 
-        // Create PriceMaterial rows
         await tx.priceMaterial.createMany({
           data: input.priceMaterials.map((pm) => ({
             id: randomUUID(),
@@ -1210,6 +2279,133 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           },
         });
         return { skuId };
+      });
+    },
+
+    async updateSku(input: {
+      grants: PermissionGrants;
+      actor: AuditActor;
+      skuId: string;
+      name: string;
+      code?: string | null;
+      notes?: string | null;
+      brandId?: string | null;
+      baseUnitId: string;
+      purchaseUnitId?: string | null;
+      categoryIds: string[];
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuManage);
+      actorIsUsable(input.actor);
+      const name = requiredName(input.name, "SKU_NAME_REQUIRED");
+      const slug = requiredSlug(name);
+      if (!input.categoryIds || input.categoryIds.length === 0) {
+        throw new AppError("VALIDATION", "SKU_CATEGORY_REQUIRED", "At least one category is required.");
+      }
+
+      return runTransaction(async (tx) => {
+        const existing = await tx.sku.findUniqueOrThrow({
+          where: { id: input.skuId },
+          include: { categories: true },
+        });
+
+        const baseUnit = await tx.unit.findUniqueOrThrow({ where: { id: input.baseUnitId } });
+        if (baseUnit.status !== "ACTIVE") throw new AppError("VALIDATION", "SKU_BASE_UNIT_INACTIVE", "Base unit must be active.");
+        if (input.purchaseUnitId) {
+          const purchaseUnit = await tx.unit.findUniqueOrThrow({ where: { id: input.purchaseUnitId } });
+          if (purchaseUnit.status !== "ACTIVE") throw new AppError("VALIDATION", "SKU_PURCHASE_UNIT_INACTIVE", "Purchase unit must be active.");
+        }
+
+        if (input.brandId) {
+          const brand = await tx.brand.findUniqueOrThrow({ where: { id: input.brandId } });
+          if (brand.deleted_at !== null) throw new AppError("VALIDATION", "SKU_BRAND_ARCHIVED", "Brand is archived.");
+        }
+
+        const categories = await tx.category.findMany({
+          where: { id: { in: input.categoryIds } },
+          select: { id: true, kind: true, status: true },
+        });
+        if (categories.length !== input.categoryIds.length) {
+          throw new AppError("VALIDATION", "SKU_CATEGORY_NOT_FOUND", "One or more categories not found.");
+        }
+        for (const cat of categories) {
+          if (cat.status !== "ACTIVE") throw new AppError("VALIDATION", "SKU_CATEGORY_INACTIVE", `Category ${cat.id} is not active.`);
+        }
+
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        if (existing.name !== name) {
+          changes.name = { from: existing.name, to: name };
+          changes.slug = { from: existing.slug, to: slug };
+        }
+        if ((existing.code || null) !== (input.code?.trim() || null)) {
+          changes.code = { from: existing.code, to: input.code?.trim() || null };
+        }
+        if ((existing.brand_id || null) !== (input.brandId || null)) {
+          changes.brand_id = { from: existing.brand_id, to: input.brandId || null };
+        }
+        if (existing.base_unit_id !== input.baseUnitId) {
+          changes.base_unit_id = { from: existing.base_unit_id, to: input.baseUnitId };
+        }
+        if ((existing.purchase_unit_id || null) !== (input.purchaseUnitId || null)) {
+          changes.purchase_unit_id = { from: existing.purchase_unit_id, to: input.purchaseUnitId || null };
+        }
+
+        try {
+          await tx.sku.update({
+            where: { id: input.skuId },
+            data: {
+              name,
+              slug,
+              code: input.code?.trim() || null,
+              notes: input.notes?.trim() || null,
+              brand_id: input.brandId || null,
+              base_unit_id: input.baseUnitId,
+              purchase_unit_id: input.purchaseUnitId || null,
+            },
+          });
+        } catch (error) {
+          mapWriteError(error);
+        }
+
+        // Update SkuCategories
+        await tx.skuCategory.deleteMany({ where: { sku_id: input.skuId } });
+        await tx.skuCategory.createMany({
+          data: input.categoryIds.map((categoryId) => ({ id: randomUUID(), sku_id: input.skuId, category_id: categoryId })),
+        });
+
+        // Clean and update Brand Category SKU enrichment
+        await tx.brandCategoryOrigin.deleteMany({ where: { source_sku_id: input.skuId } });
+        if (input.brandId) {
+          const productCategoryIds = categories.filter((c) => c.kind === "PRODUCT").map((c) => c.id);
+          for (const catId of productCategoryIds) {
+            let bc = await tx.brandCategory.findUnique({
+              where: { brand_id_category_id: { brand_id: input.brandId, category_id: catId } },
+            });
+            if (!bc) {
+              bc = await tx.brandCategory.create({
+                data: { id: randomUUID(), brand_id: input.brandId, category_id: catId },
+              });
+            }
+            await tx.brandCategoryOrigin.create({
+              data: {
+                id: randomUUID(),
+                brand_category_id: bc.id,
+                kind: "SKU_ENRICHMENT",
+                source_sku_id: input.skuId,
+                actor_user_id: input.actor.userId ?? null,
+                actor_label: input.actor.label,
+              },
+            });
+          }
+        }
+
+        await writeAudit(tx, {
+          action: "sku.updated",
+          entityType: "sku",
+          entityId: input.skuId,
+          actor: input.actor,
+          changes: Object.keys(changes).length > 0 ? changes : undefined,
+        });
+        return { skuId: input.skuId };
       });
     },
 
@@ -1257,7 +2453,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         }
 
         await removeDirectCause(tx, "sku", input.skuId);
-        // Check remaining causes
         const remaining = await tx.archiveCause.count({ where: { entity_type: "sku", entity_id: input.skuId } });
         if (remaining > 0) {
           throw new AppError("CONFLICT", "SKU_HAS_PARENT_CAUSES", "SKU cannot be restored while its parent (Brand) is still archived.");
@@ -1313,7 +2508,81 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       });
     },
 
-    // ── PriceMaterial CRUD + lifecycle ────────────────────────────────────────
+    // ── PriceMaterial Management ────────────────────────────────────────────
+
+    async listPriceMaterials(input: {
+      grants: PermissionGrants;
+      search?: string;
+      skuId?: string;
+      supplierVendorId?: string;
+      brandId?: string;
+      includeArchived?: boolean;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialRead);
+      const search = input.search?.trim();
+
+      return db.priceMaterial.findMany({
+        where: {
+          ...(input.includeArchived ? {} : { deleted_at: null }),
+          ...(input.skuId ? { sku_id: input.skuId } : {}),
+          ...(input.supplierVendorId ? { supplier_vendor_id: input.supplierVendorId } : {}),
+          ...(input.brandId ? { sku: { brand_id: input.brandId } } : {}),
+          ...(search
+            ? {
+                OR: [
+                  { sku: { name: { contains: search, mode: "insensitive" } } },
+                  { supplier_vendor: { name: { contains: search, mode: "insensitive" } } },
+                ],
+              }
+            : {}),
+        },
+        orderBy: [{ sku: { name: "asc" } }, { supplier_vendor: { name: "asc" } }],
+        select: {
+          id: true,
+          amount: true,
+          currency: true,
+          notes: true,
+          deleted_at: true,
+          sku: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              code: true,
+              brand: { select: { id: true, name: true, slug: true } },
+            },
+          },
+          supplier_vendor: {
+            select: { id: true, name: true, slug: true },
+          },
+          unit: {
+            select: { id: true, code: true, name: true },
+          },
+          source_link: {
+            select: { id: true, kind: true, url: true, label: true },
+          },
+        },
+      });
+    },
+
+    async getPriceMaterial(input: { grants: PermissionGrants; priceMaterialId: string }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialRead);
+      return db.priceMaterial.findUniqueOrThrow({
+        where: { id: input.priceMaterialId },
+        include: {
+          sku: {
+            include: {
+              brand: { select: { id: true, name: true, slug: true, links: true } },
+              base_unit: true,
+              purchase_unit: true,
+            },
+          },
+          supplier_vendor: true,
+          unit: true,
+          source_link: true,
+        },
+      });
+    },
 
     async createPriceMaterial(input: {
       grants: PermissionGrants;
@@ -1322,18 +2591,27 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       supplierVendorId: string;
       amount: string;
       currency: string;
+      sourceLinkId?: string;
       notes?: string;
     }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
       actorIsUsable(input.actor);
       const currency = requiredCurrency(input.currency);
       const amount = requiredAmount(input.amount);
+
       return runTransaction(async (tx) => {
         const sku = await tx.sku.findUniqueOrThrow({ where: { id: input.skuId } });
         if (sku.deleted_at !== null) throw new AppError("VALIDATION", "SKU_ARCHIVED", "SKU is archived.");
         const vendor = await tx.vendor.findUniqueOrThrow({ where: { id: input.supplierVendorId } });
         if (vendor.deleted_at !== null) throw new AppError("VALIDATION", "VENDOR_ARCHIVED", "Supplier vendor is archived.");
         await assertVendorMaterialCapable(tx, input.supplierVendorId);
+
+        if (input.sourceLinkId) {
+          const link = await tx.brandLink.findUniqueOrThrow({ where: { id: input.sourceLinkId } });
+          if (sku.brand_id && link.brand_id !== sku.brand_id) {
+            throw new AppError("VALIDATION", "LINK_BRAND_MISMATCH", "Source link must belong to the SKU's Brand.");
+          }
+        }
 
         const unitId = sku.purchase_unit_id ?? sku.base_unit_id;
         let price;
@@ -1346,6 +2624,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
               amount,
               currency,
               unit_id: unitId,
+              source_link_id: input.sourceLinkId || null,
               notes: input.notes?.trim() || null,
               updated_by_user_id: input.actor.userId ?? null,
               updated_by_label: input.actor.label,
@@ -1362,6 +2641,77 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           metadata: { sku_id: input.skuId, vendor_id: input.supplierVendorId },
         });
         return { priceMaterialId: price!.id };
+      });
+    },
+
+    async updatePriceMaterial(input: {
+      grants: PermissionGrants;
+      actor: AuditActor;
+      priceMaterialId: string;
+      amount: string;
+      currency: string;
+      unitId?: string;
+      sourceLinkId?: string | null;
+      notes?: string | null;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
+      actorIsUsable(input.actor);
+      const currency = requiredCurrency(input.currency);
+      const amount = requiredAmount(input.amount);
+
+      return runTransaction(async (tx) => {
+        const existing = await tx.priceMaterial.findUniqueOrThrow({
+          where: { id: input.priceMaterialId },
+          include: { sku: true },
+        });
+
+        if (input.sourceLinkId) {
+          const link = await tx.brandLink.findUniqueOrThrow({ where: { id: input.sourceLinkId } });
+          if (existing.sku.brand_id && link.brand_id !== existing.sku.brand_id) {
+            throw new AppError("VALIDATION", "LINK_BRAND_MISMATCH", "Source link must belong to the SKU's Brand.");
+          }
+        }
+
+        const unitId = input.unitId ?? existing.unit_id;
+        const unit = await tx.unit.findUniqueOrThrow({ where: { id: unitId } });
+        if (unit.status !== "ACTIVE") throw new AppError("VALIDATION", "PRICE_UNIT_INACTIVE", "Unit must be active.");
+
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        if (existing.amount.toString() !== amount) changes.amount = { from: existing.amount.toString(), to: amount };
+        if (existing.currency !== currency) changes.currency = { from: existing.currency, to: currency };
+        if (existing.unit_id !== unitId) changes.unit_id = { from: existing.unit_id, to: unitId };
+        if ((existing.source_link_id || null) !== (input.sourceLinkId || null)) {
+          changes.source_link_id = { from: existing.source_link_id, to: input.sourceLinkId || null };
+        }
+        if ((existing.notes || null) !== (input.notes?.trim() || null)) {
+          changes.notes = { from: existing.notes, to: input.notes?.trim() || null };
+        }
+
+        try {
+          await tx.priceMaterial.update({
+            where: { id: input.priceMaterialId },
+            data: {
+              amount,
+              currency,
+              unit_id: unitId,
+              source_link_id: input.sourceLinkId || null,
+              notes: input.notes?.trim() || null,
+              updated_by_user_id: input.actor.userId ?? null,
+              updated_by_label: input.actor.label,
+            },
+          });
+        } catch (error) {
+          mapWriteError(error);
+        }
+
+        await writeAudit(tx, {
+          action: "price-material.updated",
+          entityType: "price_material",
+          entityId: input.priceMaterialId,
+          actor: input.actor,
+          changes: Object.keys(changes).length > 0 ? changes : undefined,
+        });
+        return { priceMaterialId: input.priceMaterialId };
       });
     },
 
@@ -1439,7 +2789,63 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       });
     },
 
-    // ── PriceMaterialLabor CRUD + lifecycle ───────────────────────────────────
+    // ── PriceMaterialLabor Management ───────────────────────────────────────
+
+    async listPriceMaterialLabors(input: {
+      grants: PermissionGrants;
+      search?: string;
+      categoryId?: string;
+      vendorId?: string;
+      includeArchived?: boolean;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkRead);
+      const search = input.search?.trim();
+
+      return db.priceMaterialLabor.findMany({
+        where: {
+          ...(input.includeArchived ? {} : { deleted_at: null }),
+          ...(input.categoryId ? { category_id: input.categoryId } : {}),
+          ...(input.vendorId ? { vendor_id: input.vendorId } : {}),
+          ...(search
+            ? {
+                OR: [
+                  { name: { contains: search, mode: "insensitive" } },
+                  { vendor: { name: { contains: search, mode: "insensitive" } } },
+                  { category: { name: { contains: search, mode: "insensitive" } } },
+                ],
+              }
+            : {}),
+        },
+        orderBy: [{ name: "asc" }, { vendor: { name: "asc" } }],
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          amount: true,
+          currency: true,
+          scope_note: true,
+          spec: true,
+          dim_display: true,
+          notes: true,
+          deleted_at: true,
+          category: { select: { id: true, name: true, slug: true } },
+          vendor: { select: { id: true, name: true, slug: true } },
+          unit: { select: { id: true, code: true, name: true } },
+        },
+      });
+    },
+
+    async getPriceMaterialLabor(input: { grants: PermissionGrants; priceMaterialLaborId: string }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkRead);
+      return db.priceMaterialLabor.findUniqueOrThrow({
+        where: { id: input.priceMaterialLaborId },
+        include: {
+          category: true,
+          vendor: true,
+          unit: true,
+        },
+      });
+    },
 
     async createPriceMaterialLabor(input: {
       grants: PermissionGrants;
@@ -1459,6 +2865,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       const slug = requiredSlug(name);
       const currency = requiredCurrency(input.currency);
       const amount = requiredAmount(input.amount);
+
       return runTransaction(async (tx) => {
         const category = await tx.category.findUniqueOrThrow({ where: { id: input.categoryId } });
         if (category.status !== "ACTIVE") throw new AppError("VALIDATION", "CATEGORY_INACTIVE", "Category is not active.");
@@ -1498,6 +2905,87 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           metadata: { vendor_id: input.vendorId, category_id: input.categoryId },
         });
         return { priceMaterialLaborId: price!.id };
+      });
+    },
+
+    async updatePriceMaterialLabor(input: {
+      grants: PermissionGrants;
+      actor: AuditActor;
+      priceMaterialLaborId: string;
+      name: string;
+      categoryId: string;
+      vendorId: string;
+      unitId: string;
+      amount: string;
+      currency: string;
+      scopeNote?: string | null;
+      notes?: string | null;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkManage);
+      actorIsUsable(input.actor);
+      const name = requiredName(input.name, "PRICE_NAME_REQUIRED");
+      const slug = requiredSlug(name);
+      const currency = requiredCurrency(input.currency);
+      const amount = requiredAmount(input.amount);
+
+      return runTransaction(async (tx) => {
+        const existing = await tx.priceMaterialLabor.findUniqueOrThrow({ where: { id: input.priceMaterialLaborId } });
+
+        const category = await tx.category.findUniqueOrThrow({ where: { id: input.categoryId } });
+        if (category.status !== "ACTIVE") throw new AppError("VALIDATION", "CATEGORY_INACTIVE", "Category is not active.");
+        if (category.kind !== "WORK") throw new AppError("VALIDATION", "CATEGORY_NOT_WORK", "Category must be of kind WORK.");
+        const unit = await tx.unit.findUniqueOrThrow({ where: { id: input.unitId } });
+        if (unit.status !== "ACTIVE") throw new AppError("VALIDATION", "UNIT_INACTIVE", "Unit is not active.");
+        const vendor = await tx.vendor.findUniqueOrThrow({ where: { id: input.vendorId } });
+        if (vendor.deleted_at !== null) throw new AppError("VALIDATION", "VENDOR_ARCHIVED", "Vendor is archived.");
+        await assertVendorLaborCapable(tx, input.vendorId);
+
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        if (existing.name !== name) {
+          changes.name = { from: existing.name, to: name };
+          changes.slug = { from: existing.slug, to: slug };
+        }
+        if (existing.amount.toString() !== amount) changes.amount = { from: existing.amount.toString(), to: amount };
+        if (existing.currency !== currency) changes.currency = { from: existing.currency, to: currency };
+        if (existing.category_id !== input.categoryId) changes.category_id = { from: existing.category_id, to: input.categoryId };
+        if (existing.vendor_id !== input.vendorId) changes.vendor_id = { from: existing.vendor_id, to: input.vendorId };
+        if (existing.unit_id !== input.unitId) changes.unit_id = { from: existing.unit_id, to: input.unitId };
+        if ((existing.scope_note || null) !== (input.scopeNote?.trim() || null)) {
+          changes.scope_note = { from: existing.scope_note, to: input.scopeNote?.trim() || null };
+        }
+        if ((existing.notes || null) !== (input.notes?.trim() || null)) {
+          changes.notes = { from: existing.notes, to: input.notes?.trim() || null };
+        }
+
+        try {
+          await tx.priceMaterialLabor.update({
+            where: { id: input.priceMaterialLaborId },
+            data: {
+              name,
+              slug,
+              category_id: input.categoryId,
+              vendor_id: input.vendorId,
+              unit_id: input.unitId,
+              amount,
+              currency,
+              scope_note: input.scopeNote?.trim() || null,
+              notes: input.notes?.trim() || null,
+              updated_by_user_id: input.actor.userId ?? null,
+              updated_by_label: input.actor.label,
+            },
+          });
+        } catch (error) {
+          mapWriteError(error);
+        }
+
+        await writeAudit(tx, {
+          action: "price-material-labor.updated",
+          entityType: "price_material_labor",
+          entityId: input.priceMaterialLaborId,
+          actor: input.actor,
+          changes: Object.keys(changes).length > 0 ? changes : undefined,
+        });
+        return { priceMaterialLaborId: input.priceMaterialLaborId };
       });
     },
 
@@ -1575,7 +3063,62 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       });
     },
 
-    // ── PriceLabor CRUD + lifecycle ───────────────────────────────────────────
+    // ── PriceLabor Management ───────────────────────────────────────────────
+
+    async listPriceLabors(input: {
+      grants: PermissionGrants;
+      search?: string;
+      categoryId?: string;
+      vendorId?: string;
+      includeArchived?: boolean;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkRead);
+      const search = input.search?.trim();
+
+      return db.priceLabor.findMany({
+        where: {
+          ...(input.includeArchived ? {} : { deleted_at: null }),
+          ...(input.categoryId ? { category_id: input.categoryId } : {}),
+          ...(input.vendorId ? { vendor_id: input.vendorId } : {}),
+          ...(search
+            ? {
+                OR: [
+                  { name: { contains: search, mode: "insensitive" } },
+                  { vendor: { name: { contains: search, mode: "insensitive" } } },
+                  { category: { name: { contains: search, mode: "insensitive" } } },
+                ],
+              }
+            : {}),
+        },
+        orderBy: [{ name: "asc" }, { vendor: { name: "asc" } }],
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          amount: true,
+          currency: true,
+          spec: true,
+          dim_display: true,
+          notes: true,
+          deleted_at: true,
+          category: { select: { id: true, name: true, slug: true } },
+          vendor: { select: { id: true, name: true, slug: true } },
+          unit: { select: { id: true, code: true, name: true } },
+        },
+      });
+    },
+
+    async getPriceLabor(input: { grants: PermissionGrants; priceLaborId: string }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkRead);
+      return db.priceLabor.findUniqueOrThrow({
+        where: { id: input.priceLaborId },
+        include: {
+          category: true,
+          vendor: true,
+          unit: true,
+        },
+      });
+    },
 
     async createPriceLabor(input: {
       grants: PermissionGrants;
@@ -1594,6 +3137,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       const slug = requiredSlug(name);
       const currency = requiredCurrency(input.currency);
       const amount = requiredAmount(input.amount);
+
       return runTransaction(async (tx) => {
         const category = await tx.category.findUniqueOrThrow({ where: { id: input.categoryId } });
         if (category.status !== "ACTIVE") throw new AppError("VALIDATION", "CATEGORY_INACTIVE", "Category is not active.");
@@ -1632,6 +3176,82 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           metadata: { vendor_id: input.vendorId, category_id: input.categoryId },
         });
         return { priceLaborId: price!.id };
+      });
+    },
+
+    async updatePriceLabor(input: {
+      grants: PermissionGrants;
+      actor: AuditActor;
+      priceLaborId: string;
+      name: string;
+      categoryId: string;
+      vendorId: string;
+      unitId: string;
+      amount: string;
+      currency: string;
+      notes?: string | null;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkManage);
+      actorIsUsable(input.actor);
+      const name = requiredName(input.name, "PRICE_NAME_REQUIRED");
+      const slug = requiredSlug(name);
+      const currency = requiredCurrency(input.currency);
+      const amount = requiredAmount(input.amount);
+
+      return runTransaction(async (tx) => {
+        const existing = await tx.priceLabor.findUniqueOrThrow({ where: { id: input.priceLaborId } });
+
+        const category = await tx.category.findUniqueOrThrow({ where: { id: input.categoryId } });
+        if (category.status !== "ACTIVE") throw new AppError("VALIDATION", "CATEGORY_INACTIVE", "Category is not active.");
+        if (category.kind !== "WORK") throw new AppError("VALIDATION", "CATEGORY_NOT_WORK", "Category must be of kind WORK.");
+        const unit = await tx.unit.findUniqueOrThrow({ where: { id: input.unitId } });
+        if (unit.status !== "ACTIVE") throw new AppError("VALIDATION", "UNIT_INACTIVE", "Unit is not active.");
+        const vendor = await tx.vendor.findUniqueOrThrow({ where: { id: input.vendorId } });
+        if (vendor.deleted_at !== null) throw new AppError("VALIDATION", "VENDOR_ARCHIVED", "Vendor is archived.");
+        await assertVendorLaborCapable(tx, input.vendorId);
+
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        if (existing.name !== name) {
+          changes.name = { from: existing.name, to: name };
+          changes.slug = { from: existing.slug, to: slug };
+        }
+        if (existing.amount.toString() !== amount) changes.amount = { from: existing.amount.toString(), to: amount };
+        if (existing.currency !== currency) changes.currency = { from: existing.currency, to: currency };
+        if (existing.category_id !== input.categoryId) changes.category_id = { from: existing.category_id, to: input.categoryId };
+        if (existing.vendor_id !== input.vendorId) changes.vendor_id = { from: existing.vendor_id, to: input.vendorId };
+        if (existing.unit_id !== input.unitId) changes.unit_id = { from: existing.unit_id, to: input.unitId };
+        if ((existing.notes || null) !== (input.notes?.trim() || null)) {
+          changes.notes = { from: existing.notes, to: input.notes?.trim() || null };
+        }
+
+        try {
+          await tx.priceLabor.update({
+            where: { id: input.priceLaborId },
+            data: {
+              name,
+              slug,
+              category_id: input.categoryId,
+              vendor_id: input.vendorId,
+              unit_id: input.unitId,
+              amount,
+              currency,
+              notes: input.notes?.trim() || null,
+              updated_by_user_id: input.actor.userId ?? null,
+              updated_by_label: input.actor.label,
+            },
+          });
+        } catch (error) {
+          mapWriteError(error);
+        }
+
+        await writeAudit(tx, {
+          action: "price-labor.updated",
+          entityType: "price_labor",
+          entityId: input.priceLaborId,
+          actor: input.actor,
+          changes: Object.keys(changes).length > 0 ? changes : undefined,
+        });
+        return { priceLaborId: input.priceLaborId };
       });
     },
 
@@ -1711,6 +3331,21 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
 
     // ── Deletion approval workflow ────────────────────────────────────────────
 
+    async listDeletionRequests(input: {
+      grants: PermissionGrants;
+      status?: "PENDING" | "APPROVED" | "REJECTED";
+      targetType?: string;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.access);
+      return db.deletionRequest.findMany({
+        where: {
+          ...(input.status ? { status: input.status } : {}),
+          ...(input.targetType ? { target_type: input.targetType } : {}),
+        },
+        orderBy: { requested_at: "desc" },
+      });
+    },
+
     async rejectDeletion(input: {
       grants: PermissionGrants;
       actor: AuditActor;
@@ -1771,9 +3406,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
 
         const { target_type: targetType, target_id: targetId } = request;
 
-        // Execute hard delete based on target type
         if (targetType === "brand") {
-          // Block if BrandSupplier rows exist
           const supplierCount = await tx.brandSupplier.count({ where: { brand_id: targetId } });
           if (supplierCount > 0) {
             throw new AppError("CONFLICT", "BRAND_HAS_SUPPLIERS", "Brand still has supplier relations. Remove them first.");
@@ -1860,6 +3493,14 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         } else if (targetType === "category") {
           try {
             await tx.category.delete({ where: { id: targetId } });
+          } catch (error) {
+            mapWriteError(error);
+          }
+
+        } else if (targetType === "vendor_type") {
+          await tx.archiveCause.deleteMany({ where: { entity_type: "vendor_type", entity_id: targetId } });
+          try {
+            await tx.vendorType.delete({ where: { id: targetId } });
           } catch (error) {
             mapWriteError(error);
           }

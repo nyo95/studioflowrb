@@ -31,7 +31,12 @@ export function useDebouncedValue<T>(value: T, delayMs: number): T {
 export function useOptionOverlay<T extends IdentityLike>(serverOptions: readonly T[]) {
   const [overlayOptions, setOverlayOptions] = useState<readonly T[]>([]);
 
-  const options = useMemo(() => mergeOverlayOptions(serverOptions, overlayOptions), [serverOptions, overlayOptions]);
+  const options = useMemo(() => {
+    const uncommittedOverlays = overlayOptions.filter(
+      (option) => !serverOptions.some((serverOption) => serverOption.id === option.id),
+    );
+    return mergeOverlayOptions(serverOptions, uncommittedOverlays);
+  }, [serverOptions, overlayOptions]);
 
   const upsertOverlayOption = useCallback((option: T) => {
     setOverlayOptions((current) => mergeOverlayOptions(current, [option]));
@@ -42,10 +47,6 @@ export function useOptionOverlay<T extends IdentityLike>(serverOptions: readonly
   }, []);
 
   const clearOverlay = useCallback(() => setOverlayOptions([]), []);
-
-  useEffect(() => {
-    setOverlayOptions((current) => current.filter((option) => !serverOptions.some((serverOption) => serverOption.id === option.id)));
-  }, [serverOptions]);
 
   return { options, upsertOverlayOption, removeOverlayOption, clearOverlay };
 }
@@ -122,14 +123,16 @@ export function useUnsavedChangesGuard<T>({
   confirmLabel = "Discard changes",
   cancelLabel = "Keep editing",
 }: UnsavedChangesGuardOptions<T>) {
-  const baselineRef = useRef(initialValue);
+  const [savedBaseline, setSavedBaseline] = useState<T>(initialValue);
+  const [prevInitial, setPrevInitial] = useState<T>(initialValue);
+
+  if (initialValue !== prevInitial) {
+    setPrevInitial(initialValue);
+    setSavedBaseline(initialValue);
+  }
+
+  const isDirty = !equals(value, savedBaseline);
   const confirm = useConfirm();
-
-  useEffect(() => {
-    baselineRef.current = initialValue;
-  }, [initialValue]);
-
-  const isDirty = !equals(value, baselineRef.current);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -142,7 +145,8 @@ export function useUnsavedChangesGuard<T>({
   }, [isDirty]);
 
   const markSaved = useCallback((nextValue: T) => {
-    baselineRef.current = nextValue;
+    setSavedBaseline(nextValue);
+    setPrevInitial(nextValue);
   }, []);
 
   const requestDiscard = useCallback(
@@ -161,7 +165,8 @@ export function useUnsavedChangesGuard<T>({
       });
 
       if (accepted) {
-        baselineRef.current = value;
+        setSavedBaseline(value);
+        setPrevInitial(value);
         onDiscard?.();
       }
       return accepted;

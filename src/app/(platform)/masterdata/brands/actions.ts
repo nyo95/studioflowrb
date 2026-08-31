@@ -1,0 +1,165 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+
+import { requirePrincipalGrants } from "@platform/core/auth";
+import { runSafeAction, type ActionResult } from "@platform/core/actions";
+import { validationError } from "@platform/core/validation";
+import { masterDataService } from "@/apps/masterdata/runtime";
+
+function revalidateBrands(): void {
+  revalidatePath("/masterdata/brands");
+  revalidatePath("/masterdata/skus");
+  revalidatePath("/masterdata");
+}
+
+const BrandInputSchema = z.object({
+  name: z.string().min(1, "Brand name is required").max(64, "Brand name is too long"),
+  ownerVendorId: z.string().uuid().optional().nullable().or(z.literal("")),
+  notes: z.string().max(1000).optional().nullable().or(z.literal("")),
+  categoryIds: z.array(z.string().uuid()).optional(),
+  hashtags: z.array(z.string()).optional(),
+  links: z.array(z.object({ kind: z.string().min(1), url: z.string().url("Must be a valid URL"), label: z.string().optional().nullable() })).optional(),
+  suppliers: z.array(z.object({ vendorId: z.string().uuid() })).optional(),
+});
+
+export async function createBrandAction(
+  _prev: ActionResult<{ brandId?: string }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ brandId: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const rawLinksJson = String(formData.get("linksJson") ?? "[]");
+    let links = [];
+    try {
+      links = JSON.parse(rawLinksJson);
+    } catch {
+      // ignore
+    }
+
+    const rawHashtags = String(formData.get("hashtags") ?? "")
+      .split(/[\s,]+/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
+
+    const parsed = BrandInputSchema.safeParse({
+      name: String(formData.get("name") ?? ""),
+      ownerVendorId: formData.get("ownerVendorId") ? String(formData.get("ownerVendorId")) : null,
+      notes: formData.get("notes") ? String(formData.get("notes")) : null,
+      categoryIds,
+      hashtags: rawHashtags,
+      links,
+    });
+    if (!parsed.success) throw validationError(parsed.error);
+
+    const result = await masterDataService.createBrand({
+      grants,
+      actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
+      name: parsed.data.name,
+      ownerVendorId: parsed.data.ownerVendorId || undefined,
+      notes: parsed.data.notes || undefined,
+      categoryIds: parsed.data.categoryIds,
+      hashtags: parsed.data.hashtags,
+      links: (parsed.data.links ?? []).map((l) => ({ kind: l.kind, url: l.url, label: l.label ?? undefined })),
+    });
+    revalidateBrands();
+    return result;
+  });
+}
+
+export async function updateBrandAction(
+  _prev: ActionResult<{ brandId?: string }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ brandId: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const rawLinksJson = String(formData.get("linksJson") ?? "[]");
+    let links = [];
+    try {
+      links = JSON.parse(rawLinksJson);
+    } catch {
+      // ignore
+    }
+
+    const rawHashtags = String(formData.get("hashtags") ?? "")
+      .split(/[\s,]+/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
+
+    const parsed = BrandInputSchema.extend({ brandId: z.string().uuid() }).safeParse({
+      brandId: String(formData.get("brandId") ?? ""),
+      name: String(formData.get("name") ?? ""),
+      ownerVendorId: formData.get("ownerVendorId") ? String(formData.get("ownerVendorId")) : null,
+      notes: formData.get("notes") ? String(formData.get("notes")) : null,
+      categoryIds,
+      hashtags: rawHashtags,
+      links,
+    });
+    if (!parsed.success) throw validationError(parsed.error);
+
+    const result = await masterDataService.updateBrand({
+      grants,
+      actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
+      brandId: parsed.data.brandId,
+      name: parsed.data.name,
+      ownerVendorId: parsed.data.ownerVendorId,
+      notes: parsed.data.notes,
+      categoryIds: parsed.data.categoryIds,
+      hashtags: parsed.data.hashtags,
+      links: (parsed.data.links ?? []).map((l) => ({ kind: l.kind, url: l.url, label: l.label ?? undefined })),
+    });
+    revalidateBrands();
+    return result;
+  });
+}
+
+export async function archiveBrandAction(brandId: string): Promise<ActionResult<{ brandId: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const result = await masterDataService.archiveBrand({
+      grants,
+      actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
+      brandId,
+    });
+    revalidateBrands();
+    return result;
+  });
+}
+
+export async function restoreBrandAction(brandId: string): Promise<ActionResult<{ brandId: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const result = await masterDataService.restoreBrand({
+      grants,
+      actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
+      brandId,
+    });
+    revalidateBrands();
+    return result;
+  });
+}
+
+export async function requestBrandDeletionAction(
+  brandId: string,
+  reason?: string,
+  notes?: string,
+): Promise<ActionResult<{ requestId: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const result = await masterDataService.requestBrandDeletion({
+      grants,
+      actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
+      brandId,
+      reason,
+      notes,
+    });
+    revalidateBrands();
+    revalidatePath("/masterdata/deletions");
+    return result;
+  });
+}
