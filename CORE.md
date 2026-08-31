@@ -484,7 +484,10 @@ The active foundation is complete only when:
 
 ## 17. Code-derived evidence and current conformance
 
-Legacy evidence is the committed code at `D:\Projects\studioflow`, commit `6377ac0971e7a7cc0fd8fb58a8360c069675f9a5`.
+The ledger below preserves historical committed evidence recorded at commit
+`6377ac0971e7a7cc0fd8fb58a8360c069675f9a5`; it does not establish a current
+checkout path or commit. Any new legacy access follows the cross-location,
+strictly read-only repository and PostgreSQL isolation rules in `AGENTS.md`.
 
 | Exact code evidence | Decision | Foundation meaning |
 |---|---|---|

@@ -5,7 +5,12 @@ Consumers: StudioFlow, Master Data, BQ, future apps.
 
 Authority: this is the single shared UI architecture contract and specializes `DESIGN.md`. App-specific UI policy remains owned by an owner-approved app contract; none is executable in the current foundation-only phase.
 
-Legacy evidence provenance: every UI capability ledger records an exact commit from the owner-designated read-only checkout at `D:\Projects\studioflow`. Committed evidence is read from that commit; working-tree-only evidence is named separately. A moving branch tip and prose-only summary are never sufficient evidence.
+Legacy evidence provenance: existing UI capability ledgers preserve the exact
+commit used when that evidence was recorded; they do not establish a current
+checkout path or commit. Before new legacy access, ask the owner for the exact
+path on the current computer and follow the strict read-only repository and
+PostgreSQL isolation rules in `AGENTS.md`. A moving branch tip and prose-only
+summary are never sufficient evidence.
 
 ## 1. Purpose
 
@@ -631,7 +636,9 @@ UI Engine foundation implementation is complete when:
 
 ## 21. Code-derived legacy evidence
 
-All paths refer to committed legacy code at `D:\Projects\studioflow`, commit `6377ac0971e7a7cc0fd8fb58a8360c069675f9a5`.
+All paths refer to historical committed legacy evidence recorded at commit
+`6377ac0971e7a7cc0fd8fb58a8360c069675f9a5`. This ledger does not establish a
+current checkout path or commit; new access follows `AGENTS.md`.
 
 | Exact code evidence | Decision | Shared intent |
 |---|---|---|

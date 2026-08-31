@@ -17,7 +17,12 @@ Current delivery scope is foundation-first:
 
 Read [`docs/README.md`](docs/README.md) and [`CHANGELOG.md`](CHANGELOG.md), then the shared contract relevant to the change (`CORE.md`, `DESIGN.md`, or `UI_ENGINE.md`). Read an approved app contract only for an activated planning slice, followed by `prisma/schema.prisma` and the real implementation path when one exists.
 
-The local `../studioflow` repository is stale behavioral evidence, not source of truth and never a runtime/build dependency. Inspect committed code at an exact recorded commit, preserve useful workflows, fix defects, merge duplicated shared capabilities, and purge contradicted behavior.
+StudioFlow legacy is behavioral evidence only, never an implementation base or
+runtime/build dependency. Its location differs between the owner's computers;
+before any access, ask for the exact current-computer path and follow the strict
+read-only repository and PostgreSQL isolation rules in `AGENTS.md`. Preserve
+useful workflows, fix defects, merge duplicated shared capabilities, and purge
+contradicted behavior while rebuilding isolated code and persistence from zero.
 
 ## Architecture rule
 

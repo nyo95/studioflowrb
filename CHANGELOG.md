@@ -4,10 +4,50 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 ## Revision state
 
-- Published baseline after this release is pushed: **R2** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R2**
-- Next local revision: **R2.01**
-- Remote publication: **authorized by the owner on 2026-08-31**
+- Published baseline: **R2** — `433a2cb502c3ae6569b6b7cd2fa21188dbf28c37` on `origin/main`
+- Current local revision after this entry is committed: **R2.01**
+- Next local revision: **R2.02**
+- Remote publication of **R2.01**: **not authorized**
+
+## R2.01 — 2026-08-31 — docs(governance): isolate legacy across work locations
+
+Status: **owner-approved governance clarification**
+
+### Changed
+
+- Removed fixed home-machine assumptions for the StudioFlow legacy checkout;
+  an agent must ask the owner for the exact current-computer path before any
+  legacy evidence access.
+- Made the legacy repository strictly read-only and prohibited all commands that
+  could alter its files, Git state, dependencies, generated output, or external
+  state.
+- Put every PostgreSQL resource used by or capable of affecting StudioFlow
+  legacy completely out of scope, including read/query, dump, restore,
+  migration, seed, reset, container, volume, and service operations.
+- Required rebuild-only code, migrations, configuration, and database resources
+  created from zero; database writes must fail closed unless their explicit
+  target is proven to belong only to `studioflow-rebuild`.
+- Aligned the active documentation and Master Data evidence gate with the new
+  cross-location isolation rule.
+- Removed the obsolete `check:legacy` script that assumed a sibling
+  `../studioflow` checkout, and neutralized fixed home paths in active shared
+  contracts, the repository entry documentation, and the completed Foundation
+  work order's provenance note.
+
+### Verification
+
+- Reviewed the changed governance text for fixed legacy-path assumptions and
+  contradictory legacy/database authority.
+- Markdown relative-link scan and `git diff --cached --check`: passed.
+- `package.json` parse and the remaining repository checks' script references:
+  passed.
+- No runtime code, dependency version, Prisma schema, migration, or database
+  changed.
+
+### Reserved owner state
+
+- Existing `next-env.d.ts` and decimal/money utility changes remain unstaged and
+  are not part of this revision.
 
 ## R2 — 2026-08-31 — release: publish foundation-only rebuild baseline
 

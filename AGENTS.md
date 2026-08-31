@@ -19,7 +19,46 @@
 5. Current code/tests as behavior evidence
 6. Legacy code at an exact commit as evidence only
 
-The local `../studioflow` checkout is known to be behind the owner's office version. Before using it, record the resolved commit and dirty state. Read committed evidence with `git show`; name working-tree-only evidence separately. Never make the rebuild depend on the legacy repository.
+## Legacy isolation and location rule
+
+StudioFlow legacy has different checkout locations and may have different local
+states on the owner's home and office computers. Never assume `../studioflow`, a
+drive letter, a saved path, or that a previously observed checkout is the one the
+owner intends to use.
+
+When legacy evidence is actually required, stop before accessing it and ask the
+owner for the exact StudioFlow legacy repository path on the current computer.
+Do not discover it by broadly scanning drives or sibling directories. After the
+owner supplies the path, resolve and record that exact path, commit, branch, and
+dirty state before reading evidence. A path supplied for one computer/session is
+not a portable default for another computer.
+
+The legacy repository is strictly read-only evidence:
+
+- never edit, format, generate into, stage, commit, stash, reset, clean, switch,
+  merge, rebase, pull, push, install dependencies in, or otherwise alter it;
+- never run its application, scripts, seeds, migrations, tests, or commands that
+  may write files, caches, dependencies, generated output, or external state;
+- inspect committed evidence with read-only Git operations such as `git show`;
+  name working-tree-only evidence separately and never modify it;
+- never copy its code, schema, migrations, database, or configuration into the
+  rebuild as an implementation starting point; legacy informs behavior only;
+- never make the rebuild depend on the presence, path, branch, or availability
+  of the legacy repository.
+
+StudioFlow legacy PostgreSQL is completely out of scope. Never connect to,
+query, inspect, dump, restore, migrate, seed, reset, truncate, or otherwise touch
+any database, server, schema, role, connection string, container, volume, backup,
+or service used by or capable of affecting StudioFlow legacy. Do not run a
+command when its database target is absent, ambiguous, inherited from the legacy
+environment, or not proven to be rebuild-only.
+
+The rebuild starts from zero and owns isolated code, migrations, configuration,
+and PostgreSQL resources. Before any database command that can write or apply a
+migration, verify that its explicit target belongs only to
+`studioflow-rebuild`; otherwise stop and ask the owner. No legacy data migration
+or compatibility dependency is implied unless the owner later approves a
+separate, explicit, safely isolated work order.
 
 ## Legacy evidence workflow
 

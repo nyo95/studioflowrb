@@ -42,7 +42,13 @@ When facts disagree, use this order:
 5. current code and tests as evidence of current behavior;
 6. legacy code at an exact recorded commit as behavioral evidence only.
 
-The local `../studioflow` checkout is known to be behind the owner's office version. Never treat its branch tip, dirty working tree, Markdown, or schema alone as current product truth. Record the exact commit and inspect the relevant committed code end to end.
+StudioFlow legacy checkout locations and local states differ between the owner's
+home and office computers. When legacy evidence is needed, follow
+`AGENTS.md`: ask the owner for the exact path on the current computer, record its
+commit and dirty state, and use it as strictly read-only behavioral evidence.
+Never touch its repository or PostgreSQL resources, copy it as an implementation
+base, or make the rebuild depend on it. The rebuild starts from zero with isolated
+code, migrations, configuration, and database resources.
 
 ## Minimum product bar
 

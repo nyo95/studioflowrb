@@ -362,7 +362,10 @@ If a shared pattern is missing, report it rather than creating a parallel design
 
 ## 17. Legacy Evidence Used
 
-All paths below are committed code evidence from `D:\Projects\studioflow` at commit `6377ac0971e7a7cc0fd8fb58a8360c069675f9a5`; legacy Markdown and dirty working-tree styling are not authority.
+All paths below are historical committed-code evidence recorded at commit
+`6377ac0971e7a7cc0fd8fb58a8360c069675f9a5`; they do not establish a current
+checkout path or commit. Any new legacy access follows `AGENTS.md`. Legacy
+Markdown and dirty working-tree styling are not authority.
 
 - `src/ui_engine/design-system.config.ts`
 - `src/ui_engine/tokens/**`

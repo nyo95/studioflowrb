@@ -31,7 +31,12 @@ Read in this order before editing:
 
 `docs/apps/masterdata.md` is consumer evidence only. Do not resume Master Data product development. The only allowed Master Data edits are deterministic replacement of the unsafe configured operator with the new request identity, exposure of its permission registry through `public/`, and compatibility needed to protect its already-existing routes.
 
-Legacy evidence is committed code at `D:\Projects\studioflow`, commit `6377ac0971e7a7cc0fd8fb58a8360c069675f9a5`. Use `git show <commit>:<path>`. Never read legacy Markdown as behavior authority, copy a folder wholesale, use its dirty working tree, or create a runtime dependency on it.
+This completed work order used historical committed evidence recorded at commit
+`6377ac0971e7a7cc0fd8fb58a8360c069675f9a5`; that record does not establish a
+current checkout path or commit. Any later legacy access must follow the current
+cross-location and strict isolation rules in `AGENTS.md`. Never read legacy
+Markdown as behavior authority, copy a folder wholesale, use its dirty working
+tree, or create a runtime dependency on it.
 
 ## 2. Repository safety and reserved owner state
 

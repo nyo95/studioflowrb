@@ -123,19 +123,16 @@ metadata. This preserves Core's one-operation/one-primary-event rule.
 
 ## 6. Evidence and activation gate
 
-Legacy behavior evidence is committed code at:
-
-```text
-D:\Projects\studioflow
-commit 6377ac0971e7a7cc0fd8fb58a8360c069675f9a5
-```
-
-The checkout is dirty and stale; only `git show` evidence at that commit is
-admissible. The active contracts record **KEEP**, **FIX**, **MERGE**, and **PURGE**
-destinations. The retired rebuild implementation is recoverable at Git revision
-R1.05. Its historical migrations remain immutable replay evidence, but the active
-Prisma schema is platform-only and the R1.06 reset migration permanently drops
-all app schemas and app grants.
+Legacy behavior evidence comes only from the exact checkout path and commit the
+owner identifies for the current home or office computer. The agent must ask for
+that path before access and follow the strict read-only repository and PostgreSQL
+isolation rules in `AGENTS.md`; no path or commit previously observed elsewhere
+is an active default. The active contracts record **KEEP**, **FIX**, **MERGE**,
+and **PURGE** destinations. The retired rebuild implementation is recoverable at
+Git revision R1.05. Its historical migrations remain immutable replay evidence,
+but the active Prisma schema is platform-only and the R1.06 reset migration
+permanently drops all app schemas and app grants. New implementation starts from
+the isolated rebuild contract and schema, never by copying legacy code or data.
 
 No Master Data implementation work order may be issued until:
 
