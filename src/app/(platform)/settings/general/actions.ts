@@ -29,7 +29,6 @@ export async function updateGeneralSettingsAction(
     revalidatePath("/settings/general");
     revalidatePath("/login");
     revalidatePath("/", "layout");
-    revalidatePath("/masterdata", "layout");
     return { changed: result.changed };
   });
 }

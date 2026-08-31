@@ -15,15 +15,15 @@ contracts and does not authorize implementation.
 | [`vendor-contract.md`](vendor-contract.md) | Vendor identity, VendorType capability model, contacts, links, Brand relations, lifecycle, permissions, and audit |
 | [`pricing-contract.md`](pricing-contract.md) | Material, material-plus-labor, and labor-only prices; lifecycle; permissions; and BQ-facing reads |
 
-These three contracts were reviewed together. Where an old name from the current
-implementation appears in code or migrations, the migration ledgers in the
-individual contracts define its approved destination.
+These three contracts were reviewed together. R1.06 permanently removed the old
+implementation and app data. Old names that remain in contract evidence ledgers
+refer only to the R1.05 Git snapshot and define what must not be reintroduced.
 
 ## 2. Remaining Master Data scope
 
 Master Data also owns Category, SKU, Unit, media, physical Samples, import/export,
-and its public read contracts. Their existing schema and code remain implemented-
-state evidence only until each slice receives an owner-approved logic contract.
+and its public read contracts. No active schema or code exists for those slices;
+each must receive an owner-approved logic contract before implementation.
 
 In particular, the following are not decided by the approved Brand/Vendor/Pricing
 contracts and must not be inferred during implementation:
@@ -132,14 +132,17 @@ commit 6377ac0971e7a7cc0fd8fb58a8360c069675f9a5
 
 The checkout is dirty and stale; only `git show` evidence at that commit is
 admissible. The active contracts record **KEEP**, **FIX**, **MERGE**, and **PURGE**
-destinations. Current schema, migrations, code, and tests remain evidence of the
-implemented state, not authority over owner-approved logic.
+destinations. The retired rebuild implementation is recoverable at Git revision
+R1.05. Its historical migrations remain immutable replay evidence, but the active
+Prisma schema is platform-only and the R1.06 reset migration permanently drops
+all app schemas and app grants.
 
 No Master Data implementation work order may be issued until:
 
-- Foundation F0 is accepted and UI-F1 is activated and verified;
-- Brand, Vendor, and Pricing contradictions identified in these contracts are
-  closed in one deterministic migration/work order;
+- Foundation F0 remains green and UI-F1 is audited, corrected, and verified
+  against the shared contracts and useful legacy StudioFlow interaction quality;
+- no Master Data route or app-private replacement for a missing UI Engine pattern
+  is created before that UI-F1 gate;
 - the remaining consumer slice needed by that work order (especially SKU and
   Category) has its required cardinalities and lifecycle locked;
 - the owner approves the exact migration/recovery plan and acceptance tests.

@@ -419,7 +419,12 @@ Returns live PriceMaterialLabor and PriceLabor records with category, unit, and 
 
 ---
 
-## 13. Schema Migration Plan
+## 13. Retired R1.05 implementation ledger
+
+The source artifacts below were permanently removed from the active tree in
+R1.06 and are recoverable only through Git history. The ledger preserves
+KEEP/FIX/MERGE/PURGE intent for the clean rebuild; it is not a data-migration
+instruction.
 
 ### 13.1 PURGE
 
@@ -488,7 +493,11 @@ Returns live PriceMaterialLabor and PriceLabor records with category, unit, and 
 
 ---
 
-## 14. Legacy Import Mapping
+## 14. Historical field mapping — no import authorized
+
+R1.06 permanently discarded old application data. This section is retained only
+to explain old field names found in Git evidence; the clean rebuild must not
+create a legacy importer or fallback from it.
 
 ### 14.1 SkuPrice → PriceMaterial
 

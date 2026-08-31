@@ -5,7 +5,8 @@
 1. `docs/README.md`
 2. `CHANGELOG.md` for the published baseline, current local revision, and next revision
 3. The shared contract relevant to the task: `CORE.md`, `DESIGN.md`, and/or `UI_ENGINE.md`
-4. The active work order. There is currently no executable app contract; `docs/apps/masterdata.md` is a deferred intake only.
+4. The active work order, when one exists. There is currently no executable app
+   work order. `docs/apps/masterdata.md` indexes approved logic contracts only.
 5. `prisma/schema.prisma` for the implemented persisted shape
 6. The relevant current code, tests, and migrations
 

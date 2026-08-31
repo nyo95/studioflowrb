@@ -1,5 +1,4 @@
 import type { AppPermissionRegistrationInput } from "@platform/core/rbac/registry";
-import { MASTERDATA_PERMISSIONS } from "@masterdata/public";
 
 /**
  * App registrations for the platform permission registry and app launcher
@@ -11,11 +10,4 @@ import { MASTERDATA_PERMISSIONS } from "@masterdata/public";
  * boundary; this file only hands the platform registry the already-public
  * lists plus launcher metadata.
  */
-export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [
-  {
-    appId: "masterdata",
-    name: "Master Data",
-    rootPath: "/masterdata",
-    permissions: MASTERDATA_PERMISSIONS,
-  },
-];
+export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [];

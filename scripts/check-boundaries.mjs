@@ -187,9 +187,13 @@ export async function collectBoundaryViolations({ projectRoot = process.cwd(), s
 
   const aliasMap = await readAliasMap(projectRoot);
   const appsRoot = join(srcDir, "apps");
-  const apps = (await readdir(appsRoot, { withFileTypes: true }))
-    .filter((e) => e.isDirectory())
-    .map((e) => e.name);
+  let appEntries = [];
+  try {
+    appEntries = await readdir(appsRoot, { withFileTypes: true });
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  const apps = appEntries.filter((e) => e.isDirectory()).map((e) => e.name);
 
   const violations = [];
   const files = await walkSources(srcDir);

@@ -107,7 +107,20 @@ try {
     assert.ok(!flagged.has(file), `legal fixture must not be flagged: ${file}`);
   }
 
-  console.log("PASS boundary fixtures: 9 rejections, all legal cases and comment/string false-positive cases clean");
+  const platformOnlyRoot = await mkdtemp(join(tmpdir(), "wo3-boundaries-platform-only-"));
+  try {
+    await writeTree(platformOnlyRoot, {
+      "tsconfig.json": JSON.stringify({
+        compilerOptions: { paths: { "@/*": ["./src/*"], "@platform/*": ["./src/platform/*"] } },
+      }),
+      "src/platform/core/index.ts": "export const core = true;\n",
+    });
+    assert.deepEqual(await collectBoundaryViolations({ projectRoot: platformOnlyRoot }), []);
+  } finally {
+    await rm(platformOnlyRoot, { recursive: true, force: true });
+  }
+
+  console.log("PASS boundary fixtures: 9 rejections, legal cases clean, platform-only tree accepted");
 } finally {
   await rm(projectRoot, { recursive: true, force: true });
 }

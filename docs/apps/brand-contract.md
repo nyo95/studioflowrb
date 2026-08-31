@@ -335,11 +335,11 @@ includes:
 - downstream reads: `src/extensions/library/services/brand-library-service.ts`
   and BQ Master Data services.
 
-Current rebuild evidence includes `brand-rules.ts`, `brand-service.ts`,
-`brand-repository-prisma.ts`, Brand tests, `prisma/schema.prisma`, and migrations
-`20260825171210_master_data_full_schema` / `20260828000000_master_data_sku_pair_pricing`.
-The migration ledger above records their approved destinations; it does not
-authorize code changes yet.
+Retired rebuild evidence is recoverable at Git revision R1.05, including
+`brand-rules.ts`, `brand-service.ts`, `brand-repository-prisma.ts`, Brand tests,
+the former Prisma models, and their historical migrations. R1.06 removed that
+implementation and all app data. The ledger above remains classification
+evidence only; it does not authorize code changes.
 
 ## Locked decisions summary
 

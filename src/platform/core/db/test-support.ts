@@ -8,22 +8,21 @@ import { PrismaClient } from "@/generated/prisma/client";
  * tests. These tests prove race-safe database constraints and transactional
  * behavior, so they require a real disposable PostgreSQL database.
  *
- * The guard fails closed unless DATABASE_URL and MASTERDATA_TEST_DATABASE_URL
- * are both set and identical — the same disposable-DB contract the Master
- * Data suites use — so these tests can never truncate an ordinary
+ * The guard fails closed unless DATABASE_URL and PLATFORM_TEST_DATABASE_URL
+ * are both set and identical, so these tests can never truncate an ordinary
  * development database.
  */
 export function requireDisposableTestDatabaseUrl(): string {
   const databaseUrl = process.env.DATABASE_URL;
-  const disposableUrl = process.env.MASTERDATA_TEST_DATABASE_URL;
+  const disposableUrl = process.env.PLATFORM_TEST_DATABASE_URL;
   if (!databaseUrl || !disposableUrl) {
     throw new Error(
-      "Platform contract tests require a disposable database: set both DATABASE_URL and MASTERDATA_TEST_DATABASE_URL to the same disposable PostgreSQL URL.",
+      "Platform contract tests require a disposable database: set both DATABASE_URL and PLATFORM_TEST_DATABASE_URL to the same disposable PostgreSQL URL.",
     );
   }
   if (databaseUrl !== disposableUrl) {
     throw new Error(
-      "Platform contract tests refuse to run: DATABASE_URL does not equal MASTERDATA_TEST_DATABASE_URL. Point both at the disposable test database.",
+      "Platform contract tests refuse to run: DATABASE_URL does not equal PLATFORM_TEST_DATABASE_URL. Point both at the disposable test database.",
     );
   }
   return databaseUrl;
@@ -32,9 +31,8 @@ export function requireDisposableTestDatabaseUrl(): string {
 export type TestDb = {
   prisma: PrismaClient;
   pool: Pool;
-  /// Dedicated connection holding the file-level advisory lock. The lock key
-  /// is shared with the Master Data suites (0x4d443031) so ALL disposable-DB
-  /// test files serialize against the same database.
+  /// Dedicated connection holding the file-level advisory lock so all
+  /// Foundation disposable-DB test files serialize against the same database.
   lockClient: PoolClient;
 };
 

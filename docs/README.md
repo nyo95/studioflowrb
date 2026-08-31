@@ -16,14 +16,20 @@ order unless it says so explicitly.
 | [`apps/vendor-contract.md`](apps/vendor-contract.md) | owner-approved Vendor identity, types/capabilities, contacts/links, Brand relations, lifecycle, deletion, and UI |
 | [`apps/pricing-contract.md`](apps/pricing-contract.md) | owner-approved three-table Pricing model, validation, lifecycle, permissions, UI, migration, and downstream reads |
 
-Execution and continuity are governed by [`AGENTS.md`](../AGENTS.md), [`CHANGELOG.md`](../CHANGELOG.md), and the locked [`Foundation F0 work order`](../scripts/work-orders/FOUNDATION.md).
+Execution and continuity are governed by [`AGENTS.md`](../AGENTS.md) and
+[`CHANGELOG.md`](../CHANGELOG.md). The completed
+[`Foundation F0 work order`](../scripts/work-orders/FOUNDATION.md) is retained as
+historical implementation evidence; there is currently no executable app work
+order.
 
 StudioFlow and BQ contracts are intentionally absent until those apps become
-active. Brand, Vendor, and Pricing are approved Master Data logic contracts, but
-they do not authorize implementation until their remaining dependencies and an
-explicit work order are locked. Category, SKU, Unit, media, Samples, import, and
-BQ snapshot details remain deferred as recorded in the Master Data index. Legacy
-code may be inspected as evidence; it never authorizes implementation by itself.
+active. R1.06 removes every old/speculative application route, module, seed, and
+active database schema. Brand, Vendor, and Pricing remain approved Master Data
+logic contracts, but they do not authorize implementation until UI-F1, their
+remaining dependencies, and an explicit work order are locked. Category, SKU,
+Unit, media, Samples, import, and BQ snapshot details remain deferred as recorded
+in the Master Data index. Deleted code is recoverable as Git evidence only; it
+never authorizes implementation by itself.
 
 ## Authority order
 
@@ -59,9 +65,10 @@ Forbidden: `platform -> app`, cross-app internal imports, implicit cross-app wri
 
 ## Active sequence
 
-1. OpenCode implements the locked `CORE.md` Stage F0 plus `UI_ENGINE.md` UI-F0 in the assigned local revision;
-2. the Codex navigator reviews the implementation commit and real running workflows, issuing a new correction revision if required;
-3. activate and verify UI-F1 immediately before Master Data;
+1. preserve and verify the Foundation-only baseline;
+2. audit UI Engine against `DESIGN.md`, `UI_ENGINE.md`, and the useful interaction
+   quality proven by committed legacy StudioFlow screens;
+3. implement and verify UI-F1 before any Master Data route or domain UI is built;
 4. complete and approve the remaining Master Data domain contracts and exact
    migration/recovery plan without reopening the approved Brand, Vendor, and
    Pricing product decisions;

@@ -5,9 +5,88 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R1** — `c8e473702801510aa314bbed45242a71b600f733` on `origin/main`
-- Current local revision after this entry is committed: **R1.05**
-- Next local revision: **R1.06**
+- Current local revision after this entry is committed: **R1.06**
+- Next local revision: **R1.07**
 - Remote publication: **not authorized**
+
+## R1.06 — 2026-08-31 — chore(reset): return repository to platform foundation
+
+Status: **owner-authorized destructive application reset — Foundation-only baseline**
+
+Permanently retires every pre-contract application implementation and app data so
+Master Data can be rebuilt from the approved Brand, Vendor, and Pricing contracts.
+The shared platform, Core, Utilities, Design, and UI Engine remain; no application
+is registered or routable after this revision.
+
+### Removed
+
+- Deleted all old Master Data routes, actions, UI, domain/application/
+  infrastructure/public modules, tests, workbook/import-export code, app-owned
+  README files, and both app seed files.
+- Deleted speculative StudioFlow and BQ module stubs plus the obsolete shared
+  placeholder README.
+- Deleted completed executor-context/prompt handoffs that no longer govern an
+  active run. The locked Foundation work order remains historical evidence.
+- Removed the `@masterdata/*`, `@studioflow/*`, and `@bq/*` aliases and removed
+  `exceljs` plus its now-unused transitive dependency tree.
+- Removed the stale `/masterdata` settings revalidation target. The production
+  route manifest now contains platform/login/settings/account routes only.
+
+### Changed
+
+- Reduced the active Prisma schema to `platform` only: User, Role, UserRole,
+  RolePermission, Session, PlatformGeneralSettings, AuditEvent, and UserStatus.
+- Left the application registration composition root intentionally empty. The
+  launcher therefore renders the Foundation no-app state until an approved app
+  work order registers a real public permission surface.
+- Kept bootstrap connected to the code-owned registry so a fresh owner receives
+  exactly the seven platform grants in the Foundation-only vocabulary.
+- Made the architecture checker accept and test a valid platform-only source
+  tree with no `src/apps` directory.
+- Renamed the disposable Foundation database guard from the retired
+  `MASTERDATA_TEST_DATABASE_URL` name to `PLATFORM_TEST_DATABASE_URL` and changed
+  the transaction-client type proof from an app Category model to platform User.
+- Updated governance and active documentation to record the reset and make UI-F1
+  audit/correction a hard gate before any Master Data route or domain UI. Brand,
+  Vendor, and Pricing contracts remain product authority; their old-code ledgers
+  now point only to the R1.05 Git snapshot.
+
+### Dependencies and migration
+
+- Removed production dependency `exceljs@4.4.0`; no dependency was added or
+  upgraded.
+- Added irreversible migration
+  `20260831000000_reset_to_platform_foundation`: deletes persisted
+  `masterdata.*`, `studioflow.*`, and `bq.*` grants, then drops the
+  `master_data`, `studioflow`, and `bq` schemas with CASCADE. Platform audit
+  history and all historical migration files remain intact.
+- The owner explicitly authorized permanent loss of all old application data and
+  a clean future application schema.
+
+### Verification
+
+- `npx prisma format`, `npx prisma validate`, and `npx prisma generate`: passed.
+- Platform-only schema SQL generation with `prisma migrate diff --from-empty`:
+  passed.
+- `npm run check`: passed (typecheck, boundaries, no legacy runtime references).
+- `npm run lint`: passed with zero warnings/errors.
+- `npm run build`: passed on Next.js 16.3.2; route manifest contains `/`,
+  `/login`, `/account`, and platform settings routes only.
+- Non-DB Foundation suite: **140 passed, 0 failed, 0 cancelled**.
+- Full `npm test`: **not a pass** — 140 passed, 2 file-level hook failures and 40
+  cancellations because the required disposable PostgreSQL database was
+  unavailable.
+- Migration deployment/status and DB integration tests could not run: configured
+  target is local `localhost:5433/masterdata`, but Docker Desktop/service could
+  not be started from this non-administrator session. The reset migration is
+  committed but not applied to that local database.
+- Active Markdown relative-link scan and `git diff --cached --check`: passed.
+
+### Reserved owner state
+
+- Existing decimal/money display-format changes and generated `next-env.d.ts`
+  remain unstaged. They were exercised by the local checks but are not owned by
+  this reset revision.
 
 ## R1.05 — 2026-08-31 — docs(masterdata): reconcile brand vendor and pricing contracts
 

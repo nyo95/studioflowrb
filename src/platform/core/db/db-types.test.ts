@@ -12,15 +12,15 @@ type _exportedTypeIsPrismaNamespaceTransactionClient = Expect<
   Equal<TransactionClient, Prisma.TransactionClient>
 >;
 
-async function firstCategoryId(tx: TransactionClient): Promise<string | null> {
-  const rows = await tx.category.findMany({ select: { id: true }, take: 1 });
+async function firstUserId(tx: TransactionClient): Promise<string | null> {
+  const rows = await tx.user.findMany({ select: { id: true }, take: 1 });
   return rows[0]?.id ?? null;
 }
 
 // Type-proves the shared client accepts functions written against the shared
 // TransactionClient with no casts or app-local aliases. Never executed here.
 function acceptSharedTransaction(client: PrismaClient): void {
-  void client.$transaction((tx) => firstCategoryId(tx));
+  void client.$transaction((tx) => firstUserId(tx));
 }
 
 describe("core db type contracts", () => {

@@ -11,6 +11,9 @@ import { Pool } from "pg";
 import { PrismaClient } from "@/generated/prisma/client";
 import { bootstrapFirstOwner } from "@platform/core/auth/bootstrap";
 import { createAuditEventWriter } from "@platform/core/audit/persistence";
+import { runSerializableTransaction } from "@platform/core/db/transactions";
+import { initializePermissionRegistry } from "@platform/core/rbac/registry";
+import { APP_REGISTRATIONS } from "../src/app/app-registrations";
 
 /**
  * One-time first-owner bootstrap CLI (Foundation F0 §6; CORE.md §3).
@@ -50,14 +53,15 @@ async function main(): Promise<void> {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
   try {
+    const registry = initializePermissionRegistry(APP_REGISTRATIONS);
     const result = await bootstrapFirstOwner(
       {
-        runTransaction: (work) => prisma.$transaction(work),
+        runTransaction: (work) => runSerializableTransaction(prisma, work),
         auditWriter: createAuditEventWriter(),
         now: () => new Date(),
         generateId: () => crypto.randomUUID(),
       },
-      { email, displayName, password },
+      { email, displayName, password, permissionIds: registry.permissions },
     );
     console.log(`Bootstrap complete: owner ${result.email} created with role platform-owner (${result.roleId}).`);
   } finally {

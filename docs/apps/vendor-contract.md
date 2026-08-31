@@ -379,7 +379,12 @@ narrow-viewport, and horizontal-overflow states before acceptance.
 
 ---
 
-## 14. Schema Migration Plan
+## 14. Retired R1.05 implementation ledger
+
+The source artifacts below were permanently removed from the active tree in
+R1.06 and are recoverable only through Git history. The ledger preserves
+KEEP/FIX/MERGE/PURGE intent for the clean rebuild; it is not a data-migration
+instruction.
 
 ### 14.1 PURGE
 
@@ -451,7 +456,7 @@ narrow-viewport, and horizontal-overflow states before acceptance.
 
 ---
 
-## 15. Legacy Import Mapping
+## 15. Historical vocabulary mapping
 
 The legacy 6-value `PartyRoleKind` maps to the new VendorType seed codes:
 
@@ -464,7 +469,8 @@ The legacy 6-value `PartyRoleKind` maps to the new VendorType seed codes:
 | `SERVICE_VENDOR` | `SERVICE` | |
 | `MANUFACTURER` | `FACTORY` | |
 
-All legacy values now have a direct VendorType code mapping — no relationship evidence inference needed.
+All legacy values have a direct VendorType code mapping for evidence review. The
+R1.06 reset discarded old app data, so no automatic legacy import is planned.
 
 ---
 
