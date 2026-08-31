@@ -43,9 +43,19 @@ describe("formatMoney", () => {
   it("renders IDR display for very large amounts without precision loss", () => {
     const value = createMoney("98765432109876543210987", "IDR");
     const formatted = formatMoney(value, { locale: "id-ID" });
-    assert.ok(formatted.includes("Rp"));
-    assert.equal(formatted, "Rp\u00A098.765.432.109.876.543.210.987,00");
+    assert.equal(formatted, "Rp.98.765.432.109.876.543.210.987");
     assert.ok(!/[eE]/.test(formatted));
+  });
+
+  it("uses the compact platform display for default IDR values", () => {
+    assert.equal(formatMoney(createMoney("0", "IDR")), "Rp.0");
+    assert.equal(formatMoney(createMoney("1000000", "IDR")), "Rp.1.000.000");
+    assert.equal(formatMoney(createMoney("1250.5", "IDR")), "Rp.1.250,5");
+    assert.equal(formatMoney(createMoney("-1250.5", "IDR")), "-Rp.1.250,5");
+  });
+
+  it("rejects a forged Money value with a non-canonical amount", () => {
+    assert.throws(() => formatMoney({ amount: "01" as never, currency: "USD" }));
   });
 
   it("rounds for display only and never mutates the stored value", () => {

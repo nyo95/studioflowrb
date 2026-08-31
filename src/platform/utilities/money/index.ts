@@ -1,5 +1,5 @@
 import type { Money } from "@platform/contracts";
-import { isDecimalString, toDecimalString, type DecimalString } from "@platform/utilities/decimal";
+import { formatDecimal, isDecimalString, toDecimalString, type DecimalString } from "@platform/utilities/decimal";
 
 /**
  * Display-only money formatting (CORE.md §8).
@@ -35,6 +35,13 @@ export function createMoney(amount: DecimalString | string, currency: string): M
 export function formatMoney(value: Money, options: { locale?: string } = {}): string {
   if (!isValidCurrencyCode(value.currency)) {
     throw new Error(`Invalid currency code on Money value: ${JSON.stringify(value.currency)}.`);
+  }
+  if (!isDecimalString(value.amount)) {
+    throw new Error(`Invalid decimal amount on Money value: ${JSON.stringify(value.amount)}.`);
+  }
+  if (value.currency === "IDR" && (options.locale === undefined || options.locale === DEFAULT_MONEY_LOCALE)) {
+    const amount = formatDecimal(value.amount, { locale: DEFAULT_MONEY_LOCALE });
+    return amount.startsWith("-") ? `-Rp.${amount.slice(1)}` : `Rp.${amount}`;
   }
   // ECMA-402 formats decimal strings as exact mathematical values; the TS
   // library only admits literal numeric strings, so bridge the branded type

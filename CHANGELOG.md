@@ -5,9 +5,48 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R2** — `433a2cb502c3ae6569b6b7cd2fa21188dbf28c37` on `origin/main`
-- Current local revision after this entry is committed: **R2.01**
-- Next local revision: **R2.02**
-- Remote publication of **R2.01**: **not authorized**
+- Current local revision after this entry is committed: **R2.02**
+- Next local revision: **R2.03**
+- Remote publication: **authorized by the owner on 2026-08-31**
+
+## R2.02 — 2026-08-31 — feat(utilities): generalize decimal and money display
+
+Status: **owner-requested reusable utility review and correction**
+
+### Changed
+
+- Added locale-aware, arbitrary-precision decimal display without JavaScript
+  number conversion, calculation rounding, padded zeroes, or Intl fraction-digit
+  limits; the formatter supports locale grouping, decimal separators, localized
+  digits, signs, and explicit grouping control.
+- Kept `id-ID` as the platform default while allowing explicit locales such as
+  `en-US`, `de-DE`, and Indian grouping through the same domain-neutral API.
+- Locked compact default IDR presentation (`Rp.` with the canonical grouped
+  amount), including a sign before the currency symbol for negative values.
+- Made money display reject forged/non-canonical amounts at runtime rather than
+  relying only on the branded TypeScript type.
+- Updated the Core money contract and accepted the production-build-generated
+  `next-env.d.ts` route-type references.
+
+### Verification
+
+- Focused decimal/money suite: **19 passed, 0 failed, 0 cancelled**.
+- `npm run check`: passed (typecheck, architecture boundaries, and no legacy
+  runtime references).
+- `npm run lint`: passed with zero warnings/errors.
+- `npm run build`: passed; the production route manifest remains Foundation-only.
+- `npx prisma format --check` and `npx prisma validate`: passed; no schema or
+  migration changed.
+- Full `npm test`: **not a complete pass** — 143 passed, 2 file-level hook
+  failures, and 40 cancellations because no explicitly isolated disposable
+  rebuild PostgreSQL URL was supplied. The database guard stopped before any
+  connection; no legacy PostgreSQL resource was touched.
+- `git diff --cached --check`: passed.
+
+### Remaining limitation
+
+- UI Engine visual quality remains an acknowledged next-stage audit/correction
+  item; this utility revision does not claim a browser/UI quality pass.
 
 ## R2.01 — 2026-08-31 — docs(governance): isolate legacy across work locations
 

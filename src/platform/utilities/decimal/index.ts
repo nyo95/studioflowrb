@@ -14,6 +14,13 @@ export type DecimalString = string & { readonly [decimalStringBrand]: true };
 
 const DECIMAL_PATTERN = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/;
 
+export const DEFAULT_DECIMAL_LOCALE = "id-ID";
+
+export type FormatDecimalOptions = {
+  locale?: string;
+  useGrouping?: boolean;
+};
+
 function normalize(value: string): string {
   let sign = "";
   let body = value;
@@ -50,6 +57,35 @@ export function isDecimalString(value: unknown): value is DecimalString {
   return typeof value === "string" && DECIMAL_PATTERN.test(value) && normalize(value) === value;
 }
 
+/**
+ * Formats a canonical decimal for display without converting its magnitude or
+ * fractional digits to a JavaScript number. Locale grouping, signs, decimal
+ * separators, and digits are applied without rounding or appending zeroes.
+ */
+export function formatDecimal(
+  value: DecimalString | string,
+  options: FormatDecimalOptions = {},
+): string {
+  const canonical = isDecimalString(value) ? value : toDecimalString(value);
+  const negative = canonical.startsWith("-");
+  const unsigned = negative ? canonical.slice(1) : canonical;
+  const [integer, fraction] = splitParts(unsigned);
+  const locale = options.locale ?? DEFAULT_DECIMAL_LOCALE;
+  const useGrouping = options.useGrouping ?? true;
+  const integerFormatter = new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 0,
+    useGrouping,
+  });
+  const formattedInteger = integerFormatter.format(BigInt(integer));
+  const formattedFraction = fraction ? localizeDigits(fraction, locale) : "";
+  const decimalSeparator = formattedFraction ? getDecimalSeparator(locale) : "";
+
+  if (!negative) return `${formattedInteger}${decimalSeparator}${formattedFraction}`;
+
+  const { prefix, suffix } = getNegativeAffixes(locale);
+  return `${prefix}${formattedInteger}${decimalSeparator}${formattedFraction}${suffix}`;
+}
+
 /** Pure three-way comparison of two canonical decimal strings; no numeric conversion. */
 export function compareDecimals(a: DecimalString, b: DecimalString): -1 | 0 | 1 {
   const negativeA = a.startsWith("-");
@@ -83,4 +119,41 @@ function splitParts(value: string): [string, string] {
   const dotIndex = value.indexOf(".");
   if (dotIndex === -1) return [value, ""];
   return [value.slice(0, dotIndex), value.slice(dotIndex + 1)];
+}
+
+function localizeDigits(value: string, locale: string): string {
+  const formatter = new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 0,
+    useGrouping: false,
+  });
+  const digits = Array.from({ length: 10 }, (_, digit) => formatter.format(digit));
+  return value.replace(/\d/g, (digit) => digits[Number(digit)]);
+}
+
+function getDecimalSeparator(locale: string): string {
+  const formatter = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+    useGrouping: false,
+  });
+  return formatter.formatToParts(1.1).find((part) => part.type === "decimal")?.value ?? ".";
+}
+
+function getNegativeAffixes(locale: string): { prefix: string; suffix: string } {
+  const parts = new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 0,
+    useGrouping: false,
+  }).formatToParts(-1);
+  const integerIndex = parts.findIndex((part) => part.type === "integer");
+  if (integerIndex === -1) return { prefix: "-", suffix: "" };
+  return {
+    prefix: parts
+      .slice(0, integerIndex)
+      .map((part) => part.value)
+      .join(""),
+    suffix: parts
+      .slice(integerIndex + 1)
+      .map((part) => part.value)
+      .join(""),
+  };
 }

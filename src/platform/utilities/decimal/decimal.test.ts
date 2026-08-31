@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { compareDecimals, isDecimalString, toDecimalString } from "./index";
+import { compareDecimals, formatDecimal, isDecimalString, toDecimalString } from "./index";
 
 describe("toDecimalString normalization", () => {
   it("normalizes sign, leading zeros, and trailing fractional zeros", () => {
@@ -83,6 +83,38 @@ describe("compareDecimals", () => {
     assert.equal(
       compareDecimals(d("99999999999999999999999.1"), d("100000000000000000000000")),
       -1,
+    );
+  });
+});
+
+describe("formatDecimal", () => {
+  it("defaults to Indonesian separators without adding display-only zeroes", () => {
+    assert.equal(formatDecimal("0"), "0");
+    assert.equal(formatDecimal("1000"), "1.000");
+    assert.equal(formatDecimal("1000000"), "1.000.000");
+    assert.equal(formatDecimal("1250.5"), "1.250,5");
+    assert.equal(formatDecimal("-9876543.21"), "-9.876.543,21");
+  });
+
+  it("preserves arbitrary precision", () => {
+    assert.equal(
+      formatDecimal("98765432109876543210987.00009876543210987654321"),
+      "98.765.432.109.876.543.210.987,00009876543210987654321",
+    );
+  });
+
+  it("accepts explicit locales and their grouping rules", () => {
+    assert.equal(formatDecimal("1234567.89", { locale: "en-US" }), "1,234,567.89");
+    assert.equal(formatDecimal("1234567.89", { locale: "de-DE" }), "1.234.567,89");
+    assert.equal(formatDecimal("1234567.89", { locale: "hi-IN" }), "12,34,567.89");
+    assert.equal(formatDecimal("-0.5", { locale: "en-US" }), "-0.5");
+  });
+
+  it("does not impose Intl's fraction-digit limit or round the source", () => {
+    const fraction = `${"1234567890".repeat(12)}1`;
+    assert.equal(
+      formatDecimal(`1.${fraction}`, { locale: "en-US", useGrouping: false }),
+      `1.${fraction}`,
     );
   });
 });

@@ -276,6 +276,9 @@ type Money = {
 
 - Currency is an uppercase ISO-4217 code and is always explicit in persisted/public values.
 - Default display settings are `IDR` and `id-ID`, but formatters accept explicit currency and locale.
+- The default `IDR`/`id-ID` presentation is compact (`Rp.` followed by the
+  grouped canonical amount) and does not pad absent fractional zeroes. Generic
+  decimal display remains locale-aware and arbitrary-precision.
 - Formatting is display-only and must not mutate stored values or define calculation rounding.
 - No implicit currency conversion exists in Core.
 - Money arithmetic, allocation, tax, markup, and commercial rounding belong to the owning domain.
