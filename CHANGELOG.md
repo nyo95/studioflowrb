@@ -9,6 +9,27 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Next local revision: **R3.02**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
+## R3.04 — 2026-08-31 — docs(masterdata): activate curated implementation scope
+
+Status: **owner-authorized Master Data work order**
+
+### Changed
+
+- Recorded the owner-locked Unit, Category, and SKU decisions in the active
+  Master Data contract index.
+- Activated the Master Data implementation work order with Brand, Vendor,
+  Pricing, Unit, Category, and SKU as the first isolated application scope.
+- Preserved Brand, Vendor, and Pricing contracts as authority for their own
+  product decisions when wording differs from the shared index.
+- Locked rebuild-only migration, Core audit, RBAC, lifecycle, deletion approval,
+  UI Engine reuse, and browser acceptance boundaries.
+
+### Verification
+
+- Contract and work-order review completed.
+- No database, legacy repository, or remote state changed.
+- Implementation begins in the next local revision.
+
 ## R3.03 — 2026-08-31 — docs(masterdata): record implementation readiness boundary
 
 Status: **navigator gate review — implementation blocked on missing domain decisions**

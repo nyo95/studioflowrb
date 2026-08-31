@@ -1,11 +1,13 @@
 # Master Data — Contract Index and Shared Rules
 
-Status: **PARTIALLY OWNER-APPROVED — not yet an executable work order**
+Status: **OWNER-APPROVED CONTRACT INDEX — executable work order activated by owner instruction 2026-08-31**
 
 Master Data is the first application built on the shared platform. This file is
 the active index for its approved domain slices and the cross-slice rules needed
-to keep those contracts consistent. It is not a substitute for the individual
-contracts and does not authorize implementation.
+to keep those contracts consistent. The individual Brand, Vendor, and Pricing
+contracts remain the product authority for those slices. The owner has now
+locked the Unit, Category, and SKU decisions recorded below and explicitly
+activated implementation.
 
 ## 1. Active owner-approved logic contracts
 
@@ -19,7 +21,48 @@ These three contracts were reviewed together. R1.06 permanently removed the old
 implementation and app data. Old names that remain in contract evidence ledgers
 refer only to the R1.05 Git snapshot and define what must not be reintroduced.
 
-## 2. Remaining Master Data scope
+## 2. Owner-locked Unit, Category, and SKU decisions
+
+### Unit
+
+- Unit is a dictionary table, never a plain string.
+- Unit supports CRUD plus archive/restore. Permanent deletion uses the shared
+  staff-request and explicit-approver workflow.
+- The implementation seeds the units required by BQ, material pricing, and work
+  pricing.
+- Existing records retain their selected Unit snapshot when a Unit is deleted;
+  new forms may select only live Units.
+
+### Category
+
+- Category has exactly two kinds: `PRODUCT` and `WORK`.
+- Missing Categories may be created through the shared CreatableSearch flow.
+- Category lifecycle is deactivate, merge, and permanent delete; it does not use
+  archive/restore.
+- Merge is allowed only within the same kind and requires a staff request plus
+  explicit approval. It transfers approved relations atomically before the
+  source Category is deactivated.
+- Staff may create, edit, merge, and deactivate Categories. Permanent deletion
+  requires the shared approval permission.
+
+### SKU
+
+- SKU has an optional single Brand (`0..1`), never a Brand junction table.
+- Live identity is `(brand_id, slug)`; Brand-less SKUs use the corresponding
+  partial unique rule for `brand_id IS NULL`.
+- `code` is retained and nullable.
+- Vendor is not stored on SKU; Vendor belongs on `PriceMaterial`.
+- SKU uses archive/restore and the shared permanent-deletion approval workflow.
+- Create requires name, Unit, Category, and at least one PriceMaterial.
+- Archiving a SKU archives its PriceMaterial rows. SkuCategory, Media, and Sample
+  relations remain independent.
+- All staff use one SKU management permission package.
+
+These decisions supersede any earlier deferred wording in this index. If a
+decision conflicts with Brand, Vendor, or Pricing, the owner-curated contract
+for that entity remains authoritative.
+
+## 3. Remaining Master Data scope
 
 Master Data also owns Category, SKU, Unit, media, physical Samples, import/export,
 and its public read contracts. No active schema or code exists for those slices;
@@ -134,12 +177,13 @@ but the active Prisma schema is platform-only and the R1.06 reset migration
 permanently drops all app schemas and app grants. New implementation starts from
 the isolated rebuild contract and schema, never by copying legacy code or data.
 
-No Master Data implementation work order may be issued until:
+The owner instruction on 2026-08-31 satisfies the previous implementation gate:
 
 - Foundation F0 remains green and UI-F1 is audited, corrected, and verified
   against the shared contracts and useful legacy StudioFlow interaction quality;
 - no Master Data route or app-private replacement for a missing UI Engine pattern
   is created before that UI-F1 gate;
-- the remaining consumer slice needed by that work order (especially SKU and
-  Category) has its required cardinalities and lifecycle locked;
-- the owner approves the exact migration/recovery plan and acceptance tests.
+- the remaining consumer slice needed by the work order (SKU, Category, and Unit)
+  now has its required cardinalities and lifecycle locked;
+- this revision activates the rebuild-only migration plan and acceptance tests
+  defined by the Master Data work order.
