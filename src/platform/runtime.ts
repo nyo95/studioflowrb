@@ -17,12 +17,16 @@ import type { Prisma } from "@/generated/prisma/client";
 export const runTransaction = <T>(work: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> =>
   runSerializableTransaction(prisma, work);
 
+export { prisma };
+
 const commonPorts = {
   runTransaction,
   auditWriter: createAuditEventWriter(),
   now: () => new Date(),
   generateId: randomUUID,
 };
+
+export const auditWriter = commonPorts.auditWriter;
 
 export const platformAccess = createPlatformAccessService({
   db: prisma,

@@ -5,9 +5,40 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.06**
-- Next local revision: **R3.07**
+- Current revision after this entry is committed: **R3.07**
+- Next local revision: **R3.08**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.07 — 2026-08-31 — feat(masterdata): add service boundary and landing route
+
+Status: **Master Data implementation — first vertical slice**
+
+### Changed
+
+- Added Master Data service composition for permission-checked summary and
+  directory reads across Units, Categories, Brands, and Vendors.
+- Added transactional audited create commands for Unit, Category, Brand, and
+  Vendor using shared normalization, slug, safe-error, transaction, and audit
+  infrastructure.
+- Added authenticated `/masterdata` landing route backed by live rebuild data.
+- Kept app code under `src/apps/masterdata` and domain-neutral concerns in Core,
+  Utilities, and UI Engine.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `npm run build`: passed; `/masterdata` is dynamic and routable.
+- `npm run check:boundaries`: passed.
+- `npm run check:legacy-runtime`: passed.
+- `npm test` with explicit rebuild database: **183 passed, 0 failed, 0
+  cancelled**.
+- No legacy repository or legacy PostgreSQL resource was accessed.
+
+### Remaining
+
+- Complete update, archive/restore, Category merge/deactivation, SKU create
+  invariant, pricing commands, deletion approval, cascade provenance, detailed
+  directories/forms, and browser acceptance in `R3.08+`.
 
 ## R3.06 — 2026-08-31 — feat(masterdata): activate permissions and seed vocabulary
 
