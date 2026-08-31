@@ -4,10 +4,30 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 ## Revision state
 
-- Published baseline: **R1** — `c8e473702801510aa314bbed45242a71b600f733` on `origin/main`
-- Current local revision after this entry is committed: **R1.06**
-- Next local revision: **R1.07**
-- Remote publication: **not authorized**
+- Published baseline after this release is pushed: **R2** — this release commit on `origin/main`
+- Current revision after this entry is committed: **R2**
+- Next local revision: **R2.01**
+- Remote publication: **authorized by the owner on 2026-08-31**
+
+## R2 — 2026-08-31 — release: publish foundation-only rebuild baseline
+
+Status: **owner-authorized GitHub publication**
+
+Publishes the complete locally reviewed `R1.01` through `R1.06` series as the
+new remote baseline. The release contains the locked Foundation contracts and
+implementation, the curated Brand, Vendor, and Pricing contracts, and the
+owner-authorized reset to a platform-only persisted/runtime baseline. Master
+Data remains deferred until the UI Engine audit/correction gate is completed;
+no application is currently registered or routable.
+
+### Verification
+
+- Release content is exactly the committed `R1.01`–`R1.06` history plus this
+  changelog-only promotion commit.
+- The checks and known database limitation for the published implementation are
+  recorded under `R1.06` below.
+- Reserved owner changes to `next-env.d.ts` and decimal/money utilities remain
+  unstaged and are not part of this release.
 
 ## R1.06 — 2026-08-31 — chore(reset): return repository to platform foundation
 
