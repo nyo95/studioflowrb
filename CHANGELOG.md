@@ -5,9 +5,38 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.01**
-- Next local revision: **R3.02**
+- Current revision after this entry is committed: **R3.05**
+- Next local revision: **R3.06**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.05 — 2026-08-31 — feat(masterdata): add curated isolated schema
+
+Status: **Master Data implementation — persisted foundation**
+
+### Changed
+
+- Added the isolated `master_data` Prisma schema for Unit, Category, Vendor,
+  VendorType, Brand, SKU, Brand/Vendor relations, and all three Pricing tables.
+- Added persisted archive-cause provenance and permanent-deletion request tables.
+- Added live partial identity indexes for Brand, Vendor, Category, SKU, and
+  Pricing, including the owner-locked nullable Brand SKU identity rules.
+- Added the rebuild-only schema migration and a follow-up FK correction so
+  removing a BrandLink sets `PriceMaterial.source_link_id` to null as required
+  by the curated Pricing contract.
+- No legacy data, schema, code, or database resource was accessed or copied.
+
+### Verification
+
+- `npx prisma format`: passed.
+- `npx prisma validate`: passed.
+- `npx prisma generate`: passed.
+- Explicit rebuild target `postgresql://masterdata:masterdata@localhost:5433/masterdata`:
+  migrations deployed successfully and status is up to date.
+
+### Remaining
+
+- Domain services, seeds, permissions, routes, UI, and behavior tests continue
+  in the next Master Data revisions.
 
 ## R3.04 — 2026-08-31 — docs(masterdata): activate curated implementation scope
 

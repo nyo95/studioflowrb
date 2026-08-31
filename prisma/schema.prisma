@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["platform"]
+  schemas  = ["platform", "master_data"]
 }
 
 // ============================================================================
@@ -197,4 +197,429 @@ model AuditEvent {
   @@index([actor_user_id, occurred_at])
   @@index([occurred_at])
   @@schema("platform")
+}
+
+// ============================================================================
+// MASTER DATA — curated first application scope
+// ============================================================================
+
+enum UnitStatus {
+  ACTIVE
+  ARCHIVED
+
+  @@schema("master_data")
+}
+
+enum CategoryKind {
+  PRODUCT
+  WORK
+
+  @@schema("master_data")
+}
+
+enum CategoryStatus {
+  ACTIVE
+  DEACTIVATED
+
+  @@schema("master_data")
+}
+
+enum ArchiveCauseKind {
+  DIRECT
+  PARENT
+
+  @@schema("master_data")
+}
+
+enum DeletionRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@schema("master_data")
+}
+
+enum CategoryOriginKind {
+  MANUAL
+  SKU_ENRICHMENT
+
+  @@schema("master_data")
+}
+
+model Unit {
+  id          String     @id @default(uuid())
+  code        String     @unique
+  name        String
+  status      UnitStatus @default(ACTIVE)
+  created_at  DateTime   @default(now())
+  updated_at  DateTime   @updatedAt
+  archived_at DateTime?
+
+  base_skus             Sku[]                @relation("SkuBaseUnit")
+  purchase_skus         Sku[]                @relation("SkuPurchaseUnit")
+  material_prices       PriceMaterial[]
+  material_labor_prices PriceMaterialLabor[]
+  labor_prices          PriceLabor[]
+
+  @@index([status])
+  @@schema("master_data")
+}
+
+model Category {
+  id             String         @id @default(uuid())
+  name           String
+  slug           String
+  kind           CategoryKind
+  status         CategoryStatus @default(ACTIVE)
+  deactivated_at DateTime?
+  merged_into_id String?
+  created_at     DateTime       @default(now())
+  updated_at     DateTime       @updatedAt
+
+  merged_into           Category?            @relation("CategoryMerge", fields: [merged_into_id], references: [id], onDelete: Restrict)
+  merged_from           Category[]           @relation("CategoryMerge")
+  brand_categories      BrandCategory[]
+  sku_categories        SkuCategory[]
+  material_labor_prices PriceMaterialLabor[]
+  labor_prices          PriceLabor[]
+
+  @@index([kind, status])
+  @@index([merged_into_id])
+  @@schema("master_data")
+}
+
+model VendorType {
+  id                  String    @id @default(uuid())
+  code                String    @unique
+  name                String
+  can_supply_material Boolean   @default(false)
+  can_supply_labor    Boolean   @default(false)
+  deleted_at          DateTime?
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  vendor_types VendorVendorType[]
+
+  @@index([deleted_at])
+  @@schema("master_data")
+}
+
+model Vendor {
+  id         String    @id @default(uuid())
+  name       String
+  slug       String
+  legal_name String?
+  address    String?
+  notes      String?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  types                 VendorVendorType[]
+  contacts              VendorContact[]
+  links                 VendorLink[]
+  owned_brands          Brand[]              @relation("BrandOwner")
+  brand_suppliers       BrandSupplier[]
+  material_prices       PriceMaterial[]
+  material_labor_prices PriceMaterialLabor[]
+  labor_prices          PriceLabor[]
+
+  @@index([deleted_at])
+  @@schema("master_data")
+}
+
+model VendorVendorType {
+  id             String     @id @default(uuid())
+  vendor_id      String
+  vendor_type_id String
+  assigned_at    DateTime   @default(now())
+  vendor         Vendor     @relation(fields: [vendor_id], references: [id], onDelete: Restrict)
+  vendor_type    VendorType @relation(fields: [vendor_type_id], references: [id], onDelete: Restrict)
+
+  @@unique([vendor_id, vendor_type_id])
+  @@index([vendor_type_id])
+  @@schema("master_data")
+}
+
+model VendorContact {
+  id         String   @id @default(uuid())
+  vendor_id  String
+  brand_id   String?
+  name       String
+  email      String?
+  phone      String?
+  position   String?
+  notes      String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  vendor     Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Restrict)
+  brand      Brand?   @relation(fields: [brand_id], references: [id], onDelete: Restrict)
+
+  @@index([vendor_id])
+  @@index([brand_id])
+  @@schema("master_data")
+}
+
+model VendorLink {
+  id         String   @id @default(uuid())
+  vendor_id  String
+  kind       String
+  url        String
+  label      String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  vendor     Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Restrict)
+
+  @@unique([vendor_id, url])
+  @@schema("master_data")
+}
+
+model Brand {
+  id              String    @id @default(uuid())
+  name            String
+  slug            String
+  owner_vendor_id String?
+  notes           String?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  deleted_at      DateTime?
+
+  owner_vendor Vendor?         @relation("BrandOwner", fields: [owner_vendor_id], references: [id], onDelete: Restrict)
+  contacts     VendorContact[]
+  suppliers    BrandSupplier[]
+  links        BrandLink[]
+  hashtags     BrandHashtag[]
+  categories   BrandCategory[]
+  skus         Sku[]
+
+  @@index([deleted_at])
+  @@index([owner_vendor_id])
+  @@schema("master_data")
+}
+
+model BrandSupplier {
+  id         String   @id @default(uuid())
+  brand_id   String
+  vendor_id  String
+  created_at DateTime @default(now())
+  brand      Brand    @relation(fields: [brand_id], references: [id], onDelete: Restrict)
+  vendor     Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Restrict)
+
+  @@unique([brand_id, vendor_id])
+  @@index([vendor_id])
+  @@schema("master_data")
+}
+
+model BrandLink {
+  id              String          @id @default(uuid())
+  brand_id        String
+  kind            String
+  url             String
+  label           String?
+  created_at      DateTime        @default(now())
+  updated_at      DateTime        @updatedAt
+  brand           Brand           @relation(fields: [brand_id], references: [id], onDelete: Restrict)
+  material_prices PriceMaterial[]
+
+  @@unique([brand_id, url])
+  @@schema("master_data")
+}
+
+model BrandHashtag {
+  id         String   @id @default(uuid())
+  brand_id   String
+  label      String
+  normalized String
+  created_at DateTime @default(now())
+  brand      Brand    @relation(fields: [brand_id], references: [id], onDelete: Restrict)
+
+  @@unique([brand_id, normalized])
+  @@index([normalized])
+  @@schema("master_data")
+}
+
+model BrandCategory {
+  id          String                @id @default(uuid())
+  brand_id    String
+  category_id String
+  created_at  DateTime              @default(now())
+  brand       Brand                 @relation(fields: [brand_id], references: [id], onDelete: Restrict)
+  category    Category              @relation(fields: [category_id], references: [id], onDelete: Restrict)
+  origins     BrandCategoryOrigin[]
+
+  @@unique([brand_id, category_id])
+  @@index([category_id])
+  @@schema("master_data")
+}
+
+model BrandCategoryOrigin {
+  id                String             @id @default(uuid())
+  brand_category_id String
+  kind              CategoryOriginKind
+  source_sku_id     String?
+  actor_user_id     String?
+  actor_label       String
+  created_at        DateTime           @default(now())
+  brand_category    BrandCategory      @relation(fields: [brand_category_id], references: [id], onDelete: Restrict)
+  source_sku        Sku?               @relation(fields: [source_sku_id], references: [id], onDelete: Restrict)
+
+  @@index([source_sku_id])
+  @@index([brand_category_id, kind])
+  @@schema("master_data")
+}
+
+model Sku {
+  id               String    @id @default(uuid())
+  brand_id         String?
+  code             String?
+  name             String
+  slug             String
+  base_unit_id     String
+  purchase_unit_id String?
+  notes            String?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+  deleted_at       DateTime?
+
+  brand            Brand?                @relation(fields: [brand_id], references: [id], onDelete: Restrict)
+  base_unit        Unit                  @relation("SkuBaseUnit", fields: [base_unit_id], references: [id], onDelete: Restrict)
+  purchase_unit    Unit?                 @relation("SkuPurchaseUnit", fields: [purchase_unit_id], references: [id], onDelete: Restrict)
+  categories       SkuCategory[]
+  material_prices  PriceMaterial[]
+  category_origins BrandCategoryOrigin[]
+
+  @@index([brand_id])
+  @@index([deleted_at])
+  @@index([code])
+  @@schema("master_data")
+}
+
+model SkuCategory {
+  id          String   @id @default(uuid())
+  sku_id      String
+  category_id String
+  created_at  DateTime @default(now())
+  sku         Sku      @relation(fields: [sku_id], references: [id], onDelete: Restrict)
+  category    Category @relation(fields: [category_id], references: [id], onDelete: Restrict)
+
+  @@unique([sku_id, category_id])
+  @@index([category_id])
+  @@schema("master_data")
+}
+
+model PriceMaterial {
+  id                 String    @id @default(uuid())
+  sku_id             String
+  supplier_vendor_id String
+  amount             Decimal   @db.Decimal(16, 2)
+  currency           String
+  unit_id            String
+  source_link_id     String?
+  notes              String?
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+  deleted_at         DateTime?
+  updated_by_user_id String?
+  updated_by_label   String
+
+  sku             Sku        @relation(fields: [sku_id], references: [id], onDelete: Restrict)
+  supplier_vendor Vendor     @relation(fields: [supplier_vendor_id], references: [id], onDelete: Restrict)
+  unit            Unit       @relation(fields: [unit_id], references: [id], onDelete: Restrict)
+  source_link     BrandLink? @relation(fields: [source_link_id], references: [id], onDelete: SetNull)
+
+  @@index([sku_id])
+  @@index([supplier_vendor_id])
+  @@index([deleted_at])
+  @@schema("master_data")
+}
+
+model PriceMaterialLabor {
+  id                 String    @id @default(uuid())
+  name               String
+  slug               String
+  category_id        String
+  vendor_id          String
+  unit_id            String
+  amount             Decimal   @db.Decimal(16, 2)
+  currency           String
+  scope_note         String?
+  spec               Json?
+  dim_display        String?
+  notes              String?
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+  deleted_at         DateTime?
+  updated_by_user_id String?
+  updated_by_label   String
+
+  category Category @relation(fields: [category_id], references: [id], onDelete: Restrict)
+  vendor   Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Restrict)
+  unit     Unit     @relation(fields: [unit_id], references: [id], onDelete: Restrict)
+
+  @@index([category_id])
+  @@index([vendor_id])
+  @@index([deleted_at])
+  @@schema("master_data")
+}
+
+model PriceLabor {
+  id                 String    @id @default(uuid())
+  name               String
+  slug               String
+  category_id        String
+  vendor_id          String
+  unit_id            String
+  amount             Decimal   @db.Decimal(16, 2)
+  currency           String
+  spec               Json?
+  dim_display        String?
+  notes              String?
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+  deleted_at         DateTime?
+  updated_by_user_id String?
+  updated_by_label   String
+
+  category Category @relation(fields: [category_id], references: [id], onDelete: Restrict)
+  vendor   Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Restrict)
+  unit     Unit     @relation(fields: [unit_id], references: [id], onDelete: Restrict)
+
+  @@index([category_id])
+  @@index([vendor_id])
+  @@index([deleted_at])
+  @@schema("master_data")
+}
+
+model ArchiveCause {
+  id          String           @id @default(uuid())
+  entity_type String
+  entity_id   String
+  kind        ArchiveCauseKind
+  parent_type String?
+  parent_id   String?
+  created_at  DateTime         @default(now())
+
+  @@unique([entity_type, entity_id, kind, parent_type, parent_id])
+  @@index([entity_type, entity_id])
+  @@index([parent_type, parent_id])
+  @@schema("master_data")
+}
+
+model DeletionRequest {
+  id                String                @id @default(uuid())
+  target_type       String
+  target_id         String
+  status            DeletionRequestStatus @default(PENDING)
+  requester_user_id String
+  requester_label   String
+  requested_at      DateTime              @default(now())
+  approver_user_id  String?
+  approver_label    String?
+  decided_at        DateTime?
+  reason            String?
+  notes             String?
+
+  @@index([target_type, target_id, status])
+  @@index([status])
+  @@schema("master_data")
 }
