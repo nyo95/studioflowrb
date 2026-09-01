@@ -5,9 +5,26 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.24**
-- Next local revision: **R3.25**
+- Current revision after this entry is committed: **R3.25**
+- Next local revision: **R3.26**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.25 — 2026-09-01 — feat(masterdata): add Pricing sorting and pagination
+
+- All three Pricing tables now use the shared accessible sortable table headers
+  and shared pagination controls, with a 25-row page size.
+- Sorting supports identity, Vendor/Supplier, and exact decimal price amount;
+  currency amounts are compared with the platform decimal comparator, never via
+  lossy JavaScript number conversion. Changing filters or sort resets to page 1.
+
+### Verification
+
+- `npm run typecheck`, `npm run lint`, `npm run check`, `npm run build`,
+  `npm test`, and `git diff --check`: passed; **197 passed, 0 failed, 0
+  cancelled** on the isolated test database.
+- Browser acceptance: the authenticated Pricing route renders the empty state
+  and create controls correctly. The local development dataset contains no
+  pricing rows, so row-sort interaction requires seeded non-production data.
 
 ## R3.24 — 2026-09-01 — feat(masterdata): add capability-safe Pricing vendor quick entry
 
