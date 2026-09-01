@@ -358,6 +358,12 @@ UI Engine may own:
 
 Use approved base primitives directly where sufficient. Do not create redundant wrappers without a real shared rule.
 
+Field descriptions are for short, essential guidance only. Longer contextual
+explanations, examples, and semantic distinctions use the shared `Tooltip`
+pattern beside the field label with a compact `(?)` affordance and an accessible
+label. Apps own the tooltip copy; the UI Engine owns the interaction, placement,
+focus behavior, and accessible relationship.
+
 Apps own:
 - validation schema;
 - domain field grouping;

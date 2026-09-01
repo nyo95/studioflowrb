@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.14**
-- Next local revision: **R4.15**
+- Current revision: **R4.15**
+- Next local revision: **R4.16**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## R4.14 — 2026-09-01 — fix(masterdata/pricing): streamline SKU creation and measurement context
@@ -32,6 +32,25 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ### Remaining
 
 - The untracked owner file `docs/apps/bq-contract.md` remains untouched.
+
+## R4.15 — 2026-09-01 — fix(masterdata/pricing): clarify field help and notes editing
+
+- Applied the shared UI Engine rule that longer field guidance uses a compact
+  tooltip affordance instead of persistent description text.
+- Updated pricing unit selectors to show canonical unit codes only, preserving
+  the semantic distinction in the field labels and tooltip help.
+- Replaced material-price Notes input with the shared small text editor used by
+  work pricing.
+- Documented SKU `code` as an optional external Brand/Vendor article identifier,
+  separate from PriceMaterial identity.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test`
+- `npm run build`
+- Browser verification of `/masterdata/pricing`
 
 ## R4.13 — 2026-09-01 — fix(masterdata/pricing): tighten SKU and directory invariants
 

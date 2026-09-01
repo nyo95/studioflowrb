@@ -52,7 +52,8 @@ refer only to the R1.05 Git snapshot and define what must not be reintroduced.
 - SKU has an optional single Brand (`0..1`), never a Brand junction table.
 - Live identity is `(brand_id, slug)`; Brand-less SKUs use the corresponding
   partial unique rule for `brand_id IS NULL`.
-- `code` is retained and nullable.
+- `code` is retained and nullable as an external SKU/article identifier supplied
+  by the Brand or Vendor; it is not the identity of a PriceMaterial row.
 - Vendor is not stored on SKU; Vendor belongs on `PriceMaterial`.
 - SKU uses archive/restore and the shared permanent-deletion approval workflow.
 - SKU creation is entered from Pricing → Material, not from the standalone SKU
