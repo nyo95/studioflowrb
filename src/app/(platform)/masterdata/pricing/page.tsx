@@ -122,7 +122,14 @@ export default async function PricingPage() {
         canManageBrands={canManageBrands}
         brands={materialRefs?.brands ?? []}
         productCategories={materialRefs?.productCategories ?? []}
-        skus={(materialRefs?.skus ?? []).map((sku) => ({ ...sku, brand: sku.brand ?? null }))}
+        skus={(materialRefs?.skus ?? []).map((sku) => ({
+          ...sku,
+          brand: sku.brand ?? null,
+          dimension_length: sku.dimension_length?.toString() ?? null,
+          dimension_width: sku.dimension_width?.toString() ?? null,
+          dimension_thickness: sku.dimension_thickness?.toString() ?? null,
+          purchase_to_base_factor: sku.purchase_to_base_factor?.toString() ?? null,
+        }))}
         vendors={materialRefs?.vendors ?? workRefs?.vendors ?? []}
         units={materialRefs?.units ?? workRefs?.units ?? []}
         workCategories={workRefs?.workCategories ?? []}

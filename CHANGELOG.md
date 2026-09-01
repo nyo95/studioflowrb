@@ -5,9 +5,33 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.13**
-- Next local revision: **R4.14**
+- Current revision: **R4.14**
+- Next local revision: **R4.15**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.14 — 2026-09-01 — fix(masterdata/pricing): streamline SKU creation and measurement context
+
+- Removed the redundant material-price mode toggle; one UI Engine
+  `CreatableSearch` now selects an existing SKU or starts the SKU + first-price
+  flow when no match exists.
+- Kept dimensions and BQ conversion visible for new SKU creation and added a
+  read-only measurement summary when pricing an existing SKU.
+- Replaced long conversion guidance with a tooltip and widened the dimension-unit
+  control so unit labels remain readable.
+- Extended pricing SKU reference loading with measurement and conversion fields,
+  normalizing database decimals at the page boundary.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test`
+- `npm run build`
+- Browser verification of `/masterdata/pricing`
+
+### Remaining
+
+- The untracked owner file `docs/apps/bq-contract.md` remains untouched.
 
 ## R4.13 — 2026-09-01 — fix(masterdata/pricing): tighten SKU and directory invariants
 

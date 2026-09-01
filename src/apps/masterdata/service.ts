@@ -1803,6 +1803,13 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
             name: true,
             code: true,
             brand: { select: { id: true, name: true } },
+            base_unit: { select: { id: true, code: true, name: true } },
+            purchase_unit: { select: { id: true, code: true, name: true } },
+            dimension_length: true,
+            dimension_width: true,
+            dimension_thickness: true,
+            dimension_unit: { select: { id: true, code: true, name: true } },
+            purchase_to_base_factor: true,
           },
         }),
         db.brand.findMany({
