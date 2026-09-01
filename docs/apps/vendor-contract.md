@@ -365,9 +365,13 @@ Quick entry validates:
 
 **Tabs (3):**
 
-1. **Overview** — Vendor info (name, legal name, address, notes), VendorType assignments (add/remove via searchable select from the controlled dictionary), Links (CRUD)
+1. **Profile & Types** — Vendor info (name, legal name, address, notes) and VendorType assignments (add/remove via searchable select from the controlled dictionary)
 2. **Contacts** — Contact list with CRUD. Brand-scoped contacts grouped under their brand. Primary contact indicator.
-3. **Brands** — BrandSupplier relations: which brands this vendor supplies, `is_authorized` toggle, notes. Also shows owned brands (via `Brand.owner_vendor_id`, read-only here).
+3. **Links** — Website, catalog, portfolio, and WhatsApp references with explicit type, URL, and optional display label fields.
+
+BrandSupplier relations are managed from the Brand workflow, not from Vendor
+create/edit. The Vendor form must not silently replace those relations when it
+saves profile, contact, or link changes.
 
 **No Prices tab** — prices are managed from the SKU/Work side, not from Vendor detail.
 

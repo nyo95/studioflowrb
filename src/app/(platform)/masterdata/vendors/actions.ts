@@ -35,7 +35,6 @@ const VendorInputSchema = z.object({
     url: z.string().url("Must be a valid URL"),
     label: z.string().optional().nullable(),
   })).optional(),
-  brandSuppliers: z.array(z.object({ brandId: z.string().uuid() })).optional(),
 });
 
 export async function createVendorAction(
@@ -60,7 +59,6 @@ export async function createVendorAction(
     }
 
     const vendorTypeIds = formData.getAll("vendorTypeIds").map(String).filter(Boolean);
-    const brandSupplierIds = formData.getAll("brandSupplierIds").map(String).filter(Boolean);
 
     const parsed = VendorInputSchema.safeParse({
       name: String(formData.get("name") ?? ""),
@@ -70,7 +68,6 @@ export async function createVendorAction(
       vendorTypeIds,
       contacts,
       links,
-      brandSuppliers: brandSupplierIds.map((brandId) => ({ brandId })),
     });
     if (!parsed.success) throw validationError(parsed.error);
 
@@ -91,7 +88,6 @@ export async function createVendorAction(
         brandId: c.brandId || undefined,
       })),
       links: (parsed.data.links ?? []).map((l) => ({ kind: l.kind, url: l.url, label: l.label ?? undefined })),
-      brandSuppliers: parsed.data.brandSuppliers,
     });
     revalidateVendors();
     return result;
@@ -120,7 +116,6 @@ export async function updateVendorAction(
     }
 
     const vendorTypeIds = formData.getAll("vendorTypeIds").map(String).filter(Boolean);
-    const brandSupplierIds = formData.getAll("brandSupplierIds").map(String).filter(Boolean);
 
     const parsed = VendorInputSchema.extend({ vendorId: z.string().uuid() }).safeParse({
       vendorId: String(formData.get("vendorId") ?? ""),
@@ -131,7 +126,6 @@ export async function updateVendorAction(
       vendorTypeIds,
       contacts,
       links,
-      brandSuppliers: brandSupplierIds.map((brandId) => ({ brandId })),
     });
     if (!parsed.success) throw validationError(parsed.error);
 
@@ -154,7 +148,6 @@ export async function updateVendorAction(
         brandId: c.brandId || undefined,
       })),
       links: (parsed.data.links ?? []).map((l) => ({ kind: l.kind, url: l.url, label: l.label ?? undefined })),
-      brandSuppliers: parsed.data.brandSuppliers,
     });
     revalidateVendors();
     return result;

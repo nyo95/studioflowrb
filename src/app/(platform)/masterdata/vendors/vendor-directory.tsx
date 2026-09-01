@@ -488,23 +488,11 @@ export function VendorDirectory({
                 ),
               },
               {
-                value: "brands",
-                label: "Brands & Links",
+                value: "resources",
+                label: "Links",
                 content: (
                   <div className="grid gap-4">
-                    <Field label="Supplied brands" description="Brands this vendor is authorized to supply.">
-                      <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto border border-line rounded p-2 bg-surface-muted/30">
-                        {brands.map((b) => (
-                          <label key={b.id} className="flex items-center gap-2 text-xs cursor-pointer select-none">
-                            <input type="checkbox" name="brandSupplierIds" value={b.id} />
-                            <span>{b.name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </Field>
-
-                    {/* Links */}
-                    <div className="grid gap-2 border-t border-line pt-3">
+                    <div className="grid gap-3">
                       <Text size="sm" weight="semibold">Website &amp; Catalogs</Text>
                       {linksList.map((link, idx) => (
                         <div key={idx} className="flex items-center justify-between text-xs bg-surface-muted p-2 rounded">
@@ -512,16 +500,18 @@ export function VendorDirectory({
                           <Button type="button" size="sm" variant="ghost" onClick={() => removeLinkDraft(idx)}>Remove</Button>
                         </div>
                       ))}
-                      <div className="flex gap-2 items-center">
-                        <Select value={newLinkKind} onChange={(e) => setNewLinkKind(e.target.value)} className="w-32">
+                      <div className="grid gap-3 rounded border border-line bg-surface-muted/30 p-3">
+                        <Field label="Link type">
+                          <Select value={newLinkKind} onChange={(e) => setNewLinkKind(e.target.value)}>
                           <option value="WEBSITE">Website</option>
                           <option value="CATALOG">Catalog</option>
                           <option value="PORTFOLIO">Portfolio</option>
                           <option value="WHATSAPP">WhatsApp</option>
-                        </Select>
-                        <Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://..." className="flex-1" />
-                        <Input value={newLinkLabel} onChange={(e) => setNewLinkLabel(e.target.value)} placeholder="Label (opt)" className="w-32" />
-                          <Button type="button" size="sm" variant="secondary" onClick={addLinkDraft}>Add</Button>
+                          </Select>
+                        </Field>
+                        <Field label="URL" required><Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://example.com/catalog" /></Field>
+                        <Field label="Display label"><Input value={newLinkLabel} onChange={(e) => setNewLinkLabel(e.target.value)} placeholder="Optional label, e.g. Product catalog 2026" /></Field>
+                        <Button type="button" size="sm" variant="secondary" className="justify-self-start" onClick={addLinkDraft}>Add link</Button>
                       </div>
                     </div>
                   </div>
@@ -549,7 +539,7 @@ export function VendorDirectory({
             if (!open) setEditTarget(null);
           }}
           title={`Edit vendor ${editTarget.name}`}
-          description="Update vendor profile, capability type assignments, contacts, and supplied brands."
+          description="Update the vendor profile, capability types, contacts, and reference links."
         >
           <form
             onSubmit={async (e) => {
@@ -687,26 +677,11 @@ export function VendorDirectory({
                   ),
                 },
                 {
-                  value: "brands",
-                  label: "Brands & Links",
+                  value: "resources",
+                  label: "Links",
                   content: (
                     <div className="grid gap-4">
-                      <Field label="Supplied brands">
-                        <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto border border-line rounded p-2 bg-surface-muted/30">
-                          {brands.map((b) => {
-                            const isChecked = false; // will be handled by form default
-                            return (
-                              <label key={b.id} className="flex items-center gap-2 text-xs cursor-pointer select-none">
-                                <input type="checkbox" name="brandSupplierIds" value={b.id} defaultChecked={isChecked} />
-                                <span>{b.name}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </Field>
-
-                      {/* Links */}
-                      <div className="grid gap-2 border-t border-line pt-3">
+                      <div className="grid gap-3">
                         <Text size="sm" weight="semibold">Website &amp; Catalogs</Text>
                         {linksList.map((link, idx) => (
                           <div key={idx} className="flex items-center justify-between text-xs bg-surface-muted p-2 rounded">
@@ -714,16 +689,18 @@ export function VendorDirectory({
                             <Button type="button" size="sm" variant="ghost" onClick={() => removeLinkDraft(idx)}>Remove</Button>
                           </div>
                         ))}
-                        <div className="flex gap-2 items-center">
-                          <Select value={newLinkKind} onChange={(e) => setNewLinkKind(e.target.value)} className="w-32">
+                        <div className="grid gap-3 rounded border border-line bg-surface-muted/30 p-3">
+                          <Field label="Link type">
+                            <Select value={newLinkKind} onChange={(e) => setNewLinkKind(e.target.value)}>
                             <option value="WEBSITE">Website</option>
                             <option value="CATALOG">Catalog</option>
                             <option value="PORTFOLIO">Portfolio</option>
                             <option value="WHATSAPP">WhatsApp</option>
-                          </Select>
-                          <Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://..." className="flex-1" />
-                          <Input value={newLinkLabel} onChange={(e) => setNewLinkLabel(e.target.value)} placeholder="Label (opt)" className="w-32" />
-                        <Button type="button" size="sm" variant="secondary" onClick={addLinkDraft}>Add</Button>
+                            </Select>
+                          </Field>
+                          <Field label="URL" required><Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://example.com/catalog" /></Field>
+                          <Field label="Display label"><Input value={newLinkLabel} onChange={(e) => setNewLinkLabel(e.target.value)} placeholder="Optional label, e.g. Product catalog 2026" /></Field>
+                          <Button type="button" size="sm" variant="secondary" className="justify-self-start" onClick={addLinkDraft}>Add link</Button>
                         </div>
                       </div>
                     </div>
