@@ -2,8 +2,8 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { Archive, Pencil, RotateCcw, Trash2 } from "lucide-react";
-import { Button, ConfirmDialog, DataTable, Dialog, EmptyState, Field, FormActions, Input, SearchField, SectionCard, Select, Spinner, StatusBadge, TableCell, TableCellContent, TableHead, TableHeader, TableRow, TableToolbar, Tabs } from "@/platform/ui_engine";
-import { archivePriceAction, requestPriceDeletionAction, restorePriceAction, savePriceAction } from "./actions";
+import { Button, ConfirmDialog, DataTable, Dialog, EmptyState, Field, FormActions, Input, SearchField, SectionCard, Select, Spinner, StatusBadge, TableCell, TableCellContent, TableHead, TableHeader, TableRow, TableToolbar, Tabs, useOptionOverlay } from "@/platform/ui_engine";
+import { archivePriceAction, createPricingVendorQuickAction, requestPriceDeletionAction, restorePriceAction, savePriceAction } from "./actions";
 
 type Kind = "material" | "material-labor" | "labor";
 type MaterialRow = { id: string; sku: { id: string; name: string; code: string | null }; supplier_vendor: { id: string; name: string }; amount: string; currency: string; unit: { id: string; code: string; name: string }; notes: string | null; deleted_at: Date | null };
@@ -12,7 +12,7 @@ type Target = { kind: Kind; id: string; name: string };
 type Editor = { kind: Kind; row?: MaterialRow | WorkRow };
 type Ref = { id: string; name: string };
 
-export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; skus: Array<{ id: string; name: string; code: string | null }>; vendors: Ref[]; units: Array<Ref & { code: string }>; workCategories: Ref[] }) {
+export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; canManageVendors: boolean; skus: Array<{ id: string; name: string; code: string | null }>; vendors: Ref[]; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
   const [query, setQuery] = useState(""); const [status, setStatus] = useState("ACTIVE"); const [editor, setEditor] = useState<Editor | null>(null); const [formError, setFormError] = useState<string | null>(null);
   const [archive, setArchive] = useState<Target | null>(null); const [restore, setRestore] = useState<Target | null>(null); const [deletion, setDeletion] = useState<Target | null>(null); const [reason, setReason] = useState(""); const [pendingId, setPendingId] = useState<string | null>(null); const [, startTransition] = useTransition();
   const matches = (text: string, archived: boolean) => (status === "ALL" || (status === "ARCHIVED") === archived) && text.toLowerCase().includes(query.toLowerCase());
@@ -36,11 +36,77 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
   </SectionCard>;
 }
 
-function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Editor; refs: { skus: Array<{ id: string; name: string; code: string | null }>; vendors: Ref[]; units: Array<Ref & { code: string }>; workCategories: Ref[] }; error: string | null; onCancel: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
-  const edit = Boolean(editor.row); const material = editor.kind === "material"; const row = editor.row; const materialRow = material && row ? row as MaterialRow : undefined; const workRow = !material && row ? row as WorkRow : undefined;
-  return <Dialog open onOpenChange={(open) => !open && onCancel()} title={`${edit ? "Edit" : "Create"} ${material ? "material price" : "price"}`} description={material && edit ? "SKU and supplier identity are read-only." : "Choose only active and eligible catalog references."}><form className="grid gap-4" onSubmit={onSubmit}>
-    {edit && <input type="hidden" name="id" value={row!.id} />}{error && <div role="alert" className="text-sm text-danger">{error}</div>}
-    {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name} readOnly /></Field><Field label="Supplier vendor"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Unit"><Input value={`${materialRow!.unit.name} (${materialRow!.unit.code})`} readOnly /></Field></> : <><Field label="SKU" required><Select name="skuId" required><option value="">Select SKU</option>{refs.skus.map((sku) => <option key={sku.id} value={sku.id}>{sku.name}{sku.code ? ` (${sku.code})` : ""}</option>)}</Select></Field><Field label="Supplier vendor" required><Select name="vendorId" required><option value="">Select vendor</option>{refs.vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}</Select></Field></>) : <><Field label="Name" required><Input name="name" defaultValue={workRow?.name} required /></Field><Field label="WORK category" required><Select name="categoryId" defaultValue={workRow?.category.id ?? ""} required><option value="">Select category</option>{refs.workCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></Field><Field label="Vendor" required><Select name="vendorId" defaultValue={workRow?.vendor.id ?? ""} required><option value="">Select vendor</option>{refs.vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}</Select></Field><Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note"><Input name="scopeNote" defaultValue={workRow?.scope_note ?? ""} /></Field>}</>}
-    <Field label="Amount" required><Input name="amount" defaultValue={row?.amount ?? ""} inputMode="decimal" required /></Field><Field label="Currency" required><Input name="currency" defaultValue={row?.currency ?? "IDR"} maxLength={3} required onInput={(event) => { event.currentTarget.value = event.currentTarget.value.toUpperCase(); }} /></Field><Field label="Notes"><Input name="notes" defaultValue={row?.notes ?? ""} /></Field><FormActions><Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button><Button type="submit" variant="primary">{edit ? "Save changes" : "Create price"}</Button></FormActions>
-  </form></Dialog>;
+type PriceEditorRefs = {
+  skus: Array<{ id: string; name: string; code: string | null }>;
+  vendors: Ref[];
+  units: Array<Ref & { code: string }>;
+  workCategories: Ref[];
+  vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }>;
+  canManageVendors: boolean;
+};
+
+function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Editor; refs: PriceEditorRefs; error: string | null; onCancel: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
+  const edit = Boolean(editor.row);
+  const material = editor.kind === "material";
+  const row = editor.row;
+  const materialRow = material && row ? row as MaterialRow : undefined;
+  const workRow = !material && row ? row as WorkRow : undefined;
+  const { options: vendorOptions, upsertOverlayOption } = useOptionOverlay(refs.vendors);
+  const [vendorId, setVendorId] = useState(materialRow?.supplier_vendor.id ?? workRow?.vendor.id ?? "");
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickName, setQuickName] = useState("");
+  const [quickVendorTypeId, setQuickVendorTypeId] = useState("");
+  const [quickError, setQuickError] = useState<string | null>(null);
+  const [quickPending, setQuickPending] = useState(false);
+  const needsMaterial = material;
+  const eligibleTypes = refs.vendorTypes.filter((type) => needsMaterial ? type.canSupplyMaterial : type.canSupplyLabor);
+
+  const addVendor = async () => {
+    setQuickError(null);
+    setQuickPending(true);
+    const data = new FormData();
+    data.set("name", quickName);
+    data.set("vendorTypeId", quickVendorTypeId);
+    const result = await createPricingVendorQuickAction(editor.kind, data);
+    setQuickPending(false);
+    if (!result.ok) {
+      setQuickError(result.error.safeMessage);
+      return;
+    }
+    const name = quickName.trim();
+    upsertOverlayOption({ id: result.data.vendorId, name });
+    setVendorId(result.data.vendorId);
+    setQuickName("");
+    setQuickVendorTypeId("");
+    setQuickOpen(false);
+  };
+
+  const vendorField = !edit && (
+    <Field label={material ? "Supplier vendor" : "Vendor"} required>
+      <div className="grid gap-2">
+        <Select name="vendorId" value={vendorId} onChange={(event) => setVendorId(event.target.value)} required>
+          <option value="">Select vendor</option>
+          {vendorOptions.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}
+        </Select>
+        {refs.canManageVendors && <Button type="button" size="sm" variant="secondary" className="justify-self-start" onClick={() => setQuickOpen(true)}>Add vendor</Button>}
+      </div>
+    </Field>
+  );
+
+  return <>
+    <Dialog open onOpenChange={(open) => !open && onCancel()} title={`${edit ? "Edit" : "Create"} ${material ? "material price" : "price"}`} description={material && edit ? "SKU and supplier identity are read-only." : "Choose only active and eligible catalog references."}><form className="grid gap-4" onSubmit={onSubmit}>
+      {edit && <input type="hidden" name="id" value={row!.id} />}{error && <div role="alert" className="text-sm text-danger">{error}</div>}
+      {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name} readOnly /></Field><Field label="Supplier vendor"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Unit"><Input value={`${materialRow!.unit.name} (${materialRow!.unit.code})`} readOnly /></Field></> : <><Field label="SKU" required><Select name="skuId" required><option value="">Select SKU</option>{refs.skus.map((sku) => <option key={sku.id} value={sku.id}>{sku.name}{sku.code ? ` (${sku.code})` : ""}</option>)}</Select></Field>{vendorField}</>) : <><Field label="Name" required><Input name="name" defaultValue={workRow?.name} required /></Field><Field label="WORK category" required><Select name="categoryId" defaultValue={workRow?.category.id ?? ""} required><option value="">Select category</option>{refs.workCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></Field>{vendorField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note"><Input name="scopeNote" defaultValue={workRow?.scope_note ?? ""} /></Field>}</>}
+      <Field label="Amount" required><Input name="amount" defaultValue={row?.amount ?? ""} inputMode="decimal" required /></Field><Field label="Currency" required><Input name="currency" defaultValue={row?.currency ?? "IDR"} maxLength={3} required onInput={(event) => { event.currentTarget.value = event.currentTarget.value.toUpperCase(); }} /></Field><Field label="Notes"><Input name="notes" defaultValue={row?.notes ?? ""} /></Field><FormActions><Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button><Button type="submit" variant="primary">{edit ? "Save changes" : "Create price"}</Button></FormActions>
+    </form></Dialog>
+    {quickOpen && <Dialog open onOpenChange={(open) => !open && setQuickOpen(false)} title="Add vendor" description={`Create a vendor for this ${needsMaterial ? "material" : "labor"} price using one eligible VendorType.`}>
+      <div className="grid gap-4">
+        {quickError && <div role="alert" className="text-sm text-danger">{quickError}</div>}
+        <Field label="Vendor name" required><Input value={quickName} onChange={(event) => setQuickName(event.target.value)} required autoFocus /></Field>
+        <Field label="VendorType" required><Select value={quickVendorTypeId} onChange={(event) => setQuickVendorTypeId(event.target.value)} required><option value="">Select eligible VendorType</option>{eligibleTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}</Select></Field>
+        {eligibleTypes.length === 0 && <div role="alert" className="text-sm text-danger">No active VendorType has the required capability. Configure it in Master Data settings first.</div>}
+        <FormActions><Button type="button" variant="ghost" onClick={() => setQuickOpen(false)}>Cancel</Button><Button type="button" variant="primary" disabled={quickPending || !quickName.trim() || !quickVendorTypeId || eligibleTypes.length === 0} onClick={() => void addVendor()}>{quickPending ? "Adding..." : "Add vendor"}</Button></FormActions>
+      </div>
+    </Dialog>}
+  </>;
 }

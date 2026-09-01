@@ -364,6 +364,36 @@ describe("Master Data service", () => {
     assert.equal(workPrices.some((w) => w.id === laborPrice.priceLaborId && w.kind === "labor"), true);
   });
 
+  it("creates Pricing quick-entry vendors only with an active matching capability", async () => {
+    const supplier = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    const serviceType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SERVICE" } });
+
+    const materialVendor = await service.createPricingVendorQuick({
+      grants: GRANTS,
+      actor: ACTOR,
+      name: "Quick Material Vendor",
+      vendorTypeId: supplier.id,
+      capability: "MATERIAL",
+    });
+    const assignment = await testDb.prisma.vendorVendorType.findFirstOrThrow({
+      where: { vendor_id: materialVendor.vendorId },
+    });
+    assert.equal(assignment.vendor_type_id, supplier.id);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "vendor.created", entity_id: materialVendor.vendorId } }), 1);
+
+    await assert.rejects(
+      service.createPricingVendorQuick({
+        grants: GRANTS,
+        actor: ACTOR,
+        name: "Wrong Capability Vendor",
+        vendorTypeId: serviceType.id,
+        capability: "MATERIAL",
+      }),
+      (error: unknown) => error instanceof AppError && error.code === "VENDOR_TYPE_CAPABILITY_REQUIRED",
+    );
+    assert.equal(await testDb.prisma.vendor.count({ where: { name: "Wrong Capability Vendor" } }), 0);
+  });
+
   it("executes approved permanent deletion atomically and preserves the final audit event", async () => {
     const created = await service.createUnit({ grants: GRANTS, actor: ACTOR, code: "TEST_BOX", name: "Test Box" });
     await service.archiveUnit({ grants: GRANTS, actor: ACTOR, unitId: created.unitId });

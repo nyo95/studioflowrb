@@ -5,9 +5,29 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.23**
-- Next local revision: **R3.24**
+- Current revision after this entry is committed: **R3.24**
+- Next local revision: **R3.25**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.24 — 2026-09-01 — feat(masterdata): add capability-safe Pricing vendor quick entry
+
+- Pricing create dialogs now offer **Add vendor** for holders of
+  `masterdata.vendor.manage`. The option is available without granting
+  dictionary-management permission.
+- The server creates the Vendor and its single active VendorType assignment in
+  one audited transaction. Material pricing requires material-supply capability;
+  Material + Labor and Labor Only require labor-provision capability. A stale,
+  archived, or mismatched VendorType is rejected at the server boundary.
+- The newly created Vendor is selected in the open Pricing dialog immediately,
+  so the user can finish the price without navigating away.
+
+### Verification
+
+- `npm run typecheck`, `npm run lint`, `npm run check`, `npm run build`,
+  `git diff --check`, and `npm test`: passed; **197 passed, 0 failed, 0
+  cancelled** against the isolated `studioflowrb_test` database.
+- Browser acceptance: Pricing loaded for the authenticated owner; **New material
+  price** and its **Add vendor** action were visible.
 
 ## R3.23 — 2026-09-01 — fix(masterdata): validate VendorType assignments
 

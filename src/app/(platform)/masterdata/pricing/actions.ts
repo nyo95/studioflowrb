@@ -25,6 +25,27 @@ const priceForm = z.object({
   id: z.string().uuid().optional(), name: z.string().min(1).max(128).optional(), skuId: z.string().uuid().optional(), vendorId: z.string().uuid().optional(), categoryId: z.string().uuid().optional(), unitId: z.string().uuid().optional(), amount: z.string().min(1), currency: z.string().length(3), scopeNote: z.string().max(1000).optional(), notes: z.string().max(1000).optional(),
 });
 
+const pricingVendorQuickForm = z.object({
+  name: z.string().min(1).max(128),
+  vendorTypeId: z.string().uuid(),
+});
+
+export async function createPricingVendorQuickAction(kind: PriceKind, formData: FormData): Promise<ActionResult<{ vendorId: string }>> {
+  return runSafeAction(async () => {
+    const parsed = pricingVendorQuickForm.safeParse(Object.fromEntries(formData));
+    if (!parsed.success) throw validationError(parsed.error);
+    const ctx = await context();
+    const result = await masterDataService.createPricingVendorQuick({
+      ...ctx,
+      name: parsed.data.name,
+      vendorTypeId: parsed.data.vendorTypeId,
+      capability: kind === "material" ? "MATERIAL" : "LABOR",
+    });
+    refreshPricing();
+    return result;
+  });
+}
+
 export async function savePriceAction(kind: PriceKind, formData: FormData): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const raw = Object.fromEntries(formData);

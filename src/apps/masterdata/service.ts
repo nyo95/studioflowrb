@@ -827,6 +827,20 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       });
     },
 
+    async listVendorTypesForAssignment(input: { grants: PermissionGrants }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
+      return db.vendorType.findMany({
+        where: { deleted_at: null },
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          can_supply_material: true,
+          can_supply_labor: true,
+        },
+      });
+    },
+
     async getVendorType(input: { grants: PermissionGrants; vendorTypeId: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryRead);
       return db.vendorType.findUniqueOrThrow({
@@ -1758,6 +1772,59 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           metadata: { slug },
         });
         return { vendorId };
+      });
+    },
+
+    async createPricingVendorQuick(input: {
+      grants: PermissionGrants;
+      actor: AuditActor;
+      name: string;
+      vendorTypeId: string;
+      capability: "MATERIAL" | "LABOR";
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
+      actorIsUsable(input.actor);
+      const name = requiredName(input.name, "VENDOR_NAME_REQUIRED");
+      const slug = requiredSlug(name);
+
+      return runTransaction(async (tx) => {
+        const vendorType = await tx.vendorType.findUnique({ where: { id: input.vendorTypeId } });
+        if (!vendorType || vendorType.deleted_at !== null) {
+          throw new AppError("VALIDATION", "VENDOR_TYPE_INVALID", "Choose an active VendorType.");
+        }
+        const capable = input.capability === "MATERIAL"
+          ? vendorType.can_supply_material
+          : vendorType.can_supply_labor;
+        if (!capable) {
+          throw new AppError(
+            "VALIDATION",
+            "VENDOR_TYPE_CAPABILITY_REQUIRED",
+            input.capability === "MATERIAL"
+              ? "Choose a VendorType that can supply material."
+              : "Choose a VendorType that can provide labor.",
+          );
+        }
+
+        let vendor;
+        try {
+          vendor = await tx.vendor.create({
+            data: { id: randomUUID(), name, slug, legal_name: null, address: null, notes: null },
+          });
+          await tx.vendorVendorType.create({
+            data: { id: randomUUID(), vendor_id: vendor.id, vendor_type_id: vendorType.id },
+          });
+        } catch (error) {
+          mapWriteError(error);
+        }
+
+        await writeAudit(tx, {
+          action: "vendor.created",
+          entityType: "vendor",
+          entityId: vendor!.id,
+          actor: input.actor,
+          metadata: { slug, quick_entry: "pricing", vendor_type_id: vendorType.id, capability: input.capability },
+        });
+        return { vendorId: vendor!.id };
       });
     },
 

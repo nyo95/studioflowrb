@@ -70,6 +70,7 @@ export default async function PricingPage() {
 
   const canReadMaterial = hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialRead);
   const canReadWork = hasPermission(grants, MASTERDATA_PERMISSIONS.priceWorkRead);
+  const canManageVendors = hasPermission(grants, MASTERDATA_PERMISSIONS.vendorManage);
 
   if (!canReadMaterial && !canReadWork) {
     return (
@@ -82,7 +83,7 @@ export default async function PricingPage() {
     );
   }
 
-  const [rawMaterial, rawML, rawLabor, skus, vendors, units, categories] = await Promise.all([
+  const [rawMaterial, rawML, rawLabor, skus, vendors, units, categories, vendorTypes] = await Promise.all([
     canReadMaterial ? masterDataService.listPriceMaterials({ grants, includeArchived: true }) : [],
     canReadWork ? masterDataService.listPriceMaterialLabors({ grants, includeArchived: true }) : [],
     canReadWork ? masterDataService.listPriceLabors({ grants, includeArchived: true }) : [],
@@ -90,6 +91,7 @@ export default async function PricingPage() {
     masterDataService.listVendors({ grants }),
     masterDataService.listUnits({ grants }),
     masterDataService.listCategories({ grants }),
+    canManageVendors ? masterDataService.listVendorTypesForAssignment({ grants }) : [],
   ]);
 
   const materialPrices = rawMaterial.map(mapMaterialPrice);
@@ -114,10 +116,12 @@ export default async function PricingPage() {
         canManageWork={canManageWork}
         canReadMaterial={canReadMaterial}
         canReadWork={canReadWork}
+        canManageVendors={canManageVendors}
         skus={skus.map((sku) => ({ id: sku.id, name: sku.name, code: sku.code }))}
         vendors={vendors.filter((vendor) => !vendor.deleted_at).map((vendor) => ({ id: vendor.id, name: vendor.name }))}
         units={units.filter((unit) => unit.status === "ACTIVE").map((unit) => ({ id: unit.id, code: unit.code, name: unit.name }))}
         workCategories={categories.filter((category) => category.status === "ACTIVE" && category.kind === "WORK").map((category) => ({ id: category.id, name: category.name }))}
+        vendorTypes={vendorTypes.map((vendorType) => ({ id: vendorType.id, name: vendorType.name, canSupplyMaterial: vendorType.can_supply_material, canSupplyLabor: vendorType.can_supply_labor }))}
       />
     </div>
   );
