@@ -94,6 +94,23 @@ Status: **local**
 - `npm run lint`: passed.
 - `git diff --check`: passed.
 
+## R3.14 — 2026-09-01 — feat(masterdata): group governed dictionaries
+
+Status: **local**
+
+### Changed
+
+- Added `Settings > General > Master Data Settings` with Units, Categories,
+  Vendor Types, and permission-gated deletion review tabs.
+- Added VendorType create/edit capability controls plus archive, restore, and
+  permanent-deletion-request UI backed by the existing audited service.
+- Added revalidation of the Settings shell after dictionary and deletion
+  mutations, and linked it from General Settings.
+
+### Verification
+
+- `npm run typecheck`, `npm run lint`, and `npm run build`: passed.
+
 ### Remaining
 
 - Complete Pricing create/edit UI and the deletion-approval directory.

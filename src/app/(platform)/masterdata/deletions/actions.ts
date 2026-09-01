@@ -10,6 +10,7 @@ import { masterDataService } from "@/apps/masterdata/runtime"
 
 function revalidateDeletions(): void {
   revalidatePath("/masterdata/deletions")
+  revalidatePath("/settings/general/masterdata")
   // also refresh related masterdata routes that may have been altered by a purge
   revalidatePath("/masterdata")
   revalidatePath("/masterdata/brands")

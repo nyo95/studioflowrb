@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
-import { ErrorState, PageHeader, PageShell, SectionCard } from "@/platform/ui_engine";
+import Link from "next/link";
+import { ErrorState, PageHeader, PageShell, SectionCard, Notice } from "@/platform/ui_engine";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
 import { toSafeErrorPayload, type SafeErrorPayload } from "@platform/core/errors";
@@ -41,6 +42,7 @@ export default async function GeneralSettingsPage() {
         title="General Settings"
         description="Shared display defaults for every application."
       />
+      {hasPermission(grants, "masterdata.dictionary.read") ? <Notice title="Master Data Settings">Manage Units, Categories, Vendor Types, and protected deletion review in <Link className="underline" href="/settings/general/masterdata">Master Data Settings</Link>.</Notice> : null}
       {failure ? (
         <SectionCard>
           <ErrorState title="Unable to load settings" description={failure.safeMessage} />

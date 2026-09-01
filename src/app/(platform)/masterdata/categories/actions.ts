@@ -10,6 +10,7 @@ import { masterDataService } from "@/apps/masterdata/runtime";
 
 function revalidateCategories(): void {
   revalidatePath("/masterdata/categories");
+  revalidatePath("/settings/general/masterdata");
   revalidatePath("/masterdata");
 }
 
