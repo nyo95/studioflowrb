@@ -5,9 +5,30 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.18**
-- Next local revision: **R4.19**
+- Current revision: **R4.19**
+- Next local revision: **R4.20**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.19 — 2026-09-02 — fix(masterdata): centralize price formatting
+
+- Replaced raw currency and decimal rendering in Pricing tables with the
+  shared `@platform/utilities/money` formatter.
+- Replaced the SKU directory's `Number(...).toLocaleString()` shortcut so
+  displayed prices preserve the canonical decimal/money boundary.
+- Clarified the Pricing contract: all price columns use the shared money
+  formatter, while `DataTable` remains a generic presentation component.
+
+### Verification
+
+- `git diff --check`
+- `npm test`
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+
+### Remaining
+
+- No known regression or business-logic defect introduced by this change.
 
 ## R4.18 — 2026-09-02 — fix(masterdata): close SKU flow and transport debt
 

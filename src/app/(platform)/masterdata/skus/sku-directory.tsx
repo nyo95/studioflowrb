@@ -28,6 +28,7 @@ import {
   Text,
   Textarea,
 } from "@/platform/ui_engine";
+import { createMoney, formatMoney } from "@platform/utilities/money";
 import {
   archiveSkuAction,
   requestSkuDeletionAction,
@@ -208,7 +209,7 @@ export function SkuDirectory({
                   <TableCell>
                     {primaryPrice ? (
                       <div className="text-xs">
-                        <span className="font-semibold">{primaryPrice.currency} {Number(primaryPrice.amount).toLocaleString()}</span>
+                        <span className="font-semibold">{formatMoney(createMoney(String(primaryPrice.amount), primaryPrice.currency))}</span>
                         <span className="text-ink-secondary"> / {primaryPrice.unit.code}</span>
                         <div className="text-ink-tertiary truncate max-w-[140px]">{primaryPrice.supplier_vendor.name}</div>
                       </div>

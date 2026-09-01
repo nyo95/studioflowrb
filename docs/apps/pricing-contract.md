@@ -401,7 +401,7 @@ Three tabs under Pricing section: **Material Prices**, **Material + Labor**, **L
 | SKU | SKU name + code/slug |
 | Brand | SKU's brand name |
 | Vendor | Supplier vendor name |
-| Price | Formatted amount + currency |
+| Price | Formatted amount + currency, rendered through the shared `@platform/utilities/money` formatter |
 | Unit | Unit label |
 | Status | Active / Archived |
 
@@ -412,7 +412,7 @@ Three tabs under Pricing section: **Material Prices**, **Material + Labor**, **L
 | Name | Price name |
 | Category | WORK category name |
 | Vendor | Vendor name |
-| Price | Formatted amount + currency |
+| Price | Formatted amount + currency, rendered through the shared `@platform/utilities/money` formatter |
 | Unit | Unit label |
 | Scope | scope_note preview (if set) |
 | Status | Active / Archived |
@@ -424,7 +424,7 @@ Three tabs under Pricing section: **Material Prices**, **Material + Labor**, **L
 | Name | Price name |
 | Category | WORK category name |
 | Vendor | Vendor name |
-| Price | Formatted amount + currency |
+| Price | Formatted amount + currency, rendered through the shared `@platform/utilities/money` formatter |
 | Unit | Unit label |
 | Status | Active / Archived |
 
