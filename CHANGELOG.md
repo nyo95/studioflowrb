@@ -4,10 +4,23 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 ## Revision state
 
-- Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.30**
-- Next local revision: **R3.31**
+- Published baseline after this release is pushed: **R4** — publication commit follows this entry
+- Current revision after this entry is committed: **R4**
+- Next local revision: **R4.01**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4 — 2026-09-01 — release: publish Master Data checkpoint
+
+- Published the owner-authorized local Master Data revisions through R3.30 to
+  the `main` branch.
+
+### Release boundary
+
+- This is a verified implementation checkpoint, not a claim that all future
+  Master Data scope is production-complete. Media, Samples, import/export, and
+  BQ snapshot persistence remain explicitly deferred by the active contract.
+- The Master Data closure work order also still requires its complete browser
+  acceptance matrix to be recorded before a 100% production-readiness claim.
 
 ## R3.30 — 2026-09-01 — feat(ui-engine): add simple text editor
 
