@@ -490,7 +490,7 @@ export function BrandDirectory({
             if (!open) setDeleteTarget(null);
           }}
           title={`Submit brand "${deleteTarget.name}" for deletion`}
-          description="Archived brands with zero active supplier relations can be permanently purged after supervisor approval."
+          description="Archived brands can be permanently purged only after approval by a user with the deletion approval permission and after their explicit relation guards pass."
         >
           <div className="grid gap-4">
             <Field label="Reason for deletion">

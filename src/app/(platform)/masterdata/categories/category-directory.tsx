@@ -369,7 +369,7 @@ export function CategoryDirectory({
             if (!open) setDeleteTarget(null);
           }}
           title={`Submit category "${deleteTarget.name}" for deletion`}
-          description="Deactivated categories with zero remaining dependencies can be permanently purged after supervisor approval."
+          description="Deactivated categories with zero remaining dependencies can be permanently purged after approval by a user with the deletion approval permission."
         >
           <div className="grid gap-4">
             <Field label="Reason for deletion">

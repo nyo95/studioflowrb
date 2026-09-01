@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.11**
-- Next local revision: **R3.12**
+- Current revision after this entry is committed: **R3.12**
+- Next local revision: **R3.13**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## R3.10 — 2026-09-01 — chore(masterdata): checkpoint in-progress implementation
@@ -74,6 +74,24 @@ Status: **local**
   `masterdata_test` was used.
 - `npm test`: **196 passed, 0 failed, 0 cancelled**.
 - `npm run check`: passed (`typecheck`, boundaries, and legacy-runtime guard).
+- `git diff --check`: passed.
+
+## R3.13 — 2026-09-01 — fix(masterdata): clarify lifecycle feedback
+
+Status: **local**
+
+### Changed
+
+- Corrected the revision ledger after `R3.12` publication.
+- Unit create and edit now close their successful dialogs and leave a visible
+  success notice in the directory.
+- Replaced inaccurate role-based “supervisor” copy with the actual deletion
+  approval permission wording across Unit, Category, and Brand workflows.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
 - `git diff --check`: passed.
 
 ### Remaining

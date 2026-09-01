@@ -13,6 +13,7 @@ import {
   FormActions,
   InlineError,
   Input,
+  Notice,
   SearchField,
   SectionCard,
   Spinner,
@@ -76,6 +77,7 @@ export function UnitDirectory({
   const [createPending, setCreatePending] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editPending, setEditPending] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const filtered = units.filter((u) => {
     if (!query) return true;
@@ -96,6 +98,7 @@ export function UnitDirectory({
 
   return (
     <SectionCard>
+      {successMessage ? <Notice tone="success" title="Saved">{successMessage}</Notice> : null}
       <TableToolbar>
         <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search units by code or name..." />
         <div className="ml-auto">
@@ -187,6 +190,7 @@ export function UnitDirectory({
               const res = await createUnitAction(null, fd);
               if (res && "ok" in res && res.ok) {
                 setCreateOpen(false);
+                setSuccessMessage("Measurement unit created.");
               } else if (res && "ok" in res && !res.ok) {
                 setCreateError(res.error.safeMessage);
               }
@@ -232,8 +236,9 @@ export function UnitDirectory({
               const fd = new FormData(e.currentTarget);
               try {
                 const res = await updateUnitAction(null, fd);
-                if (res && "ok" in res && res.ok) {
-                  setEditTarget(null);
+              if (res && "ok" in res && res.ok) {
+                setEditTarget(null);
+                setSuccessMessage("Measurement unit updated.");
                 } else if (res && "ok" in res && !res.ok) {
                   setEditError(res.error.safeMessage);
                 }
@@ -308,7 +313,7 @@ export function UnitDirectory({
             if (!open) setDeleteTarget(null);
           }}
           title={`Submit unit ${displayUnitCode(deleteTarget.code)} for deletion`}
-          description="Archived units with zero dependencies can be permanently purged after approval by a user with deletion permission."
+          description="Archived units with zero dependencies can be permanently purged after approval by a user with the deletion approval permission."
         >
           <div className="grid gap-4">
             <Field label="Reason for deletion">
