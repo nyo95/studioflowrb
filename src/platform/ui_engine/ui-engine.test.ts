@@ -98,6 +98,16 @@ describe("UI Engine foundation", () => {
     assert.match(overlays, /drawer/);
   });
 
+  it("keeps compound button children on one line", () => {
+    const button = renderToStaticMarkup(createElement(
+      ui.Button,
+      null,
+      createElement("svg", { "aria-hidden": true }),
+      createElement("span", null, "New record"),
+    ));
+    assert.match(button, /inline-flex items-center gap-\[7px\] whitespace-nowrap/);
+  });
+
   it("connects field labels, descriptions, and errors to their control", () => {
     const field = renderToStaticMarkup(
       createElement(

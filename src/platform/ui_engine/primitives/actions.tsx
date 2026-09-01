@@ -47,7 +47,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       {...props}
     >
       {pending ? <LoaderCircle className="animate-ui-spin" aria-hidden="true" /> : leadingIcon}
-      <span>{children}</span>
+      <span className="inline-flex items-center gap-[7px] whitespace-nowrap">{children}</span>
       {!pending && trailingIcon}
     </button>
   );

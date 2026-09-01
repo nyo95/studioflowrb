@@ -9,6 +9,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Next local revision: **R4.07**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
+## R4.08 — 2026-09-01 — fix(ui-engine): stabilize compound button content
+
+- Updated the shared `Button` content wrapper to use an inline flex row with
+  a no-wrap contract, so child icon and label content remains horizontal in
+  every consuming directory.
+- Added a UI Engine regression test for compound button children.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `node --test --import tsx src/platform/ui_engine/ui-engine.test.ts`
+- Browser acceptance: Vendor create actions render the icon and label
+  horizontally in the toolbar and empty state after the dev server reload;
+  the shared fix also covers Brand, Category, SKU, and Unit consumers.
+
 ## R4.07 — 2026-09-01 — fix(masterdata): use shared brand action contract
 
 - Passed the Brand directory create icon through the shared Button
