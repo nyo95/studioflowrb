@@ -7,6 +7,7 @@ import {
   Badge,
   Button,
   ConfirmDialog,
+  CreatableSearch,
   DataTable,
   Dialog,
   EmptyState,
@@ -27,9 +28,11 @@ import {
   TableToolbar,
   Text,
   Textarea,
+  useOptionOverlay,
 } from "@/platform/ui_engine";
 import {
   archiveBrandAction,
+  createOwnerVendorQuickAction,
   createBrandAction,
   requestBrandDeletionAction,
   restoreBrandAction,
@@ -60,15 +63,19 @@ export function BrandDirectory({
   productCategories,
   materialVendors,
   canManage,
+  canManageVendors,
 }: {
   brands: BrandRow[];
   productCategories: Option[];
   materialVendors: Option[];
   canManage: boolean;
+  canManageVendors: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<BrandRow | null>(null);
+  const [createOwnerVendorId, setCreateOwnerVendorId] = useState("");
+  const [editOwnerVendorId, setEditOwnerVendorId] = useState("");
   const [confirmArchive, setConfirmArchive] = useState<BrandRow | null>(null);
   const [confirmRestore, setConfirmRestore] = useState<BrandRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BrandRow | null>(null);
@@ -86,6 +93,7 @@ export function BrandDirectory({
   const [createPending, setCreatePending] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editPending, setEditPending] = useState(false);
+  const { options: ownerVendors, upsertOverlayOption } = useOptionOverlay(materialVendors);
 
   const filtered = brands.filter((b) => {
     if (!query) return true;
@@ -113,6 +121,7 @@ export function BrandDirectory({
     setLinksList([]);
     setNewLinkUrl("");
     setNewLinkLabel("");
+    setCreateOwnerVendorId("");
     setCreateOpen(true);
   };
 
@@ -120,6 +129,7 @@ export function BrandDirectory({
     setLinksList(brand.links.map((l) => ({ kind: l.kind, url: l.url, label: l.label ?? "" })));
     setNewLinkUrl("");
     setNewLinkLabel("");
+    setEditOwnerVendorId(brand.owner_vendor?.id ?? "");
     setEditTarget(brand);
   };
 
@@ -132,6 +142,18 @@ export function BrandDirectory({
 
   const removeLink = (index: number) => {
     setLinksList(linksList.filter((_, i) => i !== index));
+  };
+
+  const createOwnerVendor = async (name: string, setError: (error: string | null) => void) => {
+    setError(null);
+    const result = await createOwnerVendorQuickAction(name);
+    if (!result.ok) {
+      setError(result.error.safeMessage);
+      return;
+    }
+    const option = { id: result.data.vendorId, name: name.trim() };
+    upsertOverlayOption(option);
+    return option.id;
   };
 
   return (
@@ -286,15 +308,19 @@ export function BrandDirectory({
           <Field label="Brand name" required>
             <Input name="name" required maxLength={64} placeholder="e.g. TACO, Blum, Hafele" autoFocus />
           </Field>
+          <input type="hidden" name="ownerVendorId" value={createOwnerVendorId} />
           <Field label="Owner vendor" description="Optional registered manufacturer/brand owner vendor.">
-            <Select name="ownerVendorId">
-              <option value="">No dedicated owner vendor</option>
-              {materialVendors.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
-              ))}
-            </Select>
+            <CreatableSearch
+              label="Owner vendor"
+              options={ownerVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
+              value={createOwnerVendorId}
+              onValueChange={setCreateOwnerVendorId}
+              allowClear
+              clearLabel="No dedicated owner vendor"
+              placeholder="Select an owner vendor"
+              onCreate={canManageVendors ? (name) => createOwnerVendor(name, setCreateError) : undefined}
+              createLabel={(name) => `Create owner vendor “${name}”`}
+            />
           </Field>
           <Field label="Hashtags" description="Space or comma-separated tags for operator discovery (e.g. #laminate #finish).">
             <Input name="hashtags" placeholder="#hpl #veneer #premium" />
@@ -381,15 +407,19 @@ export function BrandDirectory({
             <Field label="Brand name" required>
               <Input name="name" defaultValue={editTarget.name} required maxLength={64} autoFocus />
             </Field>
+            <input type="hidden" name="ownerVendorId" value={editOwnerVendorId} />
             <Field label="Owner vendor">
-              <Select name="ownerVendorId" defaultValue={editTarget.owner_vendor?.id ?? ""}>
-                <option value="">No dedicated owner vendor</option>
-                {materialVendors.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name}
-                  </option>
-                ))}
-              </Select>
+              <CreatableSearch
+                label="Owner vendor"
+                options={ownerVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
+                value={editOwnerVendorId}
+                onValueChange={setEditOwnerVendorId}
+                allowClear
+                clearLabel="No dedicated owner vendor"
+                placeholder="Select an owner vendor"
+                onCreate={canManageVendors ? (name) => createOwnerVendor(name, setEditError) : undefined}
+                createLabel={(name) => `Create owner vendor “${name}”`}
+              />
             </Field>
             <Field label="Hashtags" description="Space or comma-separated tags.">
               <Input name="hashtags" defaultValue={editTarget.hashtags.map((h) => `#${h.label}`).join(" ")} />

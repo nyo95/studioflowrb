@@ -24,6 +24,23 @@ const BrandInputSchema = z.object({
   suppliers: z.array(z.object({ vendorId: z.string().uuid() })).optional(),
 });
 
+export async function createOwnerVendorQuickAction(name: string): Promise<ActionResult<{ vendorId: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = z.string().min(1, "Vendor name is required").max(64, "Vendor name is too long").safeParse(name);
+    if (!parsed.success) throw validationError(parsed.error);
+
+    const result = await masterDataService.createVendor({
+      grants,
+      actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
+      name: parsed.data,
+    });
+    revalidateBrands();
+    revalidatePath("/masterdata/vendors");
+    return result;
+  });
+}
+
 export async function createBrandAction(
   _prev: ActionResult<{ brandId?: string }> | null,
   formData: FormData,

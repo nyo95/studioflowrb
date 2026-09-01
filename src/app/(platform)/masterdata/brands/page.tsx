@@ -33,6 +33,7 @@ export default async function BrandsPage() {
   ]);
 
   const canManage = hasPermission(grants, MASTERDATA_PERMISSIONS.brandManage);
+  const canManageVendors = hasPermission(grants, MASTERDATA_PERMISSIONS.vendorManage);
 
   return (
     <div className="grid gap-6">
@@ -46,6 +47,7 @@ export default async function BrandsPage() {
         productCategories={productCategories.map((c) => ({ id: c.id, name: c.name }))}
         materialVendors={materialVendors.map((v) => ({ id: v.id, name: v.name }))}
         canManage={canManage}
+        canManageVendors={canManageVendors}
       />
     </div>
   );

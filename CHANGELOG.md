@@ -5,9 +5,34 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.19**
-- Next local revision: **R3.20**
+- Current revision after this entry is committed: **R3.20**
+- Next local revision: **R3.21**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.20 — 2026-09-01 — feat(masterdata): add owner-vendor quick entry
+
+Status: **local Master Data continuation**
+
+### Changed
+
+- Activated asynchronous creation in the reusable UI Engine searchable picker;
+  the generic component remains domain-neutral and receives only the resulting
+  option identity.
+- Brand create and edit dialogs now use that picker for the optional owner
+  Vendor. A holder of `masterdata.vendor.manage` can create an owner-only
+  Vendor inline; no VendorType is assigned, so it remains ineligible for price
+  supply until classified through the Vendor directory.
+- The server action authenticates, validates the name, delegates permission and
+  transactional audit behavior to the Master Data Vendor service, and refreshes
+  Brand and Vendor views.
+
+### Verification
+
+- `npm run typecheck`, `npm run lint`, `npm run check`, `npm run build`, and
+  `git diff --check`: passed.
+- `npm test`: **196 passed, 0 failed, 0 cancelled** against the verified,
+  isolated `studioflowrb_test` database.
+- Browser acceptance remains to be completed for this new picker flow.
 
 ## R3.19 — 2026-09-01 — docs(verification): record isolated test execution
 

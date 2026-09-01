@@ -27,7 +27,7 @@ export type CreatableSearchProps = {
   groups?: readonly CreatableSearchGroup[];
   value?: string;
   onValueChange: (value: string) => void;
-  onCreate?: (label: string) => string | void;
+  onCreate?: (label: string) => string | void | Promise<string | void>;
   query?: string;
   onQueryChange?: (query: string) => void;
   label: string;
@@ -100,8 +100,8 @@ export function CreatableSearch({
     updateQuery("");
   };
 
-  const createOption = (text: string) => {
-    const createdValue = onCreate?.(text);
+  const createOption = async (text: string) => {
+    const createdValue = await onCreate?.(text);
     onValueChange(typeof createdValue === "string" ? createdValue : text);
     setOpen(false);
     updateQuery("");
