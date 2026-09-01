@@ -83,7 +83,7 @@ describe("Master Data service", () => {
       actor: ACTOR,
       name: "HPL Panel",
       baseUnitId: context.unit.id,
-      categoryIds: [context.categoryId],
+      categoryId: context.categoryId,
       priceMaterials: [{ supplierVendorId: context.vendorId, amount: "123456789012.34", currency: "idr" }],
     });
 
@@ -105,7 +105,7 @@ describe("Master Data service", () => {
       actor: ACTOR,
       code: "KPF 2005",
       baseUnitId: context.unit.id,
-      categoryIds: [context.categoryId],
+      categoryId: context.categoryId,
       priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }],
     });
 
@@ -118,7 +118,7 @@ describe("Master Data service", () => {
         grants: GRANTS,
         actor: ACTOR,
         baseUnitId: context.unit.id,
-        categoryIds: [context.categoryId],
+        categoryId: context.categoryId,
         priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }],
       }),
       (error: unknown) => error instanceof AppError && error.code === "SKU_IDENTITY_REQUIRED",
@@ -142,7 +142,7 @@ describe("Master Data service", () => {
       dimensionWidth: "2400",
       dimensionThickness: "0.8",
       dimensionUnitId: dimensionUnit.id,
-      categoryIds: [context.categoryId],
+      categoryId: context.categoryId,
       priceMaterials: [{ supplierVendorId: context.vendorId, amount: "288000", currency: "IDR" }],
     });
 
@@ -163,7 +163,7 @@ describe("Master Data service", () => {
       name: "HPL 1200 x 2400 Updated",
       baseUnitId: baseUnit.id,
       purchaseUnitId: purchaseUnit.id,
-      categoryIds: [context.categoryId],
+        categoryId: context.categoryId,
     });
     const preserved = await testDb.prisma.sku.findUniqueOrThrow({ where: { id: result.skuId } });
     assert.equal(preserved.dimension_length?.toString(), "1200");
@@ -183,7 +183,7 @@ describe("Master Data service", () => {
       name: "Invalid measured SKU",
       baseUnitId: baseUnit.id,
       purchaseUnitId: purchaseUnit.id,
-      categoryIds: [context.categoryId],
+      categoryId: context.categoryId,
       priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }],
     };
     await assert.rejects(
@@ -196,24 +196,20 @@ describe("Master Data service", () => {
     );
   });
 
-  it("rejects incomplete, duplicate, and invalid-price SKU input before persistence", async () => {
+  it("rejects incomplete and invalid-price SKU input before persistence", async () => {
     const context = await createMaterialContext();
     const base = {
       grants: GRANTS,
       actor: ACTOR,
       name: "Invalid SKU",
       baseUnitId: context.unit.id,
-      categoryIds: [context.categoryId],
+      categoryId: context.categoryId,
       priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }],
     };
 
     await assert.rejects(
-      () => service.createSku({ ...base, categoryIds: [] }),
+      () => service.createSku({ ...base, categoryId: "" }),
       (error: unknown) => error instanceof AppError && error.code === "SKU_CATEGORY_REQUIRED",
-    );
-    await assert.rejects(
-      () => service.createSku({ ...base, categoryIds: [context.categoryId, context.categoryId] }),
-      (error: unknown) => error instanceof AppError && error.code === "SKU_CATEGORY_DUPLICATE",
     );
     await assert.rejects(
       () => service.createSku({ ...base, priceMaterials: [{ ...base.priceMaterials[0], amount: "NaN" }] }),
@@ -230,12 +226,12 @@ describe("Master Data service", () => {
       actor: ACTOR,
       name: "Category guard SKU",
       baseUnitId: context.unit.id,
-      categoryIds: [context.categoryId],
+      categoryId: context.categoryId,
       priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }],
     };
 
     await assert.rejects(
-      () => service.createSku({ ...base, categoryIds: [workCategory.categoryId] }),
+      () => service.createSku({ ...base, categoryId: workCategory.categoryId }),
       (error: unknown) => error instanceof AppError && error.code === "SKU_CATEGORY_KIND_INVALID",
     );
 
@@ -247,7 +243,7 @@ describe("Master Data service", () => {
         skuId,
         name: "Category guard SKU",
         baseUnitId: context.unit.id,
-        categoryIds: [workCategory.categoryId],
+        categoryId: workCategory.categoryId,
       }),
       (error: unknown) => error instanceof AppError && error.code === "SKU_CATEGORY_KIND_INVALID",
     );
@@ -260,7 +256,7 @@ describe("Master Data service", () => {
       actor: ACTOR,
       name: "Cause-safe SKU",
       baseUnitId: context.unit.id,
-      categoryIds: [context.categoryId],
+      categoryId: context.categoryId,
       priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1000", currency: "IDR" }],
     });
     const price = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: skuId } });
@@ -306,7 +302,7 @@ describe("Master Data service", () => {
       actor: ACTOR,
       name: "Unit-bound SKU",
       baseUnitId: context.unit.id,
-      categoryIds: [context.categoryId],
+      categoryId: context.categoryId,
       priceMaterials: [{ supplierVendorId: context.vendorId, amount: "250", currency: "IDR" }],
     });
     await service.archiveSku({ grants: GRANTS, actor: ACTOR, skuId });
@@ -371,7 +367,7 @@ describe("Master Data service", () => {
       actor: ACTOR,
       name: "Guarded SKU",
       baseUnitId: context.unit.id,
-      categoryIds: [context.categoryId],
+      categoryId: context.categoryId,
       priceMaterials: [{ supplierVendorId: context.vendorId, amount: "5000", currency: "IDR" }],
     });
 
@@ -425,7 +421,7 @@ describe("Master Data service", () => {
       name: "TACO Natural Veneer",
       brandId: brand.brandId,
       baseUnitId: unit.id,
-      categoryIds: [catEnrich.categoryId],
+      categoryId: catEnrich.categoryId,
       priceMaterials: [{ supplierVendorId: supplier.vendorId, amount: "450000", currency: "IDR" }],
     });
 
@@ -466,7 +462,7 @@ describe("Master Data service", () => {
       actor: ACTOR,
       name: "Granite Tile 60x60",
       baseUnitId: unit.id,
-      categoryIds: [prodCat.categoryId],
+      categoryId: prodCat.categoryId,
       priceMaterials: [{ supplierVendorId: vendor.vendorId, amount: "185000", currency: "IDR" }],
     });
 

@@ -5,9 +5,34 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.16**
-- Next local revision: **R4.17**
+- Current revision: **R4.17**
+- Next local revision: **R4.18**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.17 — 2026-09-02 — fix(masterdata): enforce single SKU product category
+
+- Fixed the Server-to-Client boundary on the SKU directory by converting all
+  Prisma Decimal fields to strings before rendering the Client Component.
+- Updated SKU create and edit flows to use one searchable product category
+  instead of a growing checkbox list.
+- Renamed the SKU mutation boundary to `categoryId` and kept the PRODUCT-kind
+  validation and Brand category enrichment transactional.
+- Added a database unique constraint on `SkuCategory.sku_id` so the single
+  category rule cannot be bypassed by another write path.
+- Preserved the junction storage boundary to avoid destructive relation changes
+  and protect existing category/enrichment behavior.
+
+### Verification
+
+- `npx prisma migrate deploy` against disposable `masterdata_test` only
+- `npm run typecheck`
+- `npm run lint`
+- `npm test` — 207 passed, 0 failed
+- `npm run build`
+
+### Remaining
+
+- No known regression or unresolved backend logic issue in this scope.
 
 ## R4.16 — 2026-09-02 — fix(masterdata): allow code-only SKU identity
 

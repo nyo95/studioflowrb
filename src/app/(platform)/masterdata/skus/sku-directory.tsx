@@ -328,15 +328,11 @@ export function SkuDirectory({
             </Field>
           </div>
 
-          <Field label="Product categories" required description="At least one category is required.">
-            <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto border border-line rounded p-2 bg-surface-muted/30">
-              {productCategories.map((c) => (
-                <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer select-none">
-                  <input type="checkbox" name="categoryIds" value={c.id} />
-                  <span>{c.name}</span>
-                </label>
-              ))}
-            </div>
+          <Field label="Product category" required>
+            <Select name="categoryId" required>
+              <option value="">Select product category...</option>
+              {productCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
           </Field>
 
           {/* Initial Material Price Box */}
@@ -476,18 +472,11 @@ export function SkuDirectory({
               </Text>
             </SectionCard>
 
-            <Field label="Product categories" required description="At least one category is required.">
-              <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto border border-line rounded p-2 bg-surface-muted/30">
-                {productCategories.map((c) => {
-                  const isChecked = editTarget.categories.some((sc) => sc.category.id === c.id);
-                  return (
-                    <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer select-none">
-                      <input type="checkbox" name="categoryIds" value={c.id} defaultChecked={isChecked} />
-                      <span>{c.name}</span>
-                    </label>
-                  );
-                })}
-              </div>
+            <Field label="Product category" required>
+              <Select name="categoryId" defaultValue={editTarget.categories[0]?.category.id ?? ""} required>
+                <option value="">Select product category...</option>
+                {productCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </Select>
             </Field>
 
             <Field label="Notes">

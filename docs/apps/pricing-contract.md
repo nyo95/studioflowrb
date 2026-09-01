@@ -35,6 +35,10 @@ SKU code and SKU name are separate fields. Each is optional individually, but
 at least one must be supplied. Code-only products are valid; the UI displays
 the code as the fallback label and the service derives the slug from it.
 
+Each SKU has exactly one active PRODUCT category. Pricing and SKU CRUD use a
+single searchable/creatable category field; multiple categories are not valid
+for a SKU.
+
 ### 2.1 Identity
 
 One price per **SKU × Vendor** pair. No separate `code` field — the pair itself is the identity.

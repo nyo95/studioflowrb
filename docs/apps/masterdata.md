@@ -58,9 +58,9 @@ refer only to the R1.05 Git snapshot and define what must not be reintroduced.
 - SKU uses archive/restore and the shared permanent-deletion approval workflow.
 - SKU creation is entered from Pricing → Material, not from the standalone SKU
   directory. The flow atomically creates the SKU and its first `PriceMaterial`.
-- Create requires at least one of `code` or `name`, plus Unit, Category, and at
-  least one `PriceMaterial`; a live SKU must retain at least one live
-  `PriceMaterial`.
+- Create requires at least one of `code` or `name`, exactly one active PRODUCT
+  `categoryId`, Unit, and at least one `PriceMaterial`; a live SKU must retain
+  at least one live `PriceMaterial`.
 - `code` and `name` are stored separately and may both be present. When only
   `code` exists, it is the display fallback and the slug source; when only
   `name` exists, the name remains the slug source.
@@ -77,8 +77,11 @@ refer only to the R1.05 Git snapshot and define what must not be reintroduced.
   `purchase_to_base_factor` server-side with exact decimal arithmetic. The
   approved area rule is `length × width`, converted to square metres; thickness
   is descriptive and does not contribute to area.
-- Archiving a SKU archives its PriceMaterial rows. SkuCategory, Media, and Sample
-  relations remain independent.
+- Each SKU has exactly one active PRODUCT category. The junction table remains
+  the storage boundary for compatibility, but its database uniqueness constraint
+  prevents a SKU from receiving a second category. Archiving a SKU archives its
+  PriceMaterial rows; the category relation, Media, and Sample relations remain
+  independent.
 - All staff use one SKU management permission package.
 
 These decisions supersede any earlier deferred wording in this index. If a

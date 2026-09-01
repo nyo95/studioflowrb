@@ -63,7 +63,7 @@ export async function createPricingBrandQuickAction(name: string): Promise<Actio
 export async function createMaterialSkuAction(formData: FormData): Promise<ActionResult<{ skuId: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
-    const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
+    const categoryId = String(formData.get("categoryId") ?? "");
     const schema = z.object({
       name: z.string().max(128).optional().nullable().or(z.literal("")),
       code: z.string().max(32).optional().nullable().or(z.literal("")),
@@ -74,7 +74,7 @@ export async function createMaterialSkuAction(formData: FormData): Promise<Actio
       dimensionWidth: z.string().max(32).optional().nullable().or(z.literal("")),
       dimensionThickness: z.string().max(32).optional().nullable().or(z.literal("")),
       dimensionUnitId: z.string().uuid().optional().nullable().or(z.literal("")),
-      categoryIds: z.array(z.string().uuid()).min(1),
+      categoryId: z.string().uuid("Product category is required"),
       supplierVendorId: z.string().uuid(),
       amount: z.string().min(1),
       currency: z.string().length(3),
@@ -90,7 +90,7 @@ export async function createMaterialSkuAction(formData: FormData): Promise<Actio
       dimensionWidth: formData.get("dimensionWidth") ? String(formData.get("dimensionWidth")) : null,
       dimensionThickness: formData.get("dimensionThickness") ? String(formData.get("dimensionThickness")) : null,
       dimensionUnitId: formData.get("dimensionUnitId") ? String(formData.get("dimensionUnitId")) : null,
-      categoryIds,
+      categoryId,
       supplierVendorId: String(formData.get("supplierVendorId") ?? ""),
       amount: String(formData.get("amount") ?? ""),
       currency: String(formData.get("currency") ?? "IDR").toUpperCase(),
@@ -109,7 +109,7 @@ export async function createMaterialSkuAction(formData: FormData): Promise<Actio
       dimensionWidth: parsed.data.dimensionWidth || undefined,
       dimensionThickness: parsed.data.dimensionThickness || undefined,
       dimensionUnitId: parsed.data.dimensionUnitId || undefined,
-      categoryIds: parsed.data.categoryIds,
+      categoryId: parsed.data.categoryId,
       priceMaterials: [{ supplierVendorId: parsed.data.supplierVendorId, amount: parsed.data.amount, currency: parsed.data.currency, notes: parsed.data.notes || undefined }],
       notes: parsed.data.notes || undefined,
     });

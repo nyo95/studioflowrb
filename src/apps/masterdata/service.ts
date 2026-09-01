@@ -2484,7 +2484,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       dimensionWidth?: string;
       dimensionThickness?: string;
       dimensionUnitId?: string;
-      categoryIds: string[];
+      categoryId: string;
       priceMaterials: Array<{
         supplierVendorId: string;
         amount: string;
@@ -2495,15 +2495,13 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuManage);
       actorIsUsable(input.actor);
       const identity = resolveSkuIdentity(input.name, input.code);
-      if (!input.categoryIds || input.categoryIds.length === 0) {
+      if (!input.categoryId) {
         throw new AppError("VALIDATION", "SKU_CATEGORY_REQUIRED", "At least one category is required.");
       }
       if (!input.priceMaterials || input.priceMaterials.length === 0) {
         throw new AppError("VALIDATION", "SKU_PRICE_REQUIRED", "At least one material price is required.");
       }
-      if (new Set(input.categoryIds).size !== input.categoryIds.length) {
-        throw new AppError("VALIDATION", "SKU_CATEGORY_DUPLICATE", "Categories must not contain duplicates.");
-      }
+      const categoryIds = [input.categoryId];
       const supplierIds = input.priceMaterials.map((price) => price.supplierVendorId);
       if (new Set(supplierIds).size !== supplierIds.length) {
         throw new AppError("VALIDATION", "SKU_PRICE_VENDOR_DUPLICATE", "Only one initial price is allowed per Vendor.");
@@ -2524,10 +2522,10 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         const measurement = await resolveSkuMeasurement(tx, input, baseUnit, purchaseUnit);
 
         const categories = await tx.category.findMany({
-          where: { id: { in: input.categoryIds } },
+          where: { id: { in: categoryIds } },
           select: { id: true, kind: true, status: true },
         });
-        if (categories.length !== input.categoryIds.length) {
+        if (categories.length !== categoryIds.length) {
           throw new AppError("VALIDATION", "SKU_CATEGORY_NOT_FOUND", "One or more categories not found.");
         }
         for (const cat of categories) {
@@ -2578,7 +2576,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         const skuId = sku!.id;
 
         await tx.skuCategory.createMany({
-          data: input.categoryIds.map((categoryId) => ({ id: randomUUID(), sku_id: skuId, category_id: categoryId })),
+          data: categoryIds.map((categoryId) => ({ id: randomUUID(), sku_id: skuId, category_id: categoryId })),
         });
 
         // Brand Category SKU enrichment
@@ -2628,7 +2626,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           metadata: {
             slug: identity.slug,
             brand_id: input.brandId ?? null,
-            categories: input.categoryIds.length,
+            categories: categoryIds.length,
             prices: input.priceMaterials.length,
             purchase_to_base_factor: measurement.purchase_to_base_factor,
           },
@@ -2651,14 +2649,15 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       dimensionWidth?: string | null;
       dimensionThickness?: string | null;
       dimensionUnitId?: string | null;
-      categoryIds: string[];
+      categoryId: string;
     }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuManage);
       actorIsUsable(input.actor);
       const identity = resolveSkuIdentity(input.name, input.code);
-      if (!input.categoryIds || input.categoryIds.length === 0) {
+      if (!input.categoryId) {
         throw new AppError("VALIDATION", "SKU_CATEGORY_REQUIRED", "At least one category is required.");
       }
+      const categoryIds = [input.categoryId];
 
       return runTransaction(async (tx) => {
         const existing = await tx.sku.findUniqueOrThrow({
@@ -2695,10 +2694,10 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         }
 
         const categories = await tx.category.findMany({
-          where: { id: { in: input.categoryIds } },
+          where: { id: { in: categoryIds } },
           select: { id: true, kind: true, status: true },
         });
-        if (categories.length !== input.categoryIds.length) {
+        if (categories.length !== categoryIds.length) {
           throw new AppError("VALIDATION", "SKU_CATEGORY_NOT_FOUND", "One or more categories not found.");
         }
         for (const cat of categories) {
@@ -2778,7 +2777,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         // Update SkuCategories
         await tx.skuCategory.deleteMany({ where: { sku_id: input.skuId } });
         await tx.skuCategory.createMany({
-          data: input.categoryIds.map((categoryId) => ({ id: randomUUID(), sku_id: input.skuId, category_id: categoryId })),
+          data: categoryIds.map((categoryId) => ({ id: randomUUID(), sku_id: input.skuId, category_id: categoryId })),
         });
 
         // Clean and update Brand Category SKU enrichment

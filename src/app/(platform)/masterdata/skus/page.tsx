@@ -41,7 +41,17 @@ export default async function SkusPage() {
         description="Catalog items, article codes, brand classifications, base/purchase units, and supplier pricing."
       />
       <SkuDirectory
-        skus={skus}
+        skus={skus.map((sku) => ({
+          ...sku,
+          dimension_length: sku.dimension_length?.toString() ?? null,
+          dimension_width: sku.dimension_width?.toString() ?? null,
+          dimension_thickness: sku.dimension_thickness?.toString() ?? null,
+          purchase_to_base_factor: sku.purchase_to_base_factor?.toString() ?? null,
+          material_prices: sku.material_prices.map((price) => ({
+            ...price,
+            amount: price.amount.toString(),
+          })),
+        }))}
         brands={refs.brands}
         units={refs.units}
         productCategories={refs.productCategories}

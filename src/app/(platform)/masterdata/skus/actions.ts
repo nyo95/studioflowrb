@@ -31,7 +31,7 @@ export async function createSkuAction(
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
 
-    const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
+    const categoryId = String(formData.get("categoryId") ?? "");
     const supplierVendorId = String(formData.get("supplierVendorId") ?? "");
     const amount = String(formData.get("amount") ?? "");
     const currency = String(formData.get("currency") ?? "IDR").toUpperCase();
@@ -46,7 +46,7 @@ export async function createSkuAction(
       dimensionWidth: z.string().max(32).optional().nullable().or(z.literal("")),
       dimensionThickness: z.string().max(32).optional().nullable().or(z.literal("")),
       dimensionUnitId: z.string().uuid().optional().nullable().or(z.literal("")),
-      categoryIds: z.array(z.string().uuid()).min(1, "At least one category is required"),
+      categoryId: z.string().uuid("Product category is required"),
       supplierVendorId: z.string().uuid("Supplier vendor is required"),
       amount: z.string().min(1, "Amount is required"),
       currency: z.string().length(3, "3-letter currency code"),
@@ -63,7 +63,7 @@ export async function createSkuAction(
       dimensionWidth: formData.get("dimensionWidth") ? String(formData.get("dimensionWidth")) : null,
       dimensionThickness: formData.get("dimensionThickness") ? String(formData.get("dimensionThickness")) : null,
       dimensionUnitId: formData.get("dimensionUnitId") ? String(formData.get("dimensionUnitId")) : null,
-      categoryIds,
+      categoryId,
       supplierVendorId,
       amount,
       currency,
@@ -83,7 +83,7 @@ export async function createSkuAction(
       dimensionWidth: parsed.data.dimensionWidth || undefined,
       dimensionThickness: parsed.data.dimensionThickness || undefined,
       dimensionUnitId: parsed.data.dimensionUnitId || undefined,
-      categoryIds: parsed.data.categoryIds,
+      categoryId: parsed.data.categoryId,
       priceMaterials: [
         {
           supplierVendorId: parsed.data.supplierVendorId,
@@ -105,7 +105,7 @@ export async function updateSkuAction(
 ): Promise<ActionResult<{ skuId: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
-    const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
+    const categoryId = String(formData.get("categoryId") ?? "");
 
     const schema = z.object({
       skuId: z.string().uuid(),
@@ -118,7 +118,7 @@ export async function updateSkuAction(
       dimensionWidth: z.string().max(32).optional().nullable().or(z.literal("")),
       dimensionThickness: z.string().max(32).optional().nullable().or(z.literal("")),
       dimensionUnitId: z.string().uuid().optional().nullable().or(z.literal("")),
-      categoryIds: z.array(z.string().uuid()).min(1, "At least one category is required"),
+      categoryId: z.string().uuid("Product category is required"),
       notes: z.string().max(1000).optional().nullable().or(z.literal("")),
     }).refine((value) => Boolean(value.name?.trim() || value.code?.trim()), { message: "SKU code or SKU name is required.", path: ["name"] });
 
@@ -133,7 +133,7 @@ export async function updateSkuAction(
       dimensionWidth: formData.get("dimensionWidth") ? String(formData.get("dimensionWidth")) : null,
       dimensionThickness: formData.get("dimensionThickness") ? String(formData.get("dimensionThickness")) : null,
       dimensionUnitId: formData.get("dimensionUnitId") ? String(formData.get("dimensionUnitId")) : null,
-      categoryIds,
+      categoryId,
       notes: formData.get("notes") ? String(formData.get("notes")) : null,
     });
     if (!parsed.success) throw validationError(parsed.error);
@@ -151,7 +151,7 @@ export async function updateSkuAction(
       dimensionWidth: parsed.data.dimensionWidth,
       dimensionThickness: parsed.data.dimensionThickness,
       dimensionUnitId: parsed.data.dimensionUnitId,
-      categoryIds: parsed.data.categoryIds,
+      categoryId: parsed.data.categoryId,
       notes: parsed.data.notes,
     });
     revalidateSkus();

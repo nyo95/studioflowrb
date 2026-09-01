@@ -116,7 +116,7 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
   const [skuId, setSkuId] = useState(materialRow?.sku.id ?? "");
   const [skuName, setSkuName] = useState("");
   const [skuBrandFilter, setSkuBrandFilter] = useState<string>("ALL");
-  const [selectedProductCategoryIds, setSelectedProductCategoryIds] = useState<string[]>([]);
+  const [selectedProductCategoryId, setSelectedProductCategoryId] = useState("");
   const [productCategorySearchId, setProductCategorySearchId] = useState("");
   const currency = row?.currency ?? "IDR";
   const [amount, setAmount] = useState(row?.amount ?? "");
@@ -190,7 +190,7 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
       const result = await createPricingProductCategoryQuickAction(formData);
       if (result.ok) {
         upsertProductCategoryOption({ id: result.data.categoryId, name });
-        setSelectedProductCategoryIds((current) => (current.includes(result.data.categoryId) ? current : [...current, result.data.categoryId]));
+        setSelectedProductCategoryId(result.data.categoryId);
         return result.data.categoryId;
       }
       setProductCategoryCreateError(result.error.safeMessage);
@@ -308,7 +308,7 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
           onValueChange={(value) => {
             setProductCategorySearchId(value);
             if (value) {
-              setSelectedProductCategoryIds((current) => (current.includes(value) ? current : [...current, value]));
+            setSelectedProductCategoryId(value);
             }
           }}
           onCreate={refs.canManageCategories ? createProductCategory : undefined}
@@ -320,26 +320,7 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
           className="w-full"
         />
         {productCategoryCreateError ? <InlineError>{productCategoryCreateError}</InlineError> : null}
-        <div className="grid max-h-36 grid-cols-2 gap-2 overflow-y-auto rounded border border-line bg-surface-muted/30 p-2">
-          {productCategoryOptions.map((category) => {
-            const checked = selectedProductCategoryIds.includes(category.id);
-            return (
-              <label key={category.id} className="flex cursor-pointer select-none items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={(event) => {
-                    setSelectedProductCategoryIds((current) => event.target.checked
-                      ? [...current.filter((id) => id !== category.id), category.id]
-                      : current.filter((id) => id !== category.id));
-                  }}
-                />
-                <span>{category.name}</span>
-              </label>
-            );
-          })}
-        </div>
-        {selectedProductCategoryIds.map((id) => <input key={id} type="hidden" name="categoryIds" value={id} />)}
+        <input type="hidden" name="categoryId" value={selectedProductCategoryId} required />
       </div>
     </Field>
   </> : null;

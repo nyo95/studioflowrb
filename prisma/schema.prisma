@@ -517,6 +517,7 @@ model SkuCategory {
   category    Category @relation(fields: [category_id], references: [id], onDelete: Restrict)
 
   @@unique([sku_id, category_id])
+  @@unique([sku_id])
   @@index([category_id])
   @@schema("master_data")
 }
