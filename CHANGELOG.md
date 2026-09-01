@@ -5,9 +5,23 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.04**
-- Next local revision: **R4.05**
+- Current revision: **R4.05**
+- Next local revision: **R4.06**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.05 — 2026-09-01 — fix(shell): group settings navigation
+
+- Organized Account, General Settings, Users, and Roles & Access beneath one
+  persistent Settings section in the shared authenticated sidebar.
+- Preserved each destination's existing permission gate and active-state signal;
+  the grouped layout collapses cleanly to the existing accessible icon rail.
+
+### Verification
+
+- `npm run typecheck` and `npm run lint`: passed.
+- Browser acceptance: the expanded sidebar presents the named Settings group;
+  its accessible label and all destination labels remain available after the
+  rail is collapsed.
 
 ## R4.04 — 2026-09-01 — fix(masterdata): rebalance Brand link entry
 
