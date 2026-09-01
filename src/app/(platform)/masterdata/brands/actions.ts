@@ -23,6 +23,14 @@ const BrandInputSchema = z.object({
   links: z.array(z.object({ kind: z.string().min(1), url: z.string().url("Must be a valid URL"), label: z.string().optional().nullable() })).optional(),
   suppliers: z.array(z.object({ vendorId: z.string().uuid() })).optional(),
 });
+const IdSchema = z.string().uuid();
+const DeletionInputSchema = z.object({ id: IdSchema, reason: z.string().max(1000).optional(), notes: z.string().max(1000).optional() });
+
+function parseId(value: string): string {
+  const parsed = IdSchema.safeParse(value);
+  if (!parsed.success) throw validationError(parsed.error);
+  return parsed.data;
+}
 
 export async function createOwnerVendorQuickAction(name: string): Promise<ActionResult<{ vendorId: string }>> {
   return runSafeAction(async () => {
@@ -138,10 +146,11 @@ export async function updateBrandAction(
 export async function archiveBrandAction(brandId: string): Promise<ActionResult<{ brandId: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
+    const id = parseId(brandId);
     const result = await masterDataService.archiveBrand({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      brandId,
+      brandId: id,
     });
     revalidateBrands();
     return result;
@@ -151,10 +160,11 @@ export async function archiveBrandAction(brandId: string): Promise<ActionResult<
 export async function restoreBrandAction(brandId: string): Promise<ActionResult<{ brandId: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
+    const id = parseId(brandId);
     const result = await masterDataService.restoreBrand({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      brandId,
+      brandId: id,
     });
     revalidateBrands();
     return result;
@@ -168,12 +178,14 @@ export async function requestBrandDeletionAction(
 ): Promise<ActionResult<{ requestId: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
+    const parsed = DeletionInputSchema.safeParse({ id: brandId, reason, notes });
+    if (!parsed.success) throw validationError(parsed.error);
     const result = await masterDataService.requestBrandDeletion({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      brandId,
-      reason,
-      notes,
+      brandId: parsed.data.id,
+      reason: parsed.data.reason,
+      notes: parsed.data.notes,
     });
     revalidateBrands();
     revalidatePath("/masterdata/deletions");

@@ -9,11 +9,19 @@ import { masterDataService } from "@/apps/masterdata/runtime";
 import { validationError } from "@platform/core/validation";
 
 type PriceKind = "material" | "material-labor" | "labor";
+const mutationInput = z.object({ kind: z.enum(["material", "material-labor", "labor"]), id: z.string().uuid() });
+const deletionInput = mutationInput.extend({ reason: z.string().max(1000).optional() });
+
+function parseMutationInput(kind: PriceKind, id: string): { kind: PriceKind; id: string } {
+  const parsed = mutationInput.safeParse({ kind, id });
+  if (!parsed.success) throw validationError(parsed.error);
+  return parsed.data;
+}
 
 function refreshPricing(): void {
   revalidatePath("/masterdata/pricing");
   revalidatePath("/masterdata/skus");
-  revalidatePath("/masterdata/settings/deletions");
+
 }
 
 async function context() {
@@ -34,12 +42,14 @@ export async function createPricingVendorQuickAction(kind: PriceKind, formData: 
   return runSafeAction(async () => {
     const parsed = pricingVendorQuickForm.safeParse(Object.fromEntries(formData));
     if (!parsed.success) throw validationError(parsed.error);
+    const parsedKind = z.enum(["material", "material-labor", "labor"]).safeParse(kind);
+    if (!parsedKind.success) throw validationError(parsedKind.error);
     const ctx = await context();
     const result = await masterDataService.createPricingVendorQuick({
       ...ctx,
       name: parsed.data.name,
       vendorTypeId: parsed.data.vendorTypeId,
-      capability: kind === "material" ? "MATERIAL" : "LABOR",
+      capability: parsedKind.data === "material" ? "MATERIAL" : "LABOR",
     });
     refreshPricing();
     return result;
@@ -69,18 +79,20 @@ export async function savePriceAction(kind: PriceKind, formData: FormData): Prom
         : value.id
           ? await masterDataService.updatePriceLabor({ ...ctx, priceLaborId: value.id, name: value.name!, categoryId: value.categoryId!, vendorId: value.vendorId!, unitId: value.unitId!, amount: value.amount, currency: value.currency, notes: value.notes })
           : await masterDataService.createPriceLabor({ ...ctx, name: value.name!, categoryId: value.categoryId!, vendorId: value.vendorId!, unitId: value.unitId!, amount: value.amount, currency: value.currency, notes: value.notes });
-    refreshPricing(); return result;
+    refreshPricing();
+    return result;
   });
 }
 
 export async function archivePriceAction(kind: PriceKind, id: string): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
-    const result = kind === "material"
-      ? await masterDataService.archivePriceMaterial({ ...ctx, priceMaterialId: id })
-      : kind === "material-labor"
-        ? await masterDataService.archivePriceMaterialLabor({ ...ctx, priceMaterialLaborId: id })
-        : await masterDataService.archivePriceLabor({ ...ctx, priceLaborId: id });
+    const input = parseMutationInput(kind, id);
+    const result = input.kind === "material"
+      ? await masterDataService.archivePriceMaterial({ ...ctx, priceMaterialId: input.id })
+      : input.kind === "material-labor"
+        ? await masterDataService.archivePriceMaterialLabor({ ...ctx, priceMaterialLaborId: input.id })
+        : await masterDataService.archivePriceLabor({ ...ctx, priceLaborId: input.id });
     refreshPricing();
     return result;
   });
@@ -89,11 +101,12 @@ export async function archivePriceAction(kind: PriceKind, id: string): Promise<A
 export async function restorePriceAction(kind: PriceKind, id: string): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
-    const result = kind === "material"
-      ? await masterDataService.restorePriceMaterial({ ...ctx, priceMaterialId: id })
-      : kind === "material-labor"
-        ? await masterDataService.restorePriceMaterialLabor({ ...ctx, priceMaterialLaborId: id })
-        : await masterDataService.restorePriceLabor({ ...ctx, priceLaborId: id });
+    const input = parseMutationInput(kind, id);
+    const result = input.kind === "material"
+      ? await masterDataService.restorePriceMaterial({ ...ctx, priceMaterialId: input.id })
+      : input.kind === "material-labor"
+        ? await masterDataService.restorePriceMaterialLabor({ ...ctx, priceMaterialLaborId: input.id })
+        : await masterDataService.restorePriceLabor({ ...ctx, priceLaborId: input.id });
     refreshPricing();
     return result;
   });
@@ -102,12 +115,15 @@ export async function restorePriceAction(kind: PriceKind, id: string): Promise<A
 export async function requestPriceDeletionAction(kind: PriceKind, id: string, reason?: string): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
-    const result = kind === "material"
-      ? await masterDataService.requestPriceMaterialDeletion({ ...ctx, priceMaterialId: id, reason })
-      : kind === "material-labor"
-        ? await masterDataService.requestPriceMaterialLaborDeletion({ ...ctx, priceMaterialLaborId: id, reason })
-        : await masterDataService.requestPriceLaborDeletion({ ...ctx, priceLaborId: id, reason });
+    const input = deletionInput.safeParse({ kind, id, reason });
+    if (!input.success) throw validationError(input.error);
+    const result = input.data.kind === "material"
+      ? await masterDataService.requestPriceMaterialDeletion({ ...ctx, priceMaterialId: input.data.id, reason: input.data.reason })
+      : input.data.kind === "material-labor"
+        ? await masterDataService.requestPriceMaterialLaborDeletion({ ...ctx, priceMaterialLaborId: input.data.id, reason: input.data.reason })
+        : await masterDataService.requestPriceLaborDeletion({ ...ctx, priceLaborId: input.data.id, reason: input.data.reason });
     refreshPricing();
+    revalidatePath("/masterdata/deletions");
     return result;
   });
 }

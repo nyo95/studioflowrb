@@ -56,13 +56,20 @@ type VendorRow = {
   }>;
   contacts: Array<{
     id: string;
-    name: string;
+    person_name: string;
+    job_title: string | null;
     email: string | null;
     phone: string | null;
-    position: string | null;
+    is_primary: boolean;
     brand_id: string | null;
   }>;
-  links: Array<{ id: string; kind: string; url: string; label: string | null }>;
+  links: Array<{ id: string; kind: string; url: string; label: string | null; archive_url: string | null; sort_order: number }>;
+  brand_suppliers: Array<{
+    id: string;
+    is_authorized: boolean;
+    notes: string | null;
+    brand: { id: string; name: string };
+  }>;
   _count: {
     owned_brands: number;
     brand_suppliers: number;
@@ -84,10 +91,11 @@ type BrandOption = { id: string; name: string };
 
 type ContactDraft = {
   id?: string;
-  name: string;
+  personName: string;
+  jobTitle: string;
   email: string;
   phone: string;
-  position: string;
+  isPrimary: boolean;
   brandId: string;
   notes: string;
 };
@@ -96,6 +104,15 @@ type LinkDraft = {
   kind: string;
   url: string;
   label: string;
+  archiveUrl: string;
+  sortOrder: number;
+};
+
+type BrandSupplierDraft = {
+  brandId: string;
+  brandName: string;
+  isAuthorized: boolean;
+  notes: string;
 };
 
 export function VendorDirectory({
@@ -126,11 +143,15 @@ export function VendorDirectory({
   const [newLinkKind, setNewLinkKind] = useState("WEBSITE");
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [newLinkLabel, setNewLinkLabel] = useState("");
+  const [newLinkArchiveUrl, setNewLinkArchiveUrl] = useState("");
+  const [brandSuppliersList, setBrandSuppliersList] = useState<BrandSupplierDraft[]>([]);
 
   const [createError, setCreateError] = useState<string | null>(null);
   const [createPending, setCreatePending] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editPending, setEditPending] = useState(false);
+  const [createNameWarning, setCreateNameWarning] = useState<string | null>(null);
+  const [editNameWarning, setEditNameWarning] = useState<string | null>(null);
 
   const filtered = vendors.filter((v) => {
     if (typeFilter !== "ALL" && !v.types.some((t) => t.vendor_type.id === typeFilter)) return false;
@@ -140,7 +161,7 @@ export function VendorDirectory({
       v.name.toLowerCase().includes(q) ||
       v.slug.toLowerCase().includes(q) ||
       (v.legal_name && v.legal_name.toLowerCase().includes(q)) ||
-      v.contacts.some((c) => c.name.toLowerCase().includes(q) || (c.email && c.email.toLowerCase().includes(q)))
+      v.contacts.some((c) => c.person_name.toLowerCase().includes(q) || (c.email && c.email.toLowerCase().includes(q)))
     );
   });
 
@@ -155,11 +176,32 @@ export function VendorDirectory({
     });
   };
 
+  const checkSimilarName = (name: string, excludeId?: string): string | null => {
+    if (name.trim().length < 3) return null;
+    const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+    const input = norm(name);
+    const similar = vendors
+      .filter((v) => v.id !== excludeId)
+      .find((v) => {
+        const existing = norm(v.name);
+        if (existing === input) return true;
+        if (existing.length >= 4 && input.length >= 4) {
+          if (existing.startsWith(input.slice(0, 4)) || input.startsWith(existing.slice(0, 4))) return true;
+          if (existing.includes(input) || input.includes(existing)) return true;
+        }
+        return false;
+      });
+    return similar ? `Potential duplicate: a similar vendor "${similar.name}" already exists.` : null;
+  };
+
   const openCreateDialog = () => {
     setContactsList([]);
     setLinksList([]);
+    setBrandSuppliersList([]);
     setNewLinkUrl("");
     setNewLinkLabel("");
+    setNewLinkArchiveUrl("");
+    setCreateNameWarning(null);
     setCreateOpen(true);
   };
 
@@ -167,22 +209,26 @@ export function VendorDirectory({
     setContactsList(
       vendor.contacts.map((c) => ({
         id: c.id,
-        name: c.name,
+        personName: c.person_name,
+        jobTitle: c.job_title ?? "",
         email: c.email ?? "",
         phone: c.phone ?? "",
-        position: c.position ?? "",
+        isPrimary: c.is_primary ?? false,
         brandId: c.brand_id ?? "",
         notes: "",
       })),
     );
-    setLinksList(vendor.links.map((l) => ({ kind: l.kind, url: l.url, label: l.label ?? "" })));
+    setLinksList(vendor.links.map((l) => ({ kind: l.kind, url: l.url, label: l.label ?? "", archiveUrl: l.archive_url ?? "", sortOrder: l.sort_order })));
+    setBrandSuppliersList(vendor.brand_suppliers.map((bs) => ({ brandId: bs.brand.id, brandName: bs.brand.name, isAuthorized: bs.is_authorized, notes: bs.notes ?? "" })));
     setNewLinkUrl("");
     setNewLinkLabel("");
+    setNewLinkArchiveUrl("");
+    setEditNameWarning(null);
     setEditTarget(vendor);
   };
 
   const addContactDraft = () => {
-    setContactsList([...contactsList, { name: "", email: "", phone: "", position: "", brandId: "", notes: "" }]);
+    setContactsList([...contactsList, { personName: "", jobTitle: "", email: "", phone: "", isPrimary: false, brandId: "", notes: "" }]);
   };
 
   const updateContactDraft = (idx: number, patch: Partial<ContactDraft>) => {
@@ -197,9 +243,25 @@ export function VendorDirectory({
 
   const addLinkDraft = () => {
     if (!newLinkUrl.trim()) return;
-    setLinksList([...linksList, { kind: newLinkKind, url: newLinkUrl.trim(), label: newLinkLabel.trim() }]);
+    setLinksList([...linksList, { kind: newLinkKind, url: newLinkUrl.trim(), label: newLinkLabel.trim(), archiveUrl: newLinkArchiveUrl.trim(), sortOrder: linksList.length }]);
     setNewLinkUrl("");
     setNewLinkLabel("");
+    setNewLinkArchiveUrl("");
+  };
+
+  const addBrandSupplier = (brandId: string, brandName: string) => {
+    if (brandSuppliersList.some((bs) => bs.brandId === brandId)) return;
+    setBrandSuppliersList([...brandSuppliersList, { brandId, brandName, isAuthorized: false, notes: "" }]);
+  };
+
+  const removeBrandSupplier = (idx: number) => {
+    setBrandSuppliersList(brandSuppliersList.filter((_, i) => i !== idx));
+  };
+
+  const updateBrandSupplier = (idx: number, patch: Partial<BrandSupplierDraft>) => {
+    const next = [...brandSuppliersList];
+    next[idx] = { ...next[idx], ...patch };
+    setBrandSuppliersList(next);
   };
 
   const removeLinkDraft = (idx: number) => {
@@ -294,7 +356,7 @@ export function VendorDirectory({
                       ) : (
                         vendor.contacts.slice(0, 2).map((c) => (
                           <div key={c.id} className="truncate">
-                            <span className="font-medium text-ink">{c.name}</span>
+                            <span className="font-medium text-ink">{c.person_name}</span>
                             {c.phone ? ` (${c.phone})` : c.email ? ` (${c.email})` : ""}
                           </div>
                         ))
@@ -358,8 +420,9 @@ export function VendorDirectory({
             setCreatePending(true);
             setCreateError(null);
             const fd = new FormData(e.currentTarget);
-            fd.set("contactsJson", JSON.stringify(contactsList.filter((c) => c.name.trim())));
+            fd.set("contactsJson", JSON.stringify(contactsList.filter((c) => c.personName?.trim())));
             fd.set("linksJson", JSON.stringify(linksList));
+            fd.set("brandSuppliersJson", JSON.stringify(brandSuppliersList.map((bs) => ({ brandId: bs.brandId, isAuthorized: bs.isAuthorized, notes: bs.notes || undefined }))));
             try {
               const res = await createVendorAction(null, fd);
               if (res && "ok" in res && res.ok) {
@@ -383,8 +446,11 @@ export function VendorDirectory({
                 content: (
                   <div className="grid gap-4">
                     <Field label="Vendor trade name" required>
-                      <Input name="name" required maxLength={64} placeholder="e.g. Mitra Kayu Nusantara" autoFocus />
+                      <Input name="name" required maxLength={64} placeholder="e.g. Mitra Kayu Nusantara" autoFocus onChange={(e) => setCreateNameWarning(checkSimilarName(e.target.value))} />
                     </Field>
+                    {createNameWarning ? (
+                      <p className="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5">⚠ {createNameWarning}</p>
+                    ) : null}
                     <Field label="Legal entity name" description="Registered PT / CV name if applicable.">
                       <Input name="legalName" maxLength={128} placeholder="e.g. PT Mitra Kayu Nusantara" />
                     </Field>
@@ -441,16 +507,16 @@ export function VendorDirectory({
                         </button>
                         <Field label="Contact name" required className="col-span-2 sm:col-span-1">
                           <Input
-                            value={contact.name}
-                            onChange={(e) => updateContactDraft(idx, { name: e.target.value })}
+                            value={contact.personName}
+                            onChange={(e) => updateContactDraft(idx, { personName: e.target.value })}
                             placeholder="Full name"
                             required
                           />
                         </Field>
-                        <Field label="Position / Role" className="col-span-2 sm:col-span-1">
+                        <Field label="Job title" className="col-span-2 sm:col-span-1">
                           <Input
-                            value={contact.position}
-                            onChange={(e) => updateContactDraft(idx, { position: e.target.value })}
+                            value={contact.jobTitle}
+                            onChange={(e) => updateContactDraft(idx, { jobTitle: e.target.value })}
                             placeholder="Sales Executive, Estimator..."
                           />
                         </Field>
@@ -511,9 +577,42 @@ export function VendorDirectory({
                         </Field>
                         <Field label="URL" required><Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://example.com/catalog" /></Field>
                         <Field label="Display label"><Input value={newLinkLabel} onChange={(e) => setNewLinkLabel(e.target.value)} placeholder="Optional label, e.g. Product catalog 2026" /></Field>
+                        <Field label="Archive URL" description="Archived/cached version of this link (optional)."><Input value={newLinkArchiveUrl} onChange={(e) => setNewLinkArchiveUrl(e.target.value)} placeholder="https://web.archive.org/web/..." /></Field>
                         <Button type="button" size="sm" variant="secondary" className="justify-self-start" onClick={addLinkDraft}>Add link</Button>
                       </div>
                     </div>
+                  </div>
+                ),
+              },
+              {
+                value: "suppliers",
+                label: `Brand Suppliers (${brandSuppliersList.length})`,
+                content: (
+                  <div className="grid gap-3">
+                    <Text size="sm" weight="semibold">Brands this vendor supplies materials for</Text>
+                    <Field label="Add brand">
+                      <Select onChange={(e) => { if (e.target.value) { const b = brands.find((x) => x.id === e.target.value); if (b) addBrandSupplier(b.id, b.name); e.target.value = ""; } }}>
+                        <option value="">— select brand to add —</option>
+                        {brands.filter((b) => !brandSuppliersList.some((bs) => bs.brandId === b.id)).map((b) => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                      </Select>
+                    </Field>
+                    {brandSuppliersList.map((bs, idx) => (
+                      <div key={bs.brandId} className="grid gap-2 p-2.5 border border-line rounded bg-surface-muted/40">
+                        <div className="flex items-center justify-between">
+                          <Text size="sm" weight="medium">{bs.brandName}</Text>
+                          <Button type="button" size="sm" variant="ghost" onClick={() => removeBrandSupplier(idx)}>Remove</Button>
+                        </div>
+                        <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                          <input type="checkbox" checked={bs.isAuthorized} onChange={(e) => updateBrandSupplier(idx, { isAuthorized: e.target.checked })} />
+                          <span>Authorized supplier (official / certified)</span>
+                        </label>
+                        <Field label="Supplier notes">
+                          <Input value={bs.notes} onChange={(e) => updateBrandSupplier(idx, { notes: e.target.value })} placeholder="Territory, pricing tier, etc." />
+                        </Field>
+                      </div>
+                    ))}
                   </div>
                 ),
               },
@@ -547,8 +646,9 @@ export function VendorDirectory({
               setEditPending(true);
               setEditError(null);
               const fd = new FormData(e.currentTarget);
-              fd.set("contactsJson", JSON.stringify(contactsList.filter((c) => c.name.trim())));
+              fd.set("contactsJson", JSON.stringify(contactsList.filter((c) => c.personName?.trim())));
               fd.set("linksJson", JSON.stringify(linksList));
+              fd.set("brandSuppliersJson", JSON.stringify(brandSuppliersList.map((bs) => ({ brandId: bs.brandId, isAuthorized: bs.isAuthorized, notes: bs.notes || undefined }))));
               try {
                 const res = await updateVendorAction(null, fd);
                 if (res && "ok" in res && res.ok) {
@@ -573,8 +673,11 @@ export function VendorDirectory({
                   content: (
                     <div className="grid gap-4">
                       <Field label="Vendor trade name" required>
-                        <Input name="name" defaultValue={editTarget.name} required maxLength={64} autoFocus />
+                        <Input name="name" defaultValue={editTarget.name} required maxLength={64} autoFocus onChange={(e) => setEditNameWarning(checkSimilarName(e.target.value, editTarget.id))} />
                       </Field>
+                      {editNameWarning ? (
+                        <p className="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5">⚠ {editNameWarning}</p>
+                      ) : null}
                       <Field label="Legal entity name">
                         <Input name="legalName" defaultValue={editTarget.legal_name ?? ""} maxLength={128} />
                       </Field>
@@ -634,15 +737,15 @@ export function VendorDirectory({
                           </button>
                           <Field label="Contact name" required className="col-span-2 sm:col-span-1">
                             <Input
-                              value={contact.name}
-                              onChange={(e) => updateContactDraft(idx, { name: e.target.value })}
+                              value={contact.personName}
+                              onChange={(e) => updateContactDraft(idx, { personName: e.target.value })}
                               required
                             />
                           </Field>
-                          <Field label="Position / Role" className="col-span-2 sm:col-span-1">
+                          <Field label="Job title" className="col-span-2 sm:col-span-1">
                             <Input
-                              value={contact.position}
-                              onChange={(e) => updateContactDraft(idx, { position: e.target.value })}
+                              value={contact.jobTitle}
+                              onChange={(e) => updateContactDraft(idx, { jobTitle: e.target.value })}
                             />
                           </Field>
                           <Field label="Phone number">
@@ -700,9 +803,42 @@ export function VendorDirectory({
                           </Field>
                           <Field label="URL" required><Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://example.com/catalog" /></Field>
                           <Field label="Display label"><Input value={newLinkLabel} onChange={(e) => setNewLinkLabel(e.target.value)} placeholder="Optional label, e.g. Product catalog 2026" /></Field>
+                          <Field label="Archive URL" description="Archived/cached version of this link (optional)."><Input value={newLinkArchiveUrl} onChange={(e) => setNewLinkArchiveUrl(e.target.value)} placeholder="https://web.archive.org/web/..." /></Field>
                           <Button type="button" size="sm" variant="secondary" className="justify-self-start" onClick={addLinkDraft}>Add link</Button>
                         </div>
                       </div>
+                    </div>
+                  ),
+                },
+                {
+                  value: "suppliers",
+                  label: `Brand Suppliers (${brandSuppliersList.length})`,
+                  content: (
+                    <div className="grid gap-3">
+                      <Text size="sm" weight="semibold">Brands this vendor supplies materials for</Text>
+                      <Field label="Add brand">
+                        <Select onChange={(e) => { if (e.target.value) { const b = brands.find((x) => x.id === e.target.value); if (b) addBrandSupplier(b.id, b.name); e.target.value = ""; } }}>
+                          <option value="">— select brand to add —</option>
+                          {brands.filter((b) => !brandSuppliersList.some((bs) => bs.brandId === b.id)).map((b) => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                          ))}
+                        </Select>
+                      </Field>
+                      {brandSuppliersList.map((bs, idx) => (
+                        <div key={bs.brandId} className="grid gap-2 p-2.5 border border-line rounded bg-surface-muted/40">
+                          <div className="flex items-center justify-between">
+                            <Text size="sm" weight="medium">{bs.brandName}</Text>
+                            <Button type="button" size="sm" variant="ghost" onClick={() => removeBrandSupplier(idx)}>Remove</Button>
+                          </div>
+                          <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                            <input type="checkbox" checked={bs.isAuthorized} onChange={(e) => updateBrandSupplier(idx, { isAuthorized: e.target.checked })} />
+                            <span>Authorized supplier (official / certified)</span>
+                          </label>
+                          <Field label="Supplier notes">
+                            <Input value={bs.notes} onChange={(e) => updateBrandSupplier(idx, { notes: e.target.value })} placeholder="Territory, pricing tier, etc." />
+                          </Field>
+                        </div>
+                      ))}
                     </div>
                   ),
                 },

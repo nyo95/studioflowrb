@@ -4,10 +4,95 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 ## Revision state
 
-- Published baseline after this release is pushed: **R4** — publication commit follows this entry
-- Current revision after this entry is committed: **R4**
-- Next local revision: **R4.01**
+- Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
+- Current revision: **R4.02**
+- Next local revision: **R4.03**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.02 — 2026-09-01 — fix(masterdata): finalize deletion and action boundaries
+
+Follow-up correction for the R4.01 contract-alignment work. Permanent-deletion
+approval now re-reads each target inside the same transaction and refuses a
+target restored or reactivated after its deletion request. The request is marked
+approved only after the deletion preconditions and deletion operation succeed.
+
+### Changed
+
+- Added archive-state preconditions for Brand, Vendor, SKU, Unit, Category,
+  VendorType, and all three Price deletion branches.
+- Unit and Category permanent-deletion dependency checks now include archived
+  rows, preventing later restrictive-FK failures and preserving historical
+  references.
+- Added a regression test proving a restored Unit remains live and its request
+  remains `PENDING` when approval is attempted.
+- Added Zod validation for direct lifecycle-action IDs and deletion metadata;
+  Pricing actions also validate their kind at the server boundary.
+- Approval refresh now includes the Pricing directory.
+- Regenerated Prisma Client from the aligned schema. The R4.01 migration was
+  deployed to the owner-confirmed rebuild database `studioflow_rebuild`.
+
+### Verification
+
+- Passed: `npx prisma generate`, `npx prisma validate`, `npm run typecheck`,
+  `npm run lint`, `npm run check`, `npm run build`, and `git diff --check`.
+- Browser acceptance: authenticated `/masterdata/brands` loaded successfully
+  after restarting the local development server, with no stale Prisma-client
+  validation error.
+- `npm test` was invoked but the integration suites correctly refused to run
+  because no disposable `PLATFORM_TEST_DATABASE_URL` is configured. The owner
+  explicitly authorized skipping separate test-database migration verification
+  and the integration test run for this local commit. This remains required
+  before any production-readiness claim or deployment.
+
+## R4.01 — 2026-09-01 — fix(masterdata): schema and field contract alignment
+
+Executor pass against brand-contract.md §4.2, vendor-contract.md §2.1/§4/§5/§6.2,
+and pricing-contract.md §2/§3/§4. All identified schema gaps closed; partial
+unique indexes added; all consumer files updated to match renamed fields.
+
+### Schema changes (`prisma/schema.prisma`)
+
+- **`VendorContact`**: renamed `name` → `person_name`, `position` → `job_title`;
+  added `is_primary Boolean @default(false)` (vendor-contract §4). FK
+  `vendor_id` changed from `onDelete: Restrict` to `onDelete: Cascade` per
+  contract §14.4 (children follow parent on hard delete).
+- **`VendorType`**: added `sort_order Int @default(0)` (vendor-contract §2.1).
+- **`VendorLink`**: added `archive_url String?` and `sort_order Int @default(0)`
+  (vendor-contract §5). FK `vendor_id` changed to `onDelete: Cascade`.
+- **`BrandSupplier`**: added `is_authorized Boolean @default(false)` and
+  `notes String?` (brand-contract §4.2, vendor-contract §6.2).
+
+### Migration (`20260901000000_r4_01_contract_alignment`)
+
+- Column renames and additions for the four models above.
+- `sort_order` seeded for the 6 canonical VendorType records (SUPPLIER=1 …
+  SERVICE=6).
+- Seven partial unique indexes added:
+  - `Brand_name_live_unique` and `Brand_slug_live_unique` — `lower(name/slug)
+    WHERE deleted_at IS NULL`
+  - `Vendor_name_live_unique` and `Vendor_slug_live_unique`
+  - `PriceMaterial_sku_vendor_live_unique` — `(sku_id, supplier_vendor_id)
+    WHERE deleted_at IS NULL`
+  - `PriceMaterialLabor_vendor_name_live_unique` — `(vendor_id, lower(name))
+    WHERE deleted_at IS NULL`
+  - `PriceLabor_vendor_name_live_unique`
+
+### Consumer updates
+
+- **`service.ts`**: all `VendorContact` write paths (`createVendor`,
+  `updateVendor`) and read paths (`listVendors` search filter and select)
+  updated to `person_name`, `job_title`, `is_primary`. Input types aligned.
+- **`vendors/actions.ts`**: Zod schema for contacts updated
+  (`name`→`personName`, `position`→`jobTitle`, added `isPrimary`); action
+  mapping updated accordingly.
+- **`vendors/vendor-directory.tsx`**: `ContactDraft` type, `addContactDraft`
+  initial value, `openEditDialog` mapping, both form inputs, client-side search
+  filter, and table display all updated to new field names.
+
+### Verification
+
+- Pending: `npm run typecheck`, `npm run lint`, `npm run test` — to be run by
+  owner after applying the migration to the dev database.
 
 ## R4 — 2026-09-01 — release: publish Master Data checkpoint
 

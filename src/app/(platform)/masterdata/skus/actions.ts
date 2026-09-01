@@ -8,6 +8,15 @@ import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { validationError } from "@platform/core/validation";
 import { masterDataService } from "@/apps/masterdata/runtime";
 
+const IdSchema = z.string().uuid();
+const DeletionInputSchema = z.object({ id: IdSchema, reason: z.string().max(1000).optional(), notes: z.string().max(1000).optional() });
+
+function parseId(value: string): string {
+  const parsed = IdSchema.safeParse(value);
+  if (!parsed.success) throw validationError(parsed.error);
+  return parsed.data;
+}
+
 function revalidateSkus(): void {
   revalidatePath("/masterdata/skus");
   revalidatePath("/masterdata/pricing");
@@ -129,10 +138,11 @@ export async function updateSkuAction(
 export async function archiveSkuAction(skuId: string): Promise<ActionResult<{ skuId: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
+    const id = parseId(skuId);
     const result = await masterDataService.archiveSku({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      skuId,
+      skuId: id,
     });
     revalidateSkus();
     return result;
@@ -142,10 +152,11 @@ export async function archiveSkuAction(skuId: string): Promise<ActionResult<{ sk
 export async function restoreSkuAction(skuId: string): Promise<ActionResult<{ skuId: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
+    const id = parseId(skuId);
     const result = await masterDataService.restoreSku({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      skuId,
+      skuId: id,
     });
     revalidateSkus();
     return result;
@@ -159,12 +170,14 @@ export async function requestSkuDeletionAction(
 ): Promise<ActionResult<{ requestId: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
+    const parsed = DeletionInputSchema.safeParse({ id: skuId, reason, notes });
+    if (!parsed.success) throw validationError(parsed.error);
     const result = await masterDataService.requestSkuDeletion({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      skuId,
-      reason,
-      notes,
+      skuId: parsed.data.id,
+      reason: parsed.data.reason,
+      notes: parsed.data.notes,
     });
     revalidateSkus();
     revalidatePath("/masterdata/deletions");

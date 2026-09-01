@@ -294,6 +294,7 @@ model VendorType {
   name                String
   can_supply_material Boolean   @default(false)
   can_supply_labor    Boolean   @default(false)
+  sort_order          Int       @default(0)
   deleted_at          DateTime?
   created_at          DateTime  @default(now())
   updated_at          DateTime  @updatedAt
@@ -342,18 +343,19 @@ model VendorVendorType {
 }
 
 model VendorContact {
-  id         String   @id @default(uuid())
-  vendor_id  String
-  brand_id   String?
-  name       String
-  email      String?
-  phone      String?
-  position   String?
-  notes      String?
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  vendor     Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Restrict)
-  brand      Brand?   @relation(fields: [brand_id], references: [id], onDelete: Restrict)
+  id          String   @id @default(uuid())
+  vendor_id   String
+  brand_id    String?
+  person_name String
+  job_title   String?
+  email       String?
+  phone       String?
+  is_primary  Boolean  @default(false)
+  notes       String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  vendor      Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Cascade)
+  brand       Brand?   @relation(fields: [brand_id], references: [id], onDelete: Restrict)
 
   @@index([vendor_id])
   @@index([brand_id])
@@ -361,14 +363,16 @@ model VendorContact {
 }
 
 model VendorLink {
-  id         String   @id @default(uuid())
-  vendor_id  String
-  kind       String
-  url        String
-  label      String?
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  vendor     Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Restrict)
+  id          String   @id @default(uuid())
+  vendor_id   String
+  kind        String
+  url         String
+  archive_url String?
+  label       String?
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  vendor      Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Cascade)
 
   @@unique([vendor_id, url])
   @@schema("master_data")
@@ -398,12 +402,14 @@ model Brand {
 }
 
 model BrandSupplier {
-  id         String   @id @default(uuid())
-  brand_id   String
-  vendor_id  String
-  created_at DateTime @default(now())
-  brand      Brand    @relation(fields: [brand_id], references: [id], onDelete: Restrict)
-  vendor     Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Restrict)
+  id            String   @id @default(uuid())
+  brand_id      String
+  vendor_id     String
+  is_authorized Boolean  @default(false)
+  notes         String?
+  created_at    DateTime @default(now())
+  brand         Brand    @relation(fields: [brand_id], references: [id], onDelete: Restrict)
+  vendor        Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Restrict)
 
   @@unique([brand_id, vendor_id])
   @@index([vendor_id])

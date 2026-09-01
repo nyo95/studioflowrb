@@ -490,6 +490,20 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         if (unit.status === "ARCHIVED") {
           throw new AppError("CONFLICT", "UNIT_ALREADY_ARCHIVED", "Unit is already archived.");
         }
+
+        // Guard: reject if unit is actively used by prices or SKUs
+        const [matPriceCount, matLaborCount, laborCount, skuCount] = await Promise.all([
+          tx.priceMaterial.count({ where: { unit_id: input.unitId, deleted_at: null } }),
+          tx.priceMaterialLabor.count({ where: { unit_id: input.unitId, deleted_at: null } }),
+          tx.priceLabor.count({ where: { unit_id: input.unitId, deleted_at: null } }),
+          tx.sku.count({ where: { OR: [{ base_unit_id: input.unitId }, { purchase_unit_id: input.unitId }], deleted_at: null } }),
+        ]);
+        const inUseCount = matPriceCount + matLaborCount + laborCount + skuCount;
+        if (inUseCount > 0) {
+          throw new AppError("CONFLICT", "UNIT_IN_USE",
+            `Unit is still referenced by ${inUseCount} active record(s) (prices or SKUs) and cannot be archived.`);
+        }
+
         const now = new Date();
         await addDirectCause(tx, "unit", input.unitId);
         await tx.unit.update({ where: { id: input.unitId }, data: { status: "ARCHIVED", archived_at: now } });
@@ -814,11 +828,12 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryRead);
       return db.vendorType.findMany({
         where: input.includeArchived ? {} : { deleted_at: null },
-        orderBy: { name: "asc" },
+        orderBy: { sort_order: "asc" },
         select: {
           id: true,
           code: true,
           name: true,
+          sort_order: true,
           can_supply_material: true,
           can_supply_labor: true,
           deleted_at: true,
@@ -831,11 +846,12 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
       return db.vendorType.findMany({
         where: { deleted_at: null },
-        orderBy: { name: "asc" },
+        orderBy: { sort_order: "asc" },
         select: {
           id: true,
           code: true,
           name: true,
+          sort_order: true,
           can_supply_material: true,
           can_supply_labor: true,
         },
@@ -1161,7 +1177,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       categoryIds?: string[];
       hashtags?: string[];
       links?: Array<{ kind: string; url: string; label?: string }>;
-      suppliers?: Array<{ vendorId: string }>;
+      suppliers?: Array<{ vendorId: string; isAuthorized?: boolean; notes?: string | null }>;
     }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.brandManage);
       actorIsUsable(input.actor);
@@ -1243,6 +1259,8 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
                 id: randomUUID(),
                 brand_id: brandId,
                 vendor_id: s.vendorId,
+                is_authorized: s.isAuthorized ?? false,
+                notes: s.notes?.trim() || null,
               },
             });
           }
@@ -1269,7 +1287,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       categoryIds?: string[];
       hashtags?: string[];
       links?: Array<{ kind: string; url: string; label?: string }>;
-      suppliers?: Array<{ vendorId: string }>;
+      suppliers?: Array<{ vendorId: string; isAuthorized?: boolean; notes?: string | null }>;
     }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.brandManage);
       actorIsUsable(input.actor);
@@ -1405,6 +1423,8 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
                 id: randomUUID(),
                 brand_id: input.brandId,
                 vendor_id: s.vendorId,
+                is_authorized: s.isAuthorized ?? false,
+                notes: s.notes?.trim() || null,
               },
             });
           }
@@ -1592,7 +1612,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
                   { name: { contains: search, mode: "insensitive" } },
                   { legal_name: { contains: search, mode: "insensitive" } },
                   { slug: { contains: search, mode: "insensitive" } },
-                  { contacts: { some: { name: { contains: search, mode: "insensitive" } } } },
+                  { contacts: { some: { person_name: { contains: search, mode: "insensitive" } } } },
                 ],
               }
             : {}),
@@ -1616,15 +1636,26 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           contacts: {
             select: {
               id: true,
-              name: true,
+              person_name: true,
+              job_title: true,
               email: true,
               phone: true,
-              position: true,
+              is_primary: true,
               brand_id: true,
             },
           },
           links: {
-            select: { id: true, kind: true, url: true, label: true },
+            select: { id: true, kind: true, url: true, label: true, archive_url: true, sort_order: true },
+            orderBy: { sort_order: "asc" },
+          },
+          brand_suppliers: {
+            select: {
+              id: true,
+              is_authorized: true,
+              notes: true,
+              brand: { select: { id: true, name: true } },
+            },
+            orderBy: { brand: { name: "asc" } },
           },
           _count: {
             select: {
@@ -1680,9 +1711,9 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       address?: string;
       notes?: string;
       vendorTypeIds?: string[];
-      contacts?: Array<{ name: string; email?: string; phone?: string; position?: string; notes?: string; brandId?: string }>;
-      links?: Array<{ kind: string; url: string; label?: string }>;
-      brandSuppliers?: Array<{ brandId: string }>;
+      contacts?: Array<{ personName: string; jobTitle?: string; email?: string; phone?: string; isPrimary?: boolean; notes?: string; brandId?: string }>;
+      links?: Array<{ kind: string; url: string; label?: string; archiveUrl?: string | null; sortOrder?: number }>;
+      brandSuppliers?: Array<{ brandId: string; isAuthorized?: boolean; notes?: string | null }>;
     }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
       actorIsUsable(input.actor);
@@ -1731,15 +1762,23 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
             if (c.brandId) {
               const brand = await tx.brand.findUniqueOrThrow({ where: { id: c.brandId } });
               if (brand.deleted_at !== null) throw new AppError("VALIDATION", "CONTACT_BRAND_ARCHIVED", "Brand is archived.");
+              // vendor-contract §4: vendor must own or supply the brand
+              const ownsViaBrand = brand.owner_vendor_id === vendorId;
+              const isIncomingSupplier = input.brandSuppliers?.some((bs) => bs.brandId === c.brandId) ?? false;
+              if (!ownsViaBrand && !isIncomingSupplier) {
+                const existingSupplier = await tx.brandSupplier.findFirst({ where: { brand_id: c.brandId, vendor_id: vendorId } });
+                if (!existingSupplier) throw new AppError("VALIDATION", "CONTACT_BRAND_NOT_RELATED", "Vendor must own or supply this brand to assign a brand-scoped contact.");
+              }
             }
             await tx.vendorContact.create({
               data: {
                 id: randomUUID(),
                 vendor_id: vendorId,
-                name: requiredName(c.name, "CONTACT_NAME_REQUIRED"),
+                person_name: requiredName(c.personName, "CONTACT_NAME_REQUIRED"),
+                job_title: c.jobTitle?.trim() || null,
                 email: c.email?.trim() || null,
                 phone: c.phone?.trim() || null,
-                position: c.position?.trim() || null,
+                is_primary: c.isPrimary ?? false,
                 notes: c.notes?.trim() || null,
                 brand_id: c.brandId || null,
               },
@@ -1756,6 +1795,8 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
               kind: l.kind,
               url: l.url.trim(),
               label: l.label?.trim() || null,
+              archive_url: l.archiveUrl?.trim() || null,
+              sort_order: l.sortOrder ?? 0,
             })),
           });
         }
@@ -1769,6 +1810,8 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
                 id: randomUUID(),
                 brand_id: bs.brandId,
                 vendor_id: vendorId,
+                is_authorized: bs.isAuthorized ?? false,
+                notes: bs.notes?.trim() || null,
               },
             });
           }
@@ -1847,9 +1890,9 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       address?: string | null;
       notes?: string | null;
       vendorTypeIds?: string[];
-      contacts?: Array<{ id?: string; name: string; email?: string; phone?: string; position?: string; notes?: string; brandId?: string }>;
-      links?: Array<{ kind: string; url: string; label?: string }>;
-      brandSuppliers?: Array<{ brandId: string }>;
+      contacts?: Array<{ id?: string; personName: string; jobTitle?: string; email?: string; phone?: string; isPrimary?: boolean; notes?: string; brandId?: string }>;
+      links?: Array<{ kind: string; url: string; label?: string; archiveUrl?: string | null; sortOrder?: number }>;
+      brandSuppliers?: Array<{ brandId: string; isAuthorized?: boolean; notes?: string | null }>;
     }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
       actorIsUsable(input.actor);
@@ -1919,15 +1962,25 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
             if (c.brandId) {
               const brand = await tx.brand.findUniqueOrThrow({ where: { id: c.brandId } });
               if (brand.deleted_at !== null) throw new AppError("VALIDATION", "CONTACT_BRAND_ARCHIVED", "Brand is archived.");
+              // vendor-contract §4: vendor must own or supply the brand
+              const ownsViaBrand = brand.owner_vendor_id === input.vendorId;
+              // input.brandSuppliers (if provided) replaces all; check incoming first, then existing DB
+              const resolvedSupplierBrandIds = input.brandSuppliers?.map((bs) => bs.brandId);
+              const isIncomingSupplier = resolvedSupplierBrandIds ? resolvedSupplierBrandIds.includes(c.brandId) : false;
+              if (!ownsViaBrand && !isIncomingSupplier) {
+                const existingSupplier = await tx.brandSupplier.findFirst({ where: { brand_id: c.brandId, vendor_id: input.vendorId } });
+                if (!existingSupplier) throw new AppError("VALIDATION", "CONTACT_BRAND_NOT_RELATED", "Vendor must own or supply this brand to assign a brand-scoped contact.");
+              }
             }
             await tx.vendorContact.create({
               data: {
                 id: c.id || randomUUID(),
                 vendor_id: input.vendorId,
-                name: requiredName(c.name, "CONTACT_NAME_REQUIRED"),
+                person_name: requiredName(c.personName, "CONTACT_NAME_REQUIRED"),
+                job_title: c.jobTitle?.trim() || null,
                 email: c.email?.trim() || null,
                 phone: c.phone?.trim() || null,
-                position: c.position?.trim() || null,
+                is_primary: c.isPrimary ?? false,
                 notes: c.notes?.trim() || null,
                 brand_id: c.brandId || null,
               },
@@ -2759,6 +2812,11 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         const unitId = input.unitId ?? existing.unit_id;
         const unit = await tx.unit.findUniqueOrThrow({ where: { id: unitId } });
         if (unit.status !== "ACTIVE") throw new AppError("VALIDATION", "PRICE_UNIT_INACTIVE", "Unit must be active.");
+        // pricing-contract §5: unit must match SKU purchase_unit or base_unit
+        const allowedUnitId = existing.sku.purchase_unit_id ?? existing.sku.base_unit_id;
+        if (unitId !== allowedUnitId) {
+          throw new AppError("VALIDATION", "PRICE_UNIT_SKU_MISMATCH", "Unit must match the SKU's purchase unit or base unit.");
+        }
 
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (existing.amount.toString() !== amount) changes.amount = { from: existing.amount.toString(), to: amount };
@@ -3478,19 +3536,13 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           throw new AppError("NOT_FOUND", "DELETION_REQUEST_NOT_FOUND", "Pending deletion request not found.");
         }
 
-        await tx.deletionRequest.update({
-          where: { id: request.id },
-          data: {
-            status: "APPROVED",
-            approver_user_id: input.actor.userId!,
-            approver_label: input.actor.label,
-            decided_at: new Date(),
-          },
-        });
-
         const { target_type: targetType, target_id: targetId } = request;
 
         if (targetType === "brand") {
+          const brand = await tx.brand.findUniqueOrThrow({ where: { id: targetId } });
+          if (brand.deleted_at === null) {
+            throw new AppError("CONFLICT", "BRAND_NOT_ARCHIVED", "Brand was restored and can no longer be permanently deleted.");
+          }
           const supplierCount = await tx.brandSupplier.count({ where: { brand_id: targetId } });
           if (supplierCount > 0) {
             throw new AppError("CONFLICT", "BRAND_HAS_SUPPLIERS", "Brand still has supplier relations. Remove them first.");
@@ -3532,6 +3584,10 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           await tx.brand.delete({ where: { id: targetId } });
 
         } else if (targetType === "vendor") {
+          const vendor = await tx.vendor.findUniqueOrThrow({ where: { id: targetId } });
+          if (vendor.deleted_at === null) {
+            throw new AppError("CONFLICT", "VENDOR_NOT_ARCHIVED", "Vendor was restored and can no longer be permanently deleted.");
+          }
           const ownedBrandCount = await tx.brand.count({ where: { owner_vendor_id: targetId } });
           if (ownedBrandCount > 0) {
             throw new AppError("CONFLICT", "VENDOR_HAS_OWNED_BRANDS", "Vendor still owns brands. Clear ownership first.");
@@ -3554,6 +3610,10 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           await tx.vendor.delete({ where: { id: targetId } });
 
         } else if (targetType === "sku") {
+          const sku = await tx.sku.findUniqueOrThrow({ where: { id: targetId } });
+          if (sku.deleted_at === null) {
+            throw new AppError("CONFLICT", "SKU_NOT_ARCHIVED", "SKU was restored and can no longer be permanently deleted.");
+          }
           const priceIds = await tx.priceMaterial
             .findMany({ where: { sku_id: targetId }, select: { id: true } })
             .then((rows) => rows.map((r) => r.id));
@@ -3567,6 +3627,22 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           await tx.sku.delete({ where: { id: targetId } });
 
         } else if (targetType === "unit") {
+          const unit = await tx.unit.findUniqueOrThrow({ where: { id: targetId } });
+          if (unit.status !== "ARCHIVED") {
+            throw new AppError("CONFLICT", "UNIT_NOT_ARCHIVED", "Unit was restored and can no longer be permanently deleted.");
+          }
+          // A hard deletion must preserve every existing unit reference, including archived rows.
+          const [uMatPrice, uMatLabor, uLabor, uSku] = await Promise.all([
+            tx.priceMaterial.count({ where: { unit_id: targetId } }),
+            tx.priceMaterialLabor.count({ where: { unit_id: targetId } }),
+            tx.priceLabor.count({ where: { unit_id: targetId } }),
+            tx.sku.count({ where: { OR: [{ base_unit_id: targetId }, { purchase_unit_id: targetId }] } }),
+          ]);
+          const unitInUse = uMatPrice + uMatLabor + uLabor + uSku;
+          if (unitInUse > 0) {
+            throw new AppError("CONFLICT", "UNIT_IN_USE",
+              `Unit is still referenced by ${unitInUse} record(s) (prices or SKUs) and cannot be permanently deleted.`);
+          }
           await tx.archiveCause.deleteMany({ where: { entity_type: "unit", entity_id: targetId } });
           try {
             await tx.unit.delete({ where: { id: targetId } });
@@ -3575,6 +3651,21 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           }
 
         } else if (targetType === "category") {
+          const category = await tx.category.findUniqueOrThrow({ where: { id: targetId } });
+          if (category.status !== "DEACTIVATED") {
+            throw new AppError("CONFLICT", "CATEGORY_STILL_ACTIVE", "Category was reactivated and can no longer be permanently deleted.");
+          }
+          const [brandCatCount, skuCatCount, laborCount, workPriceCount] = await Promise.all([
+            tx.brandCategory.count({ where: { category_id: targetId } }),
+            tx.skuCategory.count({ where: { category_id: targetId } }),
+            tx.priceMaterialLabor.count({ where: { category_id: targetId } }),
+            tx.priceLabor.count({ where: { category_id: targetId } }),
+          ]);
+          const dependencyCount = brandCatCount + skuCatCount + laborCount + workPriceCount;
+          if (dependencyCount > 0) {
+            throw new AppError("CONFLICT", "CATEGORY_HAS_DEPENDENCIES",
+              `Category is still referenced by ${dependencyCount} record(s) and cannot be permanently deleted.`);
+          }
           try {
             await tx.category.delete({ where: { id: targetId } });
           } catch (error) {
@@ -3582,6 +3673,15 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           }
 
         } else if (targetType === "vendor_type") {
+          const vendorType = await tx.vendorType.findUniqueOrThrow({ where: { id: targetId } });
+          if (vendorType.deleted_at === null) {
+            throw new AppError("CONFLICT", "VENDOR_TYPE_NOT_ARCHIVED", "VendorType was restored and can no longer be permanently deleted.");
+          }
+          const vendorAssignmentCount = await tx.vendorVendorType.count({ where: { vendor_type_id: targetId } });
+          if (vendorAssignmentCount > 0) {
+            throw new AppError("CONFLICT", "VENDOR_TYPE_HAS_ASSIGNMENTS",
+              `VendorType is assigned to ${vendorAssignmentCount} vendor(s) and cannot be permanently deleted.`);
+          }
           await tx.archiveCause.deleteMany({ where: { entity_type: "vendor_type", entity_id: targetId } });
           try {
             await tx.vendorType.delete({ where: { id: targetId } });
@@ -3590,14 +3690,26 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           }
 
         } else if (targetType === "price_material") {
+          const price = await tx.priceMaterial.findUniqueOrThrow({ where: { id: targetId } });
+          if (price.deleted_at === null) {
+            throw new AppError("CONFLICT", "PRICE_NOT_ARCHIVED", "Price was restored and can no longer be permanently deleted.");
+          }
           await tx.archiveCause.deleteMany({ where: { entity_type: "price_material", entity_id: targetId } });
           await tx.priceMaterial.delete({ where: { id: targetId } });
 
         } else if (targetType === "price_material_labor") {
+          const price = await tx.priceMaterialLabor.findUniqueOrThrow({ where: { id: targetId } });
+          if (price.deleted_at === null) {
+            throw new AppError("CONFLICT", "PRICE_NOT_ARCHIVED", "Price was restored and can no longer be permanently deleted.");
+          }
           await tx.archiveCause.deleteMany({ where: { entity_type: "price_material_labor", entity_id: targetId } });
           await tx.priceMaterialLabor.delete({ where: { id: targetId } });
 
         } else if (targetType === "price_labor") {
+          const price = await tx.priceLabor.findUniqueOrThrow({ where: { id: targetId } });
+          if (price.deleted_at === null) {
+            throw new AppError("CONFLICT", "PRICE_NOT_ARCHIVED", "Price was restored and can no longer be permanently deleted.");
+          }
           await tx.archiveCause.deleteMany({ where: { entity_type: "price_labor", entity_id: targetId } });
           await tx.priceLabor.delete({ where: { id: targetId } });
 
@@ -3607,6 +3719,15 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
 
         const auditEntityType = targetType;
         const auditAction = `${targetType.replace(/_/g, "-")}.deleted`;
+        await tx.deletionRequest.update({
+          where: { id: request.id },
+          data: {
+            status: "APPROVED",
+            approver_user_id: input.actor.userId!,
+            approver_label: input.actor.label,
+            decided_at: new Date(),
+          },
+        });
         await writeAudit(tx, {
           action: auditAction,
           entityType: auditEntityType,

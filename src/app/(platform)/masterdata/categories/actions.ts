@@ -18,6 +18,14 @@ const CategorySchema = z.object({
   name: z.string().min(1, "Category name is required").max(64, "Category name is too long"),
   kind: z.enum(["PRODUCT", "WORK"]),
 });
+const IdSchema = z.string().uuid();
+const DeletionInputSchema = z.object({ id: IdSchema, reason: z.string().max(1000).optional(), notes: z.string().max(1000).optional() });
+
+function parseId(value: string): string {
+  const parsed = IdSchema.safeParse(value);
+  if (!parsed.success) throw validationError(parsed.error);
+  return parsed.data;
+}
 
 export async function createCategoryAction(
   _prev: ActionResult<{ categoryId?: string }> | null,
@@ -71,10 +79,11 @@ export async function updateCategoryAction(
 export async function deactivateCategoryAction(categoryId: string): Promise<ActionResult<{ categoryId: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
+    const id = parseId(categoryId);
     const result = await masterDataService.deactivateCategory({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      categoryId,
+      categoryId: id,
     });
     revalidateCategories();
     return result;
@@ -87,11 +96,13 @@ export async function mergeCategoryAction(
 ): Promise<ActionResult<{ sourceCategoryId: string; targetCategoryId: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
+    const parsed = z.object({ sourceCategoryId: IdSchema, targetCategoryId: IdSchema }).safeParse({ sourceCategoryId, targetCategoryId });
+    if (!parsed.success) throw validationError(parsed.error);
     const result = await masterDataService.mergeCategory({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      sourceCategoryId,
-      targetCategoryId,
+      sourceCategoryId: parsed.data.sourceCategoryId,
+      targetCategoryId: parsed.data.targetCategoryId,
     });
     revalidateCategories();
     return result;
@@ -105,12 +116,14 @@ export async function requestCategoryDeletionAction(
 ): Promise<ActionResult<{ requestId: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
+    const parsed = DeletionInputSchema.safeParse({ id: categoryId, reason, notes });
+    if (!parsed.success) throw validationError(parsed.error);
     const result = await masterDataService.requestCategoryDeletion({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      categoryId,
-      reason,
-      notes,
+      categoryId: parsed.data.id,
+      reason: parsed.data.reason,
+      notes: parsed.data.notes,
     });
     revalidateCategories();
     revalidatePath("/masterdata/deletions");

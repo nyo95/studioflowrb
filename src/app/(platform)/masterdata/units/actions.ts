@@ -18,6 +18,14 @@ const UnitSchema = z.object({
   code: z.string().min(1, "Unit code is required").max(16, "Unit code is too long"),
   name: z.string().min(1, "Unit name is required").max(64, "Unit name is too long"),
 });
+const IdSchema = z.string().uuid();
+const DeletionInputSchema = z.object({ id: IdSchema, reason: z.string().max(1000).optional(), notes: z.string().max(1000).optional() });
+
+function parseId(value: string): string {
+  const parsed = IdSchema.safeParse(value);
+  if (!parsed.success) throw validationError(parsed.error);
+  return parsed.data;
+}
 
 export async function createUnitAction(
   _prev: ActionResult<{ unitId?: string }> | null,
@@ -68,10 +76,11 @@ export async function updateUnitAction(
 export async function archiveUnitAction(unitId: string): Promise<ActionResult<{ unitId: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
+    const id = parseId(unitId);
     const result = await masterDataService.archiveUnit({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      unitId,
+      unitId: id,
     });
     revalidateUnits();
     return result;
@@ -81,10 +90,11 @@ export async function archiveUnitAction(unitId: string): Promise<ActionResult<{ 
 export async function restoreUnitAction(unitId: string): Promise<ActionResult<{ unitId: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
+    const id = parseId(unitId);
     const result = await masterDataService.restoreUnit({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      unitId,
+      unitId: id,
     });
     revalidateUnits();
     return result;
@@ -98,12 +108,14 @@ export async function requestUnitDeletionAction(
 ): Promise<ActionResult<{ requestId: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
+    const parsed = DeletionInputSchema.safeParse({ id: unitId, reason, notes });
+    if (!parsed.success) throw validationError(parsed.error);
     const result = await masterDataService.requestUnitDeletion({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      unitId,
-      reason,
-      notes,
+      unitId: parsed.data.id,
+      reason: parsed.data.reason,
+      notes: parsed.data.notes,
     });
     revalidateUnits();
     revalidatePath("/masterdata/deletions");

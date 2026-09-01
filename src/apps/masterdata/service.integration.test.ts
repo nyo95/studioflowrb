@@ -423,4 +423,22 @@ describe("Master Data service", () => {
     assert.equal(decision.status, "APPROVED");
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "unit.deleted", entity_id: created.unitId } }), 1);
   });
+
+  it("keeps a deletion request pending when its archived target is restored before approval", async () => {
+    const created = await service.createUnit({ grants: GRANTS, actor: ACTOR, code: "RESTORE_GUARD", name: "Restore Guard" });
+    await service.archiveUnit({ grants: GRANTS, actor: ACTOR, unitId: created.unitId });
+    const request = await service.requestUnitDeletion({ grants: GRANTS, actor: ACTOR, unitId: created.unitId });
+    await service.restoreUnit({ grants: GRANTS, actor: ACTOR, unitId: created.unitId });
+
+    await assert.rejects(
+      service.approveDeletion({ grants: GRANTS, actor: ACTOR, requestId: request.requestId }),
+      (error: unknown) => error instanceof AppError && error.code === "UNIT_NOT_ARCHIVED",
+    );
+
+    assert.equal(await testDb.prisma.unit.findUnique({ where: { id: created.unitId } }).then((unit) => unit?.status), "ACTIVE");
+    assert.equal(
+      await testDb.prisma.deletionRequest.findUniqueOrThrow({ where: { id: request.requestId } }).then((decision) => decision.status),
+      "PENDING",
+    );
+  });
 });

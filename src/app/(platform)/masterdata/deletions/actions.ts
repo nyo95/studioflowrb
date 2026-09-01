@@ -18,6 +18,7 @@ function revalidateDeletions(): void {
   revalidatePath("/masterdata/skus")
   revalidatePath("/masterdata/units")
   revalidatePath("/masterdata/categories")
+  revalidatePath("/masterdata/pricing")
 }
 
 export async function approveDeletionAction(

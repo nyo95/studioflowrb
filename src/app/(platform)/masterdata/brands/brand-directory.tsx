@@ -93,6 +93,8 @@ export function BrandDirectory({
   const [createPending, setCreatePending] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editPending, setEditPending] = useState(false);
+  const [createNameWarning, setCreateNameWarning] = useState<string | null>(null);
+  const [editNameWarning, setEditNameWarning] = useState<string | null>(null);
   const { options: ownerVendors, upsertOverlayOption } = useOptionOverlay(materialVendors);
 
   const filtered = brands.filter((b) => {
@@ -117,11 +119,30 @@ export function BrandDirectory({
     });
   };
 
+  const checkSimilarBrandName = (name: string, excludeId?: string): string | null => {
+    if (name.trim().length < 3) return null;
+    const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+    const input = norm(name);
+    const similar = brands
+      .filter((b) => b.id !== excludeId)
+      .find((b) => {
+        const existing = norm(b.name);
+        if (existing === input) return true;
+        if (existing.length >= 4 && input.length >= 4) {
+          if (existing.startsWith(input.slice(0, 4)) || input.startsWith(existing.slice(0, 4))) return true;
+          if (existing.includes(input) || input.includes(existing)) return true;
+        }
+        return false;
+      });
+    return similar ? `Potential duplicate: a similar brand "${similar.name}" already exists.` : null;
+  };
+
   const openCreateDialog = () => {
     setLinksList([]);
     setNewLinkUrl("");
     setNewLinkLabel("");
     setCreateOwnerVendorId("");
+    setCreateNameWarning(null);
     setCreateOpen(true);
   };
 
@@ -130,6 +151,7 @@ export function BrandDirectory({
     setNewLinkUrl("");
     setNewLinkLabel("");
     setEditOwnerVendorId(brand.owner_vendor?.id ?? "");
+    setEditNameWarning(null);
     setEditTarget(brand);
   };
 
@@ -306,8 +328,11 @@ export function BrandDirectory({
         >
           {createError ? <InlineError>{createError}</InlineError> : null}
           <Field label="Brand name" required>
-            <Input name="name" required maxLength={64} placeholder="e.g. TACO, Blum, Hafele" autoFocus />
+            <Input name="name" required maxLength={64} placeholder="e.g. TACO, Blum, Hafele" autoFocus onChange={(e) => setCreateNameWarning(checkSimilarBrandName(e.target.value))} />
           </Field>
+          {createNameWarning ? (
+            <p className="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5">⚠ {createNameWarning}</p>
+          ) : null}
           <input type="hidden" name="ownerVendorId" value={createOwnerVendorId} />
           <Field label="Owner vendor" description="Optional registered manufacturer/brand owner vendor.">
             <CreatableSearch
@@ -405,8 +430,11 @@ export function BrandDirectory({
             <input type="hidden" name="brandId" value={editTarget.id} />
             {editError ? <InlineError>{editError}</InlineError> : null}
             <Field label="Brand name" required>
-              <Input name="name" defaultValue={editTarget.name} required maxLength={64} autoFocus />
+              <Input name="name" defaultValue={editTarget.name} required maxLength={64} autoFocus onChange={(e) => setEditNameWarning(checkSimilarBrandName(e.target.value, editTarget.id))} />
             </Field>
+            {editNameWarning ? (
+              <p className="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5">⚠ {editNameWarning}</p>
+            ) : null}
             <input type="hidden" name="ownerVendorId" value={editOwnerVendorId} />
             <Field label="Owner vendor">
               <CreatableSearch
