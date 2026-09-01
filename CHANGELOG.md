@@ -5,9 +5,26 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.27**
-- Next local revision: **R3.28**
+- Current revision after this entry is committed: **R3.28**
+- Next local revision: **R3.29**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.28 — 2026-09-01 — fix(masterdata): use creatable Pricing Vendor picker
+
+- Replaced the split Vendor select and **Add vendor** button in Pricing create
+  forms with the shared accessible CreatableSearch pattern. It searches existing
+  Vendors and presents quick-create in the same picker.
+- Quick-create still opens the required capability-aware VendorType step and
+  keeps its transactional server validation; no price or vendor is created by
+  merely searching.
+
+### Verification
+
+- `npm run typecheck`, `npm run lint`, `npm run check`, `npm run build`,
+  `npm test`, and `git diff --check`: passed; **198 passed, 0 failed, 0
+  cancelled** on the isolated test database.
+- Browser acceptance: entering a new Vendor name in the Pricing picker exposes
+  the single **Add “…” as a new vendor** action.
 
 ## R3.27 — 2026-09-01 — fix(masterdata): simplify Vendor reference links
 

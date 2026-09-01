@@ -2,7 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { Archive, Pencil, RotateCcw, Trash2 } from "lucide-react";
-import { Button, ConfirmDialog, DataTable, Dialog, EmptyState, Field, FormActions, Input, Pagination, SearchField, SectionCard, Select, Spinner, StatusBadge, type SortDirection, TableCell, TableCellContent, TableHead, TableHeader, TableRow, TableToolbar, Tabs, useOptionOverlay } from "@/platform/ui_engine";
+import { Button, ConfirmDialog, CreatableSearch, DataTable, Dialog, EmptyState, Field, FormActions, Input, Pagination, SearchField, SectionCard, Select, Spinner, StatusBadge, type SortDirection, TableCell, TableCellContent, TableHead, TableHeader, TableRow, TableToolbar, Tabs, useOptionOverlay } from "@/platform/ui_engine";
 import { compareDecimals, type DecimalString } from "@platform/utilities/decimal";
 import { archivePriceAction, createPricingVendorQuickAction, requestPriceDeletionAction, restorePriceAction, savePriceAction } from "./actions";
 
@@ -97,13 +97,21 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
 
   const vendorField = !edit && (
     <Field label={material ? "Supplier vendor" : "Vendor"} required>
-      <div className="grid gap-2">
-        <Select name="vendorId" value={vendorId} onChange={(event) => setVendorId(event.target.value)} required>
-          <option value="">Select vendor</option>
-          {vendorOptions.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}
-        </Select>
-        {refs.canManageVendors && <Button type="button" size="sm" variant="secondary" className="justify-self-start" onClick={() => setQuickOpen(true)}>Add vendor</Button>}
-      </div>
+      <>
+        <input type="hidden" name="vendorId" value={vendorId} />
+        <CreatableSearch
+          label={material ? "Supplier vendor" : "Vendor"}
+          options={vendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
+          value={vendorId}
+          onValueChange={setVendorId}
+          placeholder="Search or select vendor"
+          searchPlaceholder="Search vendor…"
+          emptyLabel="No vendor matches this search."
+          onCreate={refs.canManageVendors ? (name) => { setQuickName(name); setQuickOpen(true); return ""; } : undefined}
+          createLabel={(name) => `Add “${name}” as a new vendor`}
+          className="w-full"
+        />
+      </>
     </Field>
   );
 
