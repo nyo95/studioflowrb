@@ -14,8 +14,10 @@ export default async function CategoriesPage() {
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { grants } = principalGrants;
+  const canRead = hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryRead);
+  const canManage = hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryManage);
 
-  if (!hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryRead)) {
+  if (!canRead && !canManage) {
     return (
       <div className="grid gap-4">
         <PageHeader eyebrow="Master Data" title="Categories" />
@@ -27,8 +29,6 @@ export default async function CategoriesPage() {
   }
 
   const categories = await masterDataService.listCategories({ grants, includeDeactivated: true });
-  const canManage = hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryManage);
-
   return (
     <div className="grid gap-6">
       <PageHeader

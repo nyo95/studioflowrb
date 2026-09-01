@@ -195,6 +195,37 @@ describe("Master Data service", () => {
     assert.equal(await testDb.prisma.sku.count(), 0);
   });
 
+  it("rejects non-product categories on SKU create and update", async () => {
+    const context = await createMaterialContext();
+    const workCategory = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Installation", kind: "WORK" });
+    const base = {
+      grants: GRANTS,
+      actor: ACTOR,
+      name: "Category guard SKU",
+      baseUnitId: context.unit.id,
+      categoryIds: [context.categoryId],
+      priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }],
+    };
+
+    await assert.rejects(
+      () => service.createSku({ ...base, categoryIds: [workCategory.categoryId] }),
+      (error: unknown) => error instanceof AppError && error.code === "SKU_CATEGORY_KIND_INVALID",
+    );
+
+    const { skuId } = await service.createSku(base);
+    await assert.rejects(
+      () => service.updateSku({
+        grants: GRANTS,
+        actor: ACTOR,
+        skuId,
+        name: "Category guard SKU",
+        baseUnitId: context.unit.id,
+        categoryIds: [workCategory.categoryId],
+      }),
+      (error: unknown) => error instanceof AppError && error.code === "SKU_CATEGORY_KIND_INVALID",
+    );
+  });
+
   it("preserves overlapping direct and SKU-parent archive causes", async () => {
     const context = await createMaterialContext();
     const { skuId } = await service.createSku({
@@ -263,10 +294,14 @@ describe("Master Data service", () => {
 
   it("handles Unit update and list queries", async () => {
     const created = await service.createUnit({ grants: GRANTS, actor: ACTOR, code: "TEST_ROLL", name: "Test Roll" });
-    await service.updateUnit({ grants: GRANTS, actor: ACTOR, unitId: created.unitId, code: "TEST_ROLL_PK", name: "Test Roll Pack" });
+    await assert.rejects(
+      () => service.updateUnit({ grants: GRANTS, actor: ACTOR, unitId: created.unitId, code: "TEST_ROLL_PK", name: "Test Roll Pack" }),
+      (error: unknown) => error instanceof AppError && error.code === "UNIT_CODE_IMMUTABLE",
+    );
+    await service.updateUnit({ grants: GRANTS, actor: ACTOR, unitId: created.unitId, code: "TEST_ROLL", name: "Test Roll Pack" });
 
     const updated = await service.getUnit({ grants: GRANTS, unitId: created.unitId });
-    assert.equal(updated.code, "TEST_ROLL_PK");
+    assert.equal(updated.code, "TEST_ROLL");
     assert.equal(updated.name, "Test Roll Pack");
   });
 

@@ -14,8 +14,10 @@ export default async function UnitsPage() {
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { grants } = principalGrants;
+  const canRead = hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryRead);
+  const canManage = hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryManage);
 
-  if (!hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryRead)) {
+  if (!canRead && !canManage) {
     return (
       <div className="grid gap-4">
         <PageHeader eyebrow="Master Data" title="Measurement Units" />
@@ -27,7 +29,6 @@ export default async function UnitsPage() {
   }
 
   const units = await masterDataService.listUnits({ grants, includeArchived: true });
-  const canManage = hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryManage);
 
   return (
     <div className="grid gap-6">

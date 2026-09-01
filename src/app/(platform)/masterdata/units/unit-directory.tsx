@@ -256,8 +256,8 @@ export function UnitDirectory({
           >
             <input type="hidden" name="unitId" value={editTarget.id} />
             {editError ? <InlineError>{editError}</InlineError> : null}
-            <Field label="Unit code" required>
-              <Input name="code" defaultValue={editTarget.code} required maxLength={16} onInput={(event) => { event.currentTarget.value = event.currentTarget.value.toUpperCase(); }} />
+            <Field label="Unit code" required description="Code is fixed after creation.">
+              <Input name="code" defaultValue={editTarget.code} required maxLength={16} readOnly />
             </Field>
             <Field label="Display name" required>
               <Input name="name" defaultValue={editTarget.name} required maxLength={64} />

@@ -79,7 +79,9 @@ Geometry is optional for materials that do not have meaningful rectangular
 dimensions. When geometry is supplied, length, width, and dimension Unit are
 all required; base Unit must be `M2`; and purchase Unit must be explicit. The
 browser preview is advisory only and the service always recalculates the
-persisted factor.
+persisted factor. When a live material price already exists for the SKU, the
+measurement layout is locked so later edits cannot silently change the meaning
+of recorded prices.
 
 ### 2.4 Vendor eligibility
 
@@ -91,6 +93,8 @@ Supplier must be a live Vendor with `can_supply_material = true` on at least one
 - `currency` must be uppercase 3-letter code
 - `unit_id` must match SKU's purchase unit (or base unit when no purchase unit is set)
 - `source_link_id` when set must reference a live BrandLink belonging to the SKU's own Brand
+- `source_link_id` cannot be set when the SKU has no Brand
+- When a live PriceMaterial exists for the SKU, the SKU's measurement layout is locked; base unit, purchase unit, dimension unit, and rectangular dimensions cannot be changed until the live price is cleared
 - SKU must not be archived
 - exact live SKU × Vendor match opens/targets the existing row for update; creating
   a second live row is blocked by the pair constraint

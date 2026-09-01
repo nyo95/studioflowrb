@@ -5,9 +5,42 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.12**
-- Next local revision: **R4.13**
+- Current revision: **R4.13**
+- Next local revision: **R4.14**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.13 — 2026-09-01 — fix(masterdata/pricing): tighten SKU and directory invariants
+
+- Moved the material pricing entry flow fully behind the existing PriceMaterial
+  modal: staff can search existing SKUs, filter by Brand, and create a new SKU +
+  first price from the same pricing workflow when they have permission.
+- Added quick-create support for Brand and PRODUCT category inside the material
+  pricing flow, so the modal can resolve missing catalog references without
+  leaving pricing.
+- Centralized directory reference loading in the Master Data service so Brand,
+  SKU, Pricing, and Settings pages can reuse the same read/manage-aware
+  catalog sources instead of each page guessing its own fetch shape.
+- Locked SKU codes after creation, blocked SKU category kinds that do not match
+  the PRODUCT model, and prevented material-price updates from silently
+  changing SKU measurement meaning once live prices exist.
+- Hardened PriceMaterial source-link validation so provenance links must belong
+  to the SKU's Brand and cannot be assigned when the SKU is unbranded.
+- Kept the UI engine-consistent creatable-search pattern for Brands, product
+  categories, WORK categories, and vendors, while preserving the direct master
+  data permissions on each page.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test`
+- `npm run build`
+
+### Remaining
+
+- BQ-specific consumption and snapshot persistence remain outside this revision;
+  the approved Master Data read contract is now aligned for the follow-up BQ
+  work order.
 
 ## R4.12 — 2026-09-01 — feat(pricing): derive SKU area conversion
 

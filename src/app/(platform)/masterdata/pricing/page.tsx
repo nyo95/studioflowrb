@@ -70,11 +70,14 @@ export default async function PricingPage() {
 
   const canReadMaterial = hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialRead);
   const canReadWork = hasPermission(grants, MASTERDATA_PERMISSIONS.priceWorkRead);
+  const canManageMaterial = hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
+  const canManageWork = hasPermission(grants, MASTERDATA_PERMISSIONS.priceWorkManage);
+  const canManageBrands = hasPermission(grants, MASTERDATA_PERMISSIONS.brandManage);
   const canManageVendors = hasPermission(grants, MASTERDATA_PERMISSIONS.vendorManage);
   const canManageCategories = hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryManage);
   const canManageSkus = hasPermission(grants, MASTERDATA_PERMISSIONS.skuManage);
 
-  if (!canReadMaterial && !canReadWork) {
+  if (!canReadMaterial && !canReadWork && !canManageMaterial && !canManageWork) {
     return (
       <div className="grid gap-4">
         <PageHeader eyebrow="Master Data" title="Pricing" />
@@ -85,24 +88,18 @@ export default async function PricingPage() {
     );
   }
 
-  const [rawMaterial, rawML, rawLabor, skus, vendors, units, categories, brands, vendorTypes] = await Promise.all([
-    canReadMaterial ? masterDataService.listPriceMaterials({ grants, includeArchived: true }) : [],
-    canReadWork ? masterDataService.listPriceMaterialLabors({ grants, includeArchived: true }) : [],
-    canReadWork ? masterDataService.listPriceLabors({ grants, includeArchived: true }) : [],
-    masterDataService.listSkus({ grants }),
-    masterDataService.listVendors({ grants }),
-    masterDataService.listUnits({ grants }),
-    masterDataService.listCategories({ grants }),
-    masterDataService.listBrands({ grants }),
+  const [rawMaterial, rawML, rawLabor, materialRefs, workRefs, vendorTypes] = await Promise.all([
+    canReadMaterial || canManageMaterial ? masterDataService.listPriceMaterials({ grants, includeArchived: true }) : [],
+    canReadWork || canManageWork ? masterDataService.listPriceMaterialLabors({ grants, includeArchived: true }) : [],
+    canReadWork || canManageWork ? masterDataService.listPriceLabors({ grants, includeArchived: true }) : [],
+    canReadMaterial || canManageMaterial ? masterDataService.listPricingMaterialRefs({ grants }) : null,
+    canReadWork || canManageWork ? masterDataService.listPricingWorkRefs({ grants }) : null,
     canManageVendors ? masterDataService.listVendorTypesForAssignment({ grants }) : [],
   ]);
 
   const materialPrices = rawMaterial.map(mapMaterialPrice);
   const materialLaborPrices = rawML.map(mapWorkPrice);
   const laborPrices = rawLabor.map(mapWorkPrice);
-
-  const canManageMaterial = hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
-  const canManageWork = hasPermission(grants, MASTERDATA_PERMISSIONS.priceWorkManage);
 
   return (
     <div className="grid gap-6">
@@ -122,12 +119,13 @@ export default async function PricingPage() {
         canManageVendors={canManageVendors}
         canManageCategories={canManageCategories}
         canManageSkus={canManageSkus}
-        brands={brands.filter((brand) => !brand.deleted_at).map((brand) => ({ id: brand.id, name: brand.name }))}
-        productCategories={categories.filter((category) => category.status === "ACTIVE" && category.kind === "PRODUCT").map((category) => ({ id: category.id, name: category.name }))}
-        skus={skus.map((sku) => ({ id: sku.id, name: sku.name, code: sku.code }))}
-        vendors={vendors.filter((vendor) => !vendor.deleted_at).map((vendor) => ({ id: vendor.id, name: vendor.name }))}
-        units={units.filter((unit) => unit.status === "ACTIVE").map((unit) => ({ id: unit.id, code: unit.code, name: unit.name }))}
-        workCategories={categories.filter((category) => category.status === "ACTIVE" && category.kind === "WORK").map((category) => ({ id: category.id, name: category.name }))}
+        canManageBrands={canManageBrands}
+        brands={materialRefs?.brands ?? []}
+        productCategories={materialRefs?.productCategories ?? []}
+        skus={(materialRefs?.skus ?? []).map((sku) => ({ ...sku, brand: sku.brand ?? null }))}
+        vendors={materialRefs?.vendors ?? workRefs?.vendors ?? []}
+        units={materialRefs?.units ?? workRefs?.units ?? []}
+        workCategories={workRefs?.workCategories ?? []}
         vendorTypes={vendorTypes.map((vendorType) => ({ id: vendorType.id, name: vendorType.name, canSupplyMaterial: vendorType.can_supply_material, canSupplyLabor: vendorType.can_supply_labor }))}
       />
     </div>

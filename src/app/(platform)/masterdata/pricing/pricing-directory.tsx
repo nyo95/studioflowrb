@@ -5,10 +5,10 @@ import { Archive, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import { Button, ConfirmDialog, CreatableSearch, DataTable, Dialog, EmptyState, Field, FormActions, InlineError, Input, Pagination, SearchField, SectionCard, Select, SimpleTextEditor, Spinner, StatusBadge, Text, type SortDirection, TableCell, TableCellContent, TableHead, TableHeader, TableRow, TableToolbar, Tabs, useOptionOverlay } from "@/platform/ui_engine";
 import { compareDecimals, formatDecimal, type DecimalString } from "@platform/utilities/decimal";
 import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurement";
-import { archivePriceAction, createMaterialSkuAction, createPricingVendorQuickAction, createPricingWorkCategoryQuickAction, requestPriceDeletionAction, restorePriceAction, savePriceAction } from "./actions";
+import { archivePriceAction, createMaterialSkuAction, createPricingBrandQuickAction, createPricingProductCategoryQuickAction, createPricingVendorQuickAction, createPricingWorkCategoryQuickAction, requestPriceDeletionAction, restorePriceAction, savePriceAction } from "./actions";
 
 type Kind = "material" | "material-labor" | "labor";
-type MaterialRow = { id: string; sku: { id: string; name: string; code: string | null }; supplier_vendor: { id: string; name: string }; amount: string; currency: string; unit: { id: string; code: string; name: string }; notes: string | null; deleted_at: Date | null };
+type MaterialRow = { id: string; sku: { id: string; name: string; code: string | null; brand: { id: string; name: string } | null }; supplier_vendor: { id: string; name: string }; amount: string; currency: string; unit: { id: string; code: string; name: string }; notes: string | null; deleted_at: Date | null };
 type WorkRow = { id: string; name: string; category: { id: string; name: string }; vendor: { id: string; name: string }; amount: string; currency: string; unit: { id: string; code: string; name: string }; scope_note?: string | null; notes: string | null; deleted_at: Date | null };
 type Target = { kind: Kind; id: string; name: string };
 type Editor = { kind: Kind; row?: MaterialRow | WorkRow };
@@ -16,7 +16,7 @@ type Ref = { id: string; name: string };
 type PriceSortKey = "name" | "vendor" | "amount";
 const PRICE_PAGE_SIZE = 25;
 
-export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; canManageVendors: boolean; canManageCategories: boolean; canManageSkus: boolean; skus: Array<{ id: string; name: string; code: string | null }>; brands: Ref[]; productCategories: Ref[]; vendors: Ref[]; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
+export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; canManageVendors: boolean; canManageCategories: boolean; canManageSkus: boolean; canManageBrands: boolean; skus: Array<{ id: string; name: string; code: string | null; brand: { id: string; name: string } | null }>; brands: Ref[]; productCategories: Ref[]; vendors: Ref[]; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
   const [query, setQuery] = useState(""); const [status, setStatus] = useState("ACTIVE"); const [page, setPage] = useState(1); const [sort, setSort] = useState<{ key: PriceSortKey; direction: SortDirection }>({ key: "name", direction: "asc" }); const [editor, setEditor] = useState<Editor | null>(null); const [formError, setFormError] = useState<string | null>(null);
   const [archive, setArchive] = useState<Target | null>(null); const [restore, setRestore] = useState<Target | null>(null); const [deletion, setDeletion] = useState<Target | null>(null); const [reason, setReason] = useState(""); const [pendingId, setPendingId] = useState<string | null>(null); const [, startTransition] = useTransition();
   const matches = (text: string, archived: boolean) => (status === "ALL" || (status === "ARCHIVED") === archived) && text.toLowerCase().includes(query.toLowerCase());
@@ -52,7 +52,7 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
 }
 
 type PriceEditorRefs = {
-  skus: Array<{ id: string; name: string; code: string | null }>;
+  skus: Array<{ id: string; name: string; code: string | null; brand: { id: string; name: string } | null }>;
   vendors: Ref[];
   units: Array<Ref & { code: string }>;
   workCategories: Ref[];
@@ -60,6 +60,7 @@ type PriceEditorRefs = {
   canManageVendors: boolean;
   canManageCategories: boolean;
   canManageSkus: boolean;
+  canManageBrands: boolean;
   brands: Ref[];
   productCategories: Ref[];
 };
@@ -84,8 +85,15 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
   const [materialEntryMode, setMaterialEntryMode] = useState<"existing" | "new">("existing");
   const { options: vendorOptions, upsertOverlayOption } = useOptionOverlay(refs.vendors);
   const { options: categoryOptions, upsertOverlayOption: upsertCategoryOption } = useOptionOverlay(refs.workCategories);
+  const { options: brandOptions, upsertOverlayOption: upsertBrandOption } = useOptionOverlay(refs.brands);
+  const { options: productCategoryOptions, upsertOverlayOption: upsertProductCategoryOption } = useOptionOverlay(refs.productCategories);
   const [vendorId, setVendorId] = useState(materialRow?.supplier_vendor.id ?? workRow?.vendor.id ?? "");
   const [categoryId, setCategoryId] = useState(workRow?.category.id ?? "");
+  const [brandId, setBrandId] = useState(materialRow?.sku.brand?.id ?? "");
+  const [skuId, setSkuId] = useState(materialRow?.sku.id ?? "");
+  const [skuBrandFilter, setSkuBrandFilter] = useState<string>("ALL");
+  const [selectedProductCategoryIds, setSelectedProductCategoryIds] = useState<string[]>([]);
+  const [productCategorySearchId, setProductCategorySearchId] = useState("");
   const currency = row?.currency ?? "IDR";
   const [amount, setAmount] = useState(row?.amount ?? "");
   const [amountDisplay, setAmountDisplay] = useState(row?.amount ? formatDecimal(row.amount) : "");
@@ -94,6 +102,10 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
   const [quickVendorTypeId, setQuickVendorTypeId] = useState("");
   const [quickError, setQuickError] = useState<string | null>(null);
   const [quickPending, setQuickPending] = useState(false);
+  const [brandCreateError, setBrandCreateError] = useState<string | null>(null);
+  const [brandCreatePending, setBrandCreatePending] = useState(false);
+  const [productCategoryCreateError, setProductCategoryCreateError] = useState<string | null>(null);
+  const [productCategoryCreatePending, setProductCategoryCreatePending] = useState(false);
   const [categoryCreateError, setCategoryCreateError] = useState<string | null>(null);
   const [categoryCreatePending, setCategoryCreatePending] = useState(false);
   const defaultBaseUnit = refs.units.find((unit) => unit.code.toUpperCase() === "M2");
@@ -111,6 +123,11 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
   const selectedBaseUnit = refs.units.find((unit) => unit.id === baseUnitId);
   const selectedPurchaseUnit = refs.units.find((unit) => unit.id === purchaseUnitId);
   const selectedDimensionUnit = refs.units.find((unit) => unit.id === dimensionUnitId);
+  const filteredSkus = refs.skus.filter((sku) => {
+    if (skuBrandFilter === "ALL") return true;
+    if (skuBrandFilter === "UNBRANDED") return !sku.brand;
+    return sku.brand?.id === skuBrandFilter;
+  });
   const dimensionFactors: Readonly<Record<string, string>> = { MM: "0.001", CM: "0.01", M: "1" };
   let areaPreview: string | null = null;
   const dimensionFactor = selectedDimensionUnit ? dimensionFactors[selectedDimensionUnit.code.toUpperCase()] : null;
@@ -121,6 +138,42 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
       areaPreview = null;
     }
   }
+
+  const createBrand = async (name: string) => {
+    setBrandCreateError(null);
+    setBrandCreatePending(true);
+    try {
+      const result = await createPricingBrandQuickAction(name);
+      if (result.ok) {
+        upsertBrandOption({ id: result.data.brandId, name });
+        setBrandId(result.data.brandId);
+        return result.data.brandId;
+      }
+      setBrandCreateError(result.error.safeMessage);
+      return "";
+    } finally {
+      setBrandCreatePending(false);
+    }
+  };
+
+  const createProductCategory = async (name: string) => {
+    setProductCategoryCreateError(null);
+    setProductCategoryCreatePending(true);
+    try {
+      const formData = new FormData();
+      formData.set("name", name);
+      const result = await createPricingProductCategoryQuickAction(formData);
+      if (result.ok) {
+        upsertProductCategoryOption({ id: result.data.categoryId, name });
+        setSelectedProductCategoryIds((current) => (current.includes(result.data.categoryId) ? current : [...current, result.data.categoryId]));
+        return result.data.categoryId;
+      }
+      setProductCategoryCreateError(result.error.safeMessage);
+      return "";
+    } finally {
+      setProductCategoryCreatePending(false);
+    }
+  };
 
   const addVendor = async () => {
     setQuickError(null);
@@ -183,7 +236,25 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
     <Field label="SKU name" required><Input name="name" required maxLength={128} placeholder="e.g. HPL Natural Teak 0.8mm" autoFocus /></Field>
     <div className="grid grid-cols-2 gap-3">
       <Field label="SKU code / Article #"><Input name="code" maxLength={32} placeholder="TH-001AA" /></Field>
-      <Field label="Brand"><Select name="brandId"><option value="">Unbranded / Generic</option>{refs.brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</Select></Field>
+      <input type="hidden" name="brandId" value={brandId} />
+      <Field label="Brand">
+        <CreatableSearch
+          label="Brand"
+          options={brandOptions.map((brand) => ({ id: brand.id, label: brand.name }))}
+          value={brandId}
+          onValueChange={setBrandId}
+          allowClear
+          clearLabel="Unbranded / Generic"
+          placeholder="Search or select brand"
+          searchPlaceholder="Search brands…"
+          emptyLabel="No brand matches this search."
+          onCreate={refs.canManageBrands ? createBrand : undefined}
+          createLabel={(name) => `Add “${name}” as a brand`}
+          disabled={brandCreatePending}
+          className="w-full"
+        />
+      </Field>
+      {brandCreateError ? <InlineError>{brandCreateError}</InlineError> : null}
     </div>
     <div className="grid grid-cols-2 gap-3">
       <Field label="Base / BQ unit" required description="The unit used to compare and calculate material usage."><Select name="baseUnitId" value={baseUnitId} onChange={(event) => setBaseUnitId(event.target.value)} required><option value="">Select base unit...</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} — {unit.name}</option>)}</Select></Field>
@@ -204,8 +275,46 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
       </div>
     </SectionCard>
     <Field label="Product categories" required description="At least one category is required.">
-      <div className="grid max-h-36 grid-cols-2 gap-2 overflow-y-auto rounded border border-line bg-surface-muted/30 p-2">
-        {refs.productCategories.map((category) => <label key={category.id} className="flex cursor-pointer select-none items-center gap-2 text-xs"><input type="checkbox" name="categoryIds" value={category.id} /><span>{category.name}</span></label>)}
+      <div className="grid gap-3">
+        <CreatableSearch
+          label="Product categories"
+          options={productCategoryOptions.map((category) => ({ id: category.id, label: category.name }))}
+          value={productCategorySearchId}
+          onValueChange={(value) => {
+            setProductCategorySearchId(value);
+            if (value) {
+              setSelectedProductCategoryIds((current) => (current.includes(value) ? current : [...current, value]));
+            }
+          }}
+          onCreate={refs.canManageCategories ? createProductCategory : undefined}
+          createLabel={(name) => `Add “${name}” as a product category`}
+          emptyLabel="No product category matches this search."
+          searchPlaceholder="Search or create product category…"
+          placeholder="Search product categories"
+          disabled={productCategoryCreatePending}
+          className="w-full"
+        />
+        {productCategoryCreateError ? <InlineError>{productCategoryCreateError}</InlineError> : null}
+        <div className="grid max-h-36 grid-cols-2 gap-2 overflow-y-auto rounded border border-line bg-surface-muted/30 p-2">
+          {productCategoryOptions.map((category) => {
+            const checked = selectedProductCategoryIds.includes(category.id);
+            return (
+              <label key={category.id} className="flex cursor-pointer select-none items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={(event) => {
+                    setSelectedProductCategoryIds((current) => event.target.checked
+                      ? [...current.filter((id) => id !== category.id), category.id]
+                      : current.filter((id) => id !== category.id));
+                  }}
+                />
+                <span>{category.name}</span>
+              </label>
+            );
+          })}
+        </div>
+        {selectedProductCategoryIds.map((id) => <input key={id} type="hidden" name="categoryIds" value={id} />)}
       </div>
     </Field>
   </> : null;
@@ -244,7 +353,7 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
       {material && !edit ? <div className="flex flex-wrap gap-2 border-b border-line-subtle pb-3"><Button type="button" size="sm" variant={materialEntryMode === "existing" ? "primary" : "secondary"} onClick={() => setMaterialEntryMode("existing")}>Add price to existing SKU</Button>{refs.canManageSkus ? <Button type="button" size="sm" variant={materialEntryMode === "new" ? "primary" : "secondary"} onClick={() => setMaterialEntryMode("new")}>Create SKU + first price</Button> : null}</div> : null}
       <input type="hidden" name="materialEntryMode" value={materialEntryMode} />
       {edit && <input type="hidden" name="id" value={row!.id} />}{error && <div role="alert" className="text-sm text-danger">{error}</div>}
-      {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name} readOnly /></Field><Field label="Supplier vendor"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Unit"><Input value={`${materialRow!.unit.name} (${materialRow!.unit.code})`} readOnly /></Field></> : newMaterialSku ? <>{newMaterialFields}{vendorField}</> : <><Field label="SKU" required><Select name="skuId" required><option value="">Select SKU</option>{refs.skus.map((sku) => <option key={sku.id} value={sku.id}>{sku.name}{sku.code ? ` (${sku.code})` : ""}</option>)}</Select></Field>{vendorField}</>) : <><Field label="Name" required><Input name="name" defaultValue={workRow?.name} required /></Field>{categoryField}{vendorField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note" description="Describe included work or materials. Use bullets for a clear scope."><SimpleTextEditor name="scopeNote" defaultValue={workRow?.scope_note ?? ""} placeholder={"Example:\n- Installation labor\n- Adhesive and grout"} maxLength={1000} rows={5} /></Field>}</>}
+      {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name} readOnly /></Field><Field label="Supplier vendor"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Unit"><Input value={`${materialRow!.unit.name} (${materialRow!.unit.code})`} readOnly /></Field></> : newMaterialSku ? <>{newMaterialFields}{vendorField}</> : <><Field label="SKU" required description="Search by brand, code, or SKU name.">{/* Search first, create on the dedicated new-SKU mode. */}<div className="grid gap-2"><Select value={skuBrandFilter} onChange={(event) => setSkuBrandFilter(event.target.value)}><option value="ALL">All brands</option><option value="UNBRANDED">Unbranded / Generic</option>{refs.brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</Select><input type="hidden" name="skuId" value={skuId} /><CreatableSearch label="SKU" options={filteredSkus.map((sku) => ({ id: sku.id, label: sku.name, description: sku.code ? <span className="font-mono text-xs">{sku.code}</span> : sku.brand ? sku.brand.name : undefined, keywords: [sku.code ?? "", sku.brand?.name ?? ""] }))} value={skuId} onValueChange={setSkuId} placeholder="Search SKU" searchPlaceholder="Search SKU name, code, or brand…" emptyLabel="No SKU matches this search." className="w-full" /></div></Field>{vendorField}</>) : <><Field label="Name" required><Input name="name" defaultValue={workRow?.name} required /></Field>{categoryField}{vendorField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note" description="Describe included work or materials. Use bullets for a clear scope."><SimpleTextEditor name="scopeNote" defaultValue={workRow?.scope_note ?? ""} placeholder={"Example:\n- Installation labor\n- Adhesive and grout"} maxLength={1000} rows={5} /></Field>}</>}
       <input type="hidden" name="amount" value={amount} /><input type="hidden" name="currency" value={currency} />
       <Field label="Amount" description={`${currency} default currency`} required><div className="relative"><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-3 flex items-center font-ui-mono text-sm font-semibold text-ink-secondary">{currency}</span><Input aria-label="Amount" value={amountDisplay} onChange={(event) => updateAmount(event.target.value)} onBlur={() => setAmountDisplay(amount ? formatDecimal(amount) : "")} inputMode="decimal" placeholder="15.000" className="pl-14 tabular-nums" required /></div></Field><Field label="Notes"><Input name="notes" defaultValue={row?.notes ?? ""} /></Field><FormActions><Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button><Button type="submit" variant="primary">{edit ? "Save changes" : "Create price"}</Button></FormActions>
     </form></Dialog>

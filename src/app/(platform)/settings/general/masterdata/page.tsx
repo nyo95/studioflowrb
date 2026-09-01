@@ -17,7 +17,9 @@ export default async function MasterDataSettingsPage() {
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { grants } = principalGrants;
-  if (!hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryRead)) {
+  const canRead = hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryRead);
+  const canManage = hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryManage);
+  if (!canRead && !canManage) {
     return <PageShell><PageHeader eyebrow="Settings" title="Master Data Settings" /><SectionCard><ErrorState title="Access denied" description="You do not have permission to view Master Data settings." /></SectionCard></PageShell>;
   }
   const [units, categories, vendorTypes, deletions] = await Promise.all([
@@ -26,7 +28,6 @@ export default async function MasterDataSettingsPage() {
     masterDataService.listVendorTypes({ grants, includeArchived: true }),
     hasPermission(grants, MASTERDATA_PERMISSIONS.deletionApprove) ? masterDataService.listDeletionRequests({ grants, status: "PENDING" }) : [],
   ]);
-  const canManage = hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryManage);
   const canApprove = hasPermission(grants, MASTERDATA_PERMISSIONS.deletionApprove);
   return <PageShell size="wide"><PageHeader eyebrow="Settings" title="Master Data Settings" description="Controlled vocabularies and protected deletion review. Catalog and pricing workflows remain in Master Data." />
     <Tabs label="Master Data Settings" items={[

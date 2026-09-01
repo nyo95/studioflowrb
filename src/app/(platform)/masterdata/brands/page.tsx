@@ -14,8 +14,10 @@ export default async function BrandsPage() {
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { grants } = principalGrants;
+  const canRead = hasPermission(grants, MASTERDATA_PERMISSIONS.brandRead);
+  const canManage = hasPermission(grants, MASTERDATA_PERMISSIONS.brandManage);
 
-  if (!hasPermission(grants, MASTERDATA_PERMISSIONS.brandRead)) {
+  if (!canRead && !canManage) {
     return (
       <div className="grid gap-4">
         <PageHeader eyebrow="Master Data" title="Brands" />
@@ -26,13 +28,11 @@ export default async function BrandsPage() {
     );
   }
 
-  const [brands, productCategories, materialVendors] = await Promise.all([
+  const [brands, refs] = await Promise.all([
     masterDataService.listBrands({ grants, includeArchived: true }),
-    masterDataService.listCategories({ grants, kind: "PRODUCT" }),
-    masterDataService.listVendors({ grants }),
+    masterDataService.listBrandDirectoryRefs({ grants }),
   ]);
 
-  const canManage = hasPermission(grants, MASTERDATA_PERMISSIONS.brandManage);
   const canManageVendors = hasPermission(grants, MASTERDATA_PERMISSIONS.vendorManage);
 
   return (
@@ -44,8 +44,8 @@ export default async function BrandsPage() {
       />
       <BrandDirectory
         brands={brands}
-        productCategories={productCategories.map((c) => ({ id: c.id, name: c.name }))}
-        materialVendors={materialVendors.map((v) => ({ id: v.id, name: v.name }))}
+        productCategories={refs.productCategories}
+        materialVendors={refs.materialVendors}
         canManage={canManage}
         canManageVendors={canManageVendors}
       />

@@ -42,6 +42,24 @@ const pricingCategoryQuickForm = z.object({
   name: z.string().min(1).max(64),
 });
 
+export async function createPricingBrandQuickAction(name: string): Promise<ActionResult<{ brandId: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = z.string().min(1, "Brand name is required").max(64, "Brand name is too long").safeParse(name);
+    if (!parsed.success) throw validationError(parsed.error);
+    const result = await masterDataService.createBrand({
+      grants,
+      actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
+      name: parsed.data,
+    });
+    refreshPricing();
+    revalidatePath("/masterdata/brands");
+    revalidatePath("/masterdata/skus");
+    revalidatePath("/masterdata");
+    return result;
+  });
+}
+
 export async function createMaterialSkuAction(formData: FormData): Promise<ActionResult<{ skuId: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
@@ -115,6 +133,25 @@ export async function createPricingWorkCategoryQuickAction(formData: FormData): 
     refreshPricing();
     revalidatePath("/masterdata/categories");
     revalidatePath("/settings/general/masterdata");
+    revalidatePath("/masterdata");
+    return result;
+  });
+}
+
+export async function createPricingProductCategoryQuickAction(formData: FormData): Promise<ActionResult<{ categoryId: string }>> {
+  return runSafeAction(async () => {
+    const parsed = pricingCategoryQuickForm.safeParse(Object.fromEntries(formData));
+    if (!parsed.success) throw validationError(parsed.error);
+    const ctx = await context();
+    const result = await masterDataService.createCategory({
+      ...ctx,
+      name: parsed.data.name,
+      kind: "PRODUCT",
+    });
+    refreshPricing();
+    revalidatePath("/masterdata/categories");
+    revalidatePath("/masterdata/brands");
+    revalidatePath("/masterdata/skus");
     revalidatePath("/masterdata");
     return result;
   });

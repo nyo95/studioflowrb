@@ -14,8 +14,10 @@ export default async function SkusPage() {
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { grants } = principalGrants;
+  const canRead = hasPermission(grants, MASTERDATA_PERMISSIONS.skuRead);
+  const canManage = hasPermission(grants, MASTERDATA_PERMISSIONS.skuManage);
 
-  if (!hasPermission(grants, MASTERDATA_PERMISSIONS.skuRead)) {
+  if (!canRead && !canManage) {
     return (
       <div className="grid gap-4">
         <PageHeader eyebrow="Master Data" title="SKUs" />
@@ -26,15 +28,10 @@ export default async function SkusPage() {
     );
   }
 
-  const [skus, brands, units, productCategories, materialVendors] = await Promise.all([
+  const [skus, refs] = await Promise.all([
     masterDataService.listSkus({ grants, includeArchived: true }),
-    masterDataService.listBrands({ grants }),
-    masterDataService.listUnits({ grants }),
-    masterDataService.listCategories({ grants, kind: "PRODUCT" }),
-    masterDataService.listVendors({ grants, canSupplyMaterial: true }),
+    masterDataService.listSkuDirectoryRefs({ grants }),
   ]);
-
-  const canManage = hasPermission(grants, MASTERDATA_PERMISSIONS.skuManage);
 
   return (
     <div className="grid gap-6">
@@ -45,10 +42,10 @@ export default async function SkusPage() {
       />
       <SkuDirectory
         skus={skus}
-        brands={brands.map((b) => ({ id: b.id, name: b.name }))}
-        units={units.map((u) => ({ id: u.id, code: u.code, name: u.name }))}
-        productCategories={productCategories.map((c) => ({ id: c.id, name: c.name }))}
-        materialVendors={materialVendors.map((v) => ({ id: v.id, name: v.name }))}
+        brands={refs.brands}
+        units={refs.units}
+        productCategories={refs.productCategories}
+        materialVendors={refs.materialVendors}
         canManage={canManage}
       />
     </div>

@@ -14,8 +14,10 @@ export default async function VendorsPage() {
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { grants } = principalGrants;
+  const canRead = hasPermission(grants, MASTERDATA_PERMISSIONS.vendorRead);
+  const canManage = hasPermission(grants, MASTERDATA_PERMISSIONS.vendorManage);
 
-  if (!hasPermission(grants, MASTERDATA_PERMISSIONS.vendorRead)) {
+  if (!canRead && !canManage) {
     return (
       <div className="grid gap-4">
         <PageHeader eyebrow="Master Data" title="Vendors" />
@@ -26,7 +28,6 @@ export default async function VendorsPage() {
     );
   }
 
-  const canManage = hasPermission(grants, MASTERDATA_PERMISSIONS.vendorManage);
   const [vendors, assignmentVendorTypes, brands] = await Promise.all([
     masterDataService.listVendors({ grants, includeArchived: true }),
     canManage ? masterDataService.listVendorTypesForAssignment({ grants }) : [],

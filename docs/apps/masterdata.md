@@ -28,6 +28,8 @@ refer only to the R1.05 Git snapshot and define what must not be reintroduced.
 - Unit is a dictionary table, never a plain string.
 - Unit supports CRUD plus archive/restore. Permanent deletion uses the shared
   staff-request and explicit-approver workflow.
+- Unit `code` is immutable after creation; only the display `name` may be
+  edited later.
 - The implementation seeds the units required by BQ, material pricing, and work
   pricing.
 - Existing records retain their selected Unit snapshot when a Unit is deleted;
@@ -60,6 +62,9 @@ refer only to the R1.05 Git snapshot and define what must not be reintroduced.
 - SKU may store optional rectangular geometry as positive decimal length and
   width, optional thickness, and a required dimension Unit when geometry is
   present. Geometry is structured data, not Notes or display-only text.
+- When live material prices exist on a SKU, its measurement layout and
+  base/purchase Unit pairing are locked so price semantics do not shift
+  silently.
 - Dimension Unit, base Unit, and purchase Unit are distinct meanings. For a
   sheet measured in millimetres and consumed by area, `MM` is the dimension
   Unit, `M2` is the base/BQ Unit, and `SHEET` is the purchase Unit.

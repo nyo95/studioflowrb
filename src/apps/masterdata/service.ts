@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { prepareAuditEvent, type AuditActor, type AuditWriter } from "@platform/core/audit";
 import { AppError, mapPrismaKnownError } from "@platform/core/errors";
-import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
+import { hasPermission, requirePermission, type PermissionGrants } from "@platform/core/rbac";
 import { normalizeText } from "@platform/utilities/normalization";
 import { toSlug } from "@platform/utilities/slug";
 import { compareDecimals, toDecimalString } from "@platform/utilities/decimal";
@@ -39,6 +39,12 @@ type TxClient = Prisma.TransactionClient;
 function actorIsUsable(actor: AuditActor): void {
   if (actor.kind !== "USER" || !actor.userId) {
     throw new AppError("UNAUTHENTICATED", "ACTOR_REQUIRED", "An authenticated staff member is required.");
+  }
+}
+
+function requireAnyPermission(grants: PermissionGrants, permissions: readonly string[], safeMessage: string): void {
+  if (!permissions.some((permission) => hasPermission(grants, permission))) {
+    throw new AppError("FORBIDDEN", "PERMISSION_DENIED", safeMessage);
   }
 }
 
@@ -452,7 +458,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
     // ── Unit Dictionary ─────────────────────────────────────────────────────
 
     async listUnits(input: { grants: PermissionGrants; search?: string; includeArchived?: boolean }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryRead);
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.dictionaryRead, MASTERDATA_PERMISSIONS.dictionaryManage], "You do not have permission to view units.");
       const search = input.search?.trim();
       return db.unit.findMany({
         where: {
@@ -488,7 +494,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
     },
 
     async getUnit(input: { grants: PermissionGrants; unitId: string }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryRead);
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.dictionaryRead, MASTERDATA_PERMISSIONS.dictionaryManage], "You do not have permission to view units.");
       return db.unit.findUniqueOrThrow({
         where: { id: input.unitId },
         include: {
@@ -531,13 +537,15 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       return runTransaction(async (tx) => {
         const existing = await tx.unit.findUniqueOrThrow({ where: { id: input.unitId } });
         const changes: Record<string, { from: unknown; to: unknown }> = {};
-        if (existing.code !== code) changes.code = { from: existing.code, to: code };
         if (existing.name !== name) changes.name = { from: existing.name, to: name };
+        if (existing.code !== code) {
+          throw new AppError("CONFLICT", "UNIT_CODE_IMMUTABLE", "Unit code is fixed after creation.");
+        }
 
         if (Object.keys(changes).length === 0) return { unitId: input.unitId };
 
         try {
-          await tx.unit.update({ where: { id: input.unitId }, data: { code, name } });
+          await tx.unit.update({ where: { id: input.unitId }, data: { name } });
         } catch (error) {
           mapWriteError(error);
         }
@@ -625,7 +633,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       kind?: "PRODUCT" | "WORK";
       includeDeactivated?: boolean;
     }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryRead);
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.dictionaryRead, MASTERDATA_PERMISSIONS.dictionaryManage], "You do not have permission to view categories.");
       const search = input.search?.trim();
       return db.category.findMany({
         where: {
@@ -662,7 +670,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
     },
 
     async getCategory(input: { grants: PermissionGrants; categoryId: string }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryRead);
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.dictionaryRead, MASTERDATA_PERMISSIONS.dictionaryManage], "You do not have permission to view categories.");
       return db.category.findUniqueOrThrow({
         where: { id: input.categoryId },
         include: {
@@ -889,7 +897,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
     // ── VendorType Dictionary ───────────────────────────────────────────────
 
     async listVendorTypes(input: { grants: PermissionGrants; includeArchived?: boolean }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryRead);
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.dictionaryRead, MASTERDATA_PERMISSIONS.dictionaryManage], "You do not have permission to view vendor types.");
       return db.vendorType.findMany({
         where: input.includeArchived ? {} : { deleted_at: null },
         orderBy: { sort_order: "asc" },
@@ -923,7 +931,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
     },
 
     async getVendorType(input: { grants: PermissionGrants; vendorTypeId: string }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryRead);
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.dictionaryRead, MASTERDATA_PERMISSIONS.dictionaryManage], "You do not have permission to view vendor types.");
       return db.vendorType.findUniqueOrThrow({
         where: { id: input.vendorTypeId },
         include: { _count: { select: { vendor_types: true } } },
@@ -1137,7 +1145,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       supplierVendorId?: string;
       includeArchived?: boolean;
     }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.brandRead);
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.brandRead, MASTERDATA_PERMISSIONS.brandManage], "You do not have permission to view brands.");
       const search = input.search?.trim();
       const hashtag = input.hashtag?.trim().toLowerCase().replace(/^#+/, "");
 
@@ -1195,8 +1203,28 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       });
     },
 
+    async listBrandDirectoryRefs(input: { grants: PermissionGrants }) {
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.brandRead, MASTERDATA_PERMISSIONS.brandManage], "You do not have permission to view brand references.");
+      const [productCategories, materialVendors] = await Promise.all([
+        db.category.findMany({
+          where: { status: "ACTIVE", kind: "PRODUCT" },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        }),
+        db.vendor.findMany({
+          where: {
+            deleted_at: null,
+            types: { some: { vendor_type: { can_supply_material: true, deleted_at: null } } },
+          },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        }),
+      ]);
+      return { productCategories, materialVendors };
+    },
+
     async getBrand(input: { grants: PermissionGrants; brandId: string }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.brandRead);
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.brandRead, MASTERDATA_PERMISSIONS.brandManage], "You do not have permission to view brands.");
       return db.brand.findUniqueOrThrow({
         where: { id: input.brandId },
         include: {
@@ -1656,7 +1684,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       brandId?: string;
       includeArchived?: boolean;
     }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorRead);
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.vendorRead, MASTERDATA_PERMISSIONS.vendorManage], "You do not have permission to view vendors.");
       const search = input.search?.trim();
 
       return db.vendor.findMany({
@@ -1734,8 +1762,103 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       });
     },
 
+    async listSkuDirectoryRefs(input: { grants: PermissionGrants }) {
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.skuRead, MASTERDATA_PERMISSIONS.skuManage], "You do not have permission to view SKU references.");
+      const [brands, units, productCategories, materialVendors] = await Promise.all([
+        db.brand.findMany({
+          where: { deleted_at: null },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        }),
+        db.unit.findMany({
+          where: { status: "ACTIVE" },
+          orderBy: [{ name: "asc" }, { code: "asc" }],
+          select: { id: true, code: true, name: true },
+        }),
+        db.category.findMany({
+          where: { status: "ACTIVE", kind: "PRODUCT" },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        }),
+        db.vendor.findMany({
+          where: {
+            deleted_at: null,
+            types: { some: { vendor_type: { can_supply_material: true, deleted_at: null } } },
+          },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        }),
+      ]);
+      return { brands, units, productCategories, materialVendors };
+    },
+
+    async listPricingMaterialRefs(input: { grants: PermissionGrants }) {
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.priceMaterialRead, MASTERDATA_PERMISSIONS.priceMaterialManage], "You do not have permission to view material price references.");
+      const [skus, brands, units, productCategories, vendors] = await Promise.all([
+        db.sku.findMany({
+          where: { deleted_at: null },
+          orderBy: { name: "asc" },
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            brand: { select: { id: true, name: true } },
+          },
+        }),
+        db.brand.findMany({
+          where: { deleted_at: null },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        }),
+        db.unit.findMany({
+          where: { status: "ACTIVE" },
+          orderBy: [{ name: "asc" }, { code: "asc" }],
+          select: { id: true, code: true, name: true },
+        }),
+        db.category.findMany({
+          where: { status: "ACTIVE", kind: "PRODUCT" },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        }),
+        db.vendor.findMany({
+          where: {
+            deleted_at: null,
+            types: { some: { vendor_type: { can_supply_material: true, deleted_at: null } } },
+          },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        }),
+      ]);
+      return { skus, brands, units, productCategories, vendors };
+    },
+
+    async listPricingWorkRefs(input: { grants: PermissionGrants }) {
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.priceWorkRead, MASTERDATA_PERMISSIONS.priceWorkManage], "You do not have permission to view work price references.");
+      const [workCategories, vendors, units] = await Promise.all([
+        db.category.findMany({
+          where: { status: "ACTIVE", kind: "WORK" },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        }),
+        db.vendor.findMany({
+          where: {
+            deleted_at: null,
+            types: { some: { vendor_type: { can_supply_labor: true, deleted_at: null } } },
+          },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        }),
+        db.unit.findMany({
+          where: { status: "ACTIVE" },
+          orderBy: [{ name: "asc" }, { code: "asc" }],
+          select: { id: true, code: true, name: true },
+        }),
+      ]);
+      return { workCategories, vendors, units };
+    },
+
     async getVendor(input: { grants: PermissionGrants; vendorId: string }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorRead);
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.vendorRead, MASTERDATA_PERMISSIONS.vendorManage], "You do not have permission to view vendors.");
       return db.vendor.findUniqueOrThrow({
         where: { id: input.vendorId },
         include: {
@@ -2253,7 +2376,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       categoryId?: string;
       includeArchived?: boolean;
     }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuRead);
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.skuRead, MASTERDATA_PERMISSIONS.skuManage], "You do not have permission to view SKUs.");
       const search = input.search?.trim();
 
       return db.sku.findMany({
@@ -2309,7 +2432,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
     },
 
     async getSku(input: { grants: PermissionGrants; skuId: string }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuRead);
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.skuRead, MASTERDATA_PERMISSIONS.skuManage], "You do not have permission to view SKUs.");
       return db.sku.findUniqueOrThrow({
         where: { id: input.skuId },
         include: {
@@ -2395,6 +2518,9 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         for (const cat of categories) {
           if (cat.status !== "ACTIVE") {
             throw new AppError("VALIDATION", "SKU_CATEGORY_INACTIVE", `Category ${cat.id} is not active.`);
+          }
+          if (cat.kind !== "PRODUCT") {
+            throw new AppError("VALIDATION", "SKU_CATEGORY_KIND_INVALID", "SKU categories must be PRODUCT categories.");
           }
         }
 
@@ -2563,6 +2689,33 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         }
         for (const cat of categories) {
           if (cat.status !== "ACTIVE") throw new AppError("VALIDATION", "SKU_CATEGORY_INACTIVE", `Category ${cat.id} is not active.`);
+          if (cat.kind !== "PRODUCT") {
+            throw new AppError("VALIDATION", "SKU_CATEGORY_KIND_INVALID", "SKU categories must be PRODUCT categories.");
+          }
+        }
+
+        const liveMaterialPriceCount = await tx.priceMaterial.count({ where: { sku_id: input.skuId, deleted_at: null } });
+        const nextMeasurement = {
+          dimension_length: measurement.dimension_length,
+          dimension_width: measurement.dimension_width,
+          dimension_thickness: measurement.dimension_thickness,
+          dimension_unit_id: measurement.dimension_unit_id,
+          purchase_to_base_factor: measurement.purchase_to_base_factor,
+        };
+        const measurementChanged =
+          existing.base_unit_id !== input.baseUnitId ||
+          (existing.purchase_unit_id || null) !== (input.purchaseUnitId || null) ||
+          existing.dimension_length?.toString() !== nextMeasurement.dimension_length ||
+          existing.dimension_width?.toString() !== nextMeasurement.dimension_width ||
+          existing.dimension_thickness?.toString() !== nextMeasurement.dimension_thickness ||
+          (existing.dimension_unit_id || null) !== (nextMeasurement.dimension_unit_id || null) ||
+          existing.purchase_to_base_factor?.toString() !== nextMeasurement.purchase_to_base_factor;
+        if (measurementChanged && liveMaterialPriceCount > 0) {
+          throw new AppError(
+            "CONFLICT",
+            "SKU_MEASUREMENT_LOCKED_BY_PRICES",
+            "SKU measurement and unit layout cannot change while live material prices exist.",
+          );
         }
 
         const changes: Record<string, { from: unknown; to: unknown }> = {};
@@ -2760,7 +2913,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       brandId?: string;
       includeArchived?: boolean;
     }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialRead);
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.priceMaterialRead, MASTERDATA_PERMISSIONS.priceMaterialManage], "You do not have permission to view material prices.");
       const search = input.search?.trim();
 
       return db.priceMaterial.findMany({
@@ -2808,7 +2961,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
     },
 
     async getPriceMaterial(input: { grants: PermissionGrants; priceMaterialId: string }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialRead);
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.priceMaterialRead, MASTERDATA_PERMISSIONS.priceMaterialManage], "You do not have permission to view material prices.");
       return db.priceMaterial.findUniqueOrThrow({
         where: { id: input.priceMaterialId },
         include: {
@@ -2909,7 +3062,10 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
 
         if (input.sourceLinkId) {
           const link = await tx.brandLink.findUniqueOrThrow({ where: { id: input.sourceLinkId } });
-          if (existing.sku.brand_id && link.brand_id !== existing.sku.brand_id) {
+          if (!existing.sku.brand_id) {
+            throw new AppError("VALIDATION", "LINK_BRAND_REQUIRED", "Source link requires a SKU Brand.");
+          }
+          if (link.brand_id !== existing.sku.brand_id) {
             throw new AppError("VALIDATION", "LINK_BRAND_MISMATCH", "Source link must belong to the SKU's Brand.");
           }
         }
@@ -3052,7 +3208,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       vendorId?: string;
       includeArchived?: boolean;
     }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkRead);
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.priceWorkRead, MASTERDATA_PERMISSIONS.priceWorkManage], "You do not have permission to view material + labor prices.");
       const search = input.search?.trim();
 
       return db.priceMaterialLabor.findMany({
@@ -3090,7 +3246,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
     },
 
     async getPriceMaterialLabor(input: { grants: PermissionGrants; priceMaterialLaborId: string }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkRead);
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.priceWorkRead, MASTERDATA_PERMISSIONS.priceWorkManage], "You do not have permission to view material + labor prices.");
       return db.priceMaterialLabor.findUniqueOrThrow({
         where: { id: input.priceMaterialLaborId },
         include: {
@@ -3326,7 +3482,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       vendorId?: string;
       includeArchived?: boolean;
     }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkRead);
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.priceWorkRead, MASTERDATA_PERMISSIONS.priceWorkManage], "You do not have permission to view labor prices.");
       const search = input.search?.trim();
 
       return db.priceLabor.findMany({
@@ -3363,7 +3519,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
     },
 
     async getPriceLabor(input: { grants: PermissionGrants; priceLaborId: string }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkRead);
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.priceWorkRead, MASTERDATA_PERMISSIONS.priceWorkManage], "You do not have permission to view labor prices.");
       return db.priceLabor.findUniqueOrThrow({
         where: { id: input.priceLaborId },
         include: {
