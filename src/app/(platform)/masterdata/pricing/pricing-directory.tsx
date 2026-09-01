@@ -137,9 +137,9 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
   };
 
   const vendorField = !edit && (
+    <>
+      <input type="hidden" name={newMaterialSku ? "supplierVendorId" : "vendorId"} value={vendorId} required />
       <Field label={material ? "Supplier vendor" : "Vendor"} required>
-      <>
-        <input type="hidden" name={newMaterialSku ? "supplierVendorId" : "vendorId"} value={vendorId} required />
         <CreatableSearch
           label={material ? "Supplier vendor" : "Vendor"}
           options={vendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
@@ -152,8 +152,8 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
           createLabel={(name) => `Add “${name}” as a new vendor`}
           className="w-full"
         />
-      </>
-    </Field>
+      </Field>
+    </>
   );
 
   const newMaterialFields = newMaterialSku ? <>
@@ -174,9 +174,9 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
   </> : null;
 
   const categoryField = !material && (
-    <Field label="WORK category" required>
-      <>
-        <input type="hidden" name="categoryId" value={categoryId} required />
+    <>
+      <input type="hidden" name="categoryId" value={categoryId} required />
+      <Field label="WORK category" required>
         <CreatableSearch
           label="WORK category"
           options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))}
@@ -190,9 +190,9 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
           disabled={categoryCreatePending}
           className="w-full"
         />
-        {categoryCreateError ? <InlineError>{categoryCreateError}</InlineError> : null}
-      </>
-    </Field>
+      </Field>
+      {categoryCreateError ? <InlineError>{categoryCreateError}</InlineError> : null}
+    </>
   );
 
   const updateAmount = (display: string) => {

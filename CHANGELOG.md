@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.09**
-- Next local revision: **R4.10**
+- Current revision: **R4.10**
+- Next local revision: **R4.11**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## R4.10 — 2026-09-01 — feat(pricing): make material price the SKU entry point
@@ -28,6 +28,18 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Browser acceptance: Material Pricing exposes both existing-SKU offer and
   `Create SKU + first price` modes; the standalone SKU directory has no create
   action. The last-live-price guard is enforced in the service transaction.
+
+## R4.11 — 2026-09-01 — fix(pricing): keep compound fields valid
+
+- Moved Pricing hidden form values outside `Field` components so the shared
+  field wrapper receives one valid control instead of a React Fragment.
+- Removed the browser runtime error caused by forwarding `id` to that Fragment.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- Browser console after reload: no errors on `/masterdata/pricing`.
 
 ## R4.09 — 2026-09-01 — feat(pricing): create work categories inline
 
