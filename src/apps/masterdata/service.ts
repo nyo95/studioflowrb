@@ -1685,6 +1685,13 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
 
         // VendorTypes
         if (input.vendorTypeIds && input.vendorTypeIds.length > 0) {
+          const vendorTypes = await tx.vendorType.findMany({
+            where: { id: { in: input.vendorTypeIds }, deleted_at: null },
+            select: { id: true },
+          });
+          if (vendorTypes.length !== new Set(input.vendorTypeIds).size) {
+            throw new AppError("VALIDATION", "VENDOR_TYPE_INVALID", "Every selected VendorType must be active.");
+          }
           await tx.vendorVendorType.createMany({
             data: input.vendorTypeIds.map((vendorTypeId) => ({
               id: randomUUID(),

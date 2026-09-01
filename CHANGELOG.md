@@ -5,9 +5,16 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.22**
-- Next local revision: **R3.23**
+- Current revision after this entry is committed: **R3.23**
+- Next local revision: **R3.24**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.23 — 2026-09-01 — fix(masterdata): validate VendorType assignments
+
+- Vendor creation now refuses missing or archived VendorType identifiers before
+  creating assignments, closing an integrity gap used by upcoming Pricing quick
+  entry.
+- `npm run typecheck`, `npm run lint`, and `git diff --check`: passed.
 
 ## R3.22 — 2026-09-01 — docs(masterdata): activate closure work order
 
