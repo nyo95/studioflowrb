@@ -5,9 +5,25 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.19**
-- Next local revision: **R4.20**
+- Current revision: **R4.20**
+- Next local revision: **R4.21**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.20 — 2026-09-02 — docs(bq): add BQ contract, implementation plan, and UX spec
+
+- Added the owner-confirmed BQ contract covering Section → Subsection → L1 →
+  L2 → L3 hierarchy, level calculation, KATEGORI promotion rules, BQ Library,
+  templates, schema plan, RBAC, and locked decisions.
+- Added the F1–F5 implementation plan with schema, TypeScript types, expected
+  calculation tests, gates, and executor safeguards.
+- Added the BQ UX specification covering shared shell/UI Engine consumption,
+  hierarchy presentation, inline editing, component inventory, and BQ-local
+  tokens.
+
+### Verification
+
+- `git diff --cached --check`
+- Staged scope inspected: three BQ documentation files only, plus this ledger
 
 ## R4.19 — 2026-09-02 — fix(masterdata): centralize price formatting
 
