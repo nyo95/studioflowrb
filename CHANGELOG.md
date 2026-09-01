@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.12**
-- Next local revision: **R3.13**
+- Current revision after this entry is committed: **R3.15**
+- Next local revision: **R3.16**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## R3.10 — 2026-09-01 — chore(masterdata): checkpoint in-progress implementation
@@ -121,6 +121,24 @@ Status: **local**
 - Apply consistent dialog success feedback and close behavior across every
   Master Data mutation, complete admin password feedback, then run build and
   full browser acceptance at desktop and narrow viewport.
+
+## R3.15 — 2026-09-01 — docs(agent): require environment location verification
+
+Status: **local**
+
+### Changed
+
+- Added a mandatory owner-verification checkpoint to `AGENTS.md` for every new
+  computer/session or changed environment.
+- The checkpoint requires confirmation of the exact legacy checkout path, rebuild
+  checkout path, and rebuild-only PostgreSQL Docker target with container/service,
+  port, database name, and connection target.
+- Agents must not infer these values from previous handoffs, sibling folders,
+  environment variables, Docker listings, or remembered paths.
+
+### Verification
+
+- `git diff --check`: passed.
 
 ## R3.09 — 2026-08-31 — feat(masterdata): harden lifecycle and test isolation
 

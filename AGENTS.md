@@ -26,6 +26,23 @@ states on the owner's home and office computers. Never assume `../studioflow`, a
 drive letter, a saved path, or that a previously observed checkout is the one the
 owner intends to use.
 
+### Required owner verification before continuation
+
+At the start of a new computer/session, or whenever the environment has changed,
+ask the owner to verify all three locations before continuing with work that may
+need them:
+
+1. the exact local path of the StudioFlow legacy checkout, if it will be used for
+   approved read-only reference;
+2. the exact local path of the StudioFlow rebuild checkout currently in scope;
+3. the exact rebuild-only PostgreSQL Docker target, including container/service,
+   published port, database name, and connection target used by the rebuild.
+
+Do not infer any of these values from an old handoff, sibling folders, environment
+variables, Docker listings, or remembered paths. The owner must confirm the
+values in the current session. If legacy evidence is not needed, still verify the
+rebuild checkout and rebuild-only PostgreSQL target before any database command.
+
 When legacy evidence is actually required, stop before accessing it and ask the
 owner for the exact StudioFlow legacy repository path on the current computer.
 Do not discover it by broadly scanning drives or sibling directories. After the
