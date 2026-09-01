@@ -180,20 +180,26 @@ export function BrandDirectory({
 
   return (
     <SectionCard>
-      <TableToolbar>
+      <TableToolbar actions={canManage ? (
+        <Button type="button" variant="primary" onClick={openCreateDialog}>
+          <Plus aria-hidden="true" />
+          <span>New brand</span>
+        </Button>
+      ) : undefined}>
         <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search brands by name, hashtag, category..." />
-        <div className="ml-auto">
-          {canManage ? (
+      </TableToolbar>
+
+      {filtered.length === 0 ? (
+        <EmptyState
+          title="No brands found"
+          description={query ? "No brands match your search query." : "Add your first catalog brand."}
+          action={!query && canManage ? (
             <Button type="button" variant="primary" onClick={openCreateDialog}>
               <Plus aria-hidden="true" />
               <span>New brand</span>
             </Button>
-          ) : null}
-        </div>
-      </TableToolbar>
-
-      {filtered.length === 0 ? (
-        <EmptyState title="No brands found" description={query ? "No brands match your search query." : "Add your first catalog brand."} />
+          ) : undefined}
+        />
       ) : (
         <DataTable minWidth={900}>
           <TableHeader>

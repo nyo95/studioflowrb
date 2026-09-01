@@ -119,7 +119,12 @@ export function SkuDirectory({
 
   return (
     <SectionCard>
-      <TableToolbar>
+      <TableToolbar actions={canManage ? (
+        <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
+          <Plus aria-hidden="true" />
+          <span>New SKU</span>
+        </Button>
+      ) : undefined}>
         <div className="flex flex-wrap items-center gap-3">
           <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search SKUs by name, code, brand..." />
           <div className="w-40">
@@ -143,18 +148,19 @@ export function SkuDirectory({
             </Select>
           </div>
         </div>
-        <div className="ml-auto">
-          {canManage ? (
+      </TableToolbar>
+
+      {filtered.length === 0 ? (
+        <EmptyState
+          title="No SKUs found"
+          description={query ? "No items match your search filters." : "Create your first catalog SKU."}
+          action={!query && canManage ? (
             <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
               <Plus aria-hidden="true" />
               <span>New SKU</span>
             </Button>
-          ) : null}
-        </div>
-      </TableToolbar>
-
-      {filtered.length === 0 ? (
-        <EmptyState title="No SKUs found" description={query ? "No items match your search filters." : "Create your first catalog SKU."} />
+          ) : undefined}
+        />
       ) : (
         <DataTable minWidth={980}>
           <TableHeader>

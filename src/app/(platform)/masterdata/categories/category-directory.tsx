@@ -94,29 +94,33 @@ export function CategoryDirectory({
 
   return (
     <SectionCard>
-      <TableToolbar>
-        <div className="flex flex-wrap items-center gap-3">
-          <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search categories..." />
-          <div className="w-40">
-            <Select value={kindFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setKindFilter(e.target.value)}>
-              <option value="ALL">All kinds</option>
-              <option value="PRODUCT">Product categories</option>
-              <option value="WORK">Work categories</option>
-            </Select>
-          </div>
-        </div>
-        <div className="ml-auto">
-          {canManage ? (
-            <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
-              <Plus aria-hidden="true" />
-              <span>New category</span>
-            </Button>
-          ) : null}
+      <TableToolbar actions={canManage ? (
+        <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
+          <Plus aria-hidden="true" />
+          <span>New category</span>
+        </Button>
+      ) : undefined}>
+        <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search categories..." />
+        <div className="w-40">
+          <Select value={kindFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setKindFilter(e.target.value)}>
+            <option value="ALL">All kinds</option>
+            <option value="PRODUCT">Product categories</option>
+            <option value="WORK">Work categories</option>
+          </Select>
         </div>
       </TableToolbar>
 
       {filtered.length === 0 ? (
-        <EmptyState title="No categories found" description={query ? "No categories match your search filters." : "Create the first category."} />
+        <EmptyState
+          title="No categories found"
+          description={query ? "No categories match your search filters." : "Create the first category."}
+          action={!query && canManage ? (
+            <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
+              <Plus aria-hidden="true" />
+              <span>New category</span>
+            </Button>
+          ) : undefined}
+        />
       ) : (
         <DataTable minWidth={800}>
           <TableHeader>

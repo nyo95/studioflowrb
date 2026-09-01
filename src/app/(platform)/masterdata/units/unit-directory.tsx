@@ -99,20 +99,26 @@ export function UnitDirectory({
   return (
     <SectionCard>
       {successMessage ? <Notice tone="success" title="Saved">{successMessage}</Notice> : null}
-      <TableToolbar>
+      <TableToolbar actions={canManage ? (
+        <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
+          <Plus aria-hidden="true" />
+          <span>New unit</span>
+        </Button>
+      ) : undefined}>
         <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search units by code or name..." />
-        <div className="ml-auto">
-          {canManage ? (
+      </TableToolbar>
+
+      {filtered.length === 0 ? (
+        <EmptyState
+          title="No units found"
+          description={query ? "No units match your search query." : "Create the first unit to get started."}
+          action={!query && canManage ? (
             <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
               <Plus aria-hidden="true" />
               <span>New unit</span>
             </Button>
-          ) : null}
-        </div>
-      </TableToolbar>
-
-      {filtered.length === 0 ? (
-        <EmptyState title="No units found" description={query ? "No units match your search query." : "Create the first unit to get started."} />
+          ) : undefined}
+        />
       ) : (
         <DataTable minWidth={620}>
           <TableHeader>

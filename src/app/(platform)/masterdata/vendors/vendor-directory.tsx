@@ -270,32 +270,36 @@ export function VendorDirectory({
 
   return (
     <SectionCard>
-      <TableToolbar>
-        <div className="flex flex-wrap items-center gap-3">
-          <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search vendors by name, legal name, contact..." />
-          <div className="w-48">
-            <Select value={typeFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTypeFilter(e.target.value)}>
-              <option value="ALL">All vendor types</option>
-              {vendorTypes.map((vt) => (
-                <option key={vt.id} value={vt.id}>
-                  {vt.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-        </div>
-        <div className="ml-auto">
-          {canManage ? (
-            <Button type="button" variant="primary" onClick={openCreateDialog}>
-              <Plus aria-hidden="true" />
-              <span>New vendor</span>
-            </Button>
-          ) : null}
+      <TableToolbar actions={canManage ? (
+        <Button type="button" variant="primary" onClick={openCreateDialog}>
+          <Plus aria-hidden="true" />
+          <span>New vendor</span>
+        </Button>
+      ) : undefined}>
+        <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search vendors by name, legal name, contact..." />
+        <div className="w-48">
+          <Select value={typeFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTypeFilter(e.target.value)}>
+            <option value="ALL">All vendor types</option>
+            {vendorTypes.map((vt) => (
+              <option key={vt.id} value={vt.id}>
+                {vt.name}
+              </option>
+            ))}
+          </Select>
         </div>
       </TableToolbar>
 
       {filtered.length === 0 ? (
-        <EmptyState title="No vendors found" description={query ? "No vendors match your search filters." : "Register your first vendor partner."} />
+        <EmptyState
+          title="No vendors found"
+          description={query ? "No vendors match your search filters." : "Register your first vendor partner."}
+          action={!query && canManage ? (
+            <Button type="button" variant="primary" onClick={openCreateDialog}>
+              <Plus aria-hidden="true" />
+              <span>New vendor</span>
+            </Button>
+          ) : undefined}
+        />
       ) : (
         <DataTable minWidth={960}>
           <TableHeader>

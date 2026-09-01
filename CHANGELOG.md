@@ -5,9 +5,23 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.05**
-- Next local revision: **R4.06**
+- Current revision: **R4.06**
+- Next local revision: **R4.07**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.06 — 2026-09-01 — fix(masterdata): align directory actions
+
+- Moved the primary create action in Brand, Category, SKU, Unit, Vendor, and
+  Vendor Type directories into the shared toolbar action slot.
+- Added a contextual create action to each unfiltered empty state, so an empty
+  catalog remains actionable without duplicating controls in populated views.
+- Recorded the current Next.js development type-reference output.
+
+### Verification
+
+- `npm run typecheck` and `npm run lint`: passed.
+- Browser acceptance: the Brand directory presents its primary action in the
+  toolbar and a contextual action in its empty state.
 
 ## R4.05 — 2026-09-01 — fix(shell): group settings navigation
 
