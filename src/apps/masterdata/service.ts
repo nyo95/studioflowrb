@@ -834,6 +834,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         orderBy: { name: "asc" },
         select: {
           id: true,
+          code: true,
           name: true,
           can_supply_material: true,
           can_supply_labor: true,
@@ -1102,6 +1103,15 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           },
           _count: { select: { skus: true, suppliers: true, links: true, categories: true } },
         },
+      });
+    },
+
+    async listBrandsForVendorAssignment(input: { grants: PermissionGrants }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
+      return db.brand.findMany({
+        where: { deleted_at: null },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
       });
     },
 

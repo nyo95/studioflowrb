@@ -394,6 +394,19 @@ describe("Master Data service", () => {
     assert.equal(await testDb.prisma.vendor.count({ where: { name: "Wrong Capability Vendor" } }), 0);
   });
 
+  it("allows Vendor managers to load assignment options without dictionary or Brand read grants", async () => {
+    const brand = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Assignment Brand" });
+    const vendorOnlyGrants = [MASTERDATA_PERMISSIONS.vendorManage];
+
+    const [vendorTypes, brands] = await Promise.all([
+      service.listVendorTypesForAssignment({ grants: vendorOnlyGrants }),
+      service.listBrandsForVendorAssignment({ grants: vendorOnlyGrants }),
+    ]);
+
+    assert.equal(vendorTypes.some((vendorType) => vendorType.code === "SUPPLIER"), true);
+    assert.deepEqual(brands, [{ id: brand.brandId, name: "Assignment Brand" }]);
+  });
+
   it("executes approved permanent deletion atomically and preserves the final audit event", async () => {
     const created = await service.createUnit({ grants: GRANTS, actor: ACTOR, code: "TEST_BOX", name: "Test Box" });
     await service.archiveUnit({ grants: GRANTS, actor: ACTOR, unitId: created.unitId });

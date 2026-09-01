@@ -26,13 +26,16 @@ export default async function VendorsPage() {
     );
   }
 
-  const [vendors, vendorTypes, brands] = await Promise.all([
-    masterDataService.listVendors({ grants, includeArchived: true }),
-    masterDataService.listVendorTypes({ grants }),
-    masterDataService.listBrands({ grants }),
-  ]);
-
   const canManage = hasPermission(grants, MASTERDATA_PERMISSIONS.vendorManage);
+  const [vendors, assignmentVendorTypes, brands] = await Promise.all([
+    masterDataService.listVendors({ grants, includeArchived: true }),
+    canManage ? masterDataService.listVendorTypesForAssignment({ grants }) : [],
+    canManage ? masterDataService.listBrandsForVendorAssignment({ grants }) : [],
+  ]);
+  const vendorTypes = assignmentVendorTypes.length > 0
+    ? assignmentVendorTypes
+    : [...new Map(vendors.flatMap((vendor) => vendor.types.map((assignment) => [assignment.vendor_type.id, assignment.vendor_type] as const))).values()]
+      .sort((left, right) => left.name.localeCompare(right.name, "id"));
 
   return (
     <div className="grid gap-6">

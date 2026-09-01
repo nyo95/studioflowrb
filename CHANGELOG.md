@@ -5,9 +5,24 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.25**
-- Next local revision: **R3.26**
+- Current revision after this entry is committed: **R3.26**
+- Next local revision: **R3.27**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.26 — 2026-09-01 — fix(masterdata): scope Vendor assignment lookups
+
+- Vendor readers no longer need unrelated dictionary or Brand-read grants merely
+  to open the Vendor directory. A Vendor manager receives active VendorType and
+  Brand assignment options through narrowly scoped service reads; a read-only
+  viewer derives its displayed type filter from the Vendors it may already see.
+- Added integration coverage for assignment lookup under only
+  `masterdata.vendor.manage`.
+
+### Verification
+
+- `npm run typecheck`, `npm run lint`, `npm run check`, `npm run build`,
+  `npm test`, and `git diff --check`: passed; **198 passed, 0 failed, 0
+  cancelled** on the isolated test database.
 
 ## R3.25 — 2026-09-01 — feat(masterdata): add Pricing sorting and pagination
 
