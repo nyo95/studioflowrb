@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.15**
-- Next local revision: **R3.16**
+- Current revision after this entry is committed: **R3.16**
+- Next local revision: **R3.17**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## R3.10 — 2026-09-01 — chore(masterdata): checkpoint in-progress implementation
@@ -135,6 +135,22 @@ Status: **local**
   port, database name, and connection target.
 - Agents must not infer these values from previous handoffs, sibling folders,
   environment variables, Docker listings, or remembered paths.
+
+### Verification
+
+- `git diff --check`: passed.
+
+## R3.16 — 2026-09-01 — docs(masterdata): add continuation reference
+
+Status: **local**
+
+### Changed
+
+- Added `docs/apps/masterdata-handoff.md` as a cross-computer continuation
+  reference for the remaining Master Data implementation.
+- Recorded repository state, protected uncommitted Pricing files, mandatory
+  environment verification, remaining work, execution order, and completion
+  criteria.
 
 ### Verification
 
