@@ -275,7 +275,7 @@ export function TableToolbar({ search, filters, actions, className, children, ..
         {filters}
         {children}
       </div>
-      {actions ? <div className="flex flex-wrap items-center gap-2 max-[720px]:justify-start">{actions}</div> : null}
+      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2 max-[720px]:justify-start">{actions}</div> : null}
     </div>
   );
 }

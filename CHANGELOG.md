@@ -5,9 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.02**
-- Next local revision: **R4.03**
+- Current revision: **R4.03**
+- Next local revision: **R4.04**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.03 — 2026-09-01 — fix(ui-engine): preserve primary action labels
+
+- Shared buttons now keep their icon-and-label actions on one line and do not
+  shrink below their content width.
+- Directory toolbar action groups likewise retain their intrinsic width, while
+  the existing narrow-viewport stack behavior remains unchanged.
+
+### Verification
+
+- `npm run typecheck` and `npm run lint`: passed.
+- Browser acceptance: both Brand **New brand** controls rendered at 99×36 px
+  with `white-space: nowrap`; neither label wrapped or was pushed downward.
 
 ## R4.02 — 2026-09-01 — fix(masterdata): finalize deletion and action boundaries
 

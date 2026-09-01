@@ -4,7 +4,7 @@ export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 export type ButtonSize = "sm" | "md";
 
 export const BUTTON_BASE_CLASSES =
-  "inline-flex min-w-0 items-center justify-center gap-[7px] rounded-action border border-transparent font-semibold leading-none cursor-pointer transition-[background-color,border-color,color] duration-[120ms] disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0";
+  "inline-flex min-w-0 shrink-0 items-center justify-center gap-[7px] whitespace-nowrap rounded-action border border-transparent font-semibold leading-none cursor-pointer transition-[background-color,border-color,color] duration-[120ms] disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0";
 
 export const BUTTON_SIZE_CLASSES: Record<ButtonSize, string> = {
   sm: "min-h-(--ui-control-height-sm) px-2.5 text-xs",
