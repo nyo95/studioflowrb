@@ -369,15 +369,17 @@ export function BrandDirectory({
                 <Button type="button" size="sm" variant="ghost" onClick={() => removeLink(idx)}>Remove</Button>
               </div>
             ))}
-            <div className="flex gap-2 items-center">
-              <Select value={newLinkKind} onChange={(e) => setNewLinkKind(e.target.value)} className="w-32">
-                <option value="WEBSITE">Website</option>
-                <option value="CATALOG">Catalog</option>
-                <option value="INSTAGRAM">Instagram</option>
-                <option value="DOCS">Docs</option>
-              </Select>
-              <Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://..." className="flex-1" />
-              <Input value={newLinkLabel} onChange={(e) => setNewLinkLabel(e.target.value)} placeholder="Label (optional)" className="w-32" />
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+              <div className="grid gap-2 sm:grid-cols-[7rem_minmax(0,1fr)]">
+                <Select value={newLinkKind} onChange={(e) => setNewLinkKind(e.target.value)} className="w-full">
+                  <option value="WEBSITE">Website</option>
+                  <option value="CATALOG">Catalog</option>
+                  <option value="INSTAGRAM">Instagram</option>
+                  <option value="DOCS">Docs</option>
+                </Select>
+                <Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://..." className="min-w-0" />
+                <Input value={newLinkLabel} onChange={(e) => setNewLinkLabel(e.target.value)} placeholder="Label (optional)" className="min-w-0 sm:col-span-2" />
+              </div>
               <Button type="button" size="sm" variant="secondary" onClick={addLink}>Add</Button>
             </div>
           </div>
@@ -474,16 +476,18 @@ export function BrandDirectory({
                   <Button type="button" size="sm" variant="ghost" onClick={() => removeLink(idx)}>Remove</Button>
                 </div>
               ))}
-              <div className="flex gap-2 items-center">
-                <Select value={newLinkKind} onChange={(e) => setNewLinkKind(e.target.value)} className="w-32">
-                  <option value="WEBSITE">Website</option>
-                  <option value="CATALOG">Catalog</option>
-                  <option value="INSTAGRAM">Instagram</option>
-                  <option value="DOCS">Docs</option>
-                </Select>
-                <Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://..." className="flex-1" />
-                <Input value={newLinkLabel} onChange={(e) => setNewLinkLabel(e.target.value)} placeholder="Label (optional)" className="w-32" />
-              <Button type="button" size="sm" variant="secondary" onClick={addLink}>Add</Button>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+                <div className="grid gap-2 sm:grid-cols-[7rem_minmax(0,1fr)]">
+                  <Select value={newLinkKind} onChange={(e) => setNewLinkKind(e.target.value)} className="w-full">
+                    <option value="WEBSITE">Website</option>
+                    <option value="CATALOG">Catalog</option>
+                    <option value="INSTAGRAM">Instagram</option>
+                    <option value="DOCS">Docs</option>
+                  </Select>
+                  <Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://..." className="min-w-0" />
+                  <Input value={newLinkLabel} onChange={(e) => setNewLinkLabel(e.target.value)} placeholder="Label (optional)" className="min-w-0 sm:col-span-2" />
+                </div>
+                <Button type="button" size="sm" variant="secondary" onClick={addLink}>Add</Button>
               </div>
             </div>
 

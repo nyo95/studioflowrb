@@ -5,9 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.03**
-- Next local revision: **R4.04**
+- Current revision: **R4.04**
+- Next local revision: **R4.05**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.04 — 2026-09-01 — fix(masterdata): rebalance Brand link entry
+
+- Reworked the Brand create and edit link builders so link type and URL share
+  the primary row, the optional label receives a full second row, and Add stays
+  aligned without squeezing either input.
+
+### Verification
+
+- `npm run typecheck` and `npm run lint`: passed.
+- Browser dialog inspection confirms both URL and optional-label controls remain
+  present in the corrected two-row link-entry layout.
 
 ## R4.03 — 2026-09-01 — fix(ui-engine): preserve primary action labels
 
