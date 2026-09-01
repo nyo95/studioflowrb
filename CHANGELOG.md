@@ -37,6 +37,33 @@ Status: **local internal checkpoint — not accepted or complete**
   `masterdata_test` database.
 - `git diff --check`: passed before commit.
 
+## R3.11 — 2026-09-01 — fix(masterdata): recover pricing and deletion workflows
+
+Status: **local**
+
+### Changed
+
+- Repaired the interrupted Pricing directory so the three contract tabs compile
+  and retain their permission-scoped search, active/archive filter, archive,
+  restore, and deletion-request workflows. The SKU flow remains the sole
+  creation path for Material Prices.
+- Added a permission-gated deletion-approval directory with explicit permanent
+  deletion and rejection confirmations. It is intentionally not a primary
+  Master Data navigation destination: dictionary/governance placement remains
+  the next UI correction.
+- Removed an undeclared test dependency and invalid UI Engine imports from the
+  interrupted agent draft. Primary navigation is again limited to Overview,
+  Brands, Vendors, and Pricing.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `npm run build`: passed.
+- `npm test`: not passing because the isolated `masterdata_test` PostgreSQL
+  endpoint on port 5433 is unavailable while Docker Desktop starts; no legacy
+  database or resource was accessed.
+
 ### Remaining
 
 - Complete Pricing create/edit UI and the deletion-approval directory.

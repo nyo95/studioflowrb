@@ -9,7 +9,7 @@ type NavLink = {
   exact?: boolean;
 };
 
-export function MasterDataNav({ pendingDeletions = 0 }: { pendingDeletions?: number }) {
+export function MasterDataNav() {
   const pathname = usePathname();
 
   const links: NavLink[] = [
