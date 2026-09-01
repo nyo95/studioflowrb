@@ -5,9 +5,16 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.21**
-- Next local revision: **R3.22**
+- Current revision after this entry is committed: **R3.22**
+- Next local revision: **R3.23**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.22 — 2026-09-01 — docs(masterdata): activate closure work order
+
+Status: **owner-authorized execution boundary**
+
+- Added the deterministic Master Data closure work order for every active
+  contract slice. Deferred Master Data capabilities remain out of scope.
 
 ## R3.21 — 2026-09-01 — docs(recovery): record local owner access repair
 
