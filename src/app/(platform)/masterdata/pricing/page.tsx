@@ -82,10 +82,14 @@ export default async function PricingPage() {
     );
   }
 
-  const [rawMaterial, rawML, rawLabor] = await Promise.all([
+  const [rawMaterial, rawML, rawLabor, skus, vendors, units, categories] = await Promise.all([
     canReadMaterial ? masterDataService.listPriceMaterials({ grants, includeArchived: true }) : [],
     canReadWork ? masterDataService.listPriceMaterialLabors({ grants, includeArchived: true }) : [],
     canReadWork ? masterDataService.listPriceLabors({ grants, includeArchived: true }) : [],
+    masterDataService.listSkus({ grants }),
+    masterDataService.listVendors({ grants }),
+    masterDataService.listUnits({ grants }),
+    masterDataService.listCategories({ grants }),
   ]);
 
   const materialPrices = rawMaterial.map(mapMaterialPrice);
@@ -110,6 +114,10 @@ export default async function PricingPage() {
         canManageWork={canManageWork}
         canReadMaterial={canReadMaterial}
         canReadWork={canReadWork}
+        skus={skus.map((sku) => ({ id: sku.id, name: sku.name, code: sku.code }))}
+        vendors={vendors.filter((vendor) => !vendor.deleted_at).map((vendor) => ({ id: vendor.id, name: vendor.name }))}
+        units={units.filter((unit) => unit.status === "ACTIVE").map((unit) => ({ id: unit.id, code: unit.code, name: unit.name }))}
+        workCategories={categories.filter((category) => category.status === "ACTIVE" && category.kind === "WORK").map((category) => ({ id: category.id, name: category.name }))}
       />
     </div>
   );

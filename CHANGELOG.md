@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.16**
-- Next local revision: **R3.17**
+- Current revision after this entry is committed: **R3.17**
+- Next local revision: **R3.18**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## R3.10 — 2026-09-01 — chore(masterdata): checkpoint in-progress implementation
@@ -155,6 +155,30 @@ Status: **local**
 ### Verification
 
 - `git diff --check`: passed.
+
+## R3.17 — 2026-09-01 — feat(masterdata): add pricing entry flow
+
+Status: **local**
+
+### Changed
+
+- Added a permission-aware Pricing create flow for Material, Material + Labor,
+  and Labor Only records.
+- Added server-side Zod validation and service dispatch for create/update price
+  actions.
+- Loaded active SKU, Vendor, Unit, and WORK Category references into the Pricing
+  directory.
+- Preserved existing archive, restore, and permanent-deletion-request flows.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `git diff --check`: passed.
+
+### Remaining
+
+- Pricing edit UI and full browser acceptance remain to be completed.
 
 ## R3.09 — 2026-08-31 — feat(masterdata): harden lifecycle and test isolation
 
