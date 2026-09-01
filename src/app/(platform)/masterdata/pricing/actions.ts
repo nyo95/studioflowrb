@@ -65,7 +65,7 @@ export async function createMaterialSkuAction(formData: FormData): Promise<Actio
     const { principal, grants } = await requirePrincipalGrants();
     const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
     const schema = z.object({
-      name: z.string().min(1).max(128),
+      name: z.string().max(128).optional().nullable().or(z.literal("")),
       code: z.string().max(32).optional().nullable().or(z.literal("")),
       brandId: z.string().uuid().optional().nullable().or(z.literal("")),
       baseUnitId: z.string().uuid(),
@@ -79,9 +79,9 @@ export async function createMaterialSkuAction(formData: FormData): Promise<Actio
       amount: z.string().min(1),
       currency: z.string().length(3),
       notes: z.string().max(1000).optional().nullable().or(z.literal("")),
-    });
+    }).refine((value) => Boolean(value.name?.trim() || value.code?.trim()), { message: "SKU code or SKU name is required.", path: ["name"] });
     const parsed = schema.safeParse({
-      name: String(formData.get("name") ?? ""),
+      name: formData.get("name") ? String(formData.get("name")) : null,
       code: formData.get("code") ? String(formData.get("code")) : null,
       brandId: formData.get("brandId") ? String(formData.get("brandId")) : null,
       baseUnitId: String(formData.get("baseUnitId") ?? ""),

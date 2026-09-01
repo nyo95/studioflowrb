@@ -31,6 +31,10 @@ cannot be created without that initial offer, and a live SKU cannot lose its
 last live material price. Subsequent Vendors add additional `PriceMaterial`
 offers to the existing SKU; they do not create another SKU.
 
+SKU code and SKU name are separate fields. Each is optional individually, but
+at least one must be supplied. Code-only products are valid; the UI displays
+the code as the fallback label and the service derives the slug from it.
+
 ### 2.1 Identity
 
 One price per **SKU × Vendor** pair. No separate `code` field — the pair itself is the identity.

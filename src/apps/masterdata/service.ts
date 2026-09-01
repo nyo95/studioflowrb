@@ -59,8 +59,8 @@ function requiredName(value: string, code: string): string {
   return name;
 }
 
-function requiredSlug(name: string): string {
-  const slug = toSlug(name);
+function requiredSlug(value: string): string {
+  const slug = toSlug(value);
   if (!slug) throw new AppError("VALIDATION", "SLUG_INVALID", "The name must contain a usable identifier.");
   return slug;
 }
@@ -84,6 +84,15 @@ function requiredAmount(value: string): string {
     throw new AppError("VALIDATION", "PRICE_AMOUNT_NEGATIVE", "Amount must be non-negative.");
   }
   return amount;
+}
+
+function resolveSkuIdentity(nameValue?: string | null, codeValue?: string | null) {
+  const name = normalizeText(nameValue ?? "") || null;
+  const code = codeValue?.trim() || null;
+  if (!name && !code) {
+    throw new AppError("VALIDATION", "SKU_IDENTITY_REQUIRED", "SKU code or SKU name is required.");
+  }
+  return { name, code, slug: requiredSlug(name ?? code!) };
 }
 
 type SkuMeasurementInput = {
@@ -2465,8 +2474,8 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
     async createSku(input: {
       grants: PermissionGrants;
       actor: AuditActor;
-      name: string;
-      code?: string;
+      name?: string | null;
+      code?: string | null;
       notes?: string;
       brandId?: string;
       baseUnitId: string;
@@ -2485,8 +2494,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
     }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuManage);
       actorIsUsable(input.actor);
-      const name = requiredName(input.name, "SKU_NAME_REQUIRED");
-      const slug = requiredSlug(name);
+      const identity = resolveSkuIdentity(input.name, input.code);
       if (!input.categoryIds || input.categoryIds.length === 0) {
         throw new AppError("VALIDATION", "SKU_CATEGORY_REQUIRED", "At least one category is required.");
       }
@@ -2554,9 +2562,9 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           sku = await tx.sku.create({
             data: {
               id: randomUUID(),
-              name,
-              slug,
-              code: input.code?.trim() || null,
+              name: identity.name,
+              slug: identity.slug,
+              code: identity.code,
               notes: input.notes?.trim() || null,
               brand_id: input.brandId ?? null,
               base_unit_id: input.baseUnitId,
@@ -2618,7 +2626,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           entityId: skuId,
           actor: input.actor,
           metadata: {
-            slug,
+            slug: identity.slug,
             brand_id: input.brandId ?? null,
             categories: input.categoryIds.length,
             prices: input.priceMaterials.length,
@@ -2633,7 +2641,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       grants: PermissionGrants;
       actor: AuditActor;
       skuId: string;
-      name: string;
+      name?: string | null;
       code?: string | null;
       notes?: string | null;
       brandId?: string | null;
@@ -2647,8 +2655,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
     }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuManage);
       actorIsUsable(input.actor);
-      const name = requiredName(input.name, "SKU_NAME_REQUIRED");
-      const slug = requiredSlug(name);
+      const identity = resolveSkuIdentity(input.name, input.code);
       if (!input.categoryIds || input.categoryIds.length === 0) {
         throw new AppError("VALIDATION", "SKU_CATEGORY_REQUIRED", "At least one category is required.");
       }
@@ -2726,9 +2733,9 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         }
 
         const changes: Record<string, { from: unknown; to: unknown }> = {};
-        if (existing.name !== name) {
-          changes.name = { from: existing.name, to: name };
-          changes.slug = { from: existing.slug, to: slug };
+        if (existing.name !== identity.name) {
+          changes.name = { from: existing.name, to: identity.name };
+          changes.slug = { from: existing.slug, to: identity.slug };
         }
         if ((existing.code || null) !== (input.code?.trim() || null)) {
           changes.code = { from: existing.code, to: input.code?.trim() || null };
@@ -2754,9 +2761,9 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           await tx.sku.update({
             where: { id: input.skuId },
             data: {
-              name,
-              slug,
-              code: input.code?.trim() || null,
+              name: identity.name,
+              slug: identity.slug,
+              code: identity.code,
               notes: input.notes?.trim() || null,
               brand_id: input.brandId || null,
               base_unit_id: input.baseUnitId,

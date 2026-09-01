@@ -98,6 +98,33 @@ describe("Master Data service", () => {
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "sku.created", entity_id: sku.id } }), 1);
   });
 
+  it("accepts a code-only SKU and uses the code as its fallback identity", async () => {
+    const context = await createMaterialContext();
+    const result = await service.createSku({
+      grants: GRANTS,
+      actor: ACTOR,
+      code: "KPF 2005",
+      baseUnitId: context.unit.id,
+      categoryIds: [context.categoryId],
+      priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }],
+    });
+
+    const sku = await testDb.prisma.sku.findUniqueOrThrow({ where: { id: result.skuId } });
+    assert.equal(sku.name, null);
+    assert.equal(sku.code, "KPF 2005");
+    assert.equal(sku.slug, "kpf-2005");
+    await assert.rejects(
+      () => service.createSku({
+        grants: GRANTS,
+        actor: ACTOR,
+        baseUnitId: context.unit.id,
+        categoryIds: [context.categoryId],
+        priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }],
+      }),
+      (error: unknown) => error instanceof AppError && error.code === "SKU_IDENTITY_REQUIRED",
+    );
+  });
+
   it("derives exact sheet-to-square-metre conversion from structured dimensions", async () => {
     const context = await createMaterialContext();
     const [baseUnit, purchaseUnit, dimensionUnit] = await Promise.all([

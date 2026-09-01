@@ -38,7 +38,7 @@ import {
 
 type SkuRow = {
   id: string;
-  name: string;
+  name: string | null;
   slug: string;
   code: string | null;
   notes: string | null;
@@ -104,7 +104,7 @@ export function SkuDirectory({
     if (!query) return true;
     const q = query.toLowerCase();
     return (
-      sku.name.toLowerCase().includes(q) ||
+      (sku.name ?? "").toLowerCase().includes(q) ||
       sku.slug.toLowerCase().includes(q) ||
       (sku.code && sku.code.toLowerCase().includes(q)) ||
       (sku.brand && sku.brand.name.toLowerCase().includes(q))
@@ -178,7 +178,7 @@ export function SkuDirectory({
                 <TableRow key={sku.id}>
                   <TableCell>
                     <TableCellContent
-                      primary={<span className="font-semibold">{sku.name}</span>}
+                      primary={<span className="font-semibold">{sku.name ?? sku.code ?? "Unnamed SKU"}</span>}
                       secondary={
                         <div className="text-xs text-ink-secondary">
                           {sku.code ? <span className="font-mono">{sku.code} • </span> : null}
@@ -287,12 +287,12 @@ export function SkuDirectory({
           className="grid gap-4 max-h-[80vh] overflow-y-auto pr-1"
         >
           {createError ? <InlineError>{createError}</InlineError> : null}
-          <Field label="SKU name" required>
-            <Input name="name" required maxLength={128} placeholder="e.g. HPL Natural Teak 0.8mm" autoFocus />
-          </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="SKU code / Article #">
               <Input name="code" placeholder="TH-001AA" maxLength={32} />
+            </Field>
+            <Field label="SKU name">
+              <Input name="name" maxLength={128} placeholder="e.g. HPL Natural Teak 0.8mm" autoFocus />
             </Field>
             <Field label="Brand">
               <Select name="brandId">
@@ -384,7 +384,7 @@ export function SkuDirectory({
           onOpenChange={(open) => {
             if (!open) setEditTarget(null);
           }}
-          title={`Edit SKU ${editTarget.name}`}
+          title={`Edit SKU ${editTarget.name ?? editTarget.code ?? "Unnamed SKU"}`}
           description="Update SKU profile, brand association, and product category classifications."
         >
           <form
@@ -408,12 +408,12 @@ export function SkuDirectory({
           >
             <input type="hidden" name="skuId" value={editTarget.id} />
             {editError ? <InlineError>{editError}</InlineError> : null}
-            <Field label="SKU name" required>
-              <Input name="name" defaultValue={editTarget.name} required maxLength={128} autoFocus />
-            </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="SKU code / Article #">
                 <Input name="code" defaultValue={editTarget.code ?? ""} maxLength={32} />
+              </Field>
+              <Field label="SKU name">
+                <Input name="name" defaultValue={editTarget.name ?? ""} maxLength={128} autoFocus />
               </Field>
               <Field label="Brand">
                 <Select name="brandId" defaultValue={editTarget.brand?.id ?? ""}>

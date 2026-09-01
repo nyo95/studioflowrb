@@ -58,8 +58,12 @@ refer only to the R1.05 Git snapshot and define what must not be reintroduced.
 - SKU uses archive/restore and the shared permanent-deletion approval workflow.
 - SKU creation is entered from Pricing → Material, not from the standalone SKU
   directory. The flow atomically creates the SKU and its first `PriceMaterial`.
-- Create requires name, Unit, Category, and at least one `PriceMaterial`; a
-  live SKU must retain at least one live `PriceMaterial`.
+- Create requires at least one of `code` or `name`, plus Unit, Category, and at
+  least one `PriceMaterial`; a live SKU must retain at least one live
+  `PriceMaterial`.
+- `code` and `name` are stored separately and may both be present. When only
+  `code` exists, it is the display fallback and the slug source; when only
+  `name` exists, the name remains the slug source.
 - SKU may store optional rectangular geometry as positive decimal length and
   width, optional thickness, and a required dimension Unit when geometry is
   present. Geometry is structured data, not Notes or display-only text.

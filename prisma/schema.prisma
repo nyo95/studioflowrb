@@ -479,7 +479,7 @@ model Sku {
   id                      String    @id @default(uuid())
   brand_id                String?
   code                    String?
-  name                    String
+  name                    String?
   slug                    String
   base_unit_id            String
   purchase_unit_id        String?

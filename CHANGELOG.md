@@ -5,9 +5,36 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.15**
-- Next local revision: **R4.16**
+- Current revision: **R4.16**
+- Next local revision: **R4.17**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.16 — 2026-09-02 — fix(masterdata): allow code-only SKU identity
+
+- Updated the Master Data and Pricing contracts so SKU code and SKU name are
+  separate optional fields, with at least one required.
+- Made persisted SKU name nullable and added a rebuild-only migration for the
+  existing database shape.
+- Added the same invariant at the server action and service boundaries;
+  code-only SKUs derive their fallback slug and remain usable in search,
+  tables, pricing, and edit flows.
+- Reordered SKU entry fields to present code before name and kept existing
+  material-price creation as the single SKU-plus-first-price workflow.
+- Added an integration test covering code-only creation and rejection of an
+  empty SKU identity.
+
+### Verification
+
+- `npx prisma migrate deploy` against disposable `masterdata_test` only
+- `npm test` — 207 passed, 0 failed
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+- `git diff --check`
+
+### Remaining
+
+- No known regression or unresolved backend logic issue in this scope.
 
 ## R4.14 — 2026-09-01 — fix(masterdata/pricing): streamline SKU creation and measurement context
 

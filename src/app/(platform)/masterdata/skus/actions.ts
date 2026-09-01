@@ -37,7 +37,7 @@ export async function createSkuAction(
     const currency = String(formData.get("currency") ?? "IDR").toUpperCase();
 
     const schema = z.object({
-      name: z.string().min(1, "SKU name is required").max(128),
+      name: z.string().max(128).optional().nullable().or(z.literal("")),
       code: z.string().max(32).optional().nullable().or(z.literal("")),
       brandId: z.string().uuid().optional().nullable().or(z.literal("")),
       baseUnitId: z.string().uuid("Base unit is required"),
@@ -51,10 +51,10 @@ export async function createSkuAction(
       amount: z.string().min(1, "Amount is required"),
       currency: z.string().length(3, "3-letter currency code"),
       notes: z.string().max(1000).optional().nullable().or(z.literal("")),
-    });
+    }).refine((value) => Boolean(value.name?.trim() || value.code?.trim()), { message: "SKU code or SKU name is required.", path: ["name"] });
 
     const parsed = schema.safeParse({
-      name: String(formData.get("name") ?? ""),
+      name: formData.get("name") ? String(formData.get("name")) : null,
       code: formData.get("code") ? String(formData.get("code")) : null,
       brandId: formData.get("brandId") ? String(formData.get("brandId")) : null,
       baseUnitId: String(formData.get("baseUnitId") ?? ""),
@@ -109,7 +109,7 @@ export async function updateSkuAction(
 
     const schema = z.object({
       skuId: z.string().uuid(),
-      name: z.string().min(1, "SKU name is required").max(128),
+      name: z.string().max(128).optional().nullable().or(z.literal("")),
       code: z.string().max(32).optional().nullable().or(z.literal("")),
       brandId: z.string().uuid().optional().nullable().or(z.literal("")),
       baseUnitId: z.string().uuid("Base unit is required"),
@@ -120,11 +120,11 @@ export async function updateSkuAction(
       dimensionUnitId: z.string().uuid().optional().nullable().or(z.literal("")),
       categoryIds: z.array(z.string().uuid()).min(1, "At least one category is required"),
       notes: z.string().max(1000).optional().nullable().or(z.literal("")),
-    });
+    }).refine((value) => Boolean(value.name?.trim() || value.code?.trim()), { message: "SKU code or SKU name is required.", path: ["name"] });
 
     const parsed = schema.safeParse({
       skuId: String(formData.get("skuId") ?? ""),
-      name: String(formData.get("name") ?? ""),
+      name: formData.get("name") ? String(formData.get("name")) : null,
       code: formData.get("code") ? String(formData.get("code")) : null,
       brandId: formData.get("brandId") ? String(formData.get("brandId")) : null,
       baseUnitId: String(formData.get("baseUnitId") ?? ""),

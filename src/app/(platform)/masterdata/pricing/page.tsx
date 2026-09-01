@@ -16,7 +16,7 @@ function mapMaterialPrice(p: {
   currency: string;
   notes: string | null;
   deleted_at: Date | null;
-  sku: { name: string; id: string; code: string | null; slug: string; brand: { name: string; id: string; slug: string } | null };
+  sku: { name: string | null; id: string; code: string | null; slug: string; brand: { name: string; id: string; slug: string } | null };
   supplier_vendor: { id: string; name: string; slug: string };
   unit: { id: string; code: string; name: string };
   source_link: { id: string; kind: string; url: string; label: string | null } | null;
