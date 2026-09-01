@@ -9,6 +9,19 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Next local revision: **R4.07**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
+## R4.07 — 2026-09-01 — fix(masterdata): use shared brand action contract
+
+- Passed the Brand directory create icon through the shared Button
+  `leadingIcon` prop in both the toolbar and empty state, preventing the icon
+  and `New brand` label from rendering as separate child content.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- Browser acceptance: both Brand create actions render the plus icon and
+  `New brand` label horizontally in the toolbar and empty state.
+
 ## R4.06 — 2026-09-01 — fix(masterdata): align directory actions
 
 - Moved the primary create action in Brand, Category, SKU, Unit, Vendor, and

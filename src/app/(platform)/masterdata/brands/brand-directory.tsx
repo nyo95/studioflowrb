@@ -181,10 +181,14 @@ export function BrandDirectory({
   return (
     <SectionCard>
       <TableToolbar actions={canManage ? (
-        <Button type="button" variant="primary" onClick={openCreateDialog}>
-          <Plus aria-hidden="true" />
-          <span>New brand</span>
-        </Button>
+          <Button
+            type="button"
+            variant="primary"
+            leadingIcon={<Plus aria-hidden="true" />}
+            onClick={openCreateDialog}
+          >
+            New brand
+          </Button>
       ) : undefined}>
         <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search brands by name, hashtag, category..." />
       </TableToolbar>
@@ -194,9 +198,13 @@ export function BrandDirectory({
           title="No brands found"
           description={query ? "No brands match your search query." : "Add your first catalog brand."}
           action={!query && canManage ? (
-            <Button type="button" variant="primary" onClick={openCreateDialog}>
-              <Plus aria-hidden="true" />
-              <span>New brand</span>
+            <Button
+              type="button"
+              variant="primary"
+              leadingIcon={<Plus aria-hidden="true" />}
+              onClick={openCreateDialog}
+            >
+              New brand
             </Button>
           ) : undefined}
         />
