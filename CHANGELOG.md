@@ -5,9 +5,24 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.18**
-- Next local revision: **R3.19**
+- Current revision after this entry is committed: **R3.19**
+- Next local revision: **R3.20**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.19 — 2026-09-01 — docs(verification): record isolated test execution
+
+Status: **local verification correction**
+
+### Verification
+
+- Verified the owner-provided PostgreSQL target as the isolated rebuild test
+  container `studioflowrb-gateb-test-db` on port `5433`, database
+  `studioflowrb_test`; no legacy repository or database was accessed.
+- Applied the pending rebuild migrations to that disposable target with
+  `prisma migrate deploy`.
+- `npm test`: **196 passed, 0 failed, 0 cancelled**.
+- The test process emitted one upstream `pg` deprecation warning about
+  concurrent `client.query()` calls; it did not affect test results.
 
 ## R3.18 — 2026-09-01 — feat(masterdata): add pricing edit dialogs
 
