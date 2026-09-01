@@ -22,7 +22,7 @@ async function context() {
 }
 
 const priceForm = z.object({
-  id: z.string().uuid().optional(), name: z.string().min(1).max(128).optional(), skuId: z.string().uuid().optional(), vendorId: z.string().uuid(), categoryId: z.string().uuid().optional(), unitId: z.string().uuid().optional(), amount: z.string().min(1), currency: z.string().length(3), scopeNote: z.string().max(1000).optional(), notes: z.string().max(1000).optional(),
+  id: z.string().uuid().optional(), name: z.string().min(1).max(128).optional(), skuId: z.string().uuid().optional(), vendorId: z.string().uuid().optional(), categoryId: z.string().uuid().optional(), unitId: z.string().uuid().optional(), amount: z.string().min(1), currency: z.string().length(3), scopeNote: z.string().max(1000).optional(), notes: z.string().max(1000).optional(),
 });
 
 export async function savePriceAction(kind: PriceKind, formData: FormData): Promise<ActionResult<unknown>> {
@@ -31,15 +31,23 @@ export async function savePriceAction(kind: PriceKind, formData: FormData): Prom
     const parsed = priceForm.safeParse(raw);
     if (!parsed.success) throw validationError(parsed.error);
     const value = parsed.data; const ctx = await context();
+    if (kind === "material" && !value.id) {
+      const required = z.object({ skuId: z.string().uuid(), vendorId: z.string().uuid() }).safeParse(raw);
+      if (!required.success) throw validationError(required.error);
+    }
+    if (kind !== "material") {
+      const required = z.object({ name: z.string().min(1), categoryId: z.string().uuid(), vendorId: z.string().uuid(), unitId: z.string().uuid() }).safeParse(raw);
+      if (!required.success) throw validationError(required.error);
+    }
     const result = kind === "material" ? value.id
       ? await masterDataService.updatePriceMaterial({ ...ctx, priceMaterialId: value.id, amount: value.amount, currency: value.currency, unitId: value.unitId, notes: value.notes })
-      : await masterDataService.createPriceMaterial({ ...ctx, skuId: value.skuId!, supplierVendorId: value.vendorId, amount: value.amount, currency: value.currency, notes: value.notes })
+      : await masterDataService.createPriceMaterial({ ...ctx, skuId: value.skuId!, supplierVendorId: value.vendorId!, amount: value.amount, currency: value.currency, notes: value.notes })
       : kind === "material-labor" ? value.id
-        ? await masterDataService.updatePriceMaterialLabor({ ...ctx, priceMaterialLaborId: value.id, name: value.name!, categoryId: value.categoryId!, vendorId: value.vendorId, unitId: value.unitId!, amount: value.amount, currency: value.currency, scopeNote: value.scopeNote, notes: value.notes })
-        : await masterDataService.createPriceMaterialLabor({ ...ctx, name: value.name!, categoryId: value.categoryId!, vendorId: value.vendorId, unitId: value.unitId!, amount: value.amount, currency: value.currency, scopeNote: value.scopeNote, notes: value.notes })
+        ? await masterDataService.updatePriceMaterialLabor({ ...ctx, priceMaterialLaborId: value.id, name: value.name!, categoryId: value.categoryId!, vendorId: value.vendorId!, unitId: value.unitId!, amount: value.amount, currency: value.currency, scopeNote: value.scopeNote, notes: value.notes })
+        : await masterDataService.createPriceMaterialLabor({ ...ctx, name: value.name!, categoryId: value.categoryId!, vendorId: value.vendorId!, unitId: value.unitId!, amount: value.amount, currency: value.currency, scopeNote: value.scopeNote, notes: value.notes })
         : value.id
-          ? await masterDataService.updatePriceLabor({ ...ctx, priceLaborId: value.id, name: value.name!, categoryId: value.categoryId!, vendorId: value.vendorId, unitId: value.unitId!, amount: value.amount, currency: value.currency, notes: value.notes })
-          : await masterDataService.createPriceLabor({ ...ctx, name: value.name!, categoryId: value.categoryId!, vendorId: value.vendorId, unitId: value.unitId!, amount: value.amount, currency: value.currency, notes: value.notes });
+          ? await masterDataService.updatePriceLabor({ ...ctx, priceLaborId: value.id, name: value.name!, categoryId: value.categoryId!, vendorId: value.vendorId!, unitId: value.unitId!, amount: value.amount, currency: value.currency, notes: value.notes })
+          : await masterDataService.createPriceLabor({ ...ctx, name: value.name!, categoryId: value.categoryId!, vendorId: value.vendorId!, unitId: value.unitId!, amount: value.amount, currency: value.currency, notes: value.notes });
     refreshPricing(); return result;
   });
 }

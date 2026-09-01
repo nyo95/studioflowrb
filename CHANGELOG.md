@@ -5,9 +5,33 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.17**
-- Next local revision: **R3.18**
+- Current revision after this entry is committed: **R3.18**
+- Next local revision: **R3.19**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.18 — 2026-09-01 — feat(masterdata): add pricing edit dialogs
+
+Status: **local Master Data continuation**
+
+### Changed
+
+- Added edit actions and pre-filled dialogs for Material, Material + Labor, and
+  Labor Only pricing records.
+- Kept Material Price identity read-only during editing: its SKU, supplier, and
+  SKU-derived unit are displayed as context rather than editable inputs.
+- Kept server-action authentication, permission checks, and Zod validation at
+  the mutation boundary; missing per-kind reference fields now fail validation
+  before service dispatch.
+
+### Verification
+
+- `npx prisma generate`: passed; regenerated the local Prisma client from the
+  pulled Master Data schema without connecting to a database.
+- `npm run typecheck`, `npm run lint`, `npm run check`, and `npm run build`:
+  passed.
+- `git diff --check`: passed.
+- `npm test` and browser acceptance: not run. They require the owner-confirmed,
+  rebuild-only PostgreSQL target and a running authenticated browser workflow.
 
 ## R3.10 — 2026-09-01 — chore(masterdata): checkpoint in-progress implementation
 
