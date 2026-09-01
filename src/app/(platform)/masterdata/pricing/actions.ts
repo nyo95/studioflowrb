@@ -42,6 +42,54 @@ const pricingCategoryQuickForm = z.object({
   name: z.string().min(1).max(64),
 });
 
+export async function createMaterialSkuAction(formData: FormData): Promise<ActionResult<{ skuId: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
+    const schema = z.object({
+      name: z.string().min(1).max(128),
+      code: z.string().max(32).optional().nullable().or(z.literal("")),
+      brandId: z.string().uuid().optional().nullable().or(z.literal("")),
+      baseUnitId: z.string().uuid(),
+      purchaseUnitId: z.string().uuid().optional().nullable().or(z.literal("")),
+      categoryIds: z.array(z.string().uuid()).min(1),
+      supplierVendorId: z.string().uuid(),
+      amount: z.string().min(1),
+      currency: z.string().length(3),
+      notes: z.string().max(1000).optional().nullable().or(z.literal("")),
+    });
+    const parsed = schema.safeParse({
+      name: String(formData.get("name") ?? ""),
+      code: formData.get("code") ? String(formData.get("code")) : null,
+      brandId: formData.get("brandId") ? String(formData.get("brandId")) : null,
+      baseUnitId: String(formData.get("baseUnitId") ?? ""),
+      purchaseUnitId: formData.get("purchaseUnitId") ? String(formData.get("purchaseUnitId")) : null,
+      categoryIds,
+      supplierVendorId: String(formData.get("supplierVendorId") ?? ""),
+      amount: String(formData.get("amount") ?? ""),
+      currency: String(formData.get("currency") ?? "IDR").toUpperCase(),
+      notes: formData.get("notes") ? String(formData.get("notes")) : null,
+    });
+    if (!parsed.success) throw validationError(parsed.error);
+    const result = await masterDataService.createSku({
+      grants,
+      actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
+      name: parsed.data.name,
+      code: parsed.data.code || undefined,
+      brandId: parsed.data.brandId || undefined,
+      baseUnitId: parsed.data.baseUnitId,
+      purchaseUnitId: parsed.data.purchaseUnitId || undefined,
+      categoryIds: parsed.data.categoryIds,
+      priceMaterials: [{ supplierVendorId: parsed.data.supplierVendorId, amount: parsed.data.amount, currency: parsed.data.currency, notes: parsed.data.notes || undefined }],
+      notes: parsed.data.notes || undefined,
+    });
+    refreshPricing();
+    revalidatePath("/masterdata/brands");
+    revalidatePath("/masterdata");
+    return result;
+  });
+}
+
 export async function createPricingWorkCategoryQuickAction(formData: FormData): Promise<ActionResult<{ categoryId: string }>> {
   return runSafeAction(async () => {
     const parsed = pricingCategoryQuickForm.safeParse(Object.fromEntries(formData));

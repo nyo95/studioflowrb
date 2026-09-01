@@ -72,6 +72,7 @@ export default async function PricingPage() {
   const canReadWork = hasPermission(grants, MASTERDATA_PERMISSIONS.priceWorkRead);
   const canManageVendors = hasPermission(grants, MASTERDATA_PERMISSIONS.vendorManage);
   const canManageCategories = hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryManage);
+  const canManageSkus = hasPermission(grants, MASTERDATA_PERMISSIONS.skuManage);
 
   if (!canReadMaterial && !canReadWork) {
     return (
@@ -84,7 +85,7 @@ export default async function PricingPage() {
     );
   }
 
-  const [rawMaterial, rawML, rawLabor, skus, vendors, units, categories, vendorTypes] = await Promise.all([
+  const [rawMaterial, rawML, rawLabor, skus, vendors, units, categories, brands, vendorTypes] = await Promise.all([
     canReadMaterial ? masterDataService.listPriceMaterials({ grants, includeArchived: true }) : [],
     canReadWork ? masterDataService.listPriceMaterialLabors({ grants, includeArchived: true }) : [],
     canReadWork ? masterDataService.listPriceLabors({ grants, includeArchived: true }) : [],
@@ -92,6 +93,7 @@ export default async function PricingPage() {
     masterDataService.listVendors({ grants }),
     masterDataService.listUnits({ grants }),
     masterDataService.listCategories({ grants }),
+    masterDataService.listBrands({ grants }),
     canManageVendors ? masterDataService.listVendorTypesForAssignment({ grants }) : [],
   ]);
 
@@ -119,6 +121,9 @@ export default async function PricingPage() {
         canReadWork={canReadWork}
         canManageVendors={canManageVendors}
         canManageCategories={canManageCategories}
+        canManageSkus={canManageSkus}
+        brands={brands.filter((brand) => !brand.deleted_at).map((brand) => ({ id: brand.id, name: brand.name }))}
+        productCategories={categories.filter((category) => category.status === "ACTIVE" && category.kind === "PRODUCT").map((category) => ({ id: category.id, name: category.name }))}
         skus={skus.map((sku) => ({ id: sku.id, name: sku.name, code: sku.code }))}
         vendors={vendors.filter((vendor) => !vendor.deleted_at).map((vendor) => ({ id: vendor.id, name: vendor.name }))}
         units={units.filter((unit) => unit.status === "ACTIVE").map((unit) => ({ id: unit.id, code: unit.code, name: unit.name }))}

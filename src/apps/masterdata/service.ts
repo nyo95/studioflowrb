@@ -2863,6 +2863,13 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       return runTransaction(async (tx) => {
         const price = await tx.priceMaterial.findUniqueOrThrow({ where: { id: input.priceMaterialId } });
         if (price.deleted_at !== null) throw new AppError("CONFLICT", "PRICE_ALREADY_ARCHIVED", "Price is already archived.");
+        const sku = await tx.sku.findUniqueOrThrow({ where: { id: price.sku_id }, select: { deleted_at: true } });
+        if (sku.deleted_at === null) {
+          const livePriceCount = await tx.priceMaterial.count({ where: { sku_id: price.sku_id, deleted_at: null } });
+          if (livePriceCount <= 1) {
+            throw new AppError("CONFLICT", "SKU_PRICE_REQUIRED", "A live SKU must retain at least one active material price.");
+          }
+        }
         await addDirectCause(tx, "price_material", input.priceMaterialId);
         await tx.priceMaterial.update({ where: { id: input.priceMaterialId }, data: { deleted_at: new Date() } });
         await writeAudit(tx, {

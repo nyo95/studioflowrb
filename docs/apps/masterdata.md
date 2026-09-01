@@ -53,7 +53,10 @@ refer only to the R1.05 Git snapshot and define what must not be reintroduced.
 - `code` is retained and nullable.
 - Vendor is not stored on SKU; Vendor belongs on `PriceMaterial`.
 - SKU uses archive/restore and the shared permanent-deletion approval workflow.
-- Create requires name, Unit, Category, and at least one PriceMaterial.
+- SKU creation is entered from Pricing → Material, not from the standalone SKU
+  directory. The flow atomically creates the SKU and its first `PriceMaterial`.
+- Create requires name, Unit, Category, and at least one `PriceMaterial`; a
+  live SKU must retain at least one live `PriceMaterial`.
 - Archiving a SKU archives its PriceMaterial rows. SkuCategory, Media, and Sample
   relations remain independent.
 - All staff use one SKU management permission package.

@@ -5,9 +5,29 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.06**
-- Next local revision: **R4.07**
+- Current revision: **R4.09**
+- Next local revision: **R4.10**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.10 — 2026-09-01 — feat(pricing): make material price the SKU entry point
+
+- Added a Material Price create mode that atomically creates a new SKU with
+  its first material offer using the existing `createSku` transaction.
+- Kept the existing-SKU offer path for adding additional Vendor prices.
+- Removed standalone New SKU entry actions from the SKU directory while
+  retaining list, edit, archive, restore, and deletion workflows.
+- Prevented archiving the last live material price of a live SKU, preserving
+  the contract invariant that every live SKU has a live price.
+- Updated Pricing and Master Data contracts to document the entry point and
+  lifecycle invariant.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- Browser acceptance: Material Pricing exposes both existing-SKU offer and
+  `Create SKU + first price` modes; the standalone SKU directory has no create
+  action. The last-live-price guard is enforced in the service transaction.
 
 ## R4.09 — 2026-09-01 — feat(pricing): create work categories inline
 

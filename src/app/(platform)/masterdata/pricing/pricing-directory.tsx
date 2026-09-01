@@ -4,7 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { Archive, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import { Button, ConfirmDialog, CreatableSearch, DataTable, Dialog, EmptyState, Field, FormActions, InlineError, Input, Pagination, SearchField, SectionCard, Select, SimpleTextEditor, Spinner, StatusBadge, type SortDirection, TableCell, TableCellContent, TableHead, TableHeader, TableRow, TableToolbar, Tabs, useOptionOverlay } from "@/platform/ui_engine";
 import { compareDecimals, formatDecimal, type DecimalString } from "@platform/utilities/decimal";
-import { archivePriceAction, createPricingVendorQuickAction, createPricingWorkCategoryQuickAction, requestPriceDeletionAction, restorePriceAction, savePriceAction } from "./actions";
+import { archivePriceAction, createMaterialSkuAction, createPricingVendorQuickAction, createPricingWorkCategoryQuickAction, requestPriceDeletionAction, restorePriceAction, savePriceAction } from "./actions";
 
 type Kind = "material" | "material-labor" | "labor";
 type MaterialRow = { id: string; sku: { id: string; name: string; code: string | null }; supplier_vendor: { id: string; name: string }; amount: string; currency: string; unit: { id: string; code: string; name: string }; notes: string | null; deleted_at: Date | null };
@@ -15,7 +15,7 @@ type Ref = { id: string; name: string };
 type PriceSortKey = "name" | "vendor" | "amount";
 const PRICE_PAGE_SIZE = 25;
 
-export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; canManageVendors: boolean; canManageCategories: boolean; skus: Array<{ id: string; name: string; code: string | null }>; vendors: Ref[]; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
+export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; canManageVendors: boolean; canManageCategories: boolean; canManageSkus: boolean; skus: Array<{ id: string; name: string; code: string | null }>; brands: Ref[]; productCategories: Ref[]; vendors: Ref[]; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
   const [query, setQuery] = useState(""); const [status, setStatus] = useState("ACTIVE"); const [page, setPage] = useState(1); const [sort, setSort] = useState<{ key: PriceSortKey; direction: SortDirection }>({ key: "name", direction: "asc" }); const [editor, setEditor] = useState<Editor | null>(null); const [formError, setFormError] = useState<string | null>(null);
   const [archive, setArchive] = useState<Target | null>(null); const [restore, setRestore] = useState<Target | null>(null); const [deletion, setDeletion] = useState<Target | null>(null); const [reason, setReason] = useState(""); const [pendingId, setPendingId] = useState<string | null>(null); const [, startTransition] = useTransition();
   const matches = (text: string, archived: boolean) => (status === "ALL" || (status === "ARCHIVED") === archived) && text.toLowerCase().includes(query.toLowerCase());
@@ -37,7 +37,7 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
   const materialPaged = paginate(sortRows(material, (row) => row.sku.name, (row) => row.supplier_vendor.name));
   const workTable = (rows: WorkRow[], kind: Kind, canManage: boolean, title: string) => { const filtered = rows.filter((row) => matches(`${row.name} ${row.category.name} ${row.vendor.name}`, Boolean(row.deleted_at))); const paged = paginate(sortRows(filtered, (row) => row.name, (row) => row.vendor.name)); return <div className="grid gap-4">{toolbar}{filtered.length === 0 ? <EmptyState title={title} description={query ? "No prices match this search." : "No pricing records yet."} /> : <><DataTable minWidth={760}><TableHeader><TableRow>{sortableHead("name", "Name")}<TableHead>Category</TableHead>{sortableHead("vendor", "Vendor")}{sortableHead("amount", "Price", "end")}<TableHead>Unit</TableHead><TableHead>Status</TableHead>{canManage && <TableHead align="end">Actions</TableHead>}</TableRow></TableHeader><tbody>{paged.rows.map((row) => <TableRow key={row.id}><TableCell><TableCellContent primary={<span className="font-semibold">{row.name}</span>} /></TableCell><TableCell>{row.category.name}</TableCell><TableCell>{row.vendor.name}</TableCell><TableCell align="end">{row.currency} {row.amount}</TableCell><TableCell><span className="font-mono text-xs">{row.unit.code}</span></TableCell><TableCell><StatusBadge tone={row.deleted_at ? "neutral" : "success"}>{row.deleted_at ? "Archived" : "Active"}</StatusBadge></TableCell>{actions(row, { kind, id: row.id, name: row.name }, canManage, () => setEditor({ kind, row }))}</TableRow>)}</tbody></DataTable>{pagination(paged.currentPage, paged.pageCount)}</>}</div>; };
   return <SectionCard>
-    {editor && <PriceEditor editor={editor} refs={props} error={formError} onCancel={closeEditor} onSubmit={async (event) => { event.preventDefault(); setFormError(null); const result = await savePriceAction(editor.kind, new FormData(event.currentTarget)); if (result.ok) closeEditor(); else setFormError(result.error.safeMessage); }} />}
+    {editor && <PriceEditor editor={editor} refs={props} error={formError} onCancel={closeEditor} onSubmit={async (event) => { event.preventDefault(); setFormError(null); const formData = new FormData(event.currentTarget); const result = editor.kind === "material" && !editor.row && formData.get("materialEntryMode") === "new" ? await createMaterialSkuAction(formData) : await savePriceAction(editor.kind, formData); if (result.ok) closeEditor(); else setFormError(result.error.safeMessage); }} />}
     <div className="flex flex-wrap justify-end gap-2">{props.canManageMaterial && <Button variant="primary" onClick={() => setEditor({ kind: "material" })}>New material price</Button>}{props.canManageWork && <Button variant="primary" onClick={() => setEditor({ kind: "material-labor" })}>New work price</Button>}{props.canManageWork && <Button variant="primary" onClick={() => setEditor({ kind: "labor" })}>New labor price</Button>}</div>
     <Tabs items={[
       { value: "material", label: `Material Prices (${props.materialPrices.length})`, disabled: !props.canReadMaterial, content: <div className="grid gap-4">{toolbar}{material.length === 0 ? <EmptyState title="No material prices" description={query ? "No prices match this search." : "Create a material price for an active SKU and eligible vendor."} /> : <><DataTable minWidth={720}><TableHeader><TableRow>{sortableHead("name", "SKU")}{sortableHead("vendor", "Supplier")}{sortableHead("amount", "Price", "end")}<TableHead>Unit</TableHead><TableHead>Status</TableHead>{props.canManageMaterial && <TableHead align="end">Actions</TableHead>}</TableRow></TableHeader><tbody>{materialPaged.rows.map((row) => <TableRow key={row.id}><TableCell><TableCellContent primary={<span className="font-semibold">{row.sku.name}</span>} secondary={row.sku.code ? <span className="font-mono text-xs">{row.sku.code}</span> : undefined} /></TableCell><TableCell>{row.supplier_vendor.name}</TableCell><TableCell align="end">{row.currency} {row.amount}</TableCell><TableCell><span className="font-mono text-xs">{row.unit.code}</span></TableCell><TableCell><StatusBadge tone={row.deleted_at ? "neutral" : "success"}>{row.deleted_at ? "Archived" : "Active"}</StatusBadge></TableCell>{actions(row, { kind: "material", id: row.id, name: `${row.sku.name} / ${row.supplier_vendor.name}` }, props.canManageMaterial, () => setEditor({ kind: "material", row }))}</TableRow>)}</tbody></DataTable>{pagination(materialPaged.currentPage, materialPaged.pageCount)}</>}</div> },
@@ -58,6 +58,9 @@ type PriceEditorRefs = {
   vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }>;
   canManageVendors: boolean;
   canManageCategories: boolean;
+  canManageSkus: boolean;
+  brands: Ref[];
+  productCategories: Ref[];
 };
 
 function parseIndonesianAmount(value: string): string | null {
@@ -77,6 +80,7 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
   const row = editor.row;
   const materialRow = material && row ? row as MaterialRow : undefined;
   const workRow = !material && row ? row as WorkRow : undefined;
+  const [materialEntryMode, setMaterialEntryMode] = useState<"existing" | "new">("existing");
   const { options: vendorOptions, upsertOverlayOption } = useOptionOverlay(refs.vendors);
   const { options: categoryOptions, upsertOverlayOption: upsertCategoryOption } = useOptionOverlay(refs.workCategories);
   const [vendorId, setVendorId] = useState(materialRow?.supplier_vendor.id ?? workRow?.vendor.id ?? "");
@@ -93,6 +97,7 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
   const [categoryCreatePending, setCategoryCreatePending] = useState(false);
   const needsMaterial = material;
   const eligibleTypes = refs.vendorTypes.filter((type) => needsMaterial ? type.canSupplyMaterial : type.canSupplyLabor);
+  const newMaterialSku = material && !edit && materialEntryMode === "new";
 
   const addVendor = async () => {
     setQuickError(null);
@@ -134,7 +139,7 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
   const vendorField = !edit && (
       <Field label={material ? "Supplier vendor" : "Vendor"} required>
       <>
-        <input type="hidden" name="vendorId" value={vendorId} />
+        <input type="hidden" name={newMaterialSku ? "supplierVendorId" : "vendorId"} value={vendorId} required />
         <CreatableSearch
           label={material ? "Supplier vendor" : "Vendor"}
           options={vendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
@@ -150,6 +155,23 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
       </>
     </Field>
   );
+
+  const newMaterialFields = newMaterialSku ? <>
+    <Field label="SKU name" required><Input name="name" required maxLength={128} placeholder="e.g. HPL Natural Teak 0.8mm" autoFocus /></Field>
+    <div className="grid grid-cols-2 gap-3">
+      <Field label="SKU code / Article #"><Input name="code" maxLength={32} placeholder="TH-001AA" /></Field>
+      <Field label="Brand"><Select name="brandId"><option value="">Unbranded / Generic</option>{refs.brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</Select></Field>
+    </div>
+    <div className="grid grid-cols-2 gap-3">
+      <Field label="Base measurement unit" required><Select name="baseUnitId" required><option value="">Select base unit...</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} — {unit.name}</option>)}</Select></Field>
+      <Field label="Purchase unit" description="Optional: purchasing unit if different."><Select name="purchaseUnitId"><option value="">Same as base unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} — {unit.name}</option>)}</Select></Field>
+    </div>
+    <Field label="Product categories" required description="At least one category is required.">
+      <div className="grid max-h-36 grid-cols-2 gap-2 overflow-y-auto rounded border border-line bg-surface-muted/30 p-2">
+        {refs.productCategories.map((category) => <label key={category.id} className="flex cursor-pointer select-none items-center gap-2 text-xs"><input type="checkbox" name="categoryIds" value={category.id} /><span>{category.name}</span></label>)}
+      </div>
+    </Field>
+  </> : null;
 
   const categoryField = !material && (
     <Field label="WORK category" required>
@@ -181,9 +203,11 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
   };
 
   return <>
-    <Dialog open onOpenChange={(open) => !open && onCancel()} title={`${edit ? "Edit" : "Create"} ${material ? "material price" : "price"}`} description={material && edit ? "SKU and supplier identity are read-only." : "Choose only active and eligible catalog references."}><form className="grid gap-4" onSubmit={onSubmit}>
+    <Dialog open onOpenChange={(open) => !open && onCancel()} title={`${edit ? "Edit" : "Create"} ${newMaterialSku ? "SKU + material price" : material ? "material price" : "price"}`} description={material && edit ? "SKU and supplier identity are read-only." : "Choose only active and eligible catalog references."}><form className="grid gap-4" onSubmit={onSubmit}>
+      {material && !edit ? <div className="flex flex-wrap gap-2 border-b border-line-subtle pb-3"><Button type="button" size="sm" variant={materialEntryMode === "existing" ? "primary" : "secondary"} onClick={() => setMaterialEntryMode("existing")}>Add price to existing SKU</Button>{refs.canManageSkus ? <Button type="button" size="sm" variant={materialEntryMode === "new" ? "primary" : "secondary"} onClick={() => setMaterialEntryMode("new")}>Create SKU + first price</Button> : null}</div> : null}
+      <input type="hidden" name="materialEntryMode" value={materialEntryMode} />
       {edit && <input type="hidden" name="id" value={row!.id} />}{error && <div role="alert" className="text-sm text-danger">{error}</div>}
-      {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name} readOnly /></Field><Field label="Supplier vendor"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Unit"><Input value={`${materialRow!.unit.name} (${materialRow!.unit.code})`} readOnly /></Field></> : <><Field label="SKU" required><Select name="skuId" required><option value="">Select SKU</option>{refs.skus.map((sku) => <option key={sku.id} value={sku.id}>{sku.name}{sku.code ? ` (${sku.code})` : ""}</option>)}</Select></Field>{vendorField}</>) : <><Field label="Name" required><Input name="name" defaultValue={workRow?.name} required /></Field>{categoryField}{vendorField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note" description="Describe included work or materials. Use bullets for a clear scope."><SimpleTextEditor name="scopeNote" defaultValue={workRow?.scope_note ?? ""} placeholder={"Example:\n- Installation labor\n- Adhesive and grout"} maxLength={1000} rows={5} /></Field>}</>}
+      {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name} readOnly /></Field><Field label="Supplier vendor"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Unit"><Input value={`${materialRow!.unit.name} (${materialRow!.unit.code})`} readOnly /></Field></> : newMaterialSku ? <>{newMaterialFields}{vendorField}</> : <><Field label="SKU" required><Select name="skuId" required><option value="">Select SKU</option>{refs.skus.map((sku) => <option key={sku.id} value={sku.id}>{sku.name}{sku.code ? ` (${sku.code})` : ""}</option>)}</Select></Field>{vendorField}</>) : <><Field label="Name" required><Input name="name" defaultValue={workRow?.name} required /></Field>{categoryField}{vendorField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note" description="Describe included work or materials. Use bullets for a clear scope."><SimpleTextEditor name="scopeNote" defaultValue={workRow?.scope_note ?? ""} placeholder={"Example:\n- Installation labor\n- Adhesive and grout"} maxLength={1000} rows={5} /></Field>}</>}
       <input type="hidden" name="amount" value={amount} /><input type="hidden" name="currency" value={currency} />
       <Field label="Amount" description={`${currency} default currency`} required><div className="relative"><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-3 flex items-center font-ui-mono text-sm font-semibold text-ink-secondary">{currency}</span><Input aria-label="Amount" value={amountDisplay} onChange={(event) => updateAmount(event.target.value)} onBlur={() => setAmountDisplay(amount ? formatDecimal(amount) : "")} inputMode="decimal" placeholder="15.000" className="pl-14 tabular-nums" required /></div></Field><Field label="Notes"><Input name="notes" defaultValue={row?.notes ?? ""} /></Field><FormActions><Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button><Button type="submit" variant="primary">{edit ? "Save changes" : "Create price"}</Button></FormActions>
     </form></Dialog>

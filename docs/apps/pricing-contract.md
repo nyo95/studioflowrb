@@ -24,6 +24,13 @@ Authority: Owner decisions locked in navigator session. This contract covers all
 
 ## 2. PriceMaterial — Material Prices
 
+Material Prices are the primary entry point for material catalog CRUD. The
+create flow supports both adding an offer to an existing SKU and creating a
+new SKU together with its first `PriceMaterial` in one transaction. A new SKU
+cannot be created without that initial offer, and a live SKU cannot lose its
+last live material price. Subsequent Vendors add additional `PriceMaterial`
+offers to the existing SKU; they do not create another SKU.
+
 ### 2.1 Identity
 
 One price per **SKU × Vendor** pair. No separate `code` field — the pair itself is the identity.
@@ -392,7 +399,11 @@ Three tabs under Pricing section: **Material Prices**, **Material + Labor**, **L
 
 **Pattern:** Popup modal, same as Vendor/Brand.
 
-**Material Price modal:** SKU (read-only context), vendor selector (capability-filtered: `can_supply_material`), amount, currency, unit (locked to SKU's price unit), source link (optional, from SKU's brand links), notes.
+**Material Price modal:** either an existing-SKU offer form (SKU selector,
+vendor selector, amount, currency, source link, notes) or a new-SKU form (the
+SKU fields from the Master Data contract plus the first capability-filtered
+vendor offer). Both paths create a `PriceMaterial`; the new-SKU path is
+atomic.
 
 **Material+Labor / Labor modal:** Name, category selector (WORK categories only), vendor selector (capability-filtered: `can_supply_labor`), amount, currency, unit, scope note (ML only), spec, dimension display, notes.
 
