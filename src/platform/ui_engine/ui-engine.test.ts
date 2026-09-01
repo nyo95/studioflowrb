@@ -68,6 +68,7 @@ describe("UI Engine foundation", () => {
       "SelectionBar",
       "Combobox",
       "CreatableSearch",
+      "SimpleTextEditor",
       "useDebouncedValue",
       "useOptionOverlay",
       "useConfirm",
@@ -184,6 +185,14 @@ describe("UI Engine foundation", () => {
     }));
     assert.match(creatable, /aria-haspopup="listbox"/);
     assert.match(creatable, />One<\/span>/);
+
+    const editor = renderToStaticMarkup(createElement(ui.SimpleTextEditor, {
+      name: "scopeNote",
+      defaultValue: "- Installation labor",
+    }));
+    assert.match(editor, /role="toolbar"/);
+    assert.match(editor, /aria-label="Bullet list"/);
+    assert.match(editor, /name="scopeNote"/);
   });
 
   it("keeps desktop rail preference while forcing labeled narrow navigation", () => {

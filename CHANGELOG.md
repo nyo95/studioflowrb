@@ -5,9 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.29**
-- Next local revision: **R3.30**
+- Current revision after this entry is committed: **R3.30**
+- Next local revision: **R3.31**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.30 — 2026-09-01 — feat(ui-engine): add simple text editor
+
+- Added a shared, keyboard-accessible plain-text editor with concise Bold,
+  Italic, and Bullet list controls. Formatting is represented as text markers,
+  so consumers retain normal form submission and no rich-text persistence is
+  introduced.
+- Replaced the Material + Labor Pricing `Scope note` one-line field with the
+  editor, including a concise scope example and the existing 1,000-character
+  server limit.
+
+### Verification
+
+- `npm run typecheck`, `npm run lint`, `npm run check`, `npm run build`,
+  `npm test`, and `git diff --check`: passed; **198 passed, 0 failed, 0
+  cancelled** on the isolated test database.
+- Browser acceptance: the Work Price dialog exposes the labeled toolbar and
+  Scope note textarea; **Bullet list** changes `Installation labor` to
+  `- Installation labor` without submitting a price.
 
 ## R3.29 — 2026-09-01 — fix(masterdata): format Pricing amount entry
 
