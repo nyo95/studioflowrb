@@ -60,6 +60,27 @@ One price per **SKU × Vendor** pair. No separate `code` field — the pair itse
 - **No `is_current` / `valid_from` / `valid_to`** — one live row per pair at any time.
 - **Vendor required** — manufacturer's own list price is recorded by registering the manufacturer as a Vendor.
 
+### 2.3.1 SKU measurement and BQ conversion
+
+Material pricing distinguishes three unit meanings:
+
+- **dimension Unit** measures structured geometry, for example `MM`;
+- **base Unit** is the normalized consumption/comparison Unit, for example `M2`;
+- **purchase Unit** is the Unit quoted by the supplier, for example `SHEET`.
+
+An area-based sheet SKU may store positive decimal `dimension_length` and
+`dimension_width`, optional `dimension_thickness`, `dimension_unit_id`, and a
+derived `purchase_to_base_factor`. The server derives the factor with exact
+decimal arithmetic. Example: `1200 × 2400 MM`, base `M2`, purchase `SHEET`
+produces `1 SHEET = 2.88 M2`. Thickness may be displayed as part of the SKU
+specification but is excluded from area calculation.
+
+Geometry is optional for materials that do not have meaningful rectangular
+dimensions. When geometry is supplied, length, width, and dimension Unit are
+all required; base Unit must be `M2`; and purchase Unit must be explicit. The
+browser preview is advisory only and the service always recalculates the
+persisted factor.
+
 ### 2.4 Vendor eligibility
 
 Supplier must be a live Vendor with `can_supply_material = true` on at least one assigned VendorType (capability-based, per Vendor contract §2.3).
@@ -403,7 +424,8 @@ Three tabs under Pricing section: **Material Prices**, **Material + Labor**, **L
 vendor selector, amount, currency, source link, notes) or a new-SKU form (the
 SKU fields from the Master Data contract plus the first capability-filtered
 vendor offer). Both paths create a `PriceMaterial`; the new-SKU path is
-atomic.
+atomic. The new-SKU path also provides optional structured rectangular
+dimensions and shows `1 <purchase unit> = <factor> <base unit>` before save.
 
 **Material+Labor / Labor modal:** Name, category selector (WORK categories only), vendor selector (capability-filtered: `can_supply_labor`), amount, currency, unit, scope note (ML only), spec, dimension display, notes.
 
@@ -423,6 +445,13 @@ Pricing exposes a **read-only public contract** for downstream apps (BQ, StudioF
 ### 12.1 MaterialPriceOption
 
 Per-supplier price for a SKU. All live prices for a given SKU are returned as an array — BQ must select explicitly, no automatic fallback.
+
+Each option also exposes the SKU measurement snapshot source: base Unit,
+purchase Unit, structured dimensions, dimension Unit, and nullable
+`purchaseToBaseFactor`. A downstream BQ consumer that uses normalized base-unit
+costing computes `amount / purchaseToBaseFactor` and persists the selected
+amount, Units, and factor in its own snapshot. It must not reread current Master
+Data values for an existing BQ line.
 
 ### 12.2 PriceWorkRead
 

@@ -2,8 +2,9 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { Archive, Pencil, RotateCcw, Trash2 } from "lucide-react";
-import { Button, ConfirmDialog, CreatableSearch, DataTable, Dialog, EmptyState, Field, FormActions, InlineError, Input, Pagination, SearchField, SectionCard, Select, SimpleTextEditor, Spinner, StatusBadge, type SortDirection, TableCell, TableCellContent, TableHead, TableHeader, TableRow, TableToolbar, Tabs, useOptionOverlay } from "@/platform/ui_engine";
+import { Button, ConfirmDialog, CreatableSearch, DataTable, Dialog, EmptyState, Field, FormActions, InlineError, Input, Pagination, SearchField, SectionCard, Select, SimpleTextEditor, Spinner, StatusBadge, Text, type SortDirection, TableCell, TableCellContent, TableHead, TableHeader, TableRow, TableToolbar, Tabs, useOptionOverlay } from "@/platform/ui_engine";
 import { compareDecimals, formatDecimal, type DecimalString } from "@platform/utilities/decimal";
+import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurement";
 import { archivePriceAction, createMaterialSkuAction, createPricingVendorQuickAction, createPricingWorkCategoryQuickAction, requestPriceDeletionAction, restorePriceAction, savePriceAction } from "./actions";
 
 type Kind = "material" | "material-labor" | "labor";
@@ -95,9 +96,31 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
   const [quickPending, setQuickPending] = useState(false);
   const [categoryCreateError, setCategoryCreateError] = useState<string | null>(null);
   const [categoryCreatePending, setCategoryCreatePending] = useState(false);
+  const defaultBaseUnit = refs.units.find((unit) => unit.code.toUpperCase() === "M2");
+  const defaultPurchaseUnit = refs.units.find((unit) => unit.code.toUpperCase() === "SHEET");
+  const defaultDimensionUnit = refs.units.find((unit) => unit.code.toUpperCase() === "MM");
+  const [baseUnitId, setBaseUnitId] = useState(defaultBaseUnit?.id ?? "");
+  const [purchaseUnitId, setPurchaseUnitId] = useState(defaultPurchaseUnit?.id ?? "");
+  const [dimensionLength, setDimensionLength] = useState("");
+  const [dimensionWidth, setDimensionWidth] = useState("");
+  const [dimensionThickness, setDimensionThickness] = useState("");
+  const [dimensionUnitId, setDimensionUnitId] = useState(defaultDimensionUnit?.id ?? "");
   const needsMaterial = material;
   const eligibleTypes = refs.vendorTypes.filter((type) => needsMaterial ? type.canSupplyMaterial : type.canSupplyLabor);
   const newMaterialSku = material && !edit && materialEntryMode === "new";
+  const selectedBaseUnit = refs.units.find((unit) => unit.id === baseUnitId);
+  const selectedPurchaseUnit = refs.units.find((unit) => unit.id === purchaseUnitId);
+  const selectedDimensionUnit = refs.units.find((unit) => unit.id === dimensionUnitId);
+  const dimensionFactors: Readonly<Record<string, string>> = { MM: "0.001", CM: "0.01", M: "1" };
+  let areaPreview: string | null = null;
+  const dimensionFactor = selectedDimensionUnit ? dimensionFactors[selectedDimensionUnit.code.toUpperCase()] : null;
+  if (dimensionLength && dimensionWidth && dimensionFactor) {
+    try {
+      areaPreview = calculateRectangleAreaSquareMeters({ length: dimensionLength, width: dimensionWidth, lengthToMeterFactor: dimensionFactor });
+    } catch {
+      areaPreview = null;
+    }
+  }
 
   const addVendor = async () => {
     setQuickError(null);
@@ -163,9 +186,23 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
       <Field label="Brand"><Select name="brandId"><option value="">Unbranded / Generic</option>{refs.brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</Select></Field>
     </div>
     <div className="grid grid-cols-2 gap-3">
-      <Field label="Base measurement unit" required><Select name="baseUnitId" required><option value="">Select base unit...</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} — {unit.name}</option>)}</Select></Field>
-      <Field label="Purchase unit" description="Optional: purchasing unit if different."><Select name="purchaseUnitId"><option value="">Same as base unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} — {unit.name}</option>)}</Select></Field>
+      <Field label="Base / BQ unit" required description="The unit used to compare and calculate material usage."><Select name="baseUnitId" value={baseUnitId} onChange={(event) => setBaseUnitId(event.target.value)} required><option value="">Select base unit...</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} — {unit.name}</option>)}</Select></Field>
+      <Field label="Purchase unit" description="The unit quoted by the supplier."><Select name="purchaseUnitId" value={purchaseUnitId} onChange={(event) => setPurchaseUnitId(event.target.value)}><option value="">Same as base unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} — {unit.name}</option>)}</Select></Field>
     </div>
+    <SectionCard>
+      <div className="mb-3 grid gap-1"><Text weight="semibold">Dimensions and BQ conversion</Text><Text size="sm" tone="secondary">Optional. For sheet materials, dimensions produce the exact area contained in one purchase unit.</Text></div>
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Field label="Length"><Input name="dimensionLength" value={dimensionLength} onChange={(event) => setDimensionLength(event.target.value)} inputMode="decimal" placeholder="1200" /></Field>
+        <Field label="Width"><Input name="dimensionWidth" value={dimensionWidth} onChange={(event) => setDimensionWidth(event.target.value)} inputMode="decimal" placeholder="2400" /></Field>
+        <Field label="Thickness" description="Optional; excluded from area calculation."><Input name="dimensionThickness" value={dimensionThickness} onChange={(event) => setDimensionThickness(event.target.value)} inputMode="decimal" placeholder="0.8" /></Field>
+        <Field label="Dimension unit"><Select name="dimensionUnitId" value={dimensionUnitId} onChange={(event) => setDimensionUnitId(event.target.value)}><option value="">Select unit</option>{refs.units.filter((unit) => ["MM", "CM", "M"].includes(unit.code.toUpperCase())).map((unit) => <option key={unit.id} value={unit.id}>{unit.code} — {unit.name}</option>)}</Select></Field>
+      </div>
+      <div className="mt-3 rounded border border-line-subtle bg-surface-muted/40 px-3 py-2 text-sm">
+        {areaPreview && selectedBaseUnit?.code.toUpperCase() === "M2" && selectedPurchaseUnit
+          ? <><span className="font-medium">Conversion preview:</span> 1 {selectedPurchaseUnit.code} = {formatDecimal(areaPreview)} M²</>
+          : <span className="text-ink-secondary">Use a complete rectangular dimension with M2 as the base unit to calculate the conversion.</span>}
+      </div>
+    </SectionCard>
     <Field label="Product categories" required description="At least one category is required.">
       <div className="grid max-h-36 grid-cols-2 gap-2 overflow-y-auto rounded border border-line bg-surface-muted/30 p-2">
         {refs.productCategories.map((category) => <label key={category.id} className="flex cursor-pointer select-none items-center gap-2 text-xs"><input type="checkbox" name="categoryIds" value={category.id} /><span>{category.name}</span></label>)}

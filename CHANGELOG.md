@@ -5,9 +5,52 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.10**
-- Next local revision: **R4.11**
+- Current revision: **R4.12**
+- Next local revision: **R4.13**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.12 — 2026-09-01 — feat(pricing): derive SKU area conversion
+
+- Locked the distinction between dimension Unit, base/BQ Unit, and purchase
+  Unit in Core, Master Data, and Pricing contracts. Rectangular sheet geometry
+  uses structured positive decimals; thickness is descriptive and excluded
+  from area calculation.
+- Added exact domain-neutral rectangle arithmetic to Platform Utilities. Master
+  Data owns the `MM`/`CM`/`M` mapping and recalculates the persisted
+  purchase-to-base factor server-side instead of trusting the browser preview.
+- Added SKU dimension fields, a dimension Unit relation, and
+  `purchase_to_base_factor`, with complete/positive database constraints and
+  Unit lifecycle guards. Seeded `MM`, `CM`, and `SHEET` as active vocabulary.
+- Extended the Pricing create flow and SKU edit flow with structured dimensions
+  and the preview `1 SHEET = 2.88 M2` for `1200 × 2400 MM`.
+- Extended the Master Data public read contract so BQ can select and snapshot
+  base Unit, purchase Unit, dimensions, and the exact conversion factor.
+- Updated legacy archive tests to respect the live-SKU/last-live-price invariant
+  introduced in R4.10.
+
+### Migrations
+
+- `20260901010000_r4_12_sku_measurement_conversion`
+- `20260901011000_r4_12_sku_measurement_constraint`
+- Applied successfully to the isolated rebuild databases `masterdata` and
+  `masterdata_test` at `localhost:5433`.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test` — 205 passed, 0 failed
+- `npm run check`
+- `npm run build`
+- Browser acceptance at `/masterdata/pricing`: defaults `M2` / `SHEET` / `MM`,
+  exact preview `1 SHEET = 2,88 M²`, no horizontal overflow at 390 px, and no
+  new console errors after the Prisma-aware dev-server restart.
+
+### Remaining
+
+- BQ snapshot persistence and BQ UI consumption remain a separate app-owned
+  implementation slice; this revision exposes the approved Master Data read
+  contract but does not invent the deferred BQ schema.
 
 ## R4.10 — 2026-09-01 — feat(pricing): make material price the SKU entry point
 

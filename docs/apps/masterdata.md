@@ -57,6 +57,16 @@ refer only to the R1.05 Git snapshot and define what must not be reintroduced.
   directory. The flow atomically creates the SKU and its first `PriceMaterial`.
 - Create requires name, Unit, Category, and at least one `PriceMaterial`; a
   live SKU must retain at least one live `PriceMaterial`.
+- SKU may store optional rectangular geometry as positive decimal length and
+  width, optional thickness, and a required dimension Unit when geometry is
+  present. Geometry is structured data, not Notes or display-only text.
+- Dimension Unit, base Unit, and purchase Unit are distinct meanings. For a
+  sheet measured in millimetres and consumed by area, `MM` is the dimension
+  Unit, `M2` is the base/BQ Unit, and `SHEET` is the purchase Unit.
+- When rectangular geometry is present, Master Data calculates and persists
+  `purchase_to_base_factor` server-side with exact decimal arithmetic. The
+  approved area rule is `length × width`, converted to square metres; thickness
+  is descriptive and does not contribute to area.
 - Archiving a SKU archives its PriceMaterial rows. SkuCategory, Media, and Sample
   relations remain independent.
 - All staff use one SKU management permission package.
@@ -87,6 +97,9 @@ The following remain deferred and must not be inferred during implementation:
 - BQ snapshots the selected commercial facts at project time. A later Master Data
   edit, archive, restore, or permanent deletion must not rewrite historical BQ
   meaning.
+- For material pricing, those commercial facts include base Unit, purchase Unit,
+  and `purchase_to_base_factor`. BQ calculates price per base Unit as
+  `purchase price / purchase_to_base_factor` and snapshots the factor it used.
 - No cheapest, newest, preferred, or manufacturer fallback is inferred. When
   several eligible prices exist, the consumer selects one explicitly.
 

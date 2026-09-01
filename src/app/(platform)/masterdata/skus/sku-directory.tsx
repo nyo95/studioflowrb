@@ -46,6 +46,11 @@ type SkuRow = {
   brand: { id: string; name: string; slug: string } | null;
   base_unit: { id: string; code: string; name: string };
   purchase_unit: { id: string; code: string; name: string } | null;
+  dimension_length: { toString(): string } | null;
+  dimension_width: { toString(): string } | null;
+  dimension_thickness: { toString(): string } | null;
+  dimension_unit: { id: string; code: string; name: string } | null;
+  purchase_to_base_factor: { toString(): string } | null;
   categories: Array<{ category: { id: string; name: string; slug: string } }>;
   material_prices: Array<{
     id: string;
@@ -442,6 +447,34 @@ export function SkuDirectory({
                 </Select>
               </Field>
             </div>
+
+            <SectionCard>
+              <div className="mb-3 grid gap-1"><Text weight="semibold">Dimensions and BQ conversion</Text><Text size="sm" tone="secondary">Optional rectangular dimensions. Conversion is recalculated on the server.</Text></div>
+              <div className="grid gap-3 sm:grid-cols-4">
+                <Field label="Length">
+                  <Input name="dimensionLength" defaultValue={editTarget.dimension_length?.toString() ?? ""} inputMode="decimal" />
+                </Field>
+                <Field label="Width">
+                  <Input name="dimensionWidth" defaultValue={editTarget.dimension_width?.toString() ?? ""} inputMode="decimal" />
+                </Field>
+                <Field label="Thickness" description="Optional; excluded from area calculation.">
+                  <Input name="dimensionThickness" defaultValue={editTarget.dimension_thickness?.toString() ?? ""} inputMode="decimal" />
+                </Field>
+                <Field label="Dimension unit">
+                  <Select name="dimensionUnitId" defaultValue={editTarget.dimension_unit?.id ?? ""}>
+                    <option value="">Select unit</option>
+                    {units.filter((unit) => ["MM", "CM", "M"].includes(unit.code.toUpperCase())).map((unit) => (
+                      <option key={unit.id} value={unit.id}>{unit.code} — {unit.name}</option>
+                    ))}
+                  </Select>
+                </Field>
+              </div>
+              <Text tone="secondary">
+                {editTarget.purchase_to_base_factor
+                  ? `Current conversion: 1 ${editTarget.purchase_unit?.code ?? editTarget.base_unit.code} = ${editTarget.purchase_to_base_factor.toString()} ${editTarget.base_unit.code}`
+                  : "No dimensional conversion is stored."}
+              </Text>
+            </SectionCard>
 
             <Field label="Product categories" required description="At least one category is required.">
               <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto border border-line rounded p-2 bg-surface-muted/30">

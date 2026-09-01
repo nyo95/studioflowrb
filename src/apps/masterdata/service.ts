@@ -7,6 +7,7 @@ import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 import { normalizeText } from "@platform/utilities/normalization";
 import { toSlug } from "@platform/utilities/slug";
 import { compareDecimals, toDecimalString } from "@platform/utilities/decimal";
+import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurement";
 
 // ---------------------------------------------------------------------------
 // Permissions
@@ -77,6 +78,67 @@ function requiredAmount(value: string): string {
     throw new AppError("VALIDATION", "PRICE_AMOUNT_NEGATIVE", "Amount must be non-negative.");
   }
   return amount;
+}
+
+type SkuMeasurementInput = {
+  dimensionLength?: string | null;
+  dimensionWidth?: string | null;
+  dimensionThickness?: string | null;
+  dimensionUnitId?: string | null;
+};
+
+const LENGTH_TO_METRE: Readonly<Record<string, string>> = { MM: "0.001", CM: "0.01", M: "1" };
+
+async function resolveSkuMeasurement(
+  tx: TxClient,
+  input: SkuMeasurementInput,
+  baseUnit: { code: string },
+  purchaseUnit: { code: string; status: string } | null,
+) {
+  const length = input.dimensionLength?.trim() || null;
+  const width = input.dimensionWidth?.trim() || null;
+  const thickness = input.dimensionThickness?.trim() || null;
+  const dimensionUnitId = input.dimensionUnitId?.trim() || null;
+  if (!length && !width && !thickness && !dimensionUnitId) {
+    return {
+      dimension_length: null,
+      dimension_width: null,
+      dimension_thickness: null,
+      dimension_unit_id: null,
+      purchase_to_base_factor: null,
+    };
+  }
+  if (!length || !width || !dimensionUnitId) {
+    throw new AppError("VALIDATION", "SKU_DIMENSION_INCOMPLETE", "Length, width, and dimension unit must be filled together.");
+  }
+  if (!purchaseUnit) {
+    throw new AppError("VALIDATION", "SKU_DIMENSION_PURCHASE_UNIT_REQUIRED", "A purchase unit is required when dimensions define a conversion.");
+  }
+  if (baseUnit.code.toUpperCase() !== "M2") {
+    throw new AppError("VALIDATION", "SKU_DIMENSION_BASE_UNIT_INVALID", "Rectangular dimensions require M2 as the base measurement unit.");
+  }
+  const dimensionUnit = await tx.unit.findUniqueOrThrow({ where: { id: dimensionUnitId } });
+  if (dimensionUnit.status !== "ACTIVE") {
+    throw new AppError("VALIDATION", "SKU_DIMENSION_UNIT_INACTIVE", "Dimension unit must be active.");
+  }
+  const lengthToMeterFactor = LENGTH_TO_METRE[dimensionUnit.code.toUpperCase()];
+  if (!lengthToMeterFactor) {
+    throw new AppError("VALIDATION", "SKU_DIMENSION_UNIT_INVALID", "Dimension unit must be MM, CM, or M.");
+  }
+  try {
+    const purchaseToBaseFactor = calculateRectangleAreaSquareMeters({ length, width, lengthToMeterFactor });
+    const normalizedThickness = thickness ? toDecimalString(thickness) : null;
+    if (normalizedThickness?.startsWith("-") || normalizedThickness === "0") throw new Error("invalid thickness");
+    return {
+      dimension_length: toDecimalString(length),
+      dimension_width: toDecimalString(width),
+      dimension_thickness: normalizedThickness,
+      dimension_unit_id: dimensionUnit.id,
+      purchase_to_base_factor: purchaseToBaseFactor,
+    };
+  } catch {
+    throw new AppError("VALIDATION", "SKU_DIMENSION_INVALID", "Dimensions must be positive decimal values.");
+  }
 }
 
 function normalizeHashtags(hashtags: readonly string[]): Array<{ label: string; normalized: string }> {
@@ -415,6 +477,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
             select: {
               base_skus: true,
               purchase_skus: true,
+              dimension_skus: true,
               material_prices: true,
               material_labor_prices: true,
               labor_prices: true,
@@ -433,6 +496,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
             select: {
               base_skus: true,
               purchase_skus: true,
+              dimension_skus: true,
               material_prices: true,
               material_labor_prices: true,
               labor_prices: true,
@@ -496,7 +560,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           tx.priceMaterial.count({ where: { unit_id: input.unitId, deleted_at: null } }),
           tx.priceMaterialLabor.count({ where: { unit_id: input.unitId, deleted_at: null } }),
           tx.priceLabor.count({ where: { unit_id: input.unitId, deleted_at: null } }),
-          tx.sku.count({ where: { OR: [{ base_unit_id: input.unitId }, { purchase_unit_id: input.unitId }], deleted_at: null } }),
+          tx.sku.count({ where: { OR: [{ base_unit_id: input.unitId }, { purchase_unit_id: input.unitId }, { dimension_unit_id: input.unitId }], deleted_at: null } }),
         ]);
         const inUseCount = matPriceCount + matLaborCount + laborCount + skuCount;
         if (inUseCount > 0) {
@@ -2219,6 +2283,11 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           brand: { select: { id: true, name: true, slug: true } },
           base_unit: { select: { id: true, code: true, name: true } },
           purchase_unit: { select: { id: true, code: true, name: true } },
+          dimension_length: true,
+          dimension_width: true,
+          dimension_thickness: true,
+          dimension_unit: { select: { id: true, code: true, name: true } },
+          purchase_to_base_factor: true,
           categories: {
             select: {
               category: { select: { id: true, name: true, slug: true } },
@@ -2272,6 +2341,10 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       brandId?: string;
       baseUnitId: string;
       purchaseUnitId?: string;
+      dimensionLength?: string;
+      dimensionWidth?: string;
+      dimensionThickness?: string;
+      dimensionUnitId?: string;
       categoryIds: string[];
       priceMaterials: Array<{
         supplierVendorId: string;
@@ -2303,12 +2376,14 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         if (baseUnit.status !== "ACTIVE") {
           throw new AppError("VALIDATION", "SKU_BASE_UNIT_INACTIVE", "Base unit must be active.");
         }
+        let purchaseUnit = null;
         if (input.purchaseUnitId) {
-          const purchaseUnit = await tx.unit.findUniqueOrThrow({ where: { id: input.purchaseUnitId } });
+          purchaseUnit = await tx.unit.findUniqueOrThrow({ where: { id: input.purchaseUnitId } });
           if (purchaseUnit.status !== "ACTIVE") {
             throw new AppError("VALIDATION", "SKU_PURCHASE_UNIT_INACTIVE", "Purchase unit must be active.");
           }
         }
+        const measurement = await resolveSkuMeasurement(tx, input, baseUnit, purchaseUnit);
 
         const categories = await tx.category.findMany({
           where: { id: { in: input.categoryIds } },
@@ -2353,6 +2428,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
               brand_id: input.brandId ?? null,
               base_unit_id: input.baseUnitId,
               purchase_unit_id: input.purchaseUnitId ?? null,
+              ...measurement,
             },
           });
         } catch (error) {
@@ -2413,6 +2489,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
             brand_id: input.brandId ?? null,
             categories: input.categoryIds.length,
             prices: input.priceMaterials.length,
+            purchase_to_base_factor: measurement.purchase_to_base_factor,
           },
         });
         return { skuId };
@@ -2429,6 +2506,10 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       brandId?: string | null;
       baseUnitId: string;
       purchaseUnitId?: string | null;
+      dimensionLength?: string | null;
+      dimensionWidth?: string | null;
+      dimensionThickness?: string | null;
+      dimensionUnitId?: string | null;
       categoryIds: string[];
     }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuManage);
@@ -2447,10 +2528,26 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
 
         const baseUnit = await tx.unit.findUniqueOrThrow({ where: { id: input.baseUnitId } });
         if (baseUnit.status !== "ACTIVE") throw new AppError("VALIDATION", "SKU_BASE_UNIT_INACTIVE", "Base unit must be active.");
+        let purchaseUnit = null;
         if (input.purchaseUnitId) {
-          const purchaseUnit = await tx.unit.findUniqueOrThrow({ where: { id: input.purchaseUnitId } });
+          purchaseUnit = await tx.unit.findUniqueOrThrow({ where: { id: input.purchaseUnitId } });
           if (purchaseUnit.status !== "ACTIVE") throw new AppError("VALIDATION", "SKU_PURCHASE_UNIT_INACTIVE", "Purchase unit must be active.");
         }
+        const measurementWasProvided = [
+          input.dimensionLength,
+          input.dimensionWidth,
+          input.dimensionThickness,
+          input.dimensionUnitId,
+        ].some((value) => value !== undefined);
+        const measurementInput = measurementWasProvided
+          ? input
+          : {
+              dimensionLength: existing.dimension_length?.toString() ?? null,
+              dimensionWidth: existing.dimension_width?.toString() ?? null,
+              dimensionThickness: existing.dimension_thickness?.toString() ?? null,
+              dimensionUnitId: existing.dimension_unit_id,
+            };
+        const measurement = await resolveSkuMeasurement(tx, measurementInput, baseUnit, purchaseUnit);
 
         if (input.brandId) {
           const brand = await tx.brand.findUniqueOrThrow({ where: { id: input.brandId } });
@@ -2485,6 +2582,13 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         if ((existing.purchase_unit_id || null) !== (input.purchaseUnitId || null)) {
           changes.purchase_unit_id = { from: existing.purchase_unit_id, to: input.purchaseUnitId || null };
         }
+        for (const [field, next] of Object.entries(measurement)) {
+          const previousValue = existing[field as keyof typeof existing];
+          const previous = previousValue && typeof previousValue === "object" && "toString" in previousValue
+            ? previousValue.toString()
+            : previousValue ?? null;
+          if (previous !== next) changes[field] = { from: previous, to: next };
+        }
 
         try {
           await tx.sku.update({
@@ -2497,6 +2601,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
               brand_id: input.brandId || null,
               base_unit_id: input.baseUnitId,
               purchase_unit_id: input.purchaseUnitId || null,
+              ...measurement,
             },
           });
         } catch (error) {
@@ -3643,7 +3748,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
             tx.priceMaterial.count({ where: { unit_id: targetId } }),
             tx.priceMaterialLabor.count({ where: { unit_id: targetId } }),
             tx.priceLabor.count({ where: { unit_id: targetId } }),
-            tx.sku.count({ where: { OR: [{ base_unit_id: targetId }, { purchase_unit_id: targetId }] } }),
+            tx.sku.count({ where: { OR: [{ base_unit_id: targetId }, { purchase_unit_id: targetId }, { dimension_unit_id: targetId }] } }),
           ]);
           const unitInUse = uMatPrice + uMatLabor + uLabor + uSku;
           if (unitInUse > 0) {

@@ -257,6 +257,7 @@ model Unit {
 
   base_skus             Sku[]                @relation("SkuBaseUnit")
   purchase_skus         Sku[]                @relation("SkuPurchaseUnit")
+  dimension_skus        Sku[]                @relation("SkuDimensionUnit")
   material_prices       PriceMaterial[]
   material_labor_prices PriceMaterialLabor[]
   labor_prices          PriceLabor[]
@@ -475,21 +476,27 @@ model BrandCategoryOrigin {
 }
 
 model Sku {
-  id               String    @id @default(uuid())
-  brand_id         String?
-  code             String?
-  name             String
-  slug             String
-  base_unit_id     String
-  purchase_unit_id String?
-  notes            String?
-  created_at       DateTime  @default(now())
-  updated_at       DateTime  @updatedAt
-  deleted_at       DateTime?
+  id                      String    @id @default(uuid())
+  brand_id                String?
+  code                    String?
+  name                    String
+  slug                    String
+  base_unit_id            String
+  purchase_unit_id        String?
+  dimension_length        Decimal?  @db.Decimal(12, 3)
+  dimension_width         Decimal?  @db.Decimal(12, 3)
+  dimension_thickness     Decimal?  @db.Decimal(12, 3)
+  dimension_unit_id       String?
+  purchase_to_base_factor Decimal?  @db.Decimal(18, 6)
+  notes                   String?
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
+  deleted_at              DateTime?
 
   brand            Brand?                @relation(fields: [brand_id], references: [id], onDelete: Restrict)
   base_unit        Unit                  @relation("SkuBaseUnit", fields: [base_unit_id], references: [id], onDelete: Restrict)
   purchase_unit    Unit?                 @relation("SkuPurchaseUnit", fields: [purchase_unit_id], references: [id], onDelete: Restrict)
+  dimension_unit   Unit?                 @relation("SkuDimensionUnit", fields: [dimension_unit_id], references: [id], onDelete: Restrict)
   categories       SkuCategory[]
   material_prices  PriceMaterial[]
   category_origins BrandCategoryOrigin[]
@@ -497,6 +504,7 @@ model Sku {
   @@index([brand_id])
   @@index([deleted_at])
   @@index([code])
+  @@index([dimension_unit_id])
   @@schema("master_data")
 }
 

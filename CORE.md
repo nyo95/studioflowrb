@@ -289,6 +289,10 @@ type Money = {
 - Core provides only domain-neutral representation and formatting helpers.
 - Public values use a canonical unit code string; display labels may be supplied by the owning dictionary/contract.
 - Core does not infer conversions, compatibility, purchase units, usage units, or dimensional meaning.
+- Utilities may provide exact, pure geometry/measurement arithmetic when an
+  approved consumer supplies the conversion factor explicitly. Unit vocabulary,
+  dimensional compatibility, and the decision to derive a purchase-to-base
+  factor remain app-owned; Utilities never query or classify the Unit dictionary.
 - Unit conversion and validation against an entity's allowed units remain domain-owned.
 
 ## 10. Date/time convention

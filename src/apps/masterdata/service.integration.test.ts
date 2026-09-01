@@ -34,7 +34,7 @@ async function resetMasterData(db: PrismaClient): Promise<void> {
     RESTART IDENTITY CASCADE
   `);
   await db.unit.deleteMany({
-    where: { code: { notIn: ["PCS", "M", "M2", "M3", "KG", "SET", "LOT", "LS", "HR", "DAY"] } },
+    where: { code: { notIn: ["PCS", "M", "MM", "CM", "M2", "M3", "KG", "SET", "SHEET", "LOT", "LS", "HR", "DAY"] } },
   });
   await db.unit.updateMany({ data: { status: "ACTIVE", archived_at: null } });
   await db.vendorType.deleteMany({
@@ -98,6 +98,77 @@ describe("Master Data service", () => {
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "sku.created", entity_id: sku.id } }), 1);
   });
 
+  it("derives exact sheet-to-square-metre conversion from structured dimensions", async () => {
+    const context = await createMaterialContext();
+    const [baseUnit, purchaseUnit, dimensionUnit] = await Promise.all([
+      testDb.prisma.unit.findUniqueOrThrow({ where: { code: "M2" } }),
+      testDb.prisma.unit.findUniqueOrThrow({ where: { code: "SHEET" } }),
+      testDb.prisma.unit.findUniqueOrThrow({ where: { code: "MM" } }),
+    ]);
+    const result = await service.createSku({
+      grants: GRANTS,
+      actor: ACTOR,
+      name: "HPL 1200 x 2400",
+      baseUnitId: baseUnit.id,
+      purchaseUnitId: purchaseUnit.id,
+      dimensionLength: "1200",
+      dimensionWidth: "2400",
+      dimensionThickness: "0.8",
+      dimensionUnitId: dimensionUnit.id,
+      categoryIds: [context.categoryId],
+      priceMaterials: [{ supplierVendorId: context.vendorId, amount: "288000", currency: "IDR" }],
+    });
+
+    const sku = await testDb.prisma.sku.findUniqueOrThrow({ where: { id: result.skuId } });
+    assert.equal(sku.dimension_length?.toString(), "1200");
+    assert.equal(sku.dimension_width?.toString(), "2400");
+    assert.equal(sku.dimension_thickness?.toString(), "0.8");
+    assert.equal(sku.purchase_to_base_factor?.toString(), "2.88");
+    const option = (await publicRead.getSkuPricingOptions(result.skuId))[0];
+    assert.equal(option.measurement.purchaseToBaseFactor, "2.88");
+    assert.equal(option.measurement.baseUnit.code, "M2");
+    assert.equal(option.measurement.purchaseUnit?.code, "SHEET");
+
+    await service.updateSku({
+      grants: GRANTS,
+      actor: ACTOR,
+      skuId: result.skuId,
+      name: "HPL 1200 x 2400 Updated",
+      baseUnitId: baseUnit.id,
+      purchaseUnitId: purchaseUnit.id,
+      categoryIds: [context.categoryId],
+    });
+    const preserved = await testDb.prisma.sku.findUniqueOrThrow({ where: { id: result.skuId } });
+    assert.equal(preserved.dimension_length?.toString(), "1200");
+    assert.equal(preserved.purchase_to_base_factor?.toString(), "2.88");
+  });
+
+  it("rejects incomplete or semantically incompatible SKU dimensions", async () => {
+    const context = await createMaterialContext();
+    const [baseUnit, purchaseUnit, dimensionUnit] = await Promise.all([
+      testDb.prisma.unit.findUniqueOrThrow({ where: { code: "M2" } }),
+      testDb.prisma.unit.findUniqueOrThrow({ where: { code: "SHEET" } }),
+      testDb.prisma.unit.findUniqueOrThrow({ where: { code: "MM" } }),
+    ]);
+    const base = {
+      grants: GRANTS,
+      actor: ACTOR,
+      name: "Invalid measured SKU",
+      baseUnitId: baseUnit.id,
+      purchaseUnitId: purchaseUnit.id,
+      categoryIds: [context.categoryId],
+      priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }],
+    };
+    await assert.rejects(
+      () => service.createSku({ ...base, dimensionLength: "1200", dimensionUnitId: dimensionUnit.id }),
+      (error: unknown) => error instanceof AppError && error.code === "SKU_DIMENSION_INCOMPLETE",
+    );
+    await assert.rejects(
+      () => service.createSku({ ...base, baseUnitId: context.unit.id, dimensionLength: "1200", dimensionWidth: "2400", dimensionUnitId: dimensionUnit.id }),
+      (error: unknown) => error instanceof AppError && error.code === "SKU_DIMENSION_BASE_UNIT_INVALID",
+    );
+  });
+
   it("rejects incomplete, duplicate, and invalid-price SKU input before persistence", async () => {
     const context = await createMaterialContext();
     const base = {
@@ -135,6 +206,19 @@ describe("Master Data service", () => {
       priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1000", currency: "IDR" }],
     });
     const price = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: skuId } });
+    const secondVendor = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Supplier Two" });
+    const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    await testDb.prisma.vendorVendorType.create({
+      data: { id: crypto.randomUUID(), vendor_id: secondVendor.vendorId, vendor_type_id: supplierType.id },
+    });
+    await service.createPriceMaterial({
+      grants: GRANTS,
+      actor: ACTOR,
+      skuId,
+      supplierVendorId: secondVendor.vendorId,
+      amount: "1100",
+      currency: "IDR",
+    });
 
     await service.archivePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price.id });
     await service.archiveSku({ grants: GRANTS, actor: ACTOR, skuId });
@@ -157,7 +241,7 @@ describe("Master Data service", () => {
     assert.equal((await testDb.prisma.priceMaterial.findUniqueOrThrow({ where: { id: price.id } })).deleted_at, null);
   });
 
-  it("rolls back restore when a required Unit is archived", async () => {
+  it("rolls back SKU restore when a required Unit is archived", async () => {
     const context = await createMaterialContext();
     const { skuId } = await service.createSku({
       grants: GRANTS,
@@ -167,18 +251,14 @@ describe("Master Data service", () => {
       categoryIds: [context.categoryId],
       priceMaterials: [{ supplierVendorId: context.vendorId, amount: "250", currency: "IDR" }],
     });
-    const price = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: skuId } });
-    await service.archivePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price.id });
+    await service.archiveSku({ grants: GRANTS, actor: ACTOR, skuId });
     await service.archiveUnit({ grants: GRANTS, actor: ACTOR, unitId: context.unit.id });
 
     await assert.rejects(
-      () => service.restorePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price.id }),
-      (error: unknown) => error instanceof AppError && error.code === "PRICE_UNIT_INACTIVE",
+      () => service.restoreSku({ grants: GRANTS, actor: ACTOR, skuId }),
+      (error: unknown) => error instanceof AppError && error.code === "SKU_UNIT_INACTIVE",
     );
-    assert.equal(
-      await testDb.prisma.archiveCause.count({ where: { entity_type: "price_material", entity_id: price.id, kind: "DIRECT" } }),
-      1,
-    );
+    assert.notEqual((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: skuId } })).deleted_at, null);
   });
 
   it("handles Unit update and list queries", async () => {
