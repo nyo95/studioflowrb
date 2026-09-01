@@ -3,7 +3,7 @@
 import { useState, useTransition, type FormEvent } from "react";
 import { Archive, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import { Button, ConfirmDialog, CreatableSearch, DataTable, Dialog, EmptyState, Field, FormActions, Input, Pagination, SearchField, SectionCard, Select, Spinner, StatusBadge, type SortDirection, TableCell, TableCellContent, TableHead, TableHeader, TableRow, TableToolbar, Tabs, useOptionOverlay } from "@/platform/ui_engine";
-import { compareDecimals, type DecimalString } from "@platform/utilities/decimal";
+import { compareDecimals, formatDecimal, type DecimalString } from "@platform/utilities/decimal";
 import { archivePriceAction, createPricingVendorQuickAction, requestPriceDeletionAction, restorePriceAction, savePriceAction } from "./actions";
 
 type Kind = "material" | "material-labor" | "labor";
@@ -59,6 +59,17 @@ type PriceEditorRefs = {
   canManageVendors: boolean;
 };
 
+function parseIndonesianAmount(value: string): string | null {
+  const compact = value.replace(/\s/g, "").replace(/[^\d,.-]/g, "");
+  if (!compact) return "";
+  const commaIndex = compact.lastIndexOf(",");
+  if (commaIndex === -1) return compact.replace(/\D/g, "") || "";
+  const integer = compact.slice(0, commaIndex).replace(/\D/g, "") || "0";
+  const fraction = compact.slice(commaIndex + 1).replace(/\D/g, "");
+  if (!fraction) return integer;
+  return `${integer}.${fraction}`;
+}
+
 function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Editor; refs: PriceEditorRefs; error: string | null; onCancel: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
   const edit = Boolean(editor.row);
   const material = editor.kind === "material";
@@ -67,6 +78,9 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
   const workRow = !material && row ? row as WorkRow : undefined;
   const { options: vendorOptions, upsertOverlayOption } = useOptionOverlay(refs.vendors);
   const [vendorId, setVendorId] = useState(materialRow?.supplier_vendor.id ?? workRow?.vendor.id ?? "");
+  const currency = row?.currency ?? "IDR";
+  const [amount, setAmount] = useState(row?.amount ?? "");
+  const [amountDisplay, setAmountDisplay] = useState(row?.amount ? formatDecimal(row.amount) : "");
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickName, setQuickName] = useState("");
   const [quickVendorTypeId, setQuickVendorTypeId] = useState("");
@@ -115,11 +129,19 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
     </Field>
   );
 
+  const updateAmount = (display: string) => {
+    const parsed = parseIndonesianAmount(display);
+    if (parsed === null) return;
+    setAmount(parsed);
+    setAmountDisplay(display.endsWith(",") ? display : parsed ? formatDecimal(parsed) : "");
+  };
+
   return <>
     <Dialog open onOpenChange={(open) => !open && onCancel()} title={`${edit ? "Edit" : "Create"} ${material ? "material price" : "price"}`} description={material && edit ? "SKU and supplier identity are read-only." : "Choose only active and eligible catalog references."}><form className="grid gap-4" onSubmit={onSubmit}>
       {edit && <input type="hidden" name="id" value={row!.id} />}{error && <div role="alert" className="text-sm text-danger">{error}</div>}
       {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name} readOnly /></Field><Field label="Supplier vendor"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Unit"><Input value={`${materialRow!.unit.name} (${materialRow!.unit.code})`} readOnly /></Field></> : <><Field label="SKU" required><Select name="skuId" required><option value="">Select SKU</option>{refs.skus.map((sku) => <option key={sku.id} value={sku.id}>{sku.name}{sku.code ? ` (${sku.code})` : ""}</option>)}</Select></Field>{vendorField}</>) : <><Field label="Name" required><Input name="name" defaultValue={workRow?.name} required /></Field><Field label="WORK category" required><Select name="categoryId" defaultValue={workRow?.category.id ?? ""} required><option value="">Select category</option>{refs.workCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></Field>{vendorField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note"><Input name="scopeNote" defaultValue={workRow?.scope_note ?? ""} /></Field>}</>}
-      <Field label="Amount" required><Input name="amount" defaultValue={row?.amount ?? ""} inputMode="decimal" required /></Field><Field label="Currency" required><Input name="currency" defaultValue={row?.currency ?? "IDR"} maxLength={3} required onInput={(event) => { event.currentTarget.value = event.currentTarget.value.toUpperCase(); }} /></Field><Field label="Notes"><Input name="notes" defaultValue={row?.notes ?? ""} /></Field><FormActions><Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button><Button type="submit" variant="primary">{edit ? "Save changes" : "Create price"}</Button></FormActions>
+      <input type="hidden" name="amount" value={amount} /><input type="hidden" name="currency" value={currency} />
+      <Field label="Amount" description={`${currency} default currency`} required><div className="relative"><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-3 flex items-center font-ui-mono text-sm font-semibold text-ink-secondary">{currency}</span><Input aria-label="Amount" value={amountDisplay} onChange={(event) => updateAmount(event.target.value)} onBlur={() => setAmountDisplay(amount ? formatDecimal(amount) : "")} inputMode="decimal" placeholder="15.000" className="pl-14 tabular-nums" required /></div></Field><Field label="Notes"><Input name="notes" defaultValue={row?.notes ?? ""} /></Field><FormActions><Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button><Button type="submit" variant="primary">{edit ? "Save changes" : "Create price"}</Button></FormActions>
     </form></Dialog>
     {quickOpen && <Dialog open onOpenChange={(open) => !open && setQuickOpen(false)} title="Add vendor" description={`Create a vendor for this ${needsMaterial ? "material" : "labor"} price using one eligible VendorType.`}>
       <div className="grid gap-4">

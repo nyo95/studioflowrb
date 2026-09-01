@@ -5,9 +5,26 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.28**
-- Next local revision: **R3.29**
+- Current revision after this entry is committed: **R3.29**
+- Next local revision: **R3.30**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.29 — 2026-09-01 — fix(masterdata): format Pricing amount entry
+
+- Pricing amount entry now renders the default currency as an inline prefix and
+  groups IDR nominal values as Indonesian decimal display (for example,
+  `15000` becomes `IDR 15.000`). The submitted value remains the canonical
+  ungrouped decimal string.
+- Removed the separate editable currency field from this flow; the current
+  record currency (or default `IDR`) is retained as the submitted value.
+
+### Verification
+
+- `npm run typecheck`, `npm run lint`, `npm run check`, `npm run build`,
+  `npm test`, and `git diff --check`: passed; **198 passed, 0 failed, 0
+  cancelled** on the isolated test database.
+- Browser acceptance: entering `15000` renders as `15.000` beside the IDR
+  prefix without submitting a price.
 
 ## R3.28 — 2026-09-01 — fix(masterdata): use creatable Pricing Vendor picker
 
