@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.10**
-- Next local revision: **R3.11**
+- Current revision after this entry is committed: **R3.11**
+- Next local revision: **R3.12**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## R3.10 — 2026-09-01 — chore(masterdata): checkpoint in-progress implementation
@@ -63,6 +63,18 @@ Status: **local**
 - `npm test`: not passing because the isolated `masterdata_test` PostgreSQL
   endpoint on port 5433 is unavailable while Docker Desktop starts; no legacy
   database or resource was accessed.
+
+## R3.12 — 2026-09-01 — docs(verification): record restored rebuild test environment
+
+Status: **local**
+
+### Verification
+
+- Docker Desktop was restarted and only the rebuild test target
+  `masterdata_test` was used.
+- `npm test`: **196 passed, 0 failed, 0 cancelled**.
+- `npm run check`: passed (`typecheck`, boundaries, and legacy-runtime guard).
+- `git diff --check`: passed.
 
 ### Remaining
 
