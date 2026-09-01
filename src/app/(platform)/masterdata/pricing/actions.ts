@@ -38,6 +38,28 @@ const pricingVendorQuickForm = z.object({
   vendorTypeId: z.string().uuid(),
 });
 
+const pricingCategoryQuickForm = z.object({
+  name: z.string().min(1).max(64),
+});
+
+export async function createPricingWorkCategoryQuickAction(formData: FormData): Promise<ActionResult<{ categoryId: string }>> {
+  return runSafeAction(async () => {
+    const parsed = pricingCategoryQuickForm.safeParse(Object.fromEntries(formData));
+    if (!parsed.success) throw validationError(parsed.error);
+    const ctx = await context();
+    const result = await masterDataService.createCategory({
+      ...ctx,
+      name: parsed.data.name,
+      kind: "WORK",
+    });
+    refreshPricing();
+    revalidatePath("/masterdata/categories");
+    revalidatePath("/settings/general/masterdata");
+    revalidatePath("/masterdata");
+    return result;
+  });
+}
+
 export async function createPricingVendorQuickAction(kind: PriceKind, formData: FormData): Promise<ActionResult<{ vendorId: string }>> {
   return runSafeAction(async () => {
     const parsed = pricingVendorQuickForm.safeParse(Object.fromEntries(formData));

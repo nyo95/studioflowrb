@@ -2,9 +2,9 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { Archive, Pencil, RotateCcw, Trash2 } from "lucide-react";
-import { Button, ConfirmDialog, CreatableSearch, DataTable, Dialog, EmptyState, Field, FormActions, Input, Pagination, SearchField, SectionCard, Select, SimpleTextEditor, Spinner, StatusBadge, type SortDirection, TableCell, TableCellContent, TableHead, TableHeader, TableRow, TableToolbar, Tabs, useOptionOverlay } from "@/platform/ui_engine";
+import { Button, ConfirmDialog, CreatableSearch, DataTable, Dialog, EmptyState, Field, FormActions, InlineError, Input, Pagination, SearchField, SectionCard, Select, SimpleTextEditor, Spinner, StatusBadge, type SortDirection, TableCell, TableCellContent, TableHead, TableHeader, TableRow, TableToolbar, Tabs, useOptionOverlay } from "@/platform/ui_engine";
 import { compareDecimals, formatDecimal, type DecimalString } from "@platform/utilities/decimal";
-import { archivePriceAction, createPricingVendorQuickAction, requestPriceDeletionAction, restorePriceAction, savePriceAction } from "./actions";
+import { archivePriceAction, createPricingVendorQuickAction, createPricingWorkCategoryQuickAction, requestPriceDeletionAction, restorePriceAction, savePriceAction } from "./actions";
 
 type Kind = "material" | "material-labor" | "labor";
 type MaterialRow = { id: string; sku: { id: string; name: string; code: string | null }; supplier_vendor: { id: string; name: string }; amount: string; currency: string; unit: { id: string; code: string; name: string }; notes: string | null; deleted_at: Date | null };
@@ -15,7 +15,7 @@ type Ref = { id: string; name: string };
 type PriceSortKey = "name" | "vendor" | "amount";
 const PRICE_PAGE_SIZE = 25;
 
-export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; canManageVendors: boolean; skus: Array<{ id: string; name: string; code: string | null }>; vendors: Ref[]; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
+export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; canManageVendors: boolean; canManageCategories: boolean; skus: Array<{ id: string; name: string; code: string | null }>; vendors: Ref[]; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
   const [query, setQuery] = useState(""); const [status, setStatus] = useState("ACTIVE"); const [page, setPage] = useState(1); const [sort, setSort] = useState<{ key: PriceSortKey; direction: SortDirection }>({ key: "name", direction: "asc" }); const [editor, setEditor] = useState<Editor | null>(null); const [formError, setFormError] = useState<string | null>(null);
   const [archive, setArchive] = useState<Target | null>(null); const [restore, setRestore] = useState<Target | null>(null); const [deletion, setDeletion] = useState<Target | null>(null); const [reason, setReason] = useState(""); const [pendingId, setPendingId] = useState<string | null>(null); const [, startTransition] = useTransition();
   const matches = (text: string, archived: boolean) => (status === "ALL" || (status === "ARCHIVED") === archived) && text.toLowerCase().includes(query.toLowerCase());
@@ -57,6 +57,7 @@ type PriceEditorRefs = {
   workCategories: Ref[];
   vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }>;
   canManageVendors: boolean;
+  canManageCategories: boolean;
 };
 
 function parseIndonesianAmount(value: string): string | null {
@@ -77,7 +78,9 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
   const materialRow = material && row ? row as MaterialRow : undefined;
   const workRow = !material && row ? row as WorkRow : undefined;
   const { options: vendorOptions, upsertOverlayOption } = useOptionOverlay(refs.vendors);
+  const { options: categoryOptions, upsertOverlayOption: upsertCategoryOption } = useOptionOverlay(refs.workCategories);
   const [vendorId, setVendorId] = useState(materialRow?.supplier_vendor.id ?? workRow?.vendor.id ?? "");
+  const [categoryId, setCategoryId] = useState(workRow?.category.id ?? "");
   const currency = row?.currency ?? "IDR";
   const [amount, setAmount] = useState(row?.amount ?? "");
   const [amountDisplay, setAmountDisplay] = useState(row?.amount ? formatDecimal(row.amount) : "");
@@ -86,6 +89,8 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
   const [quickVendorTypeId, setQuickVendorTypeId] = useState("");
   const [quickError, setQuickError] = useState<string | null>(null);
   const [quickPending, setQuickPending] = useState(false);
+  const [categoryCreateError, setCategoryCreateError] = useState<string | null>(null);
+  const [categoryCreatePending, setCategoryCreatePending] = useState(false);
   const needsMaterial = material;
   const eligibleTypes = refs.vendorTypes.filter((type) => needsMaterial ? type.canSupplyMaterial : type.canSupplyLabor);
 
@@ -109,8 +114,25 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
     setQuickOpen(false);
   };
 
+  const createWorkCategory = async (name: string) => {
+    setCategoryCreateError(null);
+    setCategoryCreatePending(true);
+    const data = new FormData();
+    data.set("name", name);
+    const result = await createPricingWorkCategoryQuickAction(data);
+    setCategoryCreatePending(false);
+    if (!result.ok) {
+      setCategoryCreateError(result.error.safeMessage);
+      return "";
+    }
+    const createdName = name.trim();
+    upsertCategoryOption({ id: result.data.categoryId, name: createdName });
+    setCategoryId(result.data.categoryId);
+    return result.data.categoryId;
+  };
+
   const vendorField = !edit && (
-    <Field label={material ? "Supplier vendor" : "Vendor"} required>
+      <Field label={material ? "Supplier vendor" : "Vendor"} required>
       <>
         <input type="hidden" name="vendorId" value={vendorId} />
         <CreatableSearch
@@ -129,6 +151,28 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
     </Field>
   );
 
+  const categoryField = !material && (
+    <Field label="WORK category" required>
+      <>
+        <input type="hidden" name="categoryId" value={categoryId} required />
+        <CreatableSearch
+          label="WORK category"
+          options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))}
+          value={categoryId}
+          onValueChange={setCategoryId}
+          placeholder="Search or select category"
+          searchPlaceholder="Search WORK categories…"
+          emptyLabel="No WORK category matches this search."
+          onCreate={refs.canManageCategories ? createWorkCategory : undefined}
+          createLabel={(name) => `Add “${name}” as a WORK category`}
+          disabled={categoryCreatePending}
+          className="w-full"
+        />
+        {categoryCreateError ? <InlineError>{categoryCreateError}</InlineError> : null}
+      </>
+    </Field>
+  );
+
   const updateAmount = (display: string) => {
     const parsed = parseIndonesianAmount(display);
     if (parsed === null) return;
@@ -139,7 +183,7 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
   return <>
     <Dialog open onOpenChange={(open) => !open && onCancel()} title={`${edit ? "Edit" : "Create"} ${material ? "material price" : "price"}`} description={material && edit ? "SKU and supplier identity are read-only." : "Choose only active and eligible catalog references."}><form className="grid gap-4" onSubmit={onSubmit}>
       {edit && <input type="hidden" name="id" value={row!.id} />}{error && <div role="alert" className="text-sm text-danger">{error}</div>}
-      {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name} readOnly /></Field><Field label="Supplier vendor"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Unit"><Input value={`${materialRow!.unit.name} (${materialRow!.unit.code})`} readOnly /></Field></> : <><Field label="SKU" required><Select name="skuId" required><option value="">Select SKU</option>{refs.skus.map((sku) => <option key={sku.id} value={sku.id}>{sku.name}{sku.code ? ` (${sku.code})` : ""}</option>)}</Select></Field>{vendorField}</>) : <><Field label="Name" required><Input name="name" defaultValue={workRow?.name} required /></Field><Field label="WORK category" required><Select name="categoryId" defaultValue={workRow?.category.id ?? ""} required><option value="">Select category</option>{refs.workCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></Field>{vendorField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note" description="Describe included work or materials. Use bullets for a clear scope."><SimpleTextEditor name="scopeNote" defaultValue={workRow?.scope_note ?? ""} placeholder={"Example:\n- Installation labor\n- Adhesive and grout"} maxLength={1000} rows={5} /></Field>}</>}
+      {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name} readOnly /></Field><Field label="Supplier vendor"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Unit"><Input value={`${materialRow!.unit.name} (${materialRow!.unit.code})`} readOnly /></Field></> : <><Field label="SKU" required><Select name="skuId" required><option value="">Select SKU</option>{refs.skus.map((sku) => <option key={sku.id} value={sku.id}>{sku.name}{sku.code ? ` (${sku.code})` : ""}</option>)}</Select></Field>{vendorField}</>) : <><Field label="Name" required><Input name="name" defaultValue={workRow?.name} required /></Field>{categoryField}{vendorField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note" description="Describe included work or materials. Use bullets for a clear scope."><SimpleTextEditor name="scopeNote" defaultValue={workRow?.scope_note ?? ""} placeholder={"Example:\n- Installation labor\n- Adhesive and grout"} maxLength={1000} rows={5} /></Field>}</>}
       <input type="hidden" name="amount" value={amount} /><input type="hidden" name="currency" value={currency} />
       <Field label="Amount" description={`${currency} default currency`} required><div className="relative"><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-3 flex items-center font-ui-mono text-sm font-semibold text-ink-secondary">{currency}</span><Input aria-label="Amount" value={amountDisplay} onChange={(event) => updateAmount(event.target.value)} onBlur={() => setAmountDisplay(amount ? formatDecimal(amount) : "")} inputMode="decimal" placeholder="15.000" className="pl-14 tabular-nums" required /></div></Field><Field label="Notes"><Input name="notes" defaultValue={row?.notes ?? ""} /></Field><FormActions><Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button><Button type="submit" variant="primary">{edit ? "Save changes" : "Create price"}</Button></FormActions>
     </form></Dialog>

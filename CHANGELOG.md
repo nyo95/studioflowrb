@@ -9,6 +9,26 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Next local revision: **R4.07**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
+## R4.09 — 2026-09-01 — feat(pricing): create work categories inline
+
+- Replaced the Pricing work-price category select with the shared
+  `CreatableSearch` pattern.
+- Authorized users can create a `WORK` Category inline; the new category is
+  audited through the existing Master Data service, immediately selected, and
+  revalidated across Pricing, Categories, Master Data settings, and the app
+  index.
+- Users without `masterdata.dictionary.manage` can still select existing
+  categories but cannot create new ones.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `node --test --import tsx src/platform/ui_engine/ui-engine.test.ts`
+- Browser acceptance: Pricing work-price forms render the shared WORK category
+  combobox; create affordance is correctly hidden for the current user without
+  dictionary-manage permission.
+
 ## R4.08 — 2026-09-01 — fix(ui-engine): stabilize compound button content
 
 - Updated the shared `Button` content wrapper to use an inline flex row with

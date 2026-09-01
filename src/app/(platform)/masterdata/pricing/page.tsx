@@ -71,6 +71,7 @@ export default async function PricingPage() {
   const canReadMaterial = hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialRead);
   const canReadWork = hasPermission(grants, MASTERDATA_PERMISSIONS.priceWorkRead);
   const canManageVendors = hasPermission(grants, MASTERDATA_PERMISSIONS.vendorManage);
+  const canManageCategories = hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryManage);
 
   if (!canReadMaterial && !canReadWork) {
     return (
@@ -117,6 +118,7 @@ export default async function PricingPage() {
         canReadMaterial={canReadMaterial}
         canReadWork={canReadWork}
         canManageVendors={canManageVendors}
+        canManageCategories={canManageCategories}
         skus={skus.map((sku) => ({ id: sku.id, name: sku.name, code: sku.code }))}
         vendors={vendors.filter((vendor) => !vendor.deleted_at).map((vendor) => ({ id: vendor.id, name: vendor.name }))}
         units={units.filter((unit) => unit.status === "ACTIVE").map((unit) => ({ id: unit.id, code: unit.code, name: unit.name }))}
