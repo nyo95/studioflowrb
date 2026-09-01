@@ -5,9 +5,27 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline after this release is pushed: **R3** — this release commit on `origin/main`
-- Current revision after this entry is committed: **R3.20**
-- Next local revision: **R3.21**
+- Current revision after this entry is committed: **R3.21**
+- Next local revision: **R3.22**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R3.21 — 2026-09-01 — docs(recovery): record local owner access repair
+
+Status: **owner-authorized local recovery**
+
+### Changed
+
+- Replaced the sole active rebuild account's login credentials at the owner's
+  explicit request, revoked its previous sessions, and granted the registered
+  Master Data permissions to the existing `platform-owner` role.
+- Applied the pending Master Data migrations to the owner-confirmed local
+  rebuild database `studioflow_rebuild`; the application dashboard then loaded
+  successfully with Master Data navigation and live summary data.
+
+### Security
+
+- No password, password hash, connection secret, legacy path, or legacy
+  database was recorded in this repository.
 
 ## R3.20 — 2026-09-01 — feat(masterdata): add owner-vendor quick entry
 
