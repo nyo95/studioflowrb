@@ -30,7 +30,6 @@ import {
 } from "@/platform/ui_engine";
 import {
   archiveSkuAction,
-  createSkuAction,
   requestSkuDeletionAction,
   restoreSkuAction,
   updateSkuAction,
@@ -70,21 +69,18 @@ export function SkuDirectory({
   brands,
   units,
   productCategories,
-  materialVendors,
   canManage,
 }: {
   skus: SkuRow[];
   brands: Option[];
   units: UnitOption[];
   productCategories: Option[];
-  materialVendors: Option[];
   canManage: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [brandFilter, setBrandFilter] = useState<string>("ALL");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
 
-  const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<SkuRow | null>(null);
   const [confirmArchive, setConfirmArchive] = useState<SkuRow | null>(null);
   const [confirmRestore, setConfirmRestore] = useState<SkuRow | null>(null);
@@ -93,8 +89,6 @@ export function SkuDirectory({
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [createPending, setCreatePending] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editPending, setEditPending] = useState(false);
 
@@ -259,119 +253,6 @@ export function SkuDirectory({
           </tbody>
         </DataTable>
       )}
-
-      {/* Create SKU Dialog adhering to locked invariant */}
-      <Dialog
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        title="Create catalog SKU"
-        description="Register a new material SKU with mandatory category categorization and initial supplier pricing."
-      >
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setCreatePending(true);
-            setCreateError(null);
-            const fd = new FormData(e.currentTarget);
-            try {
-              const res = await createSkuAction(null, fd);
-              if (res && "ok" in res && res.ok) {
-                setCreateOpen(false);
-              } else if (res && "ok" in res && !res.ok) {
-                setCreateError(res.error.safeMessage);
-              }
-            } finally {
-              setCreatePending(false);
-            }
-          }}
-          className="grid gap-4 max-h-[80vh] overflow-y-auto pr-1"
-        >
-          {createError ? <InlineError>{createError}</InlineError> : null}
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="SKU code / Article #">
-              <Input name="code" placeholder="TH-001AA" maxLength={32} />
-            </Field>
-            <Field label="SKU name">
-              <Input name="name" maxLength={128} placeholder="e.g. HPL Natural Teak 0.8mm" autoFocus />
-            </Field>
-            <Field label="Brand">
-              <Select name="brandId">
-                <option value="">Unbranded / Generic</option>
-                {brands.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Base measurement unit" required>
-              <Select name="baseUnitId" required>
-                <option value="">Select base unit...</option>
-                {units.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.code} — {u.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Purchase unit" description="Optional: purchasing unit if different.">
-              <Select name="purchaseUnitId">
-                <option value="">Same as base unit</option>
-                {units.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.code} — {u.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          </div>
-
-          <Field label="Product category" required>
-            <Select name="categoryId" required>
-              <option value="">Select product category...</option>
-              {productCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          </Field>
-
-          {/* Initial Material Price Box */}
-          <div className="border border-line rounded-card p-3 bg-surface-muted/40 grid gap-3">
-            <Text size="sm" weight="semibold">Initial supplier &amp; material price</Text>
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="Supplier vendor" required className="col-span-2">
-                <Select name="supplierVendorId" required>
-                  <option value="">Select supplier vendor...</option>
-                  {materialVendors.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Price amount" required>
-                <Input name="amount" required placeholder="185000" />
-              </Field>
-              <Field label="Currency" required>
-                <Input name="currency" defaultValue="IDR" required maxLength={3} />
-              </Field>
-            </div>
-          </div>
-
-          <Field label="Notes">
-            <Textarea name="notes" placeholder="Thickness, sheet dimensions, finish texture..." rows={2} />
-          </Field>
-
-          <FormActions>
-            <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="primary" disabled={createPending}>
-              {createPending ? <Spinner /> : "Create SKU"}
-            </Button>
-          </FormActions>
-        </form>
-      </Dialog>
 
       {/* Edit SKU Dialog */}
       {editTarget ? (

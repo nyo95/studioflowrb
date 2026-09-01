@@ -5,9 +5,33 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.17**
-- Next local revision: **R4.18**
+- Current revision: **R4.18**
+- Next local revision: **R4.19**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.18 — 2026-09-02 — fix(masterdata): close SKU flow and transport debt
+
+- Fixed the remaining SKU Server Component boundary by serializing all SKU
+  measurements and material-price Decimal values before passing them to the
+  Client Component.
+- Removed the unreachable standalone SKU create dialog and action; SKU creation
+  remains exclusively atomic through Pricing → Material, while SKU directory
+  retains edit/archive/restore operations.
+- Rechecked the contract alignment for code/name fallback identity, one PRODUCT
+  category per SKU, measurement locking, supplier pricing, and Brand enrichment.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `git diff --check`
+- `npm test` — 207 passed, 0 failed
+- `npm run build`
+
+### Remaining
+
+- No known regression, backend logic defect, or business-logic debt in the
+  reviewed Master Data/Pricing scope.
 
 ## R4.17 — 2026-09-02 — fix(masterdata): enforce single SKU product category
 

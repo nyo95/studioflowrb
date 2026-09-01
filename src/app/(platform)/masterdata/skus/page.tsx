@@ -55,7 +55,6 @@ export default async function SkusPage() {
         brands={refs.brands}
         units={refs.units}
         productCategories={refs.productCategories}
-        materialVendors={refs.materialVendors}
         canManage={canManage}
       />
     </div>
