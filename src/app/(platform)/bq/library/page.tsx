@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission, hasAnyPermission } from "@platform/core/rbac";
@@ -147,10 +146,7 @@ export default async function BqLibraryPage() {
                           <p className="text-xs text-ink-secondary mb-3">
                             {sectionCount} sections · {subCount} subsections
                           </p>
-                          <div className="flex items-center justify-between gap-2">
-                            <Link href={`/bq/library/templates/${t.id}`} className="text-xs text-action hover:underline">Open editor</Link>
-                            {canManage ? <TemplateActions template={t} /> : null}
-                          </div>
+                          {canManage ? <TemplateActions template={t} /> : null}
                         </div>
                       );
                     })}
