@@ -43,7 +43,7 @@ export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [
       "bq.library.read",
       "bq.library.manage",
       "bq.library.promote",
-      "bq.library.promote.approve",
+      "bq.library.approve",
     ],
   },
 ];

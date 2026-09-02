@@ -5,9 +5,26 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.22**
-- Next local revision: **R4.23**
+- Current revision: **R4.24**
+- Next local revision: **R4.25**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.24 — 2026-09-02 — fix(bq): restore registry-valid approval permission
+
+- Replaced the invalid four-segment BQ approval permission
+  `bq.library.promote.approve` with the Core-compliant three-segment
+  `bq.library.approve` across the application registry, BQ service, and
+  BQ contracts. The invalid ID had prevented the Next.js instrumentation hook
+  from initializing, so the rebuild development server could not start.
+- Corrected the ledger state after R4.23: the current local revision is now
+  R4.24 and the next is R4.25.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+- Development server startup on the LAN listener
 
 ## R4.23 — 2026-09-02 — fix(bq): harden exact calculation, persistence, and project safety
 

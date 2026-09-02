@@ -79,7 +79,7 @@ function BqNavigation() {
     <>
       <NavItem href="/bq" icon={<FileText size={17} />} active={...}>Projects</NavItem>
       <NavItem href="/bq/library" icon={<Library size={17} />} active={...}>BQ Library</NavItem>
-      {/* hanya tampil jika punya permission bq.library.promote.approve */}
+      {/* hanya tampil jika punya permission bq.library.approve */}
       <NavItem href="/bq/promotions" icon={<ArrowUpCircle size={17} />} active={...}>Promotions</NavItem>
     </>
   )

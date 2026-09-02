@@ -376,7 +376,7 @@ Semua field snapshot di `BqLineItem` disimpan sebagai plain value — **bukan FK
 | `bq.library.read` | Lihat BQ Library + Templates |
 | `bq.library.manage` | Tambah/edit Library items + Template Editor |
 | `bq.library.promote` | Ajukan promotion request ke Master Data |
-| `bq.library.promote.approve` | Setujui/tolak request (admin Master Data) |
+| `bq.library.approve` | Setujui/tolak request (admin Master Data) |
 
 Estimator tidak punya akses ke Master Data — hanya baca via public contract.
 

@@ -827,11 +827,11 @@ Promotion flow menggunakan **Server Actions** di `src/apps/bq/actions/promotion.
 // listPromotionRequests() → PromotionRequest[]
 //   Query dari bq.BqLibMaterial + bq.BqLibLabor + bq.BqLibMaterialLabor
 //   WHERE promotion_status = REQUESTED
-//   Permission required: bq.library.promote.approve
+//   Permission required: bq.library.approve
 //   Return: { id, type, name, purchase_unit, base_unit, kategori, requested_at, notes }[]
 
 // approvePromotion(type, libItemId) → { masterdata_ref_id: string }
-//   Permission required: bq.library.promote.approve
+//   Permission required: bq.library.approve
 //   Aksi:
 //     1. Buat SKU baru di Master Data (untuk MATERIAL) atau entry PriceLabor/PriceMaterialLabor
 //        PENTING: harga TIDAK diisi dari Library snapshot — harga diisi 0 atau null, admin isi sendiri
@@ -840,7 +840,7 @@ Promotion flow menggunakan **Server Actions** di `src/apps/bq/actions/promotion.
 //     2. Update BqLib* item: promotion_status → APPROVED, masterdata_ref_id ← ID entry baru
 
 // rejectPromotion(type, libItemId, reason) → { ok: true }
-//   Permission required: bq.library.promote.approve
+//   Permission required: bq.library.approve
 //   Aksi: Update BqLib* item: promotion_status → REJECTED
 ```
 
@@ -861,7 +861,7 @@ Di `LibraryTable.tsx`, untuk item dengan `promotion_status === DRAFT`:
 ### F5-03: Halaman Promotion Queue (admin)
 
 Buat `src/apps/bq/app/bq/promotions/page.tsx`:
-- Hanya tampil untuk user dengan permission `bq.library.promote.approve`
+- Hanya tampil untuk user dengan permission `bq.library.approve`
 - Tabel: Nama, Tipe, Unit, KATEGORI, Diajukan oleh, Tanggal
 - Per baris: tombol "Approve" dan "Reject"
 - Reject: modal minta alasan (wajib diisi)

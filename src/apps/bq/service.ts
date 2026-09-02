@@ -22,7 +22,7 @@ export const BQ_PERMISSIONS = {
   libraryRead: "bq.library.read",
   libraryManage: "bq.library.manage",
   libraryPromote: "bq.library.promote",
-  libraryPromoteApprove: "bq.library.promote.approve",
+  libraryPromoteApprove: "bq.library.approve",
 } as const;
 
 function requireKategori(value: string): BqKategori {
