@@ -38,7 +38,9 @@ export async function libraryItemAction(
 ): Promise<ActionResult<{ id?: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
-    const parsed = ItemSchema.safeParse(Object.fromEntries(formData.entries()));
+    const input = Object.fromEntries(formData.entries());
+    if (input.id === "") delete input.id;
+    const parsed = ItemSchema.safeParse(input);
     if (!parsed.success) throw validationError(parsed.error);
     const value = parsed.data;
     const itemActor = actor(principal);
@@ -101,7 +103,9 @@ export async function templateAction(
 ): Promise<ActionResult<{ id?: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
-    const parsed = TemplateSchema.safeParse(Object.fromEntries(formData.entries()));
+    const input = Object.fromEntries(formData.entries());
+    if (input.id === "") delete input.id;
+    const parsed = TemplateSchema.safeParse(input);
     if (!parsed.success) throw validationError(parsed.error);
     const value = parsed.data;
     const templateActor = actor(principal);
