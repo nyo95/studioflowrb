@@ -5,9 +5,29 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.25**
-- Next local revision: **R4.26**
+- Current revision: **R4.26**
+- Next local revision: **R4.27**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.26 — 2026-09-02 — fix(bq): grant the system owner the BQ vocabulary
+
+- Added an idempotent rebuild-only migration that grants the exact seven BQ
+  permissions to the existing system `platform-owner` role. The initial BQ
+  schema migration created no permission delta, leaving pre-existing owner
+  accounts unable to enter or manage BQ despite the app being registered.
+- The migration does not overwrite customized grants and does not affect
+  non-system roles.
+
+### Verification
+
+- `npx prisma migrate deploy` and `npx prisma migrate status` on the approved
+  rebuild-only database
+- Owner-role permission query confirms all seven BQ grants
+
+### Remaining
+
+- Full integration tests require a separately confirmed disposable `_test`
+  database and were not run against the development database.
 
 ## R4.25 — 2026-09-02 — fix(dev): allow the office LAN origin
 
