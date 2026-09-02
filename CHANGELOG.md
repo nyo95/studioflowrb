@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.34**
-- Next local revision: **R4.35**
+- Current revision: **R4.35**
+- Next local revision: **R4.36**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.35 — 2026-09-02 — fix(masterdata/pricing): align pricing terminology
+
+- Agent: `Codex`
+
+- Aligned visible pricing labels with the approved contract: `Material Prices`,
+  `Material + Labor`, and `Labor Only`.
+- Replaced the ambiguous `work price` action and category wording with
+  `material + labor`, `labor`, or neutral pricing-category language.
+- Updated the Master Data summary card to avoid the generic `Work prices` label.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- Browser check of `/masterdata/pricing`
 
 ## R4.31 — 2026-09-02 — fix(shell): align sidebar and header design with DESIGN.md
 

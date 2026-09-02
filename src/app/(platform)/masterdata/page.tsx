@@ -22,7 +22,7 @@ const SECTIONS = [
   { key: "vendors", label: "Vendors", href: "/masterdata/vendors", desc: "Suppliers, subcontractors, and capability assignments." },
   { key: "skus", label: "SKUs", href: "/masterdata/skus", desc: "Product catalog items and purchase units." },
   { key: "materialPrices", label: "Material prices", href: "/masterdata/pricing", desc: "SKU supplier pricing." },
-  { key: "workPrices", label: "Work prices", href: "/masterdata/pricing", desc: "Material + labor and labor-only unit prices." },
+  { key: "workPrices", label: "Material + Labor / Labor", href: "/masterdata/pricing", desc: "Material + labor and labor-only unit prices." },
   { key: "units", label: "Units", href: "/masterdata/units", desc: "Standard measurement units." },
   { key: "categories", label: "Categories", href: "/masterdata/categories", desc: "Product & work categorization tree." },
   { key: "deletionRequests", label: "Deletion requests", href: "/masterdata/deletions", desc: "Two-step permanent purge approvals." },
