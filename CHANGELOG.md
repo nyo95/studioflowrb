@@ -5,11 +5,34 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.29**
-- Next local revision: **R4.30**
+- Current revision: **R4.30**
+- Next local revision: **R4.31**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
+## Changelog authorship rule
+
+Every new revision entry must identify the agent that made the change using an
+`Agent:` line. Use the actual agent name, for example `Agent: Codex` or
+`Agent: Claude`; do not infer or omit the identity.
+
+## R4.30 — 2026-09-02 — docs(changelog): identify the change-making agent
+
+- Added a changelog rule requiring every future revision entry to identify its
+  change-making agent.
+- This revision was made by Codex.
+
+### Agent
+
+`Codex`
+
+### Verification
+
+- Changelog diff inspection
+- `git diff --check`
+
 ## R4.29 — 2026-09-02 — fix(prisma): select the rebuild database by work location
+
+- Agent: `Codex`
 
 - Updated `prisma.config.ts` to select `.env.rumah` or `.env.kantor` through
   `STUDIOFLOW_LOCATION`, with the existing `.env.local` fallback preserved.
@@ -31,6 +54,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
   `STUDIOFLOW_LOCATION=rumah npx prisma migrate deploy`.
 
 ## R4.28 — 2026-09-02 — docs(agent): simplify home and office environment selection
+
+- Agent: `Codex`
 
 - Updated `AGENTS.md` to ask only whether work is happening at home or in the
   office, then select `.env.rumah` or `.env.kantor` accordingly.
