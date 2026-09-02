@@ -8,6 +8,7 @@ import { BQ_PERMISSIONS } from "@/apps/bq/service";
 import { bqPublicRead } from "@/apps/bq/runtime";
 import { Library } from "lucide-react";
 import { createMoney, formatMoney } from "@platform/utilities/money";
+import { LibraryItemActions, LibraryItemCreateButton, TemplateActions, TemplateCreateButton } from "./library-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -64,9 +65,11 @@ export default async function BqLibraryPage() {
         eyebrow="Bill of Quantity"
         title="BQ Library"
         description="Manage library items and templates"
+        actions={canManage ? <div className="flex flex-wrap gap-2"><LibraryItemCreateButton /><TemplateCreateButton /></div> : null}
       />
 
       <Tabs
+        label="BQ Library views"
         items={[
           {
             value: "items",
@@ -78,6 +81,7 @@ export default async function BqLibraryPage() {
                     icon={Library}
                     title="Belum ada library items"
                     description="Mulai dengan menambahkan item baru."
+                    action={canManage ? <LibraryItemCreateButton /> : undefined}
                   />
                 ) : (
                   <DataTable>
@@ -88,6 +92,7 @@ export default async function BqLibraryPage() {
                         <TableHead align="end">Harga</TableHead>
                         <TableHead>KATEGORI</TableHead>
                         <TableHead>Status</TableHead>
+                        {canManage ? <TableHead align="end">Actions</TableHead> : null}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -108,6 +113,7 @@ export default async function BqLibraryPage() {
                               {item.promotionStatus}
                             </StatusBadge>
                           </TableCell>
+                          {canManage ? <TableCell align="end"><LibraryItemActions item={item} /></TableCell> : null}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -125,6 +131,7 @@ export default async function BqLibraryPage() {
                   <EmptyState
                     title="Belum ada template"
                     description="Buat template untuk scaffold project baru."
+                    action={canManage ? <TemplateCreateButton /> : undefined}
                   />
                 ) : (
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -140,13 +147,9 @@ export default async function BqLibraryPage() {
                           <p className="text-xs text-ink-secondary mb-3">
                             {sectionCount} sections · {subCount} subsections
                           </p>
-                          <div className="flex gap-2">
-                              <Link
-                                href={`/bq/library/templates/${t.id}`}
-                                className="text-xs text-action hover:underline"
-                              >
-                                Edit
-                              </Link>
+                          <div className="flex items-center justify-between gap-2">
+                            <Link href={`/bq/library/templates/${t.id}`} className="text-xs text-action hover:underline">Open editor</Link>
+                            {canManage ? <TemplateActions template={t} /> : null}
                           </div>
                         </div>
                       );

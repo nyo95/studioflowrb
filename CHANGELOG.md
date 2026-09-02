@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.43**
-- Next local revision: **R4.44**
+- Current revision: **R4.44**
+- Next local revision: **R4.45**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.44 — 2026-09-03 — feat(bq): add library and template CRUD controls
+
+- Agent: `Codex`
+
+- Connected the BQ Library page to the existing service CRUD for Material,
+  Upah, Material + Upah, and Custom cost library items.
+- Added create, edit, and destructive-confirmation delete flows for library
+  items, with shared validation, permission checks, audit events, and refresh.
+- Added create, edit, duplicate, and destructive-confirmation delete flows for
+  templates; the existing template editor remains the place for sections and
+  recommended items.
+- Replaced the ambiguous `Sections` tab label with `BQ Library views` and made
+  the empty-state actions explicit.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test` — 212 passed, 0 failed
+- `git diff --check`
+- Browser check of BQ Library item/template dialogs and tab semantics
 
 ## R4.43 — 2026-09-03 — feat(bq): allow manual section creation
 
