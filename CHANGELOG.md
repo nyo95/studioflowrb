@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.45**
-- Next local revision: **R4.46**
+- Current revision: **R4.46**
+- Next local revision: **R4.47**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.46 — 2026-09-03 — fix(bq): restore project creation action for populated list
+
+- Agent: `Codex`
+
+- Added `+ Buat Project` to the BQ Projects page header when existing projects
+  are present and the user has project-management permission.
+- Kept the centered `+ Buat Project Baru` empty-state action as the sole CTA
+  when there are no projects.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `git diff --check`
+- Browser check of the populated BQ Projects page
 
 ## R4.45 — 2026-09-03 — fix(bq): remove unavailable template editor link
 
