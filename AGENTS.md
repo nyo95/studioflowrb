@@ -43,6 +43,9 @@ These files are local-only configuration and must not be committed or copied
 between computers. If the selected file is missing or its target is ambiguous,
 stop and ask only for the missing local setup detail.
 
+For Prisma and other repository tooling, set `STUDIOFLOW_LOCATION` to `rumah` or
+`kantor` before running the command so it selects the corresponding file.
+
 Both locations use a new rebuild-only PostgreSQL instance through Docker. The
 database name, schema, and application contract are intentionally identical at
 home and office; only connection details such as host, port, or Docker service

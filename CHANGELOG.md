@@ -5,9 +5,30 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.27**
-- Next local revision: **R4.28**
+- Current revision: **R4.29**
+- Next local revision: **R4.30**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.29 — 2026-09-02 — fix(prisma): select the rebuild database by work location
+
+- Updated `prisma.config.ts` to select `.env.rumah` or `.env.kantor` through
+  `STUDIOFLOW_LOCATION`, with the existing `.env.local` fallback preserved.
+- Added the local, ignored `.env.rumah` configuration for the new
+  `studioflow_rebuild` database and separate `studioflow_rebuild_test` database.
+- Prisma no longer needs the database name or Docker target supplied manually
+  for each command; the location file owns those connection values.
+
+### Verification
+
+- `STUDIOFLOW_LOCATION=rumah npx prisma validate`
+- `STUDIOFLOW_LOCATION=rumah npx prisma generate`
+- `STUDIOFLOW_LOCATION=rumah npx prisma migrate status` reached the configured
+  rebuild target but could not connect because Docker Desktop was not running.
+
+### Remaining
+
+- Start the rebuild-only PostgreSQL Docker service, then run
+  `STUDIOFLOW_LOCATION=rumah npx prisma migrate deploy`.
 
 ## R4.28 — 2026-09-02 — docs(agent): simplify home and office environment selection
 
