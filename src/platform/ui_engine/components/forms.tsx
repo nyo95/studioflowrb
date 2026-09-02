@@ -9,8 +9,10 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
+import { CircleHelp } from "lucide-react";
 
 import { cx } from "../internal/cx";
+import { Tooltip } from "../layouts/overlays";
 import { Heading, Text } from "../primitives";
 
 type ControlElementProps = {
@@ -54,13 +56,22 @@ export function Field({
   return (
     <div className={cx("grid min-w-0 gap-[5px]", className)} {...props}>
       <label className="inline-flex w-fit items-baseline gap-1 font-semibold text-ink" htmlFor={controlId}>
-        {label}
+        <span className="inline-flex items-center gap-1">
+          {label}
+          {description ? (
+            <Tooltip content={description}>
+              <button type="button" aria-label="More information" className="inline-flex h-4 w-4 items-center justify-center rounded-full text-ink-tertiary hover:text-ink">
+                <CircleHelp size={14} aria-hidden="true" />
+              </button>
+            </Tooltip>
+          ) : null}
+        </span>
         {required ? <span className="text-danger" aria-hidden="true">*</span> : null}
       </label>
       {description ? (
-        <Text id={descriptionId} tone="secondary" size="sm">
+        <span id={descriptionId} className="sr-only">
           {description}
-        </Text>
+        </span>
       ) : null}
       {control}
       {error ? (

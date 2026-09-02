@@ -125,6 +125,8 @@ describe("UI Engine foundation", () => {
     assert.match(field, /id="record-name"/);
     assert.match(field, /aria-describedby="record-name-description record-name-error"/);
     assert.match(field, /aria-invalid="true"/);
+    assert.match(field, /aria-label="More information"/);
+    assert.match(field, /class="sr-only"/);
   });
 
   it("locks token source, action radius, widths, and horizontal overflow", () => {

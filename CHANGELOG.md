@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.33**
-- Next local revision: **R4.34**
+- Current revision: **R4.34**
+- Next local revision: **R4.35**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -88,6 +88,24 @@ Every new revision entry must identify the agent that made the change using an
 - `npm run typecheck`
 - `npm run lint`
 - Browser check of the Create Brand dialog on `/masterdata/brands`
+
+## R4.34 — 2026-09-02 — fix(ui-engine): centralize field help tooltips
+
+- Agent: `Codex`
+
+- Updated the shared `Field` component so every field description renders as a
+  consistent `?` tooltip instead of inline helper text.
+- Preserved the description in the accessibility tree through the existing
+  `aria-describedby` relationship.
+- Removed the duplicated Brand-specific help implementation; Brand and Vendor
+  now consume the shared UI Engine behavior.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --test-name-pattern="UI Engine foundation"` (212 passed)
+- Browser check of the Create Vendor dialog on `/masterdata/vendors`
 
 ## R4.29 — 2026-09-02 — fix(prisma): select the rebuild database by work location
 
