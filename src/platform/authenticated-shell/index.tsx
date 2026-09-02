@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { UserRound } from "lucide-react";
 
 import { AppShell, Text, buttonClasses } from "@/platform/ui_engine";
@@ -55,10 +56,10 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
       </>}
       topbar={<div className="flex w-full items-center gap-3 px-(--ui-page-padding)">
         {contextSlot}
-        <div className="ml-auto flex min-w-0 items-center gap-2" title={`Signed in as ${principal.displayName}`}>
+        <Link href="/account" className="ml-auto flex min-w-0 items-center gap-2 rounded-action px-2 py-1 text-sm hover:bg-surface-muted" title={`Open account settings for ${principal.displayName}`} aria-label={`Open account settings for ${principal.displayName}`}>
           <UserRound size={17} aria-hidden="true" />
           <span className="max-w-[220px] truncate whitespace-nowrap">{principal.displayName}</span>
-        </div>
+        </Link>
       </div>}
     >
       {children}

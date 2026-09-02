@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.35**
-- Next local revision: **R4.36**
+- Current revision: **R4.36**
+- Next local revision: **R4.37**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.36 — 2026-09-02 — fix(shell): separate account and administration navigation
+
+- Agent: `Codex`
+
+- Moved the personal `Account` destination from the sidebar into the signed-in
+  user control in the topbar.
+- Renamed the permission-gated sidebar group to `Administration` and kept
+  General Settings, Users, and Roles & Access together there.
+- Preserved the existing `/account` route and platform permission boundaries.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- Browser check of the authenticated shell and `/account` link
 
 ## R4.35 — 2026-09-02 — fix(masterdata/pricing): align pricing terminology
 
