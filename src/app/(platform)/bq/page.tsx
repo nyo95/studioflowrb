@@ -41,13 +41,6 @@ export default async function BqProjectsPage() {
         eyebrow="Bill of Quantity"
         title="Projects"
         description="Manage your BQ projects"
-        actions={
-          canManage ? (
-            <Link href="/bq/new" className={buttonClasses("primary", "md")}>
-              + Buat Project
-            </Link>
-          ) : null
-        }
       />
 
       {projects.length === 0 ? (

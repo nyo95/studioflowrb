@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.41**
-- Next local revision: **R4.42**
+- Current revision: **R4.42**
+- Next local revision: **R4.43**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.42 — 2026-09-03 — fix(bq): remove duplicate project creation action
+
+- Agent: `Codex`
+
+- Removed the redundant header `+ Buat Project` action from the empty BQ
+  projects page.
+- Kept the single centered empty-state CTA `+ Buat Project Baru` for the
+  no-project state; populated project lists remain unchanged.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- Browser check of `/bq`
 
 ## R4.41 — 2026-09-03 — docs(changelog): correct shell revision ledger
 
