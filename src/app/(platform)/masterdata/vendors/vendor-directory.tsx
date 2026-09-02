@@ -12,6 +12,7 @@ import {
   EmptyState,
   Field,
   FormActions,
+  IconButton,
   InlineError,
   Input,
   SearchField,
@@ -501,14 +502,14 @@ export function VendorDirectory({
                     ) : null}
                     {contactsList.map((contact, idx) => (
                       <div key={idx} className="grid grid-cols-2 gap-2 p-2.5 border border-line rounded bg-surface-muted/40 relative">
-                        <button
-                          type="button"
+                        <IconButton
+                          label="Remove contact"
                           onClick={() => removeContactDraft(idx)}
-                          className="absolute top-2 right-2 text-ink-tertiary hover:text-ink-danger"
                           title="Remove"
-                        >
-                          <X size={14} />
-                        </button>
+                          icon={<X size={14} />}
+                          size="sm"
+                          className="absolute right-2 top-2 !h-6 !w-6 !min-h-6 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!bg-transparent hover:!text-ink-danger"
+                        />
                         <Field label="Contact name" required className="col-span-2 sm:col-span-1">
                           <Input
                             value={contact.personName}
@@ -731,14 +732,14 @@ export function VendorDirectory({
                       ) : null}
                       {contactsList.map((contact, idx) => (
                         <div key={idx} className="grid grid-cols-2 gap-2 p-2.5 border border-line rounded bg-surface-muted/40 relative">
-                          <button
-                            type="button"
+                          <IconButton
+                            label="Remove contact"
                             onClick={() => removeContactDraft(idx)}
-                            className="absolute top-2 right-2 text-ink-tertiary hover:text-ink-danger"
                             title="Remove"
-                          >
-                            <X size={14} />
-                          </button>
+                            icon={<X size={14} />}
+                            size="sm"
+                            className="absolute right-2 top-2 !h-6 !w-6 !min-h-6 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!bg-transparent hover:!text-ink-danger"
+                          />
                           <Field label="Contact name" required className="col-span-2 sm:col-span-1">
                             <Input
                               value={contact.personName}

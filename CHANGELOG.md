@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.36**
-- Next local revision: **R4.37**
+- Current revision: **R4.37**
+- Next local revision: **R4.38**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,24 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.37 — 2026-09-02 — refactor(ui-engine): enforce shared app controls
+
+- Agent: `Codex`
+
+- Replaced app-owned visual buttons with the shared `Button` and `IconButton`
+  components from `ui_engine`.
+- Replaced BQ-native textareas with the shared `Textarea` control and removed
+  duplicated control styling from app code.
+- Confirmed the app surface has no remaining native `<button>` or `<textarea>`
+  elements; hidden inputs remain native form plumbing by design.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test` — 212 passed, 0 failed
+- `git diff --check`
 
 ## R4.36 — 2026-09-02 — fix(shell): separate account and administration navigation
 

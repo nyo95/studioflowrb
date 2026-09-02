@@ -2,7 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { Archive, CircleHelp, Pencil, RotateCcw, Trash2 } from "lucide-react";
-import { Button, ConfirmDialog, CreatableSearch, DataTable, Dialog, EmptyState, Field, FormActions, InlineError, Input, Pagination, SearchField, SectionCard, Select, SimpleTextEditor, Spinner, StatusBadge, Text, Tooltip, type SortDirection, TableCell, TableCellContent, TableHead, TableHeader, TableRow, TableToolbar, Tabs, useOptionOverlay } from "@/platform/ui_engine";
+import { Button, ConfirmDialog, CreatableSearch, DataTable, Dialog, EmptyState, Field, FormActions, IconButton, InlineError, Input, Pagination, SearchField, SectionCard, Select, SimpleTextEditor, Spinner, StatusBadge, Text, Tooltip, type SortDirection, TableCell, TableCellContent, TableHead, TableHeader, TableRow, TableToolbar, Tabs, useOptionOverlay } from "@/platform/ui_engine";
 import { compareDecimals, formatDecimal, type DecimalString } from "@platform/utilities/decimal";
 import { createMoney, formatMoney } from "@platform/utilities/money";
 import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurement";
@@ -83,7 +83,7 @@ function parseIndonesianAmount(value: string): string | null {
 }
 
 function FieldHelp({ label, content }: { label: string; content: string }) {
-  return <Tooltip content={content}><button type="button" aria-label={`About ${label}`} className="inline-flex h-4 w-4 items-center justify-center rounded-full text-ink-tertiary hover:text-ink"><CircleHelp size={14} /></button></Tooltip>;
+ return <Tooltip content={content}><IconButton label={`About ${label}`} icon={<CircleHelp size={14} />} size="sm" className="!h-4 !w-4 !min-h-4 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!bg-transparent hover:!text-ink" /></Tooltip>;
 }
 
 function SkuMeasurementSummary({ sku }: { sku: SkuRef }) {
@@ -95,7 +95,7 @@ function SkuMeasurementSummary({ sku }: { sku: SkuRef }) {
       <div className="flex items-center gap-2">
         <Text weight="semibold">Measurement and BQ conversion</Text>
         <Tooltip content="These values belong to the selected SKU. The price is quoted per purchase unit and can be compared in the SKU's BQ base unit.">
-          <button type="button" aria-label="About SKU measurement and BQ conversion" className="inline-flex h-5 w-5 items-center justify-center rounded-full text-ink-tertiary hover:text-ink"><CircleHelp size={15} /></button>
+          <IconButton label="About SKU measurement and BQ conversion" icon={<CircleHelp size={15} />} size="sm" className="!h-5 !w-5 !min-h-5 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!bg-transparent hover:!text-ink" />
         </Tooltip>
       </div>
       {dimensions ? <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-secondary"><span>{dimensions}</span><span>Base: {sku.base_unit ? `${sku.base_unit.code} (${sku.base_unit.name})` : "Not set"}</span><span>Purchase: {sku.purchase_unit ? `${sku.purchase_unit.code} (${sku.purchase_unit.name})` : "Same as base"}</span></div> : <Text size="sm" tone="secondary" className="mt-2">No rectangular dimensions are stored for this SKU.</Text>}
@@ -291,7 +291,7 @@ function PriceEditor({ editor, refs, error, onCancel, onSubmit }: { editor: Edit
       <Field label={<span className="inline-flex items-center gap-1">Purchase unit <FieldHelp label="purchase unit" content="The unit quoted by the supplier." /></span>}><Select name="purchaseUnitId" value={purchaseUnitId} onChange={(event) => setPurchaseUnitId(event.target.value)}><option value="">Same as base unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code}</option>)}</Select></Field>
     </div>
     <SectionCard>
-      <div className="mb-3 flex items-center gap-2"><Text weight="semibold">Dimensions and BQ conversion</Text><Tooltip content="Optional for sheet materials. Enter length and width to calculate the BQ area contained in one purchase unit."><button type="button" aria-label="About dimensions and BQ conversion" className="inline-flex h-5 w-5 items-center justify-center rounded-full text-ink-tertiary hover:text-ink"><CircleHelp size={15} /></button></Tooltip></div>
+      <div className="mb-3 flex items-center gap-2"><Text weight="semibold">Dimensions and BQ conversion</Text><Tooltip content="Optional for sheet materials. Enter length and width to calculate the BQ area contained in one purchase unit."><IconButton label="About dimensions and BQ conversion" icon={<CircleHelp size={15} />} size="sm" className="!h-5 !w-5 !min-h-5 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!bg-transparent hover:!text-ink" /></Tooltip></div>
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(145px,1.4fr)]">
         <Field label="Length"><Input name="dimensionLength" value={dimensionLength} onChange={(event) => setDimensionLength(event.target.value)} inputMode="decimal" placeholder="1200" /></Field>
         <Field label="Width"><Input name="dimensionWidth" value={dimensionWidth} onChange={(event) => setDimensionWidth(event.target.value)} inputMode="decimal" placeholder="2400" /></Field>

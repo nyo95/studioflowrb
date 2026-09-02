@@ -13,7 +13,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  buttonClasses,
 } from "@/platform/ui_engine";
 import type { ActionResult } from "@platform/core/actions";
 import { revokeSessionAction } from "./actions";
@@ -98,13 +97,14 @@ export function SessionsTable({
                       className="inline-flex"
                     >
                       <input type="hidden" name="sessionId" value={session.id} />
-                      <button
+                      <Button
                         type="submit"
-                        className={buttonClasses("secondary", "sm")}
+                        variant="secondary"
+                        size="sm"
                         disabled={pending && revokingId === session.id}
                       >
                         {pending && revokingId === session.id ? "Revoking…" : "Revoke"}
-                      </button>
+                      </Button>
                     </form>
                   ) : (
                     <span aria-hidden="true">—</span>

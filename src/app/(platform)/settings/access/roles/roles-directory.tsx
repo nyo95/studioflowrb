@@ -23,7 +23,6 @@ import {
   TableHeader,
   TableRow,
   Textarea,
-  buttonClasses,
 } from "@/platform/ui_engine";
 import { archiveRoleAction, createRoleAction, replaceRoleGrantsAction, updateRoleAction } from "./actions";
 
@@ -133,17 +132,17 @@ export function RolesDirectory({
                     <div className="inline-flex flex-wrap justify-end gap-1.5">
                       {!role.archivedAt ? (
                         <>
-                          <button type="button" className={buttonClasses("secondary", "sm")} onClick={() => setGrantsTarget(role)}>
+                          <Button type="button" variant="secondary" size="sm" onClick={() => setGrantsTarget(role)}>
                             Grants
-                          </button>
+                          </Button>
                           {!role.isSystem ? (
                             <>
-                              <button type="button" className={buttonClasses("secondary", "sm")} onClick={() => setEditTarget(role)}>
+                              <Button type="button" variant="secondary" size="sm" onClick={() => setEditTarget(role)}>
                                 Edit
-                              </button>
-                              <button type="button" className={buttonClasses("danger", "sm")} onClick={() => setConfirmArchive(role)}>
+                              </Button>
+                              <Button type="button" variant="danger" size="sm" onClick={() => setConfirmArchive(role)}>
                                 Archive
-                              </button>
+                              </Button>
                             </>
                           ) : null}
                         </>

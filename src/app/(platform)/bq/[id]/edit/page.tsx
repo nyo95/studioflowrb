@@ -5,7 +5,7 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
 import { BQ_PERMISSIONS } from "@/apps/bq/service";
 import { bqPublicRead } from "@/apps/bq/runtime";
-import { Button, Field, FormActions, Input, PageHeader, SectionCard } from "@/platform/ui_engine";
+import { Button, Field, FormActions, Input, PageHeader, SectionCard, Textarea } from "@/platform/ui_engine";
 
 import { updateProjectAction } from "../../actions";
 
@@ -29,7 +29,7 @@ export default async function EditBqProjectPage({ params }: { params: Promise<{ 
           <Field label="Judul project" required><Input name="title" required maxLength={160} defaultValue={project.title} autoFocus /></Field>
           <Field label="Klien" required><Input name="clientName" required maxLength={160} defaultValue={project.clientName} /></Field>
           <Field label="Referensi eksternal"><Input name="externalRef" maxLength={160} defaultValue={project.externalRef ?? ""} /></Field>
-          <Field label="Catatan"><textarea name="notes" maxLength={2000} defaultValue={project.notes ?? ""} className="min-h-24 rounded-control border border-line bg-surface px-3 py-2 text-sm" /></Field>
+          <Field label="Catatan"><Textarea name="notes" maxLength={2000} defaultValue={project.notes ?? ""} /></Field>
           <FormActions><Link href={`/bq/${project.id}`} className="text-sm text-action hover:underline">Batal</Link><Button type="submit" variant="primary">Simpan perubahan</Button></FormActions>
         </form>
       </SectionCard>

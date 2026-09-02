@@ -12,6 +12,7 @@ import {
   Field,
   FormActions,
   InlineError,
+  IconButton,
   Input,
   SectionCard,
   Select,
@@ -24,7 +25,6 @@ import {
   TableRow,
   TableToolbar,
   Text,
-  buttonClasses,
 } from "@/platform/ui_engine";
 import {
   assignRoleAction,
@@ -138,12 +138,12 @@ export function UsersDirectory({
                   <div className="inline-flex flex-wrap justify-end gap-1.5">
                     {canManage ? (
                       <>
-                        <button type="button" className={buttonClasses("secondary", "sm")} onClick={() => setEditTarget(user)}>
+                        <Button type="button" variant="secondary" size="sm" onClick={() => setEditTarget(user)}>
                           Edit
-                        </button>
-                        <button type="button" className={buttonClasses("secondary", "sm")} onClick={() => setPasswordTarget(user)}>
+                        </Button>
+                        <Button type="button" variant="secondary" size="sm" onClick={() => setPasswordTarget(user)}>
                           Password
-                        </button>
+                        </Button>
                       </>
                     ) : null}
                     {canAssignRoles && roles.length > 0 ? (
@@ -162,22 +162,24 @@ export function UsersDirectory({
                     ) : null}
                     {canManage ? (
                       user.status === "ACTIVE" ? (
-                        <button
+                        <Button
                           type="button"
-                          className={buttonClasses("danger", "sm")}
+                          variant="danger"
+                          size="sm"
                           onClick={() => setConfirmDisable(user)}
                         >
                           Disable
-                        </button>
+                        </Button>
                       ) : (
-                        <button
+                        <Button
                           type="button"
-                          className={buttonClasses("secondary", "sm")}
+                          variant="secondary"
+                          size="sm"
                           disabled={pendingId === user.id}
                           onClick={() => runRowAction(user.id, () => restoreUserAction(user.id))}
                         >
                           {pendingId === user.id ? "Restoring…" : "Restore"}
-                        </button>
+                        </Button>
                       )
                     ) : null}
                   </div>
@@ -354,24 +356,23 @@ function RoleAssignControl({
               </option>
             ))}
           </Select>
-          <button type="submit" className={buttonClasses("secondary", "sm")} disabled={!roleId || pending}>
+          <Button type="submit" variant="secondary" size="sm" disabled={!roleId || pending}>
             Assign
-          </button>
+          </Button>
         </form>
       ) : null}
       {user.roles.filter((role) => !role.archived).map((role) => (
         <span key={role.id} className="inline-flex items-center gap-1 rounded-control border border-line px-2 py-1 text-xs">
           <span>{role.name}</span>
-          <button
-            type="button"
-            className="font-semibold text-ink-secondary hover:text-danger"
-            aria-label={`Remove ${role.name} from ${user.displayName}`}
+          <IconButton
+            label={`Remove ${role.name} from ${user.displayName}`}
             title={`Remove ${role.name}`}
+            icon={<>×</>}
+            size="sm"
+            className="!h-5 !w-5 !min-h-5 !border-0 !bg-transparent !p-0 !text-ink-secondary hover:!bg-transparent hover:!text-danger"
             disabled={pending}
             onClick={() => onRemove(role.id)}
-          >
-            ×
-          </button>
+          />
         </span>
       ))}
     </>
