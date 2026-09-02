@@ -74,77 +74,97 @@ export function AppShell({
     onCollapsedChange?.(next);
   };
 
+  const railBrand = isCollapsed ? (collapsedBrand ?? brand) : brand;
+  const railToggle = collapsible && !narrowNavigation ? (
+    <IconButton
+      className="shrink-0 max-[840px]:hidden"
+      size="sm"
+      variant="ghost"
+      label={isCollapsed ? expandLabel : collapseLabel}
+      aria-expanded={!isCollapsed}
+      onClick={toggle}
+      icon={isCollapsed ? <PanelLeftOpen aria-hidden="true" /> : <PanelLeftClose aria-hidden="true" />}
+    />
+  ) : null;
+
   return (
     <RailContext.Provider value={{ collapsed: isCollapsed }}>
       <div
         className={cx(
-          "grid min-h-screen overflow-x-clip transition-[grid-template-columns] duration-[160ms] motion-reduce:transition-none",
-          "grid-cols-[var(--ui-rail-width,232px)_minmax(0,1fr)] max-[840px]:grid-cols-1",
-          isCollapsed && "[--ui-rail-width:60px]",
+          "min-h-screen overflow-x-clip",
           className,
         )}
         data-collapsed={isCollapsed || undefined}
       >
-        {/* The rail is divided from the work area by a drawn rule, not by a tone. It is one
-            step stronger than an ordinary border because it separates navigation from work —
-            a major division, unlike the hairlines inside a card. */}
-        <aside
-          className={cx(
-            "group sticky top-0 flex h-screen max-w-screen min-w-0 flex-col overflow-hidden border-r border-line",
-            "bg-[color-mix(in_srgb,var(--ui-surface-muted)_52%,var(--ui-surface))]",
-            "max-[840px]:static max-[840px]:h-auto max-[840px]:border-b max-[840px]:border-r-0",
-          )}
-          aria-label={navigationLabel}
-          data-collapsed={isCollapsed || undefined}
-        >
-          <div
-            className={cx(
-              "flex min-h-[72px] items-center justify-between gap-2 px-4 py-3.5 max-[840px]:min-h-[52px]",
-              isCollapsed && "flex-col justify-center gap-1.5 px-2 py-2.5",
-            )}
-          >
-            {/* At 60px the mark and the toggle cannot sit side by side, so they stack. */}
-            <div className={cx("min-w-0 overflow-hidden", isCollapsed && "grid place-items-center")}>
-              {isCollapsed ? (collapsedBrand ?? brand) : brand}
-            </div>
-            {collapsible && !narrowNavigation ? (
-              <IconButton
-                className="shrink-0 max-[840px]:hidden"
-                size="sm"
-                variant="ghost"
-                label={isCollapsed ? expandLabel : collapseLabel}
-                aria-expanded={!isCollapsed}
-                onClick={toggle}
-                icon={isCollapsed ? <PanelLeftOpen aria-hidden="true" /> : <PanelLeftClose aria-hidden="true" />}
-              />
-            ) : null}
-          </div>
-          <nav
-            className={cx(
-              "min-w-0 flex-1 overflow-auto px-3 pt-2 pb-3.5",
-              isCollapsed && "px-1.5",
-              "max-[840px]:flex max-[840px]:overflow-x-auto max-[840px]:p-2.5 max-[840px]:[scrollbar-width:none] max-[840px]:[&::-webkit-scrollbar]:hidden",
-            )}
-          >
-            {navigation}
-          </nav>
-          {utility ? (
+        {topbar ? (
+          <header className="sticky top-0 z-20 flex min-h-16 items-stretch border-b border-line bg-surface/94 backdrop-blur-[12px]">
             <div
               className={cx(
-                "grid gap-1 border-t border-line px-3 pt-2.5 pb-3.5 max-[840px]:hidden",
-                isCollapsed && "px-1.5",
+                "flex min-w-0 shrink-0 items-center justify-between gap-2 border-r border-line px-4 py-3.5 transition-[width] duration-[160ms] motion-reduce:transition-none",
+                "w-[var(--ui-rail-width,232px)] max-[840px]:w-auto max-[840px]:border-r-0 max-[840px]:px-3",
+                isCollapsed && "[--ui-rail-width:60px] flex-col justify-center gap-1.5 px-2 py-2.5",
               )}
             >
-              {utility}
+              <div className={cx("min-w-0 overflow-hidden", isCollapsed && "grid place-items-center")}>
+                {railBrand}
+              </div>
+              {railToggle}
             </div>
-          ) : null}
-        </aside>
-        <div className="min-w-0">
-          {topbar ? (
-            <header className="sticky top-0 z-10 flex min-h-16 items-center border-b border-line bg-surface/94 backdrop-blur-[12px]">
-              {topbar}
-            </header>
-          ) : null}
+            <div className="min-w-0 flex-1">{topbar}</div>
+          </header>
+        ) : null}
+        <div
+          className={cx(
+            "grid min-h-screen overflow-x-clip transition-[grid-template-columns] duration-[160ms] motion-reduce:transition-none",
+            "grid-cols-[var(--ui-rail-width,232px)_minmax(0,1fr)] max-[840px]:grid-cols-1",
+            isCollapsed && "[--ui-rail-width:60px]",
+            topbar ? "min-h-[calc(100vh-4rem)]" : null,
+          )}
+        >
+          {/* The rail is divided from the work area by a drawn rule, not by a tone. */}
+          <aside
+            className={cx(
+              "group sticky top-16 flex h-[calc(100vh-4rem)] max-w-screen min-w-0 flex-col overflow-hidden border-r border-line",
+              "bg-[color-mix(in_srgb,var(--ui-surface-muted)_52%,var(--ui-surface))]",
+              !topbar && "top-0 h-screen",
+              "max-[840px]:static max-[840px]:h-auto max-[840px]:border-b max-[840px]:border-r-0",
+            )}
+            aria-label={navigationLabel}
+            data-collapsed={isCollapsed || undefined}
+          >
+            {!topbar ? (
+              <div
+                className={cx(
+                  "flex min-h-[72px] items-center justify-between gap-2 px-4 py-3.5 max-[840px]:min-h-[52px]",
+                  isCollapsed && "flex-col justify-center gap-1.5 px-2 py-2.5",
+                )}
+              >
+                <div className={cx("min-w-0 overflow-hidden", isCollapsed && "grid place-items-center")}>
+                  {railBrand}
+                </div>
+                {railToggle}
+              </div>
+            ) : null}
+            <nav
+              className={cx(
+                "min-w-0 flex-1 overflow-auto px-3 pt-2 pb-3.5",
+                isCollapsed && "px-1.5",
+                "max-[840px]:flex max-[840px]:overflow-x-auto max-[840px]:p-2.5 max-[840px]:[scrollbar-width:none] max-[840px]:[&::-webkit-scrollbar]:hidden",
+              )}
+            >
+              {navigation}
+            </nav>
+            {utility ? (
+              <div
+                className={cx(
+                  "grid gap-1 border-t border-line px-3 pt-2.5 pb-3.5 max-[840px]:hidden",
+                  isCollapsed && "px-1.5",
+                )}
+              >
+                {utility}
+              </div>
+            ) : null}
+          </aside>
           <main className="min-w-0">{children}</main>
         </div>
       </div>

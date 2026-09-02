@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.30**
-- Next local revision: **R4.31**
+- Current revision: **R4.32**
+- Next local revision: **R4.33**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -56,6 +56,23 @@ Every new revision entry must identify the agent that made the change using an
 
 - Changelog diff inspection
 - `git diff --check`
+
+## R4.32 — 2026-09-02 — fix(ui-engine): make the authenticated header continuous
+
+- Agent: `Codex`
+
+- Moved `AppShell` topbars into a full-width global header so the brand, account
+  identity, and application header share one continuous horizontal surface.
+- Kept the existing rail and content below the header, including collapsed rail
+  behavior and the legacy shell fallback when no topbar is supplied.
+- Preserved responsive navigation behavior at narrow widths.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- Desktop browser check on `/masterdata`
+- Mobile browser check at `390x844`
 
 ## R4.29 — 2026-09-02 — fix(prisma): select the rebuild database by work location
 
