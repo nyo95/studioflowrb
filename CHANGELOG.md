@@ -5,9 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.26**
-- Next local revision: **R4.27**
+- Current revision: **R4.27**
+- Next local revision: **R4.28**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.27 — 2026-09-02 — fix(ui-engine): guard field control inference
+
+- Made the shared `Field` infer a child control ID only after confirming the
+  child is a valid React element. BQ project creation no longer crashes when
+  the form is rendered.
+
+### Verification
+
+- BQ project-entry browser check
+- `npm run typecheck`
+- `npm run lint`
 
 ## R4.26 — 2026-09-02 — fix(bq): grant the system owner the BQ vocabulary
 

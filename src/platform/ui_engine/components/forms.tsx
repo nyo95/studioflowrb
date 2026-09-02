@@ -39,7 +39,7 @@ export function Field({
   ...props
 }: FieldProps) {
   const generatedId = useId();
-  const controlId = id ?? children?.props.id ?? `field-${generatedId}`;
+  const controlId = id ?? (isValidElement(children) ? children.props.id : undefined) ?? `field-${generatedId}`;
   const descriptionId = description ? `${controlId}-description` : undefined;
   const errorId = error ? `${controlId}-error` : undefined;
   const describedBy = [descriptionId, errorId].filter(Boolean).join(" ") || undefined;
