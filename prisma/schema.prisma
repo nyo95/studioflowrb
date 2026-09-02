@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["platform", "master_data"]
+  schemas  = ["platform", "master_data", "bq"]
 }
 
 // ============================================================================
@@ -637,4 +637,320 @@ model DeletionRequest {
   @@index([target_type, target_id, status])
   @@index([status])
   @@schema("master_data")
+}
+
+// ============================================================================
+// BQ — Bill of Quantity (app-owned, isolated schema)
+// ============================================================================
+
+enum BqPromotionStatus {
+  DRAFT
+  REQUESTED
+  APPROVED
+  REJECTED
+
+  @@schema("bq")
+}
+
+enum BqProjectStatus {
+  DRAFT
+  LOCKED
+
+  @@schema("bq")
+}
+
+enum BqKategori {
+  MATERIAL
+  UPAH
+  MATERIAL_UPAH
+  BIAYA_UMUM
+  TRANSPORTASI_AKOMODASI
+  ALAT
+
+  @@schema("bq")
+}
+
+enum BqLineItemSourceType {
+  MASTERDATA
+  BQ_LIBRARY
+  CUSTOM
+
+  @@schema("bq")
+}
+
+// ─── BQ LIBRARY ───────────────────────────────────────────────
+
+model BqLibMaterial {
+  id                  String   @id @default(cuid())
+  name                String
+  purchase_unit       String
+  base_unit           String?
+  harga               Decimal  @db.Decimal(18, 4)
+  currency            String   @default("IDR")
+  default_koefisien   Decimal  @default(1) @db.Decimal(18, 6)
+  kategori            BqKategori  // hanya boleh MATERIAL
+  notes               String?
+  promotion_status    BqPromotionStatus @default(DRAFT)
+  masterdata_ref_id   String?  // plain ID, bukan FK
+  created_by          String   // plain User ID, bukan FK
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  template_recommendations BqTemplateRecommendation[]
+
+  @@map("bq_lib_material")
+  @@schema("bq")
+}
+
+model BqLibLabor {
+  id                  String   @id @default(cuid())
+  name                String
+  purchase_unit       String
+  base_unit           String?
+  harga               Decimal  @db.Decimal(18, 4)
+  currency            String   @default("IDR")
+  default_koefisien   Decimal  @default(1) @db.Decimal(18, 6)
+  kategori            BqKategori  // hanya boleh UPAH
+  notes               String?
+  promotion_status    BqPromotionStatus @default(DRAFT)
+  masterdata_ref_id   String?
+  created_by          String
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  template_recommendations BqTemplateRecommendation[]
+
+  @@map("bq_lib_labor")
+  @@schema("bq")
+}
+
+model BqLibMaterialLabor {
+  id                  String   @id @default(cuid())
+  name                String
+  purchase_unit       String
+  base_unit           String?
+  harga               Decimal  @db.Decimal(18, 4)
+  currency            String   @default("IDR")
+  default_koefisien   Decimal  @default(1) @db.Decimal(18, 6)
+  kategori            BqKategori  // hanya boleh MATERIAL_UPAH
+  notes               String?
+  promotion_status    BqPromotionStatus @default(DRAFT)
+  masterdata_ref_id   String?
+  created_by          String
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  template_recommendations BqTemplateRecommendation[]
+
+  @@map("bq_lib_material_labor")
+  @@schema("bq")
+}
+
+// Kategori: Biaya Umum, Transportasi & Akomodasi, Alat
+// TIDAK bisa dipromosikan ke Master Data
+model BqLibCustomItem {
+  id                  String       @id @default(cuid())
+  name                String
+  purchase_unit       String
+  harga               Decimal      @db.Decimal(18, 4)
+  currency            String       @default("IDR")
+  default_koefisien   Decimal      @default(1) @db.Decimal(18, 6)
+  kategori            BqKategori
+  notes               String?
+  created_by          String
+  created_at          DateTime     @default(now())
+  updated_at          DateTime     @updatedAt
+
+  template_recommendations BqTemplateRecommendation[]
+
+  @@map("bq_lib_custom_item")
+  @@schema("bq")
+}
+
+// ─── TEMPLATE ─────────────────────────────────────────────────
+
+model BqTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  created_by  String
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  sections    BqTemplateSection[]
+
+  @@map("bq_template")
+  @@schema("bq")
+}
+
+// Template section — max 2 level: Section (parent_id = null) → Subsection (parent_id → Section).
+// Nested lebih dari 2 level tidak didukung oleh UI dan business logic BQ.
+// Server action harus menolak creation Subsection yang parent-nya sudah merupakan Subsection.
+model BqTemplateSection {
+  id            String    @id @default(cuid())
+  template_id   String
+  template      BqTemplate @relation(fields: [template_id], references: [id], onDelete: Cascade)
+  name          String
+  parent_id     String?   // null = Section, non-null = Subsection (FK ke BqTemplateSection sendiri)
+  parent        BqTemplateSection?  @relation("SectionChildren", fields: [parent_id], references: [id])
+  children      BqTemplateSection[] @relation("SectionChildren")
+  sort_order    Int       @default(0)
+  created_by    String
+  created_at    DateTime  @default(now())
+
+  recommendations BqTemplateRecommendation[]
+
+  @@map("bq_template_section")
+  @@schema("bq")
+}
+
+// Pointer dari template section ke library item (live reference, bukan snapshot)
+// lib_material_id, lib_labor_id, lib_material_labor_id, lib_custom_item_id:
+// hanya satu yang non-null per baris
+model BqTemplateRecommendation {
+  id                      String    @id @default(cuid())
+  template_section_id     String
+  template_section        BqTemplateSection @relation(fields: [template_section_id], references: [id], onDelete: Cascade)
+  sort_order              Int       @default(0)
+
+  lib_material_id         String?
+  lib_material            BqLibMaterial?        @relation(fields: [lib_material_id], references: [id])
+  lib_labor_id            String?
+  lib_labor               BqLibLabor?           @relation(fields: [lib_labor_id], references: [id])
+  lib_material_labor_id   String?
+  lib_material_labor      BqLibMaterialLabor?   @relation(fields: [lib_material_labor_id], references: [id])
+  lib_custom_item_id      String?
+  lib_custom_item         BqLibCustomItem?      @relation(fields: [lib_custom_item_id], references: [id])
+
+  @@map("bq_template_recommendation")
+  @@schema("bq")
+}
+
+// ─── BQ PROJECT ───────────────────────────────────────────────
+
+model BqProject {
+  id           String      @id @default(cuid())
+  title        String
+  client_name  String
+  status       BqProjectStatus @default(DRAFT)
+  external_ref String?
+  notes        String?
+  created_by   String
+  created_at   DateTime    @default(now())
+  updated_at   DateTime    @updatedAt
+
+  sections     BqSection[]
+
+  @@map("bq_project")
+  @@schema("bq")
+}
+
+model BqSection {
+  id          String    @id @default(cuid())
+  project_id  String
+  project     BqProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  name        String
+  sort_order  Int       @default(0)
+  created_at  DateTime  @default(now())
+
+  subsections BqSubsection[]
+  items       BqItem[]       // L1 items langsung di section (tanpa subsection)
+
+  @@map("bq_section")
+  @@schema("bq")
+}
+
+model BqSubsection {
+  id          String    @id @default(cuid())
+  section_id  String
+  section     BqSection @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  name        String
+  sort_order  Int       @default(0)
+  created_at  DateTime  @default(now())
+
+  items       BqItem[]
+
+  @@map("bq_subsection")
+  @@schema("bq")
+}
+
+// L1 Item
+// section_id XOR subsection_id — satu harus non-null, yang lain null
+// L1 boleh berdiri sendiri tanpa L2 maupun L3. Saat L1-only, harga_snapshot dan koefisien dipakai untuk kalkulasi.
+model BqItem {
+  id             String        @id @default(cuid())
+  section_id     String?
+  section        BqSection?    @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  subsection_id  String?
+  subsection     BqSubsection? @relation(fields: [subsection_id], references: [id], onDelete: Cascade)
+  name           String
+  qty            Decimal       @db.Decimal(18, 6)
+  unit           String
+  harga_snapshot Decimal?      @db.Decimal(18, 4)  // dipakai hanya saat L1 tanpa child
+  koefisien      Decimal       @default(1) @db.Decimal(18, 6)  // dipakai hanya saat L1 tanpa child
+  markup_l1_pct  Decimal       @default(0) @db.Decimal(6, 4)
+  sort_order     Int           @default(0)
+  notes          String?
+  created_at     DateTime      @default(now())
+  updated_at     DateTime      @updatedAt
+
+  sub_objects    BqSubObject[]
+  line_items     BqLineItem[]  // L3 langsung di L1 (tanpa L2)
+
+  @@map("bq_item")
+  @@schema("bq")
+}
+
+// L2 Sub-object (opsional)
+model BqSubObject {
+  id            String    @id @default(cuid())
+  item_id       String
+  item          BqItem    @relation(fields: [item_id], references: [id], onDelete: Cascade)
+  name          String
+  qty_per_l1    Decimal   @db.Decimal(18, 6)
+  markup_l2_pct Decimal   @default(0) @db.Decimal(6, 4)
+  sort_order    Int       @default(0)
+  notes         String?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  line_items    BqLineItem[]
+
+  @@map("bq_sub_object")
+  @@schema("bq")
+}
+
+// L3 Line Item — terminal, tempat kalkulasi terjadi
+// sub_object_id XOR item_id — satu harus non-null, yang lain null
+model BqLineItem {
+  id                              String       @id @default(cuid())
+  sub_object_id                   String?
+  sub_object                      BqSubObject? @relation(fields: [sub_object_id], references: [id], onDelete: Cascade)
+  item_id                         String?      // L3 langsung di L1 (tanpa L2)
+  item                            BqItem?      @relation(fields: [item_id], references: [id], onDelete: Cascade)
+
+  // Snapshot fields — semua plain value, tidak ada FK ke MD
+  source_type                     BqLineItemSourceType
+  source_ref_id                   String?      // plain ID asal (MD price ID atau Library item ID)
+  source_imported_at              DateTime?
+
+  title_snapshot                  String
+  purchase_unit_snapshot          String
+  base_unit_snapshot              String?
+  purchase_to_base_factor_snapshot Decimal?    @db.Decimal(18, 6)  // display only
+  harga_snapshot                  Decimal      @db.Decimal(18, 4)
+  currency_snapshot               String       @default("IDR")
+  kategori                        BqKategori
+
+  // Input estimator
+  qty                             Decimal      @db.Decimal(18, 6)
+  koefisien                       Decimal      @default(1) @db.Decimal(18, 6)
+
+  sort_order                      Int          @default(0)
+  notes                           String?
+  created_at                      DateTime     @default(now())
+  updated_at                      DateTime     @updatedAt
+
+  @@map("bq_line_item")
+  @@schema("bq")
 }

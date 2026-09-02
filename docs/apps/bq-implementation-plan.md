@@ -49,12 +49,6 @@ src/apps/bq/
       library/page.tsx           ← BQ Library + Template Editor
       library/templates/[id]/page.tsx
       promotions/page.tsx        ← promotion queue (admin)
-
-src/apps/masterdata/
-  app/api/promotion-requests/
-    route.ts                     ← GET list (BQ-F5)
-    [id]/approve/route.ts        ← POST approve (BQ-F5)
-    [id]/reject/route.ts         ← POST reject (BQ-F5)
 ```
 
 ---
@@ -80,6 +74,7 @@ model BqLibMaterial {
   harga               Decimal  @db.Decimal(18, 4)
   currency            String   @default("IDR")
   default_koefisien   Decimal  @default(1) @db.Decimal(18, 6)
+  kategori            BqKategori  // hanya boleh MATERIAL
   notes               String?
   promotion_status    BqPromotionStatus @default(DRAFT)
   masterdata_ref_id   String?  // plain ID, bukan FK
@@ -97,9 +92,11 @@ model BqLibLabor {
   id                  String   @id @default(cuid())
   name                String
   purchase_unit       String
+  base_unit           String?
   harga               Decimal  @db.Decimal(18, 4)
   currency            String   @default("IDR")
   default_koefisien   Decimal  @default(1) @db.Decimal(18, 6)
+  kategori            BqKategori  // hanya boleh UPAH
   notes               String?
   promotion_status    BqPromotionStatus @default(DRAFT)
   masterdata_ref_id   String?
@@ -117,9 +114,11 @@ model BqLibMaterialLabor {
   id                  String   @id @default(cuid())
   name                String
   purchase_unit       String
+  base_unit           String?
   harga               Decimal  @db.Decimal(18, 4)
   currency            String   @default("IDR")
   default_koefisien   Decimal  @default(1) @db.Decimal(18, 6)
+  kategori            BqKategori  // hanya boleh MATERIAL_UPAH
   notes               String?
   promotion_status    BqPromotionStatus @default(DRAFT)
   masterdata_ref_id   String?
@@ -170,6 +169,9 @@ model BqTemplate {
   @@schema("bq")
 }
 
+// Template section — max 2 level: Section (parent_id = null) → Subsection (parent_id → Section).
+// Nested lebih dari 2 level tidak didukung oleh UI dan business logic BQ.
+// Server action harus menolak creation Subsection yang parent-nya sudah merupakan Subsection.
 model BqTemplateSection {
   id            String    @id @default(cuid())
   template_id   String
@@ -179,6 +181,7 @@ model BqTemplateSection {
   parent        BqTemplateSection?  @relation("SectionChildren", fields: [parent_id], references: [id])
   children      BqTemplateSection[] @relation("SectionChildren")
   sort_order    Int       @default(0)
+  created_by    String
   created_at    DateTime  @default(now())
 
   recommendations BqTemplateRecommendation[]
@@ -259,6 +262,7 @@ model BqSubsection {
 
 // L1 Item
 // section_id XOR subsection_id — satu harus non-null, yang lain null
+// L1 boleh berdiri sendiri tanpa L2 maupun L3. Saat L1-only, harga_snapshot dan koefisien dipakai untuk kalkulasi.
 model BqItem {
   id             String        @id @default(cuid())
   section_id     String?
@@ -268,6 +272,8 @@ model BqItem {
   name           String
   qty            Decimal       @db.Decimal(18, 6)
   unit           String
+  harga_snapshot Decimal?      @db.Decimal(18, 4)  // dipakai hanya saat L1 tanpa child
+  koefisien      Decimal       @default(1) @db.Decimal(18, 6)  // dipakai hanya saat L1 tanpa child
   markup_l1_pct  Decimal       @default(0) @db.Decimal(6, 4)
   sort_order     Int           @default(0)
   notes          String?
@@ -382,6 +388,11 @@ datasource db {
 }
 ```
 
+**Catatan schema revision dari kontrak:**
+- `BqLibMaterial`, `BqLibLabor`, `BqLibMaterialLabor` masing-masing mendapat `base_unit String?` dan `kategori BqKategori`.
+- `BqItem` mendapat `harga_snapshot Decimal?` dan `koefisien Decimal @default(1)` untuk kasus L1-only.
+- Validasi kategori per tipe ditegakkan di server action, bukan di level enum Prisma (karena satu enum dipakai semua tipe).
+
 ### F1-02: Jalankan migration
 
 ```bash
@@ -419,7 +430,11 @@ Buat `src/apps/bq/actions/library.ts`:
 Validasi yang wajib:
 - `harga > 0`
 - `default_koefisien > 0`
-- `kategori` di BqLibCustomItem harus salah satu dari `BIAYA_UMUM`, `TRANSPORTASI_AKOMODASI`, `ALAT` — tiga nilai lainnya dilarang di sini
+- `kategori` wajib diisi untuk semua tipe library item
+- `BqLibMaterial` hanya boleh `MATERIAL`
+- `BqLibLabor` hanya boleh `UPAH`
+- `BqLibMaterialLabor` hanya boleh `MATERIAL_UPAH`
+- `BqLibCustomItem` hanya boleh `BIAYA_UMUM`, `TRANSPORTASI_AKOMODASI`, `ALAT` — tiga nilai lainnya dilarang
 
 ### F2-02: Server actions untuk Template
 
@@ -469,24 +484,29 @@ Buat `src/apps/bq/app/bq/library/templates/[id]/page.tsx`:
 Buat `src/apps/bq/lib/calculation-engine.ts`:
 
 ```typescript
-// Tipe input:
+import type { DecimalString } from "@platform/utilities/decimal";
+
+// Tipe input — SEMUA menggunakan DecimalString, bukan number:
 type LineItemInput = {
-  qty: number           // L3 qty (per parent langsung)
-  harga_snapshot: number
-  koefisien: number
+  qty: DecimalString           // L3 qty (per parent langsung)
+  harga_snapshot: DecimalString
+  koefisien: DecimalString
 }
 
 type SubObjectInput = {
-  qty_per_l1: number
-  markup_l2_pct: number   // persen, bukan desimal: 15 = 15%
+  qty_per_l1: DecimalString
+  markup_l2_pct: DecimalString   // persen, bukan desimal: "15" = 15%
   line_items: LineItemInput[]
 }
 
 type ItemInput = {
-  qty: number             // L1 qty
-  markup_l1_pct: number
+  qty: DecimalString             // L1 qty
+  markup_l1_pct: DecimalString
   sub_objects: SubObjectInput[]
   line_items_direct: LineItemInput[]  // L3 langsung di L1 tanpa L2
+  // L1-only fields (dipakai saat tidak ada child):
+  harga_snapshot?: DecimalString
+  koefisien?: DecimalString
 }
 
 // Output per L3:
@@ -498,57 +518,136 @@ type ItemInput = {
 // subtotal_L2 = subtotal_L2_raw × (1 + markup_l2_pct / 100)
 
 // Output per L1:
-// biaya_pokok = SUM(subtotal_L2) + SUM(biaya_line L3 langsung)
-// rate = biaya_pokok × (1 + markup_l1_pct / 100)
-// total = rate × L1.qty
+// Jika punya child:
+//   biaya_pokok = SUM(subtotal_L2) + SUM(biaya_line L3 langsung)
+//   rate = biaya_pokok × (1 + markup_l1_pct / 100)
+//   total = rate × L1.qty
+// Jika L1-only (tanpa child):
+//   rate = harga_snapshot × koefisien × (1 + markup_l1_pct / 100)
+//   total = rate × L1.qty
 
 // Output grand total:
 // grand_total = SUM(total semua L1)
+
+// Semua output bertipe DecimalString. Tidak ada Number/parseFloat.
+
+// Output types — semua nilai DecimalString, truncate 2 desimal di setiap intermediate:
+type LineItemResult = {
+  biaya_line: DecimalString  // qty × harga_snapshot × koefisien, truncate 2 desimal
+}
+
+type SubObjectResult = {
+  subtotal_L2_raw: DecimalString
+  subtotal_L2: DecimalString  // subtotal_L2_raw × (1 + markup_l2_pct / 100), truncate 2 desimal
+  line_items: LineItemResult[]
+}
+
+type ItemResult = {
+  // Jika L1 punya child:
+  biaya_pokok?: DecimalString   // SUM(subtotal_L2) + SUM(biaya_line L3 langsung), truncate 2 desimal
+  rate?: DecimalString          // biaya_pokok × (1 + markup_l1_pct / 100), truncate 2 desimal
+  total?: DecimalString         // rate × L1.qty, truncate 2 desimal
+  // Jika L1-only (tanpa child):
+  rate: DecimalString           // harga_snapshot × koefisien × (1 + markup_l1_pct / 100), truncate 2 desimal
+  total: DecimalString          // rate × L1.qty, truncate 2 desimal
+  sub_objects?: SubObjectResult[]
+  line_items_direct: LineItemResult[]
+}
+
+type ProjectResult = {
+  items: ItemResult[]
+  grand_total: DecimalString    // SUM(total semua L1), truncate 2 desimal
+}
 
 // Export:
 export function calculateItem(item: ItemInput): ItemResult
 export function calculateProject(items: ItemInput[]): ProjectResult
 ```
 
+**Aturan arithmetic:**
+- Tidak boleh memakai `Number()`, `parseFloat()`, atau operasi floating-point JavaScript.
+- Tidak boleh mengimpor `Prisma.Decimal` ke calculation engine murni.
+- Adapter action/service yang mengubah `Prisma.Decimal` menjadi `DecimalString` via `.toString()` sebelum memanggil engine.
+- Penjumlahan, perkalian, pembagian persen dilakukan dengan arithmetic decimal presisi eksak.
+- **Rounding policy: truncate 2 desimal** di setiap intermediate step (`biaya_line`, `subtotal_L2_raw`, `subtotal_L2`, `biaya_pokok`, `rate`) dan output final (`total`, `grand_total`).
+  - Truncate = buang digit di luar 2 desimal tanpa pembulatan: `"123.456"` → `"123.45"`.
+  - Output tetap canonical `DecimalString` (tanpa trailing zero): `"100.50"` → `"100.5"`.
+  - Fungsi truncate harus bekerja pada `DecimalString` langsung, bukan via `Number()`.
+
+**Foundation-first assessment:**
+Sebelum F3 diimplementasikan, navigator harus menilai apakah `@platform/utilities/decimal` perlu diextend dengan arithmetic generik (add, multiply, divide-percent, round). Jika ya, capability generik tersebut diuji di shared Utilities; rumus dan rounding BQ tetap app-owned.
+
 **Unit test wajib** — buat `src/apps/bq/lib/calculation-engine.test.ts`:
 
 ```
-Test case 1: L1 tanpa L2, tanpa markup
-  L1.qty = 1, markup_l1 = 0
-  L3: qty=1, harga=100_000, koef=1
-  Expected: biaya_line=100000, rate=100000, total=100000
+Test case 1: L1-only tanpa markup
+  L1.qty = "1", markup_l1 = "0"
+  L1.harga_snapshot = "100000", L1.koefisien = "1"
+  Expected: rate="100000", total="100000"
 
-Test case 2: L1 dengan L2, markup di L2 saja
-  L1.qty = 3, markup_l1 = 0
-  L2.qty_per_l1 = 2, markup_l2 = 10 (10%)
-  L3: qty=1, harga=100_000, koef=0.75
+Test case 2: L1-only dengan koefisien dan markup L1
+  L1.qty = "2", markup_l1 = "15"
+  L1.harga_snapshot = "50000", L1.koefisien = "0.8"
   Expected:
-    biaya_line = 1 × 100000 × 0.75 = 75000
-    subtotal_L2_raw = 75000
-    subtotal_L2 = 75000 × 1.10 = 82500
-    biaya_pokok = 82500
-    rate = 82500 (markup_l1=0)
-    total = 82500 × 3 = 247500
+    rate = 50000 × 0.8 × 1.15 = "46000"
+    total = 46000 × 2 = "92000"
 
-Test case 3: L1 dengan L2 dan markup compound
-  L1.qty = 1, markup_l1 = 20 (20%)
-  L2.qty_per_l1 = 1, markup_l2 = 10 (10%)
-  L3: qty=1, harga=100_000, koef=1
+Test case 3: L1 dengan L3 langsung (tanpa L2), tanpa markup
+  L1.qty = "1", markup_l1 = "0"
+  L3: qty="1", harga_snapshot="100000", koefisien="1"
+  Expected: biaya_line="100000", rate="100000", total="100000"
+
+Test case 4: L1 dengan L2, markup di L2 saja
+  L1.qty = "3", markup_l1 = "0"
+  L2.qty_per_l1 = "2", markup_l2 = "10"
+  L3: qty="1", harga_snapshot="100000", koefisien="0.75"
   Expected:
-    subtotal_L2 = 100000 × 1.10 = 110000
-    biaya_pokok = 110000
-    rate = 110000 × 1.20 = 132000
-    total = 132000
+    biaya_line = "75000"
+    subtotal_L2_raw = "75000"
+    subtotal_L2 = "82500"
+    biaya_pokok = "82500"
+    rate = "82500"
+    total = "247500"
 
-Test case 4: L1 dengan L2 dan L3 langsung (campuran)
-  L1.qty = 1, markup_l1 = 0
-  L2.qty_per_l1 = 1, markup_l2 = 0
-    L3 di L2: qty=1, harga=50000, koef=1 → biaya_line=50000
-  L3 langsung: qty=1, harga=30000, koef=1 → biaya_line=30000
-  Expected: biaya_pokok = 50000 + 30000 = 80000, total = 80000
+Test case 5: L1 dengan L2 dan markup compound
+  L1.qty = "1", markup_l1 = "20"
+  L2.qty_per_l1 = "1", markup_l2 = "10"
+  L3: qty="1", harga_snapshot="100000", koefisien="1"
+  Expected:
+    subtotal_L2 = "110000"
+    biaya_pokok = "110000"
+    rate = "132000"
+    total = "132000"
+
+Test case 6: L1 dengan campuran L2 dan L3 langsung
+  L1.qty = "1", markup_l1 = "0"
+  L2.qty_per_l1 = "1", markup_l2 = "0"
+    L3 di L2: qty="1", harga_snapshot="50000", koefisien="1" → biaya_line="50000"
+  L3 langsung: qty="1", harga_snapshot="30000", koefisien="1" → biaya_line="30000"
+  Expected: biaya_pokok = "80000", total = "80000"
+
+Test case 7: Truncate intermediate — koefisien menghasilkan pecahan > 2 desimal
+  L1.qty = "1", markup_l1 = "0"
+  L3: qty="1", harga_snapshot="100000", koefisien="0.333333"
+  Expected:
+    biaya_line_raw = 33333.3 → truncate 2 desimal → "33333.3"
+    rate = "33333.3"
+    total = "33333.3"
+
+Test case 8: Truncate di setiap step — markup menghasilkan pecahan panjang
+  L1.qty = "1", markup_l1 = "0"
+  L2.qty_per_l1 = "1", markup_l2 = "7"
+  L3: qty="3", harga_snapshot="100000", koefisien="0.333333"
+  Expected:
+    biaya_line = 3 × 100000 × 0.333333 = 99999.9 → "99999.9"
+    subtotal_L2_raw = "99999.9"
+    subtotal_L2 = 99999.9 × 1.07 = 106999.893 → truncate → "106999.89"
+    biaya_pokok = "106999.89"
+    rate = "106999.89"
+    total = "106999.89"
 ```
 
-Semua test harus pass sebelum F3 dianggap selesai.
+Semua expected value ditulis sebagai `DecimalString` (canonical string), bukan number. Semua test harus pass sebelum F3 dianggap selesai.
 
 ### F3-02: Server actions untuk Project
 
@@ -588,6 +687,9 @@ Validasi:
 - `qty > 0`, `koefisien > 0`, `harga_snapshot > 0`
 - `section_id` XOR `subsection_id` di BqItem (tidak boleh keduanya null atau keduanya non-null)
 - `sub_object_id` XOR `item_id` di BqLineItem
+- L1-only: saat L1 tidak memiliki child, `harga_snapshot` wajib diisi dan `koefisien > 0`
+- L1 dengan child: `harga_snapshot` diabaikan (tidak dipakai kalkulasi). Saat updateItem yang menambahkan child pertama, `harga_snapshot` otomatis di-clear (set null) untuk mencegah dead data membingungkan.
+- Library item kategori: `BqLibMaterial` hanya `MATERIAL`, `BqLibLabor` hanya `UPAH`, `BqLibMaterialLabor` hanya `MATERIAL_UPAH`, `BqLibCustomItem` hanya `BIAYA_UMUM`/`TRANSPORTASI_AKOMODASI`/`ALAT`
 
 ### F3-03: Halaman Project List + Project Detail
 
@@ -612,7 +714,7 @@ Validasi:
 - Edit inline: klik nilai qty/koefisien/harga → input muncul → blur → save → recompute
 - Markup ditampilkan di L1 dan L2 row (hanya visible saat expanded), tidak di output klien
 
-**Gate F3:** Jalankan semua unit test. Buat project manual: 1 Section, 1 L1 (qty 3), 1 L2 (qty_per_l1 2, markup 10%), 1 L3 CUSTOM (qty 1, harga 100000, koef 0.75). Verifikasi: total = 3 × 2 × 1 × 100000 × 0.75 × 1.10 = 495000.
+**Gate F3:** Jalankan semua unit test. Buat project manual: 1 Section, 1 L1 (qty "3"), 1 L2 (qty_per_l1 "2", markup "10"), 1 L3 CUSTOM (qty "1", harga_snapshot "100000", koefisien "0.75"). Verifikasi: total = "495000". Semua nilai verifikasi ditulis sebagai canonical decimal string.
 
 ---
 
@@ -661,12 +763,13 @@ Buat `src/apps/bq/lib/snapshot.ts`:
 // snapshotFromLibrary(libItem, libItemType) → BqLineItemCreateInput
 //   title_snapshot         ← libItem.name
 //   purchase_unit_snapshot ← libItem.purchase_unit
+//   base_unit_snapshot     ← libItem.base_unit / null
 //   harga_snapshot         ← libItem.harga
 //   currency_snapshot      ← libItem.currency
 //   source_type            ← BQ_LIBRARY
 //   source_ref_id          ← libItem.id
 //   source_imported_at     ← new Date()
-//   kategori               ← sesuai tipe Library
+//   kategori               ← libItem.kategori (sudah tervalidasi per tipe)
 //   qty                    ← 1
 //   koefisien              ← libItem.default_koefisien
 
@@ -706,39 +809,42 @@ Setelah LineItem terbentuk, tampilkan di tree dengan nilai default. Estimator bi
 **Prerequisite:** F4 selesai.
 **Gate:** Estimator ajukan promosi. Admin Master Data lihat antrian, approve, entry baru terbuat di Master Data.
 
-### F5-01: API endpoint baru di Master Data
+### F5-01: Server actions untuk promotion (bukan REST API)
 
-Buat di `src/apps/masterdata/app/api/promotion-requests/`:
+Promotion flow menggunakan **Server Actions** di `src/apps/bq/actions/promotion.ts`, bukan REST API routes. Alasannya:
+- Seluruh mutation di aplikasi ini (Library, Project, Template) sudah menggunakan Server Actions.
+- REST API di `src/apps/masterdata/app/api/` akan menjadi cross-app write dari BQ perspective, melanggar aturan "tidak ada FK lintas schema" dan boundary app.
+- Server Actions tetap melakukan auth, permission check, dan transactional audit seperti biasa.
 
-**`route.ts`:**
 ```typescript
-// GET /api/masterdata/promotion-requests
-// Response: list semua BQ Library items dengan status REQUESTED
-// Query dari bq.BqLibMaterial + bq.BqLibLabor + bq.BqLibMaterialLabor
-// Permission required: bq.library.promote.approve
-// Return: { id, type, name, purchase_unit, base_unit, kategori, requested_at, notes }[]
+// src/apps/bq/actions/promotion.ts
+// Fungsi yang harus ada:
+
+// requestPromotion(type, libItemId) → void
+//   Validasi: hanya MATERIAL/UPAH/MATERIAL_UPAH yang bisa REQUESTED
+//   Update BqLib* item: promotion_status → REQUESTED
+
+// listPromotionRequests() → PromotionRequest[]
+//   Query dari bq.BqLibMaterial + bq.BqLibLabor + bq.BqLibMaterialLabor
+//   WHERE promotion_status = REQUESTED
+//   Permission required: bq.library.promote.approve
+//   Return: { id, type, name, purchase_unit, base_unit, kategori, requested_at, notes }[]
+
+// approvePromotion(type, libItemId) → { masterdata_ref_id: string }
+//   Permission required: bq.library.promote.approve
+//   Aksi:
+//     1. Buat SKU baru di Master Data (untuk MATERIAL) atau entry PriceLabor/PriceMaterialLabor
+//        PENTING: harga TIDAK diisi dari Library snapshot — harga diisi 0 atau null, admin isi sendiri
+//        Field yang ikut promosi: name, purchase_unit, base_unit, kategori → menjadi SKU + price entry baru
+//        Import Master Data service via public contract atau direct service import (satu process)
+//     2. Update BqLib* item: promotion_status → APPROVED, masterdata_ref_id ← ID entry baru
+
+// rejectPromotion(type, libItemId, reason) → { ok: true }
+//   Permission required: bq.library.promote.approve
+//   Aksi: Update BqLib* item: promotion_status → REJECTED
 ```
 
-**`[id]/approve/route.ts`:**
-```typescript
-// POST /api/masterdata/promotion-requests/:id/approve
-// Body: { type: 'MATERIAL' | 'LABOR' | 'MATERIAL_LABOR', lib_item_id: string }
-// Permission required: bq.library.promote.approve
-// Aksi:
-//   1. Buat SKU baru di Master Data (untuk MATERIAL) atau entry PriceLabor/PriceMaterialLabor
-//      PENTING: harga TIDAK diisi dari Library snapshot — harga diisi 0 atau null, admin isi sendiri
-//   2. Update BqLib* item: promotion_status → APPROVED, masterdata_ref_id ← ID entry baru
-// Response: { masterdata_ref_id }
-```
-
-**`[id]/reject/route.ts`:**
-```typescript
-// POST /api/masterdata/promotion-requests/:id/reject
-// Body: { lib_item_id: string, type: string, reason: string }
-// Permission required: bq.library.promote.approve
-// Aksi: Update BqLib* item: promotion_status → REJECTED
-// Response: { ok: true }
-```
+**Catatan arsitektur:** Promotion approve perlu membuat entry di Master Data (SKU + price). Karena BQ dan Master Data berjalan di process yang sama, Server Action BQ bisa mengimport Master Data service langsung. Tidak perlu REST API cross-app. Jika di masa depan ada pemisahan process, promotion endpoint bisa diekstrak saat itu.
 
 ### F5-02: Tombol "Ajukan Promosi" di Library
 
@@ -769,12 +875,17 @@ Buat `src/apps/bq/app/bq/promotions/page.tsx`:
 
 - [ ] `npx prisma migrate dev` berjalan bersih
 - [ ] `npx prisma generate` sukses
-- [ ] Semua unit test di `calculation-engine.test.ts` pass
+- [ ] Semua unit test di `calculation-engine.test.ts` pass (8 test cases, semua expected value DecimalString, termasuk truncate cases)
 - [ ] Gate F1 terpenuhi
-- [ ] Gate F2 terpenuhi
-- [ ] Gate F3 terpenuhi (termasuk angka verifikasi 495000)
+- [ ] Gate F2 terpenuhi (kategori validasi per tipe library item)
+- [ ] Gate F3 terpenuhi (termasuk angka verifikasi "495000" sebagai DecimalString)
 - [ ] Gate F4 terpenuhi
-- [ ] Gate F5 terpenuhi
+- [ ] Gate F5 terpenuhi (promotion via Server Actions, bukan REST API)
 - [ ] Tidak ada kalkulasi di client (cek: tidak ada `×`, `/`, `+` arithmetic di file `.tsx`)
 - [ ] Tidak ada FK lintas schema di schema.prisma
 - [ ] `src/apps/masterdata/public/` adalah satu-satunya titik baca MD dari BQ
+- [ ] Tidak ada `Number()`, `parseFloat()`, atau floating-point arithmetic di calculation engine
+- [ ] Tidak ada import `Prisma.Decimal` di calculation engine murni
+- [ ] Truncate 2 desimal di setiap intermediate step dan output final
+- [ ] BqTemplateSection: server action menolak nested > 2 level
+- [ ] L1 dengan child: harga_snapshot otomatis di-clear (set null)

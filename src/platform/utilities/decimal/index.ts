@@ -101,6 +101,72 @@ export function compareDecimals(a: DecimalString, b: DecimalString): -1 | 0 | 1 
   return (negativeA ? -magnitude : magnitude) as -1 | 0 | 1;
 }
 
+/** Adds two canonical decimals exactly, without using floating point. */
+export function addDecimals(a: DecimalString, b: DecimalString): DecimalString {
+  const [aSign, aInteger, aFraction] = decimalParts(a);
+  const [bSign, bInteger, bFraction] = decimalParts(b);
+  const scale = Math.max(aFraction.length, bFraction.length);
+  const left = aSign * BigInt(`${aInteger}${aFraction.padEnd(scale, "0")}`);
+  const right = bSign * BigInt(`${bInteger}${bFraction.padEnd(scale, "0")}`);
+  return fromScaledInteger(left + right, scale);
+}
+
+/** Multiplies two canonical decimals exactly, without using floating point. */
+export function multiplyDecimals(a: DecimalString, b: DecimalString): DecimalString {
+  const [aSign, aInteger, aFraction] = decimalParts(a);
+  const [bSign, bInteger, bFraction] = decimalParts(b);
+  const left = BigInt(`${aInteger}${aFraction}`);
+  const right = BigInt(`${bInteger}${bFraction}`);
+  return fromScaledInteger(aSign * bSign * left * right, aFraction.length + bFraction.length);
+}
+
+/**
+ * Divides canonical decimals and truncates (toward zero) to the requested
+ * number of fractional places. Callers must choose the precision explicitly.
+ */
+export function divideDecimals(
+  a: DecimalString,
+  b: DecimalString,
+  maximumFractionDigits: number,
+): DecimalString {
+  if (!Number.isInteger(maximumFractionDigits) || maximumFractionDigits < 0) {
+    throw new Error("maximumFractionDigits must be a non-negative integer.");
+  }
+  const [aSign, aInteger, aFraction] = decimalParts(a);
+  const [bSign, bInteger, bFraction] = decimalParts(b);
+  const numerator = BigInt(`${aInteger}${aFraction}`) * 10n ** BigInt(bFraction.length + maximumFractionDigits);
+  const denominator = BigInt(`${bInteger}${bFraction}`) * 10n ** BigInt(aFraction.length);
+  if (denominator === 0n) throw new Error("Cannot divide by zero.");
+  return fromScaledInteger((aSign * bSign * numerator) / denominator, maximumFractionDigits);
+}
+
+/** Truncates a canonical decimal toward zero to the requested fractional precision. */
+export function truncateDecimal(value: DecimalString, maximumFractionDigits: number): DecimalString {
+  if (!Number.isInteger(maximumFractionDigits) || maximumFractionDigits < 0) {
+    throw new Error("maximumFractionDigits must be a non-negative integer.");
+  }
+  const [sign, integer, fraction] = decimalParts(value);
+  if (fraction.length <= maximumFractionDigits) return value;
+  return fromScaledInteger(
+    sign * BigInt(`${integer}${fraction.slice(0, maximumFractionDigits)}`),
+    maximumFractionDigits,
+  );
+}
+
+function decimalParts(value: DecimalString): [1n | -1n, string, string] {
+  const negative = value.startsWith("-");
+  const [integer, fraction = ""] = (negative ? value.slice(1) : value).split(".");
+  return [negative ? -1n : 1n, integer, fraction];
+}
+
+function fromScaledInteger(value: bigint, scale: number): DecimalString {
+  const negative = value < 0n;
+  const magnitude = (negative ? -value : value).toString().padStart(scale + 1, "0");
+  const integer = scale === 0 ? magnitude : magnitude.slice(0, -scale);
+  const fraction = scale === 0 ? "" : magnitude.slice(-scale);
+  return toDecimalString(`${negative ? "-" : ""}${integer}${fraction ? `.${fraction}` : ""}`);
+}
+
 function compareMagnitude(x: string, y: string): -1 | 0 | 1 {
   const [intX, fracX] = splitParts(x);
   const [intY, fracY] = splitParts(y);

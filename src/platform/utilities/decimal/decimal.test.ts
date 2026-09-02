@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { compareDecimals, formatDecimal, isDecimalString, toDecimalString } from "./index";
+import {
+  addDecimals,
+  compareDecimals,
+  divideDecimals,
+  formatDecimal,
+  isDecimalString,
+  multiplyDecimals,
+  toDecimalString,
+  truncateDecimal,
+} from "./index";
 
 describe("toDecimalString normalization", () => {
   it("normalizes sign, leading zeros, and trailing fractional zeros", () => {
@@ -84,6 +93,21 @@ describe("compareDecimals", () => {
       compareDecimals(d("99999999999999999999999.1"), d("100000000000000000000000")),
       -1,
     );
+  });
+});
+
+describe("exact decimal arithmetic", () => {
+  it("adds and multiplies arbitrary precision values without floating point", () => {
+    assert.equal(addDecimals(toDecimalString("999999999999999999.99"), toDecimalString("0.01")), "1000000000000000000");
+    assert.equal(multiplyDecimals(toDecimalString("0.045"), toDecimalString("100")), "4.5");
+    assert.equal(multiplyDecimals(toDecimalString("-1.25"), toDecimalString("0.2")), "-0.25");
+  });
+
+  it("divides and truncates toward zero at caller-selected precision", () => {
+    assert.equal(divideDecimals(toDecimalString("12.5"), toDecimalString("100"), 6), "0.125");
+    assert.equal(divideDecimals(toDecimalString("-1"), toDecimalString("3"), 2), "-0.33");
+    assert.equal(truncateDecimal(toDecimalString("123.459"), 2), "123.45");
+    assert.equal(truncateDecimal(toDecimalString("-123.459"), 2), "-123.45");
   });
 });
 

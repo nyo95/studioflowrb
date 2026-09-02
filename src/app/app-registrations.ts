@@ -32,4 +32,18 @@ export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [
       "masterdata.deletion.approve",
     ],
   },
+  {
+    appId: "bq",
+    name: "Bill of Quantity",
+    rootPath: "/bq",
+    permissions: [
+      "bq.access",
+      "bq.project.read",
+      "bq.project.manage",
+      "bq.library.read",
+      "bq.library.manage",
+      "bq.library.promote",
+      "bq.library.promote.approve",
+    ],
+  },
 ];

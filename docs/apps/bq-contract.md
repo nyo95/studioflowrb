@@ -58,8 +58,14 @@ Section           (PRELIMINARIES, INTERIOR WORKS, FURNITURE WORKS...)
 - Subsection: opsional di Section manapun.
 - L1: selalu ada. Ini item BQ yang dikerjakan.
 - L2: **opsional**. Hanya muncul saat L1 perlu dipecah ke komponen (fixture kompleks). L1 sederhana langsung punya L3.
-- L3: **terminal, wajib ada**. Tidak ada level di bawah L3. Semua kalkulasi terjadi di sini.
+- L3: **terminal**. Tidak ada level di bawah L3. Semua kalkulasi terjadi di sini.
 - L3 atomic = salah satu dari: `PriceMaterial`, `PriceLabor`, `PriceMaterialLabor`.
+- **L1 boleh berdiri sendiri** tanpa L2 maupun L3. Struktur yang sah:
+  - `L1 only` — L1 menyimpan `harga_snapshot` dan `koefisien` sendiri, kalkulasi langsung di level L1.
+  - `L1 → L3` — L1 tanpa L2, L3 langsung di bawah L1.
+  - `L1 → L2 → L3` — breakdown penuh dengan komponen.
+  - Campuran L2 dan L3 langsung di bawah L1 tetap sah.
+- L3 wajib terminal bila L1 memiliki breakdown, tetapi L1 boleh menjadi terminal tanpa child.
 
 ---
 
@@ -96,6 +102,23 @@ Waste, minimum order, rounding increment dihapus. Satu angka: koefisien.
 
 ## 6. Mesin kalkulasi
 
+### 6.0 Representasi numerik
+
+Semua nilai numerik dalam calculation engine — `qty`, `harga_snapshot`, `koefisien`, `qty_per_l1`, `markup_l1_pct`, `markup_l2_pct`, seluruh subtotal, `rate`, `total`, dan `grand_total` — bertipe **`DecimalString`** (canonical base-10 string, CORE.md §8).
+
+- Tidak boleh memakai `Number()`, `parseFloat()`, atau operasi floating-point JavaScript.
+- Tidak boleh mengimpor `Prisma.Decimal` ke calculation engine murni.
+- Adapter action/service yang mengubah `Prisma.Decimal` menjadi `DecimalString` via `.toString()` sebelum memanggil engine.
+- Penjumlahan, perkalian, pembagian persen, dan pembulatan dilakukan dengan arithmetic decimal presisi eksak.
+
+**Rounding policy (dikunci owner):**
+- **Truncate** (bukan round) ke **2 desimal** di setiap intermediate step: `biaya_line`, `subtotal_L2_raw`, `subtotal_L2`, `biaya_pokok`, `rate`.
+- **Output final** (`total` per L1, `grand_total`) juga **truncate ke 2 desimal**.
+- Truncate berarti membuang digit di luar 2 desimal tanpa pembulatan: `"123.456"` → `"123.45"`, `"123.459"` → `"123.45"`.
+- Tidak ada rounding half-up, round-half-even, atau strategi lain. Truncate bersifat deterministik dan reversible.
+
+Cross-reference: `CORE.md §8` menetapkan decimal lintas layer = canonical strings; `@platform/utilities/decimal` menyediakan normalisasi dan perbandingan, bukan arithmetic umum. Sebelum F3 diimplementasikan, navigator harus menilai apakah operasi exact decimal generik minimal perlu diextend ke `@platform/utilities/decimal`. Jika ya, capability generik tersebut diuji di shared Utilities; rumus dan rounding BQ tetap app-owned.
+
 ### 6.1 Formula L3
 
 ```
@@ -119,9 +142,15 @@ biaya_line = qty_L3 × harga_snapshot × koefisien
 -- L3 total di dalam konteks project:
 biaya_total = L1.qty × (L2.qty_per_l1 ?? 1) × L3.qty × harga_snapshot × koefisien
 
--- L1 tanpa anak (no L2, no L3 children):
-biaya = L1.qty × harga_snapshot × koefisien
+-- L1 tanpa anak (no L2, no L3 children) — L1-only:
+rate    = L1.harga_snapshot × L1.koefisien × (1 + L1.markup_l1_pct / 100)
+total   = rate × L1.qty
 ```
+
+**L1-only fields:**
+- `harga_snapshot Decimal @db.Decimal(18, 4)` — harga satuan untuk L1 tanpa breakdown. Snapshot/overrideable seperti nilai biaya BQ lain.
+- `koefisien Decimal @default(1) @db.Decimal(18, 6)` — koefisien efisiensi untuk L1-only. Default `1.0`.
+- Field ini hanya dipakai saat L1 tidak memiliki L2 maupun L3 child. Saat L1 punya child, kalkulasi mengikuti agregasi dari child.
 
 ### 6.3 Aggregasi (urutan wajib)
 
@@ -134,16 +163,15 @@ L2 (jika ada):
   subtotal_L2     = subtotal_L2_raw × (1 + markup_l2_pct / 100)
 
 L1:
-  -- Jika punya L2:
+  -- Jika punya child (L2 dan/atau L3 langsung):
   biaya_pokok = SUM(subtotal_L2 dari semua L2 di bawah L1 ini)
-
-  -- Jika punya L3 langsung (tanpa L2):
-  biaya_pokok = SUM(biaya_line dari L3 langsung di bawah L1)
-
-  -- Jika campuran L2 dan L3 langsung (edge case):
-  biaya_pokok = SUM(subtotal_L2) + SUM(biaya_line L3 langsung)
+              + SUM(biaya_line dari L3 langsung di bawah L1)
 
   rate  = biaya_pokok × (1 + markup_l1_pct / 100)
+  total = rate × L1.qty
+
+  -- Jika L1-only (tanpa L2, tanpa L3 child):
+  rate  = L1.harga_snapshot × L1.koefisien × (1 + L1.markup_l1_pct / 100)
   total = rate × L1.qty
 
 Grand Total = SUM(total semua L1)
@@ -204,6 +232,14 @@ Items dengan KATEGORI Biaya Umum / Transportasi & Akomodasi / Alat disimpan seba
 
 **Field minimum semua Library Item:**
 `name`, `purchase_unit`, `base_unit` (nullable), `harga`, `currency`, `default_koefisien`, `kategori`, `notes`, `promotion_status`, `masterdata_ref_id` (nullable), `created_by`.
+
+**Validasi kategori per tipe:**
+- `BqLibMaterial` hanya boleh `Material`.
+- `BqLibLabor` hanya boleh `Upah`.
+- `BqLibMaterialLabor` hanya boleh `Material+Upah`.
+- `BqLibCustomItem` hanya boleh `Biaya Umum`, `Transportasi & Akomodasi`, atau `Alat`.
+
+Enum `BqKategori` disimpan pada seluruh tipe demi bentuk data Library yang seragam, UI badge, snapshot L3, dan validasi promotion. `kategori` bukan FK ke Master Data.
 
 ### 8.2 Status promosi Library Item
 
@@ -266,10 +302,13 @@ bq.BqTemplateRecommendation -- link template_section → library_item
 **Yang TIDAK ikut dalam promosi:** harga snapshot. Harga di Master Data diisi admin secara mandiri.
 **Yang ikut:** `name`, `purchase_unit`, `base_unit`, `kategori` → menjadi SKU + price entry baru.
 
-**API baru yang dibutuhkan di Master Data:**
-- `GET  /api/masterdata/promotion-requests` — list antrian
-- `POST /api/masterdata/promotion-requests/:id/approve`
-- `POST /api/masterdata/promotion-requests/:id/reject`
+**Server actions yang dibutuhkan di BQ:**
+- `requestPromotion(type, libItemId)` — ubah status → REQUESTED
+- `approvePromotion(type, libItemId)` — buat entry MD + update status → APPROVED
+- `rejectPromotion(type, libItemId, reason)` — update status → REJECTED
+- `listPromotionRequests()` — list antrian (admin only)
+
+Promotion approve mengimport Master Data service langsung (satu process), bukan lewat REST API.
 
 ---
 
@@ -316,6 +355,12 @@ bq.BqTemplateRecommendation
 - `qty`, `koefisien`, `qty_per_l1` → `NUMERIC(18,6)`
 - `harga_snapshot`, `harga` → `NUMERIC(18,4)`
 - `markup_pct` → `NUMERIC(6,4)` (misal: 15.0000 = 15%)
+
+**L1-only fields:**
+- `BqItem` memiliki `harga_snapshot NUMERIC(18,4)` dan `koefisien NUMERIC(18,6) DEFAULT 1`. Dipakai hanya saat L1 tidak memiliki child.
+
+**Library Item fields:**
+- Seluruh library item (`BqLibMaterial`, `BqLibLabor`, `BqLibMaterialLabor`, `BqLibCustomItem`) memiliki `base_unit` (nullable) dan `kategori` (enum `BqKategori`).
 
 Semua field snapshot di `BqLineItem` disimpan sebagai plain value — **bukan FK**. Perubahan Master Data tidak menyentuh baris yang sudah ada.
 
@@ -402,6 +447,9 @@ Project baru → (opsional) Load Template → dapat scaffold Section/Subsection
 | K-11 | KATEGORI Biaya Umum / Transportasi & Akomodasi / Alat tidak bisa dipromosikan ke MD. |
 | K-12 | Template = scaffold Section + Subsection + optional recommended items. Load saat project baru dibuat. |
 | K-13 | Masterdata tidak berubah (tidak ada API write dari BQ ke MD kecuali lewat promotion approval). |
+| K-14 | L1 boleh berdiri sendiri tanpa L2 maupun L3. L1 menyimpan `harga_snapshot` dan `koefisien` untuk kasus L1-only. |
+| K-15 | Semua Library Item wajib mempunyai `kategori` (enum `BqKategori`) dan `base_unit` (nullable). Validasi kategori per tipe: Material/Upah/Material+Upah sesuai jenis library; CustomItem hanya Biaya Umum/Transportasi/Alat. |
+| K-16 | Calculation engine menggunakan `DecimalString` (canonical string), bukan JavaScript `number`. Tidak ada floating-point arithmetic. Rounding policy adalah keputusan owner yang harus dikunci sebelum F3. |
 
 ---
 
@@ -416,3 +464,14 @@ Project baru → (opsional) Load Template → dapat scaffold Section/Subsection
 | Revisi antar versi BQ | Snapshot di §7 sudah siap sejak awal. |
 | Integrasi formal ke StudioFlow project | Via `external_ref` nanti. |
 | Assembly template (fixture library) | Butuh 20-30 breakdown nyata dulu. |
+
+## 17. Blocker keputusan sebelum F3
+
+Tidak ada blocker yang tersisa. Semua keputusan sudah dikunci.
+
+### Catatan pra-implementasi
+
+| Item | Status |
+|---|---|
+| Rounding policy | **LOCKED** — truncate 2 desimal di intermediate dan output final |
+| Exact decimal capability placement | Navigator harus menilai apakah `@platform/utilities/decimal` perlu diextend dengan arithmetic generik (add/multiply/divide/truncate) sebelum F3, atau BQ membuat adapter sendiri. |

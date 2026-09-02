@@ -5,9 +5,75 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.20**
-- Next local revision: **R4.21**
+- Current revision: **R4.22**
+- Next local revision: **R4.23**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.23 — 2026-09-02 — fix(bq): harden exact calculation, persistence, and project safety
+
+- Added a tested Foundation decimal arithmetic extension for exact add, multiply, explicit-precision divide, and truncate. BQ retains its app-owned formula and two-decimal truncation policy while no longer relying on private arithmetic or JavaScript floating point.
+- Corrected BQ fractional-markup calculation and premature partial-product truncation. The engine now rejects an incomplete L1-only calculation rather than silently reporting a false zero total.
+- Added and applied `20260902020000_bq_initial_schema` to the explicitly approved rebuild-only target `studioflow_rebuild` on `studioflowrb-gateb-test-db:5433`. It creates the isolated `bq` schema, hierarchy/source XOR constraints, category/positive-value constraints, foreign keys, and hierarchy indexes.
+- Made BQ mutations transaction-scoped with their Core audit event, corrected category typing, prevented edits through child deletion after a project is locked, clears obsolete L1-only price snapshots when its first child is created, and fixed template duplication of subsections.
+- Extended the Master Data public read contract with SKU display identity for correct BQ material snapshots. BQ project summaries now calculate a real total or explicitly return no total for an incomplete draft; library money display preserves decimal precision.
+- Added server-validated create/edit project routes, replacing the previous broken `/bq/new` and `/bq/[id]/edit` links.
+
+### Verification
+
+- `npx prisma migrate deploy` and `npx prisma migrate status` on the approved rebuild-only target
+- `npx prisma validate`
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+- `npm run check:boundaries`
+- `npm run check:legacy-runtime`
+- Focused decimal/BQ engine tests: 15 passed
+- Full integration suite not run: its disposable-database guard correctly refuses `studioflow_rebuild` because it has no `_test` marker. No guard was bypassed and no alternate test database was created without owner confirmation.
+
+## R4.22 — 2026-09-02 — docs(bq): lock rounding policy and resolve minor spec gaps
+
+- **Rounding policy locked** (owner decision): truncate 2 desimal di setiap intermediate step (`biaya_line`, `subtotal_L2_raw`, `subtotal_L2`, `biaya_pokok`, `rate`) dan output final (`total`, `grand_total`). Truncate = buang digit di luar 2 desimal tanpa pembulatan. Output tetap canonical `DecimalString`. §6.0 kontrak dan F3-01 implementation plan diperbarui. §17 blocker dihapus.
+- **Test cases diperluas** dari 6 ke 8: tambahan test case 7 (truncate koefisien pecahan panjang) dan test case 8 (truncate di setiap step dengan markup).
+- **ItemResult/ProjectResult types didefinisikan** di implementation plan F3-01 — semua field bertipe `DecimalString`, shape output eksplisit untuk executor.
+  *Rekomendasi:* Tanpa definisi ini executor harus infer sendiri shape return dari calculation engine, berisiko mismatch antara action consumer dan engine output.
+- **L1 dengan child: `harga_snapshot` otomatis di-clear** saat child pertama ditambahkan via `updateItem`. Validasi F3-02 diperbarui.
+  *Rekomendasi:* Field ini tidak dipakai saat L1 punya child. Membiarkannya tersimpan menciptakan dead data yang membingungkan saat debug atau audit. Auto-clear lebih aman daripada validasi yang menolak.
+- **BqTemplateSection: `created_by` ditambahkan** dan comment eksplisit "max 2 level" di schema. Server action harus menolak nested > 2 level.
+  *Rekomendasi:* Semua model lain punya `created_by` untuk audit trail. Konsistensi ini penting karena Template Editor adalah fitur multi-user. Max 2 level ditegaskan karena kontrak hanya mendefinisikan Section → Subsection; nested lebih dalam tidak punya UI atau business meaning.
+- **Promotion flow diubah dari REST API ke Server Actions** di `src/apps/bq/actions/promotion.ts`. F5-01 implementation plan dan kontrak §9 diperbarui. File map dihapus REST routes dari `src/apps/masterdata/app/api/`.
+  *Rekomendasi:* Seluruh mutation lain di aplikasi sudah pakai Server Actions. REST API di `src/apps/masterdata/app/api/` akan menjadi cross-app write dari BQ perspective, melanggar boundary app. Karena BQ dan Master Data satu process, Server Action bisa import MD service langsung. REST endpoint hanya diperlukan jika ada pemisahan process di masa depan.
+
+### Verification
+
+- `git diff --check`
+- Staged scope inspected: two BQ documentation files only, plus this ledger
+
+## R4.21 — 2026-09-02 — docs(bq): lock L1-only, library kategori/base_unit, and DecimalString calculation
+
+- Updated `bq-contract.md` and `bq-implementation-plan.md` per owner decisions:
+  - **L1 may stand alone** without L2 or L3. Added `harga_snapshot` and `koefisien` fields to `BqItem` for L1-only calculation: `rate = harga_snapshot × koefisien × (1 + markup_l1_pct / 100)`, `total = rate × L1.qty`. Hierarchy rule changed from "L3 wajib ada" to "L3 wajib terminal bila L1 memiliki breakdown, tetapi L1 boleh menjadi terminal tanpa child."
+  - **All Library Items** (`BqLibMaterial`, `BqLibLabor`, `BqLibMaterialLabor`, `BqLibCustomItem`) now carry `base_unit` (nullable) and `kategori` (`BqKategori` enum). Per-type kategori validation: Material/Upah/Material+Upah locked to their respective types; CustomItem restricted to Biaya Umum/Transportasi/Alat.
+  - **Calculation engine uses `DecimalString`** exclusively — no JavaScript `number`, `Number()`, `parseFloat()`, or floating-point arithmetic. All inputs/outputs are canonical decimal strings per `CORE.md §8`. The adapter layer converts `Prisma.Decimal → DecimalString` via `.toString()`.
+  - **Rounding policy** recorded as an owner decision blocker before F3; no implicit rounding assumed.
+  - **Foundation-first assessment**: navigator must evaluate whether `@platform/utilities/decimal` needs generic arithmetic extension (add/multiply/divide-percent/round) before F3 implementation.
+- Expanded F3 test matrix to 6 cases covering L1-only, L1+L3, L1+L2, compound markup, and mixed L2+L3 — all expected values as `DecimalString`.
+- Added §17 to `bq-contract.md` for pre-F3 decision blockers.
+- Added locked decisions K-14 (L1-only), K-15 (library kategori/base_unit), K-16 (DecimalString engine) to the contract.
+
+### Verification
+
+- `git diff --check`
+- Staged scope inspected: two BQ documentation files only, plus this ledger
+
+### Deferred / decision pending
+
+- Database `CHECK` constraints for XOR (`section_id`/`subsection_id`, `sub_object_id`/`item_id`).
+- Index `(template_id, parent_id, sort_order)` on `BqTemplateSection`.
+- Search functions on Master Data public contract for F4.
+- Lock without unlock flow for `BqProject`.
+- Hard delete vs soft delete for BQ entities.
+- Promotion flow architecture (Server Actions vs REST API).
+- **Rounding policy** for calculation engine intermediate and output values — owner decision required before F3.
 
 ## R4.20 — 2026-09-02 — docs(bq): add BQ contract, implementation plan, and UX spec
 

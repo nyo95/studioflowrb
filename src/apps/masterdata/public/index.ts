@@ -17,6 +17,8 @@ export type BrandLibraryRead = {
 export type MaterialPriceOption = {
   id: string;
   skuId: string;
+  skuName: string | null;
+  skuCode: string | null;
   supplierVendor: { id: string; name: string; slug: string };
   amount: string;
   currency: string;
@@ -150,6 +152,8 @@ export function createMasterDataPublicRead(db: PrismaClient) {
           unit: { select: { id: true, code: true, name: true } },
           sku: {
             select: {
+              name: true,
+              code: true,
               base_unit: { select: { id: true, code: true, name: true } },
               purchase_unit: { select: { id: true, code: true, name: true } },
               dimension_length: true,
@@ -166,6 +170,8 @@ export function createMasterDataPublicRead(db: PrismaClient) {
       return prices.map((p) => ({
         id: p.id,
         skuId: p.sku_id,
+        skuName: p.sku.name,
+        skuCode: p.sku.code,
         supplierVendor: p.supplier_vendor,
         amount: p.amount.toString(),
         currency: p.currency,
