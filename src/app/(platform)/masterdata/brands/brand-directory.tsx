@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Archive, ExternalLink, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, CircleHelp, ExternalLink, Plus, RotateCcw, Trash2 } from "lucide-react";
 
 import {
   Badge,
@@ -28,6 +28,7 @@ import {
   TableToolbar,
   Text,
   Textarea,
+  Tooltip,
   useOptionOverlay,
 } from "@/platform/ui_engine";
 import {
@@ -57,6 +58,10 @@ type BrandRow = {
 };
 
 type Option = { id: string; name: string };
+
+function FieldHelp({ label, content }: { label: string; content: string }) {
+  return <Tooltip content={content}><button type="button" aria-label={`About ${label}`} className="inline-flex h-4 w-4 items-center justify-center rounded-full text-ink-tertiary hover:text-ink"><CircleHelp size={14} /></button></Tooltip>;
+}
 
 export function BrandDirectory({
   brands,
@@ -348,7 +353,7 @@ export function BrandDirectory({
             <p className="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5">⚠ {createNameWarning}</p>
           ) : null}
           <input type="hidden" name="ownerVendorId" value={createOwnerVendorId} />
-          <Field label="Owner vendor" description="Optional registered manufacturer/brand owner vendor.">
+          <Field label={<span className="inline-flex items-center gap-1">Owner vendor <FieldHelp label="owner vendor" content="Optional registered manufacturer or brand owner vendor." /></span>}>
             <CreatableSearch
               label="Owner vendor"
               options={ownerVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
@@ -361,10 +366,10 @@ export function BrandDirectory({
               createLabel={(name) => `Create owner vendor “${name}”`}
             />
           </Field>
-          <Field label="Hashtags" description="Space or comma-separated tags for operator discovery (e.g. #laminate #finish).">
+          <Field label={<span className="inline-flex items-center gap-1">Hashtags <FieldHelp label="hashtags" content="Use space- or comma-separated tags for operator discovery, such as #laminate or #finish." /></span>}>
             <Input name="hashtags" placeholder="#hpl #veneer #premium" />
           </Field>
-          <Field label="Product categories" description="Direct discovery categories for this brand.">
+          <Field label={<span className="inline-flex items-center gap-1">Product categories <FieldHelp label="product categories" content="Select the direct discovery categories associated with this brand." /></span>}>
             <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto border border-line rounded p-2 bg-surface-muted/30">
               {productCategories.map((c) => (
                 <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer select-none">
@@ -465,10 +470,10 @@ export function BrandDirectory({
                 createLabel={(name) => `Create owner vendor “${name}”`}
               />
             </Field>
-            <Field label="Hashtags" description="Space or comma-separated tags.">
+            <Field label={<span className="inline-flex items-center gap-1">Hashtags <FieldHelp label="hashtags" content="Use space- or comma-separated tags for operator discovery." /></span>}>
               <Input name="hashtags" defaultValue={editTarget.hashtags.map((h) => `#${h.label}`).join(" ")} />
             </Field>
-            <Field label="Product categories" description="Checked categories will have MANUAL provenance.">
+            <Field label={<span className="inline-flex items-center gap-1">Product categories <FieldHelp label="product categories" content="Checked categories will have MANUAL provenance." /></span>}>
               <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto border border-line rounded p-2 bg-surface-muted/30">
                 {productCategories.map((c) => {
                   const isChecked = editTarget.categories.some((bc) => bc.category.id === c.id);

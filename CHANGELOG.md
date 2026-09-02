@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.32**
-- Next local revision: **R4.33**
+- Current revision: **R4.33**
+- Next local revision: **R4.34**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -73,6 +73,21 @@ Every new revision entry must identify the agent that made the change using an
 - `npm run lint`
 - Desktop browser check on `/masterdata`
 - Mobile browser check at `390x844`
+
+## R4.33 — 2026-09-02 — fix(masterdata): standardize Brand field help
+
+- Agent: `Codex`
+
+- Replaced inline descriptions in the Brand create/edit form with the shared
+  tooltip help pattern already used by Pricing.
+- Added accessible help buttons for Owner vendor, Hashtags, and Product
+  categories without changing form values or validation behavior.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- Browser check of the Create Brand dialog on `/masterdata/brands`
 
 ## R4.29 — 2026-09-02 — fix(prisma): select the rebuild database by work location
 
