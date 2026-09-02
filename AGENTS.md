@@ -28,27 +28,36 @@ owner intends to use.
 
 ### Required owner verification before continuation
 
-At the start of a new computer/session, or whenever the environment has changed,
-ask the owner to verify all three locations before continuing with work that may
-need them:
+This project is worked on from both the owner's home and office computers. At
+the start of a new computer/session, or whenever the environment has changed,
+ask one short question: **"Ini kerja di mana: rumah atau kantor?"**
 
-1. the exact local path of the StudioFlow legacy checkout, if it will be used for
-   approved read-only reference;
-2. the exact local path of the StudioFlow rebuild checkout currently in scope;
-3. the exact rebuild-only PostgreSQL Docker target, including container/service,
-   published port, database name, and connection target used by the rebuild.
+Use the current checkout location as the identity of the rebuild repository. Do
+not ask the owner to restate its path when the agent is already running in this
+checkout. The home/office answer selects the matching local environment file:
 
-Do not infer any of these values from an old handoff, sibling folders, environment
-variables, Docker listings, or remembered paths. The owner must confirm the
-values in the current session. If legacy evidence is not needed, still verify the
-rebuild checkout and rebuild-only PostgreSQL target before any database command.
+- `rumah`: load `.env.rumah`;
+- `kantor`: load `.env.kantor`.
 
-When legacy evidence is actually required, stop before accessing it and ask the
-owner for the exact StudioFlow legacy repository path on the current computer.
-Do not discover it by broadly scanning drives or sibling directories. After the
-owner supplies the path, resolve and record that exact path, commit, branch, and
-dirty state before reading evidence. A path supplied for one computer/session is
-not a portable default for another computer.
+These files are local-only configuration and must not be committed or copied
+between computers. If the selected file is missing or its target is ambiguous,
+stop and ask only for the missing local setup detail.
+
+Both locations use a new rebuild-only PostgreSQL instance through Docker. The
+database name, schema, and application contract are intentionally identical at
+home and office; only connection details such as host, port, or Docker service
+may differ. Select the target through the location-specific environment file,
+and verify that it is rebuild-only before any database command. Do not require
+the owner to provide the database name or full Docker target on every session.
+
+Legacy evidence remains a separate exception: when it is actually required,
+stop and ask the owner for the exact StudioFlow legacy repository path on the
+current computer. Do not discover it by broadly scanning drives or sibling
+folders.
+
+After the owner supplies the path, resolve and record that exact path, commit,
+branch, and dirty state before reading evidence. A path supplied for one
+computer/session is not a portable default for another computer.
 
 The legacy repository is strictly read-only evidence:
 

@@ -9,6 +9,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Next local revision: **R4.28**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
+## R4.28 — 2026-09-02 — docs(agent): simplify home and office environment selection
+
+- Updated `AGENTS.md` to ask only whether work is happening at home or in the
+  office, then select `.env.rumah` or `.env.kantor` accordingly.
+- Documented that both locations use a new rebuild-only Docker PostgreSQL with
+  identical database name, schema, and application contract; only local
+  connection details may differ.
+- Kept exact legacy repository path verification limited to cases where legacy
+  evidence is actually required.
+
+### Verification
+
+- `git diff --check`
+- Documentation diff inspection
+
 ## R4.27 — 2026-09-02 — fix(ui-engine): guard field control inference
 
 - Made the shared `Field` infer a child control ID only after confirming the
