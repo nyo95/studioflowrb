@@ -66,3 +66,30 @@ export async function updateProjectAction(formData: FormData) {
     redirect(`/bq/${id.data}`);
   });
 }
+
+const SectionSchema = z.object({
+  projectId: z.string().cuid(),
+  name: z.string().trim().min(1, "Section name is required").max(160),
+});
+
+export async function addSectionAction(
+  _prev: unknown,
+  formData: FormData,
+) {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = SectionSchema.safeParse({
+      projectId: String(formData.get("projectId") ?? ""),
+      name: String(formData.get("name") ?? ""),
+    });
+    if (!parsed.success) throw validationError(parsed.error);
+    const section = await bqService.addSection({
+      grants,
+      actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
+      projectId: parsed.data.projectId,
+      name: parsed.data.name,
+    });
+    revalidatePath(`/bq/${parsed.data.projectId}`);
+    return { sectionId: section.id };
+  });
+}

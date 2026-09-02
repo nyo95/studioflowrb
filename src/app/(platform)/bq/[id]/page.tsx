@@ -18,6 +18,7 @@ import {
 import { BQ_PERMISSIONS } from "@/apps/bq/service";
 import { bqPublicRead } from "@/apps/bq/runtime";
 import { notFound } from "next/navigation";
+import { AddSectionDialog } from "./add-section-dialog";
 
 export const dynamic = "force-dynamic";
 
@@ -48,10 +49,13 @@ export default async function BqProjectDetailPage({
         title={project.title}
         description={`Client: ${project.clientName} · ${project.status}`}
         actions={
-          canManage && !isLocked ? (
-            <Link href={`/bq/${project.id}/edit`} className={buttonClasses("primary", "md")}>
-              Edit
-            </Link>
+          canManage && !isLocked && project.sections.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              <Link href={`/bq/${project.id}/edit`} className={buttonClasses("secondary", "md")}>
+                Edit
+              </Link>
+              <AddSectionDialog projectId={project.id} />
+            </div>
           ) : null
         }
       />
@@ -62,9 +66,10 @@ export default async function BqProjectDetailPage({
             title="Belum ada section"
             description={
               canManage
-                ? "Mulai dengan menambahkan section atau scaffold dari template."
+                ? "Tambahkan section secara manual atau scaffold dari template."
                 : "Project ini belum memiliki section."
             }
+            action={canManage && !isLocked ? <AddSectionDialog projectId={project.id} /> : undefined}
           />
         </SectionCard>
       ) : (

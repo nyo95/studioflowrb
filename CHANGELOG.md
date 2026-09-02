@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.42**
-- Next local revision: **R4.43**
+- Current revision: **R4.43**
+- Next local revision: **R4.44**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,27 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.43 — 2026-09-03 — feat(bq): allow manual section creation
+
+- Agent: `Codex`
+
+- Added a permission-checked BQ server action that delegates manual section
+  creation to the existing BQ service and records the existing audit event.
+- Added a shared UI Engine-based dialog for entering a section name.
+- Exposed one non-duplicated `Add section` CTA in the empty state, and in the
+  detail header once sections exist; locked projects and read-only users do not
+  receive the action.
+- Template scaffolding remains an optional future path rather than the only way
+  to create a section.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test` — 212 passed, 0 failed
+- `git diff --check`
+- Browser check of BQ project detail and manual section dialog
 
 ## R4.42 — 2026-09-03 — fix(bq): remove duplicate project creation action
 
