@@ -1,6 +1,6 @@
 "use client";
 
-import { AppWindow, LayoutGrid, Settings, ShieldCheck, Users } from "lucide-react";
+import { Database, FileText, LayoutGrid, Settings, ShieldCheck, Users } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { NavItem } from "@/platform/ui_engine";
@@ -24,7 +24,7 @@ export function AuthenticatedPlatformNavigation({ apps, showGeneralSettings, sho
     <div className="grid gap-1">
       {apps.length > 1 ? <NavItem href="/" icon={<LayoutGrid size={17} />} active={pathname === "/"}>Applications</NavItem> : null}
       {apps.map((app) => (
-        <NavItem key={app.appId} href={app.rootPath} icon={<AppWindow size={17} />} active={activePath(pathname, app.rootPath)}>
+        <NavItem key={app.appId} href={app.rootPath} icon={app.appId === "masterdata" ? <Database size={17} /> : app.appId === "bq" ? <FileText size={17} /> : <LayoutGrid size={17} />} active={activePath(pathname, app.rootPath)}>
           {app.name}
         </NavItem>
       ))}

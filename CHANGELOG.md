@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.38**
-- Next local revision: **R4.39**
+- Current revision: **R4.39**
+- Next local revision: **R4.40**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,24 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.39 — 2026-09-03 — fix(shell): refine account menu and app navigation icons
+
+- Agent: `Codex`
+
+- Moved `Sign out` from the rail utility footer into the signed-in user hover
+  and keyboard-focus menu in the top-right header.
+- Replaced generic app icons with meaningful platform navigation symbols for
+  Master Data and BQ; collapsed labels continue to use the shared `NavItem`
+  tooltip behavior.
+- Kept domain navigation and app-owned routes outside the UI Engine.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test` — 212 passed, 0 failed
+- Browser check of the authenticated shell at `/`
 
 ## R4.38 — 2026-09-03 — feat(ui-engine): support compact legacy-style rails
 

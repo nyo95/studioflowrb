@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { UserRound } from "lucide-react";
 
-import { AppShell, Text, buttonClasses } from "@/platform/ui_engine";
+import { AppShell, Button, Text } from "@/platform/ui_engine";
 import type { SessionPrincipal } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
 import type { PlatformGeneralSettings } from "@platform/core/settings";
@@ -49,18 +49,22 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
         showRoles={hasPermission(grants, "platform.role.read")}
         domainNavigation={domainNavigation}
       />}
-      utility={<>
-        {domainUtilityNavigation}
-        <form action={logoutAction}>
-          <button type="submit" className={buttonClasses("ghost") + " w-full justify-start"}>Sign out</button>
-        </form>
-      </>}
+      utility={domainUtilityNavigation}
       topbar={<div className="flex w-full items-center gap-3 px-(--ui-page-padding)">
         {contextSlot}
-        <Link href="/account" className="ml-auto flex min-w-0 items-center gap-2 rounded-action px-2 py-1 text-sm hover:bg-surface-muted" title={`Open account settings for ${principal.displayName}`} aria-label={`Open account settings for ${principal.displayName}`}>
-          <UserRound size={17} aria-hidden="true" />
-          <span className="max-w-[220px] truncate whitespace-nowrap">{principal.displayName}</span>
-        </Link>
+        <div className="group relative ml-auto">
+          <Link href="/account" className="flex min-w-0 items-center gap-2 rounded-action px-2 py-1 text-sm hover:bg-surface-muted" title={`Open account settings for ${principal.displayName}`} aria-label={`Open account settings for ${principal.displayName}`}>
+            <UserRound size={17} aria-hidden="true" />
+            <span className="max-w-[220px] truncate whitespace-nowrap">{principal.displayName}</span>
+          </Link>
+          <div className="pointer-events-none absolute right-0 top-full z-30 pt-2 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+            <div className="min-w-36 rounded-card border border-line bg-surface p-1 shadow-elevated">
+              <form action={logoutAction}>
+                <Button type="submit" variant="ghost" className="w-full justify-start">Sign out</Button>
+              </form>
+            </div>
+          </div>
+        </div>
       </div>}
     >
       {children}
