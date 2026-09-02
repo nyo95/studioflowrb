@@ -5,9 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.24**
-- Next local revision: **R4.25**
+- Current revision: **R4.25**
+- Next local revision: **R4.26**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.25 — 2026-09-02 — fix(dev): allow the office LAN origin
+
+- Added the current office Wi-Fi host to Next.js `allowedDevOrigins`, allowing
+  development assets and endpoints to load from the LAN URL. Without this
+  allowlist, the page rendered but client hydration was blocked, leaving local
+  UI controls such as Brand creation inert.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- LAN development-server startup and browser interaction verification
 
 ## R4.24 — 2026-09-02 — fix(bq): restore registry-valid approval permission
 
