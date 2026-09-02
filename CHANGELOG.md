@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.39**
-- Next local revision: **R4.40**
+- Current revision: **R4.41**
+- Next local revision: **R4.42**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -15,7 +15,19 @@ Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
 
-## R4.39 — 2026-09-03 — fix(shell): refine account menu and app navigation icons
+## R4.41 — 2026-09-03 — docs(changelog): correct shell revision ledger
+
+- Agent: `Codex`
+
+- Corrected the revision state after the R4.40 shell commit so the ledger
+  identifies R4.40 as the implementation revision and advances the next local
+  revision to R4.42.
+
+### Verification
+
+- `git diff --check`
+
+## R4.40 — 2026-09-03 — fix(shell): refine account menu and app navigation icons
 
 - Agent: `Codex`
 
