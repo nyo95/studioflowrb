@@ -144,6 +144,10 @@ Owns global navigation frame, content viewport, and responsive shell behavior. A
 
 The expanded rail is warm application chrome rather than a white content card.
 The sticky topbar aligns to the page content and carries app-supplied context/status.
+Platform shells may opt into `railPresentation="compact"` when the product uses
+the legacy single-header concept: the full brand header remains at the wider
+brand width while the desktop rail below is icon-only. The engine owns the
+label hiding and tooltip behavior; apps only provide navigation data.
 Active navigation uses a bordered white plane plus the retained leading ink rule;
 hover remains a lighter transient state.
 
@@ -159,6 +163,7 @@ is not shown, and the stored state resumes only when the viewport widens.
 | Prop | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `collapsible` | `boolean` | `false` | Off by default, so existing shells are unchanged |
+| `railPresentation` | `"expanded" | "compact"` | `"expanded"` | Compact keeps the desktop rail icon-only while preserving the full header brand area |
 | `collapsed` | `boolean` | — | Controlled state; omit to let the shell manage it |
 | `defaultCollapsed` | `boolean` | `false` | Uncontrolled initial state |
 | `onCollapsedChange` | `(collapsed: boolean) => void` | — | Fires on toggle in both modes |

@@ -35,6 +35,8 @@ export type AppShellProps = {
   className?: string;
   /** Show the rail collapse control. Off by default so existing shells are unchanged. */
   collapsible?: boolean;
+  /** Keep the desktop rail icon-only while retaining the full brand header. */
+  railPresentation?: "expanded" | "compact";
   /** Controlled collapsed state. Omit to let the shell manage it. */
   collapsed?: boolean;
   defaultCollapsed?: boolean;
@@ -54,6 +56,7 @@ export function AppShell({
   navigationLabel = "Application navigation",
   className,
   collapsible = false,
+  railPresentation = "expanded",
   collapsed,
   defaultCollapsed = false,
   onCollapsedChange,
@@ -63,7 +66,7 @@ export function AppShell({
 }: AppShellProps) {
   const [internalCollapsed, setInternalCollapsed] = useState(defaultCollapsed);
   const narrowNavigation = useNarrowNavigation();
-  const storedCollapsed = collapsed ?? internalCollapsed;
+  const storedCollapsed = railPresentation === "compact" ? true : collapsed ?? internalCollapsed;
   // Narrow layouts always retain visible labels. The desktop preference remains
   // untouched and returns when the viewport widens again.
   const isCollapsed = getEffectiveRailCollapsed(collapsible, narrowNavigation, storedCollapsed);
@@ -74,8 +77,8 @@ export function AppShell({
     onCollapsedChange?.(next);
   };
 
-  const railBrand = isCollapsed ? (collapsedBrand ?? brand) : brand;
-  const railToggle = collapsible && !narrowNavigation ? (
+  const railBrand = railPresentation === "compact" ? brand : isCollapsed ? (collapsedBrand ?? brand) : brand;
+  const railToggle = collapsible && railPresentation !== "compact" && !narrowNavigation ? (
     <IconButton
       className="shrink-0 max-[840px]:hidden"
       size="sm"
@@ -101,7 +104,8 @@ export function AppShell({
             <div
               className={cx(
                 "flex min-w-0 shrink-0 items-center justify-between gap-2 border-r border-line px-4 py-3.5 transition-[width] duration-[160ms] motion-reduce:transition-none",
-                "w-[var(--ui-rail-width,232px)] max-[840px]:w-auto max-[840px]:border-r-0 max-[840px]:px-3",
+                railPresentation === "compact" ? "w-[var(--ui-header-brand-width,232px)]" : "w-[var(--ui-rail-width,232px)]",
+                "max-[840px]:w-auto max-[840px]:border-r-0 max-[840px]:px-3",
                 isCollapsed && "[--ui-rail-width:60px] flex-col justify-center gap-1.5 px-2 py-2.5",
               )}
             >

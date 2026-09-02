@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.37**
-- Next local revision: **R4.38**
+- Current revision: **R4.38**
+- Next local revision: **R4.39**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,23 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.38 — 2026-09-03 — feat(ui-engine): support compact legacy-style rails
+
+- Agent: `Codex`
+
+- Added the generic `railPresentation="compact"` mode to `AppShell`.
+- Platform app shells now keep one full-width brand/user header while the
+  desktop navigation rail below is icon-only, matching the verified legacy
+  Master Data composition without importing legacy code.
+- Kept label accessibility and tooltip behavior centralized in `NavItem`.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test` — 212 passed, 0 failed
+- Legacy checkout inspected read-only at commit `102ff85`
 
 ## R4.37 — 2026-09-02 — refactor(ui-engine): enforce shared app controls
 

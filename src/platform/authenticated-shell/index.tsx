@@ -40,6 +40,7 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
       </div>}
       collapsedBrand={<Text as="span" weight="semibold">{appAbbreviation ?? productMark}</Text>}
       collapsible
+      railPresentation="compact"
       navigationLabel={`${settings.appTitle} navigation`}
       navigation={<AuthenticatedPlatformNavigation
         apps={apps}
