@@ -22,7 +22,7 @@ export function AuthenticatedPlatformNavigation({ apps, showGeneralSettings, sho
   const pathname = usePathname();
   return (
     <div className="grid gap-1">
-      <NavItem href="/" icon={<LayoutGrid size={17} />} active={pathname === "/"}>Applications</NavItem>
+      {apps.length > 1 ? <NavItem href="/" icon={<LayoutGrid size={17} />} active={pathname === "/"}>Applications</NavItem> : null}
       {apps.map((app) => (
         <NavItem key={app.appId} href={app.rootPath} icon={<AppWindow size={17} />} active={activePath(pathname, app.rootPath)}>
           {app.name}

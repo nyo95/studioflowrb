@@ -15,6 +15,33 @@ Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
 
+## R4.31 — 2026-09-02 — fix(shell): align sidebar and header design with DESIGN.md
+
+- Agent: `Claude`
+
+- `shells.tsx`: replaced hardcoded `bg-white/94` on the sticky topbar with
+  semantic token `bg-surface/94`, per DESIGN.md §3 ("translucent white plane").
+- `shells.tsx`: replaced `hover:bg-white/62` on NavItem idle hover with
+  `hover:bg-surface-muted`, matching DESIGN.md §3 ("Surface muted: hover").
+- `authenticated-shell/index.tsx`: brand subtitle now renders only when it
+  differs from `settings.appTitle`, eliminating the redundant display when
+  organizationName equals appTitle.
+- `authenticated-shell/navigation.tsx`: "Applications" launcher link hidden
+  when user has access to only one app, consistent with legacy NavOuter
+  (no launcher item) and the existing single-app auto-redirect in LauncherPage.
+
+### Verification
+
+- `npx tsc --noEmit` — pass
+- `git diff --cached --check` — pass
+- Legacy NavOuter at `D:\Projects\studioflow` inspected — no Applications
+  launcher in sidebar confirms decision is evidence-based.
+
+### Remaining
+
+- BQ not visible in sidebar: expected — user requires `bq.access` grant via
+  Settings → Roles & Access.
+
 ## R4.30 — 2026-09-02 — docs(changelog): identify the change-making agent
 
 - Added a changelog rule requiring every future revision entry to identify its

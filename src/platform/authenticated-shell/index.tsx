@@ -22,6 +22,7 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
   children: ReactNode;
 }) {
   const productMark = settings.appTitle.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "SF";
+  const subtitle = appName ?? settings.organizationName;
   return (
     <AppShell
       brand={<div className="flex min-w-0 items-center gap-2.5">
@@ -31,9 +32,9 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
         ) : null}
         <div className="min-w-0">
           <Text as="span" className="block truncate font-semibold">{settings.appTitle}</Text>
-          <Text as="span" tone="tertiary" size="sm" className="block truncate">
-            {appName ?? settings.organizationName}
-          </Text>
+          {subtitle !== settings.appTitle ? (
+            <Text as="span" tone="tertiary" size="sm" className="block truncate">{subtitle}</Text>
+          ) : null}
         </div>
       </div>}
       collapsedBrand={<Text as="span" weight="semibold">{appAbbreviation ?? productMark}</Text>}

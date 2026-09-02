@@ -141,7 +141,7 @@ export function AppShell({
         </aside>
         <div className="min-w-0">
           {topbar ? (
-            <header className="sticky top-0 z-10 flex min-h-16 items-center border-b border-line bg-white/94 backdrop-blur-[12px]">
+            <header className="sticky top-0 z-10 flex min-h-16 items-center border-b border-line bg-surface/94 backdrop-blur-[12px]">
               {topbar}
             </header>
           ) : null}
@@ -165,7 +165,7 @@ const NAV_ITEM_BASE_CLASSES =
   "relative flex w-full min-h-[38px] items-center gap-2.5 rounded-control border border-transparent bg-transparent px-2.5 py-2 text-left font-[inherit] text-ink-secondary no-underline";
 
 const NAV_ITEM_STATE_CLASSES = {
-  idle: "hover:border-line-subtle hover:bg-white/62 hover:text-ink",
+  idle: "hover:border-line-subtle hover:bg-surface-muted hover:text-ink",
   active:
     "border-line bg-surface text-ink font-semibold " +
     /* Current location. Hover already owns the muted fill, so "active" cannot rely on
