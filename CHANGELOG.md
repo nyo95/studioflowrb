@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.50**
-- Next local revision: **R4.51**
+- Current revision: **R4.51**
+- Next local revision: **R4.52**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,23 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.51 — 2026-09-03 — fix(ui-engine): compose brand and account into one top bar
+
+- Agent: `Codex`
+
+- Reworked the shared AppShell header so its brand sits inside the same
+  continuous top-bar plane as app context and account controls, instead of
+  reserving a separate header column.
+- Preserved the legacy full-width brand position and the independent compact
+  rail beneath the header; narrow navigation keeps its previous flow.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `git diff --check`
+- Browser check of the authenticated BQ header
 
 ## R4.50 — 2026-09-03 — fix(ui-engine): consolidate compact rail administration navigation
 
