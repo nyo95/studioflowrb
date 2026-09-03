@@ -30,7 +30,7 @@ export function MasterDataNav() {
   if (!pathname.startsWith("/masterdata")) return null;
 
   return (
-    <nav className="mt-2 grid gap-1 border-t border-line-subtle pt-2" aria-label="Master Data navigation">
+    <nav className="mt-2 grid gap-1 border-t border-line-subtle pt-2 max-[840px]:mt-0 max-[840px]:border-t-0 max-[840px]:pt-0 max-[840px]:contents" aria-label="Master Data navigation">
       {links.map(({ href, label, icon: Icon, exact }) => {
         const isActive = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
         return (

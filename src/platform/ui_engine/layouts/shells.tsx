@@ -122,7 +122,7 @@ export function AppShell({
         <div
           className={cx(
             "grid min-h-screen overflow-x-clip transition-[grid-template-columns] duration-[160ms] motion-reduce:transition-none",
-            "grid-cols-[var(--ui-rail-width,232px)_minmax(0,1fr)] max-[840px]:grid-cols-1",
+            "grid-cols-[var(--ui-rail-width,232px)_minmax(0,1fr)] max-[840px]:grid-cols-1 max-[840px]:block",
             isCollapsed && "[--ui-rail-width:60px]",
             topbar ? "min-h-[calc(100vh-4rem)]" : null,
           )}
@@ -155,7 +155,7 @@ export function AppShell({
               className={cx(
                 "min-w-0 flex-1 overflow-auto px-3 pt-2 pb-3.5",
                 isCollapsed && "px-1.5",
-                "max-[840px]:flex max-[840px]:overflow-x-auto max-[840px]:p-2.5 max-[840px]:[scrollbar-width:none] max-[840px]:[&::-webkit-scrollbar]:hidden",
+                "max-[840px]:flex max-[840px]:flex-none max-[840px]:gap-1 max-[840px]:overflow-x-auto max-[840px]:p-2.5 max-[840px]:[scrollbar-width:none] max-[840px]:[&::-webkit-scrollbar]:hidden",
               )}
             >
               {navigation}
@@ -188,16 +188,16 @@ export type NavItemProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "childr
 };
 
 const NAV_ITEM_BASE_CLASSES =
-  "relative flex w-full min-h-[38px] items-center gap-2.5 rounded-control border border-transparent bg-transparent px-2.5 py-2 text-left font-[inherit] text-ink-secondary no-underline";
+  "relative flex w-full min-h-[38px] items-center gap-2.5 rounded-control border border-transparent bg-transparent px-2.5 py-2 text-left font-[inherit] text-ink-secondary no-underline max-[840px]:w-auto max-[840px]:shrink-0 max-[840px]:min-h-[34px]";
 
 const NAV_ITEM_STATE_CLASSES = {
   idle: "hover:border-line-subtle hover:bg-surface-muted hover:text-ink",
   active:
-    "border-line bg-surface text-ink font-semibold " +
+    "border-line max-[840px]:border-transparent bg-surface max-[840px]:bg-transparent text-ink font-semibold " +
     /* Current location. Hover already owns the muted fill, so "active" cannot rely on
        fill alone or the two become indistinguishable. It is marked on three channels
        at once: an ink rule, ink-weight text, and heavier type. */
-    "before:absolute before:-left-px before:top-1/2 before:h-[18px] before:w-[3px] before:-translate-y-1/2 before:rounded-r-[2px] before:bg-action before:content-['']",
+    "before:absolute before:-left-px before:top-1/2 before:h-[18px] before:w-[3px] before:-translate-y-1/2 before:rounded-r-[2px] before:bg-action before:content-[''] max-[840px]:before:hidden",
   disabled: "cursor-not-allowed opacity-48",
 } as const;
 
@@ -276,12 +276,12 @@ export function NavSubmenu({
 
   if (!collapsed) {
     return (
-      <div className="mt-3" role="group" aria-label={label}>
-        <p className="flex min-h-7 items-center gap-2 px-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-tertiary">
+      <div className="mt-3 max-[840px]:mt-0 max-[840px]:contents" role="group" aria-label={label}>
+        <p className="flex min-h-7 items-center gap-2 px-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-tertiary max-[840px]:hidden">
           <span className="inline-flex shrink-0 [&_svg]:h-4 [&_svg]:w-4" aria-hidden="true">{icon}</span>
           {label}
         </p>
-        <div className="mt-1 grid gap-1 border-l border-line-subtle pl-2">
+        <div className="mt-1 grid gap-1 border-l border-line-subtle pl-2 max-[840px]:mt-0 max-[840px]:border-l-0 max-[840px]:pl-0 max-[840px]:contents">
           {items.map((item) => (
             <NavItem key={item.href} href={item.href} icon={item.icon} active={item.active} disabled={item.disabled}>
               {item.label}
@@ -345,7 +345,7 @@ export function PageShell({
   return (
     <div
       className={cx(
-        "mx-auto grid w-full max-w-(--ui-page-max) gap-6 p-(--ui-page-padding) max-[560px]:gap-5",
+        "mx-auto grid w-full max-w-(--ui-page-max) gap-6 p-(--ui-page-padding) max-[560px]:gap-5 [&>*]:min-w-0",
         size === "default" && "max-w-(--ui-page-max)",
         className,
       )}

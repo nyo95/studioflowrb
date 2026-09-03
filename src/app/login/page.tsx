@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { PageShell, PageHeader, Text } from "@/platform/ui_engine";
+import { PageShell } from "@/platform/ui_engine";
 import { getPrincipalGrants } from "@platform/core/auth";
 import { prisma } from "@platform/core/db";
 import { getPermissionRegistry } from "@platform/core/rbac/registry";
@@ -33,12 +33,6 @@ export default async function LoginPage() {
           // eslint-disable-next-line @next/next/no-img-element -- owner-configured URL/path has no fixed image host.
           <img src={settings.brandMarkUrl} alt="" className="max-h-16 max-w-16 object-contain" />
         ) : null}
-        <PageHeader
-          eyebrow={settings.organizationName}
-          title="Sign in"
-          divider={false}
-        />
-        <Text as="p" tone="secondary" className="m-0">{settings.appTitle}</Text>
         <LoginForm />
       </div>
     </PageShell>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowRight, CheckCircle2, CircleAlert, Filter, LayoutGrid, PanelLeftClose, PanelLeftOpen, Sparkles, Trash2 } from "lucide-react";
+import { ArrowRight, CircleAlert, Filter, LayoutGrid, PanelLeftClose, PanelLeftOpen, Pencil, Sparkles, Trash2 } from "lucide-react";
 
 import {
   AppShell,
@@ -18,7 +18,6 @@ import {
   EmptyState,
   ErrorState,
   Field,
-  FilterBar,
   FormActions,
   FormSection,
   Heading,
@@ -33,11 +32,10 @@ import {
   PageShell,
   Pagination,
   RadioGroup,
-  RowActionMenu,
   SearchField,
   SectionCard,
   Select,
-  SelectionBar,
+  type SortDirection,
   Skeleton,
   Spinner,
   StatusBadge,
@@ -62,17 +60,20 @@ type ShowcaseRow = {
   id: string;
   code: string;
   name: string;
+  vendor: string;
   status: "draft" | "active" | "archived";
-  owner: string;
-  amount: string;
+  unit: string;
+  price: string;
   notes: string;
 };
 
+type ShowcaseSortKey = "name" | "vendor" | "price";
+
 const ROWS: ShowcaseRow[] = [
-  { id: "r1", code: "BRD-001", name: "Arbor Linen", status: "active", owner: "Nadia", amount: "18.000", notes: "Primary supplier price" },
-  { id: "r2", code: "BRD-002", name: "Tide Ash", status: "draft", owner: "Bima", amount: "12.500", notes: "Pending supplier review" },
-  { id: "r3", code: "BRD-003", name: "Hearth Clay", status: "active", owner: "Maya", amount: "24.750", notes: "Featured material" },
-  { id: "r4", code: "BRD-004", name: "North Reed", status: "archived", owner: "Ari", amount: "9.900", notes: "Archived row for review" },
+  { id: "r1", code: "BRD-001", name: "Arbor Linen", vendor: "Nadia Supply", status: "active", unit: "SHEET", price: "Rp 18.000", notes: "Primary supplier price" },
+  { id: "r2", code: "BRD-002", name: "Tide Ash", vendor: "Bima Trading", status: "draft", unit: "M2", price: "Rp 12.500", notes: "Pending supplier review" },
+  { id: "r3", code: "BRD-003", name: "Hearth Clay", vendor: "Maya Corp", status: "active", unit: "SHEET", price: "Rp 24.750", notes: "Featured material" },
+  { id: "r4", code: "BRD-004", name: "North Reed", vendor: "Ari Group", status: "archived", unit: "PCS", price: "Rp 9.900", notes: "Archived row for review" },
 ];
 
 const COMBO_OPTIONS = [
@@ -86,15 +87,14 @@ export function UiEngineShowcase() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 140);
   const [statusFilter, setStatusFilter] = useState<"all" | ShowcaseRow["status"]>("all");
-  const [selectedIds, setSelectedIds] = useState<string[]>(["r1"]);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [sort, setSort] = useState<{ key: ShowcaseSortKey; direction: SortDirection }>({ key: "name", direction: "asc" });
+  const changeSort = (key: ShowcaseSortKey) => (direction: SortDirection) => setSort({ key, direction });
   const [selectedCombo, setSelectedCombo] = useState("active");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [lastAction, setLastAction] = useState<string>("Ready.");
   const [note, setNote] = useState("This note starts dirty only after editing.");
   const [selectedTag, setSelectedTag] = useState("studioflow");
-  const [statusQuery, setStatusQuery] = useState("");
   const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<ShowcaseRow | null>(null);
   const confirm = useConfirm();
 
@@ -117,14 +117,14 @@ export function UiEngineShowcase() {
     const term = debouncedSearch.trim().toLowerCase();
     return ROWS
       .filter((row) => (statusFilter === "all" ? true : row.status === statusFilter))
-      .filter((row) => !term || [row.code, row.name, row.owner, row.notes].some((value) => value.toLowerCase().includes(term)))
+      .filter((row) => !term || [row.code, row.name, row.vendor, row.notes].some((value) => value.toLowerCase().includes(term)))
       .sort((left, right) => {
-        const a = left.name.localeCompare(right.name);
-        return sortDirection === "asc" ? a : -a;
+        const lv = sort.key === "vendor" ? left.vendor : sort.key === "price" ? left.price : left.name;
+        const rv = sort.key === "vendor" ? right.vendor : sort.key === "price" ? right.price : right.name;
+        const cmp = lv.localeCompare(rv);
+        return sort.direction === "asc" ? cmp : -cmp;
       });
-  }, [debouncedSearch, sortDirection, statusFilter]);
-
-  const selectedCount = selectedIds.length;
+  }, [debouncedSearch, sort, statusFilter]);
   const currentNoteInitial = "This note starts dirty only after editing.";
   const noteGuard = useUnsavedChangesGuard({
     value: note,
@@ -133,16 +133,6 @@ export function UiEngineShowcase() {
     description: "The note has unsaved edits. Discard them and reset the demo form?",
   });
 
-  const toggleSelected = (id: string) => {
-    setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
-  };
-
-  const selectAllVisible = () => {
-    setSelectedIds(filteredRows.map((row) => row.id));
-  };
-
-  const clearSelection = () => setSelectedIds([]);
-
   const stageTemporaryTag = () => {
     const label = `Tag ${Math.floor(Math.random() * 100)}`;
     const id = label.toLowerCase().replace(/\s+/g, "-");
@@ -150,8 +140,6 @@ export function UiEngineShowcase() {
     setSelectedTag(id);
     setLastAction(`Staged overlay option "${label}".`);
   };
-
-  const rowsForMenu = filteredRows;
 
   return (
     <AppShell
@@ -230,75 +218,78 @@ export function UiEngineShowcase() {
           </SectionCard>
         </PageSection>
 
-        <PageSection title="Directory" description="Table chrome, search, filter state, selection, row actions, and pagination.">
+        <PageSection title="Directory" description="Table chrome, search, status filter, sortable columns, status badge, and inline row actions.">
           <SectionCard id="directory">
             <div className="grid gap-4">
-              <TableToolbar
-                search={
+              <TableToolbar>
+                <div className="flex flex-wrap items-center gap-3">
                   <SearchField
                     label="Search records"
                     value={search}
-                    onChange={(event) => setSearch(event.target.value)}
+                    onChange={(event) => { setSearch(event.target.value); }}
                     onClear={() => setSearch("")}
+                    placeholder="Search records..."
                   />
-                }
-                filters={
-                  <FilterBar active={statusFilter !== "all"} onClear={() => setStatusFilter("all")} clearLabel="All records">
-                    <Button size="sm" variant={statusFilter === "all" ? "primary" : "ghost"} onClick={() => setStatusFilter("all")}>All</Button>
-                    <Button size="sm" variant={statusFilter === "active" ? "primary" : "ghost"} onClick={() => setStatusFilter("active")}>Active</Button>
-                    <Button size="sm" variant={statusFilter === "draft" ? "primary" : "ghost"} onClick={() => setStatusFilter("draft")}>Draft</Button>
-                    <Button size="sm" variant={statusFilter === "archived" ? "primary" : "ghost"} onClick={() => setStatusFilter("archived")}>Archived</Button>
-                  </FilterBar>
-                }
-                actions={
-                  <Button variant="secondary" size="sm" onClick={selectAllVisible}>
-                    Select visible
-                  </Button>
-                }
-              >
-                {selectedCount > 0 ? (
-                  <SelectionBar
-                    count={selectedCount}
-                    variant="inline"
-                    label={(count) => `${count} record${count === 1 ? "" : "s"} selected`}
+                  <Select
+                    value={statusFilter}
+                    onChange={(event) => setStatusFilter(event.target.value as "all" | ShowcaseRow["status"])}
+                    className="w-36"
                   >
-                    <Button size="sm" variant="ghost" onClick={clearSelection}>Clear</Button>
-                    <Button size="sm" variant="danger" onClick={() => setLastAction("Bulk delete requested.")}>
-                      Delete
-                    </Button>
-                  </SelectionBar>
-                ) : null}
+                    <option value="all">All status</option>
+                    <option value="active">Active</option>
+                    <option value="draft">Draft</option>
+                    <option value="archived">Archived</option>
+                  </Select>
+                </div>
               </TableToolbar>
 
-              <DataTable minWidth={980} stickyHeader>
+              <DataTable minWidth={720}>
                 <TableHeader>
                   <TableRow>
-                    <TableHead aria-label="Select rows" />
-                    <TableHead sortable sortDirection={sortDirection} onSortChange={setSortDirection} sortLabel={(direction) => `Name, sort ${direction}`}>
+                    <TableHead
+                      sortable
+                      sortDirection={sort.key === "name" ? sort.direction : null}
+                      onSortChange={changeSort("name")}
+                      sortLabel={(d) => `Name, sort ${d}`}
+                    >
                       Name
                     </TableHead>
-                    <TableHead data-column="identifier">Code</TableHead>
+                    <TableHead
+                      sortable
+                      sortDirection={sort.key === "vendor" ? sort.direction : null}
+                      onSortChange={changeSort("vendor")}
+                      sortLabel={(d) => `Vendor, sort ${d}`}
+                    >
+                      Vendor
+                    </TableHead>
+                    <TableHead
+                      align="end"
+                      sortable
+                      sortDirection={sort.key === "price" ? sort.direction : null}
+                      onSortChange={changeSort("price")}
+                      sortLabel={(d) => `Price, sort ${d}`}
+                    >
+                      Price
+                    </TableHead>
+                    <TableHead>Unit</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Owner</TableHead>
-                    <TableHead align="end">Amount</TableHead>
                     <TableHead align="end">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rowsForMenu.map((row) => (
-                    <TableRow key={row.id} selected={selectedIds.includes(row.id)}>
+                  {filteredRows.map((row) => (
+                    <TableRow key={row.id}>
                       <TableCell>
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${row.name}`}
-                          checked={selectedIds.includes(row.id)}
-                          onChange={() => toggleSelected(row.id)}
+                        <TableCellContent
+                          primary={<span className="font-semibold">{row.name}</span>}
+                          secondary={<span className="font-mono text-xs">{row.code}</span>}
                         />
                       </TableCell>
+                      <TableCell>{row.vendor}</TableCell>
+                      <TableCell align="end">{row.price}</TableCell>
                       <TableCell>
-                        <TableCellContent primary={row.name} secondary={row.notes} primaryLines={2} />
+                        <span className="font-mono text-xs">{row.unit}</span>
                       </TableCell>
-                      <TableCell data-column="identifier">{row.code}</TableCell>
                       <TableCell>
                         {row.status === "active" ? (
                           <StatusBadge tone="success">Active</StatusBadge>
@@ -308,17 +299,21 @@ export function UiEngineShowcase() {
                           <StatusBadge tone="neutral">Archived</StatusBadge>
                         )}
                       </TableCell>
-                      <TableCell>{row.owner}</TableCell>
-                      <TableCell align="end">{row.amount}</TableCell>
                       <TableCell align="end">
-                        <div className="inline-flex items-center gap-2">
-                          <RowActionMenu
-                            label={`Actions for ${row.name}`}
-                            items={[
-                              { label: "Open detail", onSelect: () => setDrawerOpen(true) },
-                              { label: "Quick edit", onSelect: () => setDialogOpen(true) },
-                              { label: "Remove", danger: true, onSelect: () => setConfirmDeleteTarget(row) },
-                            ]}
+                        <div className="flex items-center justify-end gap-1">
+                          <IconButton
+                            size="sm"
+                            variant="ghost"
+                            label={`Edit ${row.name}`}
+                            icon={<Pencil size={15} aria-hidden="true" />}
+                            onClick={() => { setDialogOpen(true); setLastAction(`Edit: ${row.name}`); }}
+                          />
+                          <IconButton
+                            size="sm"
+                            variant="ghost"
+                            label={`Delete ${row.name}`}
+                            icon={<Trash2 size={15} aria-hidden="true" />}
+                            onClick={() => setConfirmDeleteTarget(row)}
                           />
                         </div>
                       </TableCell>
@@ -327,11 +322,13 @@ export function UiEngineShowcase() {
                 </TableBody>
               </DataTable>
 
-              <Pagination
-                page={1}
-                pageCount={4}
-                onPageChange={(page) => setLastAction(`Page changed to ${page}.`)}
-              />
+              {filteredRows.length > 0 ? (
+                <Pagination
+                  page={1}
+                  pageCount={Math.max(1, Math.ceil(ROWS.length / 25))}
+                  onPageChange={(page) => setLastAction(`Page changed to ${page}.`)}
+                />
+              ) : null}
 
               <Notice tone="neutral" title="Latest action">
                 {lastAction}

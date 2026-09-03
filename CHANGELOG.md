@@ -5,10 +5,47 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.76**
-- Next local revision: **R4.77**
+- Current revision: **R4.79**
+- Next local revision: **R4.80**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
+
+## R4.79 — 2026-09-03 — feat(ui-engine): refine responsive navigation and creation actions
+
+- Agent: `Codex`
+
+Refines shared UI behavior already under active implementation:
+
+- Adds a shared labelled `ButtonMenu` for grouped creation actions, then applies it to the three Pricing creation paths as one **New price** control.
+- Makes the application rail and Master Data navigation become a compact, horizontally scrollable navigation row on narrow viewports without collapsing its accessible names or active-state semantics.
+- Makes page and section surfaces reliably shrink inside narrow layouts, and adjusts shared page/card spacing for the updated density.
+- Updates the UI Engine directory showcase and streamlined sign-in presentation to use the current patterns.
+- Updates generated Next type references to the active development convention.
+
+### Verification
+
+- `node --test --import tsx src/platform/ui_engine/ui-engine.test.ts` — 27 pass
+- `npm run typecheck` — clean
+- focused ESLint — clean (generated Next declaration and stylesheet are excluded by the ESLint configuration)
+- `npm run check:boundaries` — pass
+- `npm run check:legacy-runtime` — pass
+- `git diff --check` — clean (line-ending warnings only)
+
+## R4.78 — 2026-09-03 — fix(vendors): align editor tabs with contract
+
+- Agent: `Codex`
+- Commit: `ff2cc6d` (published to the authorized remote)
+
+Corrects the Vendor editor to its locked three-tab contract: **Profile & Types**,
+**Contacts**, and **Links**. Brand supplier relationships remain owned by the
+Brand workflow and are no longer shown as a Vendor editor tab. The shared tabs
+component can keep inactive panels mounted, so entering Profile fields and then
+switching to Contacts or Links preserves the unsaved draft.
+
+### Verification
+
+- Initial focused UI Engine test exposed the expected narrow-viewport fallback
+  as an outdated assertion; it is corrected in R4.79 and re-verified there.
 
 ## R4.77 — 2026-09-03 — fix(platform): harden audited action and recovery paths
 

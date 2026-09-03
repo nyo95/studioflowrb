@@ -4,7 +4,7 @@ import { cx } from "../internal/cx";
 import { Heading, Surface, Text } from "../primitives";
 
 export function SectionCard({ className, ...props }: HTMLAttributes<HTMLElement>) {
-  return <Surface as="section" className={cx("px-(--ui-section-px) py-(--ui-section-py)", className)} {...props} />;
+  return <Surface as="section" className={cx("min-w-0 px-(--ui-section-px) py-(--ui-section-py)", className)} {...props} />;
 }
 
 export type PageSectionProps = HTMLAttributes<HTMLElement> & {

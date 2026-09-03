@@ -45,7 +45,7 @@ export function AuthenticatedPlatformNavigation({ showGeneralSettings, showUsers
 }) {
   const pathname = usePathname();
   return (
-    <div className="grid gap-1">
+    <div className="grid gap-1 max-[840px]:contents">
       {domainNavigation}
       <NavSubmenu
         label="Administration"

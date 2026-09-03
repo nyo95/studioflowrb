@@ -324,7 +324,7 @@ describe("UI Engine foundation", () => {
     assert.match(tabs, /\[&amp;::\-webkit-scrollbar\]:hidden/);
   });
 
-  it("can distribute a fixed tab set evenly without a scroll strip", () => {
+  it("distributes fixed tabs evenly and falls back to scrolling only on narrow viewports", () => {
     const tabs = renderToStaticMarkup(createElement(ui.Tabs, {
       distribution: "equal",
       items: [
@@ -335,7 +335,8 @@ describe("UI Engine foundation", () => {
     }));
     assert.match(tabs, /class="[^"]*\bgrid\b/);
     assert.match(tabs, /grid-template-columns:repeat\(3, minmax\(0, 1fr\)\)/);
-    assert.doesNotMatch(tabs, /overflow-x-auto/);
+    assert.match(tabs, /grid overflow-hidden/);
+    assert.match(tabs, /max-\[560px\]:overflow-x-auto/);
   });
 
   it("keeps a bounded scroll body available for a sticky header", () => {
