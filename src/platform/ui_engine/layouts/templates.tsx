@@ -76,17 +76,24 @@ export type TabsProps = {
   defaultValue?: string;
   onValueChange?: (value: string) => void;
   label?: string;
+  distribution?: "scroll" | "equal";
   className?: string;
 };
 
-export function Tabs({ items, label = "Sections", className, defaultValue, ...props }: TabsProps) {
+export function Tabs({ items, label = "Sections", distribution = "scroll", className, defaultValue, ...props }: TabsProps) {
   // The spread used to overwrite the computed fallback with an undefined
   // `defaultValue`, so an uncontrolled Tabs opened with no panel selected at all.
   const fallbackValue = items.find((item) => !item.disabled)?.value;
   return (
     <RTabs.Root className={cx("min-w-0", className)} defaultValue={defaultValue ?? fallbackValue} {...props}>
       <RTabs.List
-        className="flex gap-0.5 overflow-x-auto border-b border-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className={cx(
+          "gap-0.5 border-b border-line",
+          distribution === "equal"
+            ? "grid overflow-hidden [&>[role=tab]]:min-w-0 [&>[role=tab]]:whitespace-normal [&>[role=tab]]:leading-tight"
+            : "flex overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        )}
+        style={distribution === "equal" ? { gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` } : undefined}
         aria-label={label}
       >
         {items.map((item) => (

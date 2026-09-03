@@ -324,6 +324,20 @@ describe("UI Engine foundation", () => {
     assert.match(tabs, /\[&amp;::\-webkit-scrollbar\]:hidden/);
   });
 
+  it("can distribute a fixed tab set evenly without a scroll strip", () => {
+    const tabs = renderToStaticMarkup(createElement(ui.Tabs, {
+      distribution: "equal",
+      items: [
+        { value: "one", label: "One", content: "First" },
+        { value: "two", label: "Two", content: "Second" },
+        { value: "three", label: "Three", content: "Third" },
+      ],
+    }));
+    assert.match(tabs, /class="[^"]*\bgrid\b/);
+    assert.match(tabs, /grid-template-columns:repeat\(3, minmax\(0, 1fr\)\)/);
+    assert.doesNotMatch(tabs, /overflow-x-auto/);
+  });
+
   it("keeps a bounded scroll body available for a sticky header", () => {
     const table = renderToStaticMarkup(createElement(ui.DataTable, {
       stickyHeader: true,

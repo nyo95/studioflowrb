@@ -5,9 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.73**
-- Next local revision: **R4.74**
+- Current revision: **R4.74**
+- Next local revision: **R4.75**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.74 — 2026-09-03 — fix(pricing): fix price tabs to equal columns
+
+- Agent: `Codex`
+
+Adds a shared equal-width mode to `Tabs` for a known, fixed set of sections.
+Pricing uses it for its three permanent price kinds, so each tab has one stable
+third of the strip and there is no horizontal scroll behavior.
+
+### Verification
+
+- `npm run typecheck` — clean
+- `npm run lint` — clean
+- `node --test --import tsx src/platform/ui_engine/ui-engine.test.ts` — pass
+- `npm run check:boundaries` — pass
+- `npm run check:legacy-runtime` — pass
+- Browser acceptance — unavailable: the existing automation tab landed on
+  Brands and direct navigation to Pricing was aborted by the browser.
+- `git diff --check` — clean
 
 ## R4.73 — 2026-09-03 — fix(ui-engine): hide tab strip scrollbar
 
