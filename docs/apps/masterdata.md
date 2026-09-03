@@ -196,6 +196,23 @@ metadata. This preserves Core's one-operation/one-primary-event rule.
 | **APP-OWNED** | Vendor capability policy, Brand discovery/enrichment, price identity, lifecycle cascades/provenance, deletion requests, restore validation, public DTO composition |
 | **DEFER** | file storage/upload, internal catalog files, import/export codecs, BQ snapshot persistence, jobs/notifications |
 
+### 5.4 Choice-control scale rule
+
+Use the UI Engine control that matches both the contract and the cardinality of
+the candidate set. This is interaction policy only; each app keeps query,
+permission, validation, and persistence policy.
+
+| Candidate | Required interaction | Reason |
+|---|---|---|
+| Brand, Vendor, SKU, Product Category, Work Category | searchable `Combobox` when choosing one existing record | These are live application dictionaries and can grow beyond a usable native dropdown. |
+| Brand Category/hashtag assignment | `CreatableMultiSelect` | The Brand contract permits multiple values and Category creation through its approved flow. |
+| Category required by SKU or Pricing | searchable `CreatableSearch` only where that contract authorizes inline Category creation; otherwise `Combobox` | SKU has exactly one PRODUCT Category; creation authority remains app-owned. |
+| VendorType assignment | searchable existing-only multi-select | The Vendor contract forbids inline VendorType creation outside dictionary administration. |
+| Status, Category kind, LinkKind, fixed capability, currency, and short unit vocabulary | native `Select` | These are bounded controlled vocabularies; search would add friction without solving scale. |
+
+An application must not render an unbounded Brand, Vendor, SKU, or Category
+list as a native dropdown merely because the current seed data is short.
+
 ## 6. Evidence and activation gate
 
 Legacy behavior evidence comes only from the exact checkout path and commit the

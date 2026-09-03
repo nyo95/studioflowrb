@@ -6,6 +6,7 @@ import { GitMerge, Plus, PowerOff, Trash2 } from "lucide-react";
 import {
   Badge,
   Button,
+  Combobox,
   DataTable,
   Dialog,
   EmptyState,
@@ -302,16 +303,7 @@ export function CategoryDirectory({
         >
           <div className="grid gap-4">
             <Field label="Destination category" required description={`Must be an active ${mergeTarget.kind} category.`}>
-              <Select value={mergeDestinationId} onChange={(e) => setMergeDestinationId(e.target.value)}>
-                <option value="">Select target category...</option>
-                {categories
-                  .filter((c) => c.id !== mergeTarget.id && c.kind === mergeTarget.kind && c.status === "ACTIVE")
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-              </Select>
+              <Combobox label="Destination category" options={categories.filter((category) => category.id !== mergeTarget.id && category.kind === mergeTarget.kind && category.status === "ACTIVE").map((category) => ({ id: category.id, label: category.name }))} value={mergeDestinationId} onValueChange={setMergeDestinationId} placeholder="Search target category" searchPlaceholder="Search active categories…" />
             </Field>
             <FormActions>
               <Button type="button" variant="ghost" onClick={() => setMergeTarget(null)}>

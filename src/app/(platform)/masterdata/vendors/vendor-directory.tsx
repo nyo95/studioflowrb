@@ -6,6 +6,8 @@ import { Archive, Plus, RotateCcw, Trash2, UserPlus, X } from "lucide-react";
 import {
   Badge,
   Button,
+  Combobox,
+  CreatableMultiSelect,
   ConfirmDialog,
   DataTable,
   Dialog,
@@ -146,6 +148,9 @@ export function VendorDirectory({
   const [newLinkLabel, setNewLinkLabel] = useState("");
   const [newLinkArchiveUrl, setNewLinkArchiveUrl] = useState("");
   const [brandSuppliersList, setBrandSuppliersList] = useState<BrandSupplierDraft[]>([]);
+  const [brandSupplierToAdd, setBrandSupplierToAdd] = useState("");
+  const [createVendorTypeIds, setCreateVendorTypeIds] = useState<string[]>([]);
+  const [editVendorTypeIds, setEditVendorTypeIds] = useState<string[]>([]);
 
   const [createError, setCreateError] = useState<string | null>(null);
   const [createPending, setCreatePending] = useState(false);
@@ -199,6 +204,8 @@ export function VendorDirectory({
     setContactsList([]);
     setLinksList([]);
     setBrandSuppliersList([]);
+    setBrandSupplierToAdd("");
+    setCreateVendorTypeIds([]);
     setNewLinkUrl("");
     setNewLinkLabel("");
     setNewLinkArchiveUrl("");
@@ -221,6 +228,8 @@ export function VendorDirectory({
     );
     setLinksList(vendor.links.map((l) => ({ kind: l.kind, url: l.url, label: l.label ?? "", archiveUrl: l.archive_url ?? "", sortOrder: l.sort_order })));
     setBrandSuppliersList(vendor.brand_suppliers.map((bs) => ({ brandId: bs.brand.id, brandName: bs.brand.name, isAuthorized: bs.is_authorized, notes: bs.notes ?? "" })));
+    setBrandSupplierToAdd("");
+    setEditVendorTypeIds(vendor.types.map((type) => type.vendor_type.id));
     setNewLinkUrl("");
     setNewLinkLabel("");
     setNewLinkArchiveUrl("");
@@ -441,6 +450,7 @@ export function VendorDirectory({
           }}
           className="grid gap-4 max-h-[80vh] overflow-y-auto pr-1"
         >
+          {createVendorTypeIds.map((id) => <input key={id} type="hidden" name="vendorTypeIds" value={id} />)}
           {createError ? <InlineError>{createError}</InlineError> : null}
 
           <Tabs
@@ -459,20 +469,8 @@ export function VendorDirectory({
                     <Field label="Legal entity name" description="Registered PT / CV name if applicable.">
                       <Input name="legalName" maxLength={128} placeholder="e.g. PT Mitra Kayu Nusantara" />
                     </Field>
-                    <Field label="Vendor types" description="Assign role dimensions to grant pricing capabilities.">
-                      <div className="grid grid-cols-2 gap-2 border border-line rounded p-2 bg-surface-muted/30">
-                        {vendorTypes.map((vt) => (
-                          <label key={vt.id} className="flex items-center gap-2 text-xs cursor-pointer select-none">
-                            <input type="checkbox" name="vendorTypeIds" value={vt.id} />
-                            <div>
-                              <span className="font-medium">{vt.name}</span>
-                              <span className="block text-[10px] text-ink-tertiary">
-                                {vt.can_supply_material ? "Material " : ""}{vt.can_supply_labor ? "Labor" : ""}
-                              </span>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
+                    <Field label="Vendor types" description="Search the controlled type vocabulary; assign role dimensions to grant pricing capabilities.">
+                      <CreatableMultiSelect label="Vendor types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={createVendorTypeIds} onValueChange={setCreateVendorTypeIds} placeholder="Search vendor types" searchPlaceholder="Search vendor types…" />
                     </Field>
                     <Field label="Office / Workshop address">
                       <Input name="address" maxLength={256} placeholder="Address, City" />
@@ -541,17 +539,7 @@ export function VendorDirectory({
                           />
                         </Field>
                         <Field label="Brand scoping" description="Optional: specific brand this contact manages.">
-                          <Select
-                            value={contact.brandId}
-                            onChange={(e) => updateContactDraft(idx, { brandId: e.target.value })}
-                          >
-                            <option value="">All vendor brands</option>
-                            {brands.map((b) => (
-                              <option key={b.id} value={b.id}>
-                                {b.name}
-                              </option>
-                            ))}
-                          </Select>
+                          <Combobox label={`Brand scope for ${contact.personName || "contact"}`} options={[{ id: "", label: "All vendor brands" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={contact.brandId} onValueChange={(brandId) => updateContactDraft(idx, { brandId })} placeholder="All vendor brands" searchPlaceholder="Search brands…" />
                         </Field>
                       </div>
                     ))}
@@ -596,12 +584,7 @@ export function VendorDirectory({
                   <div className="grid gap-3">
                     <Text size="sm" weight="semibold">Brands this vendor supplies materials for</Text>
                     <Field label="Add brand">
-                      <Select onChange={(e) => { if (e.target.value) { const b = brands.find((x) => x.id === e.target.value); if (b) addBrandSupplier(b.id, b.name); e.target.value = ""; } }}>
-                        <option value="">— select brand to add —</option>
-                        {brands.filter((b) => !brandSuppliersList.some((bs) => bs.brandId === b.id)).map((b) => (
-                          <option key={b.id} value={b.id}>{b.name}</option>
-                        ))}
-                      </Select>
+                      <Combobox label="Add supplied brand" options={brands.filter((brand) => !brandSuppliersList.some((supplier) => supplier.brandId === brand.id)).map((brand) => ({ id: brand.id, label: brand.name }))} value={brandSupplierToAdd} onValueChange={(brandId) => { const brand = brands.find((item) => item.id === brandId); if (brand) addBrandSupplier(brand.id, brand.name); setBrandSupplierToAdd(""); }} placeholder="Search brand to add" searchPlaceholder="Search brands…" />
                     </Field>
                     {brandSuppliersList.map((bs, idx) => (
                       <div key={bs.brandId} className="grid gap-2 p-2.5 border border-line rounded bg-surface-muted/40">
@@ -668,6 +651,7 @@ export function VendorDirectory({
             className="grid gap-4 max-h-[80vh] overflow-y-auto pr-1"
           >
             <input type="hidden" name="vendorId" value={editTarget.id} />
+            {editVendorTypeIds.map((id) => <input key={id} type="hidden" name="vendorTypeIds" value={id} />)}
             {editError ? <InlineError>{editError}</InlineError> : null}
 
             <Tabs
@@ -686,23 +670,8 @@ export function VendorDirectory({
                       <Field label="Legal entity name">
                         <Input name="legalName" defaultValue={editTarget.legal_name ?? ""} maxLength={128} />
                       </Field>
-                      <Field label="Vendor types" description="Removing capability types is guarded against active dependent prices.">
-                        <div className="grid grid-cols-2 gap-2 border border-line rounded p-2 bg-surface-muted/30">
-                          {vendorTypes.map((vt) => {
-                            const isChecked = editTarget.types.some((t) => t.vendor_type.id === vt.id);
-                            return (
-                              <label key={vt.id} className="flex items-center gap-2 text-xs cursor-pointer select-none">
-                                <input type="checkbox" name="vendorTypeIds" value={vt.id} defaultChecked={isChecked} />
-                                <div>
-                                  <span className="font-medium">{vt.name}</span>
-                                  <span className="block text-[10px] text-ink-tertiary">
-                                    {vt.can_supply_material ? "Material " : ""}{vt.can_supply_labor ? "Labor" : ""}
-                                  </span>
-                                </div>
-                              </label>
-                            );
-                          })}
-                        </div>
+                      <Field label="Vendor types" description="Search the controlled type vocabulary. Removing capability types is guarded against active dependent prices.">
+                        <CreatableMultiSelect label="Vendor types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={editVendorTypeIds} onValueChange={setEditVendorTypeIds} placeholder="Search vendor types" searchPlaceholder="Search vendor types…" />
                       </Field>
                       <Field label="Office / Workshop address">
                         <Input name="address" defaultValue={editTarget.address ?? ""} maxLength={256} />
@@ -767,17 +736,7 @@ export function VendorDirectory({
                             />
                           </Field>
                           <Field label="Brand scoping">
-                            <Select
-                              value={contact.brandId}
-                              onChange={(e) => updateContactDraft(idx, { brandId: e.target.value })}
-                            >
-                              <option value="">All vendor brands</option>
-                              {brands.map((b) => (
-                                <option key={b.id} value={b.id}>
-                                  {b.name}
-                                </option>
-                              ))}
-                            </Select>
+                            <Combobox label={`Brand scope for ${contact.personName || "contact"}`} options={[{ id: "", label: "All vendor brands" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={contact.brandId} onValueChange={(brandId) => updateContactDraft(idx, { brandId })} placeholder="All vendor brands" searchPlaceholder="Search brands…" />
                           </Field>
                         </div>
                       ))}
@@ -822,12 +781,7 @@ export function VendorDirectory({
                     <div className="grid gap-3">
                       <Text size="sm" weight="semibold">Brands this vendor supplies materials for</Text>
                       <Field label="Add brand">
-                        <Select onChange={(e) => { if (e.target.value) { const b = brands.find((x) => x.id === e.target.value); if (b) addBrandSupplier(b.id, b.name); e.target.value = ""; } }}>
-                          <option value="">— select brand to add —</option>
-                          {brands.filter((b) => !brandSuppliersList.some((bs) => bs.brandId === b.id)).map((b) => (
-                            <option key={b.id} value={b.id}>{b.name}</option>
-                          ))}
-                        </Select>
+                        <Combobox label="Add supplied brand" options={brands.filter((brand) => !brandSuppliersList.some((supplier) => supplier.brandId === brand.id)).map((brand) => ({ id: brand.id, label: brand.name }))} value={brandSupplierToAdd} onValueChange={(brandId) => { const brand = brands.find((item) => item.id === brandId); if (brand) addBrandSupplier(brand.id, brand.name); setBrandSupplierToAdd(""); }} placeholder="Search brand to add" searchPlaceholder="Search brands…" />
                       </Field>
                       {brandSuppliersList.map((bs, idx) => (
                         <div key={bs.brandId} className="grid gap-2 p-2.5 border border-line rounded bg-surface-muted/40">

@@ -5,9 +5,34 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.71**
-- Next local revision: **R4.72**
+- Current revision: **R4.72**
+- Next local revision: **R4.73**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.72 — 2026-09-03 — fix(masterdata): search scalable reference choices
+
+- Agent: `Codex`
+
+Records the shared choice-control scale rule in the Master Data contract: live
+Brand, Vendor, SKU, and Category references use a searchable picker; bounded
+controlled vocabularies remain native dropdowns. Inline creation remains limited
+to the specific contract-approved workflows.
+
+Replaces native dropdowns with searchable UI Engine choices for the Pricing SKU
+Brand filter, SKU directory Brand/Category filters and edit fields, Vendor
+contact Brand scope, Vendor Brand Supplier assignment, VendorType assignment,
+and Category merge destinations. Status, kind, LinkKind, and units remain
+native dropdowns because their controlled vocabularies are short.
+
+### Verification
+
+- `npm run typecheck` — clean
+- `npm run lint` — clean
+- `node --test --import tsx src/platform/ui_engine/ui-engine.test.ts` — pass
+- `npm run check:boundaries` — pass
+- `npm run check:legacy-runtime` — pass
+- Browser acceptance — Pricing Brand filter searches `TACO` and returns only it.
+- `git diff --check` — clean
 
 ## R4.71 — 2026-09-03 — fix(ui-engine): restore rail navigation
 

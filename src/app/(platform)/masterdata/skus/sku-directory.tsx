@@ -6,6 +6,7 @@ import { Archive, Plus, RotateCcw, Trash2 } from "lucide-react";
 import {
   Badge,
   Button,
+  Combobox,
   ConfirmDialog,
   DataTable,
   Dialog,
@@ -83,6 +84,8 @@ export function SkuDirectory({
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
 
   const [editTarget, setEditTarget] = useState<SkuRow | null>(null);
+  const [editBrandId, setEditBrandId] = useState("");
+  const [editCategoryId, setEditCategoryId] = useState("");
   const [confirmArchive, setConfirmArchive] = useState<SkuRow | null>(null);
   const [confirmRestore, setConfirmRestore] = useState<SkuRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SkuRow | null>(null);
@@ -117,30 +120,22 @@ export function SkuDirectory({
     });
   };
 
+  const openEditDialog = (sku: SkuRow) => {
+    setEditBrandId(sku.brand?.id ?? "");
+    setEditCategoryId(sku.categories[0]?.category.id ?? "");
+    setEditTarget(sku);
+  };
+
   return (
     <SectionCard>
       <TableToolbar>
         <div className="flex flex-wrap items-center gap-3">
           <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search SKUs by name, code, brand..." />
-          <div className="w-40">
-            <Select value={brandFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setBrandFilter(e.target.value)}>
-              <option value="ALL">All brands</option>
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </Select>
+          <div className="w-52">
+            <Combobox label="Brand filter" options={[{ id: "ALL", label: "All brands" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={brandFilter} onValueChange={setBrandFilter} placeholder="All brands" searchPlaceholder="Search brands…" />
           </div>
-          <div className="w-44">
-            <Select value={categoryFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setCategoryFilter(e.target.value)}>
-              <option value="ALL">All categories</option>
-              {productCategories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
+          <div className="w-52">
+            <Combobox label="Product category filter" options={[{ id: "ALL", label: "All categories" }, ...productCategories.map((category) => ({ id: category.id, label: category.name }))]} value={categoryFilter} onValueChange={setCategoryFilter} placeholder="All categories" searchPlaceholder="Search product categories…" />
           </div>
         </div>
       </TableToolbar>
@@ -227,7 +222,7 @@ export function SkuDirectory({
                       {isPending ? <Spinner /> : null}
                       {canManage && (
                         <>
-                          <Button size="sm" variant="ghost" onClick={() => setEditTarget(sku)} disabled={isPending}>
+                          <Button size="sm" variant="ghost" onClick={() => openEditDialog(sku)} disabled={isPending}>
                             Edit
                           </Button>
                           {!isArchived ? (
@@ -285,6 +280,8 @@ export function SkuDirectory({
             className="grid gap-4 max-h-[80vh] overflow-y-auto pr-1"
           >
             <input type="hidden" name="skuId" value={editTarget.id} />
+            <input type="hidden" name="brandId" value={editBrandId} />
+            <input type="hidden" name="categoryId" value={editCategoryId} />
             {editError ? <InlineError>{editError}</InlineError> : null}
             <div className="grid grid-cols-2 gap-3">
               <Field label="SKU code / Article #">
@@ -294,14 +291,7 @@ export function SkuDirectory({
                 <Input name="name" defaultValue={editTarget.name ?? ""} maxLength={128} autoFocus />
               </Field>
               <Field label="Brand">
-                <Select name="brandId" defaultValue={editTarget.brand?.id ?? ""}>
-                  <option value="">Unbranded / Generic</option>
-                  {brands.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </Select>
+                <Combobox label="SKU brand" options={[{ id: "", label: "Unbranded / Generic" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={editBrandId} onValueChange={setEditBrandId} placeholder="Unbranded / Generic" searchPlaceholder="Search brands…" />
               </Field>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -355,10 +345,7 @@ export function SkuDirectory({
             </SectionCard>
 
             <Field label="Product category" required>
-              <Select name="categoryId" defaultValue={editTarget.categories[0]?.category.id ?? ""} required>
-                <option value="">Select product category...</option>
-                {productCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </Select>
+              <Combobox label="SKU product category" options={productCategories.map((category) => ({ id: category.id, label: category.name }))} value={editCategoryId} onValueChange={setEditCategoryId} placeholder="Search product category" searchPlaceholder="Search product categories…" />
             </Field>
 
             <Field label="Notes">
