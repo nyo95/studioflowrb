@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.56**
-- Next local revision: **R4.57**
+- Current revision: **R4.57**
+- Next local revision: **R4.58**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.57 — 2026-09-03 — fix(bq): load import sources after dialog render
+
+- Agent: `Codex`
+
+`ImportDialog` previously started its initial source lookup from the render
+path. The lookup calls `startTransition`, which React forbids during rendering,
+so opening **Impor** crashed the BQ project page with "Cannot call
+startTransition while rendering."
+
+The dialog now mounts only for an active import target and starts its initial
+lookup from an effect after render. Each fresh opening has fresh local state;
+closing the dialog unmounts it and cancels an in-flight initial lookup.
+
+### Verification
+
+- `npm run typecheck` — clean
+- `npx eslint src/app/(platform)/bq/[id]/project-editor.tsx` — clean
+- `npm run check:boundaries` — pass
+- `git diff --check` — clean
+- Browser acceptance: opened **Impor** on a draft BQ project; the picker
+  rendered its empty state without the previous React error overlay.
 
 ## R4.56 — 2026-09-03 — feat(bq): close BQ-F2 through BQ-F5 and activate InlineEdit
 

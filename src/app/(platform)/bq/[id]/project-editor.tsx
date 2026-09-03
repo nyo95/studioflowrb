@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, ChevronRight, Download, Lock, Plus, Trash2 } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import {
   Badge,
@@ -212,20 +212,23 @@ export function ProjectEditor({
         </SectionCard>
       ))}
 
-      <ImportDialog
-        target={importTarget}
-        onClose={() => setImportTarget(null)}
-        onPick={async (option) => {
-          await run(addLineItemAction, {
-            itemId: importTarget?.itemId,
-            subObjectId: importTarget?.subObjectId,
-            sourceType: option.sourceType,
-            sourceRefId: option.id,
-            sourceKind: option.sourceKind,
-          });
-          setImportTarget(null);
-        }}
-      />
+      {importTarget ? (
+        <ImportDialog
+          key={`${importTarget.itemId ?? ""}:${importTarget.subObjectId ?? ""}`}
+          target={importTarget}
+          onClose={() => setImportTarget(null)}
+          onPick={async (option) => {
+            await run(addLineItemAction, {
+              itemId: importTarget.itemId,
+              subObjectId: importTarget.subObjectId,
+              sourceType: option.sourceType,
+              sourceRefId: option.id,
+              sourceKind: option.sourceKind,
+            });
+            setImportTarget(null);
+          }}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={lockOpen}
@@ -714,7 +717,7 @@ function ImportDialog({
   onClose,
   onPick,
 }: {
-  target: { itemId?: string; subObjectId?: string } | null;
+  target: { itemId?: string; subObjectId?: string };
   onClose: () => void;
   onPick: (option: LineItemSourceOption) => Promise<void>;
 }) {
@@ -722,9 +725,6 @@ function ImportDialog({
   const [options, setOptions] = useState<LineItemSourceOption[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, startTransition] = useTransition();
-  const [loadedFor, setLoadedFor] = useState<string | null>(null);
-
-  const key = target ? `${target.itemId ?? ""}:${target.subObjectId ?? ""}` : null;
 
   const search = (nextQuery: string) => {
     setQuery(nextQuery);
@@ -739,17 +739,25 @@ function ImportDialog({
     });
   };
 
-  // Load once per opening, adjusted during render rather than from an effect.
-  if (key && loadedFor !== key) {
-    setLoadedFor(key);
-    setQuery("");
-    search("");
-  }
-  if (!key && loadedFor !== null) setLoadedFor(null);
+  // A source lookup begins after the dialog has rendered. Starting a transition
+  // during render is forbidden by React and crashes when the dialog opens.
+  useEffect(() => {
+    let cancelled = false;
+    startTransition(async () => {
+      const result = await listLineItemSourcesAction("");
+      if (cancelled) return;
+      if (!result.ok) {
+        setError(result.error.safeMessage);
+        return;
+      }
+      setOptions(result.data);
+    });
+    return () => { cancelled = true; };
+  }, [startTransition]);
 
   return (
     <Dialog
-      open={target !== null}
+      open
       onOpenChange={(next) => { if (!next) onClose(); }}
       title="Impor dari Master Data atau BQ Library"
       description="Harga yang dipilih disalin sebagai snapshot. Perubahan di Master Data tidak akan mengubah baris ini."
