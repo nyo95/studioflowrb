@@ -5,9 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.65**
-- Next local revision: **R4.66**
+- Current revision: **R4.66**
+- Next local revision: **R4.67**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.66 — 2026-09-03 — fix(shell): right-align application navigation
+
+- Agent: `Codex`
+
+Aligns the application switcher and account control as one group at the right
+edge of the header.
+
+### Verification
+
+- `npm run typecheck` — clean
+- `git diff --check` — clean
 
 ## R4.65 — 2026-09-03 — fix(shell): reduce brand mark scale
 

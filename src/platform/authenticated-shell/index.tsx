@@ -56,7 +56,7 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
       topbar={<div className="flex w-full items-center gap-3 px-(--ui-page-padding)">
         <HeaderApplicationNavigation apps={apps} />
         {contextSlot}
-        <div className="group relative ml-auto">
+        <div className="group relative">
           <Link href="/account" className="flex min-w-0 items-center gap-2 rounded-action px-2 py-1 text-sm hover:bg-surface-muted" title={`Open account settings for ${principal.displayName}`} aria-label={`Open account settings for ${principal.displayName}`}>
             <UserRound size={17} aria-hidden="true" />
             <span className="max-w-[220px] truncate whitespace-nowrap">{principal.displayName}</span>

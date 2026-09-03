@@ -17,7 +17,7 @@ function activePath(pathname: string, href: string, includeChildren = true): boo
 export function HeaderApplicationNavigation({ apps }: { apps: readonly ShellAppLink[] }) {
   const pathname = usePathname();
   return (
-    <nav className="flex min-w-0 items-center gap-1 overflow-x-auto" aria-label="Applications">
+    <nav className="ml-auto flex min-w-0 items-center gap-1 overflow-x-auto" aria-label="Applications">
       {apps.length > 1 ? (
         <Link
           href="/"
