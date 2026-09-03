@@ -128,3 +128,189 @@ export async function templateAction(
     return { id: result && typeof result === "object" && "id" in result && typeof result.id === "string" ? result.id : value.id };
   });
 }
+
+// ─── TEMPLATE STRUCTURE (BQ-F2) ───────────────────────────────
+
+const SectionSchema = z.object({
+  templateId: z.string().cuid(),
+  name: z.string().trim().min(1, "Section name is required").max(160),
+  parentId: z.string().cuid().optional(),
+});
+
+/**
+ * A template is a Section/Subsection scaffold (bq-contract §8.3/K-12). Without
+ * these actions every template stayed empty, so loading one into a new project
+ * scaffolded nothing.
+ */
+export async function addTemplateSectionAction(
+  _prev: ActionResult<{ id: string }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ id: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const raw = Object.fromEntries(formData.entries());
+    if (!raw.parentId) delete raw.parentId;
+    const parsed = SectionSchema.safeParse(raw);
+    if (!parsed.success) throw validationError(parsed.error);
+    const value = parsed.data;
+    const section = await bqService.addTemplateSection({
+      grants,
+      actor: actor(principal),
+      templateId: value.templateId,
+      name: value.name,
+      parentId: value.parentId,
+    });
+    revalidatePath("/bq/library");
+    return { id: section.id };
+  });
+}
+
+export async function deleteTemplateSectionAction(
+  _prev: ActionResult<{ id: string }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ id: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const id = requireId(String(formData.get("id") ?? ""));
+    await bqService.deleteTemplateSection({ grants, actor: actor(principal), id });
+    revalidatePath("/bq/library");
+    return { id };
+  });
+}
+
+const ReorderSchema = z.object({
+  templateId: z.string().cuid(),
+  orderedIds: z.string().min(1),
+});
+
+export async function reorderTemplateSectionsAction(
+  _prev: ActionResult<{ id: string }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ id: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = ReorderSchema.safeParse(Object.fromEntries(formData.entries()));
+    if (!parsed.success) throw validationError(parsed.error);
+    const orderedIds = parsed.data.orderedIds.split(",").filter(Boolean);
+    await bqService.reorderTemplateSections({
+      grants,
+      actor: actor(principal),
+      templateId: parsed.data.templateId,
+      orderedIds,
+    });
+    revalidatePath("/bq/library");
+    return { id: parsed.data.templateId };
+  });
+}
+
+const RecommendationSchema = z.object({
+  templateSectionId: z.string().cuid(),
+  libItemType: z.enum(["material", "labor", "material_labor", "custom"]),
+  libItemId: z.string().cuid(),
+});
+
+export async function addTemplateRecommendationAction(
+  _prev: ActionResult<{ id: string }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ id: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = RecommendationSchema.safeParse(Object.fromEntries(formData.entries()));
+    if (!parsed.success) throw validationError(parsed.error);
+    const rec = await bqService.addTemplateRecommendation({
+      grants,
+      actor: actor(principal),
+      templateSectionId: parsed.data.templateSectionId,
+      libItemType: parsed.data.libItemType,
+      libItemId: parsed.data.libItemId,
+    });
+    revalidatePath("/bq/library");
+    return { id: rec.id };
+  });
+}
+
+export async function removeTemplateRecommendationAction(
+  _prev: ActionResult<{ id: string }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ id: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const id = requireId(String(formData.get("id") ?? ""));
+    await bqService.removeTemplateRecommendation({ grants, actor: actor(principal), id });
+    revalidatePath("/bq/library");
+    return { id };
+  });
+}
+
+// ─── PROMOTION (BQ-F5) ────────────────────────────────────────
+
+const PromotionSchema = z.object({
+  type: z.enum(["material", "labor", "material_labor"]),
+  libItemId: z.string().cuid(),
+});
+
+export async function requestPromotionAction(
+  _prev: ActionResult<{ id: string }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ id: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = PromotionSchema.safeParse(Object.fromEntries(formData.entries()));
+    if (!parsed.success) throw validationError(parsed.error);
+    await bqService.requestPromotion({
+      grants,
+      actor: actor(principal),
+      type: parsed.data.type,
+      libItemId: parsed.data.libItemId,
+    });
+    revalidatePath("/bq/library");
+    return { id: parsed.data.libItemId };
+  });
+}
+
+/**
+ * bq-contract §9/K-10: promotion carries structure, never price. The Master Data
+ * entry is created there by an administrator through the ordinary pricing
+ * workflow; approval only records which entry it became.
+ */
+export async function approvePromotionAction(
+  _prev: ActionResult<{ id: string }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ id: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = PromotionSchema.extend({ masterdataRefId: z.string().trim().min(1, "Master Data entry ID is required").max(64) })
+      .safeParse(Object.fromEntries(formData.entries()));
+    if (!parsed.success) throw validationError(parsed.error);
+    await bqService.approvePromotion({
+      grants,
+      actor: actor(principal),
+      type: parsed.data.type,
+      libItemId: parsed.data.libItemId,
+      masterdataRefId: parsed.data.masterdataRefId,
+    });
+    revalidatePath("/bq/library");
+    return { id: parsed.data.libItemId };
+  });
+}
+
+export async function rejectPromotionAction(
+  _prev: ActionResult<{ id: string }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ id: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = PromotionSchema.extend({ reason: z.string().trim().min(1, "A rejection must state its reason").max(500) })
+      .safeParse(Object.fromEntries(formData.entries()));
+    if (!parsed.success) throw validationError(parsed.error);
+    await bqService.rejectPromotion({
+      grants,
+      actor: actor(principal),
+      type: parsed.data.type,
+      libItemId: parsed.data.libItemId,
+      reason: parsed.data.reason,
+    });
+    revalidatePath("/bq/library");
+    return { id: parsed.data.libItemId };
+  });
+}

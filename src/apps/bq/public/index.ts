@@ -1,5 +1,5 @@
 import { BQ_PERMISSIONS } from "../service";
-import { calculateProject, type ItemInput } from "../lib/calculation-engine";
+import { calculateItem, calculateProject, type ItemInput } from "../lib/calculation-engine";
 import { toDecimalString } from "@platform/utilities/decimal";
 
 export { BQ_PERMISSIONS };
@@ -98,6 +98,15 @@ export type BqItemDetail = {
   notes: string | null;
   subObjects: BqSubObjectDetail[];
   lineItems: BqLineItemDetail[];
+  /**
+   * Server-computed amounts. bq-contract §2 forbids calculating in the client,
+   * and §13.1 needs rate and total on a collapsed L1, so they travel with the
+   * row. `null` means this L1 cannot be priced yet — a standalone item with no
+   * price entered — which is stated rather than shown as a confident zero.
+   */
+  biayaPokok: string | null;
+  rate: string | null;
+  total: string | null;
 };
 
 export type BqSubObjectDetail = {
@@ -108,6 +117,8 @@ export type BqSubObjectDetail = {
   sortOrder: number;
   notes: string | null;
   lineItems: BqLineItemDetail[];
+  subtotalL2Raw: string | null;
+  subtotalL2: string | null;
 };
 
 export type BqLineItemDetail = {
@@ -126,6 +137,7 @@ export type BqLineItemDetail = {
   koefisien: string;
   sortOrder: number;
   notes: string | null;
+  biayaLine: string | null;
 };
 
 import type { PrismaClient } from "@/generated/prisma/client";
@@ -306,7 +318,7 @@ export function createBqPublicRead(db: PrismaClient) {
         createdBy: p.created_by,
         createdAt: p.created_at.toISOString(),
         updatedAt: p.updated_at.toISOString(),
-        grandTotal: calculateGrandTotal(
+        grandTotal: applyCalculations(
           p.sections.map((s) => ({
             id: s.id,
             name: s.name,
@@ -399,22 +411,69 @@ export function createBqPublicRead(db: PrismaClient) {
         createdAt: project.created_at.toISOString(),
         updatedAt: project.updated_at.toISOString(),
         sections,
-        grandTotal: calculateGrandTotal(sections),
+        grandTotal: applyCalculations(sections),
       };
     },
   };
 }
 
-function calculateGrandTotal(sections: BqSectionDetail[]): string | null {
-  const items = sections.flatMap((section) => [
+function flattenItems(sections: BqSectionDetail[]): BqItemDetail[] {
+  return sections.flatMap((section) => [
     ...section.items,
     ...section.subsections.flatMap((subsection) => subsection.items),
   ]);
+}
+
+/**
+ * Runs the engine once and writes its results back onto the rows, so every level
+ * carries the number the estimator needs and the client never computes one.
+ *
+ * A draft may hold an L1 whose price is not entered yet. That single row cannot
+ * be priced; the rest of the document still can. Each item is therefore attempted
+ * on its own, and the grand total is stated only when every item produced one —
+ * a missing total is truthful, a total silently missing a line is not.
+ */
+function applyCalculations(sections: BqSectionDetail[]): string | null {
+  let complete = true;
+
+  for (const item of flattenItems(sections)) {
+    let result;
+    try {
+      result = calculateItem(toCalculationItem(item));
+    } catch {
+      complete = false;
+      item.biayaPokok = null;
+      item.rate = null;
+      item.total = null;
+      for (const subObject of item.subObjects) {
+        subObject.subtotalL2Raw = null;
+        subObject.subtotalL2 = null;
+        for (const line of subObject.lineItems) line.biayaLine = null;
+      }
+      for (const line of item.lineItems) line.biayaLine = null;
+      continue;
+    }
+
+    item.biayaPokok = result.biayaPokok ?? null;
+    item.rate = result.rate;
+    item.total = result.total;
+    item.subObjects.forEach((subObject, index) => {
+      const computed = result.subObjects?.[index];
+      subObject.subtotalL2Raw = computed?.subtotalL2Raw ?? null;
+      subObject.subtotalL2 = computed?.subtotalL2 ?? null;
+      subObject.lineItems.forEach((line, lineIndex) => {
+        line.biayaLine = computed?.lineItems[lineIndex]?.biayaLine ?? null;
+      });
+    });
+    item.lineItems.forEach((line, index) => {
+      line.biayaLine = result.lineItemsDirect[index]?.biayaLine ?? null;
+    });
+  }
+
+  if (!complete) return null;
   try {
-    return calculateProject(items.map(toCalculationItem)).grandTotal;
+    return calculateProject(flattenItems(sections).map(toCalculationItem)).grandTotal;
   } catch {
-    // Drafts may contain an L1 before its price or first child is entered.
-    // A missing total is truthful; a made-up zero total is not.
     return null;
   }
 }
@@ -513,8 +572,13 @@ function mapItemDetail(item: {
       sortOrder: so.sort_order,
       notes: so.notes,
       lineItems: so.line_items.map(mapLineItemDetail),
+      subtotalL2Raw: null,
+      subtotalL2: null,
     })),
     lineItems: item.line_items.map(mapLineItemDetail),
+    biayaPokok: null,
+    rate: null,
+    total: null,
   };
 }
 
@@ -553,5 +617,6 @@ function mapLineItemDetail(li: {
     koefisien: (li.koefisien as { toString: () => string }).toString(),
     sortOrder: li.sort_order,
     notes: li.notes,
+    biayaLine: null,
   };
 }

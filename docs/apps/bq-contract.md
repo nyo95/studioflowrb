@@ -426,6 +426,18 @@ Project baru → (opsional) Load Template → dapat scaffold Section/Subsection
         → biaya terhitung otomatis
 ```
 
+**Editing vs penyisipan (dikunci owner 2026-09-03).** Semua *pengubahan* nilai —
+nama, unit, harga, qty, koefisien, markup, di semua level — dilakukan inline di
+tabel, bukan lewat dialog: Enter commit, Escape batal, commit yang ditolak
+mengembalikan nilai sebelumnya. Ini yang mengaktifkan `InlineEdit` di UI Engine.
+
+*Penyisipan* baris tetap punya afordansnya sendiri, karena memilih sumber bukan
+mengubah nilai: "Baris custom" langsung membuat baris kosong yang siap diketik,
+sedangkan "Impor" membuka picker pencarian Master Data dan BQ Library. Picker itu
+tidak melanggar aturan inline — ia memilih dari mana sebuah baris berasal, bukan
+mengedit isinya. Setelah tersisip, baris impor sama bisa di-edit inline seperti
+yang lain (K-05).
+
 ### 13.3 Halaman yang dibutuhkan
 
 1. **Project list** — daftar BQ project, status, total, estimator
@@ -438,13 +450,16 @@ Project baru → (opsional) Load Template → dapat scaffold Section/Subsection
 
 ## 14. Build order
 
-| Fase | Deliverable | Gate |
-|---|---|---|
-| **BQ-F1** | Schema `bq.*` (migration) + Prisma models | Migration run clean, models generated |
-| **BQ-F2** | BQ Library CRUD (Items + BqLibCustomItem) + Template Editor | Library bisa ditambah/edit; Template bisa dibuat |
-| **BQ-F3** | BQ Project + Section/Subsection + L1/L2/L3 + engine kalkulasi | Angka terhitung benar (lihat §6), ubah qty L3 update semua ke atas |
-| **BQ-F4** | Import dari Master Data ke L3 (snapshot flow) | Pilih material dari MD, harga tersimpan sebagai snapshot, override bisa |
-| **BQ-F5** | Promotion flow (Library → Master Data) | Estimator ajukan, Admin MD approve/reject via API baru |
+| Fase | Deliverable | Gate | Status |
+|---|---|---|---|
+| **BQ-F1** | Schema `bq.*` (migration) + Prisma models | Migration run clean, models generated | selesai |
+| **BQ-F2** | BQ Library CRUD (Items + BqLibCustomItem) + Template Editor | Library bisa ditambah/edit; Template bisa dibuat | selesai R4.56 |
+| **BQ-F3** | BQ Project + Section/Subsection + L1/L2/L3 + engine kalkulasi | Angka terhitung benar (lihat §6), ubah qty L3 update semua ke atas | selesai R4.56 |
+| **BQ-F4** | Import dari Master Data ke L3 (snapshot flow) | Pilih material dari MD, harga tersimpan sebagai snapshot, override bisa | selesai R4.56 |
+| **BQ-F5** | Promotion flow (Library → Master Data) | Estimator ajukan, Admin MD approve/reject | selesai R4.56 |
+
+Belum diverifikasi di browser sungguhan; lihat catatan keterbatasan di
+`CHANGELOG.md` R4.56.
 
 ---
 

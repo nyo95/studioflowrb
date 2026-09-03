@@ -458,6 +458,18 @@ Pricing exposes a **read-only public contract** for downstream apps (BQ, StudioF
 
 Per-supplier price for a SKU. All live prices for a given SKU are returned as an array — BQ must select explicitly, no automatic fallback.
 
+Two reads return this shape, from one shared projection so they cannot drift:
+
+- `getSkuPricingOptions(skuId)` — every live price for one SKU. Assumes the
+  caller already knows which SKU it wants.
+- `listMaterialPriceOptions({ search?, limit? })` — live prices across all SKUs,
+  searchable by SKU name, SKU code, or supplier name, bounded by an explicit
+  limit. A consumer browsing for a material does not yet know the SKU, so
+  without this read it has no entry point at all.
+
+Neither read ranks by cheapest, newest, or preferred. Ordering is for reading
+only; the consumer selects one price explicitly.
+
 Each option also exposes the SKU measurement snapshot source: base Unit,
 purchase Unit, structured dimensions, dimension Unit, and nullable
 `purchaseToBaseFactor`. A downstream BQ consumer that uses normalized base-unit

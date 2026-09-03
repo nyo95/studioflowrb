@@ -513,6 +513,23 @@ Canonical default:
 - blur commits only where explicitly enabled;
 - failed save restores prior value and displays error.
 
+**Activated (R4.56)** by the first locked workflow that needs cell-level entry.
+`InlineEdit` is the generic editable-cell shell:
+
+| Prop | Notes |
+| --- | --- |
+| `value`, `onCommit` | The caller owns the value; the control never mutates it. Reject or throw from `onCommit` to refuse an edit |
+| `label` | Accessible name. A table header is not announced per cell |
+| `commitOnBlur` | Off by default — a click elsewhere is not a decision |
+| `display` | Read-mode presentation, e.g. a formatted amount. Editing always shows raw text |
+| `errorLabel` | Failure wording. The engine owns *when* a failure shows, the caller owns *what it says* |
+| `align`, `inputMode`, `placeholder`, `disabled` | Presentation and input affordance only |
+
+Tabbing onto a cell opens it, so keyboard entry never requires a pointer. A
+refused commit restores the previous value rather than leaving refused text on
+screen looking saved. The engine owns no validation and no persistence: what a
+value means, whether it is allowed, and where it is written stay with the app.
+
 ## 13. Document & Print Pattern
 
 UI Engine may own:
@@ -647,6 +664,7 @@ This stage includes a real login page, authenticated app launcher, user director
 
 - `RowActionMenu`, `FilterBar`, `SelectionBar`;
 - `Combobox`, `CreatableSearch`;
+- `InlineEdit` — activated in R4.56 by an approved cell-entry workflow;
 - `useDebouncedValue`, `useOptionOverlay`, `useConfirm`, `useUnsavedChangesGuard`, their accessible prompts, and generic pending/action feedback;
 - one internal UI Engine showcase route demonstrating realistic compositions without app/domain imports.
 
@@ -655,7 +673,6 @@ This stage includes a real login page, authenticated app launcher, user director
 | Pattern | Activation trigger |
 |---|---|
 | `WorkspaceShell`, `SplitPane` | first approved StudioFlow/BQ workspace requiring the layout |
-| `InlineEdit` | a locked app workflow proves inline editing is preferable to form/dialog editing |
 | `ReorderHandle` | first persisted manual-order workflow with keyboard requirements |
 | `FileDropZone` | approved file/media storage flow and its security contract |
 | `DocumentSheet` and print helpers | first approved document/print workflow |

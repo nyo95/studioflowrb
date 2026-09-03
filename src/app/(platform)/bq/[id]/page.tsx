@@ -1,24 +1,14 @@
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission, hasAnyPermission } from "@platform/core/rbac";
-import {
-  PageHeader,
-  SectionCard,
-  DataTable,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableCell,
-  TableHead,
-  EmptyState,
-  buttonClasses,
-} from "@/platform/ui_engine";
+import { PageHeader, SectionCard, EmptyState, buttonClasses } from "@/platform/ui_engine";
 import { BQ_PERMISSIONS } from "@/apps/bq/service";
 import { bqPublicRead } from "@/apps/bq/runtime";
-import { notFound } from "next/navigation";
+
 import { AddSectionDialog } from "./add-section-dialog";
+import { ProjectEditor } from "./project-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -49,10 +39,10 @@ export default async function BqProjectDetailPage({
         title={project.title}
         description={`Client: ${project.clientName} · ${project.status}`}
         actions={
-          canManage && !isLocked && project.sections.length > 0 ? (
+          canManage && !isLocked ? (
             <div className="flex flex-wrap gap-2">
               <Link href={`/bq/${project.id}/edit`} className={buttonClasses("secondary", "md")}>
-                Edit
+                Edit detail
               </Link>
               <AddSectionDialog projectId={project.id} />
             </div>
@@ -60,46 +50,12 @@ export default async function BqProjectDetailPage({
         }
       />
 
-      {project.sections.length === 0 ? (
+      {project.sections.length === 0 && !canManage ? (
         <SectionCard>
-          <EmptyState
-            title="Belum ada section"
-            description={
-              canManage
-                ? "Tambahkan section secara manual atau scaffold dari template."
-                : "Project ini belum memiliki section."
-            }
-            action={canManage && !isLocked ? <AddSectionDialog projectId={project.id} /> : undefined}
-          />
+          <EmptyState title="Belum ada section" description="Project ini belum memiliki section." />
         </SectionCard>
       ) : (
-        <SectionCard>
-          <DataTable>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Section / Subsection</TableHead>
-                <TableHead align="end">Items</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {project.sections.map((section) => {
-                const subItems = section.subsections.flatMap((sub) =>
-                  sub.items.map((item) => ({ subsection: sub.name, ...item }))
-                );
-                return (
-                  <TableRow key={section.id}>
-                    <TableCell className="font-medium" rowSpan={Math.max(subItems.length, 1)}>
-                      {section.name}
-                    </TableCell>
-                    {subItems.length === 0 ? (
-                      <TableCell align="end">0</TableCell>
-                    ) : null}
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </DataTable>
-        </SectionCard>
+        <ProjectEditor project={project} canManage={canManage} />
       )}
     </div>
   );

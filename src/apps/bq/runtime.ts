@@ -1,6 +1,8 @@
 import { auditWriter, prisma, runTransaction as platformRunTransaction } from "@platform/runtime";
 import type { PrismaClient } from "@/generated/prisma/client";
 
+import { createMasterDataPublicRead } from "@/apps/masterdata/public";
+
 import { createBqService } from "./service";
 import { createBqPublicRead } from "./public";
 
@@ -13,3 +15,10 @@ export const bqService = createBqService(prisma, {
   runTransaction: wrapRunTransaction,
 });
 export const bqPublicRead = createBqPublicRead(prisma);
+
+/**
+ * Master Data is read one way only, through its published contract. BQ never
+ * touches Master Data tables, services, or internals — a snapshot taken here is
+ * a copy of a fact, not a link to it.
+ */
+export const masterDataRead = createMasterDataPublicRead(prisma);

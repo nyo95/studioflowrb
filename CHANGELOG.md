@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.55**
-- Next local revision: **R4.56**
+- Current revision: **R4.56**
+- Next local revision: **R4.57**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,126 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.56 — 2026-09-03 — feat(bq): close BQ-F2 through BQ-F5 and activate InlineEdit
+
+- Agent: `Claude`
+
+Before this revision an estimator could create a BQ project and add an empty
+Section, and nothing else. `addSubsection`, `addItem`, `addSubObject`,
+`addLineItem`, their update and delete counterparts, `lockProject`, every
+template-structure operation, and the whole promotion flow existed in the
+service — typed, transactional, audited — with **zero consumers**. The
+calculation engine was a correct machine with no way to put anything into it.
+
+Owner decisions taken for this build: **inline editing for every value**, and
+**all three L3 sources** including Master Data.
+
+### UI Engine — InlineEdit activated
+
+`UI_ENGINE.md` §19 listed `InlineEdit` as deferred pending "a locked app workflow
+proves inline editing is preferable to form/dialog editing". That workflow now
+exists, so the pattern is activated rather than reinvented inside the app.
+
+`InlineEdit` owns edit/focus state, the keyboard convention (Enter commits,
+Escape cancels and restores, blur commits only when asked), the pending state,
+and the failed-save behavior: a refused commit restores the previous value rather
+than leaving refused text on screen looking saved. It owns no validation and no
+persistence — a test asserts the shell contains no number parsing at all.
+Tabbing onto a cell opens it, so keyboard entry never needs a pointer.
+
+### BQ-F2 — Template Editor
+
+Templates could be created, renamed, duplicated, and deleted, but the dialog had
+only a name and a description: there was nowhere to add a Section. Every template
+was therefore permanently empty, and the `templateId` scaffold wired in R4.54
+loaded nothing. Sections, Subsections, reorder, and Library recommendations are
+now editable, and a recommendation resolves to its item rather than showing as
+an unnamed row.
+
+### BQ-F3 — project structure and the tree editor
+
+- Server actions for Subsection, L1, L2, and L3 create/update/delete, plus
+  project lock.
+- The project page's stub table is replaced by a real tree with collapse/expand
+  per L1 and per L2, matching §13.1's closed and open views.
+- Every value is edited inline. Decimal shape is validated app-side, including
+  §5/K-08's rule that a coefficient is strictly greater than zero.
+- An L1 that has children shows its markup where a standalone L1 shows its
+  coefficient and price, because the standalone fields are dormant once children
+  exist and presenting them as live would be a lie.
+
+**How totals move without a reload.** §13.1 requires the grand total to follow a
+qty change immediately; §2 forbids calculating in the client. Every mutation
+therefore returns the recomputed project from the server and the client swaps
+state — no page reload, and no arithmetic in the browser.
+
+`BqProjectDetail` now carries the server's computed `biayaLine`, `subtotalL2Raw`,
+`subtotalL2`, `biayaPokok`, `rate`, and `total` on the rows they belong to. Each
+L1 is computed independently, so one item still missing its price leaves the rest
+priced and reports only itself as unpriced, instead of blanking the document.
+
+### BQ-F4 — Master Data and Library import
+
+`src/apps/bq/lib/snapshot.ts` implemented §7 and had no consumer. It now has
+one: "Impor" opens a picker over BQ Library plus Master Data prices, and the
+chosen source is snapshotted onto the L3 row. Master Data is reached only through
+its published read contract, and each half of the picker is gated on its own
+permission, so an estimator without Master Data access still gets the Library
+rather than an error.
+
+**EXTEND — `masterdata/public`.** The contract exposed `getSkuPricingOptions(skuId)`,
+which assumes the caller already knows the SKU. A consumer browsing for a material
+does not, so it had no entry point at all. Added `listMaterialPriceOptions({
+search, limit })` over one shared projection, so the per-SKU read and the
+catalogue search cannot drift. No cheapest/newest/preferred ranking is applied —
+`masterdata.md` §3 forbids inferring one. Documented in `pricing-contract.md` §12.1.
+
+### BQ-F5 — promotion flow
+
+Estimators can request promotion on an eligible Library item; holders of
+`bq.library.approve` get a queue tab with approve and reject. Approval records
+the Master Data entry ID the item became, per §9/K-10 which carries structure and
+never price. Items whose category stops at BQ never show the control at all (K-11).
+
+### Contract amendments
+
+- `bq-contract.md` §13.2 records the owner's editing decision and draws the line
+  the build follows: changing a value is always inline, choosing where a row
+  comes from is a picker. §14 marks F2–F5 delivered.
+- `pricing-contract.md` §12.1 documents the new catalogue read.
+- `UI_ENGINE.md` §12 documents the `InlineEdit` API and §19 moves it out of the
+  deferred registry.
+
+### Verification
+
+- `npx tsc --noEmit` — clean
+- `npx eslint src scripts` — clean
+- `npm run check:boundaries` — pass, including BQ's new cross-app read
+- `npm run check:legacy-runtime` — pass
+- `git diff --check` — clean
+- BQ calculation engine 4/4; UI Engine 23/23 (two new for InlineEdit), both run
+  out-of-tree
+- Every service operation listed above now resolves to at least one consumer;
+  verified by sweep
+
+### Limitations — not a pass
+
+- `npm test` still cannot run in-tree: `node_modules` holds a Windows `esbuild`
+  binary while the agent shell is Linux. Database-backed integration tests for
+  the new actions were **not run at all**. This is the largest gap in this
+  revision: the action layer is typechecked and reasoned about, not executed.
+- **No browser acceptance.** The tree, inline editing, collapse/expand, the
+  import picker, and the promotion dialogs have never been rendered. Treat this
+  revision as ready for review, not as verified working.
+- No `InlineEdit` interaction test — assertions cover its markup and its source
+  contract, not real keyboard behavior.
+- Reordering Sections/L1/L2/L3 inside a project is not implemented; only template
+  sections reorder. `sort_order` is persisted but nothing sets it after creation.
+- The import picker searches Master Data server-side but filters the Library
+  client-side, and caps at 80 rows with no pagination.
+- `purchase_to_base_factor` is shown as context on an imported row per K-03, but
+  there is no unit-conversion helper — the estimator still sets the coefficient.
 
 ## R4.55 — 2026-09-03 — fix(ui-engine): repair interaction defects and complete named capabilities
 

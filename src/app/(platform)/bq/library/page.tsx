@@ -8,6 +8,8 @@ import { bqPublicRead } from "@/apps/bq/runtime";
 import { Library } from "lucide-react";
 import { createMoney, formatMoney } from "@platform/utilities/money";
 import { LibraryItemActions, LibraryItemCreateButton, TemplateActions, TemplateCreateButton } from "./library-controls";
+import { TemplateSectionsButton } from "./template-editor";
+import { PromotionQueue, PromotionRequestButton } from "./promotion-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,8 @@ export default async function BqLibraryPage() {
 
   const canRead = hasAnyPermission(grants, [BQ_PERMISSIONS.libraryRead, BQ_PERMISSIONS.libraryManage]);
   const canManage = hasPermission(grants, BQ_PERMISSIONS.libraryManage);
+  const canPromote = hasPermission(grants, BQ_PERMISSIONS.libraryPromote);
+  const canApprove = hasPermission(grants, BQ_PERMISSIONS.libraryPromoteApprove);
 
   if (!canRead) {
     return (
@@ -91,7 +95,7 @@ export default async function BqLibraryPage() {
                         <TableHead align="end">Harga</TableHead>
                         <TableHead>KATEGORI</TableHead>
                         <TableHead>Status</TableHead>
-                        {canManage ? <TableHead align="end">Actions</TableHead> : null}
+                        {canManage || canPromote ? <TableHead align="end">Actions</TableHead> : null}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -112,7 +116,14 @@ export default async function BqLibraryPage() {
                               {item.promotionStatus}
                             </StatusBadge>
                           </TableCell>
-                          {canManage ? <TableCell align="end"><LibraryItemActions item={item} /></TableCell> : null}
+                          {canManage || canPromote ? (
+                            <TableCell align="end">
+                              <div className="flex flex-wrap items-center justify-end gap-1">
+                                {canPromote ? <PromotionRequestButton item={item} /> : null}
+                                {canManage ? <LibraryItemActions item={item} /> : null}
+                              </div>
+                            </TableCell>
+                          ) : null}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -146,7 +157,12 @@ export default async function BqLibraryPage() {
                           <p className="text-xs text-ink-secondary mb-3">
                             {sectionCount} sections · {subCount} subsections
                           </p>
-                          {canManage ? <TemplateActions template={t} /> : null}
+                          {canManage ? (
+                            <div className="flex flex-wrap gap-1">
+                              <TemplateActions template={t} />
+                              <TemplateSectionsButton template={t} libraryItems={items} />
+                            </div>
+                          ) : null}
                         </div>
                       );
                     })}
@@ -155,6 +171,17 @@ export default async function BqLibraryPage() {
               </SectionCard>
             ),
           },
+          ...(canApprove
+            ? [{
+                value: "promotion",
+                label: "Promotion queue",
+                content: (
+                  <SectionCard>
+                    <PromotionQueue items={items} />
+                  </SectionCard>
+                ),
+              }]
+            : []),
         ]}
       />
     </div>

@@ -51,6 +51,75 @@ export type PriceWorkRead = {
   notes: string | null;
 };
 
+/* One projection for every MaterialPriceOption read, so a per-SKU lookup and a
+   catalogue search can never drift into different shapes. */
+const MATERIAL_PRICE_OPTION_SELECT = {
+  id: true,
+  sku_id: true,
+  amount: true,
+  currency: true,
+  supplier_vendor: { select: { id: true, name: true, slug: true } },
+  unit: { select: { id: true, code: true, name: true } },
+  sku: {
+    select: {
+      name: true,
+      code: true,
+      base_unit: { select: { id: true, code: true, name: true } },
+      purchase_unit: { select: { id: true, code: true, name: true } },
+      dimension_length: true,
+      dimension_width: true,
+      dimension_thickness: true,
+      dimension_unit: { select: { id: true, code: true, name: true } },
+      purchase_to_base_factor: true,
+    },
+  },
+  source_link: { select: { id: true, kind: true, url: true, label: true } },
+} as const;
+
+type MaterialPriceRow = {
+  id: string;
+  sku_id: string;
+  amount: { toString: () => string };
+  currency: string;
+  supplier_vendor: { id: string; name: string; slug: string };
+  unit: { id: string; code: string; name: string };
+  sku: {
+    name: string | null;
+    code: string | null;
+    base_unit: { id: string; code: string; name: string };
+    purchase_unit: { id: string; code: string; name: string } | null;
+    dimension_length: { toString: () => string } | null;
+    dimension_width: { toString: () => string } | null;
+    dimension_thickness: { toString: () => string } | null;
+    dimension_unit: { id: string; code: string; name: string } | null;
+    purchase_to_base_factor: { toString: () => string } | null;
+  };
+  source_link: { id: string; kind: string; url: string; label: string | null } | null;
+};
+
+function toMaterialPriceOption(p: MaterialPriceRow): MaterialPriceOption {
+  return {
+    id: p.id,
+    skuId: p.sku_id,
+    skuName: p.sku.name,
+    skuCode: p.sku.code,
+    supplierVendor: p.supplier_vendor,
+    amount: p.amount.toString(),
+    currency: p.currency,
+    unit: p.unit,
+    measurement: {
+      baseUnit: p.sku.base_unit,
+      purchaseUnit: p.sku.purchase_unit,
+      dimensionLength: p.sku.dimension_length?.toString() ?? null,
+      dimensionWidth: p.sku.dimension_width?.toString() ?? null,
+      dimensionThickness: p.sku.dimension_thickness?.toString() ?? null,
+      dimensionUnit: p.sku.dimension_unit,
+      purchaseToBaseFactor: p.sku.purchase_to_base_factor?.toString() ?? null,
+    },
+    sourceLink: p.source_link,
+  };
+}
+
 export function createMasterDataPublicRead(db: PrismaClient) {
   return {
     async getBrandLibraryRead(brandIdOrSlug: string): Promise<BrandLibraryRead | null> {
@@ -133,6 +202,40 @@ export function createMasterDataPublicRead(db: PrismaClient) {
       }));
     },
 
+    /**
+     * Search live material prices across every SKU.
+     *
+     * `getSkuPricingOptions` answers "what does this SKU cost", which assumes the
+     * caller already knows the SKU. A downstream consumer browsing for a material
+     * does not, so without this read it had no entry point at all. No cheapest,
+     * newest, or preferred ranking is applied: results are ordered for reading
+     * and the consumer selects one explicitly.
+     */
+    async listMaterialPriceOptions(filter?: { search?: string; limit?: number }): Promise<MaterialPriceOption[]> {
+      const search = filter?.search?.trim();
+      const prices = await db.priceMaterial.findMany({
+        where: {
+          deleted_at: null,
+          sku: { deleted_at: null },
+          supplier_vendor: { deleted_at: null },
+          unit: { status: "ACTIVE" },
+          ...(search
+            ? {
+                OR: [
+                  { sku: { name: { contains: search, mode: "insensitive" } } },
+                  { sku: { code: { contains: search, mode: "insensitive" } } },
+                  { supplier_vendor: { name: { contains: search, mode: "insensitive" } } },
+                ],
+              }
+            : {}),
+        },
+        orderBy: [{ sku: { name: "asc" } }, { amount: "asc" }],
+        take: Math.min(Math.max(filter?.limit ?? 50, 1), 200),
+        select: MATERIAL_PRICE_OPTION_SELECT,
+      });
+      return prices.map(toMaterialPriceOption);
+    },
+
     async getSkuPricingOptions(skuId: string): Promise<MaterialPriceOption[]> {
       const prices = await db.priceMaterial.findMany({
         where: {
@@ -143,50 +246,10 @@ export function createMasterDataPublicRead(db: PrismaClient) {
           unit: { status: "ACTIVE" },
         },
         orderBy: { amount: "asc" },
-        select: {
-          id: true,
-          sku_id: true,
-          amount: true,
-          currency: true,
-          supplier_vendor: { select: { id: true, name: true, slug: true } },
-          unit: { select: { id: true, code: true, name: true } },
-          sku: {
-            select: {
-              name: true,
-              code: true,
-              base_unit: { select: { id: true, code: true, name: true } },
-              purchase_unit: { select: { id: true, code: true, name: true } },
-              dimension_length: true,
-              dimension_width: true,
-              dimension_thickness: true,
-              dimension_unit: { select: { id: true, code: true, name: true } },
-              purchase_to_base_factor: true,
-            },
-          },
-          source_link: { select: { id: true, kind: true, url: true, label: true } },
-        },
+        select: MATERIAL_PRICE_OPTION_SELECT,
       });
 
-      return prices.map((p) => ({
-        id: p.id,
-        skuId: p.sku_id,
-        skuName: p.sku.name,
-        skuCode: p.sku.code,
-        supplierVendor: p.supplier_vendor,
-        amount: p.amount.toString(),
-        currency: p.currency,
-        unit: p.unit,
-        measurement: {
-          baseUnit: p.sku.base_unit,
-          purchaseUnit: p.sku.purchase_unit,
-          dimensionLength: p.sku.dimension_length?.toString() ?? null,
-          dimensionWidth: p.sku.dimension_width?.toString() ?? null,
-          dimensionThickness: p.sku.dimension_thickness?.toString() ?? null,
-          dimensionUnit: p.sku.dimension_unit,
-          purchaseToBaseFactor: p.sku.purchase_to_base_factor?.toString() ?? null,
-        },
-        sourceLink: p.source_link,
-      }));
+      return prices.map(toMaterialPriceOption);
     },
 
     async listWorkPricesRead(filter?: {

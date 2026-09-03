@@ -68,6 +68,7 @@ describe("UI Engine foundation", () => {
       "SelectionBar",
       "Combobox",
       "CreatableSearch",
+      "InlineEdit",
       "SimpleTextEditor",
       "useDebouncedValue",
       "useOptionOverlay",
@@ -80,7 +81,7 @@ describe("UI Engine foundation", () => {
         name,
       );
     }
-    for (const deferred of ["WorkspaceShell", "SplitPane", "InlineEdit", "ReorderHandle", "FileDropZone", "DocumentSheet"]) {
+    for (const deferred of ["WorkspaceShell", "SplitPane", "ReorderHandle", "FileDropZone", "DocumentSheet"]) {
       assert.equal(deferred in ui, false, `${deferred} must remain deferred`);
     }
   });
@@ -347,6 +348,33 @@ describe("UI Engine foundation", () => {
 
     const loading = renderToStaticMarkup(createElement(ui.LoadingState, { title: "Loading records" }));
     assert.equal(loading.match(/role="status"/g)?.length, 1);
+  });
+
+  it("opens an inline cell for reading before it is edited", () => {
+    const cell = renderToStaticMarkup(createElement(ui.InlineEdit, {
+      value: "2.5",
+      label: "Quantity",
+      align: "end",
+      onCommit: () => undefined,
+    }));
+    /* Read mode is a control, not static text: it must be reachable and named
+       without the row's header, which is not announced per cell. */
+    assert.match(cell, /<button/);
+    assert.match(cell, /aria-label="Quantity: 2\.5"/);
+    assert.match(cell, /2\.5/);
+  });
+
+  it("keeps inline editing free of validation and persistence policy", () => {
+    const source = readFileSync(new URL("./patterns/inline-edit.tsx", import.meta.url), "utf8");
+    /* Enter commits, Escape cancels, blur commits only when asked. */
+    assert.match(source, /commitOnBlur = false/);
+    assert.match(source, /event\.key === "Enter"/);
+    assert.match(source, /event\.key === "Escape"/);
+    /* A refused commit restores the previous value instead of leaving refused
+       text on screen looking saved. */
+    assert.match(source, /catch \(failure\) \{[\s\S]*setDraft\(value\)/);
+    /* The shell owns no rules about what a value may be. */
+    assert.doesNotMatch(source, /parseFloat|Number\(|isNaN|required/);
   });
 
   it("keeps app internals and domain vocabulary out of shared UI sources", () => {
