@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.49**
-- Next local revision: **R4.50**
+- Current revision: **R4.50**
+- Next local revision: **R4.51**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,24 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.50 — 2026-09-03 — fix(ui-engine): consolidate compact rail administration navigation
+
+- Agent: `Codex`
+
+- Added the generic `NavSubmenu` UI Engine pattern: a compact rail renders one
+  hover, focus, and click-accessible icon menu; narrow labeled navigation keeps
+  its visible child links.
+- Replaced the redundant Administration heading and duplicate Settings icon with
+  a single Settings menu containing only the permission-visible destinations.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `git diff --check`
+- Browser checks: the Administration menu exposes General Settings, Users, and
+  Roles & Access; BQ rail remains free of the Master Data submenu.
 
 ## R4.49 — 2026-09-03 — fix(ui-engine): make the shared top header a continuous plane
 

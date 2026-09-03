@@ -3,7 +3,7 @@
 import { Database, FileText, LayoutGrid, Settings, ShieldCheck, Users } from "lucide-react";
 import { usePathname } from "next/navigation";
 
-import { NavItem } from "@/platform/ui_engine";
+import { NavItem, NavSubmenu } from "@/platform/ui_engine";
 
 export type ShellAppLink = { appId: string; name: string; rootPath: string };
 
@@ -29,20 +29,15 @@ export function AuthenticatedPlatformNavigation({ apps, showGeneralSettings, sho
         </NavItem>
       ))}
       {domainNavigation}
-      <div className="mt-4" role="group" aria-labelledby="administration-navigation-heading">
-        <p
-          id="administration-navigation-heading"
-          className="flex min-h-7 items-center gap-2 px-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-tertiary group-data-collapsed:justify-center group-data-collapsed:px-0"
-        >
-          <Settings className="size-4 shrink-0" aria-hidden="true" />
-          <span className="group-data-collapsed:sr-only">Administration</span>
-        </p>
-        <div className="mt-1 grid gap-1 border-l border-line-subtle pl-2 group-data-collapsed:border-l-0 group-data-collapsed:pl-0">
-          {showGeneralSettings ? <NavItem href="/settings/general" icon={<Settings size={17} />} active={activePath(pathname, "/settings/general")}>General Settings</NavItem> : null}
-          {showUsers ? <NavItem href="/settings/access/users" icon={<Users size={17} />} active={activePath(pathname, "/settings/access/users")}>Users</NavItem> : null}
-          {showRoles ? <NavItem href="/settings/access/roles" icon={<ShieldCheck size={17} />} active={activePath(pathname, "/settings/access/roles")}>Roles &amp; Access</NavItem> : null}
-        </div>
-      </div>
+      <NavSubmenu
+        label="Administration"
+        icon={<Settings size={17} />}
+        items={[
+          ...(showGeneralSettings ? [{ href: "/settings/general", label: "General Settings", icon: <Settings size={17} />, active: activePath(pathname, "/settings/general") }] : []),
+          ...(showUsers ? [{ href: "/settings/access/users", label: "Users", icon: <Users size={17} />, active: activePath(pathname, "/settings/access/users") }] : []),
+          ...(showRoles ? [{ href: "/settings/access/roles", label: "Roles & Access", icon: <ShieldCheck size={17} />, active: activePath(pathname, "/settings/access/roles") }] : []),
+        ]}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from "react";
+import { DropdownMenu } from "radix-ui";
+import { createContext, useContext, useEffect, useRef, useState, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from "react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import { cx } from "../internal/cx";
@@ -244,6 +245,114 @@ export function NavItem({ icon, active = false, disabled = false, children, clas
   );
 
   return collapsed ? <Tooltip content={children} side="right">{item}</Tooltip> : item;
+}
+
+export type NavSubmenuItem = {
+  href: string;
+  label: string;
+  icon?: ReactNode;
+  active?: boolean;
+  disabled?: boolean;
+};
+
+/**
+ * A compact-rail navigation group. On desktop it is one icon that opens its
+ * generic destinations on hover, focus, or click; narrow layouts retain the
+ * labeled child entries. Apps supply only routes and labels.
+ */
+export function NavSubmenu({
+  label,
+  icon,
+  items,
+}: {
+  label: string;
+  icon: ReactNode;
+  items: readonly NavSubmenuItem[];
+}) {
+  const { collapsed } = useContext(RailContext);
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const active = items.some((item) => item.active);
+
+  useEffect(() => () => {
+    if (closeTimer.current !== null) clearTimeout(closeTimer.current);
+  }, []);
+
+  const keepOpen = () => {
+    if (closeTimer.current !== null) clearTimeout(closeTimer.current);
+    setOpen(true);
+  };
+  const scheduleClose = () => {
+    if (closeTimer.current !== null) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => setOpen(false), 140);
+  };
+
+  if (!collapsed) {
+    return (
+      <div className="mt-3" role="group" aria-label={label}>
+        <p className="flex min-h-7 items-center gap-2 px-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-tertiary">
+          <span className="inline-flex shrink-0 [&_svg]:h-4 [&_svg]:w-4" aria-hidden="true">{icon}</span>
+          {label}
+        </p>
+        <div className="mt-1 grid gap-1 border-l border-line-subtle pl-2">
+          {items.map((item) => (
+            <NavItem key={item.href} href={item.href} icon={item.icon} active={item.active} disabled={item.disabled}>
+              {item.label}
+            </NavItem>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <DropdownMenu.Root open={open} onOpenChange={setOpen}>
+      <DropdownMenu.Trigger asChild>
+        <button
+          type="button"
+          className={cx(
+            NAV_ITEM_BASE_CLASSES,
+            active ? NAV_ITEM_STATE_CLASSES.active : NAV_ITEM_STATE_CLASSES.idle,
+            "justify-center gap-0 px-0 text-center",
+          )}
+          aria-label={label}
+          onPointerEnter={keepOpen}
+          onPointerLeave={scheduleClose}
+          onFocus={keepOpen}
+        >
+          <span className="inline-flex shrink-0 [&_svg]:h-4 [&_svg]:w-4" aria-hidden="true">{icon}</span>
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          className="z-[65] min-w-52 rounded-control border border-line bg-surface-raised p-[5px] shadow-elevated"
+          side="right"
+          align="start"
+          sideOffset={8}
+          onPointerEnter={keepOpen}
+          onPointerLeave={scheduleClose}
+        >
+          <DropdownMenu.Label className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-tertiary">
+            {label}
+          </DropdownMenu.Label>
+          {items.map((item) => (
+            <DropdownMenu.Item key={item.href} asChild disabled={item.disabled}>
+              <a
+                href={item.href}
+                className={cx(
+                  "flex min-h-9 items-center gap-2 rounded-action px-2 py-1.5 text-[0.8125rem] text-ink outline-0 data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-surface-muted",
+                  item.active && "bg-surface-muted font-semibold",
+                )}
+              >
+                {item.icon ? <span className="inline-flex shrink-0 [&_svg]:h-4 [&_svg]:w-4" aria-hidden="true">{item.icon}</span> : null}
+                {item.label}
+              </a>
+            </DropdownMenu.Item>
+          ))}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
 }
 
 export function PageShell({
