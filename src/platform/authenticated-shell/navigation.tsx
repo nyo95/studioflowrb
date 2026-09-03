@@ -28,7 +28,7 @@ export function AuthenticatedPlatformNavigation({ apps, showGeneralSettings, sho
           {app.name}
         </NavItem>
       ))}
-      {domainNavigation ? <div className="mt-2 grid gap-1">{domainNavigation}</div> : null}
+      {domainNavigation}
       <div className="mt-4" role="group" aria-labelledby="administration-navigation-heading">
         <p
           id="administration-navigation-heading"

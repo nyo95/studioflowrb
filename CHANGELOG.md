@@ -15,6 +15,29 @@ Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
 
+## R4.48 — 2026-09-03 — fix(shell): move Master Data primary navigation into the shared rail
+
+- Agent: `Codex`
+
+- Preserved the legacy wide-brand top-header and compact icon-rail composition.
+- Moved the four owner-approved Master Data destinations—Overview, Brands,
+  Vendors, and Pricing—from an app-local horizontal tab bar into the shared
+  UI Engine navigation rail.
+- Kept navigation content app-owned while the UI Engine continues to own active
+  state, collapsed behavior, tooltips, and accessible labels. BQ exposes no
+  Master Data submenu.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `git diff --check`
+- Browser checks: Master Data rail contains the four approved links without
+  horizontal tabs; BQ rail does not show the Master Data submenu.
+- `npm test` could not complete database-backed integration tests because this
+  session has no configured disposable `PLATFORM_TEST_DATABASE_URL`; UI Engine
+  and non-database test suites passed.
+
 ## R4.47 — 2026-09-03 — fix(bq): accept empty create ids in library actions
 
 - Agent: `Codex`

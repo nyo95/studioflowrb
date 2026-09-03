@@ -6,8 +6,6 @@ import { hasPermission } from "@platform/core/rbac";
 import { PageShell } from "@/platform/ui_engine";
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
 
-import { MasterDataNav } from "./nav";
-
 export const dynamic = "force-dynamic";
 
 export default async function MasterDataLayout({ children }: { children: ReactNode }) {
@@ -17,7 +15,6 @@ export default async function MasterDataLayout({ children }: { children: ReactNo
 
   return (
     <PageShell size="wide">
-      <MasterDataNav />
       {children}
     </PageShell>
   );
