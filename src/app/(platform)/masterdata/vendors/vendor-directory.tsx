@@ -111,13 +111,6 @@ type LinkDraft = {
   sortOrder: number;
 };
 
-type BrandSupplierDraft = {
-  brandId: string;
-  brandName: string;
-  isAuthorized: boolean;
-  notes: string;
-};
-
 export function VendorDirectory({
   vendors,
   vendorTypes,
@@ -147,8 +140,6 @@ export function VendorDirectory({
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [newLinkLabel, setNewLinkLabel] = useState("");
   const [newLinkArchiveUrl, setNewLinkArchiveUrl] = useState("");
-  const [brandSuppliersList, setBrandSuppliersList] = useState<BrandSupplierDraft[]>([]);
-  const [brandSupplierToAdd, setBrandSupplierToAdd] = useState("");
   const [createVendorTypeIds, setCreateVendorTypeIds] = useState<string[]>([]);
   const [editVendorTypeIds, setEditVendorTypeIds] = useState<string[]>([]);
 
@@ -203,8 +194,6 @@ export function VendorDirectory({
   const openCreateDialog = () => {
     setContactsList([]);
     setLinksList([]);
-    setBrandSuppliersList([]);
-    setBrandSupplierToAdd("");
     setCreateVendorTypeIds([]);
     setNewLinkUrl("");
     setNewLinkLabel("");
@@ -227,8 +216,6 @@ export function VendorDirectory({
       })),
     );
     setLinksList(vendor.links.map((l) => ({ kind: l.kind, url: l.url, label: l.label ?? "", archiveUrl: l.archive_url ?? "", sortOrder: l.sort_order })));
-    setBrandSuppliersList(vendor.brand_suppliers.map((bs) => ({ brandId: bs.brand.id, brandName: bs.brand.name, isAuthorized: bs.is_authorized, notes: bs.notes ?? "" })));
-    setBrandSupplierToAdd("");
     setEditVendorTypeIds(vendor.types.map((type) => type.vendor_type.id));
     setNewLinkUrl("");
     setNewLinkLabel("");
@@ -257,21 +244,6 @@ export function VendorDirectory({
     setNewLinkUrl("");
     setNewLinkLabel("");
     setNewLinkArchiveUrl("");
-  };
-
-  const addBrandSupplier = (brandId: string, brandName: string) => {
-    if (brandSuppliersList.some((bs) => bs.brandId === brandId)) return;
-    setBrandSuppliersList([...brandSuppliersList, { brandId, brandName, isAuthorized: false, notes: "" }]);
-  };
-
-  const removeBrandSupplier = (idx: number) => {
-    setBrandSuppliersList(brandSuppliersList.filter((_, i) => i !== idx));
-  };
-
-  const updateBrandSupplier = (idx: number, patch: Partial<BrandSupplierDraft>) => {
-    const next = [...brandSuppliersList];
-    next[idx] = { ...next[idx], ...patch };
-    setBrandSuppliersList(next);
   };
 
   const removeLinkDraft = (idx: number) => {
@@ -436,7 +408,6 @@ export function VendorDirectory({
             const fd = new FormData(e.currentTarget);
             fd.set("contactsJson", JSON.stringify(contactsList.filter((c) => c.personName?.trim())));
             fd.set("linksJson", JSON.stringify(linksList));
-            fd.set("brandSuppliersJson", JSON.stringify(brandSuppliersList.map((bs) => ({ brandId: bs.brandId, isAuthorized: bs.isAuthorized, notes: bs.notes || undefined }))));
             try {
               const res = await createVendorAction(null, fd);
               if (res && "ok" in res && res.ok) {
@@ -453,7 +424,7 @@ export function VendorDirectory({
           {createVendorTypeIds.map((id) => <input key={id} type="hidden" name="vendorTypeIds" value={id} />)}
           {createError ? <InlineError>{createError}</InlineError> : null}
 
-          <Tabs
+          <Tabs keepMounted
             items={[
               {
                 value: "profile",
@@ -577,33 +548,6 @@ export function VendorDirectory({
                   </div>
                 ),
               },
-              {
-                value: "suppliers",
-                label: `Brand Suppliers (${brandSuppliersList.length})`,
-                content: (
-                  <div className="grid gap-3">
-                    <Text size="sm" weight="semibold">Brands this vendor supplies materials for</Text>
-                    <Field label="Add brand">
-                      <Combobox label="Add supplied brand" options={brands.filter((brand) => !brandSuppliersList.some((supplier) => supplier.brandId === brand.id)).map((brand) => ({ id: brand.id, label: brand.name }))} value={brandSupplierToAdd} onValueChange={(brandId) => { const brand = brands.find((item) => item.id === brandId); if (brand) addBrandSupplier(brand.id, brand.name); setBrandSupplierToAdd(""); }} placeholder="Search brand to add" searchPlaceholder="Search brands…" />
-                    </Field>
-                    {brandSuppliersList.map((bs, idx) => (
-                      <div key={bs.brandId} className="grid gap-2 p-2.5 border border-line rounded bg-surface-muted/40">
-                        <div className="flex items-center justify-between">
-                          <Text size="sm" weight="medium">{bs.brandName}</Text>
-                          <Button type="button" size="sm" variant="ghost" onClick={() => removeBrandSupplier(idx)}>Remove</Button>
-                        </div>
-                        <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
-                          <input type="checkbox" checked={bs.isAuthorized} onChange={(e) => updateBrandSupplier(idx, { isAuthorized: e.target.checked })} />
-                          <span>Authorized supplier (official / certified)</span>
-                        </label>
-                        <Field label="Supplier notes">
-                          <Input value={bs.notes} onChange={(e) => updateBrandSupplier(idx, { notes: e.target.value })} placeholder="Territory, pricing tier, etc." />
-                        </Field>
-                      </div>
-                    ))}
-                  </div>
-                ),
-              },
             ]}
           />
 
@@ -636,7 +580,6 @@ export function VendorDirectory({
               const fd = new FormData(e.currentTarget);
               fd.set("contactsJson", JSON.stringify(contactsList.filter((c) => c.personName?.trim())));
               fd.set("linksJson", JSON.stringify(linksList));
-              fd.set("brandSuppliersJson", JSON.stringify(brandSuppliersList.map((bs) => ({ brandId: bs.brandId, isAuthorized: bs.isAuthorized, notes: bs.notes || undefined }))));
               try {
                 const res = await updateVendorAction(null, fd);
                 if (res && "ok" in res && res.ok) {
@@ -654,7 +597,7 @@ export function VendorDirectory({
             {editVendorTypeIds.map((id) => <input key={id} type="hidden" name="vendorTypeIds" value={id} />)}
             {editError ? <InlineError>{editError}</InlineError> : null}
 
-            <Tabs
+            <Tabs keepMounted
               items={[
                 {
                   value: "profile",
@@ -771,33 +714,6 @@ export function VendorDirectory({
                           <Button type="button" size="sm" variant="secondary" className="justify-self-start" onClick={addLinkDraft}>Add link</Button>
                         </div>
                       </div>
-                    </div>
-                  ),
-                },
-                {
-                  value: "suppliers",
-                  label: `Brand Suppliers (${brandSuppliersList.length})`,
-                  content: (
-                    <div className="grid gap-3">
-                      <Text size="sm" weight="semibold">Brands this vendor supplies materials for</Text>
-                      <Field label="Add brand">
-                        <Combobox label="Add supplied brand" options={brands.filter((brand) => !brandSuppliersList.some((supplier) => supplier.brandId === brand.id)).map((brand) => ({ id: brand.id, label: brand.name }))} value={brandSupplierToAdd} onValueChange={(brandId) => { const brand = brands.find((item) => item.id === brandId); if (brand) addBrandSupplier(brand.id, brand.name); setBrandSupplierToAdd(""); }} placeholder="Search brand to add" searchPlaceholder="Search brands…" />
-                      </Field>
-                      {brandSuppliersList.map((bs, idx) => (
-                        <div key={bs.brandId} className="grid gap-2 p-2.5 border border-line rounded bg-surface-muted/40">
-                          <div className="flex items-center justify-between">
-                            <Text size="sm" weight="medium">{bs.brandName}</Text>
-                            <Button type="button" size="sm" variant="ghost" onClick={() => removeBrandSupplier(idx)}>Remove</Button>
-                          </div>
-                          <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
-                            <input type="checkbox" checked={bs.isAuthorized} onChange={(e) => updateBrandSupplier(idx, { isAuthorized: e.target.checked })} />
-                            <span>Authorized supplier (official / certified)</span>
-                          </label>
-                          <Field label="Supplier notes">
-                            <Input value={bs.notes} onChange={(e) => updateBrandSupplier(idx, { notes: e.target.value })} placeholder="Territory, pricing tier, etc." />
-                          </Field>
-                        </div>
-                      ))}
                     </div>
                   ),
                 },

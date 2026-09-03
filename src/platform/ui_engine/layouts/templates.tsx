@@ -77,38 +77,47 @@ export type TabsProps = {
   onValueChange?: (value: string) => void;
   label?: string;
   distribution?: "scroll" | "equal";
+  /** Slot rendered to the right of the tab strip — use for page-level actions (e.g. "New price"). */
+  actions?: ReactNode;
+  /** Keep tab panels in the DOM when switching is part of one multi-panel form. */
+  keepMounted?: boolean;
   className?: string;
 };
 
-export function Tabs({ items, label = "Sections", distribution = "scroll", className, defaultValue, ...props }: TabsProps) {
-  // The spread used to overwrite the computed fallback with an undefined
-  // `defaultValue`, so an uncontrolled Tabs opened with no panel selected at all.
+export function Tabs({ items, label = "Sections", distribution = "scroll", className, defaultValue, actions, keepMounted = false, ...props }: TabsProps) {
   const fallbackValue = items.find((item) => !item.disabled)?.value;
   return (
     <RTabs.Root className={cx("min-w-0", className)} defaultValue={defaultValue ?? fallbackValue} {...props}>
-      <RTabs.List
-        className={cx(
-          "gap-0.5 border-b border-line",
-          distribution === "equal"
-            ? "grid overflow-hidden [&>[role=tab]]:min-w-0 [&>[role=tab]]:whitespace-normal [&>[role=tab]]:leading-tight"
-            : "flex overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-        )}
-        style={distribution === "equal" ? { gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` } : undefined}
-        aria-label={label}
-      >
-        {items.map((item) => (
-          <RTabs.Trigger
-            className="relative min-h-[38px] cursor-pointer whitespace-nowrap border-0 bg-transparent px-3 py-0 font-semibold text-ink-secondary after:absolute after:bottom-[-1px] after:left-2.5 after:right-2.5 after:h-0.5 after:rounded-[2px] after:bg-transparent after:content-[''] data-[state=active]:text-ink data-[state=active]:after:bg-action disabled:opacity-45"
-            value={item.value}
-            disabled={item.disabled}
-            key={item.value}
-          >
-            {item.label}
-          </RTabs.Trigger>
-        ))}
-      </RTabs.List>
+      <div className="flex min-w-0 items-center border-b border-line">
+        <RTabs.List
+          className={cx(
+            "min-w-0 flex-1 gap-0.5",
+            distribution === "equal"
+              ? "grid overflow-hidden max-[560px]:flex max-[560px]:overflow-x-auto max-[560px]:[scrollbar-width:none] max-[560px]:[&::-webkit-scrollbar]:hidden [&>[role=tab]]:min-w-0 [&>[role=tab]]:whitespace-normal [&>[role=tab]]:leading-tight max-[560px]:[&>[role=tab]]:min-w-fit max-[560px]:[&>[role=tab]]:shrink-0 max-[560px]:[&>[role=tab]]:whitespace-nowrap"
+              : "flex overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          )}
+          style={distribution === "equal" ? { gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` } : undefined}
+          aria-label={label}
+        >
+          {items.map((item) => (
+            <RTabs.Trigger
+              className="relative min-h-[38px] cursor-pointer whitespace-nowrap border-0 bg-transparent px-3 py-0 font-semibold text-ink-secondary after:absolute after:bottom-[-1px] after:left-2.5 after:right-2.5 after:h-0.5 after:rounded-[2px] after:bg-transparent after:content-[''] data-[state=active]:text-ink data-[state=active]:after:bg-action disabled:opacity-45"
+              value={item.value}
+              disabled={item.disabled}
+              key={item.value}
+            >
+              {item.label}
+            </RTabs.Trigger>
+          ))}
+        </RTabs.List>
+        {actions ? (
+          <div className="flex shrink-0 items-center gap-2 px-3 py-1.5">
+            {actions}
+          </div>
+        ) : null}
+      </div>
       {items.map((item) => (
-        <RTabs.Content className="pt-4" value={item.value} key={item.value}>
+        <RTabs.Content className="pt-4" value={item.value} key={item.value} forceMount={keepMounted || undefined}>
           {item.content}
         </RTabs.Content>
       ))}
