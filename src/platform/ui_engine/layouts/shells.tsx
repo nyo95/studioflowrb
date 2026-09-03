@@ -284,7 +284,9 @@ export function NavSubmenu({
   };
   const scheduleClose = () => {
     if (closeTimer.current !== null) clearTimeout(closeTimer.current);
-    closeTimer.current = setTimeout(() => setOpen(false), 140);
+    // The menu is portalled outside the rail. Keep it open long enough for a
+    // normal pointer movement from the compact icon into the menu surface.
+    closeTimer.current = setTimeout(() => setOpen(false), 320);
   };
 
   if (!collapsed) {
@@ -328,7 +330,7 @@ export function NavSubmenu({
           className="z-[65] min-w-52 rounded-control border border-line bg-surface-raised p-[5px] shadow-elevated"
           side="right"
           align="start"
-          sideOffset={8}
+          sideOffset={0}
           onPointerEnter={keepOpen}
           onPointerLeave={scheduleClose}
         >

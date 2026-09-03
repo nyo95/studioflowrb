@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.52**
-- Next local revision: **R4.53**
+- Current revision: **R4.53**
+- Next local revision: **R4.54**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,20 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.53 — 2026-09-03 — fix(ui-engine): stabilize compact rail hover menus
+
+- Agent: `Codex`
+
+- Removed the pointer gap between a compact rail submenu trigger and its
+  portalled menu, and extended the close grace period to prevent hover flicker.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `git diff --check`
+- Browser check of Administration submenu activation
 
 ## R4.52 — 2026-09-03 — fix(shell): separate application switching from app navigation
 
