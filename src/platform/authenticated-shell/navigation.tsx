@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutGrid, Settings, ShieldCheck, Users } from "lucide-react";
+import { Settings, ShieldCheck, Users } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { NavSubmenu } from "@/platform/ui_engine";
@@ -18,16 +18,6 @@ export function HeaderApplicationNavigation({ apps }: { apps: readonly ShellAppL
   const pathname = usePathname();
   return (
     <nav className="ml-auto flex min-w-0 items-center gap-1 overflow-x-auto" aria-label="Applications">
-      {apps.length > 1 ? (
-        <Link
-          href="/"
-          className="inline-flex min-h-8 items-center gap-1.5 rounded-action px-2.5 text-sm text-ink-secondary hover:bg-surface-muted hover:text-ink"
-          aria-current={pathname === "/" ? "page" : undefined}
-        >
-          <LayoutGrid size={16} aria-hidden="true" />
-          <span>Applications</span>
-        </Link>
-      ) : null}
       {apps.map((app) => {
         const active = activePath(pathname, app.rootPath);
         return (

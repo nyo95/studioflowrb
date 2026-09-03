@@ -20,10 +20,11 @@ export default async function LauncherPage() {
   const registry = getPermissionRegistry();
   const accessible = registry.apps.filter((app) => hasPermission(grants, app.accessPermission));
 
-  // One accessible app goes straight to the app (login already did this for
-  // fresh logins; this keeps the root route consistent for deep visits).
-  if (accessible.length === 1) {
-    redirect(accessible[0].rootPath);
+  // The launcher is intentionally bypassed. Master Data is the owner-selected
+  // default; a user without that grant still lands in their first allowed app.
+  const defaultApp = accessible.find((app) => app.appId === "masterdata") ?? accessible[0];
+  if (defaultApp) {
+    redirect(defaultApp.rootPath);
   }
 
   return (
