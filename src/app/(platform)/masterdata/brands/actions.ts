@@ -14,13 +14,21 @@ function revalidateBrands(): void {
   revalidatePath("/masterdata");
 }
 
+const HttpUrlSchema = z.string().url("Must be a valid URL").refine(
+  (value) => {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  },
+  "Must be an HTTP(S) URL",
+);
+
 const BrandInputSchema = z.object({
   name: z.string().min(1, "Brand name is required").max(64, "Brand name is too long"),
   ownerVendorId: z.string().uuid().optional().nullable().or(z.literal("")),
   notes: z.string().max(1000).optional().nullable().or(z.literal("")),
   categoryIds: z.array(z.string().uuid()).optional(),
   hashtags: z.array(z.string()).optional(),
-  links: z.array(z.object({ kind: z.string().min(1), url: z.string().url("Must be a valid URL"), label: z.string().optional().nullable() })).optional(),
+  links: z.array(z.object({ kind: z.string().min(1), url: HttpUrlSchema, label: z.string().optional().nullable() })).optional(),
   suppliers: z.array(z.object({ vendorId: z.string().uuid() })).optional(),
 });
 const IdSchema = z.string().uuid();

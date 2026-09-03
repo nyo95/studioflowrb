@@ -5,9 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.74**
-- Next local revision: **R4.75**
+- Current revision: **R4.75**
+- Next local revision: **R4.76**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.75 — 2026-09-03 — fix(brands): validate external links before save
+
+- Agent: `Codex`
+
+Brand external-resource entry now accepts a domain with or without an HTTP(S)
+protocol, normalizes it to a full web URL, and rejects unsupported or malformed
+addresses at Add time. Save also normalizes any pre-existing browser draft,
+preventing the generic validation failure that previously blocked the whole
+Brand update. The server boundary now accepts only HTTP(S) link protocols.
+
+### Verification
+
+- `node --test --import tsx src/app/(platform)/masterdata/brands/brand-link-input.test.ts` — pass
+- `npm run typecheck` — clean
+- `npm run lint` — clean
+- `npm run check:boundaries` — pass
+- `npm run check:legacy-runtime` — pass
+- `git diff --check` — clean
 
 ## R4.74 — 2026-09-03 — fix(pricing): fix price tabs to equal columns
 

@@ -41,6 +41,7 @@ import {
   updateBrandAction,
 } from "./actions";
 import { createCategoryAction } from "../categories/actions";
+import { normalizeBrandLinks, normalizeBrandLinkUrl, type BrandLinkDraft } from "./brand-link-input";
 
 type BrandRow = {
   id: string;
@@ -94,10 +95,11 @@ export function BrandDirectory({
   const [, startTransition] = useTransition();
 
   // Form links state for create/edit
-  const [linksList, setLinksList] = useState<Array<{ kind: string; url: string; label: string }>>([]);
+  const [linksList, setLinksList] = useState<BrandLinkDraft[]>([]);
   const [newLinkKind, setNewLinkKind] = useState("WEBSITE");
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [newLinkLabel, setNewLinkLabel] = useState("");
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   const [createError, setCreateError] = useState<string | null>(null);
   const [createPending, setCreatePending] = useState(false);
@@ -170,6 +172,7 @@ export function BrandDirectory({
     setLinksList([]);
     setNewLinkUrl("");
     setNewLinkLabel("");
+    setLinkError(null);
     setCreateOwnerVendorId("");
     setCreateCategoryIds([]);
     setCreateHashtags([]);
@@ -182,6 +185,7 @@ export function BrandDirectory({
     setLinksList(brand.links.map((l) => ({ kind: l.kind, url: l.url, label: l.label ?? "" })));
     setNewLinkUrl("");
     setNewLinkLabel("");
+    setLinkError(null);
     setEditOwnerVendorId(brand.owner_vendor?.id ?? "");
     setEditCategoryIds(brand.categories.map((item) => item.category.id));
     setEditHashtags(brand.hashtags.map((item) => item.label));
@@ -190,8 +194,13 @@ export function BrandDirectory({
   };
 
   const addLink = () => {
-    if (!newLinkUrl.trim()) return;
-    setLinksList([...linksList, { kind: newLinkKind, url: newLinkUrl.trim(), label: newLinkLabel.trim() }]);
+    const normalizedUrl = normalizeBrandLinkUrl(newLinkUrl);
+    if (!normalizedUrl.ok) {
+      setLinkError(normalizedUrl.error);
+      return;
+    }
+    setLinkError(null);
+    setLinksList([...linksList, { kind: newLinkKind, url: normalizedUrl.value, label: newLinkLabel.trim() }]);
     setNewLinkUrl("");
     setNewLinkLabel("");
   };
@@ -380,10 +389,15 @@ export function BrandDirectory({
           onChange={createDraftGuard.onFormChange}
           onSubmit={async (e) => {
             e.preventDefault();
-            setCreatePending(true);
             setCreateError(null);
+            const normalizedLinks = normalizeBrandLinks(linksList);
+            if (!normalizedLinks.ok) {
+              setCreateError(normalizedLinks.error);
+              return;
+            }
+            setCreatePending(true);
             const fd = new FormData(e.currentTarget);
-            fd.set("linksJson", JSON.stringify(linksList));
+            fd.set("linksJson", JSON.stringify(normalizedLinks.value));
             try {
               const res = await createBrandAction(null, fd);
               if (res && "ok" in res && res.ok) {
@@ -443,11 +457,12 @@ export function BrandDirectory({
                   <option value="INSTAGRAM">Instagram</option>
                   <option value="DOCS">Docs</option>
                 </Select>
-                <Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://..." className="min-w-0" />
+                <Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="example.com or https://..." className="min-w-0" />
                 <Input value={newLinkLabel} onChange={(e) => setNewLinkLabel(e.target.value)} placeholder="Label (optional)" className="min-w-0 sm:col-span-2" />
               </div>
               <Button type="button" size="sm" variant="secondary" onClick={addLink}>Add</Button>
             </div>
+            {linkError ? <InlineError>{linkError}</InlineError> : null}
           </div>
 
           <Field label="Notes">
@@ -482,10 +497,15 @@ export function BrandDirectory({
             onChange={editDraftGuard.onFormChange}
             onSubmit={async (e) => {
               e.preventDefault();
-              setEditPending(true);
               setEditError(null);
+              const normalizedLinks = normalizeBrandLinks(linksList);
+              if (!normalizedLinks.ok) {
+                setEditError(normalizedLinks.error);
+                return;
+              }
+              setEditPending(true);
               const fd = new FormData(e.currentTarget);
-              fd.set("linksJson", JSON.stringify(linksList));
+              fd.set("linksJson", JSON.stringify(normalizedLinks.value));
               try {
                 const res = await updateBrandAction(null, fd);
                 if (res && "ok" in res && res.ok) {
@@ -546,11 +566,12 @@ export function BrandDirectory({
                     <option value="INSTAGRAM">Instagram</option>
                     <option value="DOCS">Docs</option>
                   </Select>
-                  <Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://..." className="min-w-0" />
+                  <Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="example.com or https://..." className="min-w-0" />
                   <Input value={newLinkLabel} onChange={(e) => setNewLinkLabel(e.target.value)} placeholder="Label (optional)" className="min-w-0 sm:col-span-2" />
                 </div>
                 <Button type="button" size="sm" variant="secondary" onClick={addLink}>Add</Button>
               </div>
+              {linkError ? <InlineError>{linkError}</InlineError> : null}
             </div>
 
             <Field label="Notes">
