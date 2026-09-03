@@ -5,9 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.72**
-- Next local revision: **R4.73**
+- Current revision: **R4.73**
+- Next local revision: **R4.74**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.73 — 2026-09-03 — fix(ui-engine): hide tab strip scrollbar
+
+- Agent: `Codex`
+
+Keeps the shared `Tabs` strip horizontally scrollable for narrow viewports but
+hides the browser scrollbar and its up/down controls. This preserves access to
+overflowing tabs without adding visual noise to short tab sets such as Pricing.
+
+### Verification
+
+- `npm run typecheck` — clean
+- `npm run lint` — clean
+- `node --test --import tsx src/platform/ui_engine/ui-engine.test.ts` — pass
+- `npm run check:boundaries` — pass
+- `npm run check:legacy-runtime` — pass
+- Browser acceptance — Pricing tab strip has `scrollbar-width: none` while
+  retaining horizontal overflow.
+- `git diff --check` — clean
 
 ## R4.72 — 2026-09-03 — fix(masterdata): search scalable reference choices
 

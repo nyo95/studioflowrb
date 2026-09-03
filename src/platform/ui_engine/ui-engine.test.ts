@@ -315,6 +315,15 @@ describe("UI Engine foundation", () => {
     assert.match(tabs, /Second/);
   });
 
+  it("keeps narrow tab sets scrollable without exposing a browser scrollbar", () => {
+    const tabs = renderToStaticMarkup(createElement(ui.Tabs, {
+      items: [{ value: "one", label: "One", content: "First" }],
+    }));
+    assert.match(tabs, /overflow-x-auto/);
+    assert.match(tabs, /\[scrollbar-width:none\]/);
+    assert.match(tabs, /\[&amp;::\-webkit-scrollbar\]:hidden/);
+  });
+
   it("keeps a bounded scroll body available for a sticky header", () => {
     const table = renderToStaticMarkup(createElement(ui.DataTable, {
       stickyHeader: true,

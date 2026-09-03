@@ -85,7 +85,10 @@ export function Tabs({ items, label = "Sections", className, defaultValue, ...pr
   const fallbackValue = items.find((item) => !item.disabled)?.value;
   return (
     <RTabs.Root className={cx("min-w-0", className)} defaultValue={defaultValue ?? fallbackValue} {...props}>
-      <RTabs.List className="flex gap-0.5 overflow-x-auto border-b border-line" aria-label={label}>
+      <RTabs.List
+        className="flex gap-0.5 overflow-x-auto border-b border-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        aria-label={label}
+      >
         {items.map((item) => (
           <RTabs.Trigger
             className="relative min-h-[38px] cursor-pointer whitespace-nowrap border-0 bg-transparent px-3 py-0 font-semibold text-ink-secondary after:absolute after:bottom-[-1px] after:left-2.5 after:right-2.5 after:h-0.5 after:rounded-[2px] after:bg-transparent after:content-[''] data-[state=active]:text-ink data-[state=active]:after:bg-action disabled:opacity-45"
