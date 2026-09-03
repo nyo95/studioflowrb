@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.47**
-- Next local revision: **R4.48**
+- Current revision: **R4.49**
+- Next local revision: **R4.50**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.49 — 2026-09-03 — fix(ui-engine): make the shared top header a continuous plane
+
+- Agent: `Codex`
+
+- Removed the vertical divider from the AppShell brand region so the top header
+  is one continuous surface from brand to account controls.
+- Preserved the compact rail's independent divider below the header, keeping
+  navigation distinct without splitting the header itself.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `git diff --check`
+- Browser check of the authenticated BQ header
 
 ## R4.48 — 2026-09-03 — fix(shell): move Master Data primary navigation into the shared rail
 

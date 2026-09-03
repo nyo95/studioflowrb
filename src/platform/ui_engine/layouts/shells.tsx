@@ -103,9 +103,9 @@ export function AppShell({
           <header className="sticky top-0 z-20 flex min-h-16 items-stretch border-b border-line bg-surface/94 backdrop-blur-[12px]">
             <div
               className={cx(
-                "flex min-w-0 shrink-0 items-center justify-between gap-2 border-r border-line px-4 py-3.5 transition-[width] duration-[160ms] motion-reduce:transition-none",
+                "flex min-w-0 shrink-0 items-center justify-between gap-2 px-4 py-3.5 transition-[width] duration-[160ms] motion-reduce:transition-none",
                 railPresentation === "compact" ? "w-[var(--ui-header-brand-width,232px)]" : "w-[var(--ui-rail-width,232px)]",
-                "max-[840px]:w-auto max-[840px]:border-r-0 max-[840px]:px-3",
+                "max-[840px]:w-auto max-[840px]:px-3",
                 isCollapsed && "[--ui-rail-width:60px] flex-col justify-center gap-1.5 px-2 py-2.5",
               )}
             >
