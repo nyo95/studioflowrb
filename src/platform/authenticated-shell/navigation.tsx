@@ -1,9 +1,10 @@
 "use client";
 
-import { Database, FileText, LayoutGrid, Settings, ShieldCheck, Users } from "lucide-react";
+import Link from "next/link";
+import { LayoutGrid, Settings, ShieldCheck, Users } from "lucide-react";
 import { usePathname } from "next/navigation";
 
-import { NavItem, NavSubmenu } from "@/platform/ui_engine";
+import { NavSubmenu } from "@/platform/ui_engine";
 
 export type ShellAppLink = { appId: string; name: string; rootPath: string };
 
@@ -12,8 +13,41 @@ function activePath(pathname: string, href: string, includeChildren = true): boo
   return pathname === href || (includeChildren && pathname.startsWith(`${href}/`));
 }
 
-export function AuthenticatedPlatformNavigation({ apps, showGeneralSettings, showUsers, showRoles, domainNavigation }: {
-  apps: readonly ShellAppLink[];
+/** App switching belongs to the continuous top header, not the app-local rail. */
+export function HeaderApplicationNavigation({ apps }: { apps: readonly ShellAppLink[] }) {
+  const pathname = usePathname();
+  return (
+    <nav className="flex min-w-0 items-center gap-1 overflow-x-auto" aria-label="Applications">
+      {apps.length > 1 ? (
+        <Link
+          href="/"
+          className="inline-flex min-h-8 items-center gap-1.5 rounded-action px-2.5 text-sm text-ink-secondary hover:bg-surface-muted hover:text-ink"
+          aria-current={pathname === "/" ? "page" : undefined}
+        >
+          <LayoutGrid size={16} aria-hidden="true" />
+          <span>Applications</span>
+        </Link>
+      ) : null}
+      {apps.map((app) => {
+        const active = activePath(pathname, app.rootPath);
+        return (
+          <Link
+            key={app.appId}
+            href={app.rootPath}
+            aria-current={active ? "page" : undefined}
+            className={`inline-flex min-h-8 items-center rounded-action px-2.5 text-sm transition-colors ${
+              active ? "bg-surface-muted font-semibold text-ink" : "text-ink-secondary hover:bg-surface-muted hover:text-ink"
+            }`}
+          >
+            {app.name}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+export function AuthenticatedPlatformNavigation({ showGeneralSettings, showUsers, showRoles, domainNavigation }: {
   showGeneralSettings: boolean;
   showUsers: boolean;
   showRoles: boolean;
@@ -22,12 +56,6 @@ export function AuthenticatedPlatformNavigation({ apps, showGeneralSettings, sho
   const pathname = usePathname();
   return (
     <div className="grid gap-1">
-      {apps.length > 1 ? <NavItem href="/" icon={<LayoutGrid size={17} />} active={pathname === "/"}>Applications</NavItem> : null}
-      {apps.map((app) => (
-        <NavItem key={app.appId} href={app.rootPath} icon={app.appId === "masterdata" ? <Database size={17} /> : app.appId === "bq" ? <FileText size={17} /> : <LayoutGrid size={17} />} active={activePath(pathname, app.rootPath)}>
-          {app.name}
-        </NavItem>
-      ))}
       {domainNavigation}
       <NavSubmenu
         label="Administration"

@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.51**
-- Next local revision: **R4.52**
+- Current revision: **R4.52**
+- Next local revision: **R4.53**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,24 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.52 — 2026-09-03 — fix(shell): separate application switching from app navigation
+
+- Agent: `Codex`
+
+- Moved Applications, Master Data, and Bill of Quantity switching from the
+  compact rail into the continuous top header.
+- Made the rail app-local: BQ now provides Projects and BQ Library there, while
+  Master Data keeps Overview, Brands, Vendors, and Pricing. Removed BQ's
+  redundant horizontal navigation tabs.
+- Kept Administration as the existing compact utility submenu.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run lint`
+- `git diff --check`
+- Browser checks: BQ header/rail and Master Data rail.
 
 ## R4.51 — 2026-09-03 — fix(ui-engine): compose brand and account into one top bar
 

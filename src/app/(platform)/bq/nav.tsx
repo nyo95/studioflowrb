@@ -1,39 +1,40 @@
 "use client";
 
-import Link from "next/link";
+import { FileText, Library } from "lucide-react";
 import { usePathname } from "next/navigation";
 
-type NavLink = {
+import { NavItem } from "@/platform/ui_engine";
+
+type BqNavLink = {
   href: string;
   label: string;
+  icon: typeof FileText;
   exact?: boolean;
 };
+
+const links: readonly BqNavLink[] = [
+  { href: "/bq", label: "Projects", icon: FileText, exact: true },
+  { href: "/bq/library", label: "BQ Library", icon: Library },
+];
 
 export function BqNav() {
   const pathname = usePathname();
 
-  const links: NavLink[] = [
-    { href: "/bq", label: "Projects", exact: true },
-    { href: "/bq/library", label: "BQ Library" },
-  ];
+  if (!pathname.startsWith("/bq")) return null;
 
   return (
-    <nav className="flex gap-1 overflow-x-auto border-b border-line pb-px mb-6 scrollbar-none" aria-label="BQ Navigation">
-      {links.map(({ href, label, exact }) => {
+    <nav className="mt-2 grid gap-1 border-t border-line-subtle pt-2" aria-label="BQ navigation">
+      {links.map(({ href, label, icon: Icon, exact }) => {
         const isActive = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
         return (
-          <Link
+          <NavItem
             key={href}
+            icon={<Icon size={17} />}
+            active={isActive}
             href={href}
-            aria-current={isActive ? "page" : undefined}
-            className={`flex items-center gap-2 whitespace-nowrap px-3.5 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              isActive
-                ? "border-action text-ink font-semibold"
-                : "border-transparent text-ink-secondary hover:text-ink hover:border-line-subtle"
-            }`}
           >
-            <span>{label}</span>
-          </Link>
+            {label}
+          </NavItem>
         );
       })}
     </nav>

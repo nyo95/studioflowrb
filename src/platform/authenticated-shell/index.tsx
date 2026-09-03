@@ -7,7 +7,7 @@ import type { SessionPrincipal } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
 import type { PlatformGeneralSettings } from "@platform/core/settings";
 
-import { AuthenticatedPlatformNavigation, type ShellAppLink } from "./navigation";
+import { AuthenticatedPlatformNavigation, HeaderApplicationNavigation, type ShellAppLink } from "./navigation";
 
 export function AuthenticatedShell({ principal, grants, settings, apps, logoutAction, appName, appAbbreviation, domainNavigation, domainUtilityNavigation, contextSlot, children }: {
   principal: SessionPrincipal;
@@ -43,7 +43,6 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
       railPresentation="compact"
       navigationLabel={`${settings.appTitle} navigation`}
       navigation={<AuthenticatedPlatformNavigation
-        apps={apps}
         showGeneralSettings={hasPermission(grants, "platform.settings.read")}
         showUsers={hasPermission(grants, "platform.user.read")}
         showRoles={hasPermission(grants, "platform.role.read")}
@@ -51,6 +50,7 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
       />}
       utility={domainUtilityNavigation}
       topbar={<div className="flex w-full items-center gap-3 px-(--ui-page-padding)">
+        <HeaderApplicationNavigation apps={apps} />
         {contextSlot}
         <div className="group relative ml-auto">
           <Link href="/account" className="flex min-w-0 items-center gap-2 rounded-action px-2 py-1 text-sm hover:bg-surface-muted" title={`Open account settings for ${principal.displayName}`} aria-label={`Open account settings for ${principal.displayName}`}>

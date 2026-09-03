@@ -7,6 +7,7 @@ import { prisma } from "@platform/core/db";
 import { getPermissionRegistry } from "@platform/core/rbac/registry";
 import { readPlatformGeneralSettings } from "@platform/core/settings";
 import { logoutAction } from "./logout-action";
+import { BqNav } from "./bq/nav";
 import { MasterDataNav } from "./masterdata/nav";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,10 @@ export default async function PlatformLayout({ children }: { children: ReactNode
     .filter((app) => grants.includes(app.accessPermission))
     .map(({ appId, name, rootPath }) => ({ appId, name, rootPath }));
 
-  const domainNavigation = apps.some((app) => app.appId === "masterdata") ? <MasterDataNav /> : undefined;
+  const domainNavigation = <>
+    {apps.some((app) => app.appId === "masterdata") ? <MasterDataNav /> : null}
+    {apps.some((app) => app.appId === "bq") ? <BqNav /> : null}
+  </>;
 
   return <AuthenticatedShell principal={principal} grants={grants} settings={settings} apps={apps} logoutAction={logoutAction} domainNavigation={domainNavigation}>
     {children}

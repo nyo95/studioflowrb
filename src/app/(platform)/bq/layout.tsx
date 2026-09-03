@@ -6,8 +6,6 @@ import { hasPermission } from "@platform/core/rbac";
 import { PageShell } from "@/platform/ui_engine";
 import { BQ_PERMISSIONS } from "@/apps/bq/service";
 
-import { BqNav } from "./nav";
-
 export const dynamic = "force-dynamic";
 
 export default async function BqLayout({ children }: { children: ReactNode }) {
@@ -17,7 +15,6 @@ export default async function BqLayout({ children }: { children: ReactNode }) {
 
   return (
     <PageShell size="wide">
-      <BqNav />
       {children}
     </PageShell>
   );
