@@ -1,6 +1,7 @@
 "use client";
 
 import { DropdownMenu } from "radix-ui";
+import Link from "next/link";
 import { createContext, useContext, useEffect, useState, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from "react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
@@ -239,9 +240,9 @@ export function NavItem({ icon, active = false, disabled = false, children, clas
       {content}
     </button>
   ) : (
-    <a className={itemClasses} data-active={active || undefined} aria-current={active ? "page" : undefined} {...props}>
+    <Link href={props.href ?? "#"} className={itemClasses} data-active={active || undefined} aria-current={active ? "page" : undefined} {...props}>
       {content}
-    </a>
+    </Link>
   );
 
   return collapsed ? <Tooltip content={children} side="right">{item}</Tooltip> : item;

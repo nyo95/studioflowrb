@@ -265,6 +265,12 @@ describe("UI Engine foundation", () => {
     assert.match(hooks, /if \(!equals\(initialValue, prevInitial\)\)/);
   });
 
+  it("uses Next client navigation for clickable rail destinations", () => {
+    const shells = readFileSync(new URL("./layouts/shells.tsx", import.meta.url), "utf8");
+    assert.match(shells, /import Link from "next\/link"/);
+    assert.match(shells, /<Link href=\{props\.href \?\? "#"\}/);
+  });
+
   it("keeps dialog form drafts in the browser until the app explicitly saves", () => {
     const hooks = readFileSync(new URL("./patterns/hooks.tsx", import.meta.url), "utf8");
     assert.match(hooks, /export function useFormDraftGuard/);

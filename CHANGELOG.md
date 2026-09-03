@@ -5,9 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.70**
-- Next local revision: **R4.71**
+- Current revision: **R4.71**
+- Next local revision: **R4.72**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.71 — 2026-09-03 — fix(ui-engine): restore rail navigation
+
+- Agent: `Codex`
+
+`NavItem` now uses the framework's client navigation component rather than a
+plain anchor. This restores navigation from compact-rail entries, including
+Master Data Vendors and Pricing, while retaining the same href, accessible name,
+active marker, and disabled presentation.
+
+### Verification
+
+- `npm run typecheck` — clean
+- `npm run lint` — clean
+- `node --test --import tsx src/platform/ui_engine/ui-engine.test.ts` — pass
+- `npm run check:boundaries` — pass
+- `npm run check:legacy-runtime` — pass
+- Browser acceptance — compact rail navigates to both Vendors and Pricing.
+- `git diff --check` — clean
 
 ## R4.70 — 2026-09-03 — fix(ui-engine): guard browser-only dialog drafts
 
