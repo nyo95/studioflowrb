@@ -3223,6 +3223,8 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           amount: true,
           currency: true,
           notes: true,
+          updated_at: true,
+          updated_by_label: true,
           deleted_at: true,
           sku: {
             select: {
@@ -3532,6 +3534,8 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           spec: true,
           dim_display: true,
           notes: true,
+          updated_at: true,
+          updated_by_label: true,
           deleted_at: true,
           category: { select: { id: true, name: true, slug: true } },
           vendor: { select: { id: true, name: true, slug: true } },
@@ -3808,6 +3812,8 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           spec: true,
           dim_display: true,
           notes: true,
+          updated_at: true,
+          updated_by_label: true,
           deleted_at: true,
           category: { select: { id: true, name: true, slug: true } },
           vendor: { select: { id: true, name: true, slug: true } },

@@ -5,10 +5,42 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.80**
-- Next local revision: **R4.81**
+- Current revision: **R4.81**
+- Next local revision: **R4.82**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
+
+## R4.81 — 2026-09-03 — fix(masterdata): complete directory review feedback
+
+- Agent: `Codex`
+
+Completes the remaining approved review feedback without seeding new catalog
+data:
+
+- Brand rows now show a compact discovery summary: up to three product
+  categories, two hashtags, and a `+N others` indicator while retaining the
+  complete value in the native hover label.
+- Material, material-plus-labor, and labor pricing rows now show `Updated by`
+  and the Indonesian-localized last-update timestamp, using their persisted
+  audit fields.
+- Confirms the existing Pricing quick-create Brand path creates only the
+  contract-minimum Brand name, selects it for the pending SKU, and remains
+  permission-gated by Brand manage.
+- Confirms Vendor remains contract-aligned: Profile & Types, Contacts, and
+  Links are the only editor tabs; inactive tab panels stay mounted to preserve
+  unsaved drafts.
+
+### Verification
+
+- `npm run typecheck` — clean
+- focused ESLint — clean
+- `node --test --import tsx src/platform/ui_engine/ui-engine.test.ts` — 27 pass
+- `npm run check:boundaries` — pass
+- `npm run check:legacy-runtime` — pass
+- `git diff --check` — clean (line-ending warnings only)
+- Browser acceptance — unavailable in the in-app browser because its existing
+  tab remained on its browser-generated connection-error document even though
+  the local server returned HTTP 200.
 
 ## R4.80 — 2026-09-03 — chore(branding): include approved organization mark
 

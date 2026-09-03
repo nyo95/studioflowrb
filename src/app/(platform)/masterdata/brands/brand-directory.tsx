@@ -4,7 +4,6 @@ import { useRef, useState, useTransition } from "react";
 import { Archive, ExternalLink, Plus, RotateCcw, Trash2 } from "lucide-react";
 
 import {
-  Badge,
   Button,
   ConfirmDialog,
   CreatableMultiSelect,
@@ -61,6 +60,25 @@ type BrandRow = {
 };
 
 type Option = { id: string; name: string };
+
+function BrandDiscoverySummary({ brand }: { brand: Pick<BrandRow, "categories" | "hashtags"> }) {
+  const categories = brand.categories.map(({ category }) => category.name);
+  const hashtags = brand.hashtags.map((hashtag) => `#${hashtag.label.replace(/^#/, "")}`);
+  const visibleCategories = categories.slice(0, 3);
+  const visibleHashtags = hashtags.slice(0, 2);
+  const remaining = categories.length + hashtags.length - visibleCategories.length - visibleHashtags.length;
+  const fullSummary = [...categories, ...hashtags].join(" · ");
+
+  return (
+    <div className="flex max-w-sm flex-wrap items-center gap-x-1.5 gap-y-1 text-xs" title={fullSummary || undefined}>
+      {visibleCategories.map((category, index) => <span key={category} className="text-ink-secondary">{index > 0 ? "· " : ""}{category}</span>)}
+      {visibleCategories.length > 0 && visibleHashtags.length > 0 ? <span aria-hidden="true" className="text-ink-tertiary">•</span> : null}
+      {visibleHashtags.map((hashtag) => <span key={hashtag} className="font-mono text-ink-secondary">{hashtag}</span>)}
+      {remaining > 0 ? <span className="font-medium text-ink-tertiary">+{remaining} others</span> : null}
+      {categories.length === 0 && hashtags.length === 0 ? <span className="text-ink-tertiary">—</span> : null}
+    </div>
+  );
+}
 
 export function BrandDirectory({
   brands,
@@ -309,21 +327,7 @@ export function BrandDirectory({
                       }
                     />
                   </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1 max-w-sm">
-                      {brand.categories.map((c) => (
-                        <Badge key={c.category.id} tone="neutral">
-                          {c.category.name}
-                          {c.origins.some((o) => o.kind === "SKU_ENRICHMENT") ? " •" : ""}
-                        </Badge>
-                      ))}
-                      {brand.hashtags.map((h) => (
-                        <span key={h.id} className="inline-block text-xs text-ink-secondary font-mono bg-surface-muted px-1.5 py-0.5 rounded">
-                          #{h.label}
-                        </span>
-                      ))}
-                    </div>
-                  </TableCell>
+                  <TableCell><BrandDiscoverySummary brand={brand} /></TableCell>
                   <TableCell>
                     <div className="text-xs text-ink-secondary">
                       {brand.owner_vendor ? <div>Owner: <span className="font-medium text-ink">{brand.owner_vendor.name}</span></div> : null}

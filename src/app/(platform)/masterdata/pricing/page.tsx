@@ -15,6 +15,8 @@ function mapMaterialPrice(p: {
   amount: { toString(): string };
   currency: string;
   notes: string | null;
+  updated_at: Date;
+  updated_by_label: string;
   deleted_at: Date | null;
   sku: { name: string | null; id: string; code: string | null; slug: string; brand: { name: string; id: string; slug: string } | null };
   supplier_vendor: { id: string; name: string; slug: string };
@@ -30,6 +32,8 @@ function mapMaterialPrice(p: {
     unit: p.unit,
     deleted_at: p.deleted_at,
     notes: p.notes,
+    updated_at: p.updated_at,
+    updated_by_label: p.updated_by_label,
   };
 }
 
@@ -40,6 +44,8 @@ function mapWorkPrice(p: {
   amount: { toString(): string };
   currency: string;
   notes: string | null;
+  updated_at: Date;
+  updated_by_label: string;
   deleted_at: Date | null;
   unit: { id: string; code: string; name: string };
   vendor: { id: string; name: string; slug: string };
@@ -60,6 +66,8 @@ function mapWorkPrice(p: {
     scope_note: p.scope_note ?? null,
     deleted_at: p.deleted_at,
     notes: p.notes,
+    updated_at: p.updated_at,
+    updated_by_label: p.updated_by_label,
   };
 }
 
