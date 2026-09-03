@@ -30,7 +30,7 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
     <AppShell
       brand={settings.brandMarkUrl ? (
         <div className="flex min-w-0 items-center">
-          <img src={settings.brandMarkUrl} alt={settings.appTitle} className="h-12 max-w-[190px] shrink-0 object-contain object-left" />
+          <img src={settings.brandMarkUrl} alt={settings.appTitle} className="h-[38px] max-w-[190px] shrink-0 object-contain object-left" />
         </div>
       ) : (
         <div className="flex min-w-0 items-center gap-2.5">

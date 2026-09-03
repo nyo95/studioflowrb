@@ -5,9 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.64**
-- Next local revision: **R4.65**
+- Current revision: **R4.65**
+- Next local revision: **R4.66**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.65 — 2026-09-03 — fix(shell): reduce brand mark scale
+
+- Agent: `Codex`
+
+Reduces the uploaded header brand mark from 48px to 38px, approximately 80% of
+the prior displayed size, without changing the header height or alignment.
+
+### Verification
+
+- `npm run typecheck` — clean
+- `git diff --check` — clean
 
 ## R4.64 — 2026-09-03 — fix(shell): prioritize uploaded brand mark
 
