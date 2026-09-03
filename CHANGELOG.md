@@ -5,10 +5,23 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.79**
-- Next local revision: **R4.80**
+- Current revision: **R4.80**
+- Next local revision: **R4.81**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
+
+## R4.80 — 2026-09-03 — chore(branding): include approved organization mark
+
+- Agent: `Codex`
+
+Tracks the owner-approved PNG organization brand mark uploaded through General
+Settings. The application already validates and serves this local asset; this
+revision only places the approved file under source control.
+
+### Verification
+
+- PNG asset inspected: 28,793 bytes
+- `git diff --check` — clean
 
 ## R4.79 — 2026-09-03 — feat(ui-engine): refine responsive navigation and creation actions
 
