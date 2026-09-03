@@ -115,7 +115,7 @@ export function AppShell({
               </div>
               {railToggle}
             </div>
-            <div className="min-w-0 flex-1 pl-[var(--ui-header-brand-width,232px)] max-[840px]:pl-0">{topbar}</div>
+            <div className="flex min-w-0 flex-1 items-center pl-[var(--ui-header-brand-width,232px)] max-[840px]:pl-0">{topbar}</div>
           </header>
         ) : null}
         <div

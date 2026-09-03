@@ -5,9 +5,29 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.62**
-- Next local revision: **R4.63**
+- Current revision: **R4.63**
+- Next local revision: **R4.64**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.63 — 2026-09-03 — fix(shell): stabilize header and add PNG brand marks
+
+- Agent: `Codex`
+
+The AppShell topbar now centers vertically with the brand area, so header
+navigation no longer jumps against the brand mark. General Settings replaces the
+editable brand URL with an optional PNG upload. Files are limited to 2 MB,
+signature-checked, stored under `public/uploads/brand-marks` with random names,
+and rendered in the fixed 28px header mark box.
+
+### Verification
+
+- `npm run typecheck` — clean
+- ESLint on changed modules — clean
+- `npm run check:boundaries` — pass
+- `npm run check:legacy-runtime` — pass
+- `git diff --check` — clean
+- Browser acceptance — upload requires the owner to select the intended PNG;
+  no image was uploaded by the agent.
 
 ## R4.62 — 2026-09-03 — fix(bq): purge speculative template L1 placeholders
 

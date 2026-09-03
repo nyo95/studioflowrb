@@ -5,6 +5,7 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 import { platformSettings } from "@platform/runtime";
 import { parsePlatformGeneralSettingsInput } from "@platform/core/settings";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
+import { saveBrandMarkPng } from "@platform/core/settings/brand-mark";
 
 export async function updateGeneralSettingsAction(
   _prev: ActionResult<{ changed: boolean }> | null,
@@ -12,6 +13,8 @@ export async function updateGeneralSettingsAction(
 ): Promise<ActionResult<{ changed: boolean }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
+    const uploaded = formData.get("brandMarkFile");
+    const brandMarkUrl = uploaded instanceof File && uploaded.size > 0 ? await saveBrandMarkPng(uploaded) : String(formData.get("brandMarkUrl") ?? "").trim() || null;
     const values = parsePlatformGeneralSettingsInput({
       organizationName: String(formData.get("organizationName") ?? ""),
       appTitle: String(formData.get("appTitle") ?? ""),
@@ -19,7 +22,7 @@ export async function updateGeneralSettingsAction(
       timezone: String(formData.get("timezone") ?? ""),
       currency: String(formData.get("currency") ?? ""),
       weekStartsOn: Number(formData.get("weekStartsOn") ?? "1"),
-      brandMarkUrl: String(formData.get("brandMarkUrl") ?? "").trim() || null,
+      brandMarkUrl,
     });
     const result = await platformSettings.update({
       grants,

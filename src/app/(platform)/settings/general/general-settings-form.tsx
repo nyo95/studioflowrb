@@ -43,7 +43,7 @@ export function GeneralSettingsForm({
 
   return (
     <SectionCard>
-      <form action={action}>
+      <form action={action} encType="multipart/form-data">
         <div className="grid gap-4 md:grid-cols-2">
           <Field id="settings-organization" label="Organization name">
             <Input id="settings-organization" name="organizationName" defaultValue={settings.organizationName} required maxLength={120} disabled={disabled} />
@@ -73,8 +73,9 @@ export function GeneralSettingsForm({
               <option value="1">Monday</option>
             </Select>
           </Field>
-          <Field id="settings-brand-mark" label="Brand mark URL" description="Optional https URL or /path.">
-            <Input id="settings-brand-mark" name="brandMarkUrl" defaultValue={settings.brandMarkUrl ?? ""} disabled={disabled} placeholder="https://…" />
+          <input type="hidden" name="brandMarkUrl" value={settings.brandMarkUrl ?? ""} />
+          <Field id="settings-brand-mark" label="Brand mark" description="Optional PNG, maximum 2 MB. It is fitted into the header mark without changing its height.">
+            <Input id="settings-brand-mark" name="brandMarkFile" type="file" accept="image/png,.png" disabled={disabled} />
           </Field>
         </div>
 

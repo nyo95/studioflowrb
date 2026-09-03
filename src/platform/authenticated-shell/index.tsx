@@ -29,7 +29,7 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
       brand={<div className="flex min-w-0 items-center gap-2.5">
         {settings.brandMarkUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- owner-configured URL/path has no fixed image host.
-          <img src={settings.brandMarkUrl} alt="" className="h-7 w-7 object-contain" />
+          <img src={settings.brandMarkUrl} alt="" className="h-7 w-7 shrink-0 object-contain" />
         ) : null}
         <div className="min-w-0">
           <Text as="span" className="block truncate font-semibold">{settings.appTitle}</Text>
