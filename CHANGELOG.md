@@ -5,9 +5,29 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.67**
-- Next local revision: **R4.68**
+- Current revision: **R4.68**
+- Next local revision: **R4.69**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.68 — 2026-09-03 — fix(masterdata): rename Store vendor type to Retail
+
+- Agent: `Codex`
+
+Changes only the display name of stable Vendor Type code `STORE` to `Retail`.
+Its Material capability and all existing assignments remain unchanged.
+
+### Migration
+
+- Adds `20260903070000_r4_68_vendor_store_retail` to update the existing
+  rebuild vocabulary row.
+
+### Verification
+
+- `npx prisma migrate deploy` — applied to verified `studioflow_rebuild`
+- `npm run typecheck` — clean
+- `npm run check:boundaries` — pass
+- `npm run check:legacy-runtime` — pass
+- `git diff --check` — clean
 
 ## R4.67 — 2026-09-03 — fix(shell): default the root route to Master Data
 

@@ -86,7 +86,7 @@ the three curated Pricing categories.
 |---|---|---|---|
 | `SUPPLIER` | Supplier | ✓ | ✗ |
 | `DISTRIBUTOR` | Distributor | ✓ | ✗ |
-| `STORE` | Store | ✓ | ✗ |
+| `STORE` | Retail | ✓ | ✗ |
 | `FACTORY` | Factory | ✓ | ✗ |
 | `SUBCON` | Subcon | ✓ | ✓ |
 | `SERVICE` | Service | ✗ | ✓ |
