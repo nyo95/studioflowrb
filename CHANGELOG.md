@@ -5,9 +5,34 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.61**
-- Next local revision: **R4.62**
+- Current revision: **R4.62**
+- Next local revision: **R4.63**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.62 — 2026-09-03 — fix(bq): purge speculative template L1 placeholders
+
+- Agent: `Codex`
+
+The owner rejected `BqTemplateItem` as speculative. Its Prisma model, template
+section relation, and persisted table are removed. Standard BQ templates remain
+the approved Section/Subsection scaffold with optional Library recommendations;
+they do not create unapproved L1 rows.
+
+### Migration
+
+- Adds `20260903060000_r4_62_purge_speculative_template_items`, which drops only
+  `bq.bq_template_item`. The original applied migration is intentionally left
+  immutable.
+
+### Verification
+
+- `npx prisma generate` — clean
+- `npx prisma validate` — valid
+- `npx prisma migrate deploy` — applied to verified `studioflow_rebuild`
+- `npm run typecheck` — clean
+- `npm run check:boundaries` — pass
+- `npm run check:legacy-runtime` — pass
+- `git diff --check` — clean
 
 ## R4.61 — 2026-09-03 — docs(changelog): advance the revision ledger
 

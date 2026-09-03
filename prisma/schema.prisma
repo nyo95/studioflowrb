@@ -799,26 +799,8 @@ model BqTemplateSection {
   created_at    DateTime  @default(now())
 
   recommendations BqTemplateRecommendation[]
-  item_templates  BqTemplateItem[]
 
   @@map("bq_template_section")
-  @@schema("bq")
-}
-
-// Standard BQ template placeholders. These create project-owned L1 rows when a
-// Standard BQ Template is applied; they never carry reusable pricing.
-model BqTemplateItem {
-  id                  String            @id @default(cuid())
-  template_section_id String
-  template_section    BqTemplateSection @relation(fields: [template_section_id], references: [id], onDelete: Cascade)
-  name                String
-  qty                 Decimal           @default(1) @db.Decimal(18, 6)
-  unit                String            @default("ls")
-  sort_order          Int               @default(0)
-  created_at          DateTime          @default(now())
-
-  @@map("bq_template_item")
-  @@index([template_section_id, sort_order])
   @@schema("bq")
 }
 
