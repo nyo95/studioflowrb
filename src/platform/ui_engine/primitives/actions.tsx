@@ -68,6 +68,8 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       size={size}
       className={cx("w-(--ui-control-height-md) !p-0", size === "sm" && "w-(--ui-control-height-sm)", className)}
       aria-label={label}
+      // The native tooltip stays the fallback for an icon button nobody wrapped.
+      // The shared Tooltip strips it from its own child, so the two never race.
       title={title ?? label}
       {...props}
     >
@@ -78,14 +80,21 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
 
 export function Spinner({
   label = "Loading",
+  decorative = false,
   className,
   ...props
-}: HTMLAttributes<HTMLSpanElement> & { label?: string }) {
+}: HTMLAttributes<HTMLSpanElement> & {
+  label?: string;
+  /** Use inside a container that already announces the loading state, so the
+   *  same message is not read out twice. */
+  decorative?: boolean;
+}) {
   return (
     <span
       className={cx("inline-flex text-ink-secondary [&_svg]:h-[18px] [&_svg]:w-[18px] [&_svg]:animate-ui-spin", className)}
-      role="status"
-      aria-label={label}
+      role={decorative ? undefined : "status"}
+      aria-label={decorative ? undefined : label}
+      aria-hidden={decorative || undefined}
       {...props}
     >
       <LoaderCircle aria-hidden="true" />

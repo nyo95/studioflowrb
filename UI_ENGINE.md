@@ -282,6 +282,14 @@ Apps own:
 
 Do not promote one screen's table geometry to global tokens.
 
+### Sticky header and the scrolling body
+
+`stickyHeader` is inert on its own: a sticky header needs an ancestor that
+actually scrolls, and an unbounded table simply grows. Pass `maxBodyHeight`
+(e.g. `"60vh"`) with it. The engine owns the bounded scroll container and the
+sticky mechanics; the app decides how tall the body may be, because that is a
+screen-layout decision, not a shared one.
+
 ### Sorting — where the line falls
 
 Sorting is split, and the split is the whole point. The engine renders the control
@@ -369,6 +377,18 @@ pattern beside the field label with a compact `(?)` affordance and an accessible
 label. Apps own the tooltip copy; the UI Engine owns the interaction, placement,
 focus behavior, and accessible relationship.
 
+The help affordance sits **beside** the label element, never inside it: a button
+nested in a `<label>` forwards its click to the labelled control, so asking for
+help would toggle the very checkbox or switch being explained.
+
+A required field sets `aria-required` on its control. The asterisk is decorative
+and hidden, so it is not on its own a signal anyone using assistive technology
+can receive.
+
+`Tooltip` suppresses a native `title` on the element it wraps. `IconButton`
+carries `title` as the fallback for an icon button nobody wrapped; when the
+shared tooltip is present it supersedes that fallback instead of racing it.
+
 Apps own:
 - validation schema;
 - domain field grouping;
@@ -383,6 +403,17 @@ The engine distinguishes three interaction shapes instead of overloading one amb
 - `CreatableSearch` — search/select one option plus an explicit create intent and optional explicit clear intent;
 - a future creatable tag input — create/select multiple values, only when a real multi-value consumer is approved.
 
+Both controls put the combobox semantics on the **search field**, which owns the
+query and the listbox, not on the trigger button. A trigger carrying
+`role="combobox"` with no text input of its own announces an editable control
+that never accepts text. The trigger is a button with `aria-haspopup="listbox"`.
+
+Enter from the search field follows one rule in both controls, so a habit learned
+in one does not misfire in the other: an exact label match commits, otherwise a
+single remaining result commits, otherwise nothing. The engine never guesses
+among several matches. `CreatableSearch` additionally commits an explicit create
+when the query matches nothing.
+
 `CreatableSearch` owns generic interaction only:
 
 - flat or grouped options, descriptions/keywords, disabled rows, and app-supplied badges;
@@ -391,7 +422,11 @@ The engine distinguishes three interaction shapes instead of overloading one amb
 - explicit clear row/button with app-supplied copy;
 - exact-match suppression and an app-supplied create label;
 - ArrowUp/ArrowDown/Home/End navigation, Enter select/create, Escape close with focus return;
-- busy, disabled, empty, and creation-error presentation;
+- busy, disabled, empty, and creation-error presentation — the app owns the
+  create command, the engine owns the in-flight state around it: a second
+  activation is refused while one is running, a rejection is caught and shown
+  rather than escaping as an unhandled rejection, and `creatingLabel` /
+  `createErrorLabel` supply the wording;
 - accessible combobox/listbox relationships and active-option announcement.
 
 It does not create entities, call server actions, choose permissions, reuse records, assign roles, guess defaults, write audit events, or own optimistic server data. Apps provide the command and may use a generic option-overlay helper only if that helper remains persistence- and domain-neutral.
@@ -404,8 +439,18 @@ The engine also owns the React-specific mechanics repeatedly needed by forms acr
 
 - `useDebouncedValue(value, delay)` — cancels stale timers and exposes no search/business policy;
 - `useOptionOverlay(serverOptions)` — merges newly returned options by stable ID until the server refresh includes them; server data wins conflicts;
-- `useConfirm()` plus one accessible `ConfirmDialog` renderer — resolves superseded/unmounted requests safely and optionally requires exact typed text;
-- `useUnsavedChangesGuard()` plus prompt — guards close/navigation only after real edits, supports an explicit custom dirty comparator, and closes without prompting after a successful save;
+- `useConfirm()` plus one accessible `ConfirmDialog` renderer — a superseded
+  request is settled `false` before the new one replaces it, so no caller is left
+  awaiting a promise that can never resolve; unmount settles the same way;
+  `requireTypedConfirmation` gates the confirm control on exact typed text and is
+  reserved for the irreversible, since a sentence to type is a stronger guard
+  than a sentence to read;
+- `useUnsavedChangesGuard()` plus prompt — guards close/navigation only after
+  real edits, supports an explicit custom dirty comparator, and closes without
+  prompting after a successful save. The comparator governs the baseline reset as
+  well as the dirty check: reference identity would move the baseline on every
+  render of a form that rebuilds its initial object, and the guard would never
+  fire;
 - pending-submit and action-feedback presentation that accepts state as props and owns no server action, permission, redirect, or revalidation policy.
 
 These hooks must not contain entity names, toast copy, default roles, persistence calls, cache paths, or app imports. Browser unload protection is allowed only while dirty and must be removed on cleanup. In-app navigation/overlay close behavior is covered by focused interaction tests.
@@ -413,11 +458,15 @@ These hooks must not contain entity names, toast copy, default roles, persistenc
 ## 9. Dialog & Drawer Contract
 
 UI Engine owns:
-- standard size variants sm/md/lg/xl/full;
+- standard size variants sm/md/lg/xl/full — the size token applies to `Drawer` at
+  every viewport, not only the narrow one;
 - header/body/footer layout;
 - scroll behavior;
 - close/action placement;
-- destructive confirmation convention.
+- destructive confirmation convention;
+- `dismissible` — refusing Escape, outside-click, and the close control. The
+  engine owns the refusal; the app decides when to refuse, typically while a
+  submit is in flight. It must never be left false with no visible way out.
 
 Apps choose Dialog vs Drawer according to `DESIGN.md`.
 

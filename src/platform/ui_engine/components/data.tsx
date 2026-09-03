@@ -19,6 +19,13 @@ export type DataTableProps = TableHTMLAttributes<HTMLTableElement> & {
   minWidth?: string | number;
   density?: "regular" | "compact";
   stickyHeader?: boolean;
+  /**
+   * Caps the scrolling body, e.g. `"60vh"`. A sticky header needs a scroll
+   * container that actually scrolls; without a bound the table simply grows and
+   * the header has nothing to stick to. Required for `stickyHeader` to do
+   * anything, so the two are supplied together.
+   */
+  maxBodyHeight?: string | number;
   state?: ReactNode;
   containerClassName?: string;
 };
@@ -27,6 +34,7 @@ export function DataTable({
   minWidth,
   density = "regular",
   stickyHeader = false,
+  maxBodyHeight,
   state,
   className,
   containerClassName,
@@ -34,6 +42,7 @@ export function DataTable({
   children,
   ...props
 }: DataTableProps) {
+  const scrolls = maxBodyHeight !== undefined;
   return (
     <div
       className={cx(
@@ -47,7 +56,10 @@ export function DataTable({
       data-sticky-header={stickyHeader || undefined}
     >
       {state ?? (
-        <div className="overflow-x-auto">
+        <div
+          className={cx("overflow-x-auto", scrolls && "overflow-y-auto")}
+          style={scrolls ? ({ maxHeight: maxBodyHeight } as CSSProperties) : undefined}
+        >
           <table
             className={cx("w-full border-separate border-spacing-0 text-left tabular-nums", className)}
             style={{ minWidth, ...style } as CSSProperties}

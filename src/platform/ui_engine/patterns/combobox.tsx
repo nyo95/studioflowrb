@@ -78,7 +78,20 @@ export function Combobox({
   };
 
   const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
+    if (event.key === "Enter") {
+      // Enter from the search field, per the shared keyboard contract. The rule
+      // matches the creatable variant so one control never commits on a keystroke
+      // the other ignores: an exact label match wins, otherwise a single
+      // remaining result. Never a guess among several.
+      event.preventDefault();
+      const term = activeQuery.trim().toLowerCase();
+      const enabled = visibleOptions.filter((option) => !option.disabled);
+      const exact = term ? enabled.find((option) => option.label.toLowerCase() === term) : undefined;
+      if (exact) selectOption(exact.id);
+      else if (enabled.length === 1) selectOption(enabled[0].id);
+      return;
+    }
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
     focusOption(-1, event.key as ComboboxNavigationKey);
   };
@@ -108,9 +121,7 @@ export function Combobox({
           trailingIcon={<ChevronDown aria-hidden="true" />}
           aria-label={label}
           aria-expanded={open}
-          aria-controls={listboxId}
           aria-haspopup="listbox"
-          role="combobox"
           disabled={disabled}
         >
           {selected?.label ?? placeholder}
@@ -129,6 +140,10 @@ export function Combobox({
               onChange={(event) => updateQuery(event.target.value)}
               placeholder={searchPlaceholder}
               aria-label={`Search ${label.toLowerCase()}`}
+              role="combobox"
+              aria-expanded
+              aria-controls={listboxId}
+              aria-autocomplete="list"
               autoFocus
               onKeyDown={handleSearchKeyDown}
               className="pl-[31px]"
@@ -156,8 +171,11 @@ export function Combobox({
                   {option.description ? <Text as="span" size="sm" tone="secondary">{option.description}</Text> : null}
                 </span>
               </button>
-            )) : <div className="px-2.5 py-[18px] text-center text-ink-secondary">{emptyLabel}</div>}
+            )) : null}
           </div>
+          {visibleOptions.length ? null : (
+            <div className="px-2.5 py-[18px] text-center text-ink-secondary">{emptyLabel}</div>
+          )}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

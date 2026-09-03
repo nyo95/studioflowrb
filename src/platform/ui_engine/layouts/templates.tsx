@@ -79,10 +79,12 @@ export type TabsProps = {
   className?: string;
 };
 
-export function Tabs({ items, label = "Sections", className, ...props }: TabsProps) {
+export function Tabs({ items, label = "Sections", className, defaultValue, ...props }: TabsProps) {
+  // The spread used to overwrite the computed fallback with an undefined
+  // `defaultValue`, so an uncontrolled Tabs opened with no panel selected at all.
   const fallbackValue = items.find((item) => !item.disabled)?.value;
   return (
-    <RTabs.Root className={cx("min-w-0", className)} defaultValue={props.defaultValue ?? fallbackValue} {...props}>
+    <RTabs.Root className={cx("min-w-0", className)} defaultValue={defaultValue ?? fallbackValue} {...props}>
       <RTabs.List className="flex gap-0.5 overflow-x-auto border-b border-line" aria-label={label}>
         {items.map((item) => (
           <RTabs.Trigger

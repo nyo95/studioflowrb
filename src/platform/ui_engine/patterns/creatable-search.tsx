@@ -1,8 +1,8 @@
 "use client";
 
-import { Check, ChevronDown, Plus, Search, X } from "lucide-react";
+import { Check, ChevronDown, LoaderCircle, Plus, Search, X } from "lucide-react";
 import { Popover } from "radix-ui";
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { getComboboxNavigationIndex, type ComboboxNavigationKey } from "../internal/combobox-navigation";
 import { cx } from "../internal/cx";
@@ -35,6 +35,10 @@ export type CreatableSearchProps = {
   searchPlaceholder?: string;
   emptyLabel?: string;
   createLabel?: (query: string) => string;
+  /** Shown while an app-supplied create command is in flight. */
+  creatingLabel?: (query: string) => string;
+  /** Presentation for a rejected create. The engine owns when; the app owns wording. */
+  createErrorLabel?: (error: unknown) => ReactNode;
   allowClear?: boolean;
   clearLabel?: string;
   disabled?: boolean;
@@ -58,6 +62,8 @@ export function CreatableSearch({
   searchPlaceholder = "Search…",
   emptyLabel = "No matches found",
   createLabel,
+  creatingLabel = (query) => `Creating "${query}"…`,
+  createErrorLabel = () => "Could not create that entry. Try again.",
   allowClear = false,
   clearLabel = "Clear",
   disabled = false,
@@ -65,7 +71,12 @@ export function CreatableSearch({
 }: CreatableSearchProps) {
   const [open, setOpen] = useState(false);
   const [internalQuery, setInternalQuery] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<ReactNode>(null);
+  const [previousValue, setPreviousValue] = useState(value);
+  const [wasOpen, setWasOpen] = useState(false);
   const listboxId = useId();
+  const statusId = useId();
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const flatOptions = useMemo(() => (groups ? groups.flatMap((group) => group.options) : options), [groups, options]);
@@ -95,16 +106,32 @@ export function CreatableSearch({
   };
 
   const selectOption = (optionId: string) => {
+    setCreateError(null);
     onValueChange(optionId);
     setOpen(false);
     updateQuery("");
   };
 
+  /**
+   * The app owns the create command; the engine owns the busy and failure states
+   * around it. Previously a rejected create surfaced as an unhandled rejection,
+   * the overlay stayed open explaining nothing, and nothing stopped a second
+   * click from creating the record twice.
+   */
   const createOption = async (text: string) => {
-    const createdValue = await onCreate?.(text);
-    onValueChange(typeof createdValue === "string" ? createdValue : text);
-    setOpen(false);
-    updateQuery("");
+    if (creating) return;
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const createdValue = await onCreate?.(text);
+      onValueChange(typeof createdValue === "string" ? createdValue : text);
+      setOpen(false);
+      updateQuery("");
+    } catch (error) {
+      setCreateError(createErrorLabel(error));
+    } finally {
+      setCreating(false);
+    }
   };
 
   const focusOption = (currentIndex: number, key: ComboboxNavigationKey) => {
@@ -115,6 +142,20 @@ export function CreatableSearch({
     );
     if (nextIndex !== null) optionRefs.current[nextIndex]?.focus();
   };
+
+  // A value replaced from outside — a form reset, a parent switching records —
+  // must not leave the previous search term sitting in the field. Adjusted
+  // during render rather than in an effect, so no extra pass is scheduled.
+  if (value !== previousValue) {
+    setPreviousValue(value);
+    if (query === undefined) setInternalQuery("");
+    setCreateError(null);
+  }
+
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (!open) setCreateError(null);
+  }
 
   const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Escape") {
@@ -167,9 +208,7 @@ export function CreatableSearch({
           trailingIcon={<ChevronDown aria-hidden="true" />}
           aria-label={label}
           aria-expanded={open}
-          aria-controls={listboxId}
           aria-haspopup="listbox"
-          role="combobox"
           disabled={disabled}
           onClick={() => setOpen((current) => !current)}
         >
@@ -189,6 +228,11 @@ export function CreatableSearch({
               onChange={(event) => updateQuery(event.target.value)}
               placeholder={searchPlaceholder}
               aria-label={`Search ${label.toLowerCase()}`}
+              role="combobox"
+              aria-expanded
+              aria-controls={listboxId}
+              aria-autocomplete="list"
+              aria-describedby={createError || creating ? statusId : undefined}
               autoFocus
               onKeyDown={handleSearchKeyDown}
               className="pl-[31px] pr-8"
@@ -291,27 +335,46 @@ export function CreatableSearch({
               ))
             ) : null}
 
-            {!visibleOptions.length && !canCreate ? (
-              <div className="px-2.5 py-[18px] text-center text-ink-secondary">{emptyLabel}</div>
-            ) : null}
-
-            {canCreate ? (
-              <>
-                {(visibleOptions.length > 0 || allowClear) ? <div className="my-1 h-px bg-line" /> : null}
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 rounded-action border-0 bg-[color-mix(in_srgb,var(--ui-surface-muted)_60%,var(--ui-surface))] px-2 py-2 text-left text-ink hover:bg-surface-muted"
-                  onClick={() => createOption(activeQuery.trim())}
-                >
-                  <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-pill bg-action text-ink-inverse">
-                    <Plus aria-hidden="true" className="h-3 w-3" />
-                  </span>
-                  <span className="min-w-0 truncate font-medium">{createLabel?.(activeQuery.trim()) ?? `Create "${activeQuery.trim()}"`}</span>
-                  <span className="ml-auto text-xs text-ink-tertiary">Enter ↵</span>
-                </button>
-              </>
-            ) : null}
           </div>
+
+          {!visibleOptions.length && !canCreate ? (
+            <div className="px-2.5 py-[18px] text-center text-ink-secondary">{emptyLabel}</div>
+          ) : null}
+
+          {canCreate ? (
+            <div className="p-[5px] pt-0">
+              {(visibleOptions.length > 0 || allowClear) ? <div className="my-1 h-px bg-line" /> : null}
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-action border-0 bg-[color-mix(in_srgb,var(--ui-surface-muted)_60%,var(--ui-surface))] px-2 py-2 text-left text-ink hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={creating}
+                aria-busy={creating || undefined}
+                onClick={() => createOption(activeQuery.trim())}
+              >
+                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-pill bg-action text-ink-inverse">
+                  {creating
+                    ? <LoaderCircle aria-hidden="true" className="h-3 w-3 animate-ui-spin" />
+                    : <Plus aria-hidden="true" className="h-3 w-3" />}
+                </span>
+                <span className="min-w-0 truncate font-medium">
+                  {creating
+                    ? creatingLabel(activeQuery.trim())
+                    : createLabel?.(activeQuery.trim()) ?? `Create "${activeQuery.trim()}"`}
+                </span>
+                {creating ? null : <span className="ml-auto text-xs text-ink-tertiary">Enter ↵</span>}
+              </button>
+            </div>
+          ) : null}
+
+          {createError ? (
+            <div
+              id={statusId}
+              role="alert"
+              className="border-t border-line-subtle bg-danger-surface px-2.5 py-2 text-xs text-danger"
+            >
+              {createError}
+            </div>
+          ) : null}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

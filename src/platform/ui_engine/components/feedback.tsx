@@ -88,7 +88,9 @@ function State({
       aria-live={kind === "loading" ? "polite" : undefined}
       {...props}
     >
-      {kind === "loading" ? <Spinner label={typeof title === "string" ? title : "Loading"} /> : null}
+      {/* The surrounding State is already the live region; a nested status role
+          made assistive tech announce the same loading twice. */}
+      {kind === "loading" ? <Spinner decorative /> : null}
       {kind !== "loading" && Icon ? <Icon className="mb-0.5 h-[22px] w-[22px] text-ink-tertiary" aria-hidden="true" /> : null}
       {title ? <Heading level={4}>{title}</Heading> : null}
       {description ? <Text as="p" tone="secondary">{description}</Text> : null}

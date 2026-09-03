@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.54**
-- Next local revision: **R4.55**
+- Current revision: **R4.55**
+- Next local revision: **R4.56**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,107 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.55 — 2026-09-03 — fix(ui-engine): repair interaction defects and complete named capabilities
+
+- Agent: `Claude`
+
+Curation pass over `src/platform/ui_engine/` against `UI_ENGINE.md` and
+`DESIGN.md`. Nothing in the design language moved: no token, typography, radius,
+spacing, or colour changed. Every change is behavior, accessibility, or API
+completeness. `UI_ENGINE.md` was amended where it described a capability the
+engine did not actually have.
+
+### Things that did not work
+
+- `Drawer` set no width above the 560px breakpoint, so its `size` prop did
+  nothing on any desktop viewport and the panel shrank to its content. The size
+  token now reaches the drawer at every width.
+- `Tabs` spread its props after computing the first-enabled fallback, so an
+  undefined `defaultValue` overwrote it. An uncontrolled tab set opened with no
+  panel selected at all.
+- `useConfirm` replaced its resolver without settling the previous one. A second
+  confirm request left the first caller awaiting a promise that could never
+  resolve. A superseded request now settles `false`, as the contract already
+  said it did.
+- `useUnsavedChangesGuard` reset its baseline on reference identity while using
+  the caller's comparator only for the dirty check. A form that rebuilt its
+  initial object each render moved the baseline every render, so the guard never
+  saw a dirty form and never prompted. The comparator now governs both.
+- `CreatableSearch` awaited an app-supplied create with no `try`/`catch` and no
+  in-flight guard: a rejection escaped as an unhandled rejection while the
+  overlay sat open explaining nothing, and a second click created the record
+  twice. `UI_ENGINE.md` §8 has always listed busy and creation-error
+  presentation as engine-owned; neither existed.
+- `CreatableSearch` did not clear its search text when the value was replaced
+  from outside, contrary to the same section. It now resets on an external
+  change, adjusted during render rather than from an effect.
+- `Field` rendered its help affordance as a `<button>` inside the `<label>`. A
+  button nested in a label forwards its click to the labelled control, so asking
+  for help toggled the very checkbox or switch being explained. The affordance
+  now sits beside the label.
+- `DataTable` `stickyHeader` set the sticky position but nothing bounded the
+  scroll container, so the header had nothing to stick to. Added `maxBodyHeight`,
+  which the two are now documented to be supplied together.
+
+### Capabilities the contract named but the engine lacked
+
+- `ConfirmDialog` and `useConfirm` gained `requireTypedConfirmation` — exact
+  typed text before the confirm control unlocks (`UI_ENGINE.md` §8).
+- `Combobox` ignored Enter in its search field, against §19's stated keyboard
+  contract. Both search controls now follow one rule: an exact label match
+  commits, otherwise a single remaining result commits, otherwise nothing. The
+  engine never guesses among several matches.
+- `Dialog`/`Drawer` gained `dismissible`, so a submit in flight is not dismissed
+  by a stray Escape or outside click. The engine owns the refusal; the app
+  decides when.
+
+### Accessibility
+
+- `Combobox` and `CreatableSearch` put `role="combobox"` on the trigger button.
+  A trigger with no text input of its own is announced as an editable control
+  that never accepts text. The combobox semantics moved to the search field that
+  actually owns the query and the listbox; the trigger keeps
+  `aria-haspopup="listbox"`.
+- `CreatableSearch` had its empty message and create row as non-option children
+  of `role="listbox"`. They now sit beside it.
+- `Field` sets `aria-required` on its control. The asterisk is decorative and
+  `aria-hidden`, so it was not a signal assistive technology could receive.
+- `LoadingState` nested a `role="status"` spinner inside a `role="status"`
+  region, announcing the same message twice. `Spinner` gained `decorative` for
+  use inside a container that already announces.
+- `IconButton` set `title` equal to its label unconditionally, so an icon button
+  wrapped in the shared `Tooltip` showed two tooltips and announced its name
+  twice. The native title stays as the fallback for an unwrapped button;
+  `Tooltip` now supersedes it on the element it wraps.
+
+### Contract amendments
+
+`UI_ENGINE.md` §7 documents the sticky-header/`maxBodyHeight` pairing; §8
+documents where combobox semantics live, the shared Enter rule, engine-owned
+create busy/error state, the superseded-confirm guarantee, the comparator-driven
+baseline, the help-affordance placement rule, `aria-required`, and tooltip
+supersession; §9 documents `dismissible` and that the size token applies to
+`Drawer` at every viewport.
+
+### Verification
+
+- `npx tsc --noEmit` — clean
+- `npx eslint src scripts` — clean
+- `npm run check:boundaries`, `npm run check:legacy-runtime` — pass
+- UI Engine suite 21/21 (9 existing, 12 new), executed out-of-tree under `tsx`
+  against a copy of `src/platform/ui_engine/` with pinned React/radix-ui/lucide
+
+### Limitations — not a pass
+
+- `npm test` still cannot run in-tree: `node_modules` holds a Windows `esbuild`
+  binary while the agent shell is Linux. The suite above was run against an
+  out-of-tree copy, which proves the engine but not the runner.
+- No browser acceptance: keyboard traversal, focus return, and the narrow
+  viewport were reasoned about and unit-asserted, not driven in a real browser.
+- Consumers were not migrated. `dismissible`, `maxBodyHeight`,
+  `requireTypedConfirmation`, and `Spinner decorative` are available but no app
+  screen passes them yet.
 
 ## R4.54 — 2026-09-03 — fix(bq,masterdata,contracts): repair contract-violating backend logic
 

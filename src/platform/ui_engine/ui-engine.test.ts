@@ -227,6 +227,128 @@ describe("UI Engine foundation", () => {
     assert.equal(getComboboxNavigationIndex([true, true], -1, "ArrowDown"), null);
   });
 
+  it("gives the drawer the width its size token names", () => {
+    const overlays = readFileSync(new URL("./layouts/overlays.tsx", import.meta.url), "utf8");
+    /* Without a width on the drawer branch the panel shrank to its content and
+       the size prop did nothing above the narrow breakpoint. */
+    assert.match(overlays, /h-full w-\[min\(100%,var\(--dialog-width\)\)\]/);
+  });
+
+  it("refuses dismissal only when the caller asks, and never silently", () => {
+    const overlays = readFileSync(new URL("./layouts/overlays.tsx", import.meta.url), "utf8");
+    assert.match(overlays, /onEscapeKeyDown=\{blockDismiss\}/);
+    assert.match(overlays, /onPointerDownOutside=\{blockDismiss\}/);
+    assert.match(overlays, /dismissible = true/);
+  });
+
+  it("gates confirmation on exact typed text when one is required", () => {
+    const overlays = readFileSync(new URL("./layouts/overlays.tsx", import.meta.url), "utf8");
+    assert.match(overlays, /requireTypedConfirmation/);
+    assert.match(overlays, /typed === requireTypedConfirmation/);
+    const hooks = readFileSync(new URL("./patterns/hooks.tsx", import.meta.url), "utf8");
+    /* The request shape carries it through, or the dialog support is unreachable. */
+    assert.match(hooks, /requireTypedConfirmation=\{request\.requireTypedConfirmation\}/);
+  });
+
+  it("settles a superseded confirm instead of stranding its caller", () => {
+    const hooks = readFileSync(new URL("./patterns/hooks.tsx", import.meta.url), "utf8");
+    assert.match(hooks, /resolverRef\.current\?\.\(false\);\s*\n\s*resolverRef\.current = null;\s*\n\s*setRequest\(nextRequest\)/);
+  });
+
+  it("compares the unsaved-changes baseline with the caller's comparator", () => {
+    const hooks = readFileSync(new URL("./patterns/hooks.tsx", import.meta.url), "utf8");
+    /* Reference identity moved the baseline every render for a form that rebuilt
+       its initial object, so the guard never saw a dirty form. */
+    assert.match(hooks, /if \(!equals\(initialValue, prevInitial\)\)/);
+  });
+
+  it("owns the busy and failure states around an app-supplied create", () => {
+    const creatable = readFileSync(new URL("./patterns/creatable-search.tsx", import.meta.url), "utf8");
+    assert.match(creatable, /if \(creating\) return;/);
+    assert.match(creatable, /catch \(error\) \{\s*\n\s*setCreateError\(createErrorLabel\(error\)\)/);
+    assert.match(creatable, /role="alert"/);
+  });
+
+  it("puts combobox semantics on the field that owns the query", () => {
+    for (const file of ["./patterns/combobox.tsx", "./patterns/creatable-search.tsx"]) {
+      const source = readFileSync(new URL(file, import.meta.url), "utf8");
+      /* A trigger button is not a combobox: role="combobox" without an owned
+         text input announces an editable control that never accepts text. */
+      assert.doesNotMatch(source, /role="combobox"\n\s+disabled=\{disabled\}/);
+      assert.match(source, /aria-autocomplete="list"/);
+      assert.match(source, /aria-haspopup="listbox"/);
+    }
+  });
+
+  it("selects from the search field on Enter in both search controls", () => {
+    for (const file of ["./patterns/combobox.tsx", "./patterns/creatable-search.tsx"]) {
+      const source = readFileSync(new URL(file, import.meta.url), "utf8");
+      assert.match(source, /event\.key === "Enter"/);
+    }
+  });
+
+  it("opens an uncontrolled tab set on its first enabled panel", () => {
+    const tabs = renderToStaticMarkup(createElement(ui.Tabs, {
+      items: [
+        { value: "one", label: "One", content: "First", disabled: true },
+        { value: "two", label: "Two", content: "Second" },
+      ],
+    }));
+    /* The prop spread used to overwrite the computed fallback with undefined,
+       leaving every panel closed. */
+    assert.match(tabs, /data-state="active"/);
+    assert.match(tabs, /Second/);
+  });
+
+  it("keeps a bounded scroll body available for a sticky header", () => {
+    const table = renderToStaticMarkup(createElement(ui.DataTable, {
+      stickyHeader: true,
+      maxBodyHeight: "60vh",
+    }));
+    /* A sticky header needs a container that actually scrolls. */
+    assert.match(table, /data-sticky-header="true"/);
+    assert.match(table, /overflow-y-auto/);
+    assert.match(table, /max-height:60vh/);
+  });
+
+  it("marks a required field for assistive technology, not only with an asterisk", () => {
+    const field = renderToStaticMarkup(
+      createElement(
+        ui.Field,
+        { id: "record-code", label: "Code", description: "Short identifier.", required: true },
+        createElement(ui.Input, {}),
+      ),
+    );
+    assert.match(field, /aria-required="true"/);
+    /* The help control must sit beside the label, not inside it: a button in a
+       label forwards its click to the labelled control. */
+    assert.match(field, /<\/label>[\s\S]*aria-label="More information"/);
+  });
+
+  it("keeps one tooltip per control and announces loading once", () => {
+    const iconButton = renderToStaticMarkup(createElement(ui.IconButton, {
+      label: "Archive",
+      icon: createElement("svg", { "aria-hidden": true }),
+    }));
+    /* Unwrapped, the native tooltip is the fallback. */
+    assert.match(iconButton, /aria-label="Archive"/);
+    assert.match(iconButton, /title="Archive"/);
+
+    /* Wrapped, the shared tooltip supersedes it rather than racing it. */
+    const tooltipped = renderToStaticMarkup(createElement(
+      ui.Tooltip,
+      { content: "Archive this record" } as never,
+      createElement(ui.IconButton, {
+        label: "Archive",
+        icon: createElement("svg", { "aria-hidden": true }),
+      }),
+    ));
+    assert.doesNotMatch(tooltipped, /title="Archive"/);
+
+    const loading = renderToStaticMarkup(createElement(ui.LoadingState, { title: "Loading records" }));
+    assert.equal(loading.match(/role="status"/g)?.length, 1);
+  });
+
   it("keeps app internals and domain vocabulary out of shared UI sources", () => {
     const root = fileURLToPath(new URL("./", import.meta.url));
     const sourceFiles = readdirSync(root, { recursive: true, withFileTypes: true })

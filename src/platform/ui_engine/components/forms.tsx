@@ -19,6 +19,7 @@ type ControlElementProps = {
   id?: string;
   "aria-describedby"?: string;
   "aria-invalid"?: AriaAttributes["aria-invalid"];
+  "aria-required"?: AriaAttributes["aria-required"];
 };
 
 export type FieldProps = Omit<HTMLAttributes<HTMLDivElement>, "children" | "id"> & {
@@ -50,24 +51,30 @@ export function Field({
         id: controlId,
         "aria-describedby": describedBy,
         "aria-invalid": error ? true : children.props["aria-invalid"],
+        // The asterisk is decorative and hidden, so without this a screen reader
+        // never learns the field is required.
+        "aria-required": required ? true : children.props["aria-required"],
       })
     : children;
 
   return (
     <div className={cx("grid min-w-0 gap-[5px]", className)} {...props}>
-      <label className="inline-flex w-fit items-baseline gap-1 font-semibold text-ink" htmlFor={controlId}>
-        <span className="inline-flex items-center gap-1">
+      {/* The help control sits beside the label, never inside it: a button
+          nested in a <label> forwards its click to the labelled control, so
+          asking for help toggled the very checkbox or switch being explained. */}
+      <div className="inline-flex w-fit items-baseline gap-1">
+        <label className="font-semibold text-ink" htmlFor={controlId}>
           {label}
-          {description ? (
-            <Tooltip content={description}>
-              <button type="button" aria-label="More information" className="inline-flex h-4 w-4 items-center justify-center rounded-full text-ink-tertiary hover:text-ink">
-                <CircleHelp size={14} aria-hidden="true" />
-              </button>
-            </Tooltip>
-          ) : null}
-        </span>
-        {required ? <span className="text-danger" aria-hidden="true">*</span> : null}
-      </label>
+          {required ? <span className="text-danger" aria-hidden="true"> *</span> : null}
+        </label>
+        {description ? (
+          <Tooltip content={description}>
+            <button type="button" aria-label="More information" className="inline-flex h-4 w-4 shrink-0 translate-y-[2px] items-center justify-center rounded-full text-ink-tertiary hover:text-ink">
+              <CircleHelp size={14} aria-hidden="true" />
+            </button>
+          </Tooltip>
+        ) : null}
+      </div>
       {description ? (
         <span id={descriptionId} className="sr-only">
           {description}

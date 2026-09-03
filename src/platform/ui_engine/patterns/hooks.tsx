@@ -59,6 +59,8 @@ export type ConfirmRequest = {
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: ConfirmTone;
+  /** Exact text the operator must type before the confirm control unlocks. */
+  requireTypedConfirmation?: string;
 };
 
 export function useConfirm() {
@@ -66,6 +68,11 @@ export function useConfirm() {
   const resolverRef = useRef<((value: boolean) => void) | null>(null);
 
   const confirm = useCallback((nextRequest: ConfirmRequest) => {
+    // A second request supersedes the first. Replacing the resolver without
+    // settling it left the earlier caller awaiting a promise that could never
+    // resolve — the await simply never returned.
+    resolverRef.current?.(false);
+    resolverRef.current = null;
     setRequest(nextRequest);
     return new Promise<boolean>((resolve) => {
       resolverRef.current = resolve;
@@ -97,6 +104,7 @@ export function useConfirm() {
       confirmLabel={request.confirmLabel}
       cancelLabel={request.cancelLabel}
       tone={request.tone}
+      requireTypedConfirmation={request.requireTypedConfirmation}
       onConfirm={() => settle(true)}
     />
   ) : null;
@@ -126,7 +134,10 @@ export function useUnsavedChangesGuard<T>({
   const [savedBaseline, setSavedBaseline] = useState<T>(initialValue);
   const [prevInitial, setPrevInitial] = useState<T>(initialValue);
 
-  if (initialValue !== prevInitial) {
+  // Compare with the caller's comparator, not reference identity. A form that
+  // rebuilds its initial object each render moved the baseline every render, so
+  // the guard never saw a dirty form and never prompted.
+  if (!equals(initialValue, prevInitial)) {
     setPrevInitial(initialValue);
     setSavedBaseline(initialValue);
   }

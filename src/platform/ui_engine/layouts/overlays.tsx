@@ -2,10 +2,10 @@
 
 import { X } from "lucide-react";
 import { AlertDialog as RAlertDialog, Dialog as RDialog, Tooltip as RTooltip } from "radix-ui";
-import type { CSSProperties, ReactElement, ReactNode } from "react";
+import { cloneElement, isValidElement, useId, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
 
 import { cx } from "../internal/cx";
-import { Button, Heading, IconButton, Text } from "../primitives";
+import { Button, Heading, IconButton, Input, Text } from "../primitives";
 
 export type OverlaySize = "sm" | "md" | "lg" | "xl" | "full";
 
@@ -18,6 +18,13 @@ export type DialogProps = {
   children: ReactNode;
   footer?: ReactNode;
   closeLabel?: string;
+  /**
+   * Set false to refuse Escape, outside-click, and the close control. Use it
+   * while a submit is in flight, so a half-written record is not dismissed by a
+   * stray click. The engine owns the refusal; deciding when to refuse is the
+   * app's. Never leave it false with no visible way out.
+   */
+  dismissible?: boolean;
 };
 
 const DIALOG_FRAME_CLASSES =
@@ -36,9 +43,13 @@ function DialogFrame({
   children,
   footer,
   closeLabel = "Close",
+  dismissible = true,
 }: DialogProps & { drawer?: boolean; side?: "left" | "right" }) {
+  const blockDismiss = (event: { preventDefault: () => void }) => {
+    if (!dismissible) event.preventDefault();
+  };
   return (
-    <RDialog.Root open={open} onOpenChange={onOpenChange}>
+    <RDialog.Root open={open} onOpenChange={(next) => { if (next || dismissible) onOpenChange(next); }}>
       <RDialog.Portal>
         <RDialog.Overlay className="fixed inset-0 z-50 bg-[rgb(28_26_24/0.36)] backdrop-blur-[2px] animate-ui-fade-in" />
         <RDialog.Content
@@ -46,9 +57,11 @@ function DialogFrame({
             DIALOG_FRAME_CLASSES,
             drawer
               ? cx(
-                  "top-0 bottom-0 h-full max-h-none [transform:none] rounded-none",
+                  // The size token has to reach the drawer too: without a width
+                  // here the panel shrank to its content on every desktop
+                  // viewport and the size prop did nothing.
+                  "top-0 bottom-0 h-full w-[min(100%,var(--dialog-width))] max-h-none [transform:none] rounded-none",
                   side === "right" ? "right-0 left-auto" : "left-0 right-auto",
-                  "max-[560px]:w-[min(100%,var(--dialog-width))]",
                 )
               : cx(
                   "left-1/2 top-1/2 w-[min(calc(100%-32px),var(--dialog-width))] max-h-(--ui-dialog-max-height) [transform:translate(-50%,-50%)]",
@@ -56,7 +69,11 @@ function DialogFrame({
                 ),
           )}
           data-side={drawer ? side : undefined}
+          data-dismissible={dismissible ? undefined : "false"}
           style={{ "--dialog-width": `var(--ui-dialog-${size})` } as CSSProperties}
+          onEscapeKeyDown={blockDismiss}
+          onPointerDownOutside={blockDismiss}
+          onInteractOutside={blockDismiss}
         >
           <div className={DIALOG_HEADER_CLASSES}>
             <div className="grid gap-[3px]">
@@ -75,6 +92,7 @@ function DialogFrame({
                 variant="ghost"
                 label={closeLabel}
                 icon={<X aria-hidden="true" />}
+                disabled={!dismissible}
               />
             </RDialog.Close>
           </div>
@@ -104,6 +122,15 @@ export type ConfirmDialogProps = {
   onConfirm: () => void;
   pending?: boolean;
   tone?: "primary" | "danger";
+  /**
+   * Exact text the operator must type before confirming. Reserve it for the
+   * irreversible: an extra sentence to read is a weaker guard than an extra
+   * sentence to type. The engine owns the field, the exact comparison, and the
+   * disabled state; the app owns which word is worth typing.
+   */
+  requireTypedConfirmation?: string;
+  /** Prompt above the field. Receives the expected text. */
+  typedConfirmationLabel?: (expected: string) => ReactNode;
 };
 
 export function ConfirmDialog({
@@ -116,7 +143,22 @@ export function ConfirmDialog({
   onConfirm,
   pending = false,
   tone = "primary",
+  requireTypedConfirmation,
+  typedConfirmationLabel = (expected) => <>Type <strong>{expected}</strong> to confirm.</>,
 }: ConfirmDialogProps) {
+  const [typed, setTyped] = useState("");
+  const [wasOpen, setWasOpen] = useState(open);
+  const typedFieldId = useId();
+
+  // A reopened dialog must not inherit the previous answer. Adjusted during
+  // render rather than in an effect, so no extra pass is scheduled.
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (!open) setTyped("");
+  }
+
+  const typedSatisfied = !requireTypedConfirmation || typed === requireTypedConfirmation;
+
   return (
     <RAlertDialog.Root open={open} onOpenChange={onOpenChange}>
       <RAlertDialog.Portal>
@@ -134,6 +176,22 @@ export function ConfirmDialog({
                 <Text as="p" tone="secondary">{description}</Text>
               </RAlertDialog.Description>
             </div>
+            {requireTypedConfirmation ? (
+              <div className="mt-3.5 grid gap-[5px]">
+                <label className="font-semibold text-ink" htmlFor={typedFieldId}>
+                  {typedConfirmationLabel(requireTypedConfirmation)}
+                </label>
+                <Input
+                  id={typedFieldId}
+                  value={typed}
+                  onChange={(event) => setTyped(event.target.value)}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  disabled={pending}
+                />
+              </div>
+            ) : null}
           </div>
           <div className={DIALOG_FOOTER_CLASSES}>
             <RAlertDialog.Cancel asChild>
@@ -143,7 +201,14 @@ export function ConfirmDialog({
               <Button
                 variant={tone === "danger" ? "danger" : "primary"}
                 pending={pending}
-                onClick={onConfirm}
+                disabled={!typedSatisfied}
+                onClick={(event) => {
+                  if (!typedSatisfied) {
+                    event.preventDefault();
+                    return;
+                  }
+                  onConfirm();
+                }}
               >
                 {confirmLabel}
               </Button>
@@ -157,16 +222,22 @@ export function ConfirmDialog({
 
 export type TooltipProps = {
   content: ReactNode;
-  children: ReactElement;
+  children: ReactElement<{ title?: string }>;
   side?: "top" | "right" | "bottom" | "left";
   delayDuration?: number;
 };
 
 export function Tooltip({ content, children, side = "top", delayDuration = 350 }: TooltipProps) {
+  // A child carrying its own `title` would show the browser's tooltip alongside
+  // this one — two panels for one control, and the name announced twice. This
+  // tooltip supersedes it, so it suppresses the native one. An empty title is
+  // the suppression idiom: `undefined` would only re-enable a child's own
+  // fallback, which is exactly what IconButton does with its label.
+  const trigger = isValidElement(children) ? cloneElement(children, { title: "" }) : children;
   return (
     <RTooltip.Provider delayDuration={delayDuration}>
       <RTooltip.Root>
-        <RTooltip.Trigger asChild>{children}</RTooltip.Trigger>
+        <RTooltip.Trigger asChild>{trigger}</RTooltip.Trigger>
         <RTooltip.Portal>
           <RTooltip.Content
             className="z-[70] max-w-[240px] rounded-action bg-ink px-2 py-1.5 text-xs leading-[1.35] text-ink-inverse shadow-elevated"
