@@ -9,6 +9,27 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Next local revision: **R4.60**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
+## R4.60 — 2026-09-03 — fix(dev): bind the rebuild server to the office LAN port
+
+- Agent: `Codex`
+
+`npm run dev` now starts the rebuild explicitly on `0.0.0.0:3001`. This
+matches the office LAN address used for local device access and avoids the
+separate legacy checkout already using port 3000. `next.config.ts` already
+allows the office host origin during development.
+
+### Verification
+
+- `npm ci` — clean install completed
+- `http://172.16.1.163:3001/bq` — HTTP 200 from the host; the listener is bound
+  to `0.0.0.0:3001`
+- `npm run typecheck` — clean
+- `npm run check:boundaries` — pass
+- `npm run check:legacy-runtime` — pass
+- `npm test` — non-database suites pass; database integration suites require a
+  disposable `PLATFORM_TEST_DATABASE_URL`, which is absent from the office test
+  configuration, so they correctly refuse to run.
+
 ## Changelog authorship rule
 
 Every new revision entry must identify the agent that made the change using an
