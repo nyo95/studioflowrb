@@ -15,6 +15,9 @@ const ProjectSchema = z.object({
   clientName: z.string().trim().min(1, "Client name is required").max(160),
   externalRef: z.string().trim().max(160).optional(),
   notes: z.string().trim().max(2_000).optional(),
+  // bq-contract §13.2/K-12: a new project may optionally load a Template as its
+  // Section/Subsection scaffold. The service supported it; the action dropped it.
+  templateId: z.string().cuid().optional(),
 });
 
 function projectValues(formData: FormData) {
@@ -24,6 +27,7 @@ function projectValues(formData: FormData) {
     clientName: String(formData.get("clientName") ?? ""),
     externalRef: String(formData.get("externalRef") ?? ""),
     notes: String(formData.get("notes") ?? ""),
+    templateId: formData.get("templateId") ? String(formData.get("templateId")) : undefined,
   });
   if (!parsed.success) throw validationError(parsed.error);
   return parsed.data;
@@ -40,6 +44,7 @@ export async function createProjectAction(formData: FormData) {
       clientName: value.clientName,
       externalRef: value.externalRef || undefined,
       notes: value.notes || undefined,
+      templateId: value.templateId || undefined,
     });
     revalidatePath("/bq");
     redirect(`/bq/${project.id}`);

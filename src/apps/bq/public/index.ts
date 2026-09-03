@@ -130,6 +130,14 @@ export type BqLineItemDetail = {
 
 import type { PrismaClient } from "@/generated/prisma/client";
 
+const PROJECT_ITEM_INCLUDE = {
+  sub_objects: {
+    orderBy: { sort_order: "asc" },
+    include: { line_items: { orderBy: { sort_order: "asc" } } },
+  },
+  line_items: { orderBy: { sort_order: "asc" } },
+} as const;
+
 export function createBqPublicRead(db: PrismaClient) {
   return {
     async listLibraryItems(): Promise<BqLibItemRead[]> {
@@ -226,19 +234,27 @@ export function createBqPublicRead(db: PrismaClient) {
     },
 
     async listTemplates(): Promise<BqTemplateRead[]> {
-      const templates = await db.bqTemplate.findMany({
-        orderBy: { name: "asc" },
-        include: {
-          sections: {
-            orderBy: { sort_order: "asc" },
-            include: {
-              recommendations: {
-                orderBy: { sort_order: "asc" },
+      const [templates, libraryItems] = await Promise.all([
+        db.bqTemplate.findMany({
+          orderBy: { name: "asc" },
+          include: {
+            sections: {
+              orderBy: { sort_order: "asc" },
+              include: {
+                recommendations: {
+                  orderBy: { sort_order: "asc" },
+                },
               },
             },
           },
-        },
-      });
+        }),
+        // bq-contract §8.3: a recommendation is a live pointer to a Library
+        // item. Returning it unresolved left the Template Editor with rows it
+        // could not name. One indexed read serves every template.
+        this.listLibraryItems(),
+      ]);
+
+      const libraryById = new Map(libraryItems.map((item) => [item.id, item]));
 
       return templates.map((t) => ({
         id: t.id,
@@ -252,23 +268,37 @@ export function createBqPublicRead(db: PrismaClient) {
           name: s.name,
           parentId: s.parent_id,
           sortOrder: s.sort_order,
-          recommendations: s.recommendations.map((r) => ({
-            id: r.id,
-            sortOrder: r.sort_order,
-            libItem: null,
-          })),
+          recommendations: s.recommendations.map((r) => {
+            const refId = r.lib_material_id
+              ?? r.lib_labor_id
+              ?? r.lib_material_labor_id
+              ?? r.lib_custom_item_id;
+            return {
+              id: r.id,
+              sortOrder: r.sort_order,
+              libItem: (refId ? libraryById.get(refId) : undefined) ?? null,
+            };
+          }),
         })),
       }));
     },
 
     async listProjectSummaries(): Promise<BqProjectSummary[]> {
+      // One tree read per project, not a full getProjectDetail round trip each:
+      // the list page only needs the L1/L2/L3 numbers that feed the grand total.
       const projects = await db.bqProject.findMany({
         orderBy: { updated_at: "desc" },
+        include: {
+          sections: {
+            include: {
+              subsections: { include: { items: { include: PROJECT_ITEM_INCLUDE } } },
+              items: { where: { subsection_id: null }, include: PROJECT_ITEM_INCLUDE },
+            },
+          },
+        },
       });
 
-      return Promise.all(projects.map(async (p) => {
-        const detail = await this.getProjectDetail(p.id);
-        return {
+      return projects.map((p) => ({
         id: p.id,
         title: p.title,
         clientName: p.client_name,
@@ -276,8 +306,20 @@ export function createBqPublicRead(db: PrismaClient) {
         createdBy: p.created_by,
         createdAt: p.created_at.toISOString(),
         updatedAt: p.updated_at.toISOString(),
-        grandTotal: detail?.grandTotal ?? null,
-      };
+        grandTotal: calculateGrandTotal(
+          p.sections.map((s) => ({
+            id: s.id,
+            name: s.name,
+            sortOrder: s.sort_order,
+            subsections: s.subsections.map((ss) => ({
+              id: ss.id,
+              name: ss.name,
+              sortOrder: ss.sort_order,
+              items: ss.items.map(mapItemDetail),
+            })),
+            items: s.items.map(mapItemDetail),
+          })),
+        ),
       }));
     },
 

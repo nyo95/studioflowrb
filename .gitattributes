@@ -1,0 +1,6 @@
+# Line endings are normalized to LF in the repository.
+# R4.54: the whole working tree had been rewritten to CRLF while the index held
+# LF, so every file reported as modified and no revision could be committed
+# without dragging a whole-file line-ending rewrite into it. This file makes the
+# normalization explicit instead of depending on each machine core.autocrlf.
+* text=auto eol=lf

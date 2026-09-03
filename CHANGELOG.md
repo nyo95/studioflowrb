@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.53**
-- Next local revision: **R4.54**
+- Current revision: **R4.54**
+- Next local revision: **R4.55**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,162 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.54 — 2026-09-03 — fix(bq,masterdata,contracts): repair contract-violating backend logic
+
+- Agent: `Claude`
+
+Full backend audit against `CORE.md`, `docs/apps/bq-contract.md`,
+`docs/apps/pricing-contract.md`, `docs/apps/brand-contract.md`,
+`docs/apps/vendor-contract.md`, and `docs/apps/masterdata.md`, plus the repairs
+for every confirmed violation. Where the contract itself was the defect, the
+owner authorized amending it; those amendments are listed below.
+
+### Contract amendments
+
+- `bq-contract.md` §6.3 wrote `subtotal_L2_raw = SUM(biaya_line)`, omitting the
+  `qty_per_l1` factor that §6.2 and locked decision K-09 both require. The two
+  readings differ by the L2 component count. §6.3 now carries the factor and
+  §6.2 states where each qty factor is applied.
+- `bq-contract.md` §8.2 showed the promotion status graph without saying which
+  transitions are legal. It now names the allowed source status for each of the
+  three promotion actions and states that `REJECTED` persists until resubmission
+  and `APPROVED` is terminal.
+- `masterdata.md` §2 said Category merge "requires a staff request plus explicit
+  approval" and then, one line later, that staff may merge. Merge is reversible
+  in effect — the source is deactivated, not destroyed, and `merged_into_id`
+  records where its relations went — so it is staff-level like deactivate.
+  Permanent deletion remains the only approval-gated Category operation.
+
+### BQ — calculation
+
+- The calculation engine ignored `BqSubObject.qty_per_l1` entirely, so an L2
+  breakdown priced one component per L1 regardless of how many the estimator
+  declared. `subtotal_L2_raw` is now `qty_per_l1 × SUM(biaya_line)`, restoring
+  the K-09/§6.2 chain. Regression test added.
+
+### BQ — promotion state machine
+
+- `rejectPromotion` wrote `DRAFT` instead of `REJECTED`, discarding the decision
+  the Library UI already renders with a danger badge.
+- `approvePromotion` and `rejectPromotion` performed no existence, eligibility,
+  or status check: an item nobody requested could be approved, and a re-request
+  could strip an existing `masterdata_ref_id`. All three transitions now name
+  the statuses they may leave.
+- Approval requires a non-empty `masterdataRefId`; rejection requires a reason.
+  Both reach the audit event.
+
+### BQ — projects, sections, templates
+
+- `addSubObject`/`addLineItem` nulled the parent L1's `harga_snapshot`. Per §6.2
+  the field is merely unused while children exist; clearing it destroyed the
+  estimator's price and left the L1 uncalculable — and the project grand total
+  permanently `null` — once the last child was removed.
+- Five copies of the project-lock check computed `projectId` from
+  `subsection.section_id`, which is a section ID, and used it only as a
+  truthiness gate, so a row with a broken parent chain skipped the lock check.
+  Replaced by one resolver chain (`requireEditableProject*`) that treats a broken
+  chain as a `CONFLICT`.
+- `addItem` ran its parent lookups before validating the section/subsection XOR.
+- `createProject` silently produced an empty project when the requested template
+  no longer existed; it now fails with `NOT_FOUND`.
+- `createProject` and `duplicateTemplate` silently dropped a subsection whose
+  parent section was missing, producing an incomplete scaffold or copy.
+- `reorderTemplateSections` renumbered sections by ID without checking template
+  ownership, so IDs from any other template could be reordered.
+- `deleteTemplateSection` relied on Prisma's default action for the optional
+  self-relation, which is `SetNull`: deleting a Section promoted its Subsections
+  into new top-level Sections. Children are now deleted with their parent.
+- `addTemplateRecommendation` validated neither the section nor the referenced
+  Library item, so a wrong-type pointer was stored silently and a missing item
+  surfaced as a raw FK failure.
+- `lockProject` neither checked existence nor refused an already-locked project.
+- `listTemplates` always returned `libItem: null`, leaving Template Editor
+  recommendations unnamed (§8.3). They now resolve.
+- `listProjectSummaries` called `getProjectDetail` once per project — a full tree
+  read each. It now reads the trees in one query.
+- Read-only service operations no longer open a write transaction (`CORE.md` §2).
+- §13.2/K-12 allow a new project to load a Template as its scaffold. The service
+  supported `templateId`; the server action dropped it and the form never offered
+  it. Both are wired, gated on Library read permission.
+- Library `defaultKoefisien` accepted `0`, which prices every importing line at
+  nothing; §5/K-08 fixes koefisien strictly greater than zero.
+
+### Master Data — data loss on save
+
+- `updateVendor` rebuilt `BrandSupplier` rows writing neither `is_authorized`
+  nor `notes`, so every Vendor edit silently reset each supplier relation to
+  unauthorized and erased its notes.
+- `updateVendor` rebuilt `VendorLink` rows writing neither `archive_url` nor
+  `sort_order`, so every Vendor edit erased archive URLs and link ordering.
+- `updateBrand` deleted and recreated every `BrandLink`. Because
+  `PriceMaterial.source_link_id` is `onDelete: SetNull`, an unrelated Brand edit
+  silently erased the price provenance of every material price on that Brand.
+- Brand links/hashtags/suppliers and Vendor types/links/contacts/suppliers are
+  now diffed on their natural key, so unchanged rows keep their IDs and
+  timestamps.
+
+### Master Data — validation and integrity
+
+- `createPriceMaterial` skipped the source-link brand check entirely for
+  Brand-less SKUs, so an unrelated Brand's link could be attached
+  (`pricing-contract` §2.5). The update path already enforced it.
+- `createBrand`/`updateBrand` never validated Brand categories, so a WORK or
+  deactivated Category could be attached (`brand-contract` §2.1).
+- `updateVendor` did not validate that assigned VendorTypes are live, though
+  `createVendor` does, so an archived type could be assigned through update.
+- `updateSku` withdrew its `SKU_ENRICHMENT` origins without pruning
+  `BrandCategory` rows left with no origin at all, leaving the Brand holding a
+  category nothing justified (`brand-contract` §3).
+- `addDirectCause` used a bare `create`, turning a repeated direct archive into a
+  raw unique-constraint failure instead of the idempotent no-op `masterdata.md`
+  §4.1 rule 7 requires.
+
+### Master Data — audit
+
+- `updatePriceMaterial`, `updatePriceMaterialLabor`, `updatePriceLabor`,
+  `updateBrand`, `updateVendor`, and `updateSku` wrote an audit event for a
+  no-op save, against `CORE.md` §5 and each contract's audit section. They now
+  emit nothing when nothing changed, and skip the redundant row write.
+- `updateSku` never compared `notes` or its category set, so those edits produced
+  an audit event with no delta. `updateBrand`/`updateVendor` reported no relation
+  deltas at all. All three now report them.
+- `rejectDeletion` overwrote the requester's stated reason with the approver's
+  (or with `null`), destroying the request record `masterdata.md` §4.2 requires.
+  The requester's reason is preserved and the rejection reason is recorded in the
+  audit event.
+
+### Repository
+
+- Added `.gitattributes` with `* text=auto eol=lf`. The entire working tree had
+  been rewritten to CRLF while the index held LF, so all ~190 files reported as
+  modified and `git diff --check` flagged every line; no revision could be
+  committed without dragging a whole-file line-ending rewrite into it. With
+  normalization declared, only real changes appear in the diff.
+
+### Verification
+
+- `npx tsc --noEmit` — clean
+- `npx eslint src scripts` — clean
+- `npm run check:boundaries`, `npm run check:legacy-runtime` — pass
+- `git diff --check` — clean
+- BQ calculation-engine unit tests 4/4, including the new `qty_per_l1` case,
+  executed out-of-tree under `node --experimental-strip-types`
+
+### Limitations — not a pass
+
+- `npm test` **could not run**. `node_modules` holds a Windows `esbuild` binary
+  while the agent shell is Linux, so the loader fails before any test executes.
+  Database-backed integration suites were therefore not run. Run
+  `npm ci && npm test` on the owner's machine before trusting this revision.
+- No browser acceptance was performed.
+- `next-env.d.ts` carries an unrelated Next-generated change
+  (`.next/types` → `.next/dev/types`) and was deliberately left uncommitted.
+- The BQ project detail page renders a stub table (`rowSpan` over rows it never
+  emits, section-level L1 items ignored, no grand total). That is BQ-F3 UI scope
+  and was left alone.
+- `src/apps/bq/lib/snapshot.ts` implements §7 but has no consumer until BQ-F4 and
+  no tests.
 
 ## R4.53 — 2026-09-03 — fix(ui-engine): stabilize compact rail hover menus
 

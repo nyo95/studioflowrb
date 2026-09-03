@@ -81,7 +81,12 @@ export function calculateLineItem(input: LineItemInput): LineItemResult {
 
 export function calculateSubObject(input: SubObjectInput): SubObjectResult {
   const lineItems = input.lineItems.map(calculateLineItem);
-  const subtotalL2Raw = truncate2(sum(lineItems.map((item) => item.biayaLine)));
+  // bq-contract K-09/§6.2: an L2 multiplies its line items by qty_per_l1 before
+  // the L2 markup. Dropping that factor prices one component per L1 no matter
+  // how many the breakdown declares.
+  const subtotalL2Raw = truncate2(
+    multiplyDecimals(sum(lineItems.map((item) => item.biayaLine)), input.qtyPerL1),
+  );
   return { subtotalL2Raw, subtotalL2: applyMarkup(subtotalL2Raw, input.markupL2Pct), lineItems };
 }
 

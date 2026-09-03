@@ -17,7 +17,14 @@ const ItemSchema = z.object({
   baseUnit: z.string().trim().max(40).optional(),
   harga: z.string().trim().regex(/^\d+(\.\d+)?$/, "Price must be a valid number").max(32),
   currency: z.string().trim().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter uppercase code"),
-  defaultKoefisien: z.string().trim().regex(/^\d+(\.\d+)?$/, "Coefficient must be a valid number").max(32),
+  // bq-contract §5/K-08: koefisien is strictly greater than zero. A zero
+  // default silently prices every line that imports this item at nothing.
+  defaultKoefisien: z
+    .string()
+    .trim()
+    .regex(/^\d+(\.\d+)?$/, "Coefficient must be a valid number")
+    .max(32)
+    .refine((value) => /[1-9]/.test(value), "Coefficient must be greater than zero"),
   kategori: z.enum(["BIAYA_UMUM", "TRANSPORTASI_AKOMODASI", "ALAT"]).optional(),
   notes: z.string().trim().max(2000).optional(),
 });

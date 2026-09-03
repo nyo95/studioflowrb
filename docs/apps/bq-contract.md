@@ -142,6 +142,9 @@ biaya_line = qty_L3 × harga_snapshot × koefisien
 -- L3 total di dalam konteks project:
 biaya_total = L1.qty × (L2.qty_per_l1 ?? 1) × L3.qty × harga_snapshot × koefisien
 
+-- Faktor qty_per_l1 diterapkan di level L2 (lihat §6.3), sebelum markup L2.
+-- Faktor L1.qty diterapkan sekali di akhir, pada `total = rate × L1.qty`.
+
 -- L1 tanpa anak (no L2, no L3 children) — L1-only:
 rate    = L1.harga_snapshot × L1.koefisien × (1 + L1.markup_l1_pct / 100)
 total   = rate × L1.qty
@@ -159,7 +162,7 @@ L3:
   biaya_line = qty × harga_snapshot × koefisien
 
 L2 (jika ada):
-  subtotal_L2_raw = SUM(biaya_line dari semua L3 di bawah L2 ini)
+  subtotal_L2_raw = qty_per_l1 × SUM(biaya_line dari semua L3 di bawah L2 ini)
   subtotal_L2     = subtotal_L2_raw × (1 + markup_l2_pct / 100)
 
 L1:
@@ -244,11 +247,26 @@ Enum `BqKategori` disimpan pada seluruh tipe demi bentuk data Library yang serag
 ### 8.2 Status promosi Library Item
 
 ```
-DRAFT → REQUESTED → APPROVED (link ke MD entry)
-                 → REJECTED  (dengan alasan)
+DRAFT ─────→ REQUESTED → APPROVED (link ke MD entry)
+  ↑                    ↘
+  └── REJECTED ←────────  (dengan alasan)
 ```
 
 Hanya KATEGORI Material/Upah/Material+Upah yang bisa `REQUESTED`. Yang lain tetap `DRAFT` selamanya.
+
+**Transisi yang sah — tidak ada jalur lain:**
+
+| Aksi | Status asal yang sah | Status tujuan |
+|---|---|---|
+| `requestPromotion` | `DRAFT`, `REJECTED` | `REQUESTED` |
+| `approvePromotion` | `REQUESTED` | `APPROVED` |
+| `rejectPromotion` | `REQUESTED` | `REJECTED` |
+
+`REJECTED` bertahan sampai item direvisi dan diajukan ulang; ia tidak pernah
+di-reset ke `DRAFT` oleh sistem. `APPROVED` bersifat terminal — item yang sudah
+tertaut ke Master Data tidak boleh diajukan ulang karena itu akan meninggalkan
+`masterdata_ref_id` yang menggantung. `approvePromotion` wajib menerima
+`masterdata_ref_id` yang tidak kosong; `rejectPromotion` wajib menerima alasan.
 
 ### 8.3 Templates
 

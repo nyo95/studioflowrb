@@ -41,11 +41,19 @@ refer only to the R1.05 Git snapshot and define what must not be reintroduced.
 - Missing Categories may be created through the shared CreatableSearch flow.
 - Category lifecycle is deactivate, merge, and permanent delete; it does not use
   archive/restore.
-- Merge is allowed only within the same kind and requires a staff request plus
-  explicit approval. It transfers approved relations atomically before the
-  source Category is deactivated.
-- Staff may create, edit, merge, and deactivate Categories. Permanent deletion
-  requires the shared approval permission.
+- Merge is allowed only within the same kind and only between two ACTIVE
+  Categories. It transfers relations atomically before the source Category is
+  deactivated and records `merged_into_id`.
+- Staff holding `masterdata.dictionary.manage` may create, edit, merge, and
+  deactivate Categories. Only permanent deletion goes through the shared
+  staff-request and `masterdata.deletion.approve` workflow.
+
+  *(R4.54: this paragraph previously said merge itself needed a request plus
+  explicit approval and then, one line later, that staff may merge. Merge is
+  reversible in effect — the source is deactivated, not destroyed, and its
+  `merged_into_id` records where its relations went — so it is staff-level like
+  deactivate. Permanent deletion remains the only approval-gated Category
+  operation.)*
 
 ### SKU
 

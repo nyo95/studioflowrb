@@ -78,20 +78,72 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     );
   };
 
-  async function requireEditableProjectForItem(itemId: string): Promise<void> {
-    const item = await db.bqItem.findUnique({
-      where: { id: itemId },
-      include: { section: true, subsection: true },
-    });
-    if (!item) throw new AppError("NOT_FOUND", "bq.item.not-found", "Item not found");
-    const section = item.section
-      ?? (item.subsection ? await db.bqSection.findUnique({ where: { id: item.subsection.section_id } }) : null);
-    if (!section) throw new AppError("CONFLICT", "bq.item.invalid-parent", "Item does not belong to a project section");
-    const project = await db.bqProject.findUnique({ where: { id: section.project_id } });
+  async function requireEditableProject(projectId: string): Promise<void> {
+    const project = await db.bqProject.findUnique({ where: { id: projectId } });
     if (!project) throw new AppError("NOT_FOUND", "bq.project.not-found", "Project not found");
     if (project.status === "LOCKED") {
       throw new AppError("CONFLICT", "bq.project.locked", "Cannot edit a locked project");
     }
+  }
+
+  async function requireEditableProjectForSection(sectionId: string): Promise<void> {
+    const section = await db.bqSection.findUnique({ where: { id: sectionId }, select: { project_id: true } });
+    if (!section) throw new AppError("NOT_FOUND", "bq.section.not-found", "Section not found");
+    await requireEditableProject(section.project_id);
+  }
+
+  async function requireEditableProjectForSubsection(subsectionId: string): Promise<void> {
+    const subsection = await db.bqSubsection.findUnique({
+      where: { id: subsectionId },
+      select: { section: { select: { project_id: true } } },
+    });
+    if (!subsection) throw new AppError("NOT_FOUND", "bq.subsection.not-found", "Subsection not found");
+    await requireEditableProject(subsection.section.project_id);
+  }
+
+  /**
+   * Resolves the owning project of an L1 and refuses a locked one. Every
+   * structural write below routes through this: an item, sub-object, or line
+   * item whose parent chain is broken is a CONFLICT, never a silently skipped
+   * lock check.
+   */
+  async function requireEditableProjectForItem(itemId: string): Promise<void> {
+    const item = await db.bqItem.findUnique({
+      where: { id: itemId },
+      select: {
+        section: { select: { project_id: true } },
+        subsection: { select: { section: { select: { project_id: true } } } },
+      },
+    });
+    if (!item) throw new AppError("NOT_FOUND", "bq.item.not-found", "Item not found");
+    const projectId = item.section?.project_id ?? item.subsection?.section.project_id;
+    if (!projectId) {
+      throw new AppError("CONFLICT", "bq.item.invalid-parent", "Item does not belong to a project section");
+    }
+    await requireEditableProject(projectId);
+  }
+
+  async function requireEditableProjectForLineItem(lineItemId: string): Promise<void> {
+    const lineItem = await db.bqLineItem.findUnique({
+      where: { id: lineItemId },
+      select: { item_id: true, sub_object: { select: { item_id: true } } },
+    });
+    if (!lineItem) throw new AppError("NOT_FOUND", "bq.line-item.not-found", "Line item not found");
+    const itemId = lineItem.item_id ?? lineItem.sub_object?.item_id;
+    if (!itemId) {
+      throw new AppError("CONFLICT", "bq.line-item.invalid-parent", "Line item does not belong to an item");
+    }
+    await requireEditableProjectForItem(itemId);
+  }
+
+  async function requireEditableProjectForSubObject(subObjectId: string): Promise<string> {
+    const subObject = await db.bqSubObject.findUnique({
+      where: { id: subObjectId },
+      select: { item_id: true },
+    });
+    if (!subObject) throw new AppError("NOT_FOUND", "bq.sub-object.not-found", "Sub-object not found");
+    await requireEditableProjectForItem(subObject.item_id);
+    return subObject.item_id;
   }
 
   // ─── LIBRARY ITEMS ──────────────────────────────────────────
@@ -563,36 +615,43 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
       for (const section of original.sections) {
         if (section.parent_id) {
           const newParentId = sectionIdMap.get(section.parent_id);
-          if (newParentId) {
-            const subCopy = await tx.bqTemplateSection.create({
-              data: {
-                template_id: copy.id,
-                name: section.name,
-                parent_id: newParentId,
-                sort_order: section.sort_order,
-                created_by: input.actor.userId ?? "system",
-              },
-            });
-            sectionIdMap.set(section.id, subCopy.id);
+          if (!newParentId) {
+            // A subsection whose parent is missing means the source template is
+            // structurally broken. Copying around it produced a silently
+            // incomplete duplicate.
+            throw new AppError(
+              "CONFLICT",
+              "bq.template.orphan-subsection",
+              "Template contains a subsection whose parent section is missing",
+            );
           }
+          const subCopy = await tx.bqTemplateSection.create({
+            data: {
+              template_id: copy.id,
+              name: section.name,
+              parent_id: newParentId,
+              sort_order: section.sort_order,
+              created_by: input.actor.userId ?? "system",
+            },
+          });
+          sectionIdMap.set(section.id, subCopy.id);
         }
       }
 
       for (const section of original.sections) {
         const newSectionId = sectionIdMap.get(section.id);
-        if (newSectionId) {
-          for (const rec of section.recommendations) {
-            await tx.bqTemplateRecommendation.create({
-              data: {
-                template_section_id: newSectionId,
-                sort_order: rec.sort_order,
-                lib_material_id: rec.lib_material_id,
-                lib_labor_id: rec.lib_labor_id,
-                lib_material_labor_id: rec.lib_material_labor_id,
-                lib_custom_item_id: rec.lib_custom_item_id,
-              },
-            });
-          }
+        if (!newSectionId) continue;
+        for (const rec of section.recommendations) {
+          await tx.bqTemplateRecommendation.create({
+            data: {
+              template_section_id: newSectionId,
+              sort_order: rec.sort_order,
+              lib_material_id: rec.lib_material_id,
+              lib_labor_id: rec.lib_labor_id,
+              lib_material_labor_id: rec.lib_material_labor_id,
+              lib_custom_item_id: rec.lib_custom_item_id,
+            },
+          });
         }
       }
 
@@ -655,6 +714,19 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     id: string;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+    const section = await db.bqTemplateSection.findUnique({
+      where: { id: input.id },
+      select: { id: true, parent_id: true },
+    });
+    if (!section) {
+      throw new AppError("NOT_FOUND", "bq.template-section.not-found", "Template section not found");
+    }
+    if (!section.parent_id) {
+      // `parent_id` is an optional self-relation, so the default referential
+      // action is SetNull: without this the Subsections would survive as new
+      // top-level Sections instead of being removed with their parent.
+      await db.bqTemplateSection.deleteMany({ where: { parent_id: input.id } });
+    }
     await db.bqTemplateSection.delete({ where: { id: input.id } });
     await auditWriter({
       appId: "bq",
@@ -673,6 +745,19 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
     await runTransaction(async (tx) => {
+      // Renumbering is addressed by ID, so the ownership check has to be
+      // explicit: without it any section ID reorders inside another template.
+      const owned = await tx.bqTemplateSection.findMany({
+        where: { id: { in: input.orderedIds }, template_id: input.templateId },
+        select: { id: true },
+      });
+      if (owned.length !== input.orderedIds.length) {
+        throw new AppError(
+          "VALIDATION",
+          "bq.template-section.wrong-template",
+          "Every reordered section must belong to this template",
+        );
+      }
       for (let i = 0; i < input.orderedIds.length; i++) {
         await tx.bqTemplateSection.update({
           where: { id: input.orderedIds[i] },
@@ -698,6 +783,23 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     sortOrder?: number;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+
+    const section = await db.bqTemplateSection.findUnique({ where: { id: input.templateSectionId } });
+    if (!section) {
+      throw new AppError("NOT_FOUND", "bq.template-section.not-found", "Template section not found");
+    }
+
+    const libItemExists = input.libItemType === "material"
+      ? await db.bqLibMaterial.findUnique({ where: { id: input.libItemId }, select: { id: true } })
+      : input.libItemType === "labor"
+        ? await db.bqLibLabor.findUnique({ where: { id: input.libItemId }, select: { id: true } })
+        : input.libItemType === "material_labor"
+          ? await db.bqLibMaterialLabor.findUnique({ where: { id: input.libItemId }, select: { id: true } })
+          : await db.bqLibCustomItem.findUnique({ where: { id: input.libItemId }, select: { id: true } });
+    if (!libItemExists) {
+      throw new AppError("NOT_FOUND", "bq.lib-item.not-found", "Library item not found for the selected type");
+    }
+
     const rec = await db.bqTemplateRecommendation.create({
       data: {
         template_section_id: input.templateSectionId,
@@ -786,7 +888,11 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
           },
         });
 
-        if (template) {
+        if (!template) {
+          throw new AppError("NOT_FOUND", "bq.template.not-found", "Template not found");
+        }
+
+        {
           const sectionIdMap = new Map<string, string>();
 
           for (const section of template.sections) {
@@ -805,16 +911,21 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
           for (const section of template.sections) {
             if (section.parent_id) {
               const newParentId = sectionIdMap.get(section.parent_id);
-              if (newParentId) {
-                const newSubsection = await tx.bqSubsection.create({
-                  data: {
-                    section_id: newParentId,
-                    name: section.name,
-                    sort_order: section.sort_order,
-                  },
-                });
-                sectionIdMap.set(section.id, newSubsection.id);
+              if (!newParentId) {
+                throw new AppError(
+                  "CONFLICT",
+                  "bq.template.orphan-subsection",
+                  "Template contains a subsection whose parent section is missing",
+                );
               }
+              const newSubsection = await tx.bqSubsection.create({
+                data: {
+                  section_id: newParentId,
+                  name: section.name,
+                  sort_order: section.sort_order,
+                },
+              });
+              sectionIdMap.set(section.id, newSubsection.id);
             }
           }
         }
@@ -872,6 +983,11 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     id: string;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+    const existing = await db.bqProject.findUnique({ where: { id: input.id } });
+    if (!existing) throw new AppError("NOT_FOUND", "bq.project.not-found", "Project not found");
+    if (existing.status === "LOCKED") {
+      throw new AppError("CONFLICT", "bq.project.already-locked", "Project is already locked");
+    }
     const project = await db.bqProject.update({
       where: { id: input.id },
       data: { status: "LOCKED" },
@@ -894,11 +1010,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     sortOrder?: number;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
-    const project = await db.bqProject.findUnique({ where: { id: input.projectId } });
-    if (!project) throw new AppError("NOT_FOUND", "bq.project.not-found", "Project not found");
-    if (project.status === "LOCKED") {
-      throw new AppError("CONFLICT", "bq.project.locked", "Cannot edit a locked project");
-    }
+    await requireEditableProject(input.projectId);
     const section = await db.bqSection.create({
       data: {
         project_id: input.projectId,
@@ -924,12 +1036,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     sortOrder?: number;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
-    const section = await db.bqSection.findUnique({ where: { id: input.sectionId } });
-    if (!section) throw new AppError("NOT_FOUND", "bq.section.not-found", "Section not found");
-    const project = await db.bqProject.findUnique({ where: { id: section.project_id } });
-    if (project?.status === "LOCKED") {
-      throw new AppError("CONFLICT", "bq.project.locked", "Cannot edit a locked project");
-    }
+    await requireEditableProjectForSection(input.sectionId);
     const subsection = await db.bqSubsection.create({
       data: {
         section_id: input.sectionId,
@@ -963,28 +1070,15 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
 
-    if (input.sectionId) {
-      const section = await db.bqSection.findUnique({ where: { id: input.sectionId } });
-      if (!section) throw new AppError("NOT_FOUND", "bq.section.not-found", "Section not found");
-      const project = await db.bqProject.findUnique({ where: { id: section.project_id } });
-      if (project?.status === "LOCKED") throw new AppError("CONFLICT", "bq.project.locked", "Cannot edit a locked project");
-    }
-    if (input.subsectionId) {
-      const subsection = await db.bqSubsection.findUnique({ where: { id: input.subsectionId } });
-      if (!subsection) throw new AppError("NOT_FOUND", "bq.subsection.not-found", "Subsection not found");
-      const section = await db.bqSection.findUnique({ where: { id: subsection.section_id } });
-      if (section) {
-        const project = await db.bqProject.findUnique({ where: { id: section.project_id } });
-        if (project?.status === "LOCKED") throw new AppError("CONFLICT", "bq.project.locked", "Cannot edit a locked project");
-      }
-    }
-
     if (!input.sectionId && !input.subsectionId) {
       throw new AppError("VALIDATION", "bq.item.no-parent", "Item must belong to a section or subsection");
     }
     if (input.sectionId && input.subsectionId) {
       throw new AppError("VALIDATION", "bq.item.dual-parent", "Item cannot belong to both section and subsection");
     }
+
+    if (input.sectionId) await requireEditableProjectForSection(input.sectionId);
+    else await requireEditableProjectForSubsection(input.subsectionId!);
 
     const item = await db.bqItem.create({
       data: {
@@ -1025,18 +1119,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     notes?: string;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
-    const existing = await db.bqItem.findUnique({
-      where: { id: input.id },
-      include: { section: true, subsection: true },
-    });
-    if (!existing) throw new AppError("NOT_FOUND", "bq.item.not-found", "Item not found");
-
-    const projectId = existing.section?.project_id ?? existing.subsection?.section_id;
-    if (projectId) {
-      const section = existing.section ?? (existing.subsection ? await db.bqSection.findUnique({ where: { id: existing.subsection.section_id } }) : null);
-      const project = section ? await db.bqProject.findUnique({ where: { id: section.project_id } }) : null;
-      if (project?.status === "LOCKED") throw new AppError("CONFLICT", "bq.project.locked", "Cannot edit a locked project");
-    }
+    await requireEditableProjectForItem(input.id);
 
     const item = await db.bqItem.update({
       where: { id: input.id },
@@ -1090,18 +1173,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     notes?: string;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
-    const item = await db.bqItem.findUnique({
-      where: { id: input.itemId },
-      include: { section: true, subsection: true },
-    });
-    if (!item) throw new AppError("NOT_FOUND", "bq.item.not-found", "Item not found");
-
-    const projectId = item.section?.project_id ?? item.subsection?.section_id;
-    if (projectId) {
-      const section = item.section ?? (item.subsection ? await db.bqSection.findUnique({ where: { id: item.subsection.section_id } }) : null);
-      const project = section ? await db.bqProject.findUnique({ where: { id: section.project_id } }) : null;
-      if (project?.status === "LOCKED") throw new AppError("CONFLICT", "bq.project.locked", "Cannot edit a locked project");
-    }
+    await requireEditableProjectForItem(input.itemId);
 
     const subObject = await db.bqSubObject.create({
       data: {
@@ -1113,9 +1185,9 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
         notes: input.notes ?? null,
       },
     });
-    // An L1 switches from standalone pricing to child aggregation at the
-    // first child. The standalone snapshot must not remain as dead data.
-    await db.bqItem.update({ where: { id: input.itemId }, data: { harga_snapshot: null } });
+    // bq-contract §6.2: the L1-only harga_snapshot is simply unused while the
+    // item has children. Clearing it here destroyed the estimator's price and
+    // left the L1 uncalculable if the last child was later removed.
 
     await auditWriter({
       appId: "bq",
@@ -1138,18 +1210,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     notes?: string;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
-    const existing = await db.bqSubObject.findUnique({
-      where: { id: input.id },
-      include: { item: { include: { section: true, subsection: true } } },
-    });
-    if (!existing) throw new AppError("NOT_FOUND", "bq.sub-object.not-found", "Sub-object not found");
-
-    const projectId = existing.item.section?.project_id ?? existing.item.subsection?.section_id;
-    if (projectId) {
-      const section = existing.item.section ?? (existing.item.subsection ? await db.bqSection.findUnique({ where: { id: existing.item.subsection.section_id } }) : null);
-      const project = section ? await db.bqProject.findUnique({ where: { id: section.project_id } }) : null;
-      if (project?.status === "LOCKED") throw new AppError("CONFLICT", "bq.project.locked", "Cannot edit a locked project");
-    }
+    await requireEditableProjectForSubObject(input.id);
 
     const subObject = await db.bqSubObject.update({
       where: { id: input.id },
@@ -1178,9 +1239,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     id: string;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
-    const subObject = await db.bqSubObject.findUnique({ where: { id: input.id }, select: { item_id: true } });
-    if (!subObject) throw new AppError("NOT_FOUND", "bq.sub-object.not-found", "Sub-object not found");
-    await requireEditableProjectForItem(subObject.item_id);
+    await requireEditableProjectForSubObject(input.id);
     await db.bqSubObject.delete({ where: { id: input.id } });
     await auditWriter({
       appId: "bq",
@@ -1220,33 +1279,8 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
       throw new AppError("VALIDATION", "bq.line-item.dual-parent", "Line item cannot belong to both sub-object and item");
     }
 
-    if (input.subObjectId) {
-      const subObject = await db.bqSubObject.findUnique({
-        where: { id: input.subObjectId },
-        include: { item: { include: { section: true, subsection: true } } },
-      });
-      if (!subObject) throw new AppError("NOT_FOUND", "bq.sub-object.not-found", "Sub-object not found");
-      const projectId = subObject.item.section?.project_id ?? subObject.item.subsection?.section_id;
-      if (projectId) {
-        const section = subObject.item.section ?? (subObject.item.subsection ? await db.bqSection.findUnique({ where: { id: subObject.item.subsection.section_id } }) : null);
-        const project = section ? await db.bqProject.findUnique({ where: { id: section.project_id } }) : null;
-        if (project?.status === "LOCKED") throw new AppError("CONFLICT", "bq.project.locked", "Cannot edit a locked project");
-      }
-    }
-
-    if (input.itemId) {
-      const item = await db.bqItem.findUnique({
-        where: { id: input.itemId },
-        include: { section: true, subsection: true },
-      });
-      if (!item) throw new AppError("NOT_FOUND", "bq.item.not-found", "Item not found");
-      const projectId = item.section?.project_id ?? item.subsection?.section_id;
-      if (projectId) {
-        const section = item.section ?? (item.subsection ? await db.bqSection.findUnique({ where: { id: item.subsection.section_id } }) : null);
-        const project = section ? await db.bqProject.findUnique({ where: { id: section.project_id } }) : null;
-        if (project?.status === "LOCKED") throw new AppError("CONFLICT", "bq.project.locked", "Cannot edit a locked project");
-      }
-    }
+    if (input.subObjectId) await requireEditableProjectForSubObject(input.subObjectId);
+    else await requireEditableProjectForItem(input.itemId!);
 
     const lineItem = await db.bqLineItem.create({
       data: {
@@ -1268,12 +1302,6 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
         notes: input.notes ?? null,
       },
     });
-    const parentItemId = input.itemId
-      ?? (await db.bqSubObject.findUnique({ where: { id: input.subObjectId! }, select: { item_id: true } }))?.item_id;
-    if (parentItemId) {
-      await db.bqItem.update({ where: { id: parentItemId }, data: { harga_snapshot: null } });
-    }
-
     await auditWriter({
       appId: "bq",
       action: "bq.line-item.created",
@@ -1301,24 +1329,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     notes?: string;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
-    const existing = await db.bqLineItem.findUnique({
-      where: { id: input.id },
-      include: {
-        sub_object: { include: { item: { include: { section: true, subsection: true } } } },
-        item: { include: { section: true, subsection: true } },
-      },
-    });
-    if (!existing) throw new AppError("NOT_FOUND", "bq.line-item.not-found", "Line item not found");
-
-    const parentSubsection = existing.sub_object?.item.subsection ?? existing.item?.subsection ?? null;
-    const section = existing.sub_object?.item.section
-      ?? existing.item?.section
-      ?? (parentSubsection ? await db.bqSection.findUnique({ where: { id: parentSubsection.section_id } }) : null);
-
-    if (section) {
-      const project = section ? await db.bqProject.findUnique({ where: { id: section.project_id } }) : null;
-      if (project?.status === "LOCKED") throw new AppError("CONFLICT", "bq.project.locked", "Cannot edit a locked project");
-    }
+    await requireEditableProjectForLineItem(input.id);
 
     const lineItem = await db.bqLineItem.update({
       where: { id: input.id },
@@ -1353,14 +1364,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     id: string;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
-    const lineItem = await db.bqLineItem.findUnique({
-      where: { id: input.id },
-      select: { item_id: true, sub_object: { select: { item_id: true } } },
-    });
-    if (!lineItem) throw new AppError("NOT_FOUND", "bq.line-item.not-found", "Line item not found");
-    const itemId = lineItem.item_id ?? lineItem.sub_object?.item_id;
-    if (!itemId) throw new AppError("CONFLICT", "bq.line-item.invalid-parent", "Line item does not belong to an item");
-    await requireEditableProjectForItem(itemId);
+    await requireEditableProjectForLineItem(input.id);
     await db.bqLineItem.delete({ where: { id: input.id } });
     await auditWriter({
       appId: "bq",
@@ -1373,45 +1377,68 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
 
   // ─── PROMOTION ──────────────────────────────────────────────
 
+  type PromotableType = "material" | "labor" | "material_labor";
+
+  const PROMOTABLE = {
+    material: { kategori: "MATERIAL", code: "bq.lib-material", label: "Library material" },
+    labor: { kategori: "UPAH", code: "bq.lib-labor", label: "Library labor" },
+    material_labor: { kategori: "MATERIAL_UPAH", code: "bq.lib-material-labor", label: "Library material+labor" },
+  } as const;
+
+  type PromotionStatus = "DRAFT" | "REQUESTED" | "APPROVED" | "REJECTED";
+  type PromotionUpdate = { promotion_status: PromotionStatus; masterdata_ref_id?: string };
+
+  /**
+   * bq-contract §8.2/§9 state machine: DRAFT -> REQUESTED -> APPROVED | REJECTED.
+   * Every transition names the status it is allowed to leave, so an approval
+   * cannot land on an item nobody requested and a re-request cannot silently
+   * strip an existing Master Data link.
+   */
+  async function loadPromotable(
+    type: PromotableType,
+    libItemId: string,
+    expected: readonly PromotionStatus[],
+  ): Promise<{ id: string; kategori: string; promotion_status: string }> {
+    const meta = PROMOTABLE[type];
+    const item = type === "material"
+      ? await db.bqLibMaterial.findUnique({ where: { id: libItemId } })
+      : type === "labor"
+        ? await db.bqLibLabor.findUnique({ where: { id: libItemId } })
+        : await db.bqLibMaterialLabor.findUnique({ where: { id: libItemId } });
+    if (!item) throw new AppError("NOT_FOUND", `${meta.code}.not-found`, `${meta.label} not found`);
+    if (item.kategori !== meta.kategori) {
+      throw new AppError("FORBIDDEN", "bq.promotion.not-eligible", "This item cannot be promoted to Master Data");
+    }
+    if (!expected.includes(item.promotion_status as PromotionStatus)) {
+      throw new AppError(
+        "CONFLICT",
+        "bq.promotion.invalid-status",
+        `This item is ${item.promotion_status.toLowerCase()} and cannot make that promotion transition`,
+      );
+    }
+    return item;
+  }
+
+  async function setPromotionStatus(
+    type: PromotableType,
+    libItemId: string,
+    data: PromotionUpdate,
+  ): Promise<void> {
+    const where = { id: libItemId };
+    if (type === "material") await db.bqLibMaterial.update({ where, data });
+    else if (type === "labor") await db.bqLibLabor.update({ where, data });
+    else await db.bqLibMaterialLabor.update({ where, data });
+  }
+
   async function requestPromotion(input: {
     grants: PermissionGrants;
     actor: { kind: string; userId?: string; label: string };
-    type: "material" | "labor" | "material_labor";
+    type: PromotableType;
     libItemId: string;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryPromote);
-
-    if (input.type === "material") {
-      const item = await db.bqLibMaterial.findUnique({ where: { id: input.libItemId } });
-      if (!item) throw new AppError("NOT_FOUND", "bq.lib-material.not-found", "Library material not found");
-      if (item.kategori !== "MATERIAL") {
-        throw new AppError("FORBIDDEN", "bq.promotion.not-eligible", "This item cannot be promoted to Master Data");
-      }
-      await db.bqLibMaterial.update({
-        where: { id: input.libItemId },
-        data: { promotion_status: "REQUESTED" },
-      });
-    } else if (input.type === "labor") {
-      const item = await db.bqLibLabor.findUnique({ where: { id: input.libItemId } });
-      if (!item) throw new AppError("NOT_FOUND", "bq.lib-labor.not-found", "Library labor not found");
-      if (item.kategori !== "UPAH") {
-        throw new AppError("FORBIDDEN", "bq.promotion.not-eligible", "This item cannot be promoted to Master Data");
-      }
-      await db.bqLibLabor.update({
-        where: { id: input.libItemId },
-        data: { promotion_status: "REQUESTED" },
-      });
-    } else {
-      const item = await db.bqLibMaterialLabor.findUnique({ where: { id: input.libItemId } });
-      if (!item) throw new AppError("NOT_FOUND", "bq.lib-material-labor.not-found", "Library material+labor not found");
-      if (item.kategori !== "MATERIAL_UPAH") {
-        throw new AppError("FORBIDDEN", "bq.promotion.not-eligible", "This item cannot be promoted to Master Data");
-      }
-      await db.bqLibMaterialLabor.update({
-        where: { id: input.libItemId },
-        data: { promotion_status: "REQUESTED" },
-      });
-    }
+    await loadPromotable(input.type, input.libItemId, ["DRAFT", "REJECTED"]);
+    await setPromotionStatus(input.type, input.libItemId, { promotion_status: "REQUESTED" });
 
     await auditWriter({
       appId: "bq",
@@ -1460,28 +1487,24 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
   async function approvePromotion(input: {
     grants: PermissionGrants;
     actor: { kind: string; userId?: string; label: string };
-    type: "material" | "labor" | "material_labor";
+    type: PromotableType;
     libItemId: string;
     masterdataRefId: string;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryPromoteApprove);
-
-    if (input.type === "material") {
-      await db.bqLibMaterial.update({
-        where: { id: input.libItemId },
-        data: { promotion_status: "APPROVED", masterdata_ref_id: input.masterdataRefId },
-      });
-    } else if (input.type === "labor") {
-      await db.bqLibLabor.update({
-        where: { id: input.libItemId },
-        data: { promotion_status: "APPROVED", masterdata_ref_id: input.masterdataRefId },
-      });
-    } else {
-      await db.bqLibMaterialLabor.update({
-        where: { id: input.libItemId },
-        data: { promotion_status: "APPROVED", masterdata_ref_id: input.masterdataRefId },
-      });
+    const masterdataRefId = input.masterdataRefId?.trim();
+    if (!masterdataRefId) {
+      throw new AppError(
+        "VALIDATION",
+        "bq.promotion.masterdata-ref-required",
+        "An approved promotion must record the Master Data entry it links to",
+      );
     }
+    await loadPromotable(input.type, input.libItemId, ["REQUESTED"]);
+    await setPromotionStatus(input.type, input.libItemId, {
+      promotion_status: "APPROVED",
+      masterdata_ref_id: masterdataRefId,
+    });
 
     await auditWriter({
       appId: "bq",
@@ -1489,34 +1512,26 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
       entityType: "BqLibItem",
       entityId: input.libItemId,
       actor: input.actor,
+      changes: { masterdataRefId },
     });
   }
 
   async function rejectPromotion(input: {
     grants: PermissionGrants;
     actor: { kind: string; userId?: string; label: string };
-    type: "material" | "labor" | "material_labor";
+    type: PromotableType;
     libItemId: string;
     reason: string;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryPromoteApprove);
-
-    if (input.type === "material") {
-      await db.bqLibMaterial.update({
-        where: { id: input.libItemId },
-        data: { promotion_status: "DRAFT" },
-      });
-    } else if (input.type === "labor") {
-      await db.bqLibLabor.update({
-        where: { id: input.libItemId },
-        data: { promotion_status: "DRAFT" },
-      });
-    } else {
-      await db.bqLibMaterialLabor.update({
-        where: { id: input.libItemId },
-        data: { promotion_status: "DRAFT" },
-      });
+    const reason = input.reason?.trim();
+    if (!reason) {
+      throw new AppError("VALIDATION", "bq.promotion.reason-required", "A rejection must state its reason");
     }
+    await loadPromotable(input.type, input.libItemId, ["REQUESTED"]);
+    // bq-contract §8.2: a rejected request stays REJECTED until it is revised
+    // and resubmitted. Resetting it to DRAFT erased the decision.
+    await setPromotionStatus(input.type, input.libItemId, { promotion_status: "REJECTED" });
 
     await auditWriter({
       appId: "bq",
@@ -1524,7 +1539,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
       entityType: "BqLibItem",
       entityId: input.libItemId,
       actor: input.actor,
-      changes: { reason: input.reason },
+      changes: { reason },
     });
   }
 
@@ -1571,10 +1586,16 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     rejectPromotion,
   };
 
+  // CORE.md §2: a command that writes records plus its audit event runs in one
+  // transaction; simple independent reads do not open one.
+  const readOnlyOperations = new Set<string>(["getTemplateWithSections", "listPromotionRequests"]);
+
   return Object.fromEntries(
     Object.entries(operations).map(([name, operation]) => [
       name,
-      (...args: unknown[]) => runTransaction(() => (operation as (...values: unknown[]) => Promise<unknown>)(...args)),
+      readOnlyOperations.has(name)
+        ? operation
+        : (...args: unknown[]) => runTransaction(() => (operation as (...values: unknown[]) => Promise<unknown>)(...args)),
     ]),
   ) as typeof operations;
 }
