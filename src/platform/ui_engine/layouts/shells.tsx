@@ -1,7 +1,7 @@
 "use client";
 
 import { DropdownMenu } from "radix-ui";
-import { createContext, useContext, useEffect, useRef, useState, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from "react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import { cx } from "../internal/cx";
@@ -256,9 +256,9 @@ export type NavSubmenuItem = {
 };
 
 /**
- * A compact-rail navigation group. On desktop it is one icon that opens its
- * generic destinations on hover, focus, or click; narrow layouts retain the
- * labeled child entries. Apps supply only routes and labels.
+ * A compact-rail navigation group. On desktop it is one icon opened by an
+ * intentional click or keyboard activation; narrow layouts retain the labeled
+ * child entries. Apps supply only routes and labels.
  */
 export function NavSubmenu({
   label,
@@ -271,23 +271,7 @@ export function NavSubmenu({
 }) {
   const { collapsed } = useContext(RailContext);
   const [open, setOpen] = useState(false);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const active = items.some((item) => item.active);
-
-  useEffect(() => () => {
-    if (closeTimer.current !== null) clearTimeout(closeTimer.current);
-  }, []);
-
-  const keepOpen = () => {
-    if (closeTimer.current !== null) clearTimeout(closeTimer.current);
-    setOpen(true);
-  };
-  const scheduleClose = () => {
-    if (closeTimer.current !== null) clearTimeout(closeTimer.current);
-    // The menu is portalled outside the rail. Keep it open long enough for a
-    // normal pointer movement from the compact icon into the menu surface.
-    closeTimer.current = setTimeout(() => setOpen(false), 320);
-  };
 
   if (!collapsed) {
     return (
@@ -318,9 +302,6 @@ export function NavSubmenu({
             "justify-center gap-0 px-0 text-center",
           )}
           aria-label={label}
-          onPointerEnter={keepOpen}
-          onPointerLeave={scheduleClose}
-          onFocus={keepOpen}
         >
           <span className="inline-flex shrink-0 [&_svg]:h-4 [&_svg]:w-4" aria-hidden="true">{icon}</span>
         </button>
@@ -331,8 +312,6 @@ export function NavSubmenu({
           side="right"
           align="start"
           sideOffset={0}
-          onPointerEnter={keepOpen}
-          onPointerLeave={scheduleClose}
         >
           <DropdownMenu.Label className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-tertiary">
             {label}

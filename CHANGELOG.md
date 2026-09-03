@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.57**
-- Next local revision: **R4.58**
+- Current revision: **R4.58**
+- Next local revision: **R4.59**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,20 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.58 — 2026-09-03 — fix(ui-engine): prevent accidental compact-rail submenu popovers
+
+- Agent: `Codex`
+
+Compact-rail submenus, including Administration, no longer open merely because
+the pointer or focus moves through the rail. They open only by intentional click
+or keyboard activation, preventing a portalled menu from unexpectedly covering
+the active work surface.
+
+### Verification
+
+- `npm run typecheck` — clean
+- `npx eslint src/platform/ui_engine/layouts/shells.tsx` — clean
 
 ## R4.57 — 2026-09-03 — fix(bq): load import sources after dialog render
 

@@ -258,6 +258,10 @@ PageShell or Drawer
 ### SettingsShell
 Keep the legacy two-column pattern concept, but make navigation generic/configurable instead of hardcoding StudioFlow settings tabs.
 
+Compact-rail submenus open only through intentional click or keyboard activation.
+Pointer movement and focus traversal alone must not open a portalled menu over the
+current work surface.
+
 ## 7. DataTable Contract
 
 UI Engine owns:
