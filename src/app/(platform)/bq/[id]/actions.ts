@@ -7,6 +7,7 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { validationError } from "@platform/core/validation";
 import { AppError } from "@platform/core/errors";
+import { isDecimalString } from "@platform/utilities/decimal";
 import { bqPublicRead, bqService, masterDataRead } from "@/apps/bq/runtime";
 import type { BqProjectDetail } from "@/apps/bq/public";
 import {
@@ -30,13 +31,12 @@ const Id = z.string().cuid();
 
 /* Decimal shapes are app-owned policy, not a shared scalar: BQ decides that a
    quantity may be zero and a coefficient may not. */
-const DECIMAL = /^\d+(\.\d+)?$/;
-
 function decimal(value: string, field: string): string {
-  if (!DECIMAL.test(value.trim())) {
-    throw new AppError("VALIDATION", "bq.decimal.invalid", `${field} must be a positive decimal number`);
+  const parsed = value.trim();
+  if (!isDecimalString(parsed) || parsed.startsWith("-")) {
+    throw new AppError("VALIDATION", "bq.decimal.invalid", `${field} must be a canonical non-negative decimal number`);
   }
-  return value.trim();
+  return parsed;
 }
 
 function positiveDecimal(value: string, field: string): string {
@@ -239,7 +239,7 @@ export async function deleteSubObjectAction(
   });
 }
 
-const ApplyAssemblySchema = z.object({ projectId: Id, itemId: Id, assemblyId: Id, qtyPerL1: z.string().regex(DECIMAL).optional() });
+const ApplyAssemblySchema = z.object({ projectId: Id, itemId: Id, assemblyId: Id, qtyPerL1: z.string().trim().optional() });
 
 /** Copies an Assembly Template into project-owned L2/L3 rows. No live link is retained. */
 export async function applyAssemblyAction(
@@ -249,7 +249,7 @@ export async function applyAssemblyAction(
   return runSafeAction(async () => {
     const { grants, actor } = await authorize();
     const value = parse(ApplyAssemblySchema, formData);
-    await bqService.applyAssemblyTemplate({ grants, actor, itemId: value.itemId, assemblyId: value.assemblyId, qtyPerL1: value.qtyPerL1 });
+    await bqService.applyAssemblyTemplate({ grants, actor, itemId: value.itemId, assemblyId: value.assemblyId, qtyPerL1: value.qtyPerL1 ? positiveDecimal(value.qtyPerL1, "Assembly quantity") : undefined });
     return reload(value.projectId);
   });
 }

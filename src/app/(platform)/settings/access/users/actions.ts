@@ -96,10 +96,12 @@ export async function setUserPasswordAction(
 export async function disableUserAction(userId: string): Promise<ActionResult<{ changed: boolean }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
+    const parsedUserId = z.string().uuid().safeParse(userId);
+    if (!parsedUserId.success) throw validationError(parsedUserId.error);
     const result = await platformAccess.disableUser({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      userId,
+      userId: parsedUserId.data,
     });
     revalidateUsers();
     return result;
@@ -109,10 +111,12 @@ export async function disableUserAction(userId: string): Promise<ActionResult<{ 
 export async function restoreUserAction(userId: string): Promise<ActionResult<{ changed: boolean }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
+    const parsedUserId = z.string().uuid().safeParse(userId);
+    if (!parsedUserId.success) throw validationError(parsedUserId.error);
     const result = await platformAccess.restoreUser({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      userId,
+      userId: parsedUserId.data,
     });
     revalidateUsers();
     return result;
@@ -122,11 +126,13 @@ export async function restoreUserAction(userId: string): Promise<ActionResult<{ 
 export async function assignRoleAction(userId: string, roleId: string): Promise<ActionResult<{ changed: boolean }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
+    const parsed = z.object({ userId: z.string().uuid(), roleId: z.string().uuid() }).safeParse({ userId, roleId });
+    if (!parsed.success) throw validationError(parsed.error);
     const result = await platformAccess.assignUserRole({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      userId,
-      roleId,
+      userId: parsed.data.userId,
+      roleId: parsed.data.roleId,
     });
     revalidateUsers();
     return result;
@@ -136,11 +142,13 @@ export async function assignRoleAction(userId: string, roleId: string): Promise<
 export async function removeRoleAction(userId: string, roleId: string): Promise<ActionResult<{ changed: boolean }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
+    const parsed = z.object({ userId: z.string().uuid(), roleId: z.string().uuid() }).safeParse({ userId, roleId });
+    if (!parsed.success) throw validationError(parsed.error);
     const result = await platformAccess.removeUserRole({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      userId,
-      roleId,
+      userId: parsed.data.userId,
+      roleId: parsed.data.roleId,
     });
     revalidateUsers();
     return result;

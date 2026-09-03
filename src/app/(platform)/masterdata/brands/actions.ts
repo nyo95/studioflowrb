@@ -64,11 +64,11 @@ export async function createBrandAction(
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
     const rawLinksJson = String(formData.get("linksJson") ?? "[]");
-    let links = [];
+    let links: unknown;
     try {
       links = JSON.parse(rawLinksJson);
     } catch {
-      // ignore
+      throw validationError(BrandInputSchema.shape.links.safeParse(null).error!);
     }
 
     const rawHashtags = String(formData.get("hashtags") ?? "")
@@ -110,11 +110,11 @@ export async function updateBrandAction(
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
     const rawLinksJson = String(formData.get("linksJson") ?? "[]");
-    let links = [];
+    let links: unknown;
     try {
       links = JSON.parse(rawLinksJson);
     } catch {
-      // ignore
+      throw validationError(BrandInputSchema.shape.links.safeParse(null).error!);
     }
 
     const rawHashtags = String(formData.get("hashtags") ?? "")

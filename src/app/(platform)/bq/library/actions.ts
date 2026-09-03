@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
+import { hasAnyPermission, requirePermission } from "@platform/core/rbac";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { validationError } from "@platform/core/validation";
 import { bqService, bqPublicRead } from "@/apps/bq/runtime";
@@ -63,7 +64,7 @@ export async function libraryItemAction(
       return {};
     }
 
-    if (value.operation === "update" && !value.id) {
+    if (value.operation === "update") {
       requireId(value.id);
     }
     const common = {
@@ -344,8 +345,7 @@ export async function updateAssemblyAction(_prev: ActionResult<void> | null, for
 export async function deleteAssemblyAction(_prev: ActionResult<void> | null, formData: FormData): Promise<ActionResult<void>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
-    const id = formData.get("id");
-    if (!id || typeof id !== "string") throw new Error("Missing id");
+    const id = requireId(String(formData.get("id") ?? ""));
     await bqService.deleteAssemblyTemplate({ grants, actor: actor(principal), assemblyId: id });
     revalidatePath("/bq/library");
   });
@@ -396,8 +396,7 @@ export async function updateAssemblyLineAction(_prev: ActionResult<void> | null,
 export async function deleteAssemblyLineAction(_prev: ActionResult<void> | null, formData: FormData): Promise<ActionResult<void>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
-    const lineId = formData.get("lineId");
-    if (!lineId || typeof lineId !== "string") throw new Error("Missing lineId");
+    const lineId = requireId(String(formData.get("lineId") ?? ""));
     await bqService.deleteAssemblyLine({ grants, actor: actor(principal), lineId });
     revalidatePath("/bq/library");
   });
@@ -405,10 +404,6 @@ export async function deleteAssemblyLineAction(_prev: ActionResult<void> | null,
 
 export async function getAssemblyDetailAction(id: string): Promise<BqAssemblyTemplateDetail | null> {
   const { grants } = await requirePrincipalGrants();
-  // library read is needed; if user lacks it, just return null
-  try {
-    return await bqPublicRead.getAssemblyTemplateDetail(id);
-  } catch {
-    return null;
-  }
+  if (!hasAnyPermission(grants, ["bq.library.read", "bq.library.manage"])) requirePermission(grants, "bq.library.read");
+  return bqPublicRead.getAssemblyTemplateDetail(requireId(id));
 }

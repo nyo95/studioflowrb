@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { runSafeAction } from "@platform/core/actions";
+import type { ActionResult } from "@platform/core/actions";
 import { validationError } from "@platform/core/validation";
 import { bqService } from "@/apps/bq/runtime";
 
@@ -33,8 +34,8 @@ function projectValues(formData: FormData) {
   return parsed.data;
 }
 
-export async function createProjectAction(formData: FormData) {
-  await runSafeAction(async () => {
+export async function createProjectAction(_prev: ActionResult<never> | null, formData: FormData): Promise<ActionResult<never>> {
+  return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
     const value = projectValues(formData);
     const project = await bqService.createProject({
@@ -51,8 +52,8 @@ export async function createProjectAction(formData: FormData) {
   });
 }
 
-export async function updateProjectAction(formData: FormData) {
-  await runSafeAction(async () => {
+export async function updateProjectAction(_prev: ActionResult<never> | null, formData: FormData): Promise<ActionResult<never>> {
+  return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
     const value = projectValues(formData);
     const id = z.string().cuid().safeParse(value.id);
@@ -78,9 +79,9 @@ const SectionSchema = z.object({
 });
 
 export async function addSectionAction(
-  _prev: unknown,
+  _prev: ActionResult<{ sectionId: string }> | null,
   formData: FormData,
-) {
+): Promise<ActionResult<{ sectionId: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
     const parsed = SectionSchema.safeParse({

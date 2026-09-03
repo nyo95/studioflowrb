@@ -111,9 +111,9 @@ export function TemplateActions({ template }: { template: BqTemplateRead }) {
     command.startTransition(async () => { const result = await templateAction(null, data); if (!result.ok) command.setError(result.error.safeMessage); else command.router.refresh(); });
   };
   return <div className="flex flex-wrap gap-1">
-    <Button type="button" size="sm" variant="ghost" title="Edit template" onClick={() => setEditOpen(true)}><Pencil size={15} aria-hidden="true" /></Button>
-    <Button type="button" size="sm" variant="ghost" title="Duplicate template" onClick={() => run("duplicate")} disabled={command.pending}><Copy size={15} aria-hidden="true" /></Button>
-    <Button type="button" size="sm" variant="ghost" title="Delete template" onClick={() => setDeleteOpen(true)} disabled={command.pending}><Trash2 size={15} aria-hidden="true" /></Button>
+    <Button type="button" size="sm" variant="ghost" aria-label="Edit template" title="Edit template" onClick={() => setEditOpen(true)}><Pencil size={15} aria-hidden="true" /></Button>
+    <Button type="button" size="sm" variant="ghost" aria-label="Duplicate template" title="Duplicate template" onClick={() => run("duplicate")} disabled={command.pending}><Copy size={15} aria-hidden="true" /></Button>
+    <Button type="button" size="sm" variant="ghost" aria-label="Delete template" title="Delete template" onClick={() => setDeleteOpen(true)} disabled={command.pending}><Trash2 size={15} aria-hidden="true" /></Button>
     {command.error ? <InlineError>{command.error}</InlineError> : null}
     <TemplateDialog template={template} open={editOpen} onOpenChange={setEditOpen} />
     <ConfirmDialog open={deleteOpen} onOpenChange={setDeleteOpen} title={`Delete ${template.name}?`} description={command.error ?? "This template and its scaffold sections will be permanently removed."} confirmLabel="Delete" tone="danger" pending={command.pending} onConfirm={() => { run("delete"); setDeleteOpen(false); }} />

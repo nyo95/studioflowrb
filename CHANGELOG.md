@@ -10,6 +10,29 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 
+## R4.77 — 2026-09-03 — fix(platform): harden audited action and recovery paths
+
+- Agent: `Codex`
+
+Closes the validated first batch from the StudioFlow RB audit:
+
+- Assembly-detail reads now require a BQ Library read or manage grant, and all assembly/library mutation IDs are CUID-validated at the action boundary.
+- User disable/restore and role assignment actions now reject malformed UUIDs before calling persistence.
+- Brand link JSON parse failures return a safe validation result instead of silently dropping submitted links.
+- Brand-mark uploads validate a complete PNG chunk structure, not only the signature.
+- BQ decimal input must be canonical and non-negative; assembly quantities are positive.
+- Create/edit project forms now surface safe server validation failures; BQ has a recoverable route error state and loading feedback.
+- Project refresh remounts the editor when its section count changes, source-picker responses are ordered by request, and template icon controls have accessible names.
+
+### Verification
+
+- `npm run typecheck` — clean
+- focused ESLint — clean
+- `npm run check:boundaries` — pass
+- `npm run check:legacy-runtime` — pass
+- BQ calculation and decimal tests — 16 pass
+- Browser acceptance — not run; this batch did not alter the existing running browser session.
+
 ## R4.76 — 2026-09-03 — fix(bq): complete assembly-template and correct R4.59 defects
 
 - Agent: `Claude`

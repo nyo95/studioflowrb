@@ -55,7 +55,7 @@ export default async function BqProjectDetailPage({
           <EmptyState title="Belum ada section" description="Project ini belum memiliki section." />
         </SectionCard>
       ) : (
-        <ProjectEditor project={project} canManage={canManage} assemblies={assemblies} />
+      <ProjectEditor key={`${project.updatedAt}:${project.sections.length}`} project={project} canManage={canManage} assemblies={assemblies} />
       )}
     </div>
   );

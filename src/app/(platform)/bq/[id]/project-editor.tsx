@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, ChevronRight, Download, Lock, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import {
   Badge,
@@ -797,11 +797,14 @@ function ImportDialog({
   const [options, setOptions] = useState<LineItemSourceOption[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, startTransition] = useTransition();
+  const request = useRef(0);
 
   const search = (nextQuery: string) => {
     setQuery(nextQuery);
+    const requestId = ++request.current;
     startTransition(async () => {
       const result = await listLineItemSourcesAction(nextQuery);
+      if (requestId !== request.current) return;
       if (!result.ok) {
         setError(result.error.safeMessage);
         return;
