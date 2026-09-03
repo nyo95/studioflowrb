@@ -34,6 +34,7 @@ export default async function BrandsPage() {
   ]);
 
   const canManageVendors = hasPermission(grants, MASTERDATA_PERMISSIONS.vendorManage);
+  const canManageCategories = hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryManage);
 
   return (
     <div className="grid gap-6">
@@ -48,6 +49,7 @@ export default async function BrandsPage() {
         materialVendors={refs.materialVendors}
         canManage={canManage}
         canManageVendors={canManageVendors}
+        canManageCategories={canManageCategories}
       />
     </div>
   );

@@ -68,6 +68,7 @@ describe("UI Engine foundation", () => {
       "SelectionBar",
       "Combobox",
       "CreatableSearch",
+      "CreatableMultiSelect",
       "InlineEdit",
       "SimpleTextEditor",
       "useDebouncedValue",

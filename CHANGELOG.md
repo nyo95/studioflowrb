@@ -5,9 +5,31 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.68**
-- Next local revision: **R4.69**
+- Current revision: **R4.69**
+- Next local revision: **R4.70**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.69 — 2026-09-03 — feat(ui-engine): activate multi-value creatable search
+
+- Agent: `Codex`
+
+Activates the domain-neutral `CreatableMultiSelect` UI Engine control: selected
+values are removable tokens, options can be searched, and apps may supply an
+explicit asynchronous create command with busy and error presentation.
+
+Brand create/edit now uses it for Product Categories and hashtags, replacing the
+static category checkboxes and free-text hashtag field. Category creation stays
+behind the existing dictionary-manage permission and uses the existing audited
+PRODUCT Category action; hashtag normalization and persistence remain Brand-owned.
+
+### Verification
+
+- `npm run typecheck` — clean
+- `npm run lint` — clean
+- `node --test --import tsx src/platform/ui_engine/ui-engine.test.ts` — pass
+- `npm run check:boundaries` — pass
+- `npm run check:legacy-runtime` — pass
+- `git diff --check` — clean
 
 ## R4.68 — 2026-09-03 — fix(masterdata): rename Store vendor type to Retail
 

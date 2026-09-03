@@ -7,6 +7,7 @@ import {
   Badge,
   Button,
   ConfirmDialog,
+  CreatableMultiSelect,
   CreatableSearch,
   DataTable,
   Dialog,
@@ -38,6 +39,7 @@ import {
   restoreBrandAction,
   updateBrandAction,
 } from "./actions";
+import { createCategoryAction } from "../categories/actions";
 
 type BrandRow = {
   id: string;
@@ -64,18 +66,24 @@ export function BrandDirectory({
   materialVendors,
   canManage,
   canManageVendors,
+  canManageCategories,
 }: {
   brands: BrandRow[];
   productCategories: Option[];
   materialVendors: Option[];
   canManage: boolean;
   canManageVendors: boolean;
+  canManageCategories: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<BrandRow | null>(null);
   const [createOwnerVendorId, setCreateOwnerVendorId] = useState("");
   const [editOwnerVendorId, setEditOwnerVendorId] = useState("");
+  const [createCategoryIds, setCreateCategoryIds] = useState<string[]>([]);
+  const [editCategoryIds, setEditCategoryIds] = useState<string[]>([]);
+  const [createHashtags, setCreateHashtags] = useState<string[]>([]);
+  const [editHashtags, setEditHashtags] = useState<string[]>([]);
   const [confirmArchive, setConfirmArchive] = useState<BrandRow | null>(null);
   const [confirmRestore, setConfirmRestore] = useState<BrandRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BrandRow | null>(null);
@@ -96,6 +104,7 @@ export function BrandDirectory({
   const [createNameWarning, setCreateNameWarning] = useState<string | null>(null);
   const [editNameWarning, setEditNameWarning] = useState<string | null>(null);
   const { options: ownerVendors, upsertOverlayOption } = useOptionOverlay(materialVendors);
+  const { options: categoryOptions, upsertOverlayOption: upsertCategoryOption } = useOptionOverlay(productCategories);
 
   const filtered = brands.filter((b) => {
     if (!query) return true;
@@ -142,6 +151,8 @@ export function BrandDirectory({
     setNewLinkUrl("");
     setNewLinkLabel("");
     setCreateOwnerVendorId("");
+    setCreateCategoryIds([]);
+    setCreateHashtags([]);
     setCreateNameWarning(null);
     setCreateOpen(true);
   };
@@ -151,6 +162,8 @@ export function BrandDirectory({
     setNewLinkUrl("");
     setNewLinkLabel("");
     setEditOwnerVendorId(brand.owner_vendor?.id ?? "");
+    setEditCategoryIds(brand.categories.map((item) => item.category.id));
+    setEditHashtags(brand.hashtags.map((item) => item.label));
     setEditNameWarning(null);
     setEditTarget(brand);
   };
@@ -177,6 +190,23 @@ export function BrandDirectory({
     upsertOverlayOption(option);
     return option.id;
   };
+
+  const createProductCategory = async (name: string, setError: (error: string | null) => void) => {
+    setError(null);
+    const formData = new FormData();
+    formData.set("name", name);
+    formData.set("kind", "PRODUCT");
+    const result = await createCategoryAction(null, formData);
+    if (!result.ok) {
+      setError(result.error.safeMessage);
+      return;
+    }
+    const option = { id: result.data.categoryId, name: name.trim() };
+    upsertCategoryOption(option);
+    return option.id;
+  };
+
+  const hashtagOptions = (hashtags: readonly string[]) => hashtags.map((tag) => ({ id: tag, label: tag.startsWith("#") ? tag : `#${tag}` }));
 
   return (
     <SectionCard>
@@ -348,6 +378,8 @@ export function BrandDirectory({
             <p className="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5">⚠ {createNameWarning}</p>
           ) : null}
           <input type="hidden" name="ownerVendorId" value={createOwnerVendorId} />
+          {createCategoryIds.map((id) => <input key={id} type="hidden" name="categoryIds" value={id} />)}
+          <input type="hidden" name="hashtags" value={createHashtags.join(" ")} />
           <Field label="Owner vendor" description="Optional registered manufacturer or brand owner vendor.">
             <CreatableSearch
               label="Owner vendor"
@@ -361,18 +393,11 @@ export function BrandDirectory({
               createLabel={(name) => `Create owner vendor “${name}”`}
             />
           </Field>
-          <Field label="Hashtags" description="Use space- or comma-separated tags for operator discovery, such as #laminate or #finish.">
-            <Input name="hashtags" placeholder="#hpl #veneer #premium" />
+          <Field label="Hashtags" description="Search existing discovery tags or add a new one, such as #laminate or #finish.">
+            <CreatableMultiSelect label="Hashtags" options={hashtagOptions(createHashtags)} value={createHashtags} onValueChange={setCreateHashtags} onCreate={(tag) => tag.trim()} placeholder="Add hashtags" createLabel={(tag) => `Add hashtag “${tag}”`} />
           </Field>
-          <Field label="Product categories" description="Select the direct discovery categories associated with this brand.">
-            <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto border border-line rounded p-2 bg-surface-muted/30">
-              {productCategories.map((c) => (
-                <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer select-none">
-                  <input type="checkbox" name="categoryIds" value={c.id} />
-                  <span>{c.name}</span>
-                </label>
-              ))}
-            </div>
+          <Field label="Product categories" description="Search a discovery category or create a missing one.">
+            <CreatableMultiSelect label="Product categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))} value={createCategoryIds} onValueChange={setCreateCategoryIds} onCreate={canManageCategories ? (name) => createProductCategory(name, setCreateError) : undefined} createLabel={(name) => `Create product category “${name}”`} />
           </Field>
           {/* Links builder */}
           <div className="grid gap-2 border-t border-line pt-3">
@@ -444,6 +469,8 @@ export function BrandDirectory({
             className="grid gap-4 max-h-[80vh] overflow-y-auto pr-1"
           >
             <input type="hidden" name="brandId" value={editTarget.id} />
+            {editCategoryIds.map((id) => <input key={id} type="hidden" name="categoryIds" value={id} />)}
+            <input type="hidden" name="hashtags" value={editHashtags.join(" ")} />
             {editError ? <InlineError>{editError}</InlineError> : null}
             <Field label="Brand name" required>
               <Input name="name" defaultValue={editTarget.name} required maxLength={64} autoFocus onChange={(e) => setEditNameWarning(checkSimilarBrandName(e.target.value, editTarget.id))} />
@@ -465,21 +492,11 @@ export function BrandDirectory({
                 createLabel={(name) => `Create owner vendor “${name}”`}
               />
             </Field>
-            <Field label="Hashtags" description="Use space- or comma-separated tags for operator discovery.">
-              <Input name="hashtags" defaultValue={editTarget.hashtags.map((h) => `#${h.label}`).join(" ")} />
+            <Field label="Hashtags" description="Search existing discovery tags or add a new one.">
+              <CreatableMultiSelect label="Hashtags" options={hashtagOptions(editHashtags)} value={editHashtags} onValueChange={setEditHashtags} onCreate={(tag) => tag.trim()} placeholder="Add hashtags" createLabel={(tag) => `Add hashtag “${tag}”`} />
             </Field>
-            <Field label="Product categories" description="Checked categories will have MANUAL provenance.">
-              <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto border border-line rounded p-2 bg-surface-muted/30">
-                {productCategories.map((c) => {
-                  const isChecked = editTarget.categories.some((bc) => bc.category.id === c.id);
-                  return (
-                    <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer select-none">
-                      <input type="checkbox" name="categoryIds" value={c.id} defaultChecked={isChecked} />
-                      <span>{c.name}</span>
-                    </label>
-                  );
-                })}
-              </div>
+            <Field label="Product categories" description="Manual selections keep their own provenance.">
+              <CreatableMultiSelect label="Product categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))} value={editCategoryIds} onValueChange={setEditCategoryIds} onCreate={canManageCategories ? (name) => createProductCategory(name, setEditError) : undefined} createLabel={(name) => `Create product category “${name}”`} />
             </Field>
             {/* Links builder */}
             <div className="grid gap-2 border-t border-line pt-3">

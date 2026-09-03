@@ -405,7 +405,7 @@ The engine distinguishes three interaction shapes instead of overloading one amb
 
 - `Combobox` — search and select one existing option;
 - `CreatableSearch` — search/select one option plus an explicit create intent and optional explicit clear intent;
-- a future creatable tag input — create/select multiple values, only when a real multi-value consumer is approved.
+- `CreatableMultiSelect` — search/select or explicitly create multiple values as removable tokens.
 
 Both controls put the combobox semantics on the **search field**, which owns the
 query and the listbox, not on the trigger button. A trigger carrying
@@ -434,6 +434,13 @@ when the query matches nothing.
 - accessible combobox/listbox relationships and active-option announcement.
 
 It does not create entities, call server actions, choose permissions, reuse records, assign roles, guess defaults, write audit events, or own optimistic server data. Apps provide the command and may use a generic option-overlay helper only if that helper remains persistence- and domain-neutral.
+
+`CreatableMultiSelect` follows the same boundary for an ordered controlled value
+array. It filters unselected options, renders selected values as removable tokens,
+and supports exact-match/single-result Enter selection, explicit create, Escape,
+and Backspace removal only when the query is empty. It never normalizes a value,
+persists a token, or decides whether creation is authorized; the consuming app
+supplies those policies and the optional create command.
 
 The legacy component is behavior evidence, not source to copy: its clear/create/reset/group behavior is retained, while incomplete keyboard navigation, hardcoded visual values, overloaded free-text ID semantics, and untested async behavior are fixed or split.
 
@@ -667,7 +674,7 @@ This stage includes a real login page, authenticated app launcher, user director
 ### UI-F1 — activate immediately before Master Data resumes
 
 - `RowActionMenu`, `FilterBar`, `SelectionBar`;
-- `Combobox`, `CreatableSearch`;
+- `Combobox`, `CreatableSearch`, `CreatableMultiSelect`;
 - `InlineEdit` — activated in R4.56 by an approved cell-entry workflow;
 - `useDebouncedValue`, `useOptionOverlay`, `useConfirm`, `useUnsavedChangesGuard`, their accessible prompts, and generic pending/action feedback;
 - one internal UI Engine showcase route demonstrating realistic compositions without app/domain imports.
@@ -691,7 +698,7 @@ Deferred patterns may remain in design prose as routing memory. They are not req
   movement across enabled options, Home/End movement within the option list,
   Enter selection, Escape close/focus return, and visible keyboard focus. It does
   not own remote fetching, entity vocabulary, authorization, or business ranking.
-- CreatableSearch builds on the same navigation/accessibility contract and adds only explicit clear/create interaction. Persistence, authorization, validation, reuse semantics, role assignment, audit, and app option shaping remain app-owned.
+- CreatableSearch builds on the same navigation/accessibility contract and adds only explicit clear/create interaction. CreatableMultiSelect applies the same contract to removable multiple values. Persistence, authorization, validation, normalization, reuse semantics, role assignment, audit, and app option shaping remain app-owned.
 - InlineEdit owns editing states and keyboard behavior, not validation/business saving rules.
 - FileDropZone owns input/drop interaction and file-list presentation, not storage/upload policy.
 - StatusBadge receives an explicit semantic tone and never infers meaning from a domain status string.
