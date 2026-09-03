@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { UserRound } from "lucide-react";
 
+/* eslint-disable @next/next/no-img-element -- brand mark accepts a local path or owner-configured host. */
+
 import { AppShell, Button, Text } from "@/platform/ui_engine";
 import type { SessionPrincipal } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
@@ -26,18 +28,20 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
   const subtitle = appName ?? settings.organizationName;
   return (
     <AppShell
-      brand={<div className="flex min-w-0 items-center gap-2.5">
-        {settings.brandMarkUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- owner-configured URL/path has no fixed image host.
-          <img src={settings.brandMarkUrl} alt="" className="h-7 w-7 shrink-0 object-contain" />
-        ) : null}
+      brand={settings.brandMarkUrl ? (
+        <div className="flex min-w-0 items-center">
+          <img src={settings.brandMarkUrl} alt={settings.appTitle} className="h-12 max-w-[190px] shrink-0 object-contain object-left" />
+        </div>
+      ) : (
+        <div className="flex min-w-0 items-center gap-2.5">
         <div className="min-w-0">
           <Text as="span" className="block truncate font-semibold">{settings.appTitle}</Text>
           {subtitle !== settings.appTitle ? (
             <Text as="span" tone="tertiary" size="sm" className="block truncate">{subtitle}</Text>
           ) : null}
         </div>
-      </div>}
+        </div>
+      )}
       collapsedBrand={<Text as="span" weight="semibold">{appAbbreviation ?? productMark}</Text>}
       collapsible
       railPresentation="compact"

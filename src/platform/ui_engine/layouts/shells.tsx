@@ -104,7 +104,7 @@ export function AppShell({
           <header className="sticky top-0 z-20 flex min-h-16 items-stretch border-b border-line bg-surface/94 backdrop-blur-[12px]">
             <div
               className={cx(
-                "absolute inset-y-0 left-0 z-10 flex min-w-0 items-center justify-between gap-2 px-4 py-3.5 transition-[width] duration-[160ms] motion-reduce:transition-none max-[840px]:static max-[840px]:shrink-0",
+                "absolute inset-y-0 left-0 z-10 flex h-16 min-w-0 items-center justify-between gap-2 px-4 py-2 transition-[width] duration-[160ms] motion-reduce:transition-none max-[840px]:static max-[840px]:shrink-0",
                 railPresentation === "compact" ? "w-[var(--ui-header-brand-width,232px)]" : "w-[var(--ui-rail-width,232px)]",
                 "max-[840px]:w-auto max-[840px]:px-3",
                 isCollapsed && "[--ui-rail-width:60px] flex-col justify-center gap-1.5 px-2 py-2.5",

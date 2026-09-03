@@ -5,9 +5,23 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.63**
-- Next local revision: **R4.64**
+- Current revision: **R4.64**
+- Next local revision: **R4.65**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.64 — 2026-09-03 — fix(shell): prioritize uploaded brand mark
+
+- Agent: `Codex`
+
+When an organization brand mark exists, it replaces the header text block and
+uses the available brand area at a fixed 48px height. The header brand region is
+now explicitly 64px high, preserving alignment with the topbar.
+
+### Verification
+
+- `npm run typecheck` — clean
+- ESLint on changed shell modules — clean
+- `git diff --check` — clean
 
 ## R4.63 — 2026-09-03 — fix(shell): stabilize header and add PNG brand marks
 
