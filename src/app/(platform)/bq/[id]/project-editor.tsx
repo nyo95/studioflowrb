@@ -23,10 +23,14 @@ import {
   TableHeader,
   TableRow,
   Tooltip,
+  Field,
+  FormActions,
+  Select,
 } from "@/platform/ui_engine";
 import { createMoney, formatMoney } from "@platform/utilities/money";
 import type { ActionResult } from "@platform/core/actions";
 import type {
+  BqAssemblyTemplateRead,
   BqItemDetail,
   BqLineItemDetail,
   BqProjectDetail,
@@ -38,6 +42,7 @@ import {
   addLineItemAction,
   addSubObjectAction,
   addSubsectionAction,
+  applyAssemblyAction,
   deleteItemAction,
   deleteLineItemAction,
   deleteSubObjectAction,
@@ -69,15 +74,18 @@ function money(amount: string | null, currency = "IDR") {
 export function ProjectEditor({
   project: initialProject,
   canManage,
+  assemblies = [],
 }: {
   project: BqProjectDetail;
   canManage: boolean;
+  assemblies?: BqAssemblyTemplateRead[];
 }) {
   const [project, setProject] = useState(initialProject);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [importTarget, setImportTarget] = useState<{ itemId?: string; subObjectId?: string } | null>(null);
+  const [assemblyTarget, setAssemblyTarget] = useState<string | null>(null); // itemId
   const [lockOpen, setLockOpen] = useState(false);
 
   const locked = project.status === "LOCKED";
@@ -243,7 +251,56 @@ export function ProjectEditor({
           void run(lockProjectAction, {}).finally(() => setLockOpen(false));
         }}
       />
+
+      {assemblyTarget ? (
+        <AssemblyPickerDialog
+          key={assemblyTarget}
+          assemblies={assemblies}
+          pending={pending}
+          onClose={() => setAssemblyTarget(null)}
+          onApply={(assemblyId, qtyPerL1) => {
+            void run(applyAssemblyAction, { itemId: assemblyTarget, assemblyId, qtyPerL1 }).finally(() => setAssemblyTarget(null));
+          }}
+        />
+      ) : null}
     </div>
+  );
+}
+
+function AssemblyPickerDialog({
+  assemblies,
+  pending,
+  onClose,
+  onApply,
+}: {
+  assemblies: BqAssemblyTemplateRead[];
+  pending: boolean;
+  onClose: () => void;
+  onApply: (assemblyId: string, qtyPerL1: string) => void;
+}) {
+  const [selectedId, setSelectedId] = useState(assemblies[0]?.id ?? "");
+  const [qtyPerL1, setQtyPerL1] = useState("1");
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }} title="Terapkan Assembly" description="Pilih assembly untuk disalin sebagai komponen L2 beserta baris L3-nya.">
+      <div className="grid gap-4">
+        <Field label="Assembly">
+          <Select value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
+            {assemblies.map((a) => (
+              <option key={a.id} value={a.id}>{a.name} ({a.lineCount} baris)</option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Qty per L1">
+          <Input inputMode="decimal" value={qtyPerL1} onChange={(e) => setQtyPerL1(e.target.value)} />
+        </Field>
+        <FormActions>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>Batal</Button>
+          <Button type="button" variant="primary" disabled={!selectedId || pending} pending={pending} onClick={() => onApply(selectedId, qtyPerL1)}>
+            Terapkan
+          </Button>
+        </FormActions>
+      </div>
+    </Dialog>
   );
 }
 
@@ -256,6 +313,7 @@ function ItemTable({
   run,
   commit,
   onImport,
+  onApplyAssembly,
   columns,
 }: {
   items: readonly BqItemDetail[];
@@ -266,6 +324,7 @@ function ItemTable({
   run: (action: Mutation, fields: Record<string, string | undefined>) => Promise<void>;
   commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   onImport: (target: { itemId?: string; subObjectId?: string }) => void;
+  onApplyAssembly?: (itemId: string) => void;
   columns: number;
 }) {
   if (items.length === 0) {
@@ -303,6 +362,7 @@ function ItemTable({
               run={run}
               commit={commit}
               onImport={onImport}
+              onApplyAssembly={onApplyAssembly}
               columns={columns + (editable ? 1 : 0)}
             />
           );
@@ -323,6 +383,7 @@ function ItemRows({
   run,
   commit,
   onImport,
+  onApplyAssembly,
   columns,
 }: {
   item: BqItemDetail;
@@ -335,6 +396,7 @@ function ItemRows({
   run: (action: Mutation, fields: Record<string, string | undefined>) => Promise<void>;
   commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   onImport: (target: { itemId?: string; subObjectId?: string }) => void;
+  onApplyAssembly?: (itemId: string) => void;
   columns: number;
 }) {
   return (
@@ -456,6 +518,16 @@ function ItemRows({
                   >
                     Impor
                   </Button>
+                  {onApplyAssembly ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={pending}
+                      onClick={() => onApplyAssembly(item.id)}
+                    >
+                      Assembly
+                    </Button>
+                  ) : null}
                 </div>
               </TableCell>
             </TableRow>

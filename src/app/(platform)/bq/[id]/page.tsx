@@ -27,7 +27,7 @@ export default async function BqProjectDetailPage({
 
   if (!canRead) redirect("/bq");
 
-  const project = await bqPublicRead.getProjectDetail(id);
+  const [project, assemblies] = await Promise.all([bqPublicRead.getProjectDetail(id), bqPublicRead.listAssemblyTemplates()]);
   if (!project) notFound();
 
   const isLocked = project.status === "LOCKED";
@@ -55,7 +55,7 @@ export default async function BqProjectDetailPage({
           <EmptyState title="Belum ada section" description="Project ini belum memiliki section." />
         </SectionCard>
       ) : (
-        <ProjectEditor project={project} canManage={canManage} />
+        <ProjectEditor project={project} canManage={canManage} assemblies={assemblies} />
       )}
     </div>
   );

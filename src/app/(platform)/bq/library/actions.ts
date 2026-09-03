@@ -6,7 +6,8 @@ import { z } from "zod";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { validationError } from "@platform/core/validation";
-import { bqService } from "@/apps/bq/runtime";
+import { bqService, bqPublicRead } from "@/apps/bq/runtime";
+import type { BqAssemblyTemplateDetail } from "@/apps/bq/public";
 
 const ItemSchema = z.object({
   operation: z.enum(["create", "update", "delete"]),
@@ -326,4 +327,88 @@ export async function createAssemblyAction(_prev: ActionResult<{ id: string }> |
     revalidatePath("/bq/library");
     return { id: assembly.id };
   });
+}
+
+const AssemblyUpdateSchema = z.object({ id: z.string().cuid(), name: z.string().trim().min(1).max(160).optional(), description: z.string().trim().max(2000).optional() });
+export async function updateAssemblyAction(_prev: ActionResult<void> | null, formData: FormData): Promise<ActionResult<void>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = AssemblyUpdateSchema.safeParse(Object.fromEntries(formData.entries()));
+    if (!parsed.success) throw validationError(parsed.error);
+    const { id, ...rest } = parsed.data;
+    await bqService.updateAssemblyTemplate({ grants, actor: actor(principal), assemblyId: id, ...rest });
+    revalidatePath("/bq/library");
+  });
+}
+
+export async function deleteAssemblyAction(_prev: ActionResult<void> | null, formData: FormData): Promise<ActionResult<void>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const id = formData.get("id");
+    if (!id || typeof id !== "string") throw new Error("Missing id");
+    await bqService.deleteAssemblyTemplate({ grants, actor: actor(principal), assemblyId: id });
+    revalidatePath("/bq/library");
+  });
+}
+
+const AssemblyLineSchema = z.object({
+  assemblyId: z.string().cuid(),
+  title: z.string().trim().min(1).max(200),
+  purchaseUnit: z.string().trim().min(1).max(40).optional(),
+  harga: z.string().trim().regex(/^\d+(\.\d+)?$/).max(32).optional(),
+  currency: z.string().trim().regex(/^[A-Z]{3}$/).optional(),
+  kategori: z.enum(["MATERIAL", "UPAH", "MATERIAL_UPAH", "BIAYA_UMUM", "TRANSPORTASI_AKOMODASI", "ALAT"]).optional(),
+  qty: z.string().trim().regex(/^\d+(\.\d+)?$/).max(32).optional(),
+  koefisien: z.string().trim().regex(/^\d+(\.\d+)?$/).max(32).optional(),
+});
+export async function addAssemblyLineAction(_prev: ActionResult<void> | null, formData: FormData): Promise<ActionResult<void>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = AssemblyLineSchema.safeParse(Object.fromEntries(formData.entries()));
+    if (!parsed.success) throw validationError(parsed.error);
+    const { assemblyId, ...rest } = parsed.data;
+    await bqService.addAssemblyCustomLine({ grants, actor: actor(principal), assemblyId, ...rest });
+    revalidatePath("/bq/library");
+  });
+}
+
+const AssemblyLineUpdateSchema = z.object({
+  lineId: z.string().cuid(),
+  title: z.string().trim().min(1).max(200).optional(),
+  purchaseUnit: z.string().trim().min(1).max(40).optional(),
+  harga: z.string().trim().regex(/^\d+(\.\d+)?$/).max(32).optional(),
+  kategori: z.enum(["MATERIAL", "UPAH", "MATERIAL_UPAH", "BIAYA_UMUM", "TRANSPORTASI_AKOMODASI", "ALAT"]).optional(),
+  qty: z.string().trim().regex(/^\d+(\.\d+)?$/).max(32).optional(),
+  koefisien: z.string().trim().regex(/^\d+(\.\d+)?$/).max(32).optional(),
+  notes: z.string().trim().max(2000).optional(),
+});
+export async function updateAssemblyLineAction(_prev: ActionResult<void> | null, formData: FormData): Promise<ActionResult<void>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = AssemblyLineUpdateSchema.safeParse(Object.fromEntries(formData.entries()));
+    if (!parsed.success) throw validationError(parsed.error);
+    const { lineId, ...rest } = parsed.data;
+    await bqService.updateAssemblyLine({ grants, actor: actor(principal), lineId, ...rest });
+    revalidatePath("/bq/library");
+  });
+}
+
+export async function deleteAssemblyLineAction(_prev: ActionResult<void> | null, formData: FormData): Promise<ActionResult<void>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const lineId = formData.get("lineId");
+    if (!lineId || typeof lineId !== "string") throw new Error("Missing lineId");
+    await bqService.deleteAssemblyLine({ grants, actor: actor(principal), lineId });
+    revalidatePath("/bq/library");
+  });
+}
+
+export async function getAssemblyDetailAction(id: string): Promise<BqAssemblyTemplateDetail | null> {
+  const { grants } = await requirePrincipalGrants();
+  // library read is needed; if user lacks it, just return null
+  try {
+    return await bqPublicRead.getAssemblyTemplateDetail(id);
+  } catch {
+    return null;
+  }
 }

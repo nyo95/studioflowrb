@@ -486,6 +486,8 @@ Belum diverifikasi di browser sungguhan; lihat catatan keterbatasan di
 
 ---
 
+
+> **Assembly Templates diaktifkan di R4.59/R4.60.** Lihat §15 dan kode `BqAssemblyTemplate` / `BqAssemblyLine`.
 ## 16. Yang ditunda (deferred)
 
 | Item | Keterangan |
@@ -496,7 +498,6 @@ Belum diverifikasi di browser sungguhan; lihat catatan keterbatasan di
 | Rate Library | Menyusul setelah banyak L1 jadi. |
 | Revisi antar versi BQ | Snapshot di §7 sudah siap sejak awal. |
 | Integrasi formal ke StudioFlow project | Via `external_ref` nanti. |
-| Assembly template (fixture library) | Butuh 20-30 breakdown nyata dulu. |
 
 ## 17. Blocker keputusan sebelum F3
 

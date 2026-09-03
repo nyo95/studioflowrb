@@ -53,6 +53,23 @@ export type BqAssemblyTemplateRead = {
   lineCount: number;
 };
 
+export type BqAssemblyLineRead = {
+  id: string;
+  title: string;
+  purchaseUnit: string;
+  harga: string;
+  currency: string;
+  kategori: string;
+  qty: string;
+  koefisien: string;
+  sortOrder: number;
+  notes: string | null;
+};
+
+export type BqAssemblyTemplateDetail = BqAssemblyTemplateRead & {
+  lines: BqAssemblyLineRead[];
+};
+
 export type BqProjectSummary = {
   id: string;
   title: string;
@@ -162,6 +179,29 @@ export function createBqPublicRead(db: PrismaClient) {
     async listAssemblyTemplates(): Promise<BqAssemblyTemplateRead[]> {
       const assemblies = await db.bqAssemblyTemplate.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { lines: true } } } });
       return assemblies.map((assembly) => ({ id: assembly.id, name: assembly.name, description: assembly.description, lineCount: assembly._count.lines }));
+    },
+
+    async getAssemblyTemplateDetail(id: string): Promise<BqAssemblyTemplateDetail | null> {
+      const assembly = await db.bqAssemblyTemplate.findUnique({ where: { id }, include: { lines: { orderBy: { sort_order: "asc" } } } });
+      if (!assembly) return null;
+      return {
+        id: assembly.id,
+        name: assembly.name,
+        description: assembly.description,
+        lineCount: assembly.lines.length,
+        lines: assembly.lines.map((l) => ({
+          id: l.id,
+          title: l.title_snapshot,
+          purchaseUnit: l.purchase_unit_snapshot,
+          harga: String(l.harga_snapshot),
+          currency: l.currency_snapshot,
+          kategori: l.kategori,
+          qty: String(l.qty),
+          koefisien: String(l.koefisien),
+          sortOrder: l.sort_order,
+          notes: l.notes,
+        })),
+      };
     },
     async listLibraryItems(): Promise<BqLibItemRead[]> {
       const [materials, labors, materialLabors, customItems] = await Promise.all([

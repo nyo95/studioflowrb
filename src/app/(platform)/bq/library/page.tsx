@@ -7,7 +7,7 @@ import { BQ_PERMISSIONS } from "@/apps/bq/service";
 import { bqPublicRead } from "@/apps/bq/runtime";
 import { Library } from "lucide-react";
 import { createMoney, formatMoney } from "@platform/utilities/money";
-import { AssemblyCreateButton, LibraryItemActions, LibraryItemCreateButton, TemplateActions, TemplateCreateButton } from "./library-controls";
+import { AssemblyActions, AssemblyCreateButton, LibraryItemActions, LibraryItemCreateButton, TemplateActions, TemplateCreateButton } from "./library-controls";
 import { TemplateSectionsButton } from "./template-editor";
 import { PromotionQueue, PromotionRequestButton } from "./promotion-controls";
 
@@ -72,13 +72,9 @@ export default async function BqLibraryPage() {
       />
 
       <Tabs
+        defaultValue="items"
         label="BQ Library views"
         items={[
-          {
-            value: "assemblies",
-            label: "Assemblies",
-            content: <SectionCard>{assemblies.length === 0 ? <EmptyState title="Belum ada assembly" description="Assembly adalah template L2 dengan daftar L3 yang akan disalin ke proyek." action={canManage ? <AssemblyCreateButton /> : undefined} /> : <div className="grid gap-2">{assemblies.map((assembly) => <div key={assembly.id} className="rounded-control border border-line p-3"><div className="font-medium">{assembly.name}</div><Text tone="tertiary" size="sm">{assembly.lineCount} baris L3 · {assembly.description ?? "Tanpa deskripsi"}</Text></div>)}</div>}</SectionCard>,
-          },
           {
             value: "items",
             label: "Items",
@@ -136,6 +132,11 @@ export default async function BqLibraryPage() {
                 )}
               </SectionCard>
             ),
+          },
+          {
+            value: "assemblies",
+            label: "Assemblies",
+            content: <SectionCard>{assemblies.length === 0 ? <EmptyState title="Belum ada assembly" description="Assembly adalah template L2 dengan daftar L3 yang akan disalin ke proyek." action={canManage ? <AssemblyCreateButton /> : undefined} /> : <div className="grid gap-4">{assemblies.map((assembly) => <div key={assembly.id} className="rounded-control border border-line p-4"><div className="flex items-start justify-between gap-2"><div><div className="font-medium">{assembly.name}</div><Text tone="tertiary" size="sm">{assembly.lineCount} baris L3 · {assembly.description ?? "Tanpa deskripsi"}</Text></div></div>{canManage ? <AssemblyActions assembly={assembly} /> : null}</div>)}</div>}</SectionCard>,
           },
           {
             value: "templates",

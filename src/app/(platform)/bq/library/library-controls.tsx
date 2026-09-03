@@ -4,8 +4,8 @@ import { useState, useTransition, type FormEvent } from "react";
 import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import { createAssemblyAction, libraryItemAction, templateAction } from "./actions";
-import type { BqLibItemRead, BqTemplateRead } from "@/apps/bq/public";
+import { addAssemblyLineAction, createAssemblyAction, deleteAssemblyAction, deleteAssemblyLineAction, getAssemblyDetailAction, libraryItemAction, templateAction, updateAssemblyAction, updateAssemblyLineAction } from "./actions";
+import type { BqAssemblyLineRead, BqAssemblyTemplateDetail, BqAssemblyTemplateRead, BqLibItemRead, BqTemplateRead } from "@/apps/bq/public";
 import { Button, ConfirmDialog, Dialog, Field, FormActions, InlineError, Input, Select, Spinner, Textarea } from "@/platform/ui_engine";
 
 type ItemType = BqLibItemRead["type"];
@@ -140,4 +140,238 @@ function TemplateDialog({ template, open: controlledOpen, onOpenChange }: { temp
       </form>
     </Dialog>
   </>;
+}
+
+// ─── ASSEMBLY CRUD ───────────────────────────────────────────────────────────
+
+export function AssemblyActions({ assembly }: { assembly: BqAssemblyTemplateRead }) {
+  const [editOpen, setEditOpen] = useState(false);
+  const [linesOpen, setLinesOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [detail, setDetail] = useState<BqAssemblyTemplateDetail | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const command = useCommand();
+
+  const openLines = () => {
+    setLoadError(null);
+    setLinesOpen(true);
+    getAssemblyDetailAction(assembly.id).then((d) => {
+      if (!d) setLoadError("Gagal memuat assembly");
+      else setDetail(d);
+    }).catch(() => setLoadError("Gagal memuat assembly"));
+  };
+
+  const runDelete = () => {
+    const data = new FormData();
+    data.set("id", assembly.id);
+    command.startTransition(async () => {
+      const result = await deleteAssemblyAction(null, data);
+      if (!result.ok) command.setError(result.error.safeMessage);
+      else { setDeleteOpen(false); command.router.refresh(); }
+    });
+  };
+
+  return (
+    <div className="flex flex-wrap gap-1 mt-2">
+      <Button type="button" size="sm" variant="ghost" title="Edit nama/deskripsi" onClick={() => { command.setError(null); setEditOpen(true); }}>
+        <Pencil size={14} aria-hidden="true" />
+      </Button>
+      <Button type="button" size="sm" variant="ghost" title="Kelola baris L3" onClick={openLines}>
+        <Plus size={14} aria-hidden="true" />
+      </Button>
+      <Button type="button" size="sm" variant="ghost" title="Hapus assembly" onClick={() => { command.setError(null); setDeleteOpen(true); }} disabled={command.pending}>
+        <Trash2 size={14} aria-hidden="true" />
+      </Button>
+
+      {/* Edit name/desc dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit Assembly" size="sm">
+        <form className="grid gap-4" onSubmit={(e) => {
+          e.preventDefault();
+          const data = new FormData(e.currentTarget);
+          command.startTransition(async () => {
+            const result = await updateAssemblyAction(null, data);
+            if (!result.ok) command.setError(result.error.safeMessage);
+            else { setEditOpen(false); command.router.refresh(); }
+          });
+        }}>
+          {command.error ? <InlineError>{command.error}</InlineError> : null}
+          <input type="hidden" name="id" value={assembly.id} />
+          <Field label="Nama" required><Input name="name" defaultValue={assembly.name} required maxLength={160} autoFocus /></Field>
+          <Field label="Deskripsi"><Textarea name="description" defaultValue={assembly.description ?? ""} maxLength={2000} /></Field>
+          <FormActions>
+            <Button type="button" variant="ghost" onClick={() => setEditOpen(false)}>Batal</Button>
+            <Button type="submit" variant="primary" pending={command.pending}>Simpan</Button>
+          </FormActions>
+        </form>
+      </Dialog>
+
+      {/* Lines editor dialog */}
+      <Dialog open={linesOpen} onOpenChange={setLinesOpen} title={`Baris L3 — ${assembly.name}`} size="lg" description="Setiap baris akan disalin ke proyek saat assembly diterapkan.">
+        {loadError ? <InlineError>{loadError}</InlineError> : detail ? (
+          <AssemblyLineList detail={detail} onRefresh={() => {
+            getAssemblyDetailAction(assembly.id).then((d) => { if (d) setDetail(d); }).catch(() => {});
+            command.router.refresh();
+          }} />
+        ) : <div className="py-8 text-center text-sm text-ink-secondary">Memuat…</div>}
+      </Dialog>
+
+      {/* Delete confirm */}
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title={`Hapus "${assembly.name}"?`}
+        description={command.error ?? "Assembly ini akan dihapus permanen beserta semua barisnya. Proyek yang sudah menggunakannya tidak terpengaruh."}
+        confirmLabel="Hapus"
+        tone="danger"
+        pending={command.pending}
+        onConfirm={runDelete}
+      />
+    </div>
+  );
+}
+
+function AssemblyLineList({ detail, onRefresh }: { detail: BqAssemblyTemplateDetail; onRefresh: () => void }) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const [addOpen, setAddOpen] = useState(false);
+  const router = useRouter();
+
+  const addLine = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    data.set("assemblyId", detail.id);
+    startTransition(async () => {
+      const result = await addAssemblyLineAction(null, data);
+      if (!result.ok) setError(result.error.safeMessage);
+      else { setAddOpen(false); setError(null); onRefresh(); }
+    });
+  };
+
+  const deleteLine = (lineId: string) => {
+    const data = new FormData();
+    data.set("lineId", lineId);
+    startTransition(async () => {
+      const result = await deleteAssemblyLineAction(null, data);
+      if (!result.ok) setError(result.error.safeMessage);
+      else onRefresh();
+    });
+  };
+
+  return (
+    <div className="grid gap-4">
+      {error ? <InlineError>{error}</InlineError> : null}
+      {detail.lines.length === 0 ? (
+        <p className="text-sm text-ink-secondary">Belum ada baris. Tambah baris L3 di bawah.</p>
+      ) : (
+        <div className="divide-y divide-line">
+          {detail.lines.map((line) => (
+            <AssemblyLineRow key={line.id} line={line} assemblyId={detail.id} pending={pending} onDelete={() => deleteLine(line.id)} onSaved={onRefresh} />
+          ))}
+        </div>
+      )}
+
+      {addOpen ? (
+        <form className="grid gap-3 rounded-control border border-line p-3" onSubmit={addLine}>
+          <div className="font-medium text-sm">Baris baru</div>
+          <div className="grid grid-cols-2 gap-2 max-[480px]:grid-cols-1">
+            <Field label="Nama item" required><Input name="title" required maxLength={200} autoFocus /></Field>
+            <Field label="Unit"><Input name="purchaseUnit" placeholder="m2, lot" defaultValue="ls" /></Field>
+            <Field label="Harga"><Input name="harga" inputMode="decimal" defaultValue="0" /></Field>
+            <Field label="Qty"><Input name="qty" inputMode="decimal" defaultValue="1" /></Field>
+            <Field label="Koefisien"><Input name="koefisien" inputMode="decimal" defaultValue="1" /></Field>
+            <Field label="Kategori">
+              <Select name="kategori" defaultValue="MATERIAL">
+                <option value="MATERIAL">Material</option>
+                <option value="UPAH">Upah</option>
+                <option value="MATERIAL_UPAH">Material + Upah</option>
+                <option value="BIAYA_UMUM">Biaya Umum</option>
+                <option value="TRANSPORTASI_AKOMODASI">Transportasi</option>
+                <option value="ALAT">Alat</option>
+              </Select>
+            </Field>
+          </div>
+          <FormActions>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setAddOpen(false)}>Batal</Button>
+            <Button type="submit" variant="primary" size="sm" pending={pending}>Tambah baris</Button>
+          </FormActions>
+        </form>
+      ) : (
+        <Button type="button" variant="secondary" size="sm" leadingIcon={<Plus aria-hidden="true" />} onClick={() => setAddOpen(true)}>
+          Tambah baris
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function AssemblyLineRow({ line, assemblyId: _assemblyId, pending, onDelete, onSaved }: { line: BqAssemblyLineRead; assemblyId: string; pending: boolean; onDelete: () => void; onSaved: () => void }) {
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [editing, startTransition] = useTransition();
+
+  const save = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    data.set("lineId", line.id);
+    startTransition(async () => {
+      const result = await updateAssemblyLineAction(null, data);
+      if (!result.ok) setError(result.error.safeMessage);
+      else { setEditOpen(false); setError(null); onSaved(); }
+    });
+  };
+
+  return (
+    <div className="flex items-center gap-2 py-2">
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium truncate">{line.title}</div>
+        <div className="text-xs text-ink-secondary">{line.purchaseUnit} · qty {line.qty} · koef {line.koefisien} · {line.harga}</div>
+      </div>
+      <Button type="button" size="sm" variant="ghost" title="Edit baris" onClick={() => { setError(null); setEditOpen(true); }}>
+        <Pencil size={13} aria-hidden="true" />
+      </Button>
+      <Button type="button" size="sm" variant="ghost" title="Hapus baris" onClick={() => setDeleteOpen(true)} disabled={pending}>
+        <Trash2 size={13} aria-hidden="true" />
+      </Button>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit baris assembly" size="md">
+        <form className="grid gap-3" onSubmit={save}>
+          {error ? <InlineError>{error}</InlineError> : null}
+          <div className="grid grid-cols-2 gap-2 max-[480px]:grid-cols-1">
+            <Field label="Nama item" required><Input name="title" defaultValue={line.title} required maxLength={200} autoFocus /></Field>
+            <Field label="Unit"><Input name="purchaseUnit" defaultValue={line.purchaseUnit} /></Field>
+            <Field label="Harga"><Input name="harga" defaultValue={line.harga} inputMode="decimal" /></Field>
+            <Field label="Qty"><Input name="qty" defaultValue={line.qty} inputMode="decimal" /></Field>
+            <Field label="Koefisien"><Input name="koefisien" defaultValue={line.koefisien} inputMode="decimal" /></Field>
+            <Field label="Kategori">
+              <Select name="kategori" defaultValue={line.kategori}>
+                <option value="MATERIAL">Material</option>
+                <option value="UPAH">Upah</option>
+                <option value="MATERIAL_UPAH">Material + Upah</option>
+                <option value="BIAYA_UMUM">Biaya Umum</option>
+                <option value="TRANSPORTASI_AKOMODASI">Transportasi</option>
+                <option value="ALAT">Alat</option>
+              </Select>
+            </Field>
+          </div>
+          <Field label="Catatan"><Input name="notes" defaultValue={line.notes ?? ""} /></Field>
+          <FormActions>
+            <Button type="button" variant="ghost" onClick={() => setEditOpen(false)}>Batal</Button>
+            <Button type="submit" variant="primary" pending={editing}>Simpan</Button>
+          </FormActions>
+        </form>
+      </Dialog>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Hapus baris ini?"
+        description="Baris assembly akan dihapus permanen."
+        confirmLabel="Hapus"
+        tone="danger"
+        pending={pending}
+        onConfirm={onDelete}
+      />
+    </div>
+  );
 }

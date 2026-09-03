@@ -215,7 +215,7 @@ export async function updateSubObjectAction(
       if (!value.trim()) throw new AppError("VALIDATION", "bq.sub-object.name-required", "Component name is required");
       patch.name = value.trim();
     } else if (field === "qtyPerL1") {
-      patch.qtyPerL1 = decimal(value, "Quantity per item");
+      patch.qtyPerL1 = positiveDecimal(value, "Quantity per item");
     } else if (field === "markupL2Pct") {
       patch.markupL2Pct = percent(value, "Markup");
     } else {

@@ -5,9 +5,58 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.75**
-- Next local revision: **R4.76**
+- Current revision: **R4.76**
+- Next local revision: **R4.77**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+
+## R4.76 — 2026-09-03 — fix(bq): complete assembly-template and correct R4.59 defects
+
+- Agent: `Claude`
+
+Corrects all nine defects identified in R4.59.
+
+**Contract**
+- `docs/apps/bq-contract.md §16`: Removed Assembly template from the deferred list — it is now implemented.
+
+**Service (`src/apps/bq/service.ts`)**
+- `addAssemblyCustomLine`: `sort_order` now auto-increments (count of existing lines) instead of always being 0.
+- `applyAssemblyTemplate`: new sub-object receives `sort_order` = count of existing sub-objects so it doesn't collide with sibling L2 rows.
+- Added `updateAssemblyTemplate` — rename / re-describe an assembly template.
+- Added `deleteAssemblyTemplate` — cascade-deletes all lines.
+- Added `updateAssemblyLine` — edit any snapshot field or koefisien/qty on an L3 blueprint line.
+- Added `deleteAssemblyLine` — remove one line from a blueprint.
+
+**Actions (`src/app/(platform)/bq/[id]/actions.ts`)**
+- `updateSubObjectAction`: `qtyPerL1` now uses `positiveDecimal` (rejects 0) instead of the permissive `decimal` helper.
+
+**Library actions (`src/app/(platform)/bq/library/actions.ts`)**
+- Added `updateAssemblyAction`, `deleteAssemblyAction`, `addAssemblyLineAction`, `updateAssemblyLineAction`, `deleteAssemblyLineAction`, `getAssemblyDetailAction`.
+
+**Library controls (`src/app/(platform)/bq/library/library-controls.tsx`)**
+- Added `AssemblyActions` component: edit name/desc, manage L3 lines (add / inline-edit / delete), delete assembly — all from the Library Assemblies tab.
+
+**Library page (`src/app/(platform)/bq/library/page.tsx`)**
+- Fixed tab order regression: Items tab is now first (default); Assemblies tab moved after Items; Templates after Assemblies.
+- Assemblies tab now renders `AssemblyActions` per card so lines can be managed inline.
+
+**Project editor (`src/app/(platform)/bq/[id]/project-editor.tsx`)**
+- Added "Assembly" button in each L1 item's action row; opens `AssemblyPickerDialog` to select an assembly template and a `qtyPerL1` factor.
+- Calls `applyAssemblyAction` — wires up the previously orphaned server action.
+
+**Public API (`src/apps/bq/public/index.ts`)**
+- Added `BqAssemblyLineRead` and `BqAssemblyTemplateDetail` types.
+- Added `getAssemblyTemplateDetail(id)` read function (returns full lines list).
+
+**BqTemplateItem** — was listed as "orphaned table" in defect log; does not exist in the schema (was never added in R4.59). No action required.
+
+### Verification
+
+- `npx tsc --noEmit` — clean
+- `npx eslint src/apps/bq src/app/(platform)/bq --max-warnings=0` — clean
+- `npm run check:boundaries` — pass
+- `npm run check:legacy-runtime` — pass
+- `git diff --check` — warnings only (CRLF→LF on unrelated files, pre-existing)
 
 ## R4.75 — 2026-09-03 — fix(brands): validate external links before save
 
