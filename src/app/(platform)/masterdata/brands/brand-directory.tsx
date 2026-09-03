@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Archive, ExternalLink, Plus, RotateCcw, Trash2 } from "lucide-react";
 
 import {
@@ -29,6 +29,7 @@ import {
   TableToolbar,
   Text,
   Textarea,
+  useFormDraftGuard,
   useOptionOverlay,
 } from "@/platform/ui_engine";
 import {
@@ -77,6 +78,7 @@ export function BrandDirectory({
 }) {
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [createDraftKey, setCreateDraftKey] = useState(0);
   const [editTarget, setEditTarget] = useState<BrandRow | null>(null);
   const [createOwnerVendorId, setCreateOwnerVendorId] = useState("");
   const [editOwnerVendorId, setEditOwnerVendorId] = useState("");
@@ -105,6 +107,24 @@ export function BrandDirectory({
   const [editNameWarning, setEditNameWarning] = useState<string | null>(null);
   const { options: ownerVendors, upsertOverlayOption } = useOptionOverlay(materialVendors);
   const { options: categoryOptions, upsertOverlayOption: upsertCategoryOption } = useOptionOverlay(productCategories);
+  const createFormRef = useRef<HTMLFormElement>(null);
+  const editFormRef = useRef<HTMLFormElement>(null);
+  const createDraftGuard = useFormDraftGuard({
+    formRef: createFormRef,
+    resetKey: createDraftKey,
+    active: createOpen,
+    watchedValue: JSON.stringify([createOwnerVendorId, createCategoryIds, createHashtags, linksList]),
+    title: "Discard brand draft?",
+    description: "Your changes are only in this browser and have not been saved.",
+  });
+  const editDraftGuard = useFormDraftGuard({
+    formRef: editFormRef,
+    resetKey: editTarget?.id ?? "",
+    active: Boolean(editTarget),
+    watchedValue: JSON.stringify([editOwnerVendorId, editCategoryIds, editHashtags, linksList]),
+    title: "Discard changes?",
+    description: "Your edits are only in this browser and have not been saved.",
+  });
 
   const filtered = brands.filter((b) => {
     if (!query) return true;
@@ -154,6 +174,7 @@ export function BrandDirectory({
     setCreateCategoryIds([]);
     setCreateHashtags([]);
     setCreateNameWarning(null);
+    setCreateDraftKey((key) => key + 1);
     setCreateOpen(true);
   };
 
@@ -346,11 +367,17 @@ export function BrandDirectory({
       {/* Create Brand Dialog */}
       <Dialog
         open={createOpen}
-        onOpenChange={setCreateOpen}
+        onOpenChange={(open) => {
+          if (open) setCreateOpen(true);
+          else if (!createPending) void createDraftGuard.requestDiscard(() => setCreateOpen(false));
+        }}
         title="Create catalog brand"
         description="Register an independent catalog brand and its discovery profile."
+        dismissible={!createPending}
       >
         <form
+          ref={createFormRef}
+          onChange={createDraftGuard.onFormChange}
           onSubmit={async (e) => {
             e.preventDefault();
             setCreatePending(true);
@@ -428,7 +455,7 @@ export function BrandDirectory({
           </Field>
 
           <FormActions>
-            <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
+            <Button type="button" variant="ghost" onClick={() => void createDraftGuard.requestDiscard(() => setCreateOpen(false))}>
               Cancel
             </Button>
             <Button type="submit" variant="primary" disabled={createPending}>
@@ -437,18 +464,22 @@ export function BrandDirectory({
           </FormActions>
         </form>
       </Dialog>
+      {createDraftGuard.confirmDialog}
 
       {/* Edit Brand Dialog */}
       {editTarget ? (
         <Dialog
           open
           onOpenChange={(open) => {
-            if (!open) setEditTarget(null);
+            if (!open && !editPending) void editDraftGuard.requestDiscard(() => setEditTarget(null));
           }}
           title={`Edit brand ${editTarget.name}`}
           description="Update brand identity and discovery details. Supplier relations are managed from Vendor."
+          dismissible={!editPending}
         >
           <form
+            ref={editFormRef}
+            onChange={editDraftGuard.onFormChange}
             onSubmit={async (e) => {
               e.preventDefault();
               setEditPending(true);
@@ -527,7 +558,7 @@ export function BrandDirectory({
             </Field>
 
             <FormActions>
-              <Button type="button" variant="ghost" onClick={() => setEditTarget(null)}>
+              <Button type="button" variant="ghost" onClick={() => void editDraftGuard.requestDiscard(() => setEditTarget(null))}>
                 Cancel
               </Button>
               <Button type="submit" variant="primary" disabled={editPending}>
@@ -537,6 +568,7 @@ export function BrandDirectory({
           </form>
         </Dialog>
       ) : null}
+      {editDraftGuard.confirmDialog}
 
       {/* Archive Confirm */}
       {confirmArchive ? (

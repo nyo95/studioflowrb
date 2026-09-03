@@ -75,6 +75,7 @@ describe("UI Engine foundation", () => {
       "useOptionOverlay",
       "useConfirm",
       "useUnsavedChangesGuard",
+      "useFormDraftGuard",
     ]) {
       const exported = ui[name as keyof typeof ui];
       assert.ok(
@@ -262,6 +263,12 @@ describe("UI Engine foundation", () => {
     /* Reference identity moved the baseline every render for a form that rebuilt
        its initial object, so the guard never saw a dirty form. */
     assert.match(hooks, /if \(!equals\(initialValue, prevInitial\)\)/);
+  });
+
+  it("keeps dialog form drafts in the browser until the app explicitly saves", () => {
+    const hooks = readFileSync(new URL("./patterns/hooks.tsx", import.meta.url), "utf8");
+    assert.match(hooks, /export function useFormDraftGuard/);
+    assert.match(hooks, /new FormData\(form\)/);
   });
 
   it("owns the busy and failure states around an app-supplied create", () => {

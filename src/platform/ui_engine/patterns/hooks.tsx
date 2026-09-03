@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import { ConfirmDialog } from "../layouts";
 
@@ -122,6 +122,64 @@ type UnsavedChangesGuardOptions<T> = {
   cancelLabel?: string;
 };
 
+type FormDraftGuardOptions = {
+  formRef: RefObject<HTMLFormElement | null>;
+  /** Changes only when the caller opens a different draft or resets the form. */
+  resetKey: string | number;
+  /** Controlled values outside native form events, such as a picker or link builder. */
+  watchedValue?: string;
+  active?: boolean;
+  title?: ReactNode;
+  description?: ReactNode;
+  confirmLabel?: string;
+  cancelLabel?: string;
+};
+
+function serialiseForm(form: HTMLFormElement | null): string {
+  if (!form) return "";
+  return JSON.stringify(Array.from(new FormData(form).entries()));
+}
+
+/** Browser-only draft protection. Apps retain all persistence authority. */
+export function useFormDraftGuard({
+  formRef,
+  resetKey,
+  watchedValue = "",
+  active = true,
+  title,
+  description,
+  confirmLabel,
+  cancelLabel,
+}: FormDraftGuardOptions) {
+  const [baseline, setBaseline] = useState("");
+  const [value, setValue] = useState("");
+  const capture = useCallback(() => {
+    const next = serialiseForm(formRef.current);
+    setBaseline(next);
+    setValue(next);
+  }, [formRef]);
+
+  useLayoutEffect(() => {
+    if (!active) return;
+    // This runs after the opening values are mounted but before the browser can
+    // process the next user input. A deferred frame could capture the first
+    // keystroke as the baseline and silently lose the discard warning.
+    capture();
+  }, [active, capture, resetKey]);
+
+  const sync = useCallback(() => setValue(serialiseForm(formRef.current)), [formRef]);
+  useEffect(() => {
+    if (active) sync();
+  }, [active, sync, watchedValue]);
+
+  const guard = useUnsavedChangesGuard({ value, initialValue: baseline, title, description, confirmLabel, cancelLabel });
+  const requestDiscard = useCallback(
+    (onDiscard?: () => void) => guard.requestDiscard(onDiscard, serialiseForm(formRef.current)),
+    [formRef, guard],
+  );
+  return { ...guard, requestDiscard, onFormChange: sync, capture, markSaved: capture };
+}
+
 export function useUnsavedChangesGuard<T>({
   value,
   initialValue,
@@ -161,8 +219,9 @@ export function useUnsavedChangesGuard<T>({
   }, []);
 
   const requestDiscard = useCallback(
-    async (onDiscard?: () => void) => {
-      if (!isDirty) {
+    async (onDiscard?: () => void, currentValue: T = value) => {
+      const currentIsDirty = !equals(currentValue, savedBaseline);
+      if (!currentIsDirty) {
         onDiscard?.();
         return true;
       }
@@ -176,13 +235,13 @@ export function useUnsavedChangesGuard<T>({
       });
 
       if (accepted) {
-        setSavedBaseline(value);
-        setPrevInitial(value);
+        setSavedBaseline(currentValue);
+        setPrevInitial(currentValue);
         onDiscard?.();
       }
       return accepted;
     },
-    [cancelLabel, confirm, confirmLabel, description, isDirty, title, value],
+    [cancelLabel, confirm, confirmLabel, description, equals, savedBaseline, title, value],
   );
 
   return {

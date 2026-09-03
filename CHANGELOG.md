@@ -5,9 +5,31 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.69**
-- Next local revision: **R4.70**
+- Current revision: **R4.70**
+- Next local revision: **R4.71**
 - Remote publication: **authorized by the owner on 2026-08-31**
+
+## R4.70 — 2026-09-03 — fix(ui-engine): guard browser-only dialog drafts
+
+- Agent: `Codex`
+
+Adds the generic `useFormDraftGuard` for native Dialog and Drawer forms. It
+snapshots the opening form in the browser, tracks native and controlled input
+changes, and asks before a dirty draft is discarded. The guard has no server
+action or persistence capability.
+
+Brand create/edit now guards outside click, Escape, close control, and Cancel.
+Only explicit Create/Save submits invoke their existing server actions; closing
+an unconfirmed draft never writes to the database.
+
+### Verification
+
+- `npm run typecheck` — clean
+- `npm run lint` — clean
+- `node --test --import tsx src/platform/ui_engine/ui-engine.test.ts` — pass
+- `npm run check:boundaries` — pass
+- `npm run check:legacy-runtime` — pass
+- `git diff --check` — clean
 
 ## R4.69 — 2026-09-03 — feat(ui-engine): activate multi-value creatable search
 

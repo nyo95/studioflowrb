@@ -462,6 +462,11 @@ The engine also owns the React-specific mechanics repeatedly needed by forms acr
   well as the dirty check: reference identity would move the baseline on every
   render of a form that rebuilds its initial object, and the guard would never
   fire;
+- `useFormDraftGuard()` — browser-only draft protection for a native
+  Dialog/Drawer form. It snapshots opening values (including caller-declared
+  controlled values), detects later edits, and exposes a discard request. It
+  never submits a form or calls a server action; callers use it for outside
+  click, Escape, close, and Cancel, while save remains an explicit submit.
 - pending-submit and action-feedback presentation that accepts state as props and owns no server action, permission, redirect, or revalidation policy.
 
 These hooks must not contain entity names, toast copy, default roles, persistence calls, cache paths, or app imports. Browser unload protection is allowed only while dirty and must be removed on cleanup. In-app navigation/overlay close behavior is covered by focused interaction tests.
