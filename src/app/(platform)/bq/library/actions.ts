@@ -314,3 +314,16 @@ export async function rejectPromotionAction(
     return { id: parsed.data.libItemId };
   });
 }
+
+const AssemblySchema = z.object({ name: z.string().trim().min(1).max(160), description: z.string().trim().max(2000).optional() });
+export async function createAssemblyAction(_prev: ActionResult<{ id: string }> | null, formData: FormData): Promise<ActionResult<{ id: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = AssemblySchema.safeParse(Object.fromEntries(formData.entries()));
+    if (!parsed.success) throw validationError(parsed.error);
+    const value = parsed.data;
+    const assembly = await bqService.createAssemblyTemplate({ grants, actor: actor(principal), name: value.name, description: value.description || undefined });
+    revalidatePath("/bq/library");
+    return { id: assembly.id };
+  });
+}

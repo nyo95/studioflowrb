@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.58**
-- Next local revision: **R4.59**
+- Current revision: **R4.59**
+- Next local revision: **R4.60**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
 ## Changelog authorship rule
@@ -14,6 +14,36 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 Every new revision entry must identify the agent that made the change using an
 `Agent:` line. Use the actual agent name, for example `Agent: Codex` or
 `Agent: Claude`; do not infer or omit the identity.
+
+## R4.59 — 2026-09-03 — feat(bq): add assembly-template foundation
+
+- Agent: `Codex`
+
+Adds the persisted foundation for the owner-approved BQ Library split:
+
+- `BqAssemblyTemplate` and ordered `BqAssemblyLine` store reusable L2 + L3
+  blueprints.
+- Applying an assembly creates a project-owned L2 and copies every L3 value;
+  the result is a snapshot with no live dependency on the template.
+- Standard BQ Templates now have persisted L1 placeholder support through
+  `BqTemplateItem`; existing projects are untouched by the migration.
+- The Library exposes an Assemblies tab and can create an assembly shell.
+
+### Deliberately incomplete
+
+This is the data/service foundation only. Editing Assembly L3 lines, applying an
+Assembly from the project editor, and wiring Standard BQ Template placeholders
+into project creation remain pending follow-up work; this revision does not
+claim those workflows are available.
+
+### Verification
+
+- `npm run typecheck` — clean
+- ESLint on every changed BQ module — clean
+- `npx prisma validate` — valid
+- `npx prisma migrate status` — database schema up to date on verified
+  `studioflow_rebuild`
+- `git diff --check` — clean
 
 ## R4.58 — 2026-09-03 — fix(ui-engine): prevent accidental compact-rail submenu popovers
 

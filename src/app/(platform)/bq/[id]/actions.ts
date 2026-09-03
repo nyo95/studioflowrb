@@ -239,6 +239,21 @@ export async function deleteSubObjectAction(
   });
 }
 
+const ApplyAssemblySchema = z.object({ projectId: Id, itemId: Id, assemblyId: Id, qtyPerL1: z.string().regex(DECIMAL).optional() });
+
+/** Copies an Assembly Template into project-owned L2/L3 rows. No live link is retained. */
+export async function applyAssemblyAction(
+  _prev: ActionResult<BqProjectDetail> | null,
+  formData: FormData,
+): Promise<ActionResult<BqProjectDetail>> {
+  return runSafeAction(async () => {
+    const { grants, actor } = await authorize();
+    const value = parse(ApplyAssemblySchema, formData);
+    await bqService.applyAssemblyTemplate({ grants, actor, itemId: value.itemId, assemblyId: value.assemblyId, qtyPerL1: value.qtyPerL1 });
+    return reload(value.projectId);
+  });
+}
+
 // ─── L3 ───────────────────────────────────────────────────────
 
 const KATEGORI = ["MATERIAL", "UPAH", "MATERIAL_UPAH", "BIAYA_UMUM", "TRANSPORTASI_AKOMODASI", "ALAT"] as const;

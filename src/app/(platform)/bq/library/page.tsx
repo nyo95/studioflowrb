@@ -2,12 +2,12 @@ import { redirect } from "next/navigation";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission, hasAnyPermission } from "@platform/core/rbac";
-import { PageHeader, SectionCard, Tabs, DataTable, TableHeader, TableBody, TableRow, TableCell, TableHead, StatusBadge, EmptyState, Badge } from "@/platform/ui_engine";
+import { PageHeader, SectionCard, Tabs, DataTable, TableHeader, TableBody, TableRow, TableCell, TableHead, StatusBadge, EmptyState, Badge, Text } from "@/platform/ui_engine";
 import { BQ_PERMISSIONS } from "@/apps/bq/service";
 import { bqPublicRead } from "@/apps/bq/runtime";
 import { Library } from "lucide-react";
 import { createMoney, formatMoney } from "@platform/utilities/money";
-import { LibraryItemActions, LibraryItemCreateButton, TemplateActions, TemplateCreateButton } from "./library-controls";
+import { AssemblyCreateButton, LibraryItemActions, LibraryItemCreateButton, TemplateActions, TemplateCreateButton } from "./library-controls";
 import { TemplateSectionsButton } from "./template-editor";
 import { PromotionQueue, PromotionRequestButton } from "./promotion-controls";
 
@@ -35,7 +35,7 @@ export default async function BqLibraryPage() {
   }
 
   const items = await bqPublicRead.listLibraryItems();
-  const templates = await bqPublicRead.listTemplates();
+  const [templates, assemblies] = await Promise.all([bqPublicRead.listTemplates(), bqPublicRead.listAssemblyTemplates()]);
 
   const kategoriLabel: Record<string, string> = {
     MATERIAL: "Material",
@@ -68,12 +68,17 @@ export default async function BqLibraryPage() {
         eyebrow="Bill of Quantity"
         title="BQ Library"
         description="Manage library items and templates"
-        actions={canManage ? <div className="flex flex-wrap gap-2"><LibraryItemCreateButton /><TemplateCreateButton /></div> : null}
+        actions={canManage ? <div className="flex flex-wrap gap-2"><LibraryItemCreateButton /><AssemblyCreateButton /><TemplateCreateButton /></div> : null}
       />
 
       <Tabs
         label="BQ Library views"
         items={[
+          {
+            value: "assemblies",
+            label: "Assemblies",
+            content: <SectionCard>{assemblies.length === 0 ? <EmptyState title="Belum ada assembly" description="Assembly adalah template L2 dengan daftar L3 yang akan disalin ke proyek." action={canManage ? <AssemblyCreateButton /> : undefined} /> : <div className="grid gap-2">{assemblies.map((assembly) => <div key={assembly.id} className="rounded-control border border-line p-3"><div className="font-medium">{assembly.name}</div><Text tone="tertiary" size="sm">{assembly.lineCount} baris L3 · {assembly.description ?? "Tanpa deskripsi"}</Text></div>)}</div>}</SectionCard>,
+          },
           {
             value: "items",
             label: "Items",

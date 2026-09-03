@@ -46,6 +46,13 @@ export type BqTemplateRecommendationRead = {
   libItem: BqLibItemRead | null;
 };
 
+export type BqAssemblyTemplateRead = {
+  id: string;
+  name: string;
+  description: string | null;
+  lineCount: number;
+};
+
 export type BqProjectSummary = {
   id: string;
   title: string;
@@ -152,6 +159,10 @@ const PROJECT_ITEM_INCLUDE = {
 
 export function createBqPublicRead(db: PrismaClient) {
   return {
+    async listAssemblyTemplates(): Promise<BqAssemblyTemplateRead[]> {
+      const assemblies = await db.bqAssemblyTemplate.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { lines: true } } } });
+      return assemblies.map((assembly) => ({ id: assembly.id, name: assembly.name, description: assembly.description, lineCount: assembly._count.lines }));
+    },
     async listLibraryItems(): Promise<BqLibItemRead[]> {
       const [materials, labors, materialLabors, customItems] = await Promise.all([
         db.bqLibMaterial.findMany({ orderBy: { name: "asc" } }),

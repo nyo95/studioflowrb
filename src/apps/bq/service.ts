@@ -1543,6 +1543,36 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     });
   }
 
+  // ─── ASSEMBLY TEMPLATES ─────────────────────────────────────
+
+  async function createAssemblyTemplate(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; name: string; description?: string }) {
+    requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+    const assembly = await db.bqAssemblyTemplate.create({ data: { name: input.name, description: input.description ?? null, created_by: input.actor.userId ?? "system" } });
+    await auditWriter({ appId: "bq", action: "bq.assembly.created", entityType: "BqAssemblyTemplate", entityId: assembly.id, actor: input.actor });
+    return assembly;
+  }
+
+  async function addAssemblyCustomLine(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; assemblyId: string; title: string; purchaseUnit?: string; harga?: string; currency?: string; kategori?: string; qty?: string; koefisien?: string }) {
+    requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+    const assembly = await db.bqAssemblyTemplate.findUnique({ where: { id: input.assemblyId } });
+    if (!assembly) throw new AppError("NOT_FOUND", "bq.assembly.not-found", "Assembly template not found");
+    const line = await db.bqAssemblyLine.create({ data: { assembly_template_id: assembly.id, source_type: "CUSTOM", title_snapshot: input.title, purchase_unit_snapshot: input.purchaseUnit ?? "ls", harga_snapshot: input.harga ?? "0", currency_snapshot: input.currency ?? "IDR", kategori: requireKategori(input.kategori ?? "MATERIAL"), qty: input.qty ?? "1", koefisien: input.koefisien ?? "1" } });
+    await auditWriter({ appId: "bq", action: "bq.assembly-line.created", entityType: "BqAssemblyLine", entityId: line.id, actor: input.actor });
+    return line;
+  }
+
+  async function applyAssemblyTemplate(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; itemId: string; assemblyId: string; qtyPerL1?: string }) {
+    requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+    await requireEditableProjectForItem(input.itemId);
+    const assembly = await db.bqAssemblyTemplate.findUnique({ where: { id: input.assemblyId }, include: { lines: { orderBy: { sort_order: "asc" } } } });
+    if (!assembly) throw new AppError("NOT_FOUND", "bq.assembly.not-found", "Assembly template not found");
+    if (!assembly.lines.length) throw new AppError("VALIDATION", "bq.assembly.empty", "An assembly must contain at least one L3 line");
+    const subObject = await db.bqSubObject.create({ data: { item_id: input.itemId, name: assembly.name, qty_per_l1: input.qtyPerL1 ?? "1" } });
+    await db.bqLineItem.createMany({ data: assembly.lines.map((line) => ({ sub_object_id: subObject.id, source_type: line.source_type, source_ref_id: line.source_ref_id, source_imported_at: new Date(), title_snapshot: line.title_snapshot, purchase_unit_snapshot: line.purchase_unit_snapshot, base_unit_snapshot: line.base_unit_snapshot, purchase_to_base_factor_snapshot: line.purchase_to_base_factor_snapshot, harga_snapshot: line.harga_snapshot, currency_snapshot: line.currency_snapshot, kategori: line.kategori, qty: line.qty, koefisien: line.koefisien, sort_order: line.sort_order, notes: line.notes })) });
+    await auditWriter({ appId: "bq", action: "bq.assembly.applied", entityType: "BqSubObject", entityId: subObject.id, actor: input.actor, changes: { assemblyId: assembly.id } });
+    return subObject;
+  }
+
   const operations = {
     createLibMaterial,
     updateLibMaterial,
@@ -1584,6 +1614,9 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     listPromotionRequests,
     approvePromotion,
     rejectPromotion,
+    createAssemblyTemplate,
+    addAssemblyCustomLine,
+    applyAssemblyTemplate,
   };
 
   // CORE.md §2: a command that writes records plus its audit event runs in one

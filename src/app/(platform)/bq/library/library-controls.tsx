@@ -4,7 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import { libraryItemAction, templateAction } from "./actions";
+import { createAssemblyAction, libraryItemAction, templateAction } from "./actions";
 import type { BqLibItemRead, BqTemplateRead } from "@/apps/bq/public";
 import { Button, ConfirmDialog, Dialog, Field, FormActions, InlineError, Input, Select, Spinner, Textarea } from "@/platform/ui_engine";
 
@@ -18,6 +18,11 @@ function useCommand() {
 
 export function LibraryItemCreateButton() {
   return <LibraryItemDialog />;
+}
+
+export function AssemblyCreateButton() {
+  const [open, setOpen] = useState(false); const [error, setError] = useState<string | null>(null); const [pending, startTransition] = useTransition(); const router = useRouter();
+  return <><Button type="button" variant="primary" leadingIcon={<Plus aria-hidden="true" />} onClick={() => setOpen(true)}>Add assembly</Button><Dialog open={open} onOpenChange={setOpen} title="Add Assembly Template" description="Reusable L2 breakdown. Its L3 lines are copied into each project." size="sm"><form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); startTransition(async () => { const result = await createAssemblyAction(null, data); if (!result.ok) setError(result.error.safeMessage); else { setOpen(false); router.refresh(); } }); }}>{error ? <InlineError>{error}</InlineError> : null}<Field label="Name" required><Input name="name" required maxLength={160} autoFocus /></Field><Field label="Description"><Textarea name="description" maxLength={2000} /></Field><FormActions><Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" variant="primary" pending={pending}>Add assembly</Button></FormActions></form></Dialog></>;
 }
 
 export function LibraryItemActions({ item }: { item: BqLibItemRead }) {
