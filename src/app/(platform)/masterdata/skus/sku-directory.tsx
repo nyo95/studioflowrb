@@ -20,6 +20,7 @@ import {
   Select,
   Spinner,
   StatusBadge,
+  TableBody,
   TableCell,
   TableCellContent,
   TableHead,
@@ -158,7 +159,7 @@ export function SkuDirectory({
               <TableHead align="end">Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <tbody>
+          <TableBody>
             {filtered.map((sku) => {
               const isPending = pendingId === sku.id;
               const isArchived = sku.deleted_at !== null;
@@ -194,20 +195,17 @@ export function SkuDirectory({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="text-xs">
-                      <div>Base: <span className="font-mono font-medium">{sku.base_unit.code}</span></div>
-                      {sku.purchase_unit ? (
-                        <div className="text-ink-secondary">Buy: <span className="font-mono">{sku.purchase_unit.code}</span></div>
-                      ) : null}
-                    </div>
+                    <TableCellContent
+                      primary={<span>Base: <span className="font-mono font-medium">{sku.base_unit.code}</span></span>}
+                      secondary={sku.purchase_unit ? <span>Buy: <span className="font-mono">{sku.purchase_unit.code}</span></span> : undefined}
+                    />
                   </TableCell>
                   <TableCell>
                     {primaryPrice ? (
-                      <div className="text-xs">
-                        <span className="font-semibold">{formatMoney(createMoney(String(primaryPrice.amount), primaryPrice.currency))}</span>
-                        <span className="text-ink-secondary"> / {primaryPrice.unit.code}</span>
-                        <div className="text-ink-tertiary truncate max-w-[140px]">{primaryPrice.supplier_vendor.name}</div>
-                      </div>
+                      <TableCellContent
+                        primary={<span><span className="font-semibold">{formatMoney(createMoney(String(primaryPrice.amount), primaryPrice.currency))}</span><span className="text-ink-secondary"> / {primaryPrice.unit.code}</span></span>}
+                        secondary={<span className="truncate max-w-[140px]">{primaryPrice.supplier_vendor.name}</span>}
+                      />
                     ) : (
                       <span className="text-xs text-ink-tertiary">No price</span>
                     )}
@@ -246,7 +244,7 @@ export function SkuDirectory({
                 </TableRow>
               );
             })}
-          </tbody>
+          </TableBody>
         </DataTable>
       )}
 

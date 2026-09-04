@@ -17,11 +17,13 @@ import {
   SectionCard,
   Spinner,
   StatusBadge,
+  TableBody,
   TableCell,
   TableCellContent,
   TableHead,
   TableHeader,
   TableRow,
+  TableToolbar,
   Textarea,
 } from "@/platform/ui_engine";
 import { archiveRoleAction, createRoleAction, replaceRoleGrantsAction, updateRoleAction } from "./actions";
@@ -84,14 +86,12 @@ export function RolesDirectory({
         </div>
       ) : null}
 
-      {canManage ? (
-        <div className="mb-3 flex justify-end">
-          <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
-            <ShieldPlus aria-hidden="true" />
-            <span>New role</span>
-          </Button>
-        </div>
-      ) : null}
+      <TableToolbar actions={canManage ? (
+        <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
+          <ShieldPlus aria-hidden="true" />
+          <span>New role</span>
+        </Button>
+      ) : undefined} />
 
       {roles.length === 0 ? (
         <EmptyState title="No roles yet" description="Create a role and grant it registered permissions." />
@@ -107,7 +107,7 @@ export function RolesDirectory({
               {canManage ? <TableHead align="end">Actions</TableHead> : null}
             </TableRow>
           </TableHeader>
-          <tbody>
+          <TableBody>
             {roles.map((role) => (
               <TableRow key={role.id}>
                 <TableCell data-column="identifier">{role.code}</TableCell>
@@ -126,7 +126,7 @@ export function RolesDirectory({
                     <StatusBadge tone="success">Active</StatusBadge>
                   )}
                 </TableCell>
-                <TableCell align="end">{role.activeAssignmentCount}</TableCell>
+                <TableCell align="end"><TableCellContent align="end" primary={role.activeAssignmentCount.toLocaleString()} /></TableCell>
                 {canManage ? (
                   <TableCell align="end">
                     <div className="inline-flex flex-wrap justify-end gap-1.5">
@@ -154,7 +154,7 @@ export function RolesDirectory({
                 ) : null}
               </TableRow>
             ))}
-          </tbody>
+          </TableBody>
         </DataTable>
       )}
 

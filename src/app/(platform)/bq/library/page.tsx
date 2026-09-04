@@ -88,7 +88,7 @@ export default async function BqLibraryPage() {
                     action={canManage ? <LibraryItemCreateButton /> : undefined}
                   />
                 ) : (
-                  <DataTable>
+                  <DataTable minWidth={760}>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Nama</TableHead>
@@ -104,7 +104,7 @@ export default async function BqLibraryPage() {
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">{item.name}</TableCell>
                           <TableCell>{item.purchaseUnit}</TableCell>
-                          <TableCell align="end" className="tabular-nums">
+                          <TableCell align="end">
                             {formatMoney(createMoney(item.harga, item.currency))}
                           </TableCell>
                           <TableCell>

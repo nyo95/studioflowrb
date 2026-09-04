@@ -24,7 +24,7 @@ const HttpUrlSchema = z.string().url("Must be a valid URL").refine(
 
 const BrandInputSchema = z.object({
   name: z.string().min(1, "Brand name is required").max(64, "Brand name is too long"),
-  ownerVendorId: z.string().uuid().optional().nullable().or(z.literal("")),
+  ownerVendorId: z.string().uuid("Owner vendor is required"),
   notes: z.string().max(1000).optional().nullable().or(z.literal("")),
   categoryIds: z.array(z.string().uuid()).optional(),
   hashtags: z.array(z.string()).optional(),
@@ -80,7 +80,7 @@ export async function createBrandAction(
 
     const parsed = BrandInputSchema.safeParse({
       name: String(formData.get("name") ?? ""),
-      ownerVendorId: formData.get("ownerVendorId") ? String(formData.get("ownerVendorId")) : null,
+      ownerVendorId: String(formData.get("ownerVendorId") ?? ""),
       notes: formData.get("notes") ? String(formData.get("notes")) : null,
       categoryIds,
       hashtags: rawHashtags,
@@ -92,7 +92,7 @@ export async function createBrandAction(
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
       name: parsed.data.name,
-      ownerVendorId: parsed.data.ownerVendorId || undefined,
+      ownerVendorId: parsed.data.ownerVendorId,
       notes: parsed.data.notes || undefined,
       categoryIds: parsed.data.categoryIds,
       hashtags: parsed.data.hashtags,
@@ -127,7 +127,7 @@ export async function updateBrandAction(
     const parsed = BrandInputSchema.extend({ brandId: z.string().uuid() }).safeParse({
       brandId: String(formData.get("brandId") ?? ""),
       name: String(formData.get("name") ?? ""),
-      ownerVendorId: formData.get("ownerVendorId") ? String(formData.get("ownerVendorId")) : null,
+      ownerVendorId: String(formData.get("ownerVendorId") ?? ""),
       notes: formData.get("notes") ? String(formData.get("notes")) : null,
       categoryIds,
       hashtags: rawHashtags,

@@ -8,6 +8,7 @@ import {
   EmptyState,
   InlineError,
   StatusBadge,
+  TableBody,
   TableCell,
   TableCellContent,
   TableHead,
@@ -66,7 +67,7 @@ export function SessionsTable({
             <TableHead align="end">Actions</TableHead>
           </TableRow>
         </TableHeader>
-        <tbody>
+        <TableBody>
           {sessions.map((session) => {
             const isCurrent = session.id === currentSessionId;
             return (
@@ -113,7 +114,7 @@ export function SessionsTable({
               </TableRow>
             );
           })}
-        </tbody>
+        </TableBody>
       </DataTable>
       <form action={onLogoutAll} className="mt-3">
         <Button type="submit" variant="secondary">

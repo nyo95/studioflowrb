@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRef, useState, useTransition } from "react";
 import { Archive, ExternalLink, Plus, RotateCcw, Trash2 } from "lucide-react";
@@ -15,11 +15,14 @@ import {
   FormActions,
   InlineError,
   Input,
+  Notice,
   SearchField,
   SectionCard,
   Select,
+  SimpleTextEditor,
   Spinner,
   StatusBadge,
+  TableBody,
   TableCell,
   TableCellContent,
   TableHead,
@@ -27,7 +30,6 @@ import {
   TableRow,
   TableToolbar,
   Text,
-  Textarea,
   useFormDraftGuard,
   useOptionOverlay,
 } from "@/platform/ui_engine";
@@ -47,6 +49,8 @@ type BrandRow = {
   name: string;
   slug: string;
   notes: string | null;
+  updated_at: Date;
+  updated_by_label: string | null;
   deleted_at: Date | null;
   owner_vendor: { id: string; name: string } | null;
   categories: Array<{
@@ -298,7 +302,7 @@ export function BrandDirectory({
               <TableHead align="end">Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <tbody>
+          <TableBody>
             {filtered.map((brand) => {
               const isPending = pendingId === brand.id;
               const isArchived = brand.deleted_at !== null;
@@ -309,20 +313,27 @@ export function BrandDirectory({
                     <TableCellContent
                       primary={<span className="font-semibold">{brand.name}</span>}
                       secondary={
-                        <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                          <span className="font-mono text-xs text-ink-secondary">{brand.slug}</span>
-                          {brand.links.map((l) => (
-                            <a
-                              key={l.id}
-                              href={l.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-xs text-action hover:underline"
-                            >
-                              <span>{l.label || l.kind}</span>
-                              <ExternalLink size={11} />
-                            </a>
-                          ))}
+                        <div className="grid gap-0.5 mt-0.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-xs text-ink-secondary">{brand.slug}</span>
+                            {brand.links.map((l) => (
+                              <a
+                                key={l.id}
+                                href={l.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-action hover:underline"
+                              >
+                                <span>{l.label || l.kind}</span>
+                                <ExternalLink size={11} />
+                              </a>
+                            ))}
+                          </div>
+                          {brand.updated_by_label ? (
+                            <span className="text-xs text-ink-tertiary">
+                              Updated by <span className="font-medium text-ink-secondary">{brand.updated_by_label}</span> · {new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" }).format(brand.updated_at)}
+                            </span>
+                          ) : null}
                         </div>
                       }
                     />
@@ -342,7 +353,7 @@ export function BrandDirectory({
                     </StatusBadge>
                   </TableCell>
                   <TableCell align="end">
-                    <TableCellContent primary={brand._count.skus.toLocaleString()} />
+                    <TableCellContent align="end" primary={brand._count.skus.toLocaleString()} />
                   </TableCell>
                   <TableCell align="end">
                     <div className="flex items-center justify-end gap-1.5">
@@ -373,7 +384,7 @@ export function BrandDirectory({
                 </TableRow>
               );
             })}
-          </tbody>
+          </TableBody>
         </DataTable>
       )}
 
@@ -420,29 +431,27 @@ export function BrandDirectory({
             <Input name="name" required maxLength={64} placeholder="e.g. TACO, Blum, Hafele" autoFocus onChange={(e) => setCreateNameWarning(checkSimilarBrandName(e.target.value))} />
           </Field>
           {createNameWarning ? (
-            <p className="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5">⚠ {createNameWarning}</p>
+            <Notice tone="warning">{createNameWarning}</Notice>
           ) : null}
           <input type="hidden" name="ownerVendorId" value={createOwnerVendorId} />
           {createCategoryIds.map((id) => <input key={id} type="hidden" name="categoryIds" value={id} />)}
           <input type="hidden" name="hashtags" value={createHashtags.join(" ")} />
-          <Field label="Owner vendor" description="Optional registered manufacturer or brand owner vendor.">
+          <Field label="Owner vendor" required description="Registered manufacturer or brand owner vendor.">
             <CreatableSearch
               label="Owner vendor"
               options={ownerVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
               value={createOwnerVendorId}
               onValueChange={setCreateOwnerVendorId}
-              allowClear
-              clearLabel="No dedicated owner vendor"
               placeholder="Select an owner vendor"
               onCreate={canManageVendors ? (name) => createOwnerVendor(name, setCreateError) : undefined}
-              createLabel={(name) => `Create owner vendor “${name}”`}
+              createLabel={(name) => `Create owner vendor "${name}"`}
             />
           </Field>
           <Field label="Hashtags" description="Search existing discovery tags or add a new one, such as #laminate or #finish.">
-            <CreatableMultiSelect label="Hashtags" options={hashtagOptions(createHashtags)} value={createHashtags} onValueChange={setCreateHashtags} onCreate={(tag) => tag.trim()} placeholder="Add hashtags" createLabel={(tag) => `Add hashtag “${tag}”`} />
+            <CreatableMultiSelect label="Hashtags" options={hashtagOptions(createHashtags)} value={createHashtags} onValueChange={setCreateHashtags} onCreate={(tag) => tag.trim()} placeholder="Add hashtags" createLabel={(tag) => `Add hashtag "${tag}"`} />
           </Field>
           <Field label="Product categories" description="Search a discovery category or create a missing one.">
-            <CreatableMultiSelect label="Product categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))} value={createCategoryIds} onValueChange={setCreateCategoryIds} onCreate={canManageCategories ? (name) => createProductCategory(name, setCreateError) : undefined} createLabel={(name) => `Create product category “${name}”`} />
+            <CreatableMultiSelect label="Product categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))} value={createCategoryIds} onValueChange={setCreateCategoryIds} onCreate={canManageCategories ? (name) => createProductCategory(name, setCreateError) : undefined} createLabel={(name) => `Create product category "${name}"`} />
           </Field>
           {/* Links builder */}
           <div className="grid gap-2 border-t border-line pt-3">
@@ -470,7 +479,7 @@ export function BrandDirectory({
           </div>
 
           <Field label="Notes">
-            <Textarea name="notes" placeholder="Additional specifications, authorized distributors, etc." rows={2} />
+            <SimpleTextEditor name="notes" placeholder="Additional specifications, authorized distributors, etc." rows={2} />
           </Field>
 
           <FormActions>
@@ -531,27 +540,25 @@ export function BrandDirectory({
               <Input name="name" defaultValue={editTarget.name} required maxLength={64} autoFocus onChange={(e) => setEditNameWarning(checkSimilarBrandName(e.target.value, editTarget.id))} />
             </Field>
             {editNameWarning ? (
-              <p className="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5">⚠ {editNameWarning}</p>
+              <Notice tone="warning">{editNameWarning}</Notice>
             ) : null}
             <input type="hidden" name="ownerVendorId" value={editOwnerVendorId} />
-            <Field label="Owner vendor">
+            <Field label="Owner vendor" required description="Registered manufacturer or brand owner vendor.">
               <CreatableSearch
                 label="Owner vendor"
                 options={ownerVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
                 value={editOwnerVendorId}
                 onValueChange={setEditOwnerVendorId}
-                allowClear
-                clearLabel="No dedicated owner vendor"
                 placeholder="Select an owner vendor"
                 onCreate={canManageVendors ? (name) => createOwnerVendor(name, setEditError) : undefined}
-                createLabel={(name) => `Create owner vendor “${name}”`}
+                createLabel={(name) => `Create owner vendor "${name}"`}
               />
             </Field>
             <Field label="Hashtags" description="Search existing discovery tags or add a new one.">
-              <CreatableMultiSelect label="Hashtags" options={hashtagOptions(editHashtags)} value={editHashtags} onValueChange={setEditHashtags} onCreate={(tag) => tag.trim()} placeholder="Add hashtags" createLabel={(tag) => `Add hashtag “${tag}”`} />
+              <CreatableMultiSelect label="Hashtags" options={hashtagOptions(editHashtags)} value={editHashtags} onValueChange={setEditHashtags} onCreate={(tag) => tag.trim()} placeholder="Add hashtags" createLabel={(tag) => `Add hashtag "${tag}"`} />
             </Field>
             <Field label="Product categories" description="Manual selections keep their own provenance.">
-              <CreatableMultiSelect label="Product categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))} value={editCategoryIds} onValueChange={setEditCategoryIds} onCreate={canManageCategories ? (name) => createProductCategory(name, setEditError) : undefined} createLabel={(name) => `Create product category “${name}”`} />
+              <CreatableMultiSelect label="Product categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))} value={editCategoryIds} onValueChange={setEditCategoryIds} onCreate={canManageCategories ? (name) => createProductCategory(name, setEditError) : undefined} createLabel={(name) => `Create product category "${name}"`} />
             </Field>
             {/* Links builder */}
             <div className="grid gap-2 border-t border-line pt-3">
@@ -579,9 +586,14 @@ export function BrandDirectory({
             </div>
 
             <Field label="Notes">
-              <Textarea name="notes" defaultValue={editTarget.notes ?? ""} rows={2} />
+              <SimpleTextEditor name="notes" defaultValue={editTarget.notes ?? ""} rows={2} />
             </Field>
 
+            {editTarget.updated_by_label ? (
+              <p className="text-xs text-ink-tertiary px-0.5">
+                Updated by <span className="font-medium text-ink-secondary">{editTarget.updated_by_label}</span> · {new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(editTarget.updated_at)}
+              </p>
+            ) : null}
             <FormActions>
               <Button type="button" variant="ghost" onClick={() => void editDraftGuard.requestDiscard(() => setEditTarget(null))}>
                 Cancel

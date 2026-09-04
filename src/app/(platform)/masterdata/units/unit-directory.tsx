@@ -18,6 +18,7 @@ import {
   SectionCard,
   Spinner,
   StatusBadge,
+  TableBody,
   TableCell,
   TableCellContent,
   TableHead,
@@ -129,7 +130,7 @@ export function UnitDirectory({
               <TableHead align="end">Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <tbody>
+          <TableBody>
             {filtered.map((unit) => {
               const isPending = pendingId === unit.id;
 
@@ -175,7 +176,7 @@ export function UnitDirectory({
                 </TableRow>
               );
             })}
-          </tbody>
+          </TableBody>
         </DataTable>
       )}
 

@@ -19,6 +19,7 @@ import {
   Select,
   Spinner,
   StatusBadge,
+  TableBody,
   TableCell,
   TableCellContent,
   TableHead,
@@ -133,7 +134,7 @@ export function CategoryDirectory({
               <TableHead align="end">Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <tbody>
+          <TableBody>
             {filtered.map((category) => {
               const totalUsage =
                 category._count.sku_categories +
@@ -166,7 +167,7 @@ export function CategoryDirectory({
                     </StatusBadge>
                   </TableCell>
                   <TableCell align="end">
-                    <TableCellContent primary={totalUsage.toLocaleString()} />
+                    <TableCellContent align="end" primary={totalUsage.toLocaleString()} />
                   </TableCell>
                   <TableCell align="end">
                     <div className="flex items-center justify-end gap-1.5">
@@ -194,7 +195,7 @@ export function CategoryDirectory({
                 </TableRow>
               );
             })}
-          </tbody>
+          </TableBody>
         </DataTable>
       )}
 

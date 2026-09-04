@@ -250,7 +250,10 @@ Create/edit uses the shared Dialog form pattern. Category and hashtag entry use
 the activated accessible multi-value searchable/creatable UI Engine control;
 persistence, normalization, provenance, and permissions remain in Master Data.
 Archive/restore/deletion use shared confirmation mechanics and display cascade
-impact. Unsaved, pending, success, validation, conflict, permission-denied,
+impact. The edit dialog footer displays "Updated by [actor] · [relative time]"
+drawn from the most recent `brand.*` AuditEvent for that Brand; actor identity
+is stored in AuditEvent, not denormalized onto the Brand row.
+Unsaved, pending, success, validation, conflict, permission-denied,
 loading, empty, error, archived, long-content, narrow-viewport, and horizontal-
 overflow states are required.
 

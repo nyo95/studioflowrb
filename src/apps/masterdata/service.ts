@@ -462,6 +462,28 @@ async function createDeletionRequest(
   return req!.id;
 }
 
+/**
+ * brand-contract / vendor-contract: "Updated by" is sourced from AuditEvent,
+ * not denormalized onto the Brand/Vendor row. This resolves the latest actor
+ * label per entity id from the audit trail for a given entity type.
+ */
+async function latestAuditActorLabels(
+  db: PrismaClient,
+  entityType: string,
+  entityIds: readonly string[],
+): Promise<Map<string, string>> {
+  if (entityIds.length === 0) return new Map();
+  const rows = await db.$queryRaw<{ entity_id: string; actor_label: string }[]>(Prisma.sql`
+    SELECT DISTINCT ON (entity_id) entity_id, actor_label
+    FROM "platform"."AuditEvent"
+    WHERE app_id = 'masterdata'
+      AND entity_type = ${entityType}
+      AND entity_id IN (${Prisma.join(entityIds)})
+    ORDER BY entity_id, occurred_at DESC
+  `);
+  return new Map(rows.map((row) => [row.entity_id, row.actor_label]));
+}
+
 // ---------------------------------------------------------------------------
 // Service factory
 // ---------------------------------------------------------------------------
@@ -1201,7 +1223,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       const search = input.search?.trim();
       const hashtag = input.hashtag?.trim().toLowerCase().replace(/^#+/, "");
 
-      return db.brand.findMany({
+      const rows = await db.brand.findMany({
         where: {
           ...(input.includeArchived ? {} : { deleted_at: null }),
           ...(input.ownerVendorId ? { owner_vendor_id: input.ownerVendorId } : {}),
@@ -1225,6 +1247,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           name: true,
           slug: true,
           notes: true,
+          updated_at: true,
           deleted_at: true,
           owner_vendor: { select: { id: true, name: true } },
           categories: {
@@ -1244,6 +1267,8 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           _count: { select: { skus: true, suppliers: true, links: true, categories: true } },
         },
       });
+      const actorLabels = await latestAuditActorLabels(db, "brand", rows.map((row) => row.id));
+      return rows.map((row) => ({ ...row, updated_by_label: actorLabels.get(row.id) ?? null }));
     },
 
     async listBrandsForVendorAssignment(input: { grants: PermissionGrants }) {
@@ -1826,7 +1851,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.vendorRead, MASTERDATA_PERMISSIONS.vendorManage], "You do not have permission to view vendors.");
       const search = input.search?.trim();
 
-      return db.vendor.findMany({
+      const rows = await db.vendor.findMany({
         where: {
           ...(input.includeArchived ? {} : { deleted_at: null }),
           ...(input.brandId ? { brand_suppliers: { some: { brand_id: input.brandId } } } : {}),
@@ -1856,6 +1881,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           legal_name: true,
           address: true,
           notes: true,
+          updated_at: true,
           deleted_at: true,
           types: {
             select: {
@@ -1899,6 +1925,8 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           },
         },
       });
+      const actorLabels = await latestAuditActorLabels(db, "vendor", rows.map((row) => row.id));
+      return rows.map((row) => ({ ...row, updated_by_label: actorLabels.get(row.id) ?? null }));
     },
 
     async listSkuDirectoryRefs(input: { grants: PermissionGrants }) {

@@ -5,10 +5,79 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.81**
-- Next local revision: **R4.82**
+- Current revision: **R4.82**
+- Next local revision: **R4.83**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
+
+## R4.82 — 2026-09-04 — fix(masterdata): audit-sourced Updated-by, Vendor create-time contacts, UI Engine sweep
+
+- Agent: `Claude`
+
+Owner-reported inconsistencies (annotated screenshots + follow-up notes) plus
+a contract-vs-code contradiction found while investigating them:
+
+- **Updated by / kapan, corrected to match the contract.** A prior session had
+  added a denormalized `updated_by_label` column to `Vendor` and `Brand`
+  (migrated by the owner locally) and left an unused, unreferenced
+  `listEntityLastActivity` helper behind — this contradicted the documented
+  contract, which requires actor identity to live only in `AuditEvent`, never
+  denormalized onto the row. Per the owner's explicit decision ("kode yang
+  salah, ikutin dokumen"), the column is reverted (`schema.prisma` now matches
+  the published baseline again) and the dead helper is removed. Brand and
+  Vendor directories now source `Updated by [actor] · [relative time]` the
+  same way Pricing already did: a new `latestAuditActorLabels()` helper runs
+  one `DISTINCT ON (entity_id)` query against `AuditEvent` per list call and
+  the result is merged onto each row in `listBrands` / `listVendors`. Brand
+  and Vendor UI components are unchanged — they already expected this exact
+  `updated_at` / `updated_by_label` shape.
+- **`vendor-contract.md` reconciled with `brand-contract.md`.** The Vendor
+  audit-metadata line was narrower than Brand's ("most recent `vendor.updated`
+  (or `vendor.created`)" vs. Brand's "most recent `brand.*`"); Vendor is now
+  worded the same way Brand is, matching what both directories actually do —
+  any lifecycle event counts, not just create/update.
+- **Vendor: contacts can be added at creation time.** The Create dialog's flat
+  form gained a "Personnel & Sales Contacts" section reusing the same fields
+  as the Edit dialog's Contacts tab (name, job title, phone, email, brand
+  scope, primary toggle); `createVendorAction` already accepted `contactsJson`
+  from the service/action layer, so this was a UI-only gap. Confirmed Vendor
+  links intentionally exclude `CATALOG` (catalog links belong to Brand, not
+  Vendor) — contract doc updated to state this explicitly instead of listing
+  the full shared `LinkKind` vocabulary.
+- **UI Engine consistency sweep**, following the documented fix-order (check
+  `ui_engine` first): ad-hoc amber warning `<p>` blocks in Brand/Vendor
+  replaced with `Notice tone="warning"`; plain `<Textarea>` for Notes replaced
+  with `SimpleTextEditor` in Brand/Vendor; `useFormDraftGuard` wired into the
+  Vendor create/edit dialogs and the Pricing editor (unsaved-change confirm on
+  close, matching the existing Brand pattern); raw `<tbody>` replaced with
+  `TableBody`, and raw toolbar/action `<div>` wrappers replaced with
+  `TableToolbar`, across Sessions, BQ, Categories, Deletions, SKUs, Units,
+  Roles, Users, and Vendor Types directories; `TableCellContent` used for
+  numeric/end-aligned cells in the same set of files; one stray `TableHead`
+  in the BQ project editor's actions column now sets `align="end"` to match.
+
+### Remaining
+
+- The owner's local DB now has an `updated_by_label` column on `Vendor` and
+  `Brand` from the reverted migration (`prisma/migrations/20260904153201_add_updated_by_label_vendor_brand`,
+  left uncommitted/untracked). This environment cannot reach
+  `binaries.prisma.sh` to run Prisma CLI commands (403 from this sandbox's
+  network), so the owner needs to run
+  `npx prisma migrate dev --name drop_updated_by_label_vendor_brand`
+  themselves to drop the now-unused column and commit the resulting
+  migration folder.
+
+### Verification
+
+- `npm run typecheck` — clean
+- `npx eslint .` — clean
+- `node scripts/check-boundaries.mjs` — pass
+- `node scripts/check-legacy-runtime.mjs` — pass
+- `git diff --cached --check` — clean (line-ending warnings only)
+- `npx prisma validate` / `migrate` — unavailable in this sandbox (network
+  blocked to `binaries.prisma.sh`); schema change is a pure two-line revert
+  back to the last published shape, diffed and confirmed byte-identical to
+  the published baseline aside from line endings.
 
 ## R4.81 — 2026-09-03 — fix(masterdata): complete directory review feedback
 

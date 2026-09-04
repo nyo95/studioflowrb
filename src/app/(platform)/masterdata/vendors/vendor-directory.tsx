@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Archive, Plus, RotateCcw, Trash2, UserPlus, X } from "lucide-react";
 
 import {
@@ -17,11 +17,14 @@ import {
   IconButton,
   InlineError,
   Input,
+  Notice,
   SearchField,
   SectionCard,
   Select,
+  SimpleTextEditor,
   Spinner,
   StatusBadge,
+  TableBody,
   TableCell,
   TableCellContent,
   TableHead,
@@ -30,7 +33,7 @@ import {
   TableToolbar,
   Tabs,
   Text,
-  Textarea,
+  useFormDraftGuard,
 } from "@/platform/ui_engine";
 import {
   archiveVendorAction,
@@ -40,6 +43,20 @@ import {
   updateVendorAction,
 } from "./actions";
 
+const VENDOR_LINK_KINDS = [
+  { value: "WEBSITE", label: "Website" },
+  { value: "INSTAGRAM", label: "Instagram" },
+  { value: "FACEBOOK", label: "Facebook" },
+  { value: "TIKTOK", label: "TikTok" },
+  { value: "YOUTUBE", label: "YouTube" },
+  { value: "LINKEDIN", label: "LinkedIn" },
+  { value: "WHATSAPP", label: "WhatsApp" },
+  { value: "MARKETPLACE", label: "Marketplace" },
+  { value: "DRIVE", label: "Google Drive" },
+  { value: "PRICE_LIST", label: "Price List" },
+  { value: "OTHER", label: "Other" },
+] as const;
+
 type VendorRow = {
   id: string;
   name: string;
@@ -47,6 +64,8 @@ type VendorRow = {
   legal_name: string | null;
   address: string | null;
   notes: string | null;
+  updated_at: Date;
+  updated_by_label: string | null;
   deleted_at: Date | null;
   types: Array<{
     vendor_type: {
@@ -143,12 +162,37 @@ export function VendorDirectory({
   const [createVendorTypeIds, setCreateVendorTypeIds] = useState<string[]>([]);
   const [editVendorTypeIds, setEditVendorTypeIds] = useState<string[]>([]);
 
+  // Controlled edit profile fields — prevents data loss when tabs re-render
+  const [editName, setEditName] = useState("");
+  const [editLegalName, setEditLegalName] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+
   const [createError, setCreateError] = useState<string | null>(null);
   const [createPending, setCreatePending] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editPending, setEditPending] = useState(false);
   const [createNameWarning, setCreateNameWarning] = useState<string | null>(null);
   const [editNameWarning, setEditNameWarning] = useState<string | null>(null);
+  const [createDraftKey, setCreateDraftKey] = useState(0);
+  const createFormRef = useRef<HTMLFormElement>(null);
+  const editFormRef = useRef<HTMLFormElement>(null);
+  const createDraftGuard = useFormDraftGuard({
+    formRef: createFormRef,
+    resetKey: createDraftKey,
+    active: createOpen,
+    watchedValue: JSON.stringify([createVendorTypeIds, contactsList]),
+    title: "Discard vendor draft?",
+    description: "Your changes are only in this browser and have not been saved.",
+  });
+  const editDraftGuard = useFormDraftGuard({
+    formRef: editFormRef,
+    resetKey: editTarget?.id ?? "",
+    active: Boolean(editTarget),
+    watchedValue: JSON.stringify([editVendorTypeIds, contactsList, linksList]),
+    title: "Discard changes?",
+    description: "Your edits are only in this browser and have not been saved.",
+  });
 
   const filtered = vendors.filter((v) => {
     if (typeFilter !== "ALL" && !v.types.some((t) => t.vendor_type.id === typeFilter)) return false;
@@ -199,6 +243,7 @@ export function VendorDirectory({
     setNewLinkLabel("");
     setNewLinkArchiveUrl("");
     setCreateNameWarning(null);
+    setCreateDraftKey((key) => key + 1);
     setCreateOpen(true);
   };
 
@@ -217,6 +262,10 @@ export function VendorDirectory({
     );
     setLinksList(vendor.links.map((l) => ({ kind: l.kind, url: l.url, label: l.label ?? "", archiveUrl: l.archive_url ?? "", sortOrder: l.sort_order })));
     setEditVendorTypeIds(vendor.types.map((type) => type.vendor_type.id));
+    setEditName(vendor.name);
+    setEditLegalName(vendor.legal_name ?? "");
+    setEditAddress(vendor.address ?? "");
+    setEditNotes(vendor.notes ?? "");
     setNewLinkUrl("");
     setNewLinkLabel("");
     setNewLinkArchiveUrl("");
@@ -294,7 +343,7 @@ export function VendorDirectory({
               <TableHead align="end">Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <tbody>
+          <TableBody>
             {filtered.map((vendor) => {
               const isPending = pendingId === vendor.id;
               const isArchived = vendor.deleted_at !== null;
@@ -309,9 +358,16 @@ export function VendorDirectory({
                     <TableCellContent
                       primary={<span className="font-semibold">{vendor.name}</span>}
                       secondary={
-                        <div className="text-xs text-ink-secondary">
-                          {vendor.legal_name ? <span>{vendor.legal_name} • </span> : null}
-                          <span className="font-mono">{vendor.slug}</span>
+                        <div className="grid gap-0.5 text-xs text-ink-secondary">
+                          <div>
+                            {vendor.legal_name ? <span>{vendor.legal_name} • </span> : null}
+                            <span className="font-mono">{vendor.slug}</span>
+                          </div>
+                          {vendor.updated_by_label ? (
+                            <span className="text-ink-tertiary">
+                              Updated by <span className="font-medium text-ink-secondary">{vendor.updated_by_label}</span> · {new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" }).format(vendor.updated_at)}
+                            </span>
+                          ) : null}
                         </div>
                       }
                     />
@@ -358,7 +414,7 @@ export function VendorDirectory({
                     </StatusBadge>
                   </TableCell>
                   <TableCell align="end">
-                    <TableCellContent primary={totalPriceCount.toLocaleString()} />
+                    <TableCellContent align="end" primary={totalPriceCount.toLocaleString()} />
                   </TableCell>
                   <TableCell align="end">
                     <div className="flex items-center justify-end gap-1.5">
@@ -389,25 +445,30 @@ export function VendorDirectory({
                 </TableRow>
               );
             })}
-          </tbody>
+          </TableBody>
         </DataTable>
       )}
 
       {/* Create Vendor Dialog */}
       <Dialog
         open={createOpen}
-        onOpenChange={setCreateOpen}
+        onOpenChange={(open) => {
+          if (open) setCreateOpen(true);
+          else if (!createPending) void createDraftGuard.requestDiscard(() => setCreateOpen(false));
+        }}
         title="Create vendor partner"
         description="Register a material supplier, fabricator, subcontractor, or labor contractor."
+        dismissible={!createPending}
       >
         <form
+          ref={createFormRef}
+          onChange={createDraftGuard.onFormChange}
           onSubmit={async (e) => {
             e.preventDefault();
             setCreatePending(true);
             setCreateError(null);
             const fd = new FormData(e.currentTarget);
             fd.set("contactsJson", JSON.stringify(contactsList.filter((c) => c.personName?.trim())));
-            fd.set("linksJson", JSON.stringify(linksList));
             try {
               const res = await createVendorAction(null, fd);
               if (res && "ok" in res && res.ok) {
@@ -424,135 +485,87 @@ export function VendorDirectory({
           {createVendorTypeIds.map((id) => <input key={id} type="hidden" name="vendorTypeIds" value={id} />)}
           {createError ? <InlineError>{createError}</InlineError> : null}
 
-          <Tabs keepMounted
-            items={[
-              {
-                value: "profile",
-                label: "Profile & Types",
-                content: (
-                  <div className="grid gap-4">
-                    <Field label="Vendor trade name" required>
-                      <Input name="name" required maxLength={64} placeholder="e.g. Mitra Kayu Nusantara" autoFocus onChange={(e) => setCreateNameWarning(checkSimilarName(e.target.value))} />
-                    </Field>
-                    {createNameWarning ? (
-                      <p className="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5">⚠ {createNameWarning}</p>
-                    ) : null}
-                    <Field label="Legal entity name" description="Registered PT / CV name if applicable.">
-                      <Input name="legalName" maxLength={128} placeholder="e.g. PT Mitra Kayu Nusantara" />
-                    </Field>
-                    <Field label="Vendor types" description="Search the controlled type vocabulary; assign role dimensions to grant pricing capabilities.">
-                      <CreatableMultiSelect label="Vendor types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={createVendorTypeIds} onValueChange={setCreateVendorTypeIds} placeholder="Search vendor types" searchPlaceholder="Search vendor types…" />
-                    </Field>
-                    <Field label="Office / Workshop address">
-                      <Input name="address" maxLength={256} placeholder="Address, City" />
-                    </Field>
-                    <Field label="Notes">
-                      <Textarea name="notes" placeholder="Payment terms, workshop capacity, etc." rows={2} />
-                    </Field>
-                  </div>
-                ),
-              },
-              {
-                value: "contacts",
-                label: `Contacts (${contactsList.length})`,
-                content: (
-                  <div className="grid gap-3">
-                    <div className="flex justify-between items-center">
-                      <Text size="sm" weight="semibold">Personnel &amp; Sales Contacts</Text>
-                        <Button type="button" size="sm" variant="secondary" onClick={addContactDraft}>
-                          <UserPlus size={14} />
-                          <span>Add contact</span>
-                        </Button>
-                    </div>
-                    {contactsList.length === 0 ? (
-                      <div className="text-xs text-ink-tertiary py-3 text-center border border-dashed border-line rounded">
-                        No contacts added yet. Click &quot;Add contact&quot; to add sales reps or project managers.
-                      </div>
-                    ) : null}
-                    {contactsList.map((contact, idx) => (
-                      <div key={idx} className="grid grid-cols-2 gap-2 p-2.5 border border-line rounded bg-surface-muted/40 relative">
-                        <IconButton
-                          label="Remove contact"
-                          onClick={() => removeContactDraft(idx)}
-                          title="Remove"
-                          icon={<X size={14} />}
-                          size="sm"
-                          className="absolute right-2 top-2 !h-6 !w-6 !min-h-6 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!bg-transparent hover:!text-ink-danger"
-                        />
-                        <Field label="Contact name" required className="col-span-2 sm:col-span-1">
-                          <Input
-                            value={contact.personName}
-                            onChange={(e) => updateContactDraft(idx, { personName: e.target.value })}
-                            placeholder="Full name"
-                            required
-                          />
-                        </Field>
-                        <Field label="Job title" className="col-span-2 sm:col-span-1">
-                          <Input
-                            value={contact.jobTitle}
-                            onChange={(e) => updateContactDraft(idx, { jobTitle: e.target.value })}
-                            placeholder="Sales Executive, Estimator..."
-                          />
-                        </Field>
-                        <Field label="Phone number">
-                          <Input
-                            value={contact.phone}
-                            onChange={(e) => updateContactDraft(idx, { phone: e.target.value })}
-                            placeholder="+62 812..."
-                          />
-                        </Field>
-                        <Field label="Email address">
-                          <Input
-                            type="email"
-                            value={contact.email}
-                            onChange={(e) => updateContactDraft(idx, { email: e.target.value })}
-                            placeholder="rep@vendor.com"
-                          />
-                        </Field>
-                        <Field label="Brand scoping" description="Optional: specific brand this contact manages.">
-                          <Combobox label={`Brand scope for ${contact.personName || "contact"}`} options={[{ id: "", label: "All vendor brands" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={contact.brandId} onValueChange={(brandId) => updateContactDraft(idx, { brandId })} placeholder="All vendor brands" searchPlaceholder="Search brands…" />
-                        </Field>
-                      </div>
-                    ))}
-                  </div>
-                ),
-              },
-              {
-                value: "resources",
-                label: "Links",
-                content: (
-                  <div className="grid gap-4">
-                    <div className="grid gap-3">
-                      <Text size="sm" weight="semibold">Website &amp; Catalogs</Text>
-                      {linksList.map((link, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-xs bg-surface-muted p-2 rounded">
-                          <span className="font-mono">{link.kind}: {link.label || link.url}</span>
-                          <Button type="button" size="sm" variant="ghost" onClick={() => removeLinkDraft(idx)}>Remove</Button>
-                        </div>
-                      ))}
-                      <div className="grid gap-3 rounded border border-line bg-surface-muted/30 p-3">
-                        <Field label="Link type">
-                          <Select value={newLinkKind} onChange={(e) => setNewLinkKind(e.target.value)}>
-                          <option value="WEBSITE">Website</option>
-                          <option value="CATALOG">Catalog</option>
-                          <option value="PORTFOLIO">Portfolio</option>
-                          <option value="WHATSAPP">WhatsApp</option>
-                          </Select>
-                        </Field>
-                        <Field label="URL" required><Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://example.com/catalog" /></Field>
-                        <Field label="Display label"><Input value={newLinkLabel} onChange={(e) => setNewLinkLabel(e.target.value)} placeholder="Optional label, e.g. Product catalog 2026" /></Field>
-                        <Field label="Archive URL" description="Archived/cached version of this link (optional)."><Input value={newLinkArchiveUrl} onChange={(e) => setNewLinkArchiveUrl(e.target.value)} placeholder="https://web.archive.org/web/..." /></Field>
-                        <Button type="button" size="sm" variant="secondary" className="justify-self-start" onClick={addLinkDraft}>Add link</Button>
-                      </div>
-                    </div>
-                  </div>
-                ),
-              },
-            ]}
-          />
+          <Field label="Vendor trade name" required>
+            <Input name="name" required maxLength={64} placeholder="e.g. Mitra Kayu Nusantara" autoFocus onChange={(e) => setCreateNameWarning(checkSimilarName(e.target.value))} />
+          </Field>
+          {createNameWarning ? (
+            <Notice tone="warning">{createNameWarning}</Notice>
+          ) : null}
+          <Field label="Legal entity name" description="Registered PT / CV name if applicable.">
+            <Input name="legalName" maxLength={128} placeholder="e.g. PT Mitra Kayu Nusantara" />
+          </Field>
+          <Field label="Vendor types" description="Search the controlled type vocabulary; assign role dimensions to grant pricing capabilities.">
+            <CreatableMultiSelect label="Vendor types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={createVendorTypeIds} onValueChange={setCreateVendorTypeIds} placeholder="Search vendor types" searchPlaceholder="Search vendor types…" />
+          </Field>
+          <Field label="Office / Workshop address">
+            <Input name="address" maxLength={256} placeholder="Address, City" />
+          </Field>
+
+          <div className="grid gap-3 border-t border-line pt-3">
+            <div className="flex justify-between items-center">
+              <Text size="sm" weight="semibold">Personnel &amp; Sales Contacts</Text>
+              <Button type="button" size="sm" variant="secondary" onClick={addContactDraft}>
+                <UserPlus size={14} />
+                <span>Add contact</span>
+              </Button>
+            </div>
+            {contactsList.length === 0 ? (
+              <div className="text-xs text-ink-tertiary py-3 text-center border border-dashed border-line rounded">
+                No contacts yet. Contacts can also be added later from Edit.
+              </div>
+            ) : null}
+            {contactsList.map((contact, idx) => (
+              <div key={idx} className="grid grid-cols-2 gap-2 p-2.5 border border-line rounded bg-surface-muted/40 relative">
+                <IconButton
+                  label="Remove contact"
+                  onClick={() => removeContactDraft(idx)}
+                  title="Remove"
+                  icon={<X size={14} />}
+                  size="sm"
+                  className="absolute right-2 top-2 !h-6 !w-6 !min-h-6 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!bg-transparent hover:!text-ink-danger"
+                />
+                <Field label="Contact name" className="col-span-2 sm:col-span-1">
+                  <Input
+                    value={contact.personName}
+                    onChange={(e) => updateContactDraft(idx, { personName: e.target.value })}
+                  />
+                </Field>
+                <Field label="Job title" className="col-span-2 sm:col-span-1">
+                  <Input
+                    value={contact.jobTitle}
+                    onChange={(e) => updateContactDraft(idx, { jobTitle: e.target.value })}
+                  />
+                </Field>
+                <Field label="Phone number">
+                  <Input
+                    value={contact.phone}
+                    onChange={(e) => updateContactDraft(idx, { phone: e.target.value })}
+                  />
+                </Field>
+                <Field label="Email address">
+                  <Input
+                    type="email"
+                    value={contact.email}
+                    onChange={(e) => updateContactDraft(idx, { email: e.target.value })}
+                  />
+                </Field>
+                <Field label="Brand scoping">
+                  <Combobox label={`Brand scope for ${contact.personName || "contact"}`} options={[{ id: "", label: "All vendor brands" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={contact.brandId} onValueChange={(brandId) => updateContactDraft(idx, { brandId })} placeholder="All vendor brands" searchPlaceholder="Search brands…" />
+                </Field>
+                <label className="col-span-2 flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={contact.isPrimary} onChange={(e) => updateContactDraft(idx, { isPrimary: e.target.checked })} className="h-4 w-4 rounded border-line accent-brand" />
+                  <span className="text-sm text-ink-secondary">Primary contact</span>
+                </label>
+              </div>
+            ))}
+          </div>
+
+          <Field label="Notes">
+            <SimpleTextEditor name="notes" placeholder="Payment terms, workshop capacity, etc." rows={2} />
+          </Field>
 
           <FormActions>
-            <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
+            <Button type="button" variant="ghost" onClick={() => void createDraftGuard.requestDiscard(() => setCreateOpen(false))}>
               Cancel
             </Button>
             <Button type="submit" variant="primary" disabled={createPending}>
@@ -561,18 +574,22 @@ export function VendorDirectory({
           </FormActions>
         </form>
       </Dialog>
+      {createDraftGuard.confirmDialog}
 
       {/* Edit Vendor Dialog */}
       {editTarget ? (
         <Dialog
           open
           onOpenChange={(open) => {
-            if (!open) setEditTarget(null);
+            if (!open && !editPending) void editDraftGuard.requestDiscard(() => setEditTarget(null));
           }}
           title={`Edit vendor ${editTarget.name}`}
           description="Update the vendor profile, capability types, contacts, and reference links."
+          dismissible={!editPending}
         >
           <form
+            ref={editFormRef}
+            onChange={editDraftGuard.onFormChange}
             onSubmit={async (e) => {
               e.preventDefault();
               setEditPending(true);
@@ -605,22 +622,22 @@ export function VendorDirectory({
                   content: (
                     <div className="grid gap-4">
                       <Field label="Vendor trade name" required>
-                        <Input name="name" defaultValue={editTarget.name} required maxLength={64} autoFocus onChange={(e) => setEditNameWarning(checkSimilarName(e.target.value, editTarget.id))} />
+                        <Input name="name" value={editName} required maxLength={64} autoFocus onChange={(e) => { setEditName(e.target.value); setEditNameWarning(checkSimilarName(e.target.value, editTarget.id)); }} />
                       </Field>
                       {editNameWarning ? (
-                        <p className="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5">⚠ {editNameWarning}</p>
+                        <Notice tone="warning">{editNameWarning}</Notice>
                       ) : null}
                       <Field label="Legal entity name">
-                        <Input name="legalName" defaultValue={editTarget.legal_name ?? ""} maxLength={128} />
+                        <Input name="legalName" value={editLegalName} maxLength={128} onChange={(e) => setEditLegalName(e.target.value)} />
                       </Field>
                       <Field label="Vendor types" description="Search the controlled type vocabulary. Removing capability types is guarded against active dependent prices.">
                         <CreatableMultiSelect label="Vendor types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={editVendorTypeIds} onValueChange={setEditVendorTypeIds} placeholder="Search vendor types" searchPlaceholder="Search vendor types…" />
                       </Field>
                       <Field label="Office / Workshop address">
-                        <Input name="address" defaultValue={editTarget.address ?? ""} maxLength={256} />
+                        <Input name="address" value={editAddress} maxLength={256} onChange={(e) => setEditAddress(e.target.value)} />
                       </Field>
                       <Field label="Notes">
-                        <Textarea name="notes" defaultValue={editTarget.notes ?? ""} rows={2} />
+                        <SimpleTextEditor name="notes" value={editNotes} rows={2} onChange={(e) => setEditNotes(e.target.value)} />
                       </Field>
                     </div>
                   ),
@@ -652,11 +669,10 @@ export function VendorDirectory({
                             size="sm"
                             className="absolute right-2 top-2 !h-6 !w-6 !min-h-6 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!bg-transparent hover:!text-ink-danger"
                           />
-                          <Field label="Contact name" required className="col-span-2 sm:col-span-1">
+                          <Field label="Contact name" className="col-span-2 sm:col-span-1">
                             <Input
                               value={contact.personName}
                               onChange={(e) => updateContactDraft(idx, { personName: e.target.value })}
-                              required
                             />
                           </Field>
                           <Field label="Job title" className="col-span-2 sm:col-span-1">
@@ -681,6 +697,10 @@ export function VendorDirectory({
                           <Field label="Brand scoping">
                             <Combobox label={`Brand scope for ${contact.personName || "contact"}`} options={[{ id: "", label: "All vendor brands" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={contact.brandId} onValueChange={(brandId) => updateContactDraft(idx, { brandId })} placeholder="All vendor brands" searchPlaceholder="Search brands…" />
                           </Field>
+                          <label className="col-span-2 flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" checked={contact.isPrimary} onChange={(e) => updateContactDraft(idx, { isPrimary: e.target.checked })} className="h-4 w-4 rounded border-line accent-brand" />
+                            <span className="text-sm text-ink-secondary">Primary contact</span>
+                          </label>
                         </div>
                       ))}
                     </div>
@@ -688,28 +708,25 @@ export function VendorDirectory({
                 },
                 {
                   value: "resources",
-                  label: "Links",
+                  label: `Links (${linksList.length})`,
                   content: (
                     <div className="grid gap-4">
                       <div className="grid gap-3">
-                        <Text size="sm" weight="semibold">Website &amp; Catalogs</Text>
+                        <Text size="sm" weight="semibold">Reference Links</Text>
                         {linksList.map((link, idx) => (
                           <div key={idx} className="flex items-center justify-between text-xs bg-surface-muted p-2 rounded">
-                            <span className="font-mono">{link.kind}: {link.label || link.url}</span>
+                            <span className="font-mono">{VENDOR_LINK_KINDS.find((k) => k.value === link.kind)?.label ?? link.kind}: {link.label || link.url}</span>
                             <Button type="button" size="sm" variant="ghost" onClick={() => removeLinkDraft(idx)}>Remove</Button>
                           </div>
                         ))}
                         <div className="grid gap-3 rounded border border-line bg-surface-muted/30 p-3">
                           <Field label="Link type">
                             <Select value={newLinkKind} onChange={(e) => setNewLinkKind(e.target.value)}>
-                            <option value="WEBSITE">Website</option>
-                            <option value="CATALOG">Catalog</option>
-                            <option value="PORTFOLIO">Portfolio</option>
-                            <option value="WHATSAPP">WhatsApp</option>
+                              {VENDOR_LINK_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
                             </Select>
                           </Field>
-                          <Field label="URL" required><Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://example.com/catalog" /></Field>
-                          <Field label="Display label"><Input value={newLinkLabel} onChange={(e) => setNewLinkLabel(e.target.value)} placeholder="Optional label, e.g. Product catalog 2026" /></Field>
+                          <Field label="URL" required><Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://example.com" /></Field>
+                          <Field label="Display label"><Input value={newLinkLabel} onChange={(e) => setNewLinkLabel(e.target.value)} placeholder="Optional label, e.g. Price list 2026" /></Field>
                           <Field label="Archive URL" description="Archived/cached version of this link (optional)."><Input value={newLinkArchiveUrl} onChange={(e) => setNewLinkArchiveUrl(e.target.value)} placeholder="https://web.archive.org/web/..." /></Field>
                           <Button type="button" size="sm" variant="secondary" className="justify-self-start" onClick={addLinkDraft}>Add link</Button>
                         </div>
@@ -717,11 +734,42 @@ export function VendorDirectory({
                     </div>
                   ),
                 },
+                {
+                  value: "brand_suppliers",
+                  label: `Brand Suppliers (${editTarget.brand_suppliers.length})`,
+                  content: (
+                    <div className="grid gap-3">
+                      <Text size="sm" weight="semibold">Authorized Brand Relationships</Text>
+                      {editTarget.brand_suppliers.length === 0 ? (
+                        <div className="text-xs text-ink-tertiary py-3 text-center border border-dashed border-line rounded">
+                          No brand supplier relationships registered for this vendor.
+                        </div>
+                      ) : (
+                        editTarget.brand_suppliers.map((bs) => (
+                          <div key={bs.id} className="flex items-center justify-between p-2.5 border border-line rounded bg-surface-muted/40">
+                            <div className="grid gap-0.5">
+                              <Text size="sm" weight="semibold">{bs.brand.name}</Text>
+                              {bs.notes ? <Text size="sm" className="text-ink-secondary">{bs.notes}</Text> : null}
+                            </div>
+                            <Badge tone={bs.is_authorized ? "success" : "neutral"}>
+                              {bs.is_authorized ? "Authorized" : "Pending"}
+                            </Badge>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  ),
+                },
               ]}
             />
 
+            {editTarget.updated_by_label ? (
+              <p className="text-xs text-ink-tertiary px-0.5">
+                Updated by <span className="font-medium text-ink-secondary">{editTarget.updated_by_label}</span> · {new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(editTarget.updated_at)}
+              </p>
+            ) : null}
             <FormActions>
-              <Button type="button" variant="ghost" onClick={() => setEditTarget(null)}>
+              <Button type="button" variant="ghost" onClick={() => void editDraftGuard.requestDiscard(() => setEditTarget(null))}>
                 Cancel
               </Button>
               <Button type="submit" variant="primary" disabled={editPending}>
@@ -731,6 +779,7 @@ export function VendorDirectory({
           </form>
         </Dialog>
       ) : null}
+      {editDraftGuard.confirmDialog}
 
       {/* Archive Confirm */}
       {confirmArchive ? (

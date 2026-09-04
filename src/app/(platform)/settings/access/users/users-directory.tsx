@@ -18,6 +18,7 @@ import {
   Select,
   Spinner,
   StatusBadge,
+  TableBody,
   TableCell,
   TableCellContent,
   TableHead,
@@ -82,16 +83,12 @@ export function UsersDirectory({
 
   return (
     <SectionCard>
-      <TableToolbar>
-        <div className="ml-auto">
-          {canManage ? (
-            <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
-              <UserPlus aria-hidden="true" />
-              <span>New user</span>
-            </Button>
-          ) : null}
-        </div>
-      </TableToolbar>
+      <TableToolbar actions={canManage ? (
+        <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
+          <UserPlus aria-hidden="true" />
+          <span>New user</span>
+        </Button>
+      ) : undefined} />
 
       {users.length === 0 ? (
         <EmptyState title="No users yet" description="Create the first platform account to get started." />
@@ -106,7 +103,7 @@ export function UsersDirectory({
               <TableHead align="end">Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <tbody>
+          <TableBody>
             {users.map((user) => (
               <TableRow key={user.id}>
                 <TableCell data-column="identifier">{user.email}</TableCell>
@@ -186,7 +183,7 @@ export function UsersDirectory({
                 </TableCell>
               </TableRow>
             ))}
-          </tbody>
+          </TableBody>
         </DataTable>
       )}
 

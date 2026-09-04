@@ -67,7 +67,7 @@ export default async function BqProjectsPage() {
         </SectionCard>
       ) : (
         <SectionCard>
-          <DataTable>
+          <DataTable minWidth={700}>
             <TableHeader>
               <TableRow>
                 <TableHead>Judul</TableHead>
@@ -95,7 +95,7 @@ export default async function BqProjectsPage() {
                     </StatusBadge>
                   </TableCell>
                   <TableCell>{p.createdBy}</TableCell>
-                  <TableCell align="end" className="tabular-nums">
+                  <TableCell align="end">
                     {p.grandTotal === null ? "—" : formatMoney(createMoney(p.grandTotal, "IDR"))}
                   </TableCell>
                   <TableCell>

@@ -138,7 +138,9 @@ Brand-scoped contact validation: the Brand must be live, and the Vendor must own
 
 ## 5. Sub-Entity: Links (`VendorLink`)
 
-Renamed from `PartyLink`. Uses the shared `LinkKind` enum (WEBSITE, INSTAGRAM, FACEBOOK, TIKTOK, YOUTUBE, LINKEDIN, WHATSAPP, MARKETPLACE, DRIVE, CATALOG, PRICE_LIST, OTHER).
+Renamed from `PartyLink`. Vendor links use a curated subset of the shared `LinkKind` vocabulary — CATALOG is excluded (catalog links belong to Brand, not Vendor):
+
+`WEBSITE, INSTAGRAM, FACEBOOK, TIKTOK, YOUTUBE, LINKEDIN, WHATSAPP, MARKETPLACE, DRIVE, PRICE_LIST, OTHER`
 
 | Field | Type | Notes |
 |---|---|---|
@@ -361,19 +363,24 @@ Quick entry validates:
 
 ### 13.2 Detail / Edit view
 
-**Pattern:** Same as Brand — popup modal for edit.
+**Pattern:** Same as Brand — popup modal.
 
-**Tabs (3):**
+**Create dialog** — single form, no tabs: Vendor trade name (required), Legal entity name, Vendor types, Address, Notes, and an optional Contacts section (same fields as the edit dialog's Contacts tab: name, job title, phone, email, brand scope, primary toggle) so a vendor can be created with its first contacts in one step. Links are still added after creation via the edit dialog.
+
+**Edit dialog — Tabs (3 + read-only Brand Suppliers view):**
 
 1. **Profile & Types** — Vendor info (name, legal name, address, notes) and VendorType assignments (add/remove via searchable select from the controlled dictionary)
-2. **Contacts** — Contact list with CRUD. Brand-scoped contacts grouped under their brand. Primary contact indicator.
-3. **Links** — Website, catalog, portfolio, and WhatsApp references with explicit type, URL, and optional display label fields.
+2. **Contacts** — Contact list with CRUD. Each contact has: name, job title, phone, email, brand scope (optional), and a primary contact toggle. Brand-scoped contacts grouped under their brand header for readability.
+3. **Links** — External references using the vendor-scoped `LinkKind` vocabulary (§5 — CATALOG excluded). Each link has: type, URL, optional display label, optional archive URL.
+4. **Brand Suppliers** (read-only, edit dialog only) — Displays BrandSupplier relationships for visibility. Management of these relations belongs to the Brand workflow.
 
 BrandSupplier relations are managed from the Brand workflow, not from Vendor
 create/edit. The Vendor form must not silently replace those relations when it
 saves profile, contact, or link changes.
 
 **No Prices tab** — prices are managed from the SKU/Work side, not from Vendor detail.
+
+**Audit metadata:** The edit dialog footer displays "Updated by [actor] · [relative time]" drawn from the most recent `vendor.*` AuditEvent for that Vendor (matches the Brand pattern — any lifecycle event counts, not just create/update). This is a read-only display; actor identity is stored in AuditEvent, not denormalized onto the Vendor row.
 
 The page uses `DirectoryShell`, `DataTable`, sortable headers, pagination,
 `RowActionMenu`, shared `Dialog` forms, `ConfirmDialog`, unsaved-change guards,

@@ -342,7 +342,7 @@ function ItemTable({
           <TableHead align="end" className="w-[110px]">Koef.</TableHead>
           <TableHead align="end" className="w-[130px]">Rate</TableHead>
           <TableHead align="end" className="w-[140px]">Total</TableHead>
-          {editable ? <TableHead className="w-[80px]" aria-label="Actions" /> : null}
+          {editable ? <TableHead align="end" className="w-[80px]" aria-label="Actions" /> : null}
         </TableRow>
       </TableHeader>
       <TableBody>
