@@ -5,10 +5,33 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.82**
-- Next local revision: **R4.83**
+- Current revision: **R4.83**
+- Next local revision: **R4.84**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
+
+## R4.83 — 2026-09-04 — fix(masterdata): align Pricing toolbar filter with the shared TableToolbar row
+
+- Agent: `Claude`
+
+Owner-reported (side-by-side screenshots of Pricing vs. Vendors): the Pricing
+directory's status filter dropped to its own line below the search field
+instead of sitting beside it, unlike Vendors/Categories/Roles/Users.
+
+- Root cause: Pricing wrapped `SearchField` and the status `Select` in an
+  extra `<div className="flex flex-wrap items-center gap-3">` inside
+  `TableToolbar`. `TableToolbar` already lays its children out in one
+  `flex flex-wrap` row itself; the unnecessary wrapper div broke that layout
+  and pushed the filter onto its own line.
+- Fix: `SearchField` and the status filter are now direct `TableToolbar`
+  children, with the filter wrapped in a plain `<div className="w-36">` —
+  the same pattern already used by Vendors, Categories, Roles, and Users.
+
+### Verification
+
+- `npm run typecheck` — clean
+- focused ESLint (`pricing-directory.tsx`) — clean
+- `git diff --cached --check` — clean (line-ending warnings only)
 
 ## R4.82 — 2026-09-04 — fix(masterdata): audit-sourced Updated-by, Vendor create-time contacts, UI Engine sweep
 
