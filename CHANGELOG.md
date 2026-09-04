@@ -4,11 +4,30 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 ## Revision state
 
-- Published baseline: **R4** (commit `8116d5a`, 2026-09-01)
-- Current revision: **R4.83**
-- Next local revision: **R4.84**
+- Published baseline after this release is pushed: **R5** — publication commit follows this entry
+- Current revision after this entry is committed: **R5**
+- Next local revision: **R5.01**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
+
+## R5 — 2026-09-04 — release: publish audit-sourced Updated-by and directory consistency fixes
+
+Status: **owner-authorized GitHub publication**
+
+- Published `R4.82` and `R4.83` as the new remote baseline: Brand/Vendor
+  "Updated by" corrected to source from `AuditEvent` per the documented
+  contract (replacing a denormalized column a prior session had added),
+  Vendor gained create-time contacts, a broader UI Engine consistency sweep
+  across several directories, and the Pricing toolbar filter alignment fix.
+
+### Release boundary
+
+- The owner's local database still carries the reverted `updated_by_label`
+  column on `Vendor`/`Brand` from the superseded migration
+  (`prisma/migrations/20260904153201_add_updated_by_label_vendor_brand`,
+  intentionally left uncommitted). Running
+  `npx prisma migrate dev --name drop_updated_by_label_vendor_brand` locally
+  and committing the resulting migration remains outstanding.
 
 ## R4.83 — 2026-09-04 — fix(masterdata): align Pricing toolbar filter with the shared TableToolbar row
 
