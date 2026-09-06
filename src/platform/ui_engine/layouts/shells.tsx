@@ -1,13 +1,13 @@
 "use client";
 
-import { PanelLeftClose,PanelLeftOpen } from "lucide-react";
+import { ChevronLeft,ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { DropdownMenu } from "radix-ui";
 import { createContext,useContext,useEffect,useState,type AnchorHTMLAttributes,type ButtonHTMLAttributes,type HTMLAttributes,type ReactNode } from "react";
 
 import { cx } from "../internal/cx";
 import { getEffectiveRailCollapsed } from "../internal/rail-state";
-import { Heading,IconButton,Text } from "../primitives";
+import { Heading,Text } from "../primitives";
 import { Tooltip } from "./overlays";
 
 const RailContext = createContext<{ collapsed: boolean }>({ collapsed: false });
@@ -80,17 +80,6 @@ export function AppShell({
 
   const railBrand = railPresentation === "compact" ? brand : isCollapsed ? (collapsedBrand ?? brand) : brand;
   const topbarBrand = brand;
-  const railToggle = collapsible && railPresentation !== "compact" && !narrowNavigation ? (
-    <IconButton
-      className="shrink-0 max-[840px]:hidden"
-      size="sm"
-      variant="ghost"
-      label={isCollapsed ? expandLabel : collapseLabel}
-      aria-expanded={!isCollapsed}
-      onClick={toggle}
-      icon={isCollapsed ? <PanelLeftOpen aria-hidden="true" /> : <PanelLeftClose aria-hidden="true" />}
-    />
-  ) : null;
 
   return (
     <RailContext.Provider value={{ collapsed: isCollapsed }}>
@@ -113,7 +102,6 @@ export function AppShell({
               <div className={cx("min-w-0 overflow-hidden", isCollapsed && "grid place-items-center")}>
                 {topbarBrand}
               </div>
-              {!topbar ? railToggle : null}
             </div>
             <div className="flex min-w-0 flex-1 items-center pl-[var(--ui-header-brand-width,232px)] max-[840px]:pl-0">{topbar}</div>
           </header>
@@ -129,7 +117,7 @@ export function AppShell({
           {/* Warm chrome and a drawn rule separate navigation from the work area. */}
           <aside
             className={cx(
-              "group sticky top-16 flex h-[calc(100vh-4rem)] max-w-screen min-w-0 flex-col overflow-hidden border-r border-line",
+              "group relative sticky top-16 flex h-[calc(100vh-4rem)] max-w-screen min-w-0 flex-col overflow-hidden border-r border-line",
               "bg-[color-mix(in_srgb,var(--ui-surface-muted)_52%,var(--ui-surface))]",
               !topbar && "top-0 h-screen",
               "max-[840px]:static max-[840px]:h-auto max-[840px]:border-b max-[840px]:border-r-0",
@@ -139,7 +127,6 @@ export function AppShell({
           >
             {topbar ? (
               <div className={cx("flex h-10 shrink-0 items-center justify-end border-b border-line px-2", isCollapsed && "justify-center px-1")}>
-                {railToggle}
               </div>
             ) : null}
             {!topbar ? (
@@ -152,8 +139,18 @@ export function AppShell({
                 <div className={cx("min-w-0 overflow-hidden", isCollapsed && "grid place-items-center")}>
                   {railBrand}
                 </div>
-                {railToggle}
               </div>
+            ) : null}
+            {collapsible && railPresentation !== "compact" && !narrowNavigation ? (
+              <button
+                type="button"
+                className="absolute right-0 top-1/2 z-10 flex h-10 w-4 -translate-y-1/2 items-center justify-center rounded-r-md bg-transparent text-ink-tertiary hover:bg-line/40 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-line-focus"
+                aria-label={isCollapsed ? expandLabel : collapseLabel}
+                aria-expanded={!isCollapsed}
+                onClick={toggle}
+              >
+                {isCollapsed ? <ChevronRight aria-hidden="true" size={12} /> : <ChevronLeft aria-hidden="true" size={12} />}
+              </button>
             ) : null}
             <nav
               className={cx(
