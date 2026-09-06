@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { CircleHelp, X } from "lucide-react";
 import { AlertDialog as RAlertDialog,Dialog as RDialog,Tooltip as RTooltip } from "radix-ui";
 import { cloneElement,isValidElement,useId,useState,type CSSProperties,type ReactElement,type ReactNode } from "react";
 
@@ -254,5 +254,14 @@ export function Tooltip({ content, children, side = "top", delayDuration = 350 }
         </RTooltip.Portal>
       </RTooltip.Root>
     </RTooltip.Provider>
+  );
+}
+
+/** Compact, reusable help affordance for contextual explanations in dense UI. */
+export function HelpHint({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <Tooltip content={children}>
+      <IconButton label={label} icon={<CircleHelp aria-hidden="true" className="h-3.5 w-3.5" />} size="sm" variant="ghost" className="inline-flex h-4 min-h-4 w-4 align-text-bottom !p-0 text-ink-tertiary hover:text-ink" />
+    </Tooltip>
   );
 }

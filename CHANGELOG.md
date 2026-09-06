@@ -5,9 +5,15 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R5** — `d0c39ff3a2f0c1ed95b4cdb425ed968a9c2baf08` (local origin/main reference)
-- Current revision after this entry is committed: **R5.10**
-- Next local revision: **R5.11**
+- Current revision after this entry is committed: **R5.11**
+- Next local revision: **R5.12**
 - This change is local only; no new remote publication is authorized.
+
+## R5.11 — 2026-09-06 — fix(ui): centralize contextual help
+
+- Added reusable `HelpHint` to UI Engine and replaced persistent Supplier
+  relationship explanatory text with its accessible question-mark tooltip.
+- Checks: typecheck, lint, UI Engine tests, and whitespace check passed.
 
 ## R5.10 — 2026-09-06 — fix(shell): attach rail control to navigation
 

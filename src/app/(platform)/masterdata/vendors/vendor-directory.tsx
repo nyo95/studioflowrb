@@ -7,7 +7,7 @@ import { DirectoryShell,DraftDialog,Pagination,RowActionMenu,Text,usePagination 
 import { Plus,UserPlus,X } from "lucide-react";
 import { useRef,useState,useTransition } from "react";
 
-import { Badge,Button,Combobox,ConfirmDialog,CreatableMultiSelect,DataTable,Dialog,EmptyState,Field,FormActions,IconButton,InlineError,Input,Notice,SearchField,Select,SimpleTextEditor,StatusMarker,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,useFormDraftGuard } from "@/platform/ui_engine";
+import { Badge,Button,Combobox,ConfirmDialog,CreatableMultiSelect,DataTable,Dialog,EmptyState,Field,FormActions,HelpHint,IconButton,InlineError,Input,Notice,SearchField,Select,SimpleTextEditor,StatusMarker,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,useFormDraftGuard } from "@/platform/ui_engine";
 import {
 archiveVendorAction,
 createVendorAction,
@@ -622,8 +622,10 @@ export function VendorDirectory({
                   label: `Supplied brands (${editTarget.brand_suppliers.length})`,
                   content: (
                     <div className="grid gap-3">
-                      <Text size="sm" weight="semibold">Supplied brands</Text>
-                      <Text size="sm" tone="secondary">This relationship is managed from each Brand, not from Supplier.</Text>
+                      <div className="flex items-center gap-1.5">
+                        <Text size="sm" weight="semibold">Supplied brands</Text>
+                        <HelpHint label="How supplied brands work">This relationship is managed from each Brand, not from Supplier.</HelpHint>
+                      </div>
                       {editTarget.brand_suppliers.length === 0 ? (
                         <div className="text-xs text-ink-tertiary py-3 text-center border border-dashed border-line rounded">
                           No supplied brands registered for this supplier.
