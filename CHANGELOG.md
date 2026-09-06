@@ -5,9 +5,18 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R5** — `d0c39ff3a2f0c1ed95b4cdb425ed968a9c2baf08` (local origin/main reference)
-- Current revision after this entry is committed: **R5.08**
-- Next local revision: **R5.09**
+- Current revision after this entry is committed: **R5.09**
+- Next local revision: **R5.10**
 - This change is local only; no new remote publication is authorized.
+
+## R5.09 — 2026-09-06 — fix(bq): keep failed quick actions inline
+
+- Direct BQ editor actions now consume their own expected validation/action
+  rejection after showing the shared inline error, preventing Next from opening
+  a runtime error overlay.
+- Held the uncommitted snapshot/lifecycle schema work out of the running BQ
+  client until its isolated rebuild-only migration can be applied and verified.
+- Checks: Prisma client generation, typecheck, lint, and whitespace check passed.
 
 ## R5.08 — 2026-09-06 — fix(shell): restore collapsible navigation rail
 

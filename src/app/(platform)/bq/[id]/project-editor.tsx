@@ -248,7 +248,7 @@ export function ProjectEditor({
         pending={pending}
         requireTypedConfirmation="LOCK"
         onConfirm={() => {
-          void run(lockProjectAction, {}).finally(() => setLockOpen(false));
+          void run(lockProjectAction, {}).catch(() => undefined).finally(() => setLockOpen(false));
         }}
       />
 
@@ -259,7 +259,7 @@ export function ProjectEditor({
           pending={pending}
           onClose={() => setAssemblyTarget(null)}
           onApply={(assemblyId, qtyPerL1) => {
-            void run(applyAssemblyAction, { itemId: assemblyTarget, assemblyId, qtyPerL1 }).finally(() => setAssemblyTarget(null));
+            void run(applyAssemblyAction, { itemId: assemblyTarget, assemblyId, qtyPerL1 }).catch(() => undefined).finally(() => setAssemblyTarget(null));
           }}
         />
       ) : null}
@@ -505,7 +505,7 @@ function ItemRows({
                     variant="ghost"
                     leadingIcon={<Plus aria-hidden="true" />}
                     disabled={pending}
-                    onClick={() => void run(addLineItemAction, { itemId: item.id, sourceType: "CUSTOM" })}
+                    onClick={() => void run(addLineItemAction, { itemId: item.id, sourceType: "CUSTOM" }).catch(() => undefined)}
                   >
                     Baris custom
                   </Button>
@@ -615,7 +615,7 @@ function SubObjectRows({
                     variant="ghost"
                     leadingIcon={<Plus aria-hidden="true" />}
                     disabled={pending}
-                    onClick={() => void run(addLineItemAction, { subObjectId: subObject.id, sourceType: "CUSTOM" })}
+                    onClick={() => void run(addLineItemAction, { subObjectId: subObject.id, sourceType: "CUSTOM" }).catch(() => undefined)}
                   >
                     Baris custom
                   </Button>
