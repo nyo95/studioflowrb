@@ -16,8 +16,9 @@ const STATUS_TONE_MARKER_CLASSES: Record<SemanticTone, string> = {
 
 /**
  * A compact, accessible status signal for records whose name is the primary
- * scan target. Keep the visible dot close to that name; screen readers still
- * receive the full status label.
+ * scan target. Active is circular while archived/error states are squared, so
+ * colour is not the only visual signal. The native title exposes the concise
+ * text label on hover as well as to assistive technology.
  */
 export function StatusMarker({
   tone,
@@ -28,7 +29,9 @@ export function StatusMarker({
   return (
     <span
       className={cx(
-        "inline-flex h-2 w-2 shrink-0 rounded-full",
+        "inline-flex h-2 w-2 shrink-0",
+        tone === "success" && "rounded-full",
+        tone !== "success" && "rounded-[1px]",
         tone === "success" && "bg-success",
         tone === "warning" && "bg-warning",
         tone === "danger" && "bg-danger",
@@ -37,6 +40,7 @@ export function StatusMarker({
       )}
       role="img"
       aria-label={label}
+      title={label}
       {...props}
     />
   );

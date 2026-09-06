@@ -124,9 +124,9 @@ export function BrandDirectory({
     );
   });
   const { locale, timezone } = useDisplaySettings();
-  const [sortKey, setSortKey] = useState<"Brand" | "Status" | "SKUs" | "Suppliers" | "Resources" | "Updated">("Brand");
+  const [sortKey, setSortKey] = useState<"Brand" | "SKUs" | "Suppliers" | "Resources" | "Updated">("Brand");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const sortValues: Record<"Brand" | "Status" | "SKUs" | "Suppliers" | "Resources" | "Updated", (r: BrandRow) => string | number | null> = {"Brand": (r) => r.name, "Status": (r) => r.deleted_at ? "Archived" : "Active", "SKUs": (r) => r._count.skus, "Suppliers": (r) => r._count.suppliers, "Resources": (r) => r._count.links, "Updated": (r) => new Date(r.updated_at).getTime()};
+  const sortValues: Record<"Brand" | "SKUs" | "Suppliers" | "Resources" | "Updated", (r: BrandRow) => string | number | null> = {"Brand": (r) => r.name, "SKUs": (r) => r._count.skus, "Suppliers": (r) => r._count.suppliers, "Resources": (r) => r._count.links, "Updated": (r) => new Date(r.updated_at).getTime()};
   const collator = new Intl.Collator(locale, { sensitivity: "base", numeric: true });
   const orderedRows = [...filtered].sort((a, b) => {
     const left = sortValues[sortKey](a), right = sortValues[sortKey](b);
@@ -267,7 +267,7 @@ export function BrandDirectory({
 
         />
       ) : (
-        <DataTable framed={false} density="compact" stickyHeader maxBodyHeight="60vh" minWidth={1354} className="table-fixed">
+        <DataTable framed={false} density="compact" stickyHeader maxBodyHeight="60vh" minWidth={900} className="table-fixed">
           <TableHeader>
             <TableRow><TableHead style={{ width: 240 }}  sortable sortDirection={sortKey === "Brand" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Brand"); setSortDirection(direction); }}>Brand</TableHead>
 <TableHead style={{ width: 180 }}  >Categories</TableHead>

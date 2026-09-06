@@ -5,9 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R5** — `d0c39ff3a2f0c1ed95b4cdb425ed968a9c2baf08` (local origin/main reference)
-- Current revision after this entry is committed: **R5.05**
-- Next local revision: **R5.06**
+- Current revision after this entry is committed: **R5.06**
+- Next local revision: **R5.07**
 - This change is local only; no new remote publication is authorized.
+
+## R5.06 — 2026-09-06 — fix(ui): clarify compact directory status
+
+- Status markers now distinguish active and non-active records by shape as well
+  as colour, expose their text via native hover labels, and keep the accessible
+  status name.
+- Removed stale hidden sort keys and reduced unnecessary table minimum widths
+  in Brand and Supplier directories to keep the fixed, scrollable table canvas
+  useful without routinely forcing horizontal overflow.
+- Checks: typecheck, lint, boundary and legacy-runtime checks, UI Engine tests,
+  and whitespace check passed. Browser acceptance remains pending isolated
+  rebuild-only runtime verification.
 
 ## R5.05 — 2026-09-06 — fix(masterdata): make catalog resources Brand-only
 

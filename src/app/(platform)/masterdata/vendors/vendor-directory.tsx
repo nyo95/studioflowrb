@@ -152,9 +152,9 @@ export function VendorDirectory({
     );
   });
   const { locale, timezone } = useDisplaySettings();
-  const [sortKey, setSortKey] = useState<"Vendor" | "Name" | "Status" | "Brands">("Vendor");
+  const [sortKey, setSortKey] = useState<"Vendor" | "Brands">("Vendor");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const sortValues: Record<"Vendor" | "Name" | "Status" | "Brands", (r: VendorRow) => string | number | null> = {"Vendor": (r) => r.name, "Name": (r) => r.name, "Status": (r) => r.deleted_at ? "Archived" : "Active", "Brands": (r) => r._count.brand_suppliers};
+  const sortValues: Record<"Vendor" | "Brands", (r: VendorRow) => string | number | null> = {"Vendor": (r) => r.name, "Brands": (r) => r._count.brand_suppliers};
   const collator = new Intl.Collator(locale, { sensitivity: "base", numeric: true });
   const orderedRows = [...filtered].sort((a, b) => {
     const left = sortValues[sortKey](a), right = sortValues[sortKey](b);
@@ -273,7 +273,7 @@ export function VendorDirectory({
 
         />
       ) : (
-        <DataTable framed={false} density="compact" stickyHeader maxBodyHeight="60vh" minWidth={960}>
+        <DataTable framed={false} density="compact" stickyHeader maxBodyHeight="60vh" minWidth={760}>
           <TableHeader>
             <TableRow>
               <TableHead>Vendor partner</TableHead>
