@@ -79,6 +79,7 @@ export function AppShell({
   };
 
   const railBrand = railPresentation === "compact" ? brand : isCollapsed ? (collapsedBrand ?? brand) : brand;
+  const topbarBrand = brand;
   const railToggle = collapsible && railPresentation !== "compact" && !narrowNavigation ? (
     <IconButton
       className="shrink-0 max-[840px]:hidden"
@@ -110,7 +111,7 @@ export function AppShell({
               )}
             >
               <div className={cx("min-w-0 overflow-hidden", isCollapsed && "grid place-items-center")}>
-                {railBrand}
+                {topbarBrand}
               </div>
               {!topbar ? railToggle : null}
             </div>
