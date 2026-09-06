@@ -5,8 +5,35 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.14**
-- Next local revision: **R6.15**
+- Current revision after this entry is committed: **R6.19**
+- Next local revision: **R6.20**
+
+## R6.19 | docs(revisions): reconcile UI session ledger
+
+- Reconciled the revision ledger with the already committed R6.15–R6.18 UI
+  fixes: full topbar brand, Operational Catalog directory links, rail-edge
+  collapse toggle, and removal of the empty sidebar header gap.
+- No product code changes in this revision.
+
+## R6.18 | fix(ui): remove empty sidebar header div left after toggle relocation
+
+- Removed the empty sidebar header spacer left after the collapse toggle moved
+  to the rail edge, eliminating the phantom gap above navigation.
+
+## R6.17 | fix(ui): move sidebar collapse toggle to rail edge
+
+- Moved the collapse control to a thin, vertically centered strip on the
+  sidebar's right edge with ChevronLeft/ChevronRight icons.
+
+## R6.16 | fix(masterdata): replace catalog table with directory links
+
+- Replaced the Operational Catalog table with full-width directory links using
+  section descriptions, record counts, and chevrons; zero counts render as `—`.
+
+## R6.15 | fix(ui): keep full topbar brand during collapse
+
+- Kept the topbar on the full `brand` prop while preserving `collapsedBrand`
+  behavior for the sidebar-only mode.
 
 ## R6.14 | fix(ui): align shared directory controls and metadata
 
