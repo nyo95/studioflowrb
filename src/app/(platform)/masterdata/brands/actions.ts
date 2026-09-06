@@ -43,7 +43,7 @@ function parseId(value: string): string {
 export async function createOwnerVendorQuickAction(name: string): Promise<ActionResult<{ vendorId: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
-    const parsed = z.string().min(1, "Vendor name is required").max(64, "Vendor name is too long").safeParse(name);
+    const parsed = z.string().min(1, "Supplier name is required").max(64, "Supplier name is too long").safeParse(name);
     if (!parsed.success) throw validationError(parsed.error);
 
     const result = await masterDataService.createVendor({

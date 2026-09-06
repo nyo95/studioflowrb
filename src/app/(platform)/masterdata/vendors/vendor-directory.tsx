@@ -128,7 +128,7 @@ export function VendorDirectory({
     resetKey: createDraftKey,
     active: createOpen,
     watchedValue: JSON.stringify([createVendorTypeIds, contactsList]),
-    title: "Discard vendor draft?",
+    title: "Discard supplier draft?",
     description: "Your changes are only in this browser and have not been saved.",
   });
   const editDraftGuard = useFormDraftGuard({
@@ -152,9 +152,9 @@ export function VendorDirectory({
     );
   });
   const { locale, timezone } = useDisplaySettings();
-  const [sortKey, setSortKey] = useState<"Vendor" | "Brands">("Vendor");
+  const [sortKey, setSortKey] = useState<"Supplier" | "Brands">("Supplier");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const sortValues: Record<"Vendor" | "Brands", (r: VendorRow) => string | number | null> = {"Vendor": (r) => r.name, "Brands": (r) => r._count.brand_suppliers};
+  const sortValues: Record<"Supplier" | "Brands", (r: VendorRow) => string | number | null> = {"Supplier": (r) => r.name, "Brands": (r) => r._count.brand_suppliers};
   const collator = new Intl.Collator(locale, { sensitivity: "base", numeric: true });
   const orderedRows = [...filtered].sort((a, b) => {
     const left = sortValues[sortKey](a), right = sortValues[sortKey](b);
@@ -198,7 +198,7 @@ export function VendorDirectory({
         }
         return false;
       });
-    return similar ? `Potential duplicate: a similar vendor "${similar.name}" already exists.` : null;
+    return similar ? `Potential duplicate: a similar supplier "${similar.name}" already exists.` : null;
   };
 
   const openCreateDialog = () => {
@@ -252,7 +252,7 @@ export function VendorDirectory({
           <span>New vendor</span>
         </Button>
       ) : undefined}>
-        <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search vendors by name, legal name, contact..." />
+        <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search suppliers by name, legal name, contact..." />
         <div className="w-48">
           <Select value={typeFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTypeFilter(e.target.value)}>
             <option value="ALL">All vendor types</option>
@@ -268,8 +268,8 @@ export function VendorDirectory({
 
       {filtered.length === 0 ? (
         <EmptyState
-          title="No vendors found"
-          description={query ? "No vendors match your search filters." : "Register your first vendor partner."}
+          title="No suppliers found"
+          description={query ? "No suppliers match your search filters." : "Register your first supplier."}
 
         />
       ) : (
@@ -368,7 +368,7 @@ export function VendorDirectory({
           if (open) setCreateOpen(true);
           else if (!createPending) void createDraftGuard.requestDiscard(() => setCreateOpen(false));
         }}
-        title="Create vendor partner"
+        title="Create supplier"
         description="Register a material supplier, fabricator, subcontractor, or labor contractor."
         dismissible={!createPending}
       >
@@ -397,7 +397,7 @@ export function VendorDirectory({
           {createVendorTypeIds.map((id) => <input key={id} type="hidden" name="vendorTypeIds" value={id} />)}
           {createError ? <InlineError>{createError}</InlineError> : null}
 
-          <Field label="Vendor trade name" required>
+          <Field label="Supplier name" required>
             <Input name="name" required maxLength={64} placeholder="e.g. Mitra Kayu Nusantara" autoFocus onChange={(e) => setCreateNameWarning(checkSimilarName(e.target.value))} />
           </Field>
           {createNameWarning ? (
@@ -406,8 +406,8 @@ export function VendorDirectory({
           <Field label="Legal entity name" description="Registered PT / CV name if applicable.">
             <Input name="legalName" maxLength={128} placeholder="e.g. PT Mitra Kayu Nusantara" />
           </Field>
-          <Field label="Vendor types" description="Search the controlled type vocabulary; assign role dimensions to grant pricing capabilities.">
-            <CreatableMultiSelect label="Vendor types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={createVendorTypeIds} onValueChange={setCreateVendorTypeIds} placeholder="Search vendor types" searchPlaceholder="Search vendor types…" />
+          <Field label="Supplier types" description="Search the controlled type vocabulary; assign role dimensions to grant pricing capabilities.">
+            <CreatableMultiSelect label="Supplier types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={createVendorTypeIds} onValueChange={setCreateVendorTypeIds} placeholder="Search vendor types" searchPlaceholder="Search vendor types…" />
           </Field>
           <Field label="Office / Workshop address">
             <Input name="address" maxLength={256} placeholder="Address, City" />
@@ -462,7 +462,7 @@ export function VendorDirectory({
                   />
                 </Field>
                 <Field label="Brand scoping">
-                  <Combobox label={`Brand scope for ${contact.personName || "contact"}`} options={[{ id: "", label: "All vendor brands" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={contact.brandId} onValueChange={(brandId) => updateContactDraft(idx, { brandId })} placeholder="All vendor brands" searchPlaceholder="Search brands…" />
+                  <Combobox label={`Brand scope for ${contact.personName || "contact"}`} options={[{ id: "", label: "All supplier brands" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={contact.brandId} onValueChange={(brandId) => updateContactDraft(idx, { brandId })} placeholder="All supplier brands" searchPlaceholder="Search brands…" />
                 </Field>
                 <label className="col-span-2 flex items-center gap-2 cursor-pointer select-none">
                   <input type="checkbox" checked={contact.isPrimary} onChange={(e) => updateContactDraft(idx, { isPrimary: e.target.checked })} className="h-4 w-4 rounded border-line accent-brand" />
@@ -532,7 +532,7 @@ export function VendorDirectory({
                   label: "Profile & Types",
                   content: (
                     <div className="grid gap-4">
-                      <Field label="Vendor trade name" required>
+                      <Field label="Supplier name" required>
                         <Input name="name" value={editName} required maxLength={64} autoFocus onChange={(e) => { setEditName(e.target.value); setEditNameWarning(checkSimilarName(e.target.value, editTarget.id)); }} />
                       </Field>
                       {editNameWarning ? (
@@ -541,8 +541,8 @@ export function VendorDirectory({
                       <Field label="Legal entity name">
                         <Input name="legalName" value={editLegalName} maxLength={128} onChange={(e) => setEditLegalName(e.target.value)} />
                       </Field>
-                      <Field label="Vendor types" description="Search the controlled type vocabulary. Removing capability types is guarded against active dependent prices.">
-                        <CreatableMultiSelect label="Vendor types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={editVendorTypeIds} onValueChange={setEditVendorTypeIds} placeholder="Search vendor types" searchPlaceholder="Search vendor types…" />
+                      <Field label="Supplier types" description="Search the controlled type vocabulary. Removing capability types is guarded against active dependent prices.">
+                        <CreatableMultiSelect label="Supplier types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={editVendorTypeIds} onValueChange={setEditVendorTypeIds} placeholder="Search vendor types" searchPlaceholder="Search vendor types…" />
                       </Field>
                       <Field label="Office / Workshop address">
                         <Input name="address" value={editAddress} maxLength={256} onChange={(e) => setEditAddress(e.target.value)} />
@@ -606,7 +606,7 @@ export function VendorDirectory({
                             />
                           </Field>
                           <Field label="Brand scoping">
-                            <Combobox label={`Brand scope for ${contact.personName || "contact"}`} options={[{ id: "", label: "All vendor brands" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={contact.brandId} onValueChange={(brandId) => updateContactDraft(idx, { brandId })} placeholder="All vendor brands" searchPlaceholder="Search brands…" />
+                            <Combobox label={`Brand scope for ${contact.personName || "contact"}`} options={[{ id: "", label: "All supplier brands" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={contact.brandId} onValueChange={(brandId) => updateContactDraft(idx, { brandId })} placeholder="All supplier brands" searchPlaceholder="Search brands…" />
                           </Field>
                           <label className="col-span-2 flex items-center gap-2 cursor-pointer select-none">
                             <input type="checkbox" checked={contact.isPrimary} onChange={(e) => updateContactDraft(idx, { isPrimary: e.target.checked })} className="h-4 w-4 rounded border-line accent-brand" />

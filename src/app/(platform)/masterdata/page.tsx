@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 const SECTIONS = [
   { key: "brands", label: "Brands", href: "/masterdata/brands", desc: "Catalog brands, discovery categories, and hashtags." },
-  { key: "vendors", label: "Vendors", href: "/masterdata/vendors", desc: "Suppliers, subcontractors, and capability assignments." },
+  { key: "vendors", label: "Suppliers", href: "/masterdata/vendors", desc: "Suppliers, subcontractors, and capability assignments." },
   { key: "skus", label: "SKUs", href: "/masterdata/skus", desc: "Product catalog items and purchase units." },
   { key: "materialPrices", label: "Material prices", href: "/masterdata/pricing", desc: "SKU supplier pricing." },
   { key: "units", label: "Units", href: "/masterdata/units", desc: "Standard measurement units." },

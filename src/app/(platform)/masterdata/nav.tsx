@@ -18,7 +18,7 @@ type MasterDataNavLink = {
 const links: readonly MasterDataNavLink[] = [
   { href: "/masterdata", label: "Overview", icon: LayoutGrid, exact: true },
   { href: "/masterdata/brands", label: "Brands", icon: Tags },
-  { href: "/masterdata/vendors", label: "Vendors", icon: Truck },
+  { href: "/masterdata/vendors", label: "Suppliers", icon: Truck },
   { href: "/masterdata/pricing", label: "Pricing", icon: Banknote },
 ];
 

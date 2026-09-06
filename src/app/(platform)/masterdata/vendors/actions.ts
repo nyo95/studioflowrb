@@ -16,7 +16,7 @@ function revalidateVendors(): void {
 }
 
 const VendorInputSchema = z.object({
-  name: z.string().min(1, "Vendor name is required").max(64, "Vendor name is too long"),
+  name: z.string().min(1, "Supplier name is required").max(64, "Supplier name is too long"),
   legalName: z.string().max(128).optional().nullable().or(z.literal("")),
   address: z.string().max(256).optional().nullable().or(z.literal("")),
   notes: z.string().max(1000).optional().nullable().or(z.literal("")),

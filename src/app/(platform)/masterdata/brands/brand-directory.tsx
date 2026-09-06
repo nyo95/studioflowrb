@@ -352,15 +352,15 @@ export function BrandDirectory({
           {createCategoryIds.map((id) => <input key={id} type="hidden" name="categoryIds" value={id} />)}
           {createSupplierIds.map((id) => <input key={id} type="hidden" name="supplierIds" value={id} />)}
           <input type="hidden" name="hashtags" value={createHashtags.join(" ")} />
-          <Field label="Owner vendor" required description="Registered manufacturer or brand owner vendor.">
+          <Field label="Owner supplier" required description="Registered manufacturer or brand owner supplier.">
             <CreatableSearch
-              label="Owner vendor"
+              label="Owner supplier"
               options={ownerVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
               value={createOwnerVendorId}
               onValueChange={setCreateOwnerVendorId}
-              placeholder="Select an owner vendor"
+              placeholder="Select an owner supplier"
               onCreate={canManageVendors ? (name) => createOwnerVendor(name, setCreateError) : undefined}
-              createLabel={(name) => `Create owner vendor "${name}"`}
+              createLabel={(name) => `Create owner supplier "${name}"`}
             />
           </Field>
           <Field label="Hashtags" description="Search existing discovery tags or add a new one, such as #laminate or #finish.">
@@ -463,15 +463,15 @@ export function BrandDirectory({
               <Notice tone="warning">{editNameWarning}</Notice>
             ) : null}
             <input type="hidden" name="ownerVendorId" value={editOwnerVendorId} />
-            <Field label="Owner vendor" required description="Registered manufacturer or brand owner vendor.">
+            <Field label="Owner supplier" required description="Registered manufacturer or brand owner supplier.">
               <CreatableSearch
-                label="Owner vendor"
+                label="Owner supplier"
                 options={ownerVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
                 value={editOwnerVendorId}
                 onValueChange={setEditOwnerVendorId}
-                placeholder="Select an owner vendor"
+                placeholder="Select an owner supplier"
                 onCreate={canManageVendors ? (name) => createOwnerVendor(name, setEditError) : undefined}
-                createLabel={(name) => `Create owner vendor "${name}"`}
+                createLabel={(name) => `Create owner supplier "${name}"`}
               />
             </Field>
             <Field label="Hashtags" description="Search existing discovery tags or add a new one.">

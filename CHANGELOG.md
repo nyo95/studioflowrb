@@ -5,8 +5,37 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.03**
-- Next local revision: **R6.04**
+- Current revision after this entry is committed: **R6.05**
+- Next local revision: **R6.06**
+
+## R6.05 | fix(masterdata): rename Vendor→Supplier across all user-facing strings
+
+### Changed (UI strings only — Prisma schema and internal identifiers unchanged)
+- Nav label "Vendors" → "Suppliers"
+- Master Data index card "Vendors" → "Suppliers"
+- Vendor directory: dialog title "Create vendor partner" → "Create supplier"; all field labels, placeholders, empty-state messages, confirmation dialogs, and sort keys updated to "Supplier/Suppliers"
+- Pricing directory: field labels ("Supplier vendor"/"Vendor" → "Supplier"), placeholders, empty labels, create labels, quick-add dialog title and body updated
+- Brands directory: "Owner vendor" → "Owner supplier" in all labels/descriptions/placeholders/create labels
+- Validation messages: "Vendor name is required/too long" → "Supplier name is required/too long" in vendors/actions.ts and brands/actions.ts
+- "VendorType" select option label → "Supplier type"; "Select eligible VendorType" → "Select supplier type"
+
+### Files changed
+- `src/app/(platform)/masterdata/nav.tsx`
+- `src/app/(platform)/masterdata/page.tsx`
+- `src/app/(platform)/masterdata/vendors/vendor-directory.tsx`
+- `src/app/(platform)/masterdata/vendors/actions.ts`
+- `src/app/(platform)/masterdata/pricing/pricing-directory.tsx`
+- `src/app/(platform)/masterdata/brands/brand-directory.tsx`
+- `src/app/(platform)/masterdata/brands/actions.ts`
+- `CHANGELOG.md`
+
+---
+
+## R6.04 | chore(shell): verify App Shell sidebar convergence — no code changes
+
+Shell audit confirmed: tooltip on collapsed NavItems (shells.tsx:256), logo→`/` in both expanded and collapsed states (authenticated-shell/index.tsx:42-62), toggle behavior correct. No code changes required.
+
+---
 
 ## R6.03 | feat(ui-engine): EntityPrimaryCell + DirectoryShell fill + viewport-fill layout
 
