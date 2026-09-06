@@ -5,8 +5,17 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.12**
-- Next local revision: **R6.13**
+- Current revision after this entry is committed: **R6.13**
+- Next local revision: **R6.14**
+
+## R6.13 | fix(bq): format editable unit prices for Indonesian display
+
+### Scope and checks
+- BQ Work Item unit-price cells now use the shared IDR formatter in read mode,
+  rendering thousand separators such as `Rp.200.000` while preserving the raw
+  canonical decimal string for editing and persistence.
+- Checks: `npm run typecheck`, `npm run lint`, and the focused BQ/browser
+  formatting path were run before commit.
 
 ## R6.12 | feat(convergence): complete R6.1 implementation plan
 

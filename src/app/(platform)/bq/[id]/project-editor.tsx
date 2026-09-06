@@ -552,6 +552,7 @@ function ItemRows({
               inputMode="decimal"
               placeholder="Belum ada harga"
               value={item.hargaSnapshot ?? ""}
+              display={(value) => formatMoney(createMoney(value, "IDR"))}
               disabled={!editable}
               onCommit={commit(updateItemAction, item.id, "hargaSnapshot")}
             />
