@@ -125,10 +125,7 @@ export function AppShell({
             aria-label={navigationLabel}
             data-collapsed={isCollapsed || undefined}
           >
-            {topbar ? (
-              <div className={cx("flex h-10 shrink-0 items-center justify-end border-b border-line px-2", isCollapsed && "justify-center px-1")}>
-              </div>
-            ) : null}
+
             {!topbar ? (
               <div
                 className={cx(
