@@ -161,7 +161,7 @@ export function ProjectEditor({
 
       {project.sections.map((section) => (
         <SectionCard key={section.id} className="grid gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center">
             {editable ? (
               <InlineEdit
                 value={section.name}
@@ -172,22 +172,6 @@ export function ProjectEditor({
             ) : (
               <h2 className="text-base font-semibold text-ink">{section.name}</h2>
             )}
-            {editable ? (
-              <div className="flex flex-wrap gap-1.5">
-                <AddRow
-                  label="Subsection"
-                  placeholder="Nama subsection"
-                  disabled={pending}
-                  onAdd={(name) => run(addSubsectionAction, { sectionId: section.id, name })}
-                />
-                <AddRow
-                  label="Item"
-                  placeholder="Nama item L1"
-                  disabled={pending}
-                  onAdd={(name) => run(addItemAction, { sectionId: section.id, name })}
-                />
-              </div>
-            ) : null}
           </div>
 
           <ItemTable
@@ -204,7 +188,7 @@ export function ProjectEditor({
 
           {section.subsections.map((subsection) => (
             <div key={subsection.id} className="grid gap-2 rounded-control border border-line-subtle p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center">
                 {editable ? (
                   <InlineEdit
                     value={subsection.name}
@@ -215,14 +199,6 @@ export function ProjectEditor({
                 ) : (
                   <h3 className="text-sm font-semibold text-ink-secondary">{subsection.name}</h3>
                 )}
-                {editable ? (
-                  <AddRow
-                    label="Item"
-                    placeholder="Nama item L1"
-                    disabled={pending}
-                    onAdd={(name) => run(addItemAction, { subsectionId: subsection.id, name })}
-                  />
-                ) : null}
               </div>
               <ItemTable
                 items={subsection.items}
@@ -235,8 +211,34 @@ export function ProjectEditor({
                 onImport={setImportTarget}
                 columns={totalColumns}
               />
+              {editable ? (
+                <div className="flex gap-1.5 pt-1">
+                  <AddRow
+                    label="+ Item"
+                    placeholder="Nama item"
+                    disabled={pending}
+                    onAdd={(name) => run(addItemAction, { subsectionId: subsection.id, name })}
+                  />
+                </div>
+              ) : null}
             </div>
           ))}
+          {editable ? (
+            <div className="flex flex-wrap gap-1.5 border-t border-line-subtle pt-3">
+              <AddRow
+                label="+ Subsection"
+                placeholder="Nama subsection"
+                disabled={pending}
+                onAdd={(name) => run(addSubsectionAction, { sectionId: section.id, name })}
+              />
+              <AddRow
+                label="+ Item"
+                placeholder="Nama item L1"
+                disabled={pending}
+                onAdd={(name) => run(addItemAction, { sectionId: section.id, name })}
+              />
+            </div>
+          ) : null}
         </SectionCard>
       ))}
 

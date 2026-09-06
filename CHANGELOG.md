@@ -5,8 +5,23 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.06**
-- Next local revision: **R6.07**
+- Current revision after this entry is committed: **R6.07**
+- Next local revision: **R6.08**
+
+## R6.07 | refactor(bq): add controls follow insertion point
+
+### Changed
+- Section header: "Add Subsection" and "Add Item" buttons removed from header row.
+- Subsection header: "Add Item" button removed from header row.
+- Section footer (new): `+ Subsection` and `+ Item` controls now render below all items and subsections, separated by a divider — at the natural insertion point.
+- Subsection footer (new): `+ Item` control now renders below the subsection's item table.
+- Header rows are now name-only (InlineEdit or static text); no side buttons cluttering the label area.
+
+### Files changed
+- `src/app/(platform)/bq/[id]/project-editor.tsx`
+- `CHANGELOG.md`
+
+---
 
 ## R6.06 | feat(bq): inline rename for Section and Subsection names
 
