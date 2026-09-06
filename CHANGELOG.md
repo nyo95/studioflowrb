@@ -5,9 +5,17 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R5** — `d0c39ff3a2f0c1ed95b4cdb425ed968a9c2baf08` (local origin/main reference)
-- Current revision after this entry is committed: **R5.11**
-- Next local revision: **R5.12**
+- Current revision after this entry is committed: **R5.12**
+- Next local revision: **R5.13**
 - This change is local only; no new remote publication is authorized.
+
+## R5.12 — 2026-09-06 — fix(shell): preserve brand mark in collapsed rail
+
+- Collapsed rail now renders the configured brand mark at its intended compact
+  size instead of falling back to an ambiguous initial.
+- The rail control now occupies its own top strip inside the sidebar, preventing
+  overlap with the first navigation item.
+- Checks: `npm run typecheck`, `npm run lint`, and whitespace check passed.
 
 ## R5.11 — 2026-09-06 — fix(ui): centralize contextual help
 

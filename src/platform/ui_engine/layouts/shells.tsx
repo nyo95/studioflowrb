@@ -138,7 +138,7 @@ export function AppShell({
             data-collapsed={isCollapsed || undefined}
           >
             {topbar ? (
-              <div className={cx("absolute right-2 top-2 z-10", isCollapsed && "right-1")}>
+              <div className={cx("flex h-10 shrink-0 items-center justify-end border-b border-line px-2", isCollapsed && "justify-center px-1")}>
                 {railToggle}
               </div>
             ) : null}

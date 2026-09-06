@@ -52,7 +52,15 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
           </div>
         </Link>
       )}
-      collapsedBrand={<Text as="span" weight="semibold">{appAbbreviation ?? productMark}</Text>}
+      collapsedBrand={settings.brandMarkUrl ? (
+        <Link href="/" aria-label={`Open ${settings.appTitle} home`} className="flex h-9 w-9 items-center justify-center rounded-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
+          <img src={settings.brandMarkUrl} alt={settings.appTitle} className="h-8 w-8 object-contain" />
+        </Link>
+      ) : (
+        <Link href="/" aria-label={`Open ${settings.appTitle} home`} className="flex h-9 w-9 items-center justify-center rounded-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
+          <Text as="span" weight="semibold">{appAbbreviation ?? productMark}</Text>
+        </Link>
+      )}
       collapsible
       defaultCollapsed
       navigationLabel={`${settings.appTitle} navigation`}
