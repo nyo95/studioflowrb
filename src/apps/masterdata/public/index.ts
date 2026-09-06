@@ -51,6 +51,8 @@ export type PriceWorkRead = {
   notes: string | null;
 };
 
+export type UnitRead = { id: string; code: string; name: string };
+
 /* One projection for every MaterialPriceOption read, so a per-SKU lookup and a
    catalogue search can never drift into different shapes. */
 const MATERIAL_PRICE_OPTION_SELECT = {
@@ -122,6 +124,13 @@ function toMaterialPriceOption(p: MaterialPriceRow): MaterialPriceOption {
 
 export function createMasterDataPublicRead(db: PrismaClient) {
   return {
+    async listUnits(): Promise<UnitRead[]> {
+      return db.unit.findMany({
+        where: { status: "ACTIVE" },
+        orderBy: { code: "asc" },
+        select: { id: true, code: true, name: true },
+      });
+    },
     async getBrandLibraryRead(brandIdOrSlug: string): Promise<BrandLibraryRead | null> {
       const brand = await db.brand.findFirst({
         where: {

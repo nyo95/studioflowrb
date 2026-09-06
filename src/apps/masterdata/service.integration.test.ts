@@ -47,6 +47,7 @@ async function createMaterialContext() {
   const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "PCS" } });
   const vendorType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
   const category = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Panel", kind: "PRODUCT" });
+  const brand = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Panel Brand" });
   const vendor = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Supplier One" });
   await testDb.prisma.vendorVendorType.create({
     data: {
@@ -55,7 +56,7 @@ async function createMaterialContext() {
       vendor_type_id: vendorType.id,
     },
   });
-  return { unit, categoryId: category.categoryId, vendorId: vendor.vendorId };
+  return { unit, categoryId: category.categoryId, vendorId: vendor.vendorId, brandId: brand.brandId };
 }
 
 before(async () => {
@@ -82,6 +83,7 @@ describe("Master Data service", () => {
       grants: GRANTS,
       actor: ACTOR,
       name: "HPL Panel",
+      brandId: context.brandId,
       baseUnitId: context.unit.id,
       categoryId: context.categoryId,
       priceMaterials: [{ supplierVendorId: context.vendorId, amount: "123456789012.34", currency: "idr" }],
@@ -104,6 +106,7 @@ describe("Master Data service", () => {
       grants: GRANTS,
       actor: ACTOR,
       code: "KPF 2005",
+      brandId: context.brandId,
       baseUnitId: context.unit.id,
       categoryId: context.categoryId,
       priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }],
@@ -117,6 +120,7 @@ describe("Master Data service", () => {
       () => service.createSku({
         grants: GRANTS,
         actor: ACTOR,
+        brandId: context.brandId,
         baseUnitId: context.unit.id,
         categoryId: context.categoryId,
         priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }],
@@ -136,6 +140,7 @@ describe("Master Data service", () => {
       grants: GRANTS,
       actor: ACTOR,
       name: "HPL 1200 x 2400",
+      brandId: context.brandId,
       baseUnitId: baseUnit.id,
       purchaseUnitId: purchaseUnit.id,
       dimensionLength: "1200",
@@ -161,6 +166,7 @@ describe("Master Data service", () => {
       actor: ACTOR,
       skuId: result.skuId,
       name: "HPL 1200 x 2400 Updated",
+      brandId: context.brandId,
       baseUnitId: baseUnit.id,
       purchaseUnitId: purchaseUnit.id,
         categoryId: context.categoryId,
@@ -181,6 +187,7 @@ describe("Master Data service", () => {
       grants: GRANTS,
       actor: ACTOR,
       name: "Invalid measured SKU",
+      brandId: context.brandId,
       baseUnitId: baseUnit.id,
       purchaseUnitId: purchaseUnit.id,
       categoryId: context.categoryId,
@@ -202,6 +209,7 @@ describe("Master Data service", () => {
       grants: GRANTS,
       actor: ACTOR,
       name: "Invalid SKU",
+      brandId: context.brandId,
       baseUnitId: context.unit.id,
       categoryId: context.categoryId,
       priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }],
@@ -210,6 +218,10 @@ describe("Master Data service", () => {
     await assert.rejects(
       () => service.createSku({ ...base, categoryId: "" }),
       (error: unknown) => error instanceof AppError && error.code === "SKU_CATEGORY_REQUIRED",
+    );
+    await assert.rejects(
+      () => service.createSku({ ...base, brandId: "" }),
+      (error: unknown) => error instanceof AppError && error.code === "SKU_BRAND_REQUIRED",
     );
     await assert.rejects(
       () => service.createSku({ ...base, priceMaterials: [{ ...base.priceMaterials[0], amount: "NaN" }] }),
@@ -225,6 +237,7 @@ describe("Master Data service", () => {
       grants: GRANTS,
       actor: ACTOR,
       name: "Category guard SKU",
+      brandId: context.brandId,
       baseUnitId: context.unit.id,
       categoryId: context.categoryId,
       priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }],
@@ -242,6 +255,7 @@ describe("Master Data service", () => {
         actor: ACTOR,
         skuId,
         name: "Category guard SKU",
+        brandId: context.brandId,
         baseUnitId: context.unit.id,
         categoryId: workCategory.categoryId,
       }),
@@ -255,6 +269,7 @@ describe("Master Data service", () => {
       grants: GRANTS,
       actor: ACTOR,
       name: "Cause-safe SKU",
+      brandId: context.brandId,
       baseUnitId: context.unit.id,
       categoryId: context.categoryId,
       priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1000", currency: "IDR" }],
@@ -301,6 +316,7 @@ describe("Master Data service", () => {
       grants: GRANTS,
       actor: ACTOR,
       name: "Unit-bound SKU",
+      brandId: context.brandId,
       baseUnitId: context.unit.id,
       categoryId: context.categoryId,
       priceMaterials: [{ supplierVendorId: context.vendorId, amount: "250", currency: "IDR" }],
@@ -366,6 +382,7 @@ describe("Master Data service", () => {
       grants: GRANTS,
       actor: ACTOR,
       name: "Guarded SKU",
+      brandId: context.brandId,
       baseUnitId: context.unit.id,
       categoryId: context.categoryId,
       priceMaterials: [{ supplierVendorId: context.vendorId, amount: "5000", currency: "IDR" }],
@@ -455,12 +472,14 @@ describe("Master Data service", () => {
 
     const workCat = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Flooring", kind: "WORK" });
     const prodCat = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Tile", kind: "PRODUCT" });
+    const brand = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Tile Brand" });
 
     // 1. Material price via SKU
     const sku = await service.createSku({
       grants: GRANTS,
       actor: ACTOR,
       name: "Granite Tile 60x60",
+      brandId: brand.brandId,
       baseUnitId: unit.id,
       categoryId: prodCat.categoryId,
       priceMaterials: [{ supplierVendorId: vendor.vendorId, amount: "185000", currency: "IDR" }],
@@ -543,6 +562,30 @@ describe("Master Data service", () => {
 
     assert.equal(vendorTypes.some((vendorType) => vendorType.code === "SUPPLIER"), true);
     assert.deepEqual(brands, [{ id: brand.brandId, name: "Assignment Brand" }]);
+  });
+
+  it("keeps BrandSupplier mutation on Brand and exposes only a read projection on Supplier", async () => {
+    const supplier = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Projection Supplier" });
+    const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    await testDb.prisma.vendorVendorType.create({
+      data: { id: crypto.randomUUID(), vendor_id: supplier.vendorId, vendor_type_id: supplierType.id },
+    });
+    const brand = await service.createBrand({
+      grants: GRANTS,
+      actor: ACTOR,
+      name: "Owned Catalog Brand",
+      links: [{ kind: "catalog", url: "https://example.com/catalog" }],
+      suppliers: [{ vendorId: supplier.vendorId, isAuthorized: true }],
+    });
+
+    const storedRelation = await testDb.prisma.brandSupplier.findFirstOrThrow({
+      where: { brand_id: brand.brandId, vendor_id: supplier.vendorId },
+    });
+    assert.equal(storedRelation.is_authorized, true);
+    const supplierProjection = await service.getVendor({ grants: GRANTS, vendorId: supplier.vendorId });
+    assert.deepEqual(supplierProjection.brand_suppliers.map((row) => row.brand.name), ["Owned Catalog Brand"]);
+    assert.equal("links" in supplierProjection, false);
+    assert.equal(await testDb.prisma.brandLink.count({ where: { brand_id: brand.brandId } }), 1);
   });
 
   it("executes approved permanent deletion atomically and preserves the final audit event", async () => {

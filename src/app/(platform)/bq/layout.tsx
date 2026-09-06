@@ -14,7 +14,7 @@ export default async function BqLayout({ children }: { children: ReactNode }) {
   if (!hasPermission(principalGrants.grants, BQ_PERMISSIONS.access)) redirect("/");
 
   return (
-    <PageShell size="wide">
+    <PageShell size="wide" fill>
       {children}
     </PageShell>
   );

@@ -7,7 +7,7 @@ import { DirectoryShell,DraftDialog,Pagination,RowActionMenu,Text,usePagination 
 import { Plus,UserPlus,X } from "lucide-react";
 import { useRef,useState,useTransition } from "react";
 
-import { Badge,Button,Combobox,ConfirmDialog,CreatableMultiSelect,DataTable,Dialog,EmptyState,Field,FormActions,HelpHint,IconButton,InlineError,Input,Notice,SearchField,Select,SimpleTextEditor,StatusMarker,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,useFormDraftGuard } from "@/platform/ui_engine";
+import { Badge,Button,Combobox,ConfirmDialog,CreatableMultiSelect,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,HelpHint,IconButton,InlineError,Input,Notice,SearchField,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,useFormDraftGuard } from "@/platform/ui_engine";
 import {
 archiveVendorAction,
 createVendorAction,
@@ -246,16 +246,16 @@ export function VendorDirectory({
   };
 
   return (
-    <DirectoryShell header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
+    <DirectoryShell fill header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
         <Button type="button" variant="primary" onClick={openCreateDialog}>
           <Plus aria-hidden="true" />
-          <span>New vendor</span>
+          <span>New supplier</span>
         </Button>
       ) : undefined}>
         <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search suppliers by name, legal name, contact..." />
         <div className="w-48">
           <Select value={typeFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTypeFilter(e.target.value)}>
-            <option value="ALL">All vendor types</option>
+            <option value="ALL">All supplier types</option>
             {vendorTypes.map((vt) => (
               <option key={vt.id} value={vt.id}>
                 {vt.name}
@@ -273,10 +273,10 @@ export function VendorDirectory({
 
         />
       ) : (
-        <DataTable framed={false} density="compact" stickyHeader maxBodyHeight="60vh" minWidth={760}>
+        <DataTable framed={false} density="compact" stickyHeader fill minWidth={700}>
           <TableHeader>
             <TableRow>
-              <TableHead>Vendor partner</TableHead>
+              <TableHead>Supplier</TableHead>
               <TableHead>Types &amp; Capabilities</TableHead>
               <TableHead>Contacts</TableHead>
               <TableHead align="end">Prices</TableHead>
@@ -295,8 +295,10 @@ export function VendorDirectory({
               return (
                 <TableRow key={vendor.id}>
                   <TableCell>
-                    <TableCellContent
-                      primary={<span className="inline-flex items-center gap-2"><StatusMarker tone={isArchived ? "danger" : "success"} label={isArchived ? "Archived" : "Active"} /><span className="font-semibold">{vendor.name}</span></span>}
+                    <EntityPrimaryCell
+                      tone={isArchived ? "danger" : "success"}
+                      statusLabel={isArchived ? "Archived" : "Active"}
+                      name={vendor.name}
                       secondary={
                         <div className="grid gap-0.5 text-xs text-ink-secondary">
                           <div>
@@ -407,7 +409,7 @@ export function VendorDirectory({
             <Input name="legalName" maxLength={128} placeholder="e.g. PT Mitra Kayu Nusantara" />
           </Field>
           <Field label="Supplier types" description="Search the controlled type vocabulary; assign role dimensions to grant pricing capabilities.">
-            <CreatableMultiSelect label="Supplier types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={createVendorTypeIds} onValueChange={setCreateVendorTypeIds} placeholder="Search vendor types" searchPlaceholder="Search vendor types…" />
+            <CreatableMultiSelect label="Supplier types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={createVendorTypeIds} onValueChange={setCreateVendorTypeIds} placeholder="Search supplier types" searchPlaceholder="Search supplier types…" />
           </Field>
           <Field label="Office / Workshop address">
             <Input name="address" maxLength={256} placeholder="Address, City" />
@@ -481,7 +483,7 @@ export function VendorDirectory({
               Cancel
             </Button>
             <Button type="submit" variant="primary" pending={createPending}>
-              {"Create vendor"}
+              {"Create supplier"}
             </Button>
           </FormActions>
         </form>
@@ -495,8 +497,8 @@ export function VendorDirectory({
           onOpenChange={(open) => {
             if (!open && !editPending) void editDraftGuard.requestDiscard(() => setEditTarget(null));
           }}
-          title={`Edit vendor ${editTarget.name}`}
-          description="Update the vendor profile, capability types, contacts, and reference links."
+          title={`Edit supplier ${editTarget.name}`}
+          description="Update the supplier profile, capability types, and sales contacts."
           dismissible={!editPending}
         >
           <form
@@ -542,7 +544,7 @@ export function VendorDirectory({
                         <Input name="legalName" value={editLegalName} maxLength={128} onChange={(e) => setEditLegalName(e.target.value)} />
                       </Field>
                       <Field label="Supplier types" description="Search the controlled type vocabulary. Removing capability types is guarded against active dependent prices.">
-                        <CreatableMultiSelect label="Supplier types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={editVendorTypeIds} onValueChange={setEditVendorTypeIds} placeholder="Search vendor types" searchPlaceholder="Search vendor types…" />
+                        <CreatableMultiSelect label="Supplier types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={editVendorTypeIds} onValueChange={setEditVendorTypeIds} placeholder="Search supplier types" searchPlaceholder="Search supplier types…" />
                       </Field>
                       <Field label="Office / Workshop address">
                         <Input name="address" value={editAddress} maxLength={256} onChange={(e) => setEditAddress(e.target.value)} />
@@ -674,9 +676,9 @@ export function VendorDirectory({
           onOpenChange={(open) => {
             if (!open) setConfirmArchive(null);
           }}
-          title={`Archive vendor "${confirmArchive.name}"?`}
-          description="Archiving this vendor cascades archive causes to all its Material, Material+Labor, and Labor unit prices."
-          confirmLabel="Archive vendor"
+          title={`Archive supplier "${confirmArchive.name}"?`}
+          description="Archiving this supplier cascades archive causes to all its Material, Material+Labor, and Labor unit prices."
+          confirmLabel="Archive supplier"
           tone="danger"
           onConfirm={() => {
             const target = confirmArchive;
@@ -693,9 +695,9 @@ export function VendorDirectory({
           onOpenChange={(open) => {
             if (!open) setConfirmRestore(null);
           }}
-          title={`Restore vendor "${confirmRestore.name}"?`}
-          description="Restoring this vendor will restore its unit prices that were archived solely by parent provenance."
-          confirmLabel="Restore vendor"
+          title={`Restore supplier "${confirmRestore.name}"?`}
+          description="Restoring this supplier will restore its unit prices that were archived solely by parent provenance."
+          confirmLabel="Restore supplier"
           onConfirm={() => {
             const target = confirmRestore;
 
@@ -708,7 +710,7 @@ export function VendorDirectory({
       {deleteTarget ? (
         <RequestDeletionDialog open onOpenChange={(open) => {
             if (!open) setDeleteTarget(null);
-          }} title={`Submit vendor "${deleteTarget.name}" for deletion`} description="Archived vendors with zero owned brands and zero active prices can be permanently purged after supervisor approval." reason={deleteReason} onReasonChange={setDeleteReason} placeholder="e.g. Inactive duplicate vendor profile" pending={pendingId !== null} error={rowError} onSubmit={() => {
+          }} title={`Submit supplier "${deleteTarget.name}" for deletion`} description="Archived suppliers with zero owned brands and zero active prices can be permanently purged after supervisor approval." reason={deleteReason} onReasonChange={setDeleteReason} placeholder="e.g. Inactive duplicate supplier profile" pending={pendingId !== null} error={rowError} onSubmit={() => {
                   const target = deleteTarget;
                   const reason = deleteReason;
 

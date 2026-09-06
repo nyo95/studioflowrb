@@ -8,7 +8,7 @@ import { DirectoryShell,DraftDialog,Pagination,Text,usePagination } from "@/plat
 import { ShieldPlus } from "lucide-react";
 import { useActionState,useState,useTransition } from "react";
 
-import { Button,ConfirmDialog,DataTable,EmptyState,Field,FormActions,InlineError,Input,Notice,Spinner,StatusBadge,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Textarea } from "@/platform/ui_engine";
+import { Button,ConfirmDialog,DataTable,EmptyState,EntityPrimaryCell,Field,FormActions,InlineError,Input,Notice,Spinner,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Textarea } from "@/platform/ui_engine";
 import { archiveRoleAction,createRoleAction,replaceRoleGrantsAction,updateRoleAction } from "./actions";
 
 type RoleRow = {
@@ -79,7 +79,7 @@ export function RolesDirectory({
   const visibleRows = orderedRows.slice(paging.offset, paging.offset + 25);
   const pageFooter = <div className="grid gap-2"><Text tone="secondary" size="sm">{orderedRows.length ? paging.offset + 1 : 0}–{Math.min(paging.offset + 25, orderedRows.length)} of {orderedRows.length} records</Text>{paging.pageCount > 1 ? <Pagination page={paging.page} pageCount={paging.pageCount} onPageChange={paging.setPage} /> : null}</div>;
 return (
-    <DirectoryShell header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
+    <DirectoryShell fill header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
         <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
           <ShieldPlus aria-hidden="true" />
           <span>New role</span>
@@ -102,13 +102,11 @@ return (
       {orderedRows.length === 0 ? (
         <EmptyState title="No roles yet" description="Create a role and grant it registered permissions." />
       ) : (
-        <DataTable framed={false} density="compact" stickyHeader maxBodyHeight="60vh" minWidth={860}>
+        <DataTable framed={false} density="compact" stickyHeader fill minWidth={780}>
           <TableHeader>
             <TableRow>
-              <TableHead sortable sortDirection={sortKey === "Code" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Code"); setSortDirection(direction); }}>Code</TableHead>
-              <TableHead sortable sortDirection={sortKey === "Name" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Name"); setSortDirection(direction); }}>Name</TableHead>
+              <TableHead sortable sortDirection={sortKey === "Name" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Name"); setSortDirection(direction); }}>Role</TableHead>
               <TableHead>Permissions</TableHead>
-              <TableHead>Status</TableHead>
               <TableHead align="end">Members</TableHead>
               {canManage ? <TableHead stickyEnd align="end">Actions</TableHead> : null}
             </TableRow>
@@ -116,21 +114,9 @@ return (
           <TableBody>
             {visibleRows.map((role) => (
               <TableRow key={role.id}>
-                <TableCell data-column="identifier">{role.code}</TableCell>
-                <TableCell>
-                  <TableCellContent primary={role.name} secondary={role.description ?? undefined} />
-                </TableCell>
+                <TableCell data-column="identifier"><EntityPrimaryCell tone={role.archivedAt ? "danger" : role.isSystem ? "warning" : "success"} statusLabel={role.archivedAt ? "Archived" : role.isSystem ? "System" : "Active"} name={role.name} secondary={<span>{role.code}{role.description ? ` · ${role.description}` : ""}</span>} /></TableCell>
                 <TableCell wrap>
                   <TableCellContent primary={`${role.permissionIds.length} granted`} secondary={role.permissionIds.join(", ") || undefined} />
-                </TableCell>
-                <TableCell>
-                  {role.archivedAt ? (
-                    <StatusBadge tone="neutral">Archived</StatusBadge>
-                  ) : role.isSystem ? (
-                    <StatusBadge tone="warning">System</StatusBadge>
-                  ) : (
-                    <StatusBadge tone="success">Active</StatusBadge>
-                  )}
                 </TableCell>
                 <TableCell align="end"><TableCellContent align="end" primary={role.activeAssignmentCount.toLocaleString()} /></TableCell>
                 {canManage ? (

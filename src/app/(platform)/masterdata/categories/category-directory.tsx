@@ -7,7 +7,7 @@ import { ConfirmDialog,DirectoryShell,DraftDialog,Pagination,RowActionMenu,Text,
 import { Plus } from "lucide-react";
 import { useState,useTransition } from "react";
 
-import { Badge,Button,Combobox,DataTable,EmptyState,Field,FormActions,InlineError,Input,SearchField,Select,StatusBadge,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar } from "@/platform/ui_engine";
+import { Badge,Button,Combobox,DataTable,EmptyState,EntityPrimaryCell,Field,FormActions,InlineError,Input,SearchField,Select,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar } from "@/platform/ui_engine";
 import {
 createCategoryAction,
 deactivateCategoryAction,
@@ -96,7 +96,7 @@ export function CategoryDirectory({
   };
 
   return (
-    <DirectoryShell header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
+    <DirectoryShell fill header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
         <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
           <Plus aria-hidden="true" />
           <span>New category</span>
@@ -120,12 +120,11 @@ export function CategoryDirectory({
 
         />
       ) : (
-        <DataTable framed={false} density="compact" stickyHeader maxBodyHeight="60vh" minWidth={800}>
+        <DataTable framed={false} density="compact" stickyHeader fill minWidth={720}>
           <TableHeader>
             <TableRow>
               <TableHead>Name &amp; Slug</TableHead>
               <TableHead sortable sortDirection={sortKey === "Kind" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Kind"); setSortDirection(direction); }}>Kind</TableHead>
-              <TableHead sortable sortDirection={sortKey === "Status" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Status"); setSortDirection(direction); }}>Status</TableHead>
               <TableHead align="end">Usage count</TableHead>
               <TableHead stickyEnd align="end">Actions</TableHead>
             </TableRow>
@@ -142,8 +141,10 @@ export function CategoryDirectory({
               return (
                 <TableRow key={category.id}>
                   <TableCell>
-                    <TableCellContent
-                      primary={<span className="font-semibold">{category.name}</span>}
+                    <EntityPrimaryCell
+                      tone={category.status === "ACTIVE" ? "success" : "danger"}
+                      statusLabel={category.status === "ACTIVE" ? "Active" : "Deactivated"}
+                      name={category.name}
                       secondary={
                         <span className="font-ui-mono text-xs text-ink-secondary">
                           {category.slug}
@@ -156,11 +157,6 @@ export function CategoryDirectory({
                     <Badge tone={category.kind === "PRODUCT" ? "neutral" : "warning"}>
                       {category.kind === "PRODUCT" ? "Product" : "Work"}
                     </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge tone={category.status === "ACTIVE" ? "success" : "neutral"}>
-                      {category.status === "ACTIVE" ? "Active" : "Deactivated"}
-                    </StatusBadge>
                   </TableCell>
                   <TableCell align="end">
                     <TableCellContent align="end" primary={totalUsage.toLocaleString()} />

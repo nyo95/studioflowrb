@@ -8,7 +8,7 @@ import { DirectoryShell,DraftDialog,Pagination,Text,usePagination } from "@/plat
 import { UserPlus } from "lucide-react";
 import { useActionState,useState,useTransition } from "react";
 
-import { Button,ConfirmDialog,DataTable,EmptyState,Field,FormActions,IconButton,InlineError,Input,Select,Spinner,StatusBadge,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar } from "@/platform/ui_engine";
+import { Button,ConfirmDialog,DataTable,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Select,Spinner,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar } from "@/platform/ui_engine";
 import {
 assignRoleAction,
 createUserAction,
@@ -87,7 +87,7 @@ export function UsersDirectory({
   const visibleRows = orderedRows.slice(paging.offset, paging.offset + 25);
   const pageFooter = <div className="grid gap-2"><Text tone="secondary" size="sm">{orderedRows.length ? paging.offset + 1 : 0}–{Math.min(paging.offset + 25, orderedRows.length)} of {orderedRows.length} records</Text>{paging.pageCount > 1 ? <Pagination page={paging.page} pageCount={paging.pageCount} onPageChange={paging.setPage} /> : null}</div>;
 return (
-    <DirectoryShell header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
+    <DirectoryShell fill header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
         <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
           <UserPlus aria-hidden="true" />
           <span>New user</span>
@@ -98,12 +98,10 @@ return (
       {orderedRows.length === 0 ? (
         <EmptyState title="No users yet" description="Create the first platform account to get started." />
       ) : (
-        <DataTable framed={false} density="compact" stickyHeader maxBodyHeight="60vh" minWidth={860}>
+        <DataTable framed={false} density="compact" stickyHeader fill minWidth={780}>
           <TableHeader>
             <TableRow>
-              <TableHead sortable sortDirection={sortKey === "Email" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Email"); setSortDirection(direction); }}>Email</TableHead>
-              <TableHead sortable sortDirection={sortKey === "Display name" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Display name"); setSortDirection(direction); }}>Display name</TableHead>
-              <TableHead sortable sortDirection={sortKey === "Status" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Status"); setSortDirection(direction); }}>Status</TableHead>
+              <TableHead sortable sortDirection={sortKey === "Display name" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Display name"); setSortDirection(direction); }}>User</TableHead>
               <TableHead>Roles</TableHead>
               <TableHead stickyEnd align="end">Actions</TableHead>
             </TableRow>
@@ -111,17 +109,7 @@ return (
           <TableBody>
             {visibleRows.map((user) => (
               <TableRow key={user.id}>
-                <TableCell data-column="identifier">{user.email}</TableCell>
-                <TableCell>
-                  <TableCellContent primary={user.displayName} />
-                </TableCell>
-                <TableCell>
-                  {user.status === "ACTIVE" ? (
-                    <StatusBadge tone="success">Active</StatusBadge>
-                  ) : (
-                    <StatusBadge tone="danger">Disabled</StatusBadge>
-                  )}
-                </TableCell>
+                <TableCell data-column="identifier"><EntityPrimaryCell tone={user.status === "ACTIVE" ? "success" : "danger"} statusLabel={user.status === "ACTIVE" ? "Active" : "Disabled"} name={user.displayName} secondary={user.email} /></TableCell>
                 <TableCell wrap>
                   {user.roles.length === 0 ? (
                     <Text as="span" tone="secondary" className="italic">No roles</Text>

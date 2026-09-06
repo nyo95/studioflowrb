@@ -460,7 +460,7 @@ model BrandCategoryOrigin {
 
 model Sku {
   id                      String    @id @default(uuid())
-  brand_id                String?
+  brand_id                String
   code                    String?
   name                    String?
   slug                    String
@@ -476,7 +476,7 @@ model Sku {
   updated_at              DateTime  @updatedAt
   deleted_at              DateTime?
 
-  brand            Brand?                @relation(fields: [brand_id], references: [id], onDelete: Restrict)
+  brand            Brand                 @relation(fields: [brand_id], references: [id], onDelete: Restrict)
   base_unit        Unit                  @relation("SkuBaseUnit", fields: [base_unit_id], references: [id], onDelete: Restrict)
   purchase_unit    Unit?                 @relation("SkuPurchaseUnit", fields: [purchase_unit_id], references: [id], onDelete: Restrict)
   dimension_unit   Unit?                 @relation("SkuDimensionUnit", fields: [dimension_unit_id], references: [id], onDelete: Restrict)
@@ -639,6 +639,14 @@ enum BqProjectStatus {
   ACTIVE
   LOCKED
   ARCHIVED
+
+  @@schema("bq")
+}
+
+enum BqProjectDeletionStatus {
+  PENDING
+  APPROVED
+  REJECTED
 
   @@schema("bq")
 }
@@ -866,6 +874,28 @@ model BqProject {
   sections     BqSection[]
 
   @@map("bq_project")
+  @@schema("bq")
+}
+
+/// BQ-owned approval state for permanent project deletion. `project_id` is a
+/// durable target snapshot rather than a foreign key so the approved request
+/// remains auditable after the project itself is removed.
+model BqProjectDeletionRequest {
+  id                String                  @id @default(cuid())
+  project_id        String
+  project_title     String
+  status            BqProjectDeletionStatus @default(PENDING)
+  requester_user_id String
+  requester_label   String
+  requested_at      DateTime                @default(now())
+  approver_user_id  String?
+  approver_label    String?
+  decided_at        DateTime?
+  reason            String?
+
+  @@index([project_id, status])
+  @@index([status, requested_at])
+  @@map("bq_project_deletion_request")
   @@schema("bq")
 }
 

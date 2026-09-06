@@ -15,6 +15,11 @@ export const bqService = createBqService(prisma, {
   runTransaction: wrapRunTransaction,
 });
 export const bqPublicRead = createBqPublicRead(prisma);
+export const bqPublicCommands = {
+  listPromotionRequests: bqService.listPromotionRequests,
+  approvePromotion: bqService.approvePromotion,
+  rejectPromotion: bqService.rejectPromotion,
+};
 
 /**
  * Master Data is read one way only, through its published contract. BQ never

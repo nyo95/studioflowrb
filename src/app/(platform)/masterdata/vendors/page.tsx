@@ -46,7 +46,7 @@ export default async function VendorsPage() {
       .sort((left, right) => left.name.localeCompare(right.name, "id"));
 
   return (
-    <div className="grid gap-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
       <PageHeader
         title="Suppliers"
       />

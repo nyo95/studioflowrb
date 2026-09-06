@@ -24,7 +24,7 @@ const HttpUrlSchema = z.string().url("Must be a valid URL").refine(
 
 const BrandInputSchema = z.object({
   name: z.string().min(1, "Brand name is required").max(64, "Brand name is too long"),
-  ownerVendorId: z.string().uuid("Owner vendor is required"),
+  ownerVendorId: z.string().uuid("Owner supplier is required"),
   notes: z.string().max(1000).optional().nullable().or(z.literal("")),
   categoryIds: z.array(z.string().uuid()).optional(),
   hashtags: z.array(z.string()).optional(),

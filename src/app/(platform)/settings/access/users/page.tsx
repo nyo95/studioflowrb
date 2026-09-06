@@ -36,7 +36,7 @@ export default async function UsersPage() {
   }
 
   return (
-    <PageShell>
+    <PageShell fill>
       <PageHeader
         eyebrow="Settings · Access"
         title="Users"

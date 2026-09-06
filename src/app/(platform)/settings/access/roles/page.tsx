@@ -41,7 +41,7 @@ export default async function RolesPage() {
   }
 
   return (
-    <PageShell>
+    <PageShell fill>
       <PageHeader
         eyebrow="Settings · Access"
         title="Roles & Access"

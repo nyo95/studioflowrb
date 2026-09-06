@@ -37,7 +37,7 @@ export default async function CategoriesPage() {
 
   const categories = await masterDataService.listCategories({ grants, includeDeactivated: true });
   return (
-    <div className="grid gap-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
       <PageHeader
         title="Product &amp; Work Categories"
       />

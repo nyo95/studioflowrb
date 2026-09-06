@@ -18,7 +18,7 @@ shared rules in [`masterdata.md`](masterdata.md). All references to CORE.md §4
 
 ## 1. Domain Identity
 
-**UI label:** Suppliers & Vendors (consistent with legacy).
+**UI label:** Suppliers.
 
 **Domain model name:** `Vendor` (renamed from legacy `Party`). One `Vendor` row
 = one business/commercial identity as a whole. A branch is not split merely
@@ -28,7 +28,11 @@ multi-location sub-entity is not in the current scope.
 
 **Slug:** Auto-generated from `name` (lowercase, strip special characters, dash separator). Unique among live (non-archived) records. Not manually editable.
 
-**Canonical terminology:** This rebuild uses `Vendor` everywhere — domain model, database table, service layer, audit events, permissions namespace. The legacy `Party` name is retired. UI still shows "Suppliers & Vendors" as the section label.
+**Canonical terminology:** User-facing UI and public copy use **Supplier** and
+**Supplier Type**. Persisted models, database fields, internal service symbols,
+audit entity types, and the existing permission namespace retain `Vendor` and
+`VendorType`; this avoids a migration with no business value. The legacy
+`Party` name remains retired.
 
 ---
 

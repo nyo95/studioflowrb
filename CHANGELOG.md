@@ -5,8 +5,78 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.11**
-- Next local revision: **R6.12**
+- Current revision after this entry is committed: **R6.12**
+- Next local revision: **R6.13**
+
+## R6.12 | feat(convergence): complete R6.1 implementation plan
+
+### Scope and contract convergence
+- Added `docs/R6.1-DECISION-DELTA.md` as the implementation audit against the
+  current contracts, Prisma shape, public APIs, UI, and owner decisions.
+- Updated the BQ, Master Data, and Supplier contracts: Supplier terminology is
+  user-facing only; Brand owns catalog/resources and BrandSupplier mutation;
+  SKU requires Brand; BQ uses Work Item / Component Group / Cost Component,
+  Master Data Units as its source, and ACTIVE / LOCKED / ARCHIVED lifecycle.
+- Replaced direct cross-app promotion coordination with public command ports and
+  the structural `promotion-coordinator` application boundary.
+
+### Domain and persistence
+- Corrected the previously recorded R6.02 migration so it targets the mapped
+  `bq_project` / `bq_line_item` tables and replaces `BqProjectStatus` safely in
+  one migration instead of using an unsafe enum-value alteration.
+- Added the protected BQ project deletion request/approve/reject workflow and
+  registered the valid `bq.project-deletion.approve` permission.
+- Made `master_data.Sku.brand_id` required after an explicit precondition check;
+  the development database had zero unbranded SKUs before enforcement.
+- Completed strict lifecycle mutation guards, immutable imported price baseline,
+  derived override state, server-side revert, canonical decimal comparison, and
+  transactional audit for override/revert and deletion decisions.
+- BQ Library ordinary CRUD now derives non-custom categories, defaults and hides
+  coefficient `1`, snapshots Unit labels, and exposes recommendations at both
+  Template Section levels.
+
+### UI and workflow
+- Converged entity directories on viewport-fill `DirectoryShell` / `DataTable`,
+  sticky headers/actions, primary status cells, filtering, sorting, pagination,
+  and row action menus. Tabs and PageShell now propagate the bounded fill chain.
+- Fixed the app shell's extra 64px document overflow, narrowed Tailwind scanning
+  to code folders so local PDFs/images cannot become invalid utility classes,
+  and fixed portal draft baselines so untouched dialogs close without a false
+  discard prompt while edited drafts remain protected.
+- Added explicit BQ source tabs (All, Material, Labor, Material + Labor, BQ
+  Library), a four-way Custom Cost Component type choice with Other Cost
+  categories, Master Data Unit selects, lifecycle controls/read-only states,
+  project-deletion review, and canonical visible terminology.
+- Removed the remaining visible `Vendor` copy (`New supplier`) while preserving
+  persisted `Vendor`/`VendorType` identifiers.
+
+### Migrations and dependencies
+- Added `20260906110000_bq_project_deletion_workflow` and
+  `20260906112000_bq_project_deletion_permission`; all 22 migrations are applied
+  to the isolated home rebuild database and the disposable test database.
+- No dependency or lockfile changes.
+
+### Verification
+- `npx prisma validate`: passed.
+- `npx prisma generate`: passed (Prisma Client 7.9.1).
+- `npx prisma migrate status`: passed; 22 migrations, schema up to date on the
+  rebuild-only `masterdata-db` container at localhost:5433.
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `npm run check:boundaries`: passed.
+- `npm run check:legacy-runtime`: passed.
+- `npm test`: passed — 242 tests, 61 suites, 0 failed/cancelled/skipped.
+- `npm run build`: passed for every application route.
+- Browser acceptance passed at 1366×768, 1920×1080, and 2560×1440: expanded
+  and collapsed rail, no document-level horizontal/vertical overflow, directory
+  fill and independent table scroll, sticky headers/actions, modal fit, inline
+  Escape/blur, untouched/dirty draft behavior, locked and archived/restore
+  states, source picker/custom types, and a temporary 55-row BQ section. The
+  temporary project and its two lifecycle audit rows were removed afterward.
+
+### Remaining limitations
+- The test run emits the existing `pg@9` deprecation warning for overlapping
+  `client.query()` use; it does not fail or skip a test and is outside R6.1.
 
 ## R6.11 | feat(bq): assembly picker at Section and Subsection level
 

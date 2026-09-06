@@ -181,7 +181,7 @@ export async function updateItemAction(
 
     const patch: Record<string, string | null> = {};
     if (field === "name") {
-      if (!value.trim()) throw new AppError("VALIDATION", "bq.item.name-required", "Item name is required");
+      if (!value.trim()) throw new AppError("VALIDATION", "bq.item.name-required", "Work Item name is required");
       patch.name = value.trim();
     } else if (field === "unit") {
       patch.unit = value.trim() || "ls";
@@ -248,7 +248,7 @@ export async function updateSubObjectAction(
 
     const patch: Record<string, string | undefined> = {};
     if (field === "name") {
-      if (!value.trim()) throw new AppError("VALIDATION", "bq.sub-object.name-required", "Component name is required");
+      if (!value.trim()) throw new AppError("VALIDATION", "bq.sub-object.name-required", "Component Group name is required");
       patch.name = value.trim();
     } else if (field === "qtyPerL1") {
       patch.qtyPerL1 = positiveDecimal(value, "Quantity per item");
@@ -374,7 +374,7 @@ export async function addLineItemAction(
         koefisien: "1",
       });
     } else if (value.sourceType === "BQ_LIBRARY") {
-      if (!value.sourceRefId) throw new AppError("VALIDATION", "bq.line-item.source-required", "Select a library item");
+      if (!value.sourceRefId) throw new AppError("VALIDATION", "bq.line-item.source-required", "Select a BQ Library item");
       const items = await bqPublicRead.listLibraryItems();
       const item = items.find((candidate) => candidate.id === value.sourceRefId);
       if (!item) throw new AppError("NOT_FOUND", "bq.lib-item.not-found", "Library item not found");
@@ -447,7 +447,7 @@ export async function updateLineItemAction(
 
     const patch: Record<string, string | undefined> = {};
     if (field === "titleSnapshot") {
-      if (!value.trim()) throw new AppError("VALIDATION", "bq.line-item.title-required", "Line name is required");
+      if (!value.trim()) throw new AppError("VALIDATION", "bq.line-item.title-required", "Cost Component name is required");
       patch.titleSnapshot = value.trim();
     } else if (field === "purchaseUnitSnapshot") {
       patch.purchaseUnitSnapshot = value.trim() || "ls";
@@ -494,6 +494,37 @@ export async function lockProjectAction(
     await bqService.lockProject({ grants, actor, id: projectId });
     return reload(projectId);
   });
+}
+
+async function projectLifecycleAction(
+  formData: FormData,
+  operation: "unlock" | "archive" | "restore" | "requestDeletion",
+): Promise<ActionResult<BqProjectDetail>> {
+  return runSafeAction(async () => {
+    const { grants, actor } = await authorize();
+    const { projectId } = parse(z.object({ projectId: Id }), formData);
+    if (operation === "unlock") await bqService.unlockProject({ grants, actor, id: projectId });
+    else if (operation === "archive") await bqService.archiveProject({ grants, actor, id: projectId });
+    else if (operation === "restore") await bqService.restoreProject({ grants, actor, id: projectId });
+    else await bqService.requestProjectDeletion({ grants, actor, id: projectId });
+    return reload(projectId);
+  });
+}
+
+export async function unlockProjectAction(_prev: ActionResult<BqProjectDetail> | null, formData: FormData) {
+  return projectLifecycleAction(formData, "unlock");
+}
+
+export async function archiveProjectAction(_prev: ActionResult<BqProjectDetail> | null, formData: FormData) {
+  return projectLifecycleAction(formData, "archive");
+}
+
+export async function restoreProjectAction(_prev: ActionResult<BqProjectDetail> | null, formData: FormData) {
+  return projectLifecycleAction(formData, "restore");
+}
+
+export async function requestProjectDeletionAction(_prev: ActionResult<BqProjectDetail> | null, formData: FormData) {
+  return projectLifecycleAction(formData, "requestDeletion");
 }
 
 // ─── SOURCE PICKER ────────────────────────────────────────────

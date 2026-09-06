@@ -12,8 +12,9 @@
    `source_currency_snapshot`. Override changes the active snapshot only;
    revert restores the immutable imported snapshot. Existing sourced rows use
    their current snapshot as their migration baseline.
-3. BQ Project gains reversible archive, deletion request, and admin-only hard
-   delete approval. A locked project remains locked after restore. BQ owns its
+3. BQ Project gains reversible archive, deletion request, and explicit-permission
+   hard-delete approval. Only ACTIVE projects can be archived; restoring an
+   ARCHIVED project always returns it to ACTIVE. BQ owns its
    deletion-request persistence and audit; it does not reuse Master Data tables.
 4. BQ Library matches Master Data interaction and validation shape but remains
    BQ-owned. Units are selected through Master Data public reads and stored as

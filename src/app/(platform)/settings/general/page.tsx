@@ -42,7 +42,7 @@ export default async function GeneralSettingsPage() {
         title="General Settings"
         description="Shared display defaults for every application."
       />
-      {hasPermission(grants, "masterdata.dictionary.read") ? <Notice title="Master Data Settings">Manage Units, Categories, Vendor Types, and protected deletion review in <Link className="underline" href="/settings/general/masterdata">Master Data Settings</Link>.</Notice> : null}
+      {hasPermission(grants, "masterdata.dictionary.read") ? <Notice title="Master Data Settings">Manage Units, Categories, Supplier Types, and protected deletion review in <Link className="underline" href="/settings/general/masterdata">Master Data Settings</Link>.</Notice> : null}
       {failure ? (
         <SectionCard>
           <ErrorState title="Unable to load settings" description={failure.safeMessage} />

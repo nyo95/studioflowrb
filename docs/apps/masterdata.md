@@ -11,7 +11,7 @@ activated implementation.
 
 ## 1.1 Application audience and promotion ownership
 
-Master Data is restricted to **admin/staff** users. It owns catalog, vendor,
+Master Data is restricted to **admin/staff** users. It owns catalog, Supplier,
 pricing, lifecycle, and approval workflows. The BQ estimator does not enter the
 Master Data application; BQ receives eligible commercial choices through the
 Master Data public read contract.
@@ -77,17 +77,18 @@ refer only to the R1.05 Git snapshot and define what must not be reintroduced.
 
 ### SKU
 
-- SKU has an optional single Brand (`0..1`), never a Brand junction table.
-- Live identity is `(brand_id, slug)`; Brand-less SKUs use the corresponding
-  partial unique rule for `brand_id IS NULL`.
+- SKU belongs to exactly one Brand (`1`), never a Brand junction table.
+- Live identity is `(brand_id, slug)`; creating or updating an unbranded SKU is
+  rejected at the action, service, and database boundaries.
 - `code` is retained and nullable as an external SKU/article identifier supplied
   by the Brand or Vendor; it is not the identity of a PriceMaterial row.
-- Vendor is not stored on SKU; Vendor belongs on `PriceMaterial`.
+- Supplier is not stored on SKU; Supplier belongs on `PriceMaterial` (the
+  persisted model and field names remain `Vendor` and `vendor_id`).
 - SKU uses archive/restore and the shared permanent-deletion approval workflow.
 - SKU creation is entered from Pricing → Material, not from the standalone SKU
   directory. The flow atomically creates the SKU and its first `PriceMaterial`.
-- Create requires at least one of `code` or `name`, exactly one active PRODUCT
-  `categoryId`, Unit, and at least one `PriceMaterial`; a live SKU must retain
+- Create requires one active Brand, at least one of `code` or `name`, exactly one
+  active PRODUCT `categoryId`, Unit, and at least one `PriceMaterial`; a live SKU must retain
   at least one live `PriceMaterial`.
 - `code` and `name` are stored separately and may both be present. When only
   `code` exists, it is the display fallback and the slug source; when only
@@ -129,6 +130,17 @@ The following remain deferred and must not be inferred during implementation:
 - the final BQ snapshot schema.
 
 ## 3. Product and dependency boundaries
+
+### 3.1 Brand and Supplier ownership
+
+- Brand owns its identity/profile, categories, catalog resources/links, SKUs,
+  and all `BrandSupplier` mutations.
+- Supplier owns only its identity/profile, Supplier Type capabilities, and sales
+  contacts. Supplier has no catalog-resource or external-link mutation surface.
+- A Supplier detail may show supplied Brands as a read-only projection. That
+  projection does not transfer mutation authority from Brand.
+- Persisted `Vendor`, `VendorType`, and `vendor_id` names remain unchanged; all
+  user-facing language is Supplier and Supplier Type.
 
 - Master Data may consume Core, Utilities, and UI Engine. It may not create a
   private substitute for a proven generic capability.

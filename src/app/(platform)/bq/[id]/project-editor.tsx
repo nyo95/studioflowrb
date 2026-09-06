@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Download, Lock, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ChevronDown, ChevronRight, Download, Lock, LockOpen, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import {
@@ -36,6 +36,7 @@ import type {
   BqProjectDetail,
   BqSubObjectDetail,
 } from "@/apps/bq/public";
+import type { UnitRead } from "@/apps/masterdata/public";
 
 import {
   addItemAction,
@@ -43,25 +44,29 @@ import {
   addLineItemAction,
   addSubObjectAction,
   addSubsectionAction,
+  archiveProjectAction,
   applyAssemblyAction,
   deleteItemAction,
   deleteLineItemAction,
   deleteSubObjectAction,
   listLineItemSourcesAction,
   lockProjectAction,
+  requestProjectDeletionAction,
+  restoreProjectAction,
   updateItemAction,
   updateLineItemAction,
   updateSubObjectAction,
   updateSectionAction,
   updateSubsectionAction,
   revertLineItemPriceAction,
+  unlockProjectAction,
   type LineItemSourceOption,
 } from "./actions";
 
 const KATEGORI_LABEL: Record<string, string> = {
   MATERIAL: "Material",
-  UPAH: "Upah",
-  MATERIAL_UPAH: "Material+Upah",
+  UPAH: "Labor",
+  MATERIAL_UPAH: "Material + Labor",
   BIAYA_UMUM: "Biaya Umum",
   TRANSPORTASI_AKOMODASI: "Transportasi",
   ALAT: "Alat",
@@ -89,10 +94,12 @@ export function ProjectEditor({
   project: initialProject,
   canManage,
   assemblies = [],
+  units,
 }: {
   project: BqProjectDetail;
   canManage: boolean;
   assemblies?: BqAssemblyTemplateRead[];
+  units: UnitRead[];
 }) {
   const [project, setProject] = useState(initialProject);
   const [error, setError] = useState<string | null>(null);
@@ -101,6 +108,7 @@ export function ProjectEditor({
   const [importTarget, setImportTarget] = useState<{ itemId?: string; subObjectId?: string } | null>(null);
   const [assemblyTarget, setAssemblyTarget] = useState<AssemblyTarget | null>(null);
   const [lockOpen, setLockOpen] = useState(false);
+  const [lifecycleConfirm, setLifecycleConfirm] = useState<"archive" | "restore" | "delete" | null>(null);
   const [transientAdd, setTransientAdd] = useState<{ kind: "item" | "subObject"; id: string } | null>(null);
 
   const locked = project.status === "LOCKED" || project.status === "ARCHIVED";
@@ -155,12 +163,20 @@ export function ProjectEditor({
               : formatMoney(createMoney(project.grandTotal, "IDR"))}
           </span>
         </div>
-        {canManage && !locked ? (
-          <Button variant="secondary" leadingIcon={<Lock aria-hidden="true" />} onClick={() => setLockOpen(true)} disabled={pending}>
-            Lock project
-          </Button>
-        ) : null}
-        {locked ? <Badge tone="neutral">Locked — read only</Badge> : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {canManage && project.status === "ACTIVE" ? <>
+            <Button variant="secondary" leadingIcon={<Lock aria-hidden="true" />} onClick={() => setLockOpen(true)} disabled={pending}>Lock project</Button>
+            <Button variant="ghost" leadingIcon={<Archive aria-hidden="true" />} onClick={() => setLifecycleConfirm("archive")} disabled={pending}>Archive</Button>
+          </> : null}
+          {canManage && project.status === "LOCKED" ? (
+            <Button variant="secondary" leadingIcon={<LockOpen aria-hidden="true" />} onClick={() => void run(unlockProjectAction, {}).catch(() => undefined)} disabled={pending}>Unlock</Button>
+          ) : null}
+          {canManage && project.status === "ARCHIVED" ? <>
+            <Button variant="secondary" leadingIcon={<ArchiveRestore aria-hidden="true" />} onClick={() => setLifecycleConfirm("restore")} disabled={pending}>Restore</Button>
+            <Button variant="ghost" leadingIcon={<Trash2 aria-hidden="true" />} onClick={() => setLifecycleConfirm("delete")} disabled={pending}>Request deletion</Button>
+          </> : null}
+          {project.status !== "ACTIVE" ? <Badge tone={project.status === "ARCHIVED" ? "warning" : "neutral"}>{project.status === "ARCHIVED" ? "Archived — read only" : "Locked — read only"}</Badge> : null}
+        </div>
       </div>
 
       {project.sections.length === 0 ? (
@@ -189,6 +205,7 @@ export function ProjectEditor({
 
           <ItemTable
             items={section.items}
+            units={units}
             editable={editable}
             pending={pending}
             expanded={expanded}
@@ -218,6 +235,7 @@ export function ProjectEditor({
               </div>
               <ItemTable
                 items={subsection.items}
+                units={units}
                 editable={editable}
                 pending={pending}
                 expanded={expanded}
@@ -233,8 +251,8 @@ export function ProjectEditor({
               {editable ? (
                 <div className="flex gap-1.5 pt-1">
                   <AddRow
-                    label="+ Item"
-                    placeholder="Nama item"
+                    label="+ Work Item"
+                    placeholder="Nama Work Item"
                     disabled={pending}
                     onAdd={(name) => run(addItemAction, { subsectionId: subsection.id, name })}
                   />
@@ -259,8 +277,8 @@ export function ProjectEditor({
                 onAdd={(name) => run(addSubsectionAction, { sectionId: section.id, name })}
               />
               <AddRow
-                label="+ Item"
-                placeholder="Nama item L1"
+                label="+ Work Item"
+                placeholder="Nama Work Item"
                 disabled={pending}
                 onAdd={(name) => run(addItemAction, { sectionId: section.id, name })}
               />
@@ -310,6 +328,20 @@ export function ProjectEditor({
         }}
       />
 
+      <ConfirmDialog
+        open={lifecycleConfirm !== null}
+        onOpenChange={(open) => { if (!open) setLifecycleConfirm(null); }}
+        title={lifecycleConfirm === "archive" ? "Archive this project?" : lifecycleConfirm === "restore" ? "Restore this project?" : "Request permanent deletion?"}
+        description={lifecycleConfirm === "archive" ? "The project stays readable but cannot be edited until restored." : lifecycleConfirm === "restore" ? "The project returns to ACTIVE and can be edited again." : "An authorized approver must review the request before this archived project is permanently removed."}
+        confirmLabel={lifecycleConfirm === "archive" ? "Archive project" : lifecycleConfirm === "restore" ? "Restore project" : "Submit request"}
+        tone={lifecycleConfirm === "restore" ? "primary" : "danger"}
+        pending={pending}
+        onConfirm={() => {
+          const action = lifecycleConfirm === "archive" ? archiveProjectAction : lifecycleConfirm === "restore" ? restoreProjectAction : requestProjectDeletionAction;
+          void run(action, {}).catch(() => undefined).finally(() => setLifecycleConfirm(null));
+        }}
+      />
+
       {assemblyTarget ? (
         <AssemblyPickerDialog
           key={assemblyTarget.via === "item" ? assemblyTarget.itemId : assemblyTarget.via === "section" ? assemblyTarget.sectionId : assemblyTarget.subsectionId}
@@ -345,7 +377,7 @@ function AssemblyPickerDialog({
   const [selectedId, setSelectedId] = useState(assemblies[0]?.id ?? "");
   const [qtyPerL1, setQtyPerL1] = useState("1");
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }} title="Terapkan Assembly" description="Pilih assembly untuk disalin sebagai komponen L2 beserta baris L3-nya.">
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }} title="Terapkan Assembly" description="Pilih assembly untuk disalin sebagai Component Group beserta Cost Components-nya.">
       <div className="grid gap-4">
         <Field label="Assembly">
           <Select value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
@@ -354,7 +386,7 @@ function AssemblyPickerDialog({
             ))}
           </Select>
         </Field>
-        <Field label="Qty per L1">
+        <Field label="Quantity per Work Item">
           <Input inputMode="decimal" value={qtyPerL1} onChange={(e) => setQtyPerL1(e.target.value)} />
         </Field>
         <FormActions>
@@ -370,6 +402,7 @@ function AssemblyPickerDialog({
 
 function ItemTable({
   items,
+  units,
   editable,
   pending,
   expanded,
@@ -383,6 +416,7 @@ function ItemTable({
   columns,
 }: {
   items: readonly BqItemDetail[];
+  units: UnitRead[];
   editable: boolean;
   pending: boolean;
   expanded: ReadonlySet<string>;
@@ -396,7 +430,7 @@ function ItemTable({
   columns: number;
 }) {
   if (items.length === 0) {
-    return <Text tone="tertiary" size="sm">Belum ada item.</Text>;
+    return <Text tone="tertiary" size="sm">No Work Items yet.</Text>;
   }
 
   return (
@@ -421,6 +455,7 @@ function ItemTable({
             <ItemRows
               key={item.id}
               item={item}
+              units={units}
               open={open}
               hasChildren={hasChildren}
               editable={editable}
@@ -444,6 +479,7 @@ function ItemTable({
 
 function ItemRows({
   item,
+  units,
   open,
   hasChildren,
   editable,
@@ -459,6 +495,7 @@ function ItemRows({
   columns,
 }: {
   item: BqItemDetail;
+  units: UnitRead[];
   open: boolean;
   hasChildren: boolean;
   editable: boolean;
@@ -486,19 +523,17 @@ function ItemRows({
           />
         </TableCell>
         <TableCell wrap className="font-medium">
-          <InlineEdit label="Item name" value={item.name} disabled={!editable} onCommit={commit(updateItemAction, item.id, "name")} />
+          <InlineEdit label="Work Item name" value={item.name} disabled={!editable} onCommit={commit(updateItemAction, item.id, "name")} />
         </TableCell>
         <TableCell align="end">
           <InlineEdit label="Quantity" align="end" inputMode="decimal" value={item.qty} disabled={!editable} onCommit={commit(updateItemAction, item.id, "qty")} />
         </TableCell>
-        <TableCell>
-          <InlineEdit label="Unit" value={item.unit} disabled={!editable} onCommit={commit(updateItemAction, item.id, "unit")} />
-        </TableCell>
+        <TableCell>{editable ? <Select aria-label="Work Item unit" value={item.unit} disabled={pending} onChange={(event) => void commit(updateItemAction, item.id, "unit")(event.target.value).catch(() => undefined)}>{units.some((unit) => unit.code === item.unit) ? null : <option value={item.unit} disabled>{item.unit} (inactive snapshot)</option>}{units.map((unit) => <option key={unit.id} value={unit.code}>{unit.code}</option>)}</Select> : item.unit}</TableCell>
         <TableCell align="end">
           {/* An L1 with children takes its cost from them; its own coefficient
               is dormant, so showing it as editable would be a lie. */}
           {hasChildren ? (
-            <Tooltip content="Markup L1 (%). Koefisien hanya dipakai saat L1 tidak punya rincian.">
+            <Tooltip content="Work Item markup (%). Coefficient is used only when this Work Item has no breakdown.">
               <span className="inline-block">
                 <InlineEdit label="Markup percent" align="end" inputMode="decimal" value={item.markupL1Pct} disabled={!editable} onCommit={commit(updateItemAction, item.id, "markupL1Pct")} />
               </span>
@@ -581,8 +616,8 @@ function ItemRows({
               <TableCell colSpan={columns - 1}>
                 <div className="flex flex-wrap items-center gap-1.5 pl-4">
                   <AddRow
-                    label="Sub-object"
-                    placeholder="Nama komponen L2"
+                    label="+ Component Group"
+                    placeholder="Nama Component Group"
                     disabled={pending}
                     onAdd={(name) => run(addSubObjectAction, { itemId: item.id, name })}
                   />
@@ -593,7 +628,7 @@ function ItemRows({
                     disabled={pending}
                     onClick={() => onTransientAdd({ kind: "item", id: item.id })}
                   >
-                    Baris custom
+                    Custom Cost Component
                   </Button>
                   <Button
                     size="sm"
@@ -602,7 +637,7 @@ function ItemRows({
                     disabled={pending}
                     onClick={() => onImport({ itemId: item.id })}
                   >
-                    Impor
+                    Add Cost Component
                   </Button>
                   {onApplyAssembly ? (
                     <Button
@@ -667,11 +702,11 @@ function SubObjectRows({
           </div>
         </TableCell>
         <TableCell align="end">
-          <InlineEdit label="Quantity per item" align="end" inputMode="decimal" value={subObject.qtyPerL1} disabled={!editable} onCommit={commit(updateSubObjectAction, subObject.id, "qtyPerL1")} />
+          <InlineEdit label="Quantity per Work Item" align="end" inputMode="decimal" value={subObject.qtyPerL1} disabled={!editable} onCommit={commit(updateSubObjectAction, subObject.id, "qtyPerL1")} />
         </TableCell>
-        <TableCell><Text tone="tertiary" size="sm">per L1</Text></TableCell>
+        <TableCell><Text tone="tertiary" size="sm">per Work Item</Text></TableCell>
         <TableCell align="end">
-          <Tooltip content="Markup L2 (%) — berlaku hanya untuk baris di bawah komponen ini.">
+          <Tooltip content="Component Group markup (%) — applies only to Cost Components in this group.">
             <span className="inline-block">
               <InlineEdit label="Markup percent" align="end" inputMode="decimal" value={subObject.markupL2Pct} disabled={!editable} onCommit={commit(updateSubObjectAction, subObject.id, "markupL2Pct")} />
             </span>
@@ -717,7 +752,7 @@ function SubObjectRows({
                     disabled={pending}
                     onClick={() => onTransientAdd({ kind: "subObject", id: subObject.id })}
                   >
-                    Baris custom
+                    Custom Cost Component
                   </Button>
                   <Button
                     size="sm"
@@ -726,7 +761,7 @@ function SubObjectRows({
                     disabled={pending}
                     onClick={() => onImport({ subObjectId: subObject.id })}
                   >
-                    Impor
+                    Add Cost Component
                   </Button>
                 </div>
               </TableCell>
@@ -820,7 +855,7 @@ function LineItemRow({
       <TableCell />
       <TableCell wrap>
         <div className={depth === 2 ? "pl-10" : "pl-4"}>
-          <InlineEdit label="Line name" value={line.titleSnapshot} disabled={!editable} onCommit={commit(updateLineItemAction, line.id, "titleSnapshot")} />
+          <InlineEdit label="Cost Component name" value={line.titleSnapshot} disabled={!editable} onCommit={commit(updateLineItemAction, line.id, "titleSnapshot")} />
           <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
             <Badge tone="neutral">{KATEGORI_LABEL[line.kategori] ?? line.kategori}</Badge>
             {line.sourceType !== "CUSTOM" ? (
@@ -932,6 +967,7 @@ function AddRow({
         aria-label={placeholder}
         className="h-8 w-[200px]"
         onChange={(event) => setName(event.target.value)}
+        onBlur={() => { if (!name.trim()) setOpen(false); }}
         onKeyDown={(event) => {
           if (event.key === "Escape") {
             setName("");
@@ -953,7 +989,7 @@ function RemoveButton({ label, onRemove, disabled }: { label: string; onRemove: 
         open={open}
         onOpenChange={setOpen}
         title={label}
-        description="Baris ini beserta rinciannya akan dihapus permanen dari project."
+        description="This Work Item and its breakdown will be permanently removed from the project."
         confirmLabel="Hapus"
         tone="danger"
         pending={disabled}
@@ -965,16 +1001,19 @@ function RemoveButton({ label, onRemove, disabled }: { label: string; onRemove: 
   );
 }
 
-const CUSTOM_KATEGORI_OPTIONS: { value: string; label: string; description: string }[] = [
+const CUSTOM_TYPE_OPTIONS: { value: string; label: string; description: string }[] = [
   { value: "MATERIAL", label: "Material", description: "Bahan & material fisik" },
-  { value: "UPAH", label: "Upah", description: "Tenaga kerja" },
-  { value: "MATERIAL_UPAH", label: "Material+Upah", description: "Paket material dan tenaga" },
-  { value: "ALAT", label: "Alat", description: "Sewa atau penggunaan alat" },
-  { value: "BIAYA_UMUM", label: "Biaya Umum", description: "Overhead, izin, asuransi" },
-  { value: "TRANSPORTASI_AKOMODASI", label: "Transportasi", description: "Ongkir & akomodasi" },
+  { value: "UPAH", label: "Labor", description: "Labor cost" },
+  { value: "MATERIAL_UPAH", label: "Material + Labor", description: "Combined material and labor cost" },
 ];
 
-type PickerTab = "all" | "masterdata" | "bq_library" | "custom";
+const OTHER_COST_KATEGORI_OPTIONS: { value: string; label: string; description: string }[] = [
+  { value: "ALAT", label: "Alat", description: "Sewa atau penggunaan alat" },
+  { value: "BIAYA_UMUM", label: "Biaya Umum", description: "Overhead, izin, asuransi" },
+  { value: "TRANSPORTASI_AKOMODASI", label: "Transportasi & Akomodasi", description: "Ongkir dan akomodasi" },
+];
+
+type PickerTab = "all" | "material" | "labor" | "material_labor" | "bq_library";
 
 function ImportDialog({
   target,
@@ -989,6 +1028,8 @@ function ImportDialog({
   const [query, setQuery] = useState("");
   const [options, setOptions] = useState<LineItemSourceOption[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [showCustom, setShowCustom] = useState(false);
+  const [showOtherCosts, setShowOtherCosts] = useState(false);
   const [loading, startTransition] = useTransition();
   const request = useRef(0);
 
@@ -1024,23 +1065,26 @@ function ImportDialog({
   }, [startTransition]);
 
   const visibleOptions =
-    tab === "masterdata" ? options.filter((o) => o.sourceType === "MASTERDATA")
+    tab === "material" ? options.filter((o) => o.sourceKind === "material")
+    : tab === "labor" ? options.filter((o) => o.sourceKind === "labor")
+    : tab === "material_labor" ? options.filter((o) => o.sourceKind === "material-labor")
     : tab === "bq_library" ? options.filter((o) => o.sourceType === "BQ_LIBRARY")
     : options;
 
   const tabItems: { key: PickerTab; label: string }[] = [
-    { key: "all", label: "Semua" },
-    { key: "masterdata", label: "Master Data" },
+    { key: "all", label: "All" },
+    { key: "material", label: "Material" },
+    { key: "labor", label: "Labor" },
+    { key: "material_labor", label: "Material + Labor" },
     { key: "bq_library", label: "BQ Library" },
-    { key: "custom", label: "Custom" },
   ];
 
   return (
     <Dialog
       open
       onOpenChange={(next) => { if (!next) onClose(); }}
-      title="Pilih sumber harga"
-      description="Harga yang dipilih disalin sebagai snapshot. Perubahan di sumber tidak akan mengubah baris ini."
+      title="Add Cost Component"
+      description="The selected price is copied as a snapshot. Later source changes do not rewrite this Cost Component."
       size="lg"
     >
       <div className="grid gap-3">
@@ -1058,34 +1102,60 @@ function ImportDialog({
                   ? "border-b-2 border-brand text-brand"
                   : "text-ink-secondary hover:text-ink",
               ].join(" ")}
-              onClick={() => setTab(t.key)}
+              onClick={() => { setTab(t.key); setShowCustom(false); setShowOtherCosts(false); }}
             >
               {t.label}
             </button>
           ))}
         </div>
 
-        {/* Custom kategori picker */}
-        {tab === "custom" ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {CUSTOM_KATEGORI_OPTIONS.map((opt) => (
+        <Button type="button" variant="secondary" onClick={() => { setShowCustom((value) => !value); setShowOtherCosts(false); }}>+ Custom Cost Component</Button>
+        {showCustom ? (
+          <div className="grid gap-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {CUSTOM_TYPE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className="grid gap-0.5 rounded-action border border-line px-3 py-2.5 text-left transition-colors hover:border-brand hover:bg-surface-muted"
+                  onClick={() => void onPick({ sourceType: "CUSTOM", kategori: opt.value })}
+                >
+                  <span className="font-medium text-ink">{opt.label}</span>
+                  <span className="text-xs text-ink-tertiary">{opt.description}</span>
+                </button>
+              ))}
               <button
-                key={opt.value}
                 type="button"
                 className="grid gap-0.5 rounded-action border border-line px-3 py-2.5 text-left transition-colors hover:border-brand hover:bg-surface-muted"
-                onClick={() => void onPick({ sourceType: "CUSTOM", kategori: opt.value })}
+                aria-expanded={showOtherCosts}
+                onClick={() => setShowOtherCosts((value) => !value)}
               >
-                <span className="font-medium text-ink">{opt.label}</span>
-                <span className="text-xs text-ink-tertiary">{opt.description}</span>
+                <span className="font-medium text-ink">Other Cost</span>
+                <span className="text-xs text-ink-tertiary">General, transport, or equipment</span>
               </button>
-            ))}
+            </div>
+            {showOtherCosts ? (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {OTHER_COST_KATEGORI_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className="grid gap-0.5 rounded-action border border-line px-3 py-2.5 text-left transition-colors hover:border-brand hover:bg-surface-muted"
+                    onClick={() => void onPick({ sourceType: "CUSTOM", kategori: opt.value })}
+                  >
+                    <span className="font-medium text-ink">{opt.label}</span>
+                    <span className="text-xs text-ink-tertiary">{opt.description}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : (
           <>
-            <SearchField value={query} label="Cari sumber" onChange={(event) => search(event.target.value)} onClear={() => search("")} />
+            <SearchField value={query} label="Search sources" onChange={(event) => search(event.target.value)} onClear={() => search("")} />
             {error ? <InlineError>{error}</InlineError> : null}
             {visibleOptions.length === 0 && !loading ? (
-              <EmptyState title="Tidak ada sumber" description="Tidak ada harga Master Data atau item BQ Library yang cocok." />
+              <EmptyState title="No matching sources" description="No Master Data price or BQ Library item matches this search." />
             ) : (
               <ul className="grid max-h-[340px] gap-1 overflow-auto">
                 {visibleOptions.map((option) => (

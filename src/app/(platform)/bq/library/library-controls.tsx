@@ -7,7 +7,8 @@ import { useRouter } from "next/navigation";
 import { useRef,useState,useTransition,type FormEvent } from "react";
 
 import type { BqAssemblyLineRead,BqAssemblyTemplateDetail,BqAssemblyTemplateRead,BqLibItemRead,BqTemplateRead } from "@/apps/bq/public";
-import { Button,ConfirmDialog,Field,FormActions,InlineError,Input,Select,Textarea } from "@/platform/ui_engine";
+import type { UnitRead } from "@/apps/masterdata/public";
+import { Button,ConfirmDialog,Field,FormActions,InlineError,Input,RowActionMenu,Select,Textarea } from "@/platform/ui_engine";
 import { addAssemblyLineAction,createAssemblyAction,deleteAssemblyAction,deleteAssemblyLineAction,getAssemblyDetailAction,libraryItemAction,templateAction,updateAssemblyAction,updateAssemblyLineAction } from "./actions";
 
 type ItemType = BqLibItemRead["type"];
@@ -18,28 +19,31 @@ function useCommand() {
   return { pending, startTransition, error, setError, router };
 }
 
-export function LibraryItemCreateButton() {
-  return <LibraryItemDialog />;
+export function LibraryItemCreateButton({ units }: { units: UnitRead[] }) {
+  return <LibraryItemDialog units={units} />;
 }
 
 export function AssemblyCreateButton() {
   const [open, setOpen] = useState(false); const [error, setError] = useState<string | null>(null); const [pending, startTransition] = useTransition(); const router = useRouter();
-  return <><Button type="button" variant="primary" leadingIcon={<Plus aria-hidden="true" />} onClick={() => setOpen(true)}>Add assembly</Button><DraftDialog pending={pending} open={open} onOpenChange={setOpen} title="Add Assembly Template" description="Reusable L2 breakdown. Its L3 lines are copied into each project." size="sm"><form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); startTransition(async () => { const result = await createAssemblyAction(null, data); if (!result.ok) setError(result.error.safeMessage); else { setOpen(false); router.refresh(); } }); }}>{error ? <InlineError>{error}</InlineError> : null}<Field label="Name" required><Input name="name" required maxLength={160} autoFocus /></Field><Field label="Description"><Textarea name="description" maxLength={2000} /></Field><FormActions><Button data-dialog-cancel type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" variant="primary" pending={pending}>Add assembly</Button></FormActions></form></DraftDialog></>;
+  return <><Button type="button" variant="primary" leadingIcon={<Plus aria-hidden="true" />} onClick={() => setOpen(true)}>Add assembly</Button><DraftDialog pending={pending} open={open} onOpenChange={setOpen} title="Add Assembly Template" description="Reusable Component Group breakdown. Its Cost Components are copied into each project." size="sm"><form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); startTransition(async () => { const result = await createAssemblyAction(null, data); if (!result.ok) setError(result.error.safeMessage); else { setOpen(false); router.refresh(); } }); }}>{error ? <InlineError>{error}</InlineError> : null}<Field label="Name" required><Input name="name" required maxLength={160} autoFocus /></Field><Field label="Description"><Textarea name="description" maxLength={2000} /></Field><FormActions><Button data-dialog-cancel type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" variant="primary" pending={pending}>Add assembly</Button></FormActions></form></DraftDialog></>;
 }
 
-export function LibraryItemActions({ item }: { item: BqLibItemRead }) {
+export function LibraryItemActions({ item, units }: { item: BqLibItemRead; units: UnitRead[] }) {
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   return (
     <div className="flex justify-end gap-1">
-      <IconButton type="button" size="sm" variant="ghost"  onClick={() => setEditOpen(true)} label="Edit item" icon={<Pencil size={15} aria-hidden="true" />} />
-      <DeleteItemButton item={item} />
-      <LibraryItemDialog item={item} open={editOpen} onOpenChange={setEditOpen} />
+      <RowActionMenu label={`Actions for ${item.name}`} items={[
+        { label: "Edit", onSelect: () => setEditOpen(true) },
+        { label: "Delete", danger: true, separatorBefore: true, onSelect: () => setDeleteOpen(true) },
+      ]} />
+      <DeleteItemDialog item={item} open={deleteOpen} onOpenChange={setDeleteOpen} />
+      <LibraryItemDialog item={item} units={units} open={editOpen} onOpenChange={setEditOpen} />
     </div>
   );
 }
 
-function DeleteItemButton({ item }: { item: BqLibItemRead }) {
-  const [open, setOpen] = useState(false);
+function DeleteItemDialog({ item, open, onOpenChange }: { item: BqLibItemRead; open: boolean; onOpenChange: (open: boolean) => void }) {
   const command = useCommand();
   const submit = () => {
     const data = new FormData();
@@ -49,16 +53,15 @@ function DeleteItemButton({ item }: { item: BqLibItemRead }) {
     command.startTransition(async () => {
       const result = await libraryItemAction(null, data);
       if (!result.ok) command.setError(result.error.safeMessage);
-      else { setOpen(false); command.router.refresh(); }
+      else { onOpenChange(false); command.router.refresh(); }
     });
   };
   return <>
-    <IconButton type="button" size="sm" variant="ghost"  onClick={() => { command.setError(null); setOpen(true); }} label="Delete item" icon={<Trash2 size={15} aria-hidden="true" />} />
-    <ConfirmDialog open={open} onOpenChange={setOpen} title={`Delete ${item.name}?`} error={command.error} description={"This library item will be permanently removed."} confirmLabel="Delete" tone="danger" pending={command.pending} onConfirm={submit} />
+    <ConfirmDialog open={open} onOpenChange={onOpenChange} title={`Delete ${item.name}?`} error={command.error} description={"This library item will be permanently removed."} confirmLabel="Delete" tone="danger" pending={command.pending} onConfirm={submit} />
   </>;
 }
 
-function LibraryItemDialog({ item, open: controlledOpen, onOpenChange }: { item?: BqLibItemRead; open?: boolean; onOpenChange?: (open: boolean) => void }) {
+function LibraryItemDialog({ item, units, open: controlledOpen, onOpenChange }: { item?: BqLibItemRead; units: UnitRead[]; open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const router = useRouter();
   const [internalOpen, setInternalOpen] = useState(false);
   const [type, setType] = useState<ItemType>(item?.type ?? "material");
@@ -83,15 +86,15 @@ function LibraryItemDialog({ item, open: controlledOpen, onOpenChange }: { item?
         <input type="hidden" name="operation" value={item ? "update" : "create"} />
         <input type="hidden" name="type" value={type} />
         <input type="hidden" name="id" value={item?.id ?? ""} />
-        <Field label="Type" required><Select name="typeSelector" value={type} onChange={(event) => setType(event.target.value as ItemType)} disabled={Boolean(item)}><option value="material">Material</option><option value="labor">Upah</option><option value="material_labor">Material + Upah</option><option value="custom">Custom cost</option></Select></Field>
+        <Field label="Type" required><Select name="typeSelector" value={type} onChange={(event) => setType(event.target.value as ItemType)} disabled={Boolean(item)}><option value="material">Material</option><option value="labor">Labor</option><option value="material_labor">Material + Labor</option><option value="custom">Other Cost</option></Select></Field>
         <Field label="Name" required><Input name="name" defaultValue={item?.name} maxLength={160} required autoFocus /></Field>
         <div className="grid grid-cols-2 gap-3 max-[560px]:grid-cols-1">
-          <Field label="Purchase unit" required><Input name="purchaseUnit" defaultValue={item?.purchaseUnit} placeholder="m2, hour, lot" required /></Field>
-          <Field label="Base unit"><Input name="baseUnit" defaultValue={item?.baseUnit ?? ""} placeholder="Optional" disabled={type === "custom"} /></Field>
+          <Field label="Purchase unit" required><Select name="purchaseUnit" defaultValue={item?.purchaseUnit ?? units[0]?.code ?? ""} required>{units.map((unit) => <option key={unit.id} value={unit.code}>{unit.code} — {unit.name}</option>)}</Select></Field>
+          <Field label="Base unit"><Select name="baseUnit" defaultValue={item?.baseUnit ?? ""} disabled={type === "custom"}><option value="">None</option>{units.map((unit) => <option key={unit.id} value={unit.code}>{unit.code} — {unit.name}</option>)}</Select></Field>
           <Field label="Price" required><Input name="harga" defaultValue={item?.harga ?? "0"} inputMode="decimal" required /></Field>
           <Field label="Currency" required><Input name="currency" defaultValue={item?.currency ?? "IDR"} maxLength={3} required /></Field>
-          <Field label="Default coefficient" required><Input name="defaultKoefisien" defaultValue={item?.defaultKoefisien ?? "1"} inputMode="decimal" required /></Field>
-          <Field label="Category" required><Select name="kategori" defaultValue={item?.kategori ?? (type === "custom" ? "BIAYA_UMUM" : "MATERIAL")}><option value="MATERIAL">Material</option><option value="UPAH">Upah</option><option value="MATERIAL_UPAH">Material + Upah</option><option value="BIAYA_UMUM">Biaya Umum</option><option value="TRANSPORTASI_AKOMODASI">Transportasi / Akomodasi</option><option value="ALAT">Alat</option></Select></Field>
+          <input type="hidden" name="defaultKoefisien" value={item?.defaultKoefisien ?? "1"} />
+          {type === "custom" ? <Field label="Category" required><Select name="kategori" defaultValue={item?.kategori ?? "BIAYA_UMUM"}><option value="BIAYA_UMUM">Biaya Umum</option><option value="TRANSPORTASI_AKOMODASI">Transportasi &amp; Akomodasi</option><option value="ALAT">Alat</option></Select></Field> : <Field label="Category"><Input value={type === "material" ? "Material" : type === "labor" ? "Labor" : "Material + Labor"} disabled /></Field>}
         </div>
         <Field label="Notes"><Textarea name="notes" defaultValue={item?.notes ?? ""} maxLength={2000} /></Field>
         <FormActions><Button data-dialog-cancel type="button" variant="ghost" onClick={() => setOpen(false)} disabled={pending}>Cancel</Button><Button type="submit" variant="primary" pending={pending}>{item ? "Save changes" : "Add item"}</Button></FormActions>
@@ -176,7 +179,7 @@ export function AssemblyActions({ assembly }: { assembly: BqAssemblyTemplateRead
   return (
     <div className="flex flex-wrap gap-1 mt-2">
       <IconButton type="button" size="sm" variant="ghost"  onClick={() => { command.setError(null); setEditOpen(true); }} label="Edit nama/deskripsi" icon={<Pencil size={14} aria-hidden="true" />} />
-      <IconButton type="button" size="sm" variant="ghost"  onClick={openLines} label="Kelola baris L3" icon={<Plus size={14} aria-hidden="true" />} />
+      <IconButton type="button" size="sm" variant="ghost" onClick={openLines} label="Manage Cost Components" icon={<Plus size={14} aria-hidden="true" />} />
       <IconButton type="button" size="sm" variant="ghost"  onClick={() => { command.setError(null); setDeleteOpen(true); }} disabled={command.pending} label="Hapus assembly" icon={<Trash2 size={14} aria-hidden="true" />} />
 
       {/* Edit name/desc dialog */}
@@ -202,7 +205,7 @@ export function AssemblyActions({ assembly }: { assembly: BqAssemblyTemplateRead
       </DraftDialog>
 
       {/* Lines editor dialog */}
-      <DraftDialog open={linesOpen} onOpenChange={setLinesOpen} title={`Baris L3 — ${assembly.name}`} size="lg" description="Setiap baris akan disalin ke proyek saat assembly diterapkan.">
+      <DraftDialog open={linesOpen} onOpenChange={setLinesOpen} title={`Cost Components — ${assembly.name}`} size="lg" description="Each Cost Component is copied into the project when this assembly is applied.">
         {loadError ? <InlineError>{loadError}</InlineError> : detail ? (
           <AssemblyLineList detail={detail} onRefresh={() => {
             getAssemblyDetailAction(assembly.id).then((d) => { if (d) setDetail(d); }).catch(() => setLoadError("Gagal memuat ulang assembly. Tutup dan buka kembali untuk mencoba lagi."));
@@ -257,7 +260,7 @@ function AssemblyLineList({ detail, onRefresh }: { detail: BqAssemblyTemplateDet
     <div className="grid gap-4">
       {error ? <InlineError>{error}</InlineError> : null}
       {detail.lines.length === 0 ? (
-        <p className="text-sm text-ink-secondary">Belum ada baris. Tambah baris L3 di bawah.</p>
+        <p className="text-sm text-ink-secondary">No Cost Components yet. Add one below.</p>
       ) : (
         <div className="divide-y divide-line">
           {detail.lines.map((line) => (
@@ -268,7 +271,7 @@ function AssemblyLineList({ detail, onRefresh }: { detail: BqAssemblyTemplateDet
 
       {addOpen ? (
         <form className="grid gap-3 rounded-control border border-line p-3" onSubmit={addLine}>
-          <div className="font-medium text-sm">Baris baru</div>
+          <div className="font-medium text-sm">New Cost Component</div>
           <div className="grid grid-cols-2 gap-2 max-[480px]:grid-cols-1">
             <Field label="Nama item" required><Input name="title" required maxLength={200} autoFocus /></Field>
             <Field label="Unit"><Input name="purchaseUnit" placeholder="m2, lot" defaultValue="ls" /></Field>
@@ -278,8 +281,8 @@ function AssemblyLineList({ detail, onRefresh }: { detail: BqAssemblyTemplateDet
             <Field label="Kategori">
               <Select name="kategori" defaultValue="MATERIAL">
                 <option value="MATERIAL">Material</option>
-                <option value="UPAH">Upah</option>
-                <option value="MATERIAL_UPAH">Material + Upah</option>
+                <option value="UPAH">Labor</option>
+                <option value="MATERIAL_UPAH">Material + Labor</option>
                 <option value="BIAYA_UMUM">Biaya Umum</option>
                 <option value="TRANSPORTASI_AKOMODASI">Transportasi</option>
                 <option value="ALAT">Alat</option>
@@ -340,8 +343,8 @@ function AssemblyLineRow({ line, assemblyId: _assemblyId, pending, onDelete, onS
             <Field label="Kategori">
               <Select name="kategori" defaultValue={line.kategori}>
                 <option value="MATERIAL">Material</option>
-                <option value="UPAH">Upah</option>
-                <option value="MATERIAL_UPAH">Material + Upah</option>
+                <option value="UPAH">Labor</option>
+                <option value="MATERIAL_UPAH">Material + Labor</option>
                 <option value="BIAYA_UMUM">Biaya Umum</option>
                 <option value="TRANSPORTASI_AKOMODASI">Transportasi</option>
                 <option value="ALAT">Alat</option>
@@ -361,7 +364,7 @@ function AssemblyLineRow({ line, assemblyId: _assemblyId, pending, onDelete, onS
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title="Hapus baris ini?"
-        description="Baris assembly akan dihapus permanen."
+        description="This Assembly Cost Component will be permanently removed."
         confirmLabel="Hapus"
         tone="danger"
         pending={pending}

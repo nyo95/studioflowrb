@@ -120,10 +120,10 @@ export function AppShell({
         ) : null}
         <div
           className={cx(
-            "grid min-h-screen overflow-x-clip transition-[grid-template-columns] duration-[160ms] motion-reduce:transition-none",
+            "grid overflow-x-clip transition-[grid-template-columns] duration-[160ms] motion-reduce:transition-none",
             "grid-cols-[var(--ui-rail-width,232px)_minmax(0,1fr)] max-[840px]:grid-cols-1 max-[840px]:block",
             isCollapsed && "[--ui-rail-width:60px]",
-            topbar ? "min-h-[calc(100vh-4rem)]" : null,
+            topbar ? "min-h-[calc(100vh-4rem)]" : "min-h-screen",
           )}
         >
           {/* Warm chrome and a drawn rule separate navigation from the work area. */}
@@ -175,7 +175,7 @@ export function AppShell({
               </div>
             ) : null}
           </aside>
-          <main className="min-w-0">{children}</main>
+          <main className="flex h-[calc(100vh-4rem)] min-h-0 min-w-0 flex-col overflow-auto max-[840px]:h-auto max-[840px]:overflow-visible">{children}</main>
         </div>
       </div>
     </RailContext.Provider>
@@ -347,13 +347,15 @@ export function NavSubmenu({
 
 export function PageShell({
   size = "default",
+  fill = false,
   className,
   ...props
-}: HTMLAttributes<HTMLDivElement> & { size?: "default" | "wide" }) {
+}: HTMLAttributes<HTMLDivElement> & { size?: "default" | "wide"; fill?: boolean }) {
   return (
     <div
       className={cx(
-        "mx-auto grid w-full max-w-(--ui-page-max) gap-6 p-(--ui-page-padding) max-[560px]:gap-5 [&>*]:min-w-0",
+        "mx-auto w-full max-w-(--ui-page-max) gap-6 p-(--ui-page-padding) max-[560px]:gap-5 [&>*]:min-w-0",
+        fill ? "flex min-h-0 flex-1 flex-col" : "grid",
         size === "default" && "max-w-(--ui-page-max)",
         className,
       )}

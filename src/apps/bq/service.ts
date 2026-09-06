@@ -6,6 +6,7 @@ import type { AuditActor, AuditWriter } from "@platform/core/audit";
 import { prepareAuditEvent } from "@platform/core/audit";
 import { requirePermission, hasAnyPermission } from "@platform/core/rbac";
 import { AppError } from "@platform/core/errors";
+import { compareDecimals, toDecimalString } from "@platform/utilities/decimal";
 
 type BqKategori =
   | "MATERIAL"
@@ -19,6 +20,7 @@ export const BQ_PERMISSIONS = {
   access: "bq.access",
   projectRead: "bq.project.read",
   projectManage: "bq.project.manage",
+  projectDeleteApprove: "bq.project-deletion.approve",
   libraryRead: "bq.library.read",
   libraryManage: "bq.library.manage",
   libraryPromote: "bq.library.promote",
@@ -118,10 +120,10 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
         subsection: { select: { section: { select: { project_id: true } } } },
       },
     });
-    if (!item) throw new AppError("NOT_FOUND", "bq.item.not-found", "Item not found");
+    if (!item) throw new AppError("NOT_FOUND", "bq.item.not-found", "Work Item not found");
     const projectId = item.section?.project_id ?? item.subsection?.section.project_id;
     if (!projectId) {
-      throw new AppError("CONFLICT", "bq.item.invalid-parent", "Item does not belong to a project section");
+      throw new AppError("CONFLICT", "bq.item.invalid-parent", "Work Item does not belong to a project Section");
     }
     await requireEditableProject(projectId);
   }
@@ -131,10 +133,10 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
       where: { id: lineItemId },
       select: { item_id: true, sub_object: { select: { item_id: true } } },
     });
-    if (!lineItem) throw new AppError("NOT_FOUND", "bq.line-item.not-found", "Line item not found");
+    if (!lineItem) throw new AppError("NOT_FOUND", "bq.line-item.not-found", "Cost Component not found");
     const itemId = lineItem.item_id ?? lineItem.sub_object?.item_id;
     if (!itemId) {
-      throw new AppError("CONFLICT", "bq.line-item.invalid-parent", "Line item does not belong to an item");
+      throw new AppError("CONFLICT", "bq.line-item.invalid-parent", "Cost Component does not belong to a Work Item");
     }
     await requireEditableProjectForItem(itemId);
   }
@@ -144,7 +146,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
       where: { id: subObjectId },
       select: { item_id: true },
     });
-    if (!subObject) throw new AppError("NOT_FOUND", "bq.sub-object.not-found", "Sub-object not found");
+    if (!subObject) throw new AppError("NOT_FOUND", "bq.sub-object.not-found", "Component Group not found");
     await requireEditableProjectForItem(subObject.item_id);
     return subObject.item_id;
   }
@@ -159,7 +161,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     baseUnit?: string;
     harga: string;
     currency: string;
-    defaultKoefisien: string;
+    defaultKoefisien?: string;
     notes?: string;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
@@ -170,7 +172,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
         base_unit: input.baseUnit ?? null,
         harga: input.harga,
         currency: input.currency,
-        default_koefisien: input.defaultKoefisien,
+        default_koefisien: input.defaultKoefisien ?? "1",
         kategori: "MATERIAL",
         notes: input.notes ?? null,
         created_by: input.actor.userId ?? "system",
@@ -247,7 +249,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     baseUnit?: string;
     harga: string;
     currency: string;
-    defaultKoefisien: string;
+    defaultKoefisien?: string;
     notes?: string;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
@@ -258,7 +260,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
         base_unit: input.baseUnit ?? null,
         harga: input.harga,
         currency: input.currency,
-        default_koefisien: input.defaultKoefisien,
+        default_koefisien: input.defaultKoefisien ?? "1",
         kategori: "UPAH",
         notes: input.notes ?? null,
         created_by: input.actor.userId ?? "system",
@@ -335,7 +337,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     baseUnit?: string;
     harga: string;
     currency: string;
-    defaultKoefisien: string;
+    defaultKoefisien?: string;
     notes?: string;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
@@ -346,7 +348,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
         base_unit: input.baseUnit ?? null,
         harga: input.harga,
         currency: input.currency,
-        default_koefisien: input.defaultKoefisien,
+        default_koefisien: input.defaultKoefisien ?? "1",
         kategori: "MATERIAL_UPAH",
         notes: input.notes ?? null,
         created_by: input.actor.userId ?? "system",
@@ -422,7 +424,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     purchaseUnit: string;
     harga: string;
     currency: string;
-    defaultKoefisien: string;
+    defaultKoefisien?: string;
     kategori: "BIAYA_UMUM" | "TRANSPORTASI_AKOMODASI" | "ALAT";
     notes?: string;
   }) {
@@ -433,7 +435,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
         purchase_unit: input.purchaseUnit,
         harga: input.harga,
         currency: input.currency,
-        default_koefisien: input.defaultKoefisien,
+        default_koefisien: input.defaultKoefisien ?? "1",
         kategori: requireKategori(input.kategori),
         notes: input.notes ?? null,
         created_by: input.actor.userId ?? "system",
@@ -463,7 +465,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
     const existing = await db.bqLibCustomItem.findUnique({ where: { id: input.id } });
-    if (!existing) throw new AppError("NOT_FOUND", "bq.lib-custom-item.not-found", "Library custom item not found");
+    if (!existing) throw new AppError("NOT_FOUND", "bq.lib-custom-item.not-found", "Custom Library item not found");
     const item = await db.bqLibCustomItem.update({
       where: { id: input.id },
       data: {
@@ -956,11 +958,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     notes?: string | null;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
-    const existing = await db.bqProject.findUnique({ where: { id: input.id } });
-    if (!existing) throw new AppError("NOT_FOUND", "bq.project.not-found", "Project not found");
-    if (existing.status === "LOCKED") {
-      throw new AppError("CONFLICT", "bq.project.locked", "Cannot edit a locked project");
-    }
+    await requireEditableProject(input.id);
     const project = await db.bqProject.update({
       where: { id: input.id },
       data: {
@@ -1041,8 +1039,12 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
     const existing = await db.bqProject.findUnique({ where: { id: input.id } });
     if (!existing) throw new AppError("NOT_FOUND", "bq.project.not-found", "Project not found");
-    if (existing.status === "ARCHIVED") {
-      throw new AppError("CONFLICT", "bq.project.already-archived", "Project is already archived");
+    if (existing.status !== "ACTIVE") {
+      throw new AppError(
+        "CONFLICT",
+        existing.status === "LOCKED" ? "bq.project.locked" : "bq.project.already-archived",
+        existing.status === "LOCKED" ? "Unlock the project before archiving it" : "Project is already archived",
+      );
     }
     const project = await db.bqProject.update({
       where: { id: input.id },
@@ -1081,6 +1083,120 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
       actor: input.actor,
     });
     return project;
+  }
+
+  async function requestProjectDeletion(input: {
+    grants: PermissionGrants;
+    actor: { kind: string; userId?: string; label: string };
+    id: string;
+    reason?: string;
+  }) {
+    requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+    const project = await db.bqProject.findUnique({ where: { id: input.id } });
+    if (!project) throw new AppError("NOT_FOUND", "bq.project.not-found", "Project not found");
+    if (project.status !== "ARCHIVED") {
+      throw new AppError("CONFLICT", "bq.project.not-archived", "Archive the project before requesting permanent deletion");
+    }
+    const existing = await db.bqProjectDeletionRequest.findFirst({
+      where: { project_id: project.id, status: "PENDING" },
+    });
+    if (existing) {
+      throw new AppError("CONFLICT", "bq.project.deletion-pending", "A deletion request is already pending for this project");
+    }
+    const request = await db.bqProjectDeletionRequest.create({
+      data: {
+        project_id: project.id,
+        project_title: project.title,
+        requester_user_id: input.actor.userId ?? "system",
+        requester_label: input.actor.label,
+        reason: input.reason?.trim() || null,
+      },
+    });
+    await auditWriter({
+      appId: "bq",
+      action: "bq.project.deletion-requested",
+      entityType: "BqProject",
+      entityId: project.id,
+      actor: input.actor,
+      changes: { requestId: request.id },
+    });
+    return request;
+  }
+
+  async function listProjectDeletionRequests(input: { grants: PermissionGrants }) {
+    requirePermission(input.grants, BQ_PERMISSIONS.projectDeleteApprove);
+    return db.bqProjectDeletionRequest.findMany({
+      where: { status: "PENDING" },
+      orderBy: { requested_at: "asc" },
+    });
+  }
+
+  async function approveProjectDeletion(input: {
+    grants: PermissionGrants;
+    actor: { kind: string; userId?: string; label: string };
+    requestId: string;
+  }) {
+    requirePermission(input.grants, BQ_PERMISSIONS.projectDeleteApprove);
+    const request = await db.bqProjectDeletionRequest.findUnique({ where: { id: input.requestId } });
+    if (!request || request.status !== "PENDING") {
+      throw new AppError("CONFLICT", "bq.project.deletion-not-pending", "Deletion request is no longer pending");
+    }
+    const project = await db.bqProject.findUnique({ where: { id: request.project_id } });
+    if (!project) throw new AppError("NOT_FOUND", "bq.project.not-found", "Project not found");
+    if (project.status !== "ARCHIVED") {
+      throw new AppError("CONFLICT", "bq.project.not-archived", "Only an archived project can be permanently deleted");
+    }
+    await db.bqProject.delete({ where: { id: project.id } });
+    await db.bqProjectDeletionRequest.update({
+      where: { id: request.id },
+      data: {
+        status: "APPROVED",
+        approver_user_id: input.actor.userId ?? "system",
+        approver_label: input.actor.label,
+        decided_at: new Date(),
+      },
+    });
+    await auditWriter({
+      appId: "bq",
+      action: "bq.project.deleted",
+      entityType: "BqProject",
+      entityId: project.id,
+      actor: input.actor,
+      changes: { requestId: request.id },
+    });
+  }
+
+  async function rejectProjectDeletion(input: {
+    grants: PermissionGrants;
+    actor: { kind: string; userId?: string; label: string };
+    requestId: string;
+    reason: string;
+  }) {
+    requirePermission(input.grants, BQ_PERMISSIONS.projectDeleteApprove);
+    const reason = input.reason.trim();
+    if (!reason) throw new AppError("VALIDATION", "bq.project.deletion-reason-required", "A rejection reason is required");
+    const request = await db.bqProjectDeletionRequest.findUnique({ where: { id: input.requestId } });
+    if (!request || request.status !== "PENDING") {
+      throw new AppError("CONFLICT", "bq.project.deletion-not-pending", "Deletion request is no longer pending");
+    }
+    await db.bqProjectDeletionRequest.update({
+      where: { id: request.id },
+      data: {
+        status: "REJECTED",
+        approver_user_id: input.actor.userId ?? "system",
+        approver_label: input.actor.label,
+        decided_at: new Date(),
+        reason,
+      },
+    });
+    await auditWriter({
+      appId: "bq",
+      action: "bq.project.deletion-rejected",
+      entityType: "BqProject",
+      entityId: request.project_id,
+      actor: input.actor,
+      changes: { requestId: request.id, reason },
+    });
   }
 
   async function addSection(input: {
@@ -1190,10 +1306,10 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
 
     if (!input.sectionId && !input.subsectionId) {
-      throw new AppError("VALIDATION", "bq.item.no-parent", "Item must belong to a section or subsection");
+      throw new AppError("VALIDATION", "bq.item.no-parent", "Work Item must belong to a Section or Subsection");
     }
     if (input.sectionId && input.subsectionId) {
-      throw new AppError("VALIDATION", "bq.item.dual-parent", "Item cannot belong to both section and subsection");
+      throw new AppError("VALIDATION", "bq.item.dual-parent", "Work Item cannot belong to both a Section and Subsection");
     }
 
     if (input.sectionId) await requireEditableProjectForSection(input.sectionId);
@@ -1392,10 +1508,10 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
 
     if (!input.subObjectId && !input.itemId) {
-      throw new AppError("VALIDATION", "bq.line-item.no-parent", "Line item must belong to a sub-object or item");
+      throw new AppError("VALIDATION", "bq.line-item.no-parent", "Cost Component must belong to a Component Group or Work Item");
     }
     if (input.subObjectId && input.itemId) {
-      throw new AppError("VALIDATION", "bq.line-item.dual-parent", "Line item cannot belong to both sub-object and item");
+      throw new AppError("VALIDATION", "bq.line-item.dual-parent", "Cost Component cannot belong to both a Component Group and Work Item");
     }
 
     if (input.subObjectId) await requireEditableProjectForSubObject(input.subObjectId);
@@ -1412,6 +1528,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
         purchase_unit_snapshot: input.purchaseUnitSnapshot,
         base_unit_snapshot: input.baseUnitSnapshot ?? null,
         purchase_to_base_factor_snapshot: input.purchaseToBaseFactorSnapshot ?? null,
+        source_price_snapshot: input.sourceType === "CUSTOM" ? null : input.hargaSnapshot,
         harga_snapshot: input.hargaSnapshot,
         currency_snapshot: input.currencySnapshot ?? "IDR",
         kategori: requireKategori(input.kategori),
@@ -1449,6 +1566,8 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
     await requireEditableProjectForLineItem(input.id);
+    const existing = await db.bqLineItem.findUnique({ where: { id: input.id } });
+    if (!existing) throw new AppError("NOT_FOUND", "bq.line-item.not-found", "Cost Component not found");
 
     const lineItem = await db.bqLineItem.update({
       where: { id: input.id },
@@ -1469,7 +1588,14 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
 
     await auditWriter({
       appId: "bq",
-      action: "bq.line-item.updated",
+      action: input.hargaSnapshot !== undefined
+        && existing.source_price_snapshot !== null
+        && compareDecimals(
+          toDecimalString(existing.source_price_snapshot.toString()),
+          toDecimalString(input.hargaSnapshot),
+        ) !== 0
+        ? "bq.line-item.price-overridden"
+        : "bq.line-item.updated",
       entityType: "BqLineItem",
       entityId: lineItem.id,
       actor: input.actor,
@@ -1485,17 +1611,15 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
     await requireEditableProjectForLineItem(input.id);
-    // Fetch with no select so Prisma returns the full row; source_price_snapshot
-    // exists in the schema but the generated select type lags manual patches.
     const lineItem = await db.bqLineItem.findUnique({ where: { id: input.id } });
-    if (!lineItem) throw new AppError("NOT_FOUND", "bq.line-item.not-found", "Line item not found");
-    const snap = (lineItem as unknown as Record<string, unknown>)["source_price_snapshot"];
+    if (!lineItem) throw new AppError("NOT_FOUND", "bq.line-item.not-found", "Cost Component not found");
+    const snap = lineItem.source_price_snapshot;
     if (snap == null) {
-      throw new AppError("INVARIANT", "bq.line-item.no-snapshot", "No source snapshot to revert to");
+      throw new AppError("INVARIANT", "bq.line-item.no-snapshot", "This Cost Component has no imported source price to restore");
     }
     const updated = await db.bqLineItem.update({
       where: { id: input.id },
-      data: { harga_snapshot: snap as string },
+      data: { harga_snapshot: snap },
     });
     await auditWriter({
       appId: "bq",
@@ -1751,7 +1875,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     await requireEditableProjectForItem(input.itemId);
     const assembly = await db.bqAssemblyTemplate.findUnique({ where: { id: input.assemblyId }, include: { lines: { orderBy: { sort_order: "asc" } } } });
     if (!assembly) throw new AppError("NOT_FOUND", "bq.assembly.not-found", "Assembly template not found");
-    if (!assembly.lines.length) throw new AppError("VALIDATION", "bq.assembly.empty", "An assembly must contain at least one L3 line");
+    if (!assembly.lines.length) throw new AppError("VALIDATION", "bq.assembly.empty", "An assembly must contain at least one Cost Component");
     const existingSubObjectCount = await db.bqSubObject.count({ where: { item_id: input.itemId } });
     const subObject = await db.bqSubObject.create({ data: { item_id: input.itemId, name: assembly.name, qty_per_l1: input.qtyPerL1 ?? "1", sort_order: existingSubObjectCount } });
     await db.bqLineItem.createMany({ data: assembly.lines.map((line) => ({ sub_object_id: subObject.id, source_type: line.source_type, source_ref_id: line.source_ref_id, source_imported_at: new Date(), title_snapshot: line.title_snapshot, purchase_unit_snapshot: line.purchase_unit_snapshot, base_unit_snapshot: line.base_unit_snapshot, purchase_to_base_factor_snapshot: line.purchase_to_base_factor_snapshot, harga_snapshot: line.harga_snapshot, currency_snapshot: line.currency_snapshot, kategori: line.kategori, qty: line.qty, koefisien: line.koefisien, sort_order: line.sort_order, notes: line.notes })) });
@@ -1820,6 +1944,10 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     unlockProject,
     archiveProject,
     restoreProject,
+    requestProjectDeletion,
+    listProjectDeletionRequests,
+    approveProjectDeletion,
+    rejectProjectDeletion,
     addSection,
     addSubsection,
     updateSection,
@@ -1850,7 +1978,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
 
   // CORE.md §2: a command that writes records plus its audit event runs in one
   // transaction; simple independent reads do not open one.
-  const readOnlyOperations = new Set<string>(["getTemplateWithSections", "listPromotionRequests"]);
+  const readOnlyOperations = new Set<string>(["getTemplateWithSections", "listPromotionRequests", "listProjectDeletionRequests"]);
 
   return Object.fromEntries(
     Object.entries(operations).map(([name, operation]) => [

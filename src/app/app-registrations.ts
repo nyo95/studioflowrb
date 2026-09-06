@@ -41,6 +41,7 @@ export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [
       "bq.access",
       "bq.project.read",
       "bq.project.manage",
+      "bq.project-deletion.approve",
       "bq.library.read",
       "bq.library.manage",
       "bq.library.promote",

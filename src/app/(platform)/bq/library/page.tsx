@@ -5,9 +5,9 @@ import { redirect } from "next/navigation";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission, hasAnyPermission } from "@platform/core/rbac";
-import { PageHeader, SectionCard, DirectoryShell, ErrorState, Tabs, DataTable, TableHeader, TableBody, TableRow, TableCell, TableHead, StatusBadge, EmptyState, Badge, Text } from "@/platform/ui_engine";
+import { PageHeader, SectionCard, DirectoryShell, ErrorState, Tabs, DataTable, TableHeader, TableBody, TableRow, TableCell, TableHead, EmptyState, Badge, Text } from "@/platform/ui_engine";
 import { BQ_PERMISSIONS } from "@/apps/bq/service";
-import { bqPublicRead } from "@/apps/bq/runtime";
+import { bqPublicRead, masterDataRead } from "@/apps/bq/runtime";
 import { Library } from "lucide-react";
 import { createMoney, formatMoney } from "@platform/utilities/money";
 import { AssemblyActions, AssemblyCreateButton, LibraryItemActions, LibraryItemCreateButton, TemplateActions, TemplateCreateButton } from "./library-controls";
@@ -37,13 +37,17 @@ export default async function BqLibraryPage() {
     );
   }
 
-  const items = await bqPublicRead.listLibraryItems();
-  const [templates, assemblies] = await Promise.all([bqPublicRead.listTemplates(), bqPublicRead.listAssemblyTemplates()]);
+  const [items, templates, assemblies, units] = await Promise.all([
+    bqPublicRead.listLibraryItems(),
+    bqPublicRead.listTemplates(),
+    bqPublicRead.listAssemblyTemplates(),
+    masterDataRead.listUnits(),
+  ]);
 
   const kategoriLabel: Record<string, string> = {
     MATERIAL: "Material",
-    UPAH: "Upah",
-    MATERIAL_UPAH: "Material+Upah",
+    UPAH: "Labor",
+    MATERIAL_UPAH: "Material + Labor",
     BIAYA_UMUM: "Biaya Umum",
     TRANSPORTASI_AKOMODASI: "Transportasi",
     ALAT: "Alat",
@@ -58,23 +62,17 @@ export default async function BqLibraryPage() {
     ALAT: "neutral",
   };
 
-  const statusTone: Record<string, "neutral" | "success" | "warning" | "danger"> = {
-    DRAFT: "neutral",
-    REQUESTED: "warning",
-    APPROVED: "success",
-    REJECTED: "danger",
-  };
-
   return (
-    <div className="grid gap-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
       <PageHeader
         eyebrow="Bill of Quantity"
         title="BQ Library"
         description="Manage library items and templates"
-        actions={canManage ? <div className="flex flex-wrap gap-2"><LibraryItemCreateButton /><AssemblyCreateButton /><TemplateCreateButton /></div> : null}
+        actions={canManage ? <div className="flex flex-wrap gap-2"><LibraryItemCreateButton units={units} /><AssemblyCreateButton /><TemplateCreateButton /></div> : null}
       />
 
       <Tabs
+        fill
         defaultValue="items"
         label="BQ Library views"
         items={[
@@ -82,7 +80,7 @@ export default async function BqLibraryPage() {
             value: "items",
             label: "Items",
             content: (
-              <DirectoryShell surface>
+              <DirectoryShell surface fill>
                 {items.length === 0 ? (
                   <EmptyState
                     icon={Library}
@@ -90,21 +88,20 @@ export default async function BqLibraryPage() {
                     description="Mulai dengan menambahkan item baru."
                   />
                 ) : (
-                  <DataTable framed={false} density="compact" stickyHeader maxBodyHeight="60vh" minWidth={900}>
+                  <DataTable framed={false} density="compact" stickyHeader fill minWidth={760}>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Nama</TableHead>
                         <TableHead>Unit</TableHead>
                         <TableHead align="end">Harga</TableHead>
                         <TableHead>KATEGORI</TableHead>
-                        <TableHead>Status</TableHead>
                         {canManage || canPromote ? <TableHead align="end">Actions</TableHead> : null}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {items.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.name}</TableCell>
+                          <TableCell><div className="grid gap-0.5"><span className="font-medium">{item.name}</span><span className="text-xs text-ink-tertiary">Updated {new Intl.DateTimeFormat(settings.locale, { timeZone: settings.timezone, dateStyle: "medium" }).format(new Date(item.updatedAt))}</span></div></TableCell>
                           <TableCell>{item.purchaseUnit}</TableCell>
                           <TableCell align="end">
                             {formatMoney(createMoney(item.harga, item.currency), { locale: settings.locale })}
@@ -114,16 +111,11 @@ export default async function BqLibraryPage() {
                               {kategoriLabel[item.kategori] ?? item.kategori}
                             </Badge>
                           </TableCell>
-                          <TableCell>
-                            <StatusBadge tone={statusTone[item.promotionStatus] ?? "neutral"}>
-                              {item.promotionStatus}
-                            </StatusBadge>
-                          </TableCell>
                           {canManage || canPromote ? (
                             <TableCell align="end">
                               <div className="flex flex-wrap items-center justify-end gap-1">
                                 {canPromote ? <PromotionRequestButton item={item} /> : null}
-                                {canManage ? <LibraryItemActions item={item} /> : null}
+                                {canManage ? <LibraryItemActions item={item} units={units} /> : null}
                               </div>
                             </TableCell>
                           ) : null}
@@ -138,7 +130,7 @@ export default async function BqLibraryPage() {
           {
             value: "assemblies",
             label: "Assemblies",
-            content: <SectionCard>{assemblies.length === 0 ? <EmptyState title="Belum ada assembly" description="Assembly adalah template L2 dengan daftar L3 yang akan disalin ke proyek." /> : <div className="grid gap-4">{assemblies.map((assembly) => <div key={assembly.id} className="rounded-control border border-line p-4"><div className="flex items-start justify-between gap-2"><div><div className="font-medium">{assembly.name}</div><Text tone="tertiary" size="sm">{assembly.lineCount} baris L3 · {assembly.description ?? "Tanpa deskripsi"}</Text></div></div>{canManage ? <AssemblyActions assembly={assembly} /> : null}</div>)}</div>}</SectionCard>,
+            content: <SectionCard>{assemblies.length === 0 ? <EmptyState title="No assemblies" description="An assembly is a Component Group template whose Cost Components are copied into a project." /> : <div className="grid gap-4">{assemblies.map((assembly) => <div key={assembly.id} className="rounded-control border border-line p-4"><div className="flex items-start justify-between gap-2"><div><div className="font-medium">{assembly.name}</div><Text tone="tertiary" size="sm">{assembly.lineCount} Cost Components · {assembly.description ?? "No description"}</Text></div></div>{canManage ? <AssemblyActions assembly={assembly} /> : null}</div>)}</div>}</SectionCard>,
           },
           {
             value: "templates",

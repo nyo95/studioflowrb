@@ -1,4 +1,7 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+@source "../app";
+@source "../apps";
+@source "../platform";
 @import "../platform/ui_engine/tokens/tokens.css";
 @import "../platform/ui_engine/styles/base.css";
 

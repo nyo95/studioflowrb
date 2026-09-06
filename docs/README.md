@@ -1,15 +1,15 @@
 # Active Documentation
 
-## Current UI/UX remediation handoff — 2026-09-06
+## Current R6.1 convergence — 2026-09-06
 
-[`UIUX-CURATE`](../scripts/work-orders/UIUX-CURATE.md) is the locked navigator
-work order for the owner's design-audit remediation request. It targets the
-existing UI Engine, Master Data, BQ and platform UI. The owner explicitly assigned
-Codex as executor for this task on 2026-09-06, overriding the default OpenCode role.
-The handoff is R5.03; implementation is expected at the next unused revision,
-R5.04. No implementation or browser acceptance is claimed by this handoff.
-Its explicit scope takes precedence over the historical foundation-only phase
-descriptions below; it does not activate new StudioFlow domain features.
+The owner's StudioFlow R6.1 plan is the active instruction for contract,
+domain, UI Engine, Master Data, and BQ convergence. Its audited decision delta
+and implemented-state mapping are recorded in
+[`R6.1-DECISION-DELTA.md`](R6.1-DECISION-DELTA.md). The earlier
+[`UIUX-CURATE`](../scripts/work-orders/UIUX-CURATE.md) and
+[`BQ-MASTERDATA-HARDENING`](../scripts/work-orders/BQ-MASTERDATA-HARDENING.md)
+orders remain implementation history; where they conflict, the current owner
+instruction and patched contracts win.
 
 This repository keeps only the shared contracts and active app contracts that
 have been reviewed for the current rebuild. A contract is not an executable work
@@ -33,14 +33,10 @@ Execution and continuity are governed by [`AGENTS.md`](../AGENTS.md) and
 historical implementation evidence; there is currently no executable app work
 order.
 
-StudioFlow and BQ contracts are intentionally absent until those apps become
-active. R1.06 removes every old/speculative application route, module, seed, and
-active database schema. Brand, Vendor, and Pricing remain approved Master Data
-logic contracts, but they do not authorize implementation until UI-F1, their
-remaining dependencies, and an explicit work order are locked. Category, SKU,
-Unit, media, Samples, import, and BQ snapshot details remain deferred as recorded
-in the Master Data index. Deleted code is recoverable as Git evidence only; it
-never authorizes implementation by itself.
+Master Data and BQ are active implemented applications. Their current contracts,
+schema, migrations, services, public boundaries, tests, and browser behavior are
+the implementation authority. Media, Samples, workbook import/export, and other
+explicitly deferred capabilities remain out of scope.
 
 ## Authority order
 
@@ -82,15 +78,10 @@ Forbidden: `platform -> app`, cross-app internal imports, implicit cross-app wri
 
 ## Active sequence
 
-1. preserve and verify the Foundation-only baseline;
-2. audit UI Engine against `DESIGN.md`, `UI_ENGINE.md`, and the useful interaction
-   quality proven by committed legacy StudioFlow screens;
-3. implement and verify UI-F1 before any Master Data route or domain UI is built;
-4. complete and approve the remaining Master Data domain contracts and exact
-   migration/recovery plan without reopening the approved Brand, Vendor, and
-   Pricing product decisions;
-5. issue a deterministic Master Data implementation work order only after its
-   dependencies and acceptance tests are locked; StudioFlow and BQ remain
-   deferred.
+1. keep shared platform contracts reusable and domain-neutral;
+2. close Master Data against its owner-approved contract;
+3. harden BQ lifecycle, snapshots, editor, Library, and templates;
+4. keep cross-app work behind explicit public ports and application coordinators;
+5. validate schema, checks, tests, production build, and real browser behavior.
 
 Documented deferred capabilities are routing memory, not implementation scope. Do not create code, folders, dependencies, or placeholder exports until a stage/consumer activates them.

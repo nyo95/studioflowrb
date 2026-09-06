@@ -7,7 +7,7 @@ import { DirectoryShell,DraftDialog,Pagination,RowActionMenu,Text,usePagination 
 import { Plus } from "lucide-react";
 import { useRef,useState,useTransition } from "react";
 
-import { Button,ConfirmDialog,CreatableMultiSelect,CreatableSearch,DataTable,Dialog,EmptyState,Field,FormActions,InlineError,Input,Notice,SearchField,Select,SimpleTextEditor,StatusMarker,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,useFormDraftGuard,useOptionOverlay } from "@/platform/ui_engine";
+import { Button,ConfirmDialog,CreatableMultiSelect,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,InlineError,Input,Notice,SearchField,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,useFormDraftGuard,useOptionOverlay } from "@/platform/ui_engine";
 import { createCategoryAction } from "../categories/actions";
 import {
 archiveBrandAction,
@@ -124,9 +124,9 @@ export function BrandDirectory({
     );
   });
   const { locale, timezone } = useDisplaySettings();
-  const [sortKey, setSortKey] = useState<"Brand" | "SKUs" | "Suppliers" | "Resources" | "Updated">("Brand");
+  const [sortKey, setSortKey] = useState<"Brand" | "SKUs" | "Suppliers" | "Resources">("Brand");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const sortValues: Record<"Brand" | "SKUs" | "Suppliers" | "Resources" | "Updated", (r: BrandRow) => string | number | null> = {"Brand": (r) => r.name, "SKUs": (r) => r._count.skus, "Suppliers": (r) => r._count.suppliers, "Resources": (r) => r._count.links, "Updated": (r) => new Date(r.updated_at).getTime()};
+  const sortValues: Record<"Brand" | "SKUs" | "Suppliers" | "Resources", (r: BrandRow) => string | number | null> = {"Brand": (r) => r.name, "SKUs": (r) => r._count.skus, "Suppliers": (r) => r._count.suppliers, "Resources": (r) => r._count.links};
   const collator = new Intl.Collator(locale, { sensitivity: "base", numeric: true });
   const orderedRows = [...filtered].sort((a, b) => {
     const left = sortValues[sortKey](a), right = sortValues[sortKey](b);
@@ -246,7 +246,7 @@ export function BrandDirectory({
   const hashtagOptions = (hashtags: readonly string[]) => hashtags.map((tag) => ({ id: tag, label: tag.startsWith("#") ? tag : `#${tag}` }));
 
   return (
-    <DirectoryShell header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
+    <DirectoryShell fill header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
           <Button
             type="button"
             variant="primary"
@@ -267,7 +267,7 @@ export function BrandDirectory({
 
         />
       ) : (
-        <DataTable framed={false} density="compact" stickyHeader maxBodyHeight="60vh" minWidth={900} className="table-fixed">
+        <DataTable framed={false} density="compact" stickyHeader fill minWidth={820} className="table-fixed">
           <TableHeader>
             <TableRow><TableHead style={{ width: 240 }}  sortable sortDirection={sortKey === "Brand" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Brand"); setSortDirection(direction); }}>Brand</TableHead>
 <TableHead style={{ width: 180 }}  >Categories</TableHead>
@@ -276,7 +276,6 @@ export function BrandDirectory({
 <TableHead style={{ width: 90 }} align="end" sortable sortDirection={sortKey === "Suppliers" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Suppliers"); setSortDirection(direction); }}>Suppliers</TableHead>
 <TableHead style={{ width: 90 }} align="end" sortable sortDirection={sortKey === "Resources" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Resources"); setSortDirection(direction); }}>Resources</TableHead>
 <TableHead style={{ width: 90 }} align="end" sortable sortDirection={sortKey === "SKUs" ? sortDirection : null} onSortChange={(direction) => { setSortKey("SKUs"); setSortDirection(direction); }}>SKUs</TableHead>
-<TableHead style={{ width: 180 }}  sortable sortDirection={sortKey === "Updated" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Updated"); setSortDirection(direction); }}>Updated</TableHead>
 <TableHead stickyEnd style={{ width: 64 }} align="end" >Actions</TableHead></TableRow>
           </TableHeader>
           <TableBody>
@@ -286,14 +285,13 @@ export function BrandDirectory({
 
               return (
                 <TableRow key={brand.id}>
- <TableCell wrap><TableCellContent primary={<span className="inline-flex items-center gap-2"><StatusMarker tone={isArchived ? "danger" : "success"} label={isArchived ? "Archived" : "Active"} /><strong>{brand.name}</strong></span>} primaryLines={2} secondary={<span className="font-ui-mono">{brand.slug}</span>} /></TableCell>
+ <TableCell wrap><EntityPrimaryCell tone={isArchived ? "danger" : "success"} statusLabel={isArchived ? "Archived" : "Active"} name={brand.name} secondary={<span className="grid gap-0.5"><span className="font-ui-mono">{brand.slug}</span><span>Updated by {brand.updated_by_label ?? "—"} · {new Intl.DateTimeFormat(locale, { timeZone: timezone, dateStyle: "medium" }).format(new Date(brand.updated_at))}</span></span>} /></TableCell>
  <TableCell><DiscoverySummary values={brand.categories.map(c => c.category.name)} limit={3} /></TableCell>
  <TableCell><DiscoverySummary values={brand.hashtags.map(h => `#${h.label.replace(/^#/, "")}`)} limit={2} /></TableCell>
  <TableCell wrap><TableCellContent primary={brand.owner_vendor?.name ?? "—"} primaryLines={2} /></TableCell>
  <TableCell align="end">{brand._count.suppliers.toLocaleString(locale)}</TableCell>
  <TableCell align="end">{brand._count.links.toLocaleString(locale)}</TableCell>
  <TableCell align="end">{brand._count.skus.toLocaleString(locale)}</TableCell>
- <TableCell><TableCellContent primary={brand.updated_by_label ?? "—"} secondary={new Intl.DateTimeFormat(locale, { timeZone: timezone, dateStyle: "medium" }).format(new Date(brand.updated_at))} /></TableCell>
  <TableCell stickyEnd align="end">
                     <RowActionMenu label={`Actions for ${brand.name}`} pending={pendingId === brand.id} items={[...[],...(isPending ? [] : []),...[],...(canManage ? [...[],...[{ label: "Edit", onSelect: () => openEditDialog(brand), disabled: isPending, danger: false, separatorBefore: false }],...[],...(!isArchived ? [{ label: "Archive", onSelect: () => setConfirmArchive(brand), disabled: isPending, danger: false, separatorBefore: false }] : [...[],...[{ label: "Restore", onSelect: () => setConfirmRestore(brand), disabled: isPending, danger: false, separatorBefore: false }],...[],...[{ label: "Request deletion", onSelect: () => setDeleteTarget(brand), disabled: isPending, danger: true, separatorBefore: true }],...[]]),...[]] : []),...[]]} />
                   </TableCell></TableRow>

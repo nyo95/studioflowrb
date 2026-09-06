@@ -5,7 +5,7 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission, hasAnyPermission } from "@platform/core/rbac";
 import { PageHeader, SectionCard, EmptyState, buttonClasses } from "@/platform/ui_engine";
 import { BQ_PERMISSIONS } from "@/apps/bq/service";
-import { bqPublicRead } from "@/apps/bq/runtime";
+import { bqPublicRead, masterDataRead } from "@/apps/bq/runtime";
 
 import { AddSectionDialog } from "./add-section-dialog";
 import { ProjectEditor } from "./project-editor";
@@ -27,7 +27,7 @@ export default async function BqProjectDetailPage({
 
   if (!canRead) redirect("/bq");
 
-  const [project, assemblies] = await Promise.all([bqPublicRead.getProjectDetail(id), bqPublicRead.listAssemblyTemplates()]);
+  const [project, assemblies, units] = await Promise.all([bqPublicRead.getProjectDetail(id), bqPublicRead.listAssemblyTemplates(), masterDataRead.listUnits()]);
   if (!project) notFound();
 
   const isLocked = project.status === "LOCKED" || project.status === "ARCHIVED";
@@ -55,7 +55,7 @@ export default async function BqProjectDetailPage({
           <EmptyState title="Belum ada section" description="Project ini belum memiliki section." />
         </SectionCard>
       ) : (
-      <ProjectEditor key={`${project.updatedAt}:${project.sections.length}`} project={project} canManage={canManage} assemblies={assemblies} />
+      <ProjectEditor key={`${project.updatedAt}:${project.sections.length}`} project={project} canManage={canManage} assemblies={assemblies} units={units} />
       )}
     </div>
   );

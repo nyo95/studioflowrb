@@ -203,7 +203,7 @@ Grand Total = SUM(total semua L1)
 
 ---
 
-## 7. Sumber L3 (tiga tipe)
+## 7. Sumber Cost Component (tiga tipe)
 
 | `source_type` | Asal | Snapshot dari |
 |---|---|---|
@@ -264,6 +264,12 @@ Items dengan KATEGORI Biaya Umum / Transportasi & Akomodasi / Alat disimpan seba
 - `BqLibLabor` hanya boleh `Upah`.
 - `BqLibMaterialLabor` hanya boleh `Material+Upah`.
 - `BqLibCustomItem` hanya boleh `Biaya Umum`, `Transportasi & Akomodasi`, atau `Alat`.
+
+Ordinary Library CRUD exposes only Type, Name, Purchase Unit, Base Unit, Price,
+Currency, Notes, and (for Custom only) Category. Non-custom Category is derived
+from Type. `default_koefisien` is persisted as `1` and hidden from ordinary CRUD.
+Purchase and Base Units are selected from active Master Data Units through its
+public read contract, then persisted as BQ-owned snapshot strings.
 
 Enum `BqKategori` disimpan pada seluruh tipe demi bentuk data Library yang seragam, UI badge, snapshot L3, dan validasi promotion. `kategori` bukan FK ke Master Data.
 
@@ -381,6 +387,16 @@ ARCHIVED ──▶ deletion request (terpisah)
 
 **Service-layer enforcement:** setiap mutation terhadap content BQ wajib melewati guard `requireEditableProject` yang reject bila status `LOCKED` atau `ARCHIVED`. Tidak cukup hanya disable tombol di UI.
 
+Permanent deletion is a separate, BQ-owned approval workflow:
+
+- only an ARCHIVED project may receive a deletion request;
+- at most one request may be PENDING for a project;
+- approval requires `bq.project-deletion.approve` (never a Role-name bypass);
+- approval hard-deletes the project and closes the request in one transaction;
+- request, rejection, and successful deletion produce BQ audit events;
+- restoring the project before approval causes approval to fail while the
+  request remains reviewable.
+
 BQ Project berdiri sendiri dulu — integrasi formal ke StudioFlow via `external_ref` menyusul.
 
 ---
@@ -445,9 +461,9 @@ ke BQ sebagai bagian dari workflow ini.
 
 | State | Yang terlihat |
 |---|---|
-| L1 tertutup | nama, qty, unit, rate, total — tampilan klien |
-| L1 terbuka | daftar L2 (jika ada) atau L3 langsung |
-| L2 terbuka | baris L3: qty, unit, koefisien, harga, biaya |
+| Work Item tertutup | nama, qty, unit, rate, total — tampilan klien |
+| Work Item terbuka | daftar Component Group (jika ada) atau Cost Component langsung |
+| Component Group terbuka | Cost Component: qty, unit, koefisien, harga, biaya |
 
 Ubah qty/koefisien di L3 → update real-time ke L2, L1, grand total (tanpa reload).
 
@@ -455,9 +471,9 @@ Ubah qty/koefisien di L3 → update real-time ke L2, L1, grand total (tanpa relo
 
 ```
 Project baru → (opsional) Load Template → dapat scaffold Section/Subsection
-→ Tambah L1 Item di Section/Subsection yang sesuai
-  → (opsional) Tambah L2 Sub-object jika perlu pecah ke komponen
-    → Tambah L3 Line Item:
+→ Tambah Work Item di Section/Subsection yang sesuai
+  → (opsional) Tambah Component Group jika perlu pecah ke komponen
+    → Tambah Cost Component:
         pilih dari: Master Data | BQ Library | Custom
         → tampilkan: "1 SHEET = 2,88 M²" sebagai konteks
         → set qty (berapa SHEET/pcs/roll)
@@ -470,11 +486,11 @@ nama, unit, harga, qty, koefisien, markup, di semua level — dilakukan inline d
 tabel, bukan lewat dialog: Enter commit, Escape batal, commit yang ditolak
 mengembalikan nilai sebelumnya. Ini yang mengaktifkan `InlineEdit` di UI Engine.
 
-*Penyisipan* baris tetap punya afordansnya sendiri, karena memilih sumber bukan
+*Penyisipan* Cost Component tetap punya afordansnya sendiri, karena memilih sumber bukan
 mengubah nilai: "Baris custom" langsung membuat baris kosong yang siap diketik,
 sedangkan "Impor" membuka picker pencarian Master Data dan BQ Library. Picker itu
 tidak melanggar aturan inline — ia memilih dari mana sebuah baris berasal, bukan
-mengedit isinya. Setelah tersisip, baris impor sama bisa di-edit inline seperti
+mengedit isinya. Setelah tersisip, Cost Component impor sama bisa di-edit inline seperti
 yang lain (K-05).
 
 ### 13.3 Halaman yang dibutuhkan

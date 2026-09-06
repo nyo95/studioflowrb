@@ -1,12 +1,12 @@
 "use client";
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
-import { DirectoryShell,DraftDialog,Pagination,RowActionMenu,Text,usePagination } from "@/platform/ui_engine";
+import { DirectoryShell,DraftDialog,EntityPrimaryCell,Pagination,RowActionMenu,Text,usePagination } from "@/platform/ui_engine";
 
 
 import { useState,useTransition } from "react";
 
-import { Badge,Button,Combobox,ConfirmDialog,DataTable,EmptyState,Field,FormActions,InlineError,Input,SearchField,SectionCard,Select,StatusBadge,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Textarea } from "@/platform/ui_engine";
+import { Badge,Button,Combobox,ConfirmDialog,DataTable,EmptyState,Field,FormActions,InlineError,Input,SearchField,SectionCard,Select,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Textarea } from "@/platform/ui_engine";
 import { createMoney,formatMoney } from "@platform/utilities/money";
 import {
 archiveSkuAction,
@@ -88,9 +88,9 @@ export function SkuDirectory({
     );
   });
   const { locale } = useDisplaySettings();
-  const [sortKey, setSortKey] = useState<"SKU" | "Status">("SKU");
+  const [sortKey] = useState<"SKU">("SKU");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const sortValues: Record<"SKU" | "Status", (r: SkuRow) => string | number | null> = {"SKU": (r) => r.name ?? r.code ?? "", "Status": (r) => r.deleted_at ? "Archived" : "Active"};
+  const sortValues: Record<"SKU", (r: SkuRow) => string | number | null> = {"SKU": (r) => r.name ?? r.code ?? ""};
   const collator = new Intl.Collator(locale, { sensitivity: "base", numeric: true });
   const orderedRows = [...filtered].sort((a, b) => {
     const left = sortValues[sortKey](a), right = sortValues[sortKey](b);
@@ -126,7 +126,7 @@ export function SkuDirectory({
   };
 
   return (
-    <DirectoryShell header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false}>
+    <DirectoryShell fill header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false}>
         <div className="flex flex-wrap items-center gap-3">
           <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search SKUs by name, code, brand..." />
           <div className="w-52">
@@ -146,14 +146,13 @@ export function SkuDirectory({
 
         />
       ) : (
-        <DataTable framed={false} density="compact" stickyHeader maxBodyHeight="60vh" minWidth={980}>
+        <DataTable framed={false} density="compact" stickyHeader fill minWidth={860}>
           <TableHeader>
             <TableRow>
-              <TableHead>SKU &amp; Code</TableHead>
+              <TableHead sortable sortDirection={sortDirection} onSortChange={setSortDirection}>SKU &amp; Code</TableHead>
               <TableHead>Brand &amp; Categories</TableHead>
               <TableHead>Units</TableHead>
               <TableHead>Prices</TableHead>
-              <TableHead sortable sortDirection={sortKey === "Status" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Status"); setSortDirection(direction); }}>Status</TableHead>
               <TableHead stickyEnd align="end">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -166,8 +165,10 @@ export function SkuDirectory({
               return (
                 <TableRow key={sku.id}>
                   <TableCell>
-                    <TableCellContent
-                      primary={<span className="font-semibold">{sku.name ?? sku.code ?? "Unnamed SKU"}</span>}
+                    <EntityPrimaryCell
+                      tone={isArchived ? "danger" : "success"}
+                      statusLabel={isArchived ? "Archived" : "Active"}
+                      name={sku.name ?? sku.code ?? "Unnamed SKU"}
                       secondary={
                         <div className="text-xs text-ink-secondary">
                           {sku.code ? <span className="font-ui-mono">{sku.code} • </span> : null}
@@ -181,7 +182,7 @@ export function SkuDirectory({
                       {sku.brand ? (
                         <span className="text-xs font-semibold text-ink">{sku.brand.name}</span>
                       ) : (
-                        <span className="text-xs text-ink-tertiary">Unbranded</span>
+                        <span className="text-xs text-ink-tertiary">Brand unavailable</span>
                       )}
                       <div className="flex flex-wrap gap-1">
                         {sku.categories.map((c) => (
@@ -207,11 +208,6 @@ export function SkuDirectory({
                     ) : (
                       <span className="text-xs text-ink-tertiary">No price</span>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge tone={!isArchived ? "success" : "neutral"}>
-                      {!isArchived ? "Active" : "Archived"}
-                    </StatusBadge>
                   </TableCell>
                   <TableCell stickyEnd align="end">
                     <RowActionMenu label={`Actions for ${sku.id}`} pending={pendingId === sku.id} items={[...[],...(isPending ? [] : []),...[],...(canManage ? [...[],...[{ label: "Edit", onSelect: () => openEditDialog(sku), disabled: isPending, danger: false, separatorBefore: false }],...[],...(!isArchived ? [{ label: "Archive", onSelect: () => setConfirmArchive(sku), disabled: isPending, danger: false, separatorBefore: false }] : [...[],...[{ label: "Restore", onSelect: () => setConfirmRestore(sku), disabled: isPending, danger: false, separatorBefore: false }],...[],...[{ label: "Request deletion", onSelect: () => setDeleteTarget(sku), disabled: isPending, danger: true, separatorBefore: true }],...[]]),...[]] : []),...[]]} />
@@ -263,8 +259,8 @@ export function SkuDirectory({
               <Field label="SKU name">
                 <Input name="name" defaultValue={editTarget.name ?? ""} maxLength={128} autoFocus />
               </Field>
-              <Field label="Brand">
-                <Combobox label="SKU brand" options={[{ id: "", label: "Unbranded / Generic" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={editBrandId} onValueChange={setEditBrandId} placeholder="Unbranded / Generic" searchPlaceholder="Search brands…" />
+              <Field label="Brand" required>
+                <Combobox label="SKU brand" options={brands.map((brand) => ({ id: brand.id, label: brand.name }))} value={editBrandId} onValueChange={setEditBrandId} placeholder="Select brand" searchPlaceholder="Search brands…" />
               </Field>
             </div>
             <div className="grid grid-cols-2 gap-3">

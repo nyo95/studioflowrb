@@ -14,7 +14,7 @@ export default async function MasterDataLayout({ children }: { children: ReactNo
   if (!hasPermission(principalGrants.grants, MASTERDATA_PERMISSIONS.access)) redirect("/");
 
   return (
-    <PageShell size="wide">
+    <PageShell size="wide" fill>
       {children}
     </PageShell>
   );

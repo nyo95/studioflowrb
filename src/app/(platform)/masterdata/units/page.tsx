@@ -38,7 +38,7 @@ export default async function UnitsPage() {
   const units = await masterDataService.listUnits({ grants, includeArchived: true });
 
   return (
-    <div className="grid gap-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
       <PageHeader
         title="Measurement Units"
       />

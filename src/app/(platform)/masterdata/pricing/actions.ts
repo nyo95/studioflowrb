@@ -67,7 +67,7 @@ export async function createMaterialSkuAction(formData: FormData): Promise<Actio
     const schema = z.object({
       name: z.string().max(128).optional().nullable().or(z.literal("")),
       code: z.string().max(32).optional().nullable().or(z.literal("")),
-      brandId: z.string().uuid().optional().nullable().or(z.literal("")),
+      brandId: z.string().uuid("Brand is required"),
       baseUnitId: z.string().uuid(),
       purchaseUnitId: z.string().uuid().optional().nullable().or(z.literal("")),
       dimensionLength: z.string().max(32).optional().nullable().or(z.literal("")),
@@ -83,7 +83,7 @@ export async function createMaterialSkuAction(formData: FormData): Promise<Actio
     const parsed = schema.safeParse({
       name: formData.get("name") ? String(formData.get("name")) : null,
       code: formData.get("code") ? String(formData.get("code")) : null,
-      brandId: formData.get("brandId") ? String(formData.get("brandId")) : null,
+      brandId: String(formData.get("brandId") ?? ""),
       baseUnitId: String(formData.get("baseUnitId") ?? ""),
       purchaseUnitId: formData.get("purchaseUnitId") ? String(formData.get("purchaseUnitId")) : null,
       dimensionLength: formData.get("dimensionLength") ? String(formData.get("dimensionLength")) : null,
@@ -102,7 +102,7 @@ export async function createMaterialSkuAction(formData: FormData): Promise<Actio
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
       name: parsed.data.name,
       code: parsed.data.code || undefined,
-      brandId: parsed.data.brandId || undefined,
+      brandId: parsed.data.brandId,
       baseUnitId: parsed.data.baseUnitId,
       purchaseUnitId: parsed.data.purchaseUnitId || undefined,
       dimensionLength: parsed.data.dimensionLength || undefined,

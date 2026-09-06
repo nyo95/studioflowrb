@@ -99,3 +99,29 @@ export async function addSectionAction(
     return { sectionId: section.id };
   });
 }
+
+const DeletionDecisionSchema = z.object({
+  requestId: z.string().cuid(),
+  decision: z.enum(["approve", "reject"]),
+  reason: z.string().trim().max(500).optional(),
+});
+
+export async function decideProjectDeletionAction(formData: FormData): Promise<ActionResult<void>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = DeletionDecisionSchema.safeParse(Object.fromEntries(formData.entries()));
+    if (!parsed.success) throw validationError(parsed.error);
+    const actor = { kind: "USER" as const, userId: principal.userId, label: principal.displayName };
+    if (parsed.data.decision === "approve") {
+      await bqService.approveProjectDeletion({ grants, actor, requestId: parsed.data.requestId });
+    } else {
+      await bqService.rejectProjectDeletion({
+        grants,
+        actor,
+        requestId: parsed.data.requestId,
+        reason: parsed.data.reason ?? "",
+      });
+    }
+    revalidatePath("/bq");
+  });
+}

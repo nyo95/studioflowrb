@@ -24,13 +24,13 @@ export function DirectoryShell({
   pagination?: ReactNode;
 }) {
   return (
-    <div className={cx("grid gap-4", fill && "flex flex-col flex-1 min-h-0", className)} {...props}>
+    <div className={cx(fill ? "flex min-h-0 flex-1 flex-col gap-4" : "grid gap-4", className)} {...props}>
       {header}
       {surface ? <div className={cx("min-w-0 overflow-hidden rounded-card border border-line bg-surface", fill && "flex flex-col flex-1 min-h-0")} data-directory-surface>
         {toolbar ? <div className="border-b border-line">{toolbar}</div> : null}
-        <div className={cx("min-w-0", fill && "flex-1 min-h-0")}>{children}</div>
+        <div className={cx("min-w-0", fill && "flex min-h-0 flex-1 flex-col")}>{children}</div>
         {pagination ? <div className="border-t border-line px-4 py-3">{pagination}</div> : null}
-      </div> : <>{toolbar}<div className={cx("min-w-0", fill && "flex-1 min-h-0")}>{children}</div>{pagination}</>}
+      </div> : <>{toolbar}<div className={cx("min-w-0", fill && "flex min-h-0 flex-1 flex-col")}>{children}</div>{pagination}</>}
     </div>
   );
 }
@@ -89,13 +89,15 @@ export type TabsProps = {
   actions?: ReactNode;
   /** Keep tab panels in the DOM when switching is part of one multi-panel form. */
   keepMounted?: boolean;
+  /** Grow the tab root and active panel through a bounded flex parent. */
+  fill?: boolean;
   className?: string;
 };
 
-export function Tabs({ items, label = "Sections", distribution = "scroll", className, defaultValue, actions, keepMounted = false, ...props }: TabsProps) {
+export function Tabs({ items, label = "Sections", distribution = "scroll", className, defaultValue, actions, keepMounted = false, fill = false, ...props }: TabsProps) {
   const fallbackValue = items.find((item) => !item.disabled)?.value;
   return (
-    <RTabs.Root className={cx("min-w-0", className)} defaultValue={defaultValue ?? fallbackValue} {...props}>
+    <RTabs.Root className={cx("min-w-0", fill && "flex min-h-0 flex-1 flex-col", className)} defaultValue={defaultValue ?? fallbackValue} {...props}>
       <div className="flex min-w-0 items-center border-b border-line">
         <RTabs.List
           className={cx(
@@ -125,7 +127,7 @@ export function Tabs({ items, label = "Sections", distribution = "scroll", class
         ) : null}
       </div>
       {items.map((item) => (
-        <RTabs.Content className="pt-4" value={item.value} key={item.value} forceMount={keepMounted || undefined}>
+        <RTabs.Content className={cx("pt-4", fill && "min-h-0 flex-1 data-[state=active]:flex data-[state=active]:flex-col")} value={item.value} key={item.value} forceMount={keepMounted || undefined}>
           {item.content}
         </RTabs.Content>
       ))}

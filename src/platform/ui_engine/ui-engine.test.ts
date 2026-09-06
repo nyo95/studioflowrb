@@ -275,6 +275,18 @@ describe("UI Engine foundation", () => {
     const hooks = readFileSync(new URL("./patterns/hooks.tsx", import.meta.url), "utf8");
     assert.match(hooks, /export function useFormDraftGuard/);
     assert.match(hooks, /new FormData\(form\)/);
+    assert.match(hooks, /baselineCapturedRef/);
+    assert.match(hooks, /window\.setTimeout\(\(\) => \{/);
+  });
+
+  it("propagates viewport fill through shells, tabs, and table scroll regions", () => {
+    const shells = readFileSync(new URL("./layouts/shells.tsx", import.meta.url), "utf8");
+    const templates = readFileSync(new URL("./layouts/templates.tsx", import.meta.url), "utf8");
+    const data = readFileSync(new URL("./components/data.tsx", import.meta.url), "utf8");
+    assert.match(shells, /fill \? "flex min-h-0 flex-1 flex-col" : "grid"/);
+    assert.match(templates, /fill \? "flex min-h-0 flex-1 flex-col gap-4" : "grid gap-4"/);
+    assert.match(templates, /fill && "min-h-0 flex-1 data-\[state=active\]:flex/);
+    assert.match(data, /fill && "flex-1 min-h-0"/);
   });
 
   it("owns the busy and failure states around an app-supplied create", () => {

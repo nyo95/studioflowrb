@@ -7,7 +7,7 @@ import { DirectoryShell,DraftDialog,Pagination,RowActionMenu,Text,usePagination 
 import { Plus } from "lucide-react";
 import { useState,useTransition } from "react";
 
-import { Button,ConfirmDialog,DataTable,EmptyState,Field,FormActions,InlineError,Input,Notice,SearchField,StatusBadge,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar } from "@/platform/ui_engine";
+import { Button,ConfirmDialog,DataTable,EmptyState,EntityPrimaryCell,Field,FormActions,InlineError,Input,Notice,SearchField,TableBody,TableCell,TableHead,TableHeader,TableRow,TableToolbar } from "@/platform/ui_engine";
 import {
 archiveUnitAction,
 createUnitAction,
@@ -101,7 +101,7 @@ export function UnitDirectory({
   };
 
   return (
-    <DirectoryShell header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
+    <DirectoryShell fill header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
         <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
           <Plus aria-hidden="true" />
           <span>New unit</span>
@@ -119,12 +119,10 @@ export function UnitDirectory({
 
         />
       ) : (
-        <DataTable framed={false} density="compact" stickyHeader maxBodyHeight="60vh" minWidth={620}>
+        <DataTable framed={false} density="compact" stickyHeader fill minWidth={560}>
           <TableHeader>
             <TableRow>
-              <TableHead sortable sortDirection={sortKey === "Code" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Code"); setSortDirection(direction); }}>Code</TableHead>
-              <TableHead sortable sortDirection={sortKey === "Name" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Name"); setSortDirection(direction); }}>Name</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead sortable sortDirection={sortKey === "Code" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Code"); setSortDirection(direction); }}>Unit</TableHead>
               <TableHead stickyEnd align="end">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -135,15 +133,7 @@ export function UnitDirectory({
               return (
                 <TableRow key={unit.id}>
                   <TableCell>
-                    <TableCellContent primary={<span className="font-ui-mono font-semibold">{displayUnitCode(unit.code)}</span>} />
-                  </TableCell>
-                  <TableCell>
-                    <TableCellContent primary={unit.name} />
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge tone={unit.status === "ACTIVE" ? "success" : "neutral"}>
-                      {unit.status === "ACTIVE" ? "Active" : "Archived"}
-                    </StatusBadge>
+                    <EntityPrimaryCell tone={unit.status === "ACTIVE" ? "success" : "danger"} statusLabel={unit.status === "ACTIVE" ? "Active" : "Archived"} name={<span className="font-ui-mono">{displayUnitCode(unit.code)}</span>} secondary={unit.name} />
                   </TableCell>
                   <TableCell stickyEnd align="end">
                     <RowActionMenu label={`Actions for ${unit.name}`} pending={pendingId === unit.id} items={[...[],...(isPending ? [] : []),...[],...(canManage ? [...[],...[{ label: "Edit", onSelect: () => setEditTarget(unit), disabled: isPending, danger: false, separatorBefore: false }],...[],...(unit.status === "ACTIVE" ? [{ label: "Archive", onSelect: () => setConfirmArchive(unit), disabled: isPending, danger: false, separatorBefore: false }] : [...[],...[{ label: "Restore", onSelect: () => setConfirmRestore(unit), disabled: isPending, danger: false, separatorBefore: false }],...[],...[{ label: "Request deletion", onSelect: () => setDeleteTarget(unit), disabled: isPending, danger: true, separatorBefore: true }],...[]]),...[]] : []),...[]]} />

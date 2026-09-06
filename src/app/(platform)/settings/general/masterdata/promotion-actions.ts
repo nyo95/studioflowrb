@@ -6,8 +6,7 @@ import { z } from "zod";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { validationError } from "@platform/core/validation";
-import { bqService } from "@/apps/bq/runtime";
-import { masterDataService } from "@/apps/masterdata/runtime";
+import { promotionCoordinator } from "@/app/promotion-runtime";
 
 const PromotionSchema = z.object({
   type: z.enum(["material", "labor", "material_labor"]),
@@ -29,17 +28,12 @@ export async function approveBqPromotionAction(
       .safeParse(Object.fromEntries(formData.entries()));
     if (!parsed.success) throw validationError(parsed.error);
 
-    const reference = await masterDataService.validatePromotionReference({
-      grants,
-      type: parsed.data.type,
-      referenceId: parsed.data.masterdataRefId,
-    });
-    await bqService.approvePromotion({
+    await promotionCoordinator.approve({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
       type: parsed.data.type,
       libItemId: parsed.data.libItemId,
-      masterdataRefId: reference.referenceId,
+      masterdataRefId: parsed.data.masterdataRefId,
     });
     refresh();
     return { id: parsed.data.libItemId };
@@ -54,7 +48,7 @@ export async function rejectBqPromotionAction(
     const parsed = PromotionSchema.extend({ reason: z.string().trim().min(1).max(500) })
       .safeParse(Object.fromEntries(formData.entries()));
     if (!parsed.success) throw validationError(parsed.error);
-    await bqService.rejectPromotion({
+    await promotionCoordinator.reject({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
       type: parsed.data.type,

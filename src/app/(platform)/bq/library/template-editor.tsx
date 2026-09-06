@@ -131,9 +131,18 @@ function TemplateSectionsDialog({
               {children.length > 0 ? (
                 <ul className="grid gap-1 pl-4">
                   {children.map((child) => (
-                    <li key={child.id} className="flex items-center justify-between gap-2 rounded-action bg-surface-muted px-2 py-1">
-                      <span className="text-ink-secondary">{child.name}</span>
-                      <IconButton size="sm" variant="ghost" label={`Delete ${child.name}`} icon={<X aria-hidden="true" />} disabled={pending} onClick={() => run(deleteTemplateSectionAction, { id: child.id })} />
+                    <li key={child.id} className="grid gap-2 rounded-action bg-surface-muted px-2 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-ink-secondary">{child.name}</span>
+                        <IconButton size="sm" variant="ghost" label={`Delete ${child.name}`} icon={<X aria-hidden="true" />} disabled={pending} onClick={() => run(deleteTemplateSectionAction, { id: child.id })} />
+                      </div>
+                      <Recommendations
+                        section={child}
+                        libraryItems={libraryItems}
+                        pending={pending}
+                        onAdd={(libItemId, libItemType) => run(addTemplateRecommendationAction, { templateSectionId: child.id, libItemId, libItemType })}
+                        onRemove={(id) => run(removeTemplateRecommendationAction, { id })}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -190,7 +199,7 @@ function Recommendations({
         <ul className="grid gap-1">
           {section.recommendations.map((recommendation) => (
             <li key={recommendation.id} className="flex items-center justify-between gap-2 text-ink-secondary">
-              <span className="truncate">{recommendation.libItem?.name ?? "Item tidak ditemukan"}</span>
+              <span className="truncate">{recommendation.libItem?.name ?? "Library item unavailable"}</span>
               <IconButton size="sm" variant="ghost" label="Remove recommendation" icon={<X aria-hidden="true" />} disabled={pending} onClick={() => onRemove(recommendation.id)} />
             </li>
           ))}

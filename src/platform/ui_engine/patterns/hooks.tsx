@@ -158,16 +158,26 @@ export function useFormDraftGuard({
   const [baseline, setBaseline] = useState("");
   const [value, setValue] = useState("");
   const baselineRef = useRef("");
+  const baselineCapturedRef = useRef(false);
   const watchedBaselineRef = useRef(watchedValue);
   const capture = useCallback(() => {
-    const next = serialiseForm(formRef.current);
+    const form = formRef.current;
+    if (!form) {
+      baselineCapturedRef.current = false;
+      return;
+    }
+    const next = serialiseForm(form);
     baselineRef.current = next;
+    baselineCapturedRef.current = true;
     setBaseline(next);
     setValue(next);
   }, [formRef]);
 
   useLayoutEffect(() => {
-    if (!active) return;
+    if (!active) {
+      baselineCapturedRef.current = false;
+      return;
+    }
     // This runs after the opening values are mounted but before the browser can
     // process the next user input. A deferred frame could capture the first
     // keystroke as the baseline and silently lose the discard warning.
@@ -177,10 +187,30 @@ export function useFormDraftGuard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, capture, resetKey]);
 
+  useEffect(() => {
+    if (!active) return;
+    // Portalled controls can finish their mount-time controlled-value setup
+    // after the owner's layout effect. Re-capture once at the next task, which
+    // still runs before a subsequent user event can edit or dismiss the form.
+    const timer = window.setTimeout(() => {
+      watchedBaselineRef.current = watchedValue;
+      capture();
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // watchedValue is intentionally the value for this draft identity; later
+    // changes must remain dirty and therefore do not re-run this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, capture, resetKey]);
+
   const sync = useCallback(() => setValue(serialiseForm(formRef.current)), [formRef]);
   useEffect(() => {
-    if (active) sync();
-  }, [active, sync, watchedValue]);
+    if (!active) return;
+    // Radix portals can mount their form after the owner's layout effect. In
+    // that case the first capture saw a null ref; capture the actual mounted
+    // form now instead of treating all of its default fields as user edits.
+    if (!baselineCapturedRef.current) capture();
+    else sync();
+  }, [active, capture, sync, watchedValue]);
 
   const guard = useUnsavedChangesGuard({ value: JSON.stringify([value, watchedValue]), initialValue: JSON.stringify([baseline, initialWatched]), title, description, confirmLabel, cancelLabel });
   const discardConfirm = useConfirm();
