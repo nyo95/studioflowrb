@@ -111,7 +111,7 @@ export function Tabs({ items, label = "Sections", distribution = "scroll", class
         >
           {items.map((item) => (
             <RTabs.Trigger
-              className="relative min-h-[38px] cursor-pointer whitespace-nowrap border-0 bg-transparent px-3 py-0 font-semibold text-ink-secondary after:absolute after:bottom-[-1px] after:left-2.5 after:right-2.5 after:h-0.5 after:rounded-[2px] after:bg-transparent after:content-[''] data-[state=active]:text-ink data-[state=active]:after:bg-action disabled:opacity-45"
+              className="relative min-h-[38px] cursor-pointer whitespace-nowrap border-0 bg-transparent px-3 py-0 font-normal text-ink-tertiary after:absolute after:bottom-[-1px] after:left-2.5 after:right-2.5 after:h-0.5 after:rounded-[2px] after:bg-transparent after:content-[''] data-[state=active]:font-semibold data-[state=active]:text-ink data-[state=active]:after:bg-action disabled:opacity-45"
               value={item.value}
               disabled={item.disabled}
               key={item.value}

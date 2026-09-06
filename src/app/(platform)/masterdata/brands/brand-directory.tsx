@@ -1,7 +1,7 @@
 "use client";
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
-import { DirectoryShell,DraftDialog,Pagination,RowActionMenu,Text,usePagination } from "@/platform/ui_engine";
+import { DirectoryShell,DraftDialog,Pagination,RowActionMenu,RowActionsCell,RowActionsHead,Text,usePagination } from "@/platform/ui_engine";
 ﻿
 
 import { Plus } from "lucide-react";
@@ -276,7 +276,7 @@ export function BrandDirectory({
 <TableHead style={{ width: 90 }} align="end" sortable sortDirection={sortKey === "Suppliers" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Suppliers"); setSortDirection(direction); }}>Suppliers</TableHead>
 <TableHead style={{ width: 90 }} align="end" sortable sortDirection={sortKey === "Resources" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Resources"); setSortDirection(direction); }}>Resources</TableHead>
 <TableHead style={{ width: 90 }} align="end" sortable sortDirection={sortKey === "SKUs" ? sortDirection : null} onSortChange={(direction) => { setSortKey("SKUs"); setSortDirection(direction); }}>SKUs</TableHead>
-<TableHead stickyEnd style={{ width: 64 }} align="end" >Actions</TableHead></TableRow>
+<RowActionsHead /></TableRow>
           </TableHeader>
           <TableBody>
             {visibleRows.map((brand) => {
@@ -285,16 +285,16 @@ export function BrandDirectory({
 
               return (
                 <TableRow key={brand.id}>
- <TableCell wrap><EntityPrimaryCell tone={isArchived ? "danger" : "success"} statusLabel={isArchived ? "Archived" : "Active"} name={brand.name} secondary={<span className="grid gap-0.5"><span className="font-ui-mono">{brand.slug}</span><span>Updated by {brand.updated_by_label ?? "—"} · {new Intl.DateTimeFormat(locale, { timeZone: timezone, dateStyle: "medium" }).format(new Date(brand.updated_at))}</span></span>} /></TableCell>
+ <TableCell wrap><EntityPrimaryCell tone={isArchived ? "danger" : "success"} statusLabel={isArchived ? "Archived" : "Active"} name={brand.name} secondary={brand.owner_vendor?.name ?? undefined} /></TableCell>
  <TableCell><DiscoverySummary values={brand.categories.map(c => c.category.name)} limit={3} /></TableCell>
  <TableCell><DiscoverySummary values={brand.hashtags.map(h => `#${h.label.replace(/^#/, "")}`)} limit={2} /></TableCell>
  <TableCell wrap><TableCellContent primary={brand.owner_vendor?.name ?? "—"} primaryLines={2} /></TableCell>
  <TableCell align="end">{brand._count.suppliers.toLocaleString(locale)}</TableCell>
  <TableCell align="end">{brand._count.links.toLocaleString(locale)}</TableCell>
  <TableCell align="end">{brand._count.skus.toLocaleString(locale)}</TableCell>
- <TableCell stickyEnd align="end">
+ <RowActionsCell>
                     <RowActionMenu label={`Actions for ${brand.name}`} pending={pendingId === brand.id} items={[...[],...(isPending ? [] : []),...[],...(canManage ? [...[],...[{ label: "Edit", onSelect: () => openEditDialog(brand), disabled: isPending, danger: false, separatorBefore: false }],...[],...(!isArchived ? [{ label: "Archive", onSelect: () => setConfirmArchive(brand), disabled: isPending, danger: false, separatorBefore: false }] : [...[],...[{ label: "Restore", onSelect: () => setConfirmRestore(brand), disabled: isPending, danger: false, separatorBefore: false }],...[],...[{ label: "Request deletion", onSelect: () => setDeleteTarget(brand), disabled: isPending, danger: true, separatorBefore: true }],...[]]),...[]] : []),...[]]} />
-                  </TableCell></TableRow>
+                  </RowActionsCell></TableRow>
               );
             })}
           </TableBody>

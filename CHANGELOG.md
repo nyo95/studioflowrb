@@ -5,8 +5,23 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.13**
-- Next local revision: **R6.14**
+- Current revision after this entry is committed: **R6.14**
+- Next local revision: **R6.15**
+
+## R6.14 | fix(ui): align shared directory controls and metadata
+
+### Scope and checks
+- Kept the AppShell topbar brand width independent from sidebar collapse,
+  made Select wrappers fill their layout cell, and made Pricing tabs visibly
+  distinguish active and inactive states.
+- Added canonical `RowActionsHead` / `RowActionsCell` primitives and adopted
+  them in the Brand, Supplier, and Pricing directories.
+- Removed slugs from Brand/Supplier secondary identity lines and promoted
+  supplier/type metadata plus SKU code in Pricing identity rows.
+- Checks: `npm run typecheck` and `npm run lint` passed. The repository-wide
+  test runner was also invoked; six pre-existing BQ integration hooks fail when
+  run without the isolated test database (`bq` schema missing), while the other
+  tests pass.
 
 ## R6.13 | fix(bq): format editable unit prices for Indonesian display
 

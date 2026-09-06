@@ -1,7 +1,7 @@
 "use client";
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
-import { DirectoryShell,DraftDialog,Pagination,RowActionMenu,Text,usePagination } from "@/platform/ui_engine";
+import { DirectoryShell,DraftDialog,Pagination,RowActionMenu,RowActionsCell,RowActionsHead,Text,usePagination } from "@/platform/ui_engine";
 
 
 import { Plus,UserPlus,X } from "lucide-react";
@@ -280,7 +280,7 @@ export function VendorDirectory({
               <TableHead>Types &amp; Capabilities</TableHead>
               <TableHead>Contacts</TableHead>
               <TableHead align="end">Prices</TableHead>
-              <TableHead stickyEnd align="end">Actions</TableHead>
+              <RowActionsHead />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -299,19 +299,7 @@ export function VendorDirectory({
                       tone={isArchived ? "danger" : "success"}
                       statusLabel={isArchived ? "Archived" : "Active"}
                       name={vendor.name}
-                      secondary={
-                        <div className="grid gap-0.5 text-xs text-ink-secondary">
-                          <div>
-                            {vendor.legal_name ? <span>{vendor.legal_name} • </span> : null}
-                            <span className="font-ui-mono">{vendor.slug}</span>
-                          </div>
-                          {vendor.updated_by_label ? (
-                            <span className="text-ink-tertiary">
-                              Updated by <span className="font-medium text-ink-secondary">{vendor.updated_by_label}</span> · {new Intl.DateTimeFormat(locale, { timeZone: timezone, dateStyle: "medium" }).format(vendor.updated_at)}
-                            </span>
-                          ) : null}
-                        </div>
-                      }
+                      secondary={vendor.types[0]?.vendor_type.name ?? undefined}
                     />
                   </TableCell>
                   <TableCell>
@@ -353,9 +341,9 @@ export function VendorDirectory({
                   <TableCell align="end">
                     <TableCellContent align="end" primary={totalPriceCount.toLocaleString()} />
                   </TableCell>
-                  <TableCell stickyEnd align="end">
+                  <RowActionsCell>
                     <RowActionMenu label={`Actions for ${vendor.name}`} pending={pendingId === vendor.id} items={[...[],...(isPending ? [] : []),...[],...(canManage ? [...[],...[{ label: "Edit", onSelect: () => openEditDialog(vendor), disabled: isPending, danger: false, separatorBefore: false }],...[],...(!isArchived ? [{ label: "Archive", onSelect: () => setConfirmArchive(vendor), disabled: isPending, danger: false, separatorBefore: false }] : [...[],...[{ label: "Restore", onSelect: () => setConfirmRestore(vendor), disabled: isPending, danger: false, separatorBefore: false }],...[],...[{ label: "Request deletion", onSelect: () => setDeleteTarget(vendor), disabled: isPending, danger: true, separatorBefore: true }],...[]]),...[]] : []),...[]]} />
-                  </TableCell>
+                  </RowActionsCell>
                 </TableRow>
               );
             })}

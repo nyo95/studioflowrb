@@ -56,7 +56,7 @@ export const Select = forwardRef<
   SelectHTMLAttributes<HTMLSelectElement> & InvalidProp
 >(function Select({ className, invalid, children, ...props }, ref) {
   return (
-    <span className={cx("relative block", className)}>
+    <span className={cx("relative block w-full", className)}>
       <select
         ref={ref}
         className={cx(CONTROL_CLASSES, "appearance-none pr-8")}

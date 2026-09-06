@@ -210,6 +210,11 @@ export function TableHead({
   );
 }
 
+/** Canonical sticky actions column header for entity directories. */
+export function RowActionsHead() {
+  return <TableHead stickyEnd align="end" style={{ width: 48 }}>Actions</TableHead>;
+}
+
 export function TableCell({
   stickyEnd = false,
   align = "start",
@@ -238,6 +243,11 @@ export function TableCell({
       {...props}
     />
   );
+}
+
+/** Canonical sticky actions cell for entity directories. */
+export function RowActionsCell({ children }: { children: ReactNode }) {
+  return <TableCell stickyEnd align="end" className="py-1.5">{children}</TableCell>;
 }
 
 export type TableCellContentProps = HTMLAttributes<HTMLDivElement> & {
