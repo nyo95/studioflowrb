@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 
 import { redirect } from "next/navigation";
 
@@ -7,7 +8,7 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 
 import { hasPermission } from "@platform/core/rbac";
 
-import { DataTable,PageHeader,TableBody,TableCell,TableHead,TableHeader,TableRow,Text } from "@/platform/ui_engine";
+import { PageHeader } from "@/platform/ui_engine";
 
 
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
@@ -36,13 +37,30 @@ export default async function MasterDataPage() {
 
   return <div className="grid gap-4">
     <PageHeader title="Operational Catalog" />
-    <DataTable density="compact" minWidth={520}>
-      <TableHeader><TableRow><TableHead>Area</TableHead><TableHead align="end">Records</TableHead><TableHead align="end">Open</TableHead></TableRow></TableHeader>
-      <TableBody>{SECTIONS.map(section => <TableRow key={section.key}>
-        <TableCell><Text weight="semibold">{section.key === "materialPrices" ? "Pricing" : section.label}</Text></TableCell>
-        <TableCell align="end">{section.key === "materialPrices" ? <span>{summary.materialPrices} material · {summary.workPrices} work</span> : summary[section.key]}</TableCell>
-        <TableCell align="end"><Link className="rounded-action px-2 py-1 text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-line-focus" href={section.href} aria-label={`Open ${section.key === "materialPrices" ? "Pricing" : section.label}`}>Open</Link></TableCell>
-      </TableRow>)}</TableBody>
-    </DataTable>
+    <div className="divide-y divide-line-subtle border-y border-line-subtle">
+      {SECTIONS.map((section) => {
+        const label = section.key === "materialPrices" ? "Pricing" : section.label;
+        const count = section.key === "materialPrices"
+          ? `${summary.materialPrices === 0 ? "—" : summary.materialPrices} material · ${summary.workPrices === 0 ? "—" : summary.workPrices} work`
+          : (summary[section.key] === 0 ? "—" : summary[section.key]);
+        return (
+          <Link
+            key={section.key}
+            href={section.href}
+            className="group flex w-full items-center justify-between gap-4 px-3 py-4 transition-colors hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-line-focus"
+            aria-label={`Open ${label}`}
+          >
+            <span className="min-w-0">
+              <span className="block font-semibold text-ink">{label}</span>
+              <span className="mt-0.5 block text-sm text-ink-tertiary">{section.desc}</span>
+            </span>
+            <span className="flex shrink-0 items-center gap-2 text-sm text-ink-secondary">
+              <span>{count}</span>
+              <ChevronRight aria-hidden="true" className="h-4 w-4 text-ink-tertiary transition-transform group-hover:translate-x-0.5" />
+            </span>
+          </Link>
+        );
+      })}
+    </div>
   </div>;
 }
