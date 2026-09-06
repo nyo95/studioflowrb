@@ -5,8 +5,23 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.07**
-- Next local revision: **R6.08**
+- Current revision after this entry is committed: **R6.08**
+- Next local revision: **R6.09**
+
+## R6.08 | feat(bq): transient add-row for custom line items
+
+### Added
+- `TransientLineItemRow` component: a ghost `TableRow` containing a text input that appears inline in the table when the user clicks "+ Baris custom". Pressing Enter submits `addLineItemAction` with the typed title; pressing Escape or submitting empty dismisses the row without a server call.
+- `transientAdd` state (`{ kind: "item" | "subObject"; id: string } | null`) hoisted to `ProjectEditor`; threaded through `ItemTable → ItemRows → SubObjectRows` via `transientAdd` / `onTransientAdd` props.
+- `AddLineItemSchema` extended with optional `title` field (max 200 chars); `CUSTOM` line-item snapshot uses `title.trim() || "New line"` instead of hardcoded label.
+
+### Changed
+- Item-level and subObject-level "+ Baris custom" buttons no longer call the server directly on click; they now set `transientAdd` state to show the ghost row.
+- Subsection `ItemTable` now receives `transientAdd` / `onTransientAdd` props (was missing from prior commit).
+
+### Files changed
+- `src/app/(platform)/bq/[id]/project-editor.tsx`
+- `src/app/(platform)/bq/[id]/actions.ts`
 
 ## R6.07 | refactor(bq): add controls follow insertion point
 

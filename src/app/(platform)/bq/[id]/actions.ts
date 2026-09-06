@@ -302,6 +302,8 @@ const AddLineItemSchema = z.object({
   sourceRefId: z.string().max(64).optional(),
   sourceKind: z.enum(["material", "material-labor", "labor", "library"]).optional(),
   kategori: z.enum(KATEGORI).optional(),
+  /** Transient add row: caller supplies initial name for CUSTOM rows. */
+  title: z.string().trim().max(200).optional(),
 });
 
 /**
@@ -327,7 +329,7 @@ export async function addLineItemAction(
 
     if (value.sourceType === "CUSTOM") {
       snapshot = snapshotCustom({
-        title: "New line",
+        title: value.title?.trim() || "New line",
         purchaseUnit: "ls",
         harga: "0",
         currency: "IDR",

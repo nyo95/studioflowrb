@@ -89,6 +89,7 @@ export function ProjectEditor({
   const [importTarget, setImportTarget] = useState<{ itemId?: string; subObjectId?: string } | null>(null);
   const [assemblyTarget, setAssemblyTarget] = useState<string | null>(null); // itemId
   const [lockOpen, setLockOpen] = useState(false);
+  const [transientAdd, setTransientAdd] = useState<{ kind: "item" | "subObject"; id: string } | null>(null);
 
   const locked = project.status === "LOCKED" || project.status === "ARCHIVED";
   const editable = canManage && !locked;
@@ -183,6 +184,8 @@ export function ProjectEditor({
             run={run}
             commit={commit}
             onImport={setImportTarget}
+            transientAdd={transientAdd}
+            onTransientAdd={setTransientAdd}
             columns={totalColumns}
           />
 
@@ -209,6 +212,8 @@ export function ProjectEditor({
                 run={run}
                 commit={commit}
                 onImport={setImportTarget}
+                transientAdd={transientAdd}
+                onTransientAdd={setTransientAdd}
                 columns={totalColumns}
               />
               {editable ? (
@@ -336,6 +341,8 @@ function ItemTable({
   commit,
   onImport,
   onApplyAssembly,
+  transientAdd,
+  onTransientAdd,
   columns,
 }: {
   items: readonly BqItemDetail[];
@@ -347,6 +354,8 @@ function ItemTable({
   commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   onImport: (target: { itemId?: string; subObjectId?: string }) => void;
   onApplyAssembly?: (itemId: string) => void;
+  transientAdd: { kind: "item" | "subObject"; id: string } | null;
+  onTransientAdd: (v: { kind: "item" | "subObject"; id: string } | null) => void;
   columns: number;
 }) {
   if (items.length === 0) {
@@ -385,6 +394,8 @@ function ItemTable({
               commit={commit}
               onImport={onImport}
               onApplyAssembly={onApplyAssembly}
+              transientAdd={transientAdd}
+              onTransientAdd={onTransientAdd}
               columns={columns + (editable ? 1 : 0)}
             />
           );
@@ -406,6 +417,8 @@ function ItemRows({
   commit,
   onImport,
   onApplyAssembly,
+  transientAdd,
+  onTransientAdd,
   columns,
 }: {
   item: BqItemDetail;
@@ -419,6 +432,8 @@ function ItemRows({
   commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   onImport: (target: { itemId?: string; subObjectId?: string }) => void;
   onApplyAssembly?: (itemId: string) => void;
+  transientAdd: { kind: "item" | "subObject"; id: string } | null;
+  onTransientAdd: (v: { kind: "item" | "subObject"; id: string } | null) => void;
   columns: number;
 }) {
   return (
@@ -495,6 +510,8 @@ function ItemRows({
               run={run}
               commit={commit}
               onImport={onImport}
+              transientAdd={transientAdd}
+              onTransientAdd={onTransientAdd}
               columns={columns}
             />
           ))}
@@ -510,6 +527,16 @@ function ItemRows({
               commit={commit}
             />
           ))}
+          {transientAdd?.kind === "item" && transientAdd.id === item.id ? (
+            <TransientLineItemRow
+              itemId={item.id}
+              depth={1}
+              columns={columns}
+              pending={pending}
+              run={run}
+              onDismiss={() => onTransientAdd(null)}
+            />
+          ) : null}
 
           {editable ? (
             <TableRow>
@@ -527,7 +554,7 @@ function ItemRows({
                     variant="ghost"
                     leadingIcon={<Plus aria-hidden="true" />}
                     disabled={pending}
-                    onClick={() => void run(addLineItemAction, { itemId: item.id, sourceType: "CUSTOM" }).catch(() => undefined)}
+                    onClick={() => onTransientAdd({ kind: "item", id: item.id })}
                   >
                     Baris custom
                   </Button>
@@ -569,6 +596,8 @@ function SubObjectRows({
   run,
   commit,
   onImport,
+  transientAdd,
+  onTransientAdd,
   columns,
 }: {
   subObject: BqSubObjectDetail;
@@ -579,6 +608,8 @@ function SubObjectRows({
   run: (action: Mutation, fields: Record<string, string | undefined>) => Promise<void>;
   commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   onImport: (target: { itemId?: string; subObjectId?: string }) => void;
+  transientAdd: { kind: "item" | "subObject"; id: string } | null;
+  onTransientAdd: (v: { kind: "item" | "subObject"; id: string } | null) => void;
   columns: number;
 }) {
   const open = expanded.has(subObject.id);
@@ -627,6 +658,16 @@ function SubObjectRows({
           {subObject.lineItems.map((line) => (
             <LineItemRow key={line.id} line={line} depth={2} editable={editable} pending={pending} run={run} commit={commit} />
           ))}
+          {transientAdd?.kind === "subObject" && transientAdd.id === subObject.id ? (
+            <TransientLineItemRow
+              subObjectId={subObject.id}
+              depth={2}
+              columns={columns}
+              pending={pending}
+              run={run}
+              onDismiss={() => onTransientAdd(null)}
+            />
+          ) : null}
           {editable ? (
             <TableRow>
               <TableCell />
@@ -637,7 +678,7 @@ function SubObjectRows({
                     variant="ghost"
                     leadingIcon={<Plus aria-hidden="true" />}
                     disabled={pending}
-                    onClick={() => void run(addLineItemAction, { subObjectId: subObject.id, sourceType: "CUSTOM" }).catch(() => undefined)}
+                    onClick={() => onTransientAdd({ kind: "subObject", id: subObject.id })}
                   >
                     Baris custom
                   </Button>
@@ -659,6 +700,68 @@ function SubObjectRows({
     </>
   );
 }
+
+function TransientLineItemRow({
+  itemId,
+  subObjectId,
+  depth,
+  columns,
+  pending,
+  run,
+  onDismiss,
+}: {
+  itemId?: string;
+  subObjectId?: string;
+  depth: 1 | 2;
+  columns: number;
+  pending: boolean;
+  run: (action: Mutation, fields: Record<string, string | undefined>) => Promise<void>;
+  onDismiss: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const indent = depth === 1 ? "pl-4" : "pl-10";
+
+  async function submit() {
+    const t = title.trim();
+    if (!t) { onDismiss(); return; }
+    await run(addLineItemAction, {
+      ...(itemId ? { itemId } : { subObjectId }),
+      sourceType: "CUSTOM",
+      title: t,
+    }).catch(() => undefined);
+    onDismiss();
+  }
+
+  return (
+    <TableRow>
+      <TableCell />
+      <TableCell colSpan={columns - 1}>
+        <div className={`flex items-center gap-2 ${indent}`}>
+          <input
+            ref={inputRef}
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); void submit(); }
+              if (e.key === "Escape") { e.preventDefault(); onDismiss(); }
+            }}
+            placeholder="Nama baris…"
+            className="min-w-0 flex-1 rounded border border-line bg-surface px-2 py-0.5 text-sm text-ink outline-none focus:border-brand"
+            disabled={pending}
+          />
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
 
 function LineItemRow({
   line,
