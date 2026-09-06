@@ -5,8 +5,25 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.08**
-- Next local revision: **R6.09**
+- Current revision after this entry is committed: **R6.09**
+- Next local revision: **R6.10**
+
+## R6.09 | feat(bq): source-picker tab redesign with Custom kategori grid
+
+### Changed
+- `ImportDialog` redesigned with four tabs: **Semua** (all sources), **Master Data**, **BQ Library**, and **Custom**.
+- **Custom tab**: shows a 2×3 grid of kategori cards (Material, Upah, Material+Upah, Alat, Biaya Umum, Transportasi). Clicking a card adds a blank CUSTOM line item with that kategori — no search required.
+- **Semua / Master Data / BQ Library tabs**: same search-driven list as before; Master Data and BQ Library tabs pre-filter by `sourceType`.
+- Dialog title changed from "Impor dari Master Data atau BQ Library" → "Pilih sumber harga".
+- `onPick` callback now accepts `SourcePickOption` (union of `LineItemSourceOption | { sourceType: "CUSTOM"; kategori: string }`); outer handler branches accordingly.
+
+### Added
+- `SourcePickOption` union type (file-local).
+- `CUSTOM_KATEGORI_OPTIONS` constant array for the Custom tab grid.
+- `PickerTab` type and `visibleOptions` filtered list.
+
+### Files changed
+- `src/app/(platform)/bq/[id]/project-editor.tsx`
 
 ## R6.08 | feat(bq): transient add-row for custom line items
 

@@ -65,6 +65,11 @@ const KATEGORI_LABEL: Record<string, string> = {
   ALAT: "Alat",
 };
 
+/** Union of picker outcomes: a library/master-data record, or a blank custom row with chosen kategori. */
+type SourcePickOption =
+  | LineItemSourceOption
+  | { sourceType: "CUSTOM"; kategori: string };
+
 type Mutation = (prev: null, formData: FormData) => Promise<ActionResult<BqProjectDetail>>;
 
 /** Amounts arrive as canonical decimal strings; presentation never re-derives them. */
@@ -257,8 +262,9 @@ export function ProjectEditor({
               itemId: importTarget.itemId,
               subObjectId: importTarget.subObjectId,
               sourceType: option.sourceType,
-              sourceRefId: option.id,
-              sourceKind: option.sourceKind,
+              ...(option.sourceType === "CUSTOM"
+                ? { kategori: option.kategori }
+                : { sourceRefId: option.id, sourceKind: option.sourceKind }),
             });
             setImportTarget(null);
           }}
@@ -909,6 +915,17 @@ function RemoveButton({ label, onRemove, disabled }: { label: string; onRemove: 
   );
 }
 
+const CUSTOM_KATEGORI_OPTIONS: { value: string; label: string; description: string }[] = [
+  { value: "MATERIAL", label: "Material", description: "Bahan & material fisik" },
+  { value: "UPAH", label: "Upah", description: "Tenaga kerja" },
+  { value: "MATERIAL_UPAH", label: "Material+Upah", description: "Paket material dan tenaga" },
+  { value: "ALAT", label: "Alat", description: "Sewa atau penggunaan alat" },
+  { value: "BIAYA_UMUM", label: "Biaya Umum", description: "Overhead, izin, asuransi" },
+  { value: "TRANSPORTASI_AKOMODASI", label: "Transportasi", description: "Ongkir & akomodasi" },
+];
+
+type PickerTab = "all" | "masterdata" | "bq_library" | "custom";
+
 function ImportDialog({
   target,
   onClose,
@@ -916,8 +933,9 @@ function ImportDialog({
 }: {
   target: { itemId?: string; subObjectId?: string };
   onClose: () => void;
-  onPick: (option: LineItemSourceOption) => Promise<void>;
+  onPick: (option: SourcePickOption) => Promise<void>;
 }) {
+  const [tab, setTab] = useState<PickerTab>("all");
   const [query, setQuery] = useState("");
   const [options, setOptions] = useState<LineItemSourceOption[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -955,43 +973,95 @@ function ImportDialog({
     return () => { cancelled = true; };
   }, [startTransition]);
 
+  const visibleOptions =
+    tab === "masterdata" ? options.filter((o) => o.sourceType === "MASTERDATA")
+    : tab === "bq_library" ? options.filter((o) => o.sourceType === "BQ_LIBRARY")
+    : options;
+
+  const tabItems: { key: PickerTab; label: string }[] = [
+    { key: "all", label: "Semua" },
+    { key: "masterdata", label: "Master Data" },
+    { key: "bq_library", label: "BQ Library" },
+    { key: "custom", label: "Custom" },
+  ];
+
   return (
     <Dialog
       open
       onOpenChange={(next) => { if (!next) onClose(); }}
-      title="Impor dari Master Data atau BQ Library"
-      description="Harga yang dipilih disalin sebagai snapshot. Perubahan di Master Data tidak akan mengubah baris ini."
+      title="Pilih sumber harga"
+      description="Harga yang dipilih disalin sebagai snapshot. Perubahan di sumber tidak akan mengubah baris ini."
       size="lg"
     >
       <div className="grid gap-3">
-        <SearchField value={query} label="Cari sumber" onChange={(event) => search(event.target.value)} onClear={() => search("")} />
-        {error ? <InlineError>{error}</InlineError> : null}
-        {options.length === 0 && !loading ? (
-          <EmptyState title="Tidak ada sumber" description="Tidak ada harga Master Data atau item BQ Library yang cocok." />
-        ) : (
-          <ul className="grid max-h-[380px] gap-1 overflow-auto">
-            {options.map((option) => (
-              <li key={`${option.sourceType}-${option.id}`}>
-                <button
-                  type="button"
-                  className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-action border border-transparent px-2.5 py-2 text-left hover:border-line hover:bg-surface-muted"
-                  disabled={loading}
-                  onClick={() => void onPick(option)}
-                >
-                  <span className="grid min-w-0 gap-0.5">
-                    <span className="truncate font-medium text-ink">{option.title}</span>
-                    <span className="truncate text-xs text-ink-tertiary">
-                      {option.detail} · {KATEGORI_LABEL[option.kategori] ?? option.kategori}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-right tabular-nums text-ink">
-                    {formatMoney(createMoney(option.amount, option.currency))}
-                    <span className="block text-xs text-ink-tertiary">per {option.unit}</span>
-                  </span>
-                </button>
-              </li>
+        {/* Tab bar */}
+        <div role="tablist" className="flex gap-1 border-b border-line-subtle pb-0.5">
+          {tabItems.map((t) => (
+            <button
+              key={t.key}
+              role="tab"
+              aria-selected={tab === t.key}
+              type="button"
+              className={[
+                "rounded-t px-3 py-1.5 text-sm font-medium transition-colors",
+                tab === t.key
+                  ? "border-b-2 border-brand text-brand"
+                  : "text-ink-secondary hover:text-ink",
+              ].join(" ")}
+              onClick={() => setTab(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Custom kategori picker */}
+        {tab === "custom" ? (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {CUSTOM_KATEGORI_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                className="grid gap-0.5 rounded-action border border-line px-3 py-2.5 text-left transition-colors hover:border-brand hover:bg-surface-muted"
+                onClick={() => void onPick({ sourceType: "CUSTOM", kategori: opt.value })}
+              >
+                <span className="font-medium text-ink">{opt.label}</span>
+                <span className="text-xs text-ink-tertiary">{opt.description}</span>
+              </button>
             ))}
-          </ul>
+          </div>
+        ) : (
+          <>
+            <SearchField value={query} label="Cari sumber" onChange={(event) => search(event.target.value)} onClear={() => search("")} />
+            {error ? <InlineError>{error}</InlineError> : null}
+            {visibleOptions.length === 0 && !loading ? (
+              <EmptyState title="Tidak ada sumber" description="Tidak ada harga Master Data atau item BQ Library yang cocok." />
+            ) : (
+              <ul className="grid max-h-[340px] gap-1 overflow-auto">
+                {visibleOptions.map((option) => (
+                  <li key={`${option.sourceType}-${option.id}`}>
+                    <button
+                      type="button"
+                      className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-action border border-transparent px-2.5 py-2 text-left hover:border-line hover:bg-surface-muted"
+                      disabled={loading}
+                      onClick={() => void onPick(option)}
+                    >
+                      <span className="grid min-w-0 gap-0.5">
+                        <span className="truncate font-medium text-ink">{option.title}</span>
+                        <span className="truncate text-xs text-ink-tertiary">
+                          {option.detail} · {KATEGORI_LABEL[option.kategori] ?? option.kategori}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right tabular-nums text-ink">
+                        {formatMoney(createMoney(option.amount, option.currency))}
+                        <span className="block text-xs text-ink-tertiary">per {option.unit}</span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
       </div>
     </Dialog>
