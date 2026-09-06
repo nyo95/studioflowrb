@@ -4,10 +4,40 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 ## Revision state
 
-- Published baseline after this release is pushed: **R5** — publication commit follows this entry
-- Current revision after this entry is committed: **R5**
-- Next local revision: **R5.01**
-- Remote publication: **authorized by the owner on 2026-08-31**
+- Published baseline: **R5** — `d0c39ff3a2f0c1ed95b4cdb425ed968a9c2baf08` (local origin/main reference)
+- Current revision after this entry is committed: **R5.03**
+- Next local revision: **R5.04**
+- This change is local only; no new remote publication is authorized.
+
+## R5.03 — 2026-09-06 — docs(ui): lock design audit remediation work order
+
+- Agent: `Codex`, acting as navigator per AGENTS.md.
+- Visually reviewed all 11 pages of the owner's `docs/design curate.pdf` and
+  checked its findings against the current R5.02 shared contracts and UI code.
+- Added `scripts/work-orders/UIUX-CURATE.md`: deterministic shared-surface,
+  density, directory scanning/sorting/pagination, accessible menu, draft/error,
+  dialog, overview and display-formatting work. The owner subsequently assigned
+  Codex as executor in this session, overriding the default OpenCode assignment.
+- Preserved contract-mandated Brand/Vendor dialogs, serif headings, current
+  permission/persistence boundaries and audit-sourced attribution. Broad language
+  translation, new StudioFlow features and server pagination are not activated.
+- Corrected stale audit claims about Vendor draft guards and identifier adoption;
+  recorded the compact-table CSS variable mismatch and Vendor tab-contract
+  discrepancy. Added explicit browser acceptance and executor commit requirements.
+- Updated the documentation entry point and corrected the stale revision-state
+  header using existing R5.01/R5.02 ledger entries and local Git references.
+- Environment: owner confirmed rumah; selected local configuration exists.
+  No database connection, runtime execution, migration or dependency change.
+- Checks: all PDF pages visually inspected; contract/code references reviewed;
+  owned Markdown links and required sections checked; staged diff and whitespace
+  checks passed. Runtime tests and browser acceptance are not run for this
+  documentation-only handoff and remain required for implementation acceptance.
+- Remaining: UI implementation follows in R5.04 under the owner's explicit
+  Codex executor assignment; implementation and browser acceptance are outstanding.
+- Reserved, uncommitted owner files: `.env.example`, `prisma/schema.prisma`,
+  `docs/design curate.pdf`,
+  `public/uploads/brand-marks/22e07e06-00d2-45c0-894b-7b11c736a545.png`,
+  and `vercel.json`.
 
 ## R5.02 — 2026-09-06 — fix(promotion): move BQ approval into Master Data
 

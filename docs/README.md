@@ -1,5 +1,16 @@
 # Active Documentation
 
+## Current UI/UX remediation handoff — 2026-09-06
+
+[`UIUX-CURATE`](../scripts/work-orders/UIUX-CURATE.md) is the locked navigator
+work order for the owner's design-audit remediation request. It targets the
+existing UI Engine, Master Data, BQ and platform UI. The owner explicitly assigned
+Codex as executor for this task on 2026-09-06, overriding the default OpenCode role.
+The handoff is R5.03; implementation is expected at the next unused revision,
+R5.04. No implementation or browser acceptance is claimed by this handoff.
+Its explicit scope takes precedence over the historical foundation-only phase
+descriptions below; it does not activate new StudioFlow domain features.
+
 This repository keeps only the shared contracts and active app contracts that
 have been reviewed for the current rebuild. A contract is not an executable work
 order unless it says so explicitly.
