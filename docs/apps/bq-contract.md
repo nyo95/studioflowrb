@@ -11,6 +11,10 @@
 
 BQ adalah tool untuk menggantikan Excel dalam pembuatan Bill of Quantity. Target pengguna: **estimator**. Prinsip utama: kalkulasi kasar, cepat, mudah dipahami — bukan sistem akuntansi presisi.
 
+**Akses aplikasi:** BQ hanya dapat diakses oleh user dengan peran kerja
+estimator. Admin/staff Master Data tidak mendapat akses BQ sebagai bagian dari
+workflow ini.
+
 Dua cakupan yang di-cover:
 1. **Fixture Breakdown** — pecah furnitur/fixture ke material dan jasa per komponen
 2. **Full BQ** — Preliminaries, Interior Works, MEP, Furniture — satu dokumen BQ terpusat
@@ -312,21 +316,24 @@ bq.BqTemplateRecommendation -- link template_section → library_item
 
 **Alur:**
 1. BQ Library item status → `REQUESTED`
-2. Master Data mendapat notifikasi (antrian promotion request)
-3. Admin Master Data review → approve atau reject
-4. **Jika approve:** Admin buat entry baru di Master Data via pricing workflow biasa (manual input harga). `masterdata_ref_id` di Library Item diisi. Status → `APPROVED`.
-5. **Jika reject:** Admin isi alasan. Status → `REJECTED`. Bisa diajukan ulang setelah direvisi.
+2. Master Data mendapat notifikasi dan menampilkan antrian promotion request
+3. Admin/staff yang diberi kewenangan Master Data review → approve atau reject
+4. **Jika approve:** Master Data membuat entry baru melalui pricing workflow biasa (manual input harga), lalu mengembalikan ID record yang benar. Status BQ → `APPROVED` hanya setelah linkage tervalidasi.
+5. **Jika reject:** Admin/staff Master Data mengisi alasan. Status → `REJECTED`. Bisa diajukan ulang setelah direvisi.
 
 **Yang TIDAK ikut dalam promosi:** harga snapshot. Harga di Master Data diisi admin secara mandiri.
 **Yang ikut:** `name`, `purchase_unit`, `base_unit`, `kategori` → menjadi SKU + price entry baru.
 
-**Server actions yang dibutuhkan di BQ:**
-- `requestPromotion(type, libItemId)` — ubah status → REQUESTED
-- `approvePromotion(type, libItemId)` — buat entry MD + update status → APPROVED
-- `rejectPromotion(type, libItemId, reason)` — update status → REJECTED
-- `listPromotionRequests()` — list antrian (admin only)
+**Operasi lintas aplikasi:**
+- `requestPromotion(type, libItemId)` — BQ estimator mengubah status → REQUESTED
+- `listPromotionRequests()` — Master Data admin/staff melihat antrian melalui kontrak promotion
+- `approvePromotion(type, libItemId)` — Master Data membuat entry dan mengembalikan ID tervalidasi; linkage lalu menjadikan status → APPROVED
+- `rejectPromotion(type, libItemId, reason)` — Master Data mencatat alasan dan status → REJECTED
 
-Promotion approve mengimport Master Data service langsung (satu process), bukan lewat REST API.
+Approval adalah workflow milik Master Data, bukan tab atau permission BQ. BQ
+tidak menulis tabel Master Data dan tidak boleh menerima ID bebas sebagai bukti
+approval. Koordinasi lintas aplikasi memakai kontrak promotion yang eksplisit;
+tidak ada FK lintas schema atau pembacaan tabel internal aplikasi lain.
 
 ---
 
@@ -394,9 +401,11 @@ Semua field snapshot di `BqLineItem` disimpan sebagai plain value — **bukan FK
 | `bq.library.read` | Lihat BQ Library + Templates |
 | `bq.library.manage` | Tambah/edit Library items + Template Editor |
 | `bq.library.promote` | Ajukan promotion request ke Master Data |
-| `bq.library.approve` | Setujui/tolak request (admin Master Data) |
+| `bq.library.approve` | Tidak digunakan; approval promotion dimiliki Master Data |
 
-Estimator tidak punya akses ke Master Data — hanya baca via public contract.
+Estimator tidak punya akses ke halaman Master Data — hanya membaca pilihan
+komersial melalui kontrak public read. Admin/staff Master Data tidak punya akses
+ke BQ sebagai bagian dari workflow ini.
 
 ---
 
@@ -444,7 +453,8 @@ yang lain (K-05).
 2. **Project detail** — tree view Section/Subsection/L1/L2/L3, collapse/expand, grand total
 3. **BQ Library** — list items, form tambah, status promosi, tab Template Editor
 4. **Template Editor** — buat/edit template, atur section, tambah recommended items
-5. **Promotion queue** — estimator lihat status; admin review & approve/reject
+5. **Promotion status** — estimator melihat status request pada BQ Library
+6. **Master Data promotion queue** — admin/staff Master Data review, approve/reject, dan membuat entry harga
 
 ---
 
@@ -456,7 +466,7 @@ yang lain (K-05).
 | **BQ-F2** | BQ Library CRUD (Items + BqLibCustomItem) + Template Editor | Library bisa ditambah/edit; Template bisa dibuat | selesai R4.56 |
 | **BQ-F3** | BQ Project + Section/Subsection + L1/L2/L3 + engine kalkulasi | Angka terhitung benar (lihat §6), ubah qty L3 update semua ke atas | selesai R4.56 |
 | **BQ-F4** | Import dari Master Data ke L3 (snapshot flow) | Pilih material dari MD, harga tersimpan sebagai snapshot, override bisa | selesai R4.56 |
-| **BQ-F5** | Promotion flow (Library → Master Data) | Estimator ajukan, Admin MD approve/reject | selesai R4.56 |
+| **BQ-F5** | Promotion flow (Library → Master Data) | Estimator ajukan, Admin/staff MD approve/reject di Master Data | perlu implementasi ulang |
 
 Belum diverifikasi di browser sungguhan; lihat catatan keterbatasan di
 `CHANGELOG.md` R4.56.

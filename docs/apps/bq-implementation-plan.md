@@ -807,18 +807,23 @@ Setelah LineItem terbentuk, tampilkan di tree dengan nilai default. Estimator bi
 ## BQ-F5 — Promotion Flow (Library → Master Data)
 
 **Prerequisite:** F4 selesai.
-**Gate:** Estimator ajukan promosi. Admin Master Data lihat antrian, approve, entry baru terbuat di Master Data.
+**Gate:** Estimator ajukan promosi. Admin/staff Master Data melihat antrian di
+Master Data, approve atau reject, dan pada approval membuat entry baru di
+Master Data.
 
 ### F5-01: Server actions untuk promotion (bukan REST API)
 
-Promotion flow menggunakan **Server Actions** di `src/apps/bq/actions/promotion.ts`, bukan REST API routes. Alasannya:
+Request flow menggunakan **Server Actions** di BQ, tetapi approval flow adalah
+workflow Master Data. BQ tidak boleh membuat atau mengubah record Master Data.
+Koordinasi menggunakan kontrak promotion yang eksplisit, bukan REST API internal
+atau pembacaan tabel lintas aplikasi. Alasannya:
 - Seluruh mutation di aplikasi ini (Library, Project, Template) sudah menggunakan Server Actions.
-- REST API di `src/apps/masterdata/app/api/` akan menjadi cross-app write dari BQ perspective, melanggar aturan "tidak ada FK lintas schema" dan boundary app.
-- Server Actions tetap melakukan auth, permission check, dan transactional audit seperti biasa.
+- BQ hanya mengubah request miliknya sendiri dan meneruskan request ke kontrak promotion.
+- Master Data melakukan auth, permission check, pembuatan entry, linkage, dan audit dalam boundary-nya sendiri.
 
 ```typescript
-// src/apps/bq/actions/promotion.ts
-// Fungsi yang harus ada:
+// BQ request actions dan Master Data approval actions
+// Fungsi yang harus ada pada boundary aplikasi masing-masing:
 
 // requestPromotion(type, libItemId) → void
 //   Validasi: hanya MATERIAL/UPAH/MATERIAL_UPAH yang bisa REQUESTED
@@ -827,24 +832,28 @@ Promotion flow menggunakan **Server Actions** di `src/apps/bq/actions/promotion.
 // listPromotionRequests() → PromotionRequest[]
 //   Query dari bq.BqLibMaterial + bq.BqLibLabor + bq.BqLibMaterialLabor
 //   WHERE promotion_status = REQUESTED
-//   Permission required: bq.library.approve
+//   Permission required: Master Data approval permission
 //   Return: { id, type, name, purchase_unit, base_unit, kategori, requested_at, notes }[]
 
 // approvePromotion(type, libItemId) → { masterdata_ref_id: string }
-//   Permission required: bq.library.approve
+//   Permission required: Master Data approval permission
 //   Aksi:
 //     1. Buat SKU baru di Master Data (untuk MATERIAL) atau entry PriceLabor/PriceMaterialLabor
 //        PENTING: harga TIDAK diisi dari Library snapshot — harga diisi 0 atau null, admin isi sendiri
 //        Field yang ikut promosi: name, purchase_unit, base_unit, kategori → menjadi SKU + price entry baru
-//        Import Master Data service via public contract atau direct service import (satu process)
-//     2. Update BqLib* item: promotion_status → APPROVED, masterdata_ref_id ← ID entry baru
+//        Validasi dan simpan dalam transaksi Master Data
+//     2. Setelah ID entry tervalidasi, update BqLib* item melalui kontrak promotion:
+//        promotion_status → APPROVED, masterdata_ref_id ← ID entry baru
 
 // rejectPromotion(type, libItemId, reason) → { ok: true }
-//   Permission required: bq.library.approve
+//   Permission required: Master Data approval permission
 //   Aksi: Update BqLib* item: promotion_status → REJECTED
 ```
 
-**Catatan arsitektur:** Promotion approve perlu membuat entry di Master Data (SKU + price). Karena BQ dan Master Data berjalan di process yang sama, Server Action BQ bisa mengimport Master Data service langsung. Tidak perlu REST API cross-app. Jika di masa depan ada pemisahan process, promotion endpoint bisa diekstrak saat itu.
+**Catatan arsitektur:** Promotion approve adalah mutation Master Data. BQ tidak
+boleh mengimport service internal Master Data atau menerima input ID bebas.
+Implementasi harus memvalidasi tipe, kategori, eligibility, actor, dan record yang
+baru dibuat sebelum status BQ menjadi `APPROVED`.
 
 ### F5-02: Tombol "Ajukan Promosi" di Library
 
@@ -858,16 +867,20 @@ Di `LibraryTable.tsx`, untuk item dengan `promotion_status === DRAFT`:
 - Hanya KATEGORI MATERIAL, UPAH, MATERIAL_UPAH yang bisa `REQUESTED`
 - Item dengan KATEGORI lain → throw error "Tidak bisa dipromosikan ke Master Data"
 
-### F5-03: Halaman Promotion Queue (admin)
+### F5-03: Halaman Promotion Queue (Master Data admin/staff)
 
-Buat `src/apps/bq/app/bq/promotions/page.tsx`:
-- Hanya tampil untuk user dengan permission `bq.library.approve`
+Pembuatan queue berada di halaman Master Data, bukan di route BQ:
+- Hanya tampil di aplikasi Master Data untuk user dengan permission approval Master Data
 - Tabel: Nama, Tipe, Unit, KATEGORI, Diajukan oleh, Tanggal
 - Per baris: tombol "Approve" dan "Reject"
 - Reject: modal minta alasan (wajib diisi)
-- Approve: konfirmasi → call endpoint → tampilkan link ke entry MD yang baru
+- Approve: konfirmasi → buat entry melalui pricing workflow Master Data → validasi linkage → tampilkan link ke entry MD yang baru
 
-**Gate F5:** E2E test: buat Library item (Material), ajukan promosi, login sebagai admin MD, lihat di antrian, approve, cek BQ Library item status → APPROVED + masterdata_ref_id terisi. Cek bahwa entry baru di Master Data ada tapi harga belum diisi.
+**Gate F5:** E2E test: buat Library item (Material) sebagai estimator, ajukan
+promosi, login sebagai admin/staff Master Data, lihat antrian di Master Data,
+approve, cek entry baru benar-benar ada, lalu cek BQ Library item status →
+`APPROVED` dengan `masterdata_ref_id` yang tervalidasi. Harga tidak disalin dari
+snapshot Library; harga diisi melalui workflow Master Data.
 
 ---
 

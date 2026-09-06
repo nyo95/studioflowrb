@@ -9,6 +9,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Next local revision: **R5.01**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
+## R5.01 — 2026-09-06 — docs(contracts): move BQ promotion approval to Master Data
+
+- Agent: `Codex`
+- Owner decision: Master Data is restricted to admin/staff users; BQ is
+  restricted to estimators.
+- Updated the BQ, Master Data, and BQ implementation contracts so promotion
+  requests originate in BQ but the queue, approval/rejection, Master Data entry
+  creation, audit, and validated linkage are owned by Master Data.
+- Removed the obsolete `bq.library.approve` ownership from the contract and
+  prohibited BQ from writing Master Data tables or accepting an arbitrary ID as
+  approval proof.
+- Checks: contract diff inspection and repository-wide contract search completed.
+- Remaining limitation: implementation still needs a separate work order to
+  build the Master Data promotion queue and the validated cross-app promotion
+  transaction; this revision changes contracts only.
+
 
 ## R5 — 2026-09-04 — release: publish audit-sourced Updated-by and directory consistency fixes
 

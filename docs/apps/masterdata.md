@@ -9,6 +9,26 @@ contracts remain the product authority for those slices. The owner has now
 locked the Unit, Category, and SKU decisions recorded below and explicitly
 activated implementation.
 
+## 1.1 Application audience and promotion ownership
+
+Master Data is restricted to **admin/staff** users. It owns catalog, vendor,
+pricing, lifecycle, and approval workflows. The BQ estimator does not enter the
+Master Data application; BQ receives eligible commercial choices through the
+Master Data public read contract.
+
+Master Data also owns the approval side of the BQ Library promotion workflow:
+
+- BQ estimators may submit eligible Library items as promotion requests.
+- Master Data admin/staff see those requests in a Master Data approval queue.
+- Master Data validates the request, creates the appropriate catalog/price entry
+  through its normal pricing workflow, and returns the created record identity.
+- Only that validated identity may be linked back to the BQ Library item and
+  move it to `APPROVED`; rejection requires an auditable reason.
+- BQ never writes Master Data tables and does not own an approval permission.
+
+The cross-app promotion contract is the only allowed coordination boundary.
+Master Data and BQ do not use cross-schema foreign keys or internal table reads.
+
 ## 1. Active owner-approved logic contracts
 
 | Contract | Owns |
