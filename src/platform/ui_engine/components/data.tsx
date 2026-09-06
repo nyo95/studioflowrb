@@ -13,6 +13,8 @@ type ThHTMLAttributes,
 } from "react";
 
 import { cx } from "../internal/cx";
+import type { SemanticTone } from "../primitives";
+import { StatusMarker } from "./feedback";
 import { Button,IconButton,Input,Text } from "../primitives";
 
 export type DataTableProps = TableHTMLAttributes<HTMLTableElement> & {
@@ -29,6 +31,13 @@ export type DataTableProps = TableHTMLAttributes<HTMLTableElement> & {
   maxBodyHeight?: string | number;
   state?: ReactNode;
   containerClassName?: string;
+  /**
+   * When true the table scroll container grows to fill the available flex space
+   * instead of being capped at a fixed height. Requires the parent chain to be
+   * `flex flex-col` with a bounded height. Supersedes `maxBodyHeight` — do not
+   * combine both.
+   */
+  fill?: boolean;
 };
 
 export function DataTable({
@@ -38,17 +47,19 @@ export function DataTable({
   stickyHeader = false,
   maxBodyHeight,
   state,
+  fill = false,
   className,
   containerClassName,
   style,
   children,
   ...props
 }: DataTableProps) {
-  const scrolls = maxBodyHeight !== undefined;
+  const scrolls = fill || maxBodyHeight !== undefined;
   return (
     <div
       className={cx(
         "overflow-hidden bg-surface",
+        fill && "flex flex-col flex-1 min-h-0",
         framed && "rounded-card border border-line",
         density === "compact" && "[--ui-th-height:32px] [--ui-th-py:6px] [--ui-td-py:7px]",
         stickyHeader && "[--ui-thead-position:sticky]",
@@ -60,8 +71,8 @@ export function DataTable({
     >
       {state ?? (
         <div
-          className={cx("overflow-x-auto", scrolls && "overflow-y-auto")}
-          style={scrolls ? ({ maxHeight: maxBodyHeight } as CSSProperties) : undefined}
+          className={cx("overflow-x-auto", scrolls && "overflow-y-auto", fill && "flex-1 min-h-0")}
+          style={!fill && scrolls && maxBodyHeight !== undefined ? ({ maxHeight: maxBodyHeight } as CSSProperties) : undefined}
         >
           <table
             className={cx("w-full border-separate border-spacing-0 text-left tabular-nums", className)}
@@ -273,6 +284,38 @@ export function TableCellContent({
       </span>
       {secondary ? <span className="text-ink-tertiary text-xs leading-[1.25] whitespace-normal">{secondary}</span> : null}
     </div>
+  );
+}
+
+export type EntityPrimaryCellProps = {
+  /** Semantic tone for the status dot (success=ACTIVE, warning=LOCKED, neutral=ARCHIVED, danger=deleted/error) */
+  tone: SemanticTone;
+  /** Accessible label for the status dot — shown as tooltip and read by screen readers */
+  statusLabel: string;
+  /** Primary entity name */
+  name: ReactNode;
+  /** Optional secondary metadata: slug, code, type, or descriptor */
+  secondary?: ReactNode;
+};
+
+/**
+ * Canonical first-column cell for entity directory tables.
+ * Composes: ● (status dot) + name (bold) + secondary metadata.
+ * Rule: status lives in the dot color — no dedicated Status column.
+ * Use this instead of inline `<StatusMarker>` + `<TableCellContent>` composition.
+ */
+export function EntityPrimaryCell({ tone, statusLabel, name, secondary }: EntityPrimaryCellProps) {
+  return (
+    <TableCellContent
+      primary={
+        <span className="inline-flex min-w-0 items-center gap-2">
+          <StatusMarker tone={tone} label={statusLabel} className="shrink-0" />
+          <strong className="min-w-0 truncate font-semibold">{name}</strong>
+        </span>
+      }
+      secondary={secondary}
+      primaryLines={1}
+    />
   );
 }
 

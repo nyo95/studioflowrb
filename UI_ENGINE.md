@@ -134,6 +134,37 @@ App-level code must not pass arbitrary `width` or `maxWidth` overrides. If an ex
 
 `DraftDialog` remains the standard container for all CRUD dialogs with unsaved-draft protection.
 
+## 3.4 Viewport-fill pattern API (R6.03)
+
+Use `<DirectoryShell fill>` + `<DataTable fill>` to build viewport-tall tables without magic heights.
+
+```tsx
+// Page root must be a flex column that fills its parent
+<DirectoryShell fill surface toolbar={<DirectoryToolbar ... />}>
+  <DataTable fill columns={cols} rows={rows} />
+</DirectoryShell>
+```
+
+**Props added in R6.03:**
+
+| Component | Prop | Effect |
+|---|---|---|
+| `DirectoryShell` | `fill?: boolean` | Adds `flex flex-col flex-1 min-h-0` to outer + inner containers |
+| `DataTable` | `fill?: boolean` | Body scroll container grows with `flex-1 min-h-0`; `maxBodyHeight` ignored when fill is set |
+
+**Rule:** Never pass both `fill` and `maxBodyHeight` on the same `DataTable`. `fill` wins.
+
+**`EntityPrimaryCell`** formalises the ● + name + secondary composition that was previously written inline:
+
+```tsx
+import { EntityPrimaryCell } from "@/platform/ui_engine";
+// Inside a DataTable column renderer:
+<EntityPrimaryCell tone="positive" statusLabel="Active" name={row.name} secondary={row.code} />
+```
+
+Available tones mirror `StatusMarker`: `"positive" | "negative" | "warning" | "neutral" | "info"`.
+
+
 ## 4. What UI Engine Does Not Own
 
 Keep domain UI inside the app:

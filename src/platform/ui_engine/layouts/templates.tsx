@@ -10,23 +10,27 @@ export function DirectoryShell({
   toolbar,
   pagination,
   surface = false,
+  fill = false,
   children,
   className,
   ...props
 }: HTMLAttributes<HTMLDivElement> & {
   header?: ReactNode;
   surface?: boolean;
+  /** When true the shell grows to fill its flex parent (flex:1 min-h-0) and the
+   *  inner content area also fills, enabling viewport-tall tables without magic heights. */
+  fill?: boolean;
   toolbar?: ReactNode;
   pagination?: ReactNode;
 }) {
   return (
-    <div className={cx("grid gap-4", className)} {...props}>
+    <div className={cx("grid gap-4", fill && "flex flex-col flex-1 min-h-0", className)} {...props}>
       {header}
-      {surface ? <div className="min-w-0 overflow-hidden rounded-card border border-line bg-surface" data-directory-surface>
+      {surface ? <div className={cx("min-w-0 overflow-hidden rounded-card border border-line bg-surface", fill && "flex flex-col flex-1 min-h-0")} data-directory-surface>
         {toolbar ? <div className="border-b border-line">{toolbar}</div> : null}
-        <div className="min-w-0">{children}</div>
+        <div className={cx("min-w-0", fill && "flex-1 min-h-0")}>{children}</div>
         {pagination ? <div className="border-t border-line px-4 py-3">{pagination}</div> : null}
-      </div> : <>{toolbar}<div className="min-w-0">{children}</div>{pagination}</>}
+      </div> : <>{toolbar}<div className={cx("min-w-0", fill && "flex-1 min-h-0")}>{children}</div>{pagination}</>}
     </div>
   );
 }

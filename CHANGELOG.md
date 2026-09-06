@@ -5,8 +5,25 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.02**
-- Next local revision: **R6.03**
+- Current revision after this entry is committed: **R6.03**
+- Next local revision: **R6.04**
+
+## R6.03 | feat(ui-engine): EntityPrimaryCell + DirectoryShell fill + viewport-fill layout
+
+### Added
+- `EntityPrimaryCell` component in `ui_engine/components/data.tsx` — canonical ● StatusMarker + primary name + secondary metadata composition; replaces ad-hoc inline composition across directory tables.
+- `fill?: boolean` prop on `DataTable` — body scroll container uses `flex-1 min-h-0` instead of a fixed `maxBodyHeight`; `maxBodyHeight` is still supported when `fill` is absent.
+- `fill?: boolean` prop on `DirectoryShell` — shell and inner content container gain `flex flex-col flex-1 min-h-0`, enabling viewport-tall tables without magic heights when composed with `DataTable fill`.
+
+### Changed
+- `data.tsx`: `SemanticTone` import corrected from `./feedback` (not re-exported there) to `../primitives` (canonical source).
+- `UI_ENGINE.md`: added §3.4 documenting the viewport-fill pattern API and `EntityPrimaryCell` usage.
+
+### Files changed
+- `src/platform/ui_engine/components/data.tsx`
+- `src/platform/ui_engine/layouts/templates.tsx`
+- `UI_ENGINE.md`
+- `CHANGELOG.md`
 
 ## R6.02 | feat(bq): BqProjectStatus lifecycle + source_price_snapshot
 
