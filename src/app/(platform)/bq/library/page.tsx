@@ -9,7 +9,7 @@ import { Library } from "lucide-react";
 import { createMoney, formatMoney } from "@platform/utilities/money";
 import { AssemblyActions, AssemblyCreateButton, LibraryItemActions, LibraryItemCreateButton, TemplateActions, TemplateCreateButton } from "./library-controls";
 import { TemplateSectionsButton } from "./template-editor";
-import { PromotionQueue, PromotionRequestButton } from "./promotion-controls";
+import { PromotionRequestButton } from "./promotion-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,6 @@ export default async function BqLibraryPage() {
   const canRead = hasAnyPermission(grants, [BQ_PERMISSIONS.libraryRead, BQ_PERMISSIONS.libraryManage]);
   const canManage = hasPermission(grants, BQ_PERMISSIONS.libraryManage);
   const canPromote = hasPermission(grants, BQ_PERMISSIONS.libraryPromote);
-  const canApprove = hasPermission(grants, BQ_PERMISSIONS.libraryPromoteApprove);
 
   if (!canRead) {
     return (
@@ -177,17 +176,6 @@ export default async function BqLibraryPage() {
               </SectionCard>
             ),
           },
-          ...(canApprove
-            ? [{
-                value: "promotion",
-                label: "Promotion queue",
-                content: (
-                  <SectionCard>
-                    <PromotionQueue items={items} />
-                  </SectionCard>
-                ),
-              }]
-            : []),
         ]}
       />
     </div>

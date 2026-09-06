@@ -22,6 +22,17 @@ export type BqLibItemRead = {
   updatedAt: string;
 };
 
+export type BqPromotionRequest = {
+  id: string;
+  type: "material" | "labor" | "material_labor";
+  name: string;
+  purchaseUnit: string;
+  baseUnit: string | null;
+  kategori: string;
+  notes: string | null;
+  createdBy: string;
+};
+
 export type BqTemplateRead = {
   id: string;
   name: string;

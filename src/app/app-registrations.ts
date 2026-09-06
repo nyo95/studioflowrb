@@ -29,6 +29,7 @@ export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [
       "masterdata.price-material.manage",
       "masterdata.price-work.read",
       "masterdata.price-work.manage",
+      "masterdata.promotion.approve",
       "masterdata.deletion.approve",
     ],
   },
@@ -43,7 +44,6 @@ export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [
       "bq.library.read",
       "bq.library.manage",
       "bq.library.promote",
-      "bq.library.approve",
     ],
   },
 ];

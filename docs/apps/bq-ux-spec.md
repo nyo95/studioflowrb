@@ -79,8 +79,7 @@ function BqNavigation() {
     <>
       <NavItem href="/bq" icon={<FileText size={17} />} active={...}>Projects</NavItem>
       <NavItem href="/bq/library" icon={<Library size={17} />} active={...}>BQ Library</NavItem>
-      {/* hanya tampil jika punya permission bq.library.approve */}
-      <NavItem href="/bq/promotions" icon={<ArrowUpCircle size={17} />} active={...}>Promotions</NavItem>
+      {/* approval queue belongs to Master Data, not the estimator BQ shell */}
     </>
   )
 }
@@ -475,7 +474,7 @@ Dibuka dari: "Tambah Line Item" (di L2 atau L1 langsung). Gunakan `Dialog` ukura
 
 ---
 
-## 7. Halaman: Promotion Queue (admin)
+## 7. Halaman: Promotion Queue (Master Data admin/staff)
 
 `DataTable` sederhana. Gunakan `PageShell` + `PageHeader`.
 

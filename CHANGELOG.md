@@ -9,6 +9,26 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Next local revision: **R5.01**
 - Remote publication: **authorized by the owner on 2026-08-31**
 
+## R5.02 — 2026-09-06 — fix(promotion): move BQ approval into Master Data
+
+- Agent: `Codex`
+- Added the `masterdata.promotion.approve` permission and removed the obsolete
+  `bq.library.approve` registration.
+- Removed the promotion queue from BQ Library. Master Data Settings now exposes
+  a BQ approvals tab for authorized admin/staff users.
+- Approval validates that the submitted reference is an active Master Data
+  price record of the requested type before linking the BQ Library item.
+- Rejection is now executed from the Master Data approval workflow with an
+  auditable reason; BQ retains only estimator-side request submission.
+- Updated the BQ UX specification to keep approval navigation out of the BQ
+  estimator shell.
+- Checks: `npm run typecheck`, `npm run lint`, `npm run check:boundaries`,
+  `npm run check:legacy-runtime`, and `git diff --check` passed.
+- Remaining limitation: the current approval screen still asks staff to create
+  the pricing entry through the normal Pricing workflow before entering its ID;
+  the next hardening step can replace that manual handoff with an inline
+  create-and-approve flow.
+
 ## R5.01 — 2026-09-06 — docs(contracts): move BQ promotion approval to Master Data
 
 - Agent: `Codex`

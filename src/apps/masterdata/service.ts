@@ -27,6 +27,7 @@ export const MASTERDATA_PERMISSIONS = {
   priceMaterialManage: "masterdata.price-material.manage",
   priceWorkRead: "masterdata.price-work.read",
   priceWorkManage: "masterdata.price-work.manage",
+  promotionApprove: "masterdata.promotion.approve",
   deletionApprove: "masterdata.deletion.approve",
 } as const;
 
@@ -4072,6 +4073,23 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         });
         return { requestId };
       });
+    },
+
+    async validatePromotionReference(input: {
+      grants: PermissionGrants;
+      type: "material" | "labor" | "material_labor";
+      referenceId: string;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.promotionApprove);
+      const referenceId = input.referenceId.trim();
+      if (!referenceId) throw new AppError("VALIDATION", "PROMOTION_REFERENCE_REQUIRED", "A Master Data reference is required.");
+      const exists = input.type === "material"
+        ? await db.priceMaterial.findFirst({ where: { id: referenceId, deleted_at: null }, select: { id: true } })
+        : input.type === "labor"
+          ? await db.priceLabor.findFirst({ where: { id: referenceId, deleted_at: null }, select: { id: true } })
+          : await db.priceMaterialLabor.findFirst({ where: { id: referenceId, deleted_at: null }, select: { id: true } });
+      if (!exists) throw new AppError("NOT_FOUND", "PROMOTION_REFERENCE_NOT_FOUND", "The selected Master Data price entry does not exist or is archived.");
+      return { referenceId: exists.id };
     },
 
     // ── Deletion approval workflow ────────────────────────────────────────────

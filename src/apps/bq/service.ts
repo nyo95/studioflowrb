@@ -22,7 +22,7 @@ export const BQ_PERMISSIONS = {
   libraryRead: "bq.library.read",
   libraryManage: "bq.library.manage",
   libraryPromote: "bq.library.promote",
-  libraryPromoteApprove: "bq.library.approve",
+  libraryPromoteApprove: "masterdata.promotion.approve",
 } as const;
 
 function requireKategori(value: string): BqKategori {
@@ -1462,7 +1462,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
 
     const results: Array<{
       id: string;
-      type: string;
+      type: "material" | "labor" | "material_labor";
       name: string;
       purchaseUnit: string;
       baseUnit: string | null;
