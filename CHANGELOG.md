@@ -5,9 +5,16 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R5** — `d0c39ff3a2f0c1ed95b4cdb425ed968a9c2baf08` (local origin/main reference)
-- Current revision after this entry is committed: **R5.06**
-- Next local revision: **R5.07**
+- Current revision after this entry is committed: **R5.07**
+- Next local revision: **R5.08**
 - This change is local only; no new remote publication is authorized.
+
+## R5.07 — 2026-09-06 — fix(prisma): restore Prisma 7 datasource configuration
+
+- Removed uncommitted `url` and `directUrl` schema properties, which Prisma 7
+  rejects. `prisma.config.ts` already owns the location-specific datasource.
+- Regenerated the Prisma client successfully with `STUDIOFLOW_LOCATION=rumah`;
+  no database connection or migration was run.
 
 ## R5.06 — 2026-09-06 — fix(ui): clarify compact directory status
 
