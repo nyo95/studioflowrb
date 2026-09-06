@@ -16,20 +16,6 @@ restoreVendorAction,
 updateVendorAction,
 } from "./actions";
 
-const VENDOR_LINK_KINDS = [
-  { value: "WEBSITE", label: "Website" },
-  { value: "INSTAGRAM", label: "Instagram" },
-  { value: "FACEBOOK", label: "Facebook" },
-  { value: "TIKTOK", label: "TikTok" },
-  { value: "YOUTUBE", label: "YouTube" },
-  { value: "LINKEDIN", label: "LinkedIn" },
-  { value: "WHATSAPP", label: "WhatsApp" },
-  { value: "MARKETPLACE", label: "Marketplace" },
-  { value: "DRIVE", label: "Google Drive" },
-  { value: "PRICE_LIST", label: "Price List" },
-  { value: "OTHER", label: "Other" },
-] as const;
-
 type VendorRow = {
   id: string;
   name: string;
@@ -58,7 +44,6 @@ type VendorRow = {
     is_primary: boolean;
     brand_id: string | null;
   }>;
-  links: Array<{ id: string; kind: string; url: string; label: string | null; archive_url: string | null; sort_order: number }>;
   brand_suppliers: Array<{
     id: string;
     is_authorized: boolean;
@@ -95,14 +80,6 @@ type ContactDraft = {
   notes: string;
 };
 
-type LinkDraft = {
-  kind: string;
-  url: string;
-  label: string;
-  archiveUrl: string;
-  sortOrder: number;
-};
-
 export function VendorDirectory({
   vendors,
   vendorTypes,
@@ -128,11 +105,6 @@ export function VendorDirectory({
 
   // Form sub-collections
   const [contactsList, setContactsList] = useState<ContactDraft[]>([]);
-  const [linksList, setLinksList] = useState<LinkDraft[]>([]);
-  const [newLinkKind, setNewLinkKind] = useState("WEBSITE");
-  const [newLinkUrl, setNewLinkUrl] = useState("");
-  const [newLinkLabel, setNewLinkLabel] = useState("");
-  const [newLinkArchiveUrl, setNewLinkArchiveUrl] = useState("");
   const [createVendorTypeIds, setCreateVendorTypeIds] = useState<string[]>([]);
   const [editVendorTypeIds, setEditVendorTypeIds] = useState<string[]>([]);
 
@@ -163,7 +135,7 @@ export function VendorDirectory({
     formRef: editFormRef,
     resetKey: editTarget?.id ?? "",
     active: Boolean(editTarget),
-    watchedValue: JSON.stringify([editVendorTypeIds, contactsList, linksList, newLinkKind, newLinkUrl, newLinkLabel]),
+    watchedValue: JSON.stringify([editVendorTypeIds, contactsList]),
     title: "Discard changes?",
     description: "Your edits are only in this browser and have not been saved.",
   });
@@ -231,11 +203,7 @@ export function VendorDirectory({
 
   const openCreateDialog = () => {
     setContactsList([]);
-    setLinksList([]);
     setCreateVendorTypeIds([]);
-    setNewLinkUrl("");
-    setNewLinkLabel("");
-    setNewLinkArchiveUrl("");
     setCreateNameWarning(null);
     setCreateDraftKey((key) => key + 1);
     setCreateOpen(true);
@@ -254,15 +222,11 @@ export function VendorDirectory({
         notes: "",
       })),
     );
-    setLinksList(vendor.links.map((l) => ({ kind: l.kind, url: l.url, label: l.label ?? "", archiveUrl: l.archive_url ?? "", sortOrder: l.sort_order })));
     setEditVendorTypeIds(vendor.types.map((type) => type.vendor_type.id));
     setEditName(vendor.name);
     setEditLegalName(vendor.legal_name ?? "");
     setEditAddress(vendor.address ?? "");
     setEditNotes(vendor.notes ?? "");
-    setNewLinkUrl("");
-    setNewLinkLabel("");
-    setNewLinkArchiveUrl("");
     setEditNameWarning(null);
     setEditTarget(vendor);
   };
@@ -279,18 +243,6 @@ export function VendorDirectory({
 
   const removeContactDraft = (idx: number) => {
     setContactsList(contactsList.filter((_, i) => i !== idx));
-  };
-
-  const addLinkDraft = () => {
-    if (!newLinkUrl.trim()) return;
-    setLinksList([...linksList, { kind: newLinkKind, url: newLinkUrl.trim(), label: newLinkLabel.trim(), archiveUrl: newLinkArchiveUrl.trim(), sortOrder: linksList.length }]);
-    setNewLinkUrl("");
-    setNewLinkLabel("");
-    setNewLinkArchiveUrl("");
-  };
-
-  const removeLinkDraft = (idx: number) => {
-    setLinksList(linksList.filter((_, i) => i !== idx));
   };
 
   return (
@@ -556,7 +508,6 @@ export function VendorDirectory({
               setEditError(null);
               const fd = new FormData(e.currentTarget);
               fd.set("contactsJson", JSON.stringify(contactsList.filter((c) => c.personName?.trim())));
-              fd.set("linksJson", JSON.stringify(linksList));
               try {
                 const res = await updateVendorAction(null, fd);
                 if (res && "ok" in res && res.ok) {
@@ -667,42 +618,15 @@ export function VendorDirectory({
                   ),
                 },
                 {
-                  value: "resources",
-                  label: `Links (${linksList.length})`,
-                  content: (
-                    <div className="grid gap-4">
-                      <div className="grid gap-3">
-                        <Text size="sm" weight="semibold">Reference Links</Text>
-                        {linksList.map((link, idx) => (
-                          <div key={idx} className="flex items-center justify-between text-xs bg-surface-muted p-2 rounded">
-                            <span className="font-ui-mono">{VENDOR_LINK_KINDS.find((k) => k.value === link.kind)?.label ?? link.kind}: {link.label || link.url}</span>
-                            <Button type="button" size="sm" variant="ghost" onClick={() => removeLinkDraft(idx)}>Remove</Button>
-                          </div>
-                        ))}
-                        <div className="grid gap-3 rounded border border-line bg-surface-muted/30 p-3">
-                          <Field label="Link type">
-                            <Select value={newLinkKind} onChange={(e) => setNewLinkKind(e.target.value)}>
-                              {VENDOR_LINK_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
-                            </Select>
-                          </Field>
-                          <Field label="URL" required><Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://example.com" /></Field>
-                          <Field label="Display label"><Input value={newLinkLabel} onChange={(e) => setNewLinkLabel(e.target.value)} placeholder="Optional label, e.g. Price list 2026" /></Field>
-                          <Field label="Archive URL" description="Archived/cached version of this link (optional)."><Input value={newLinkArchiveUrl} onChange={(e) => setNewLinkArchiveUrl(e.target.value)} placeholder="https://web.archive.org/web/..." /></Field>
-                          <Button type="button" size="sm" variant="secondary" className="justify-self-start" onClick={addLinkDraft}>Add link</Button>
-                        </div>
-                      </div>
-                    </div>
-                  ),
-                },
-                {
                   value: "brand_suppliers",
-                  label: `Brand Suppliers (${editTarget.brand_suppliers.length})`,
+                  label: `Supplied brands (${editTarget.brand_suppliers.length})`,
                   content: (
                     <div className="grid gap-3">
-                      <Text size="sm" weight="semibold">Authorized Brand Relationships</Text>
+                      <Text size="sm" weight="semibold">Supplied brands</Text>
+                      <Text size="sm" tone="secondary">This relationship is managed from each Brand, not from Supplier.</Text>
                       {editTarget.brand_suppliers.length === 0 ? (
                         <div className="text-xs text-ink-tertiary py-3 text-center border border-dashed border-line rounded">
-                          No brand supplier relationships registered for this vendor.
+                          No supplied brands registered for this supplier.
                         </div>
                       ) : (
                         editTarget.brand_suppliers.map((bs) => (

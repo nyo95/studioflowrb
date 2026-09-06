@@ -5,9 +5,25 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R5** — `d0c39ff3a2f0c1ed95b4cdb425ed968a9c2baf08` (local origin/main reference)
-- Current revision after this entry is committed: **R5.04**
-- Next local revision: **R5.05**
+- Current revision after this entry is committed: **R5.05**
+- Next local revision: **R5.06**
 - This change is local only; no new remote publication is authorized.
+
+## R5.05 — 2026-09-06 — fix(masterdata): make catalog resources Brand-only
+
+- Owner decision implemented: the persisted `Vendor` route remains for
+  compatibility, while the UI uses Supplier consistently. Supplier catalog and
+  external-link persistence (`VendorLink`) is purged with an explicit migration.
+- Supplier actions and service mutations no longer accept links or mutate
+  `BrandSupplier`. Brand is now the sole relationship editor; Supplier exposes
+  supplied Brands as a read-only projection with clear ownership copy.
+- Added the active BQ/Master Data hardening work order, including locked
+  snapshot/revert, lifecycle, Library, and promotion-boundary decisions.
+- Checks: `npm run typecheck` and `npm run lint` passed. `npx prisma generate`
+  was blocked before generation by the pre-existing uncommitted datasource URL
+  lines in `prisma/schema.prisma`, which Prisma 7 rejects; no database command
+  was run. Browser and isolated database acceptance remain pending a proven
+  rebuild-only target and valid owner configuration.
 
 ## R5.03 — 2026-09-06 — docs(ui): lock design audit remediation work order
 

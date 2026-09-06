@@ -69,6 +69,8 @@ export function BrandDirectory({
   const [editCategoryIds, setEditCategoryIds] = useState<string[]>([]);
   const [createHashtags, setCreateHashtags] = useState<string[]>([]);
   const [editHashtags, setEditHashtags] = useState<string[]>([]);
+  const [createSupplierIds, setCreateSupplierIds] = useState<string[]>([]);
+  const [editSupplierIds, setEditSupplierIds] = useState<string[]>([]);
   const [confirmArchive, setConfirmArchive] = useState<BrandRow | null>(null);
   const [confirmRestore, setConfirmRestore] = useState<BrandRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BrandRow | null>(null);
@@ -98,7 +100,7 @@ export function BrandDirectory({
     formRef: createFormRef,
     resetKey: createDraftKey,
     active: createOpen,
-    watchedValue: JSON.stringify([createOwnerVendorId, createCategoryIds, createHashtags, linksList, newLinkKind, newLinkUrl, newLinkLabel]),
+    watchedValue: JSON.stringify([createOwnerVendorId, createCategoryIds, createHashtags, createSupplierIds, linksList, newLinkKind, newLinkUrl, newLinkLabel]),
     title: "Discard brand draft?",
     description: "Your changes are only in this browser and have not been saved.",
   });
@@ -106,7 +108,7 @@ export function BrandDirectory({
     formRef: editFormRef,
     resetKey: editTarget?.id ?? "",
     active: Boolean(editTarget),
-    watchedValue: JSON.stringify([editOwnerVendorId, editCategoryIds, editHashtags, linksList, newLinkKind, newLinkUrl, newLinkLabel]),
+    watchedValue: JSON.stringify([editOwnerVendorId, editCategoryIds, editHashtags, editSupplierIds, linksList, newLinkKind, newLinkUrl, newLinkLabel]),
     title: "Discard changes?",
     description: "Your edits are only in this browser and have not been saved.",
   });
@@ -179,6 +181,7 @@ export function BrandDirectory({
     setCreateOwnerVendorId("");
     setCreateCategoryIds([]);
     setCreateHashtags([]);
+    setCreateSupplierIds([]);
     setCreateNameWarning(null);
     setCreateDraftKey((key) => key + 1);
     setCreateOpen(true);
@@ -192,6 +195,7 @@ export function BrandDirectory({
     setEditOwnerVendorId(brand.owner_vendor?.id ?? "");
     setEditCategoryIds(brand.categories.map((item) => item.category.id));
     setEditHashtags(brand.hashtags.map((item) => item.label));
+    setEditSupplierIds(brand.suppliers.map((item) => item.vendor.id));
     setEditNameWarning(null);
     setEditTarget(brand);
   };
@@ -346,6 +350,7 @@ export function BrandDirectory({
           ) : null}
           <input type="hidden" name="ownerVendorId" value={createOwnerVendorId} />
           {createCategoryIds.map((id) => <input key={id} type="hidden" name="categoryIds" value={id} />)}
+          {createSupplierIds.map((id) => <input key={id} type="hidden" name="supplierIds" value={id} />)}
           <input type="hidden" name="hashtags" value={createHashtags.join(" ")} />
           <Field label="Owner vendor" required description="Registered manufacturer or brand owner vendor.">
             <CreatableSearch
@@ -363,6 +368,9 @@ export function BrandDirectory({
           </Field>
           <Field label="Product categories" description="Search a discovery category or create a missing one.">
             <CreatableMultiSelect label="Product categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))} value={createCategoryIds} onValueChange={setCreateCategoryIds} onCreate={canManageCategories ? (name) => createProductCategory(name, setCreateError) : undefined} createLabel={(name) => `Create product category "${name}"`} />
+          </Field>
+          <Field label="Suppliers" description="Organizations that supply this Brand. Managed here and shown read-only on Supplier.">
+            <CreatableMultiSelect label="Suppliers" options={ownerVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))} value={createSupplierIds} onValueChange={setCreateSupplierIds} placeholder="Select suppliers" />
           </Field>
           {/* Links builder */}
           <div className="grid gap-2 border-t border-line pt-3">
@@ -413,7 +421,7 @@ export function BrandDirectory({
             if (!open && !editPending) void editDraftGuard.requestDiscard(() => setEditTarget(null));
           }}
           title={`Edit brand ${editTarget.name}`}
-          description="Update brand identity and discovery details. Supplier relations are managed from Vendor."
+          description="Update brand identity, catalog discovery, and supplier relationships."
           dismissible={!editPending}
         >
           <form
@@ -445,6 +453,7 @@ export function BrandDirectory({
           >
             <input type="hidden" name="brandId" value={editTarget.id} />
             {editCategoryIds.map((id) => <input key={id} type="hidden" name="categoryIds" value={id} />)}
+            {editSupplierIds.map((id) => <input key={id} type="hidden" name="supplierIds" value={id} />)}
             <input type="hidden" name="hashtags" value={editHashtags.join(" ")} />
             {editError ? <InlineError>{editError}</InlineError> : null}
             <Field label="Brand name" required>
@@ -470,6 +479,9 @@ export function BrandDirectory({
             </Field>
             <Field label="Product categories" description="Manual selections keep their own provenance.">
               <CreatableMultiSelect label="Product categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))} value={editCategoryIds} onValueChange={setEditCategoryIds} onCreate={canManageCategories ? (name) => createProductCategory(name, setEditError) : undefined} createLabel={(name) => `Create product category "${name}"`} />
+            </Field>
+            <Field label="Suppliers" description="Organizations that supply this Brand. Changes are reflected read-only on Supplier.">
+              <CreatableMultiSelect label="Suppliers" options={ownerVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))} value={editSupplierIds} onValueChange={setEditSupplierIds} placeholder="Select suppliers" />
             </Field>
             {/* Links builder */}
             <div className="grid gap-2 border-t border-line pt-3">
@@ -505,7 +517,6 @@ export function BrandDirectory({
                 Updated by <span className="font-medium text-ink-secondary">{editTarget.updated_by_label}</span> · {new Intl.DateTimeFormat(locale, { timeZone: timezone, dateStyle: "medium", timeStyle: "short" }).format(editTarget.updated_at)}
               </p>
             ) : null}
-            {editTarget.suppliers.length > 0 ? <Field label="Suppliers"><Text>{editTarget.suppliers.map(supplier => supplier.vendor.name).join(", ")}</Text></Field> : null}
             <FormActions>
               <Button type="button" variant="ghost" onClick={() => void editDraftGuard.requestDiscard(() => setEditTarget(null))}>
                 Cancel

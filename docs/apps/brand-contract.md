@@ -1,5 +1,10 @@
 # Brand Contract — Master Data
 
+> **R5.05 owner amendment — 2026-09-06.** Brand is the exclusive owner of
+> catalog and external product resources. `BrandSupplier` is edited only from
+> Brand; the Supplier route presents the relationship read-only. UI says
+> **Supplier**, while the persisted and route vocabulary remains `Vendor`.
+
 Status: **OWNER-APPROVED LOGIC CONTRACT — not yet an executable work order**
 
 Authority: owner decisions locked in the Brand navigator session, reconciled

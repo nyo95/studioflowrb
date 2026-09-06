@@ -319,7 +319,6 @@ model Vendor {
 
   types                 VendorVendorType[]
   contacts              VendorContact[]
-  links                 VendorLink[]
   owned_brands          Brand[]              @relation("BrandOwner")
   brand_suppliers       BrandSupplier[]
   material_prices       PriceMaterial[]
@@ -360,22 +359,6 @@ model VendorContact {
 
   @@index([vendor_id])
   @@index([brand_id])
-  @@schema("master_data")
-}
-
-model VendorLink {
-  id          String   @id @default(uuid())
-  vendor_id   String
-  kind        String
-  url         String
-  archive_url String?
-  label       String?
-  sort_order  Int      @default(0)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-  vendor      Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Cascade)
-
-  @@unique([vendor_id, url])
   @@schema("master_data")
 }
 

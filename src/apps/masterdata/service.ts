@@ -1902,10 +1902,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
               brand_id: true,
             },
           },
-          links: {
-            select: { id: true, kind: true, url: true, label: true, archive_url: true, sort_order: true },
-            orderBy: { sort_order: "asc" },
-          },
           brand_suppliers: {
             select: {
               id: true,
@@ -2047,7 +2043,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
               brand: { select: { id: true, name: true, slug: true } },
             },
           },
-          links: true,
           owned_brands: { select: { id: true, name: true, slug: true } },
           brand_suppliers: {
             include: {
@@ -2074,8 +2069,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       notes?: string;
       vendorTypeIds?: string[];
       contacts?: Array<{ personName: string; jobTitle?: string; email?: string; phone?: string; isPrimary?: boolean; notes?: string; brandId?: string }>;
-      links?: Array<{ kind: string; url: string; label?: string; archiveUrl?: string | null; sortOrder?: number }>;
-      brandSuppliers?: Array<{ brandId: string; isAuthorized?: boolean; notes?: string | null }>;
     }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
       actorIsUsable(input.actor);
@@ -2126,8 +2119,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
               if (brand.deleted_at !== null) throw new AppError("VALIDATION", "CONTACT_BRAND_ARCHIVED", "Brand is archived.");
               // vendor-contract §4: vendor must own or supply the brand
               const ownsViaBrand = brand.owner_vendor_id === vendorId;
-              const isIncomingSupplier = input.brandSuppliers?.some((bs) => bs.brandId === c.brandId) ?? false;
-              if (!ownsViaBrand && !isIncomingSupplier) {
+              if (!ownsViaBrand) {
                 const existingSupplier = await tx.brandSupplier.findFirst({ where: { brand_id: c.brandId, vendor_id: vendorId } });
                 if (!existingSupplier) throw new AppError("VALIDATION", "CONTACT_BRAND_NOT_RELATED", "Vendor must own or supply this brand to assign a brand-scoped contact.");
               }
@@ -2148,36 +2140,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           }
         }
 
-        // Links
-        if (input.links && input.links.length > 0) {
-          await tx.vendorLink.createMany({
-            data: input.links.map((l) => ({
-              id: randomUUID(),
-              vendor_id: vendorId,
-              kind: l.kind,
-              url: l.url.trim(),
-              label: l.label?.trim() || null,
-              archive_url: l.archiveUrl?.trim() || null,
-              sort_order: l.sortOrder ?? 0,
-            })),
-          });
-        }
-
-        // BrandSuppliers
-        if (input.brandSuppliers && input.brandSuppliers.length > 0) {
-          await assertVendorMaterialCapable(tx, vendorId);
-          for (const bs of input.brandSuppliers) {
-            await tx.brandSupplier.create({
-              data: {
-                id: randomUUID(),
-                brand_id: bs.brandId,
-                vendor_id: vendorId,
-                is_authorized: bs.isAuthorized ?? false,
-                notes: bs.notes?.trim() || null,
-              },
-            });
-          }
-        }
 
         await writeAudit(tx, {
           action: "vendor.created",
@@ -2253,8 +2215,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       notes?: string | null;
       vendorTypeIds?: string[];
       contacts?: Array<{ id?: string; personName: string; jobTitle?: string; email?: string; phone?: string; isPrimary?: boolean; notes?: string; brandId?: string }>;
-      links?: Array<{ kind: string; url: string; label?: string; archiveUrl?: string | null; sortOrder?: number }>;
-      brandSuppliers?: Array<{ brandId: string; isAuthorized?: boolean; notes?: string | null }>;
     }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
       actorIsUsable(input.actor);
@@ -2267,8 +2227,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           include: {
             types: true,
             contacts: true,
-            links: true,
-            brand_suppliers: true,
           },
         });
 
@@ -2362,10 +2320,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
               if (brand.deleted_at !== null) throw new AppError("VALIDATION", "CONTACT_BRAND_ARCHIVED", "Brand is archived.");
               // vendor-contract §4: vendor must own or supply the brand
               const ownsViaBrand = brand.owner_vendor_id === input.vendorId;
-              // input.brandSuppliers (if provided) replaces all; check incoming first, then existing DB
-              const resolvedSupplierBrandIds = input.brandSuppliers?.map((bs) => bs.brandId);
-              const isIncomingSupplier = resolvedSupplierBrandIds ? resolvedSupplierBrandIds.includes(c.brandId) : false;
-              if (!ownsViaBrand && !isIncomingSupplier) {
+              if (!ownsViaBrand) {
                 const existingSupplier = await tx.brandSupplier.findFirst({ where: { brand_id: c.brandId, vendor_id: input.vendorId } });
                 if (!existingSupplier) throw new AppError("VALIDATION", "CONTACT_BRAND_NOT_RELATED", "Vendor must own or supply this brand to assign a brand-scoped contact.");
               }
@@ -2393,108 +2348,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
             .sort();
           if (beforeContacts.join("\u0000") !== afterContacts.join("\u0000")) {
             changes.contacts = { from: beforeContacts.length, to: input.contacts.length };
-          }
-        }
-
-        // Update Links — diffed on URL, the natural identity of a VendorLink.
-        // The previous delete-and-recreate also silently dropped `archive_url`
-        // and `sort_order`, which createVendor does persist (vendor-contract
-        // §5 field table), so every Vendor edit erased archive URLs and the
-        // link ordering.
-        if (input.links !== undefined) {
-          const desiredLinks = new Map(
-            input.links
-              .map((l) => ({ ...l, url: l.url.trim() }))
-              .filter((l) => l.url.length > 0)
-              .map((l) => [l.url, l] as const),
-          );
-          const removedLinks = existing.links.filter((l) => !desiredLinks.has(l.url));
-          if (removedLinks.length > 0) {
-            await tx.vendorLink.deleteMany({ where: { id: { in: removedLinks.map((l) => l.id) } } });
-          }
-          for (const existingLink of existing.links) {
-            const wanted = desiredLinks.get(existingLink.url);
-            if (!wanted) continue;
-            desiredLinks.delete(existingLink.url);
-            const nextLabel = wanted.label?.trim() || null;
-            const nextArchiveUrl = wanted.archiveUrl?.trim() || null;
-            const nextSortOrder = wanted.sortOrder ?? existingLink.sort_order;
-            if (
-              existingLink.kind !== wanted.kind ||
-              existingLink.label !== nextLabel ||
-              existingLink.archive_url !== nextArchiveUrl ||
-              existingLink.sort_order !== nextSortOrder
-            ) {
-              await tx.vendorLink.update({
-                where: { id: existingLink.id },
-                data: {
-                  kind: wanted.kind,
-                  label: nextLabel,
-                  archive_url: nextArchiveUrl,
-                  sort_order: nextSortOrder,
-                },
-              });
-            }
-          }
-          if (desiredLinks.size > 0) {
-            await tx.vendorLink.createMany({
-              data: [...desiredLinks.values()].map((l) => ({
-                id: randomUUID(),
-                vendor_id: input.vendorId,
-                kind: l.kind,
-                url: l.url,
-                label: l.label?.trim() || null,
-                archive_url: l.archiveUrl?.trim() || null,
-                sort_order: l.sortOrder ?? 0,
-              })),
-            });
-          }
-          const beforeLinks = existing.links.map((l) => l.url).sort();
-          const afterLinks = input.links.map((l) => l.url.trim()).filter(Boolean).sort();
-          if (beforeLinks.join("\u0000") !== afterLinks.join("\u0000")) {
-            changes.links = { from: beforeLinks, to: afterLinks };
-          }
-        }
-
-        // Update BrandSuppliers — diffed on brand ID.
-        // The previous delete-and-recreate wrote neither `is_authorized` nor
-        // `notes`, so every Vendor edit silently reset each supplier relation
-        // to unauthorized and erased its notes (vendor-contract §6).
-        if (input.brandSuppliers !== undefined) {
-          if (input.brandSuppliers.length > 0) await assertVendorMaterialCapable(tx, input.vendorId);
-          const desiredSuppliers = new Map(input.brandSuppliers.map((bs) => [bs.brandId, bs] as const));
-          const removedSuppliers = existing.brand_suppliers.filter((bs) => !desiredSuppliers.has(bs.brand_id));
-          if (removedSuppliers.length > 0) {
-            await tx.brandSupplier.deleteMany({ where: { id: { in: removedSuppliers.map((bs) => bs.id) } } });
-          }
-          for (const existingSupplier of existing.brand_suppliers) {
-            const wanted = desiredSuppliers.get(existingSupplier.brand_id);
-            if (!wanted) continue;
-            desiredSuppliers.delete(existingSupplier.brand_id);
-            const isAuthorized = wanted.isAuthorized ?? existingSupplier.is_authorized;
-            const supplierNotes = wanted.notes === undefined ? existingSupplier.notes : wanted.notes?.trim() || null;
-            if (existingSupplier.is_authorized !== isAuthorized || existingSupplier.notes !== supplierNotes) {
-              await tx.brandSupplier.update({
-                where: { id: existingSupplier.id },
-                data: { is_authorized: isAuthorized, notes: supplierNotes },
-              });
-            }
-          }
-          for (const bs of desiredSuppliers.values()) {
-            await tx.brandSupplier.create({
-              data: {
-                id: randomUUID(),
-                brand_id: bs.brandId,
-                vendor_id: input.vendorId,
-                is_authorized: bs.isAuthorized ?? false,
-                notes: bs.notes?.trim() || null,
-              },
-            });
-          }
-          const beforeSuppliers = existing.brand_suppliers.map((bs) => bs.brand_id).sort();
-          const afterSuppliers = input.brandSuppliers.map((bs) => bs.brandId).sort();
-          if (beforeSuppliers.join("\u0000") !== afterSuppliers.join("\u0000")) {
-            changes.brand_suppliers = { from: beforeSuppliers, to: afterSuppliers };
           }
         }
 
@@ -4233,7 +4086,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
             throw new AppError("CONFLICT", "VENDOR_HAS_PRICES", "Vendor still has price rows. Delete them first.");
           }
           await tx.vendorContact.deleteMany({ where: { vendor_id: targetId } });
-          await tx.vendorLink.deleteMany({ where: { vendor_id: targetId } });
           await tx.vendorVendorType.deleteMany({ where: { vendor_id: targetId } });
           await tx.archiveCause.deleteMany({ where: { entity_type: "vendor", entity_id: targetId } });
           await tx.vendor.delete({ where: { id: targetId } });

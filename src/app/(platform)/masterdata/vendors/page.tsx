@@ -27,9 +27,9 @@ export default async function VendorsPage() {
   if (!canRead && !canManage) {
     return (
       <div className="grid gap-4">
-        <PageHeader title="Vendors" />
+        <PageHeader title="Suppliers" />
         <SectionCard>
-          <ErrorState title="Access denied" description="You do not have permission to view vendors." />
+          <ErrorState title="Access denied" description="You do not have permission to view suppliers." />
         </SectionCard>
       </div>
     );
@@ -48,7 +48,7 @@ export default async function VendorsPage() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        title="Vendors &amp; Suppliers"
+        title="Suppliers"
       />
       <VendorDirectory
         vendors={vendors}

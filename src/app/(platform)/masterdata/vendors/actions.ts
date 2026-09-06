@@ -31,13 +31,6 @@ const VendorInputSchema = z.object({
     brandId: z.string().uuid().optional().nullable().or(z.literal("")),
     notes: z.string().max(500).optional().nullable().or(z.literal("")),
   })).optional(),
-  links: z.array(z.object({
-    kind: z.string().min(1),
-    url: z.string().url("Must be a valid URL"),
-    label: z.string().optional().nullable(),
-    archiveUrl: z.string().url("Must be a valid URL").optional().nullable().or(z.literal("")),
-    sortOrder: z.number().int().min(0).optional(),
-  })).optional(),
 });
 const IdSchema = z.string().uuid();
 const DeletionInputSchema = z.object({ id: IdSchema, reason: z.string().max(1000).optional(), notes: z.string().max(1000).optional() });
@@ -62,13 +55,6 @@ export async function createVendorAction(
       // ignore
     }
 
-    let links = [];
-    try {
-      links = JSON.parse(String(formData.get("linksJson") ?? "[]"));
-    } catch {
-      // ignore
-    }
-
     const vendorTypeIds = formData.getAll("vendorTypeIds").map(String).filter(Boolean);
 
     const parsed = VendorInputSchema.safeParse({
@@ -78,7 +64,6 @@ export async function createVendorAction(
       notes: formData.get("notes") ? String(formData.get("notes")) : null,
       vendorTypeIds,
       contacts,
-      links,
     });
     if (!parsed.success) throw validationError(parsed.error);
 
@@ -99,7 +84,6 @@ export async function createVendorAction(
         notes: c.notes || undefined,
         brandId: c.brandId || undefined,
       })),
-      links: (parsed.data.links ?? []).map((l, idx) => ({ kind: l.kind, url: l.url, label: l.label ?? undefined, archiveUrl: l.archiveUrl || undefined, sortOrder: l.sortOrder ?? idx })),
     });
     revalidateVendors();
     return result;
@@ -120,13 +104,6 @@ export async function updateVendorAction(
       // ignore
     }
 
-    let links = [];
-    try {
-      links = JSON.parse(String(formData.get("linksJson") ?? "[]"));
-    } catch {
-      // ignore
-    }
-
     const vendorTypeIds = formData.getAll("vendorTypeIds").map(String).filter(Boolean);
 
     const parsed = VendorInputSchema.extend({ vendorId: z.string().uuid() }).safeParse({
@@ -137,7 +114,6 @@ export async function updateVendorAction(
       notes: formData.get("notes") ? String(formData.get("notes")) : null,
       vendorTypeIds,
       contacts,
-      links,
     });
     if (!parsed.success) throw validationError(parsed.error);
 
@@ -160,7 +136,6 @@ export async function updateVendorAction(
         notes: c.notes || undefined,
         brandId: c.brandId || undefined,
       })),
-      links: (parsed.data.links ?? []).map((l, idx) => ({ kind: l.kind, url: l.url, label: l.label ?? undefined, archiveUrl: l.archiveUrl || undefined, sortOrder: l.sortOrder ?? idx })),
     });
     revalidateVendors();
     return result;

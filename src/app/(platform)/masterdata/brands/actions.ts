@@ -77,12 +77,14 @@ export async function createBrandAction(
       .filter(Boolean);
 
     const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
+    const supplierIds = formData.getAll("supplierIds").map(String).filter(Boolean);
 
     const parsed = BrandInputSchema.safeParse({
       name: String(formData.get("name") ?? ""),
       ownerVendorId: String(formData.get("ownerVendorId") ?? ""),
       notes: formData.get("notes") ? String(formData.get("notes")) : null,
       categoryIds,
+      suppliers: supplierIds.map((vendorId) => ({ vendorId })),
       hashtags: rawHashtags,
       links,
     });
@@ -97,6 +99,7 @@ export async function createBrandAction(
       categoryIds: parsed.data.categoryIds,
       hashtags: parsed.data.hashtags,
       links: (parsed.data.links ?? []).map((l) => ({ kind: l.kind, url: l.url, label: l.label ?? undefined })),
+      suppliers: parsed.data.suppliers,
     });
     revalidateBrands();
     return result;
@@ -123,6 +126,7 @@ export async function updateBrandAction(
       .filter(Boolean);
 
     const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
+    const supplierIds = formData.getAll("supplierIds").map(String).filter(Boolean);
 
     const parsed = BrandInputSchema.extend({ brandId: z.string().uuid() }).safeParse({
       brandId: String(formData.get("brandId") ?? ""),
@@ -130,6 +134,7 @@ export async function updateBrandAction(
       ownerVendorId: String(formData.get("ownerVendorId") ?? ""),
       notes: formData.get("notes") ? String(formData.get("notes")) : null,
       categoryIds,
+      suppliers: supplierIds.map((vendorId) => ({ vendorId })),
       hashtags: rawHashtags,
       links,
     });
@@ -145,6 +150,7 @@ export async function updateBrandAction(
       categoryIds: parsed.data.categoryIds,
       hashtags: parsed.data.hashtags,
       links: (parsed.data.links ?? []).map((l) => ({ kind: l.kind, url: l.url, label: l.label ?? undefined })),
+      suppliers: parsed.data.suppliers,
     });
     revalidateBrands();
     return result;

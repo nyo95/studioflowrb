@@ -1,5 +1,13 @@
 # Vendor Contract — Master Data
 
+> **R5.05 owner amendment — 2026-09-06.** The persisted entity and route remain
+> `Vendor`/`/masterdata/vendors`, but every user-facing label is **Supplier**.
+> Suppliers own operational profile, capability types, and sales contacts only.
+> `VendorLink` is PURGED: suppliers never own catalog, website, product URL, or
+> other external catalog resources. Those facts belong exclusively to Brand.
+> `BrandSupplier` remains, but mutation is owned only by Brand; Supplier displays
+> supplied Brands as an explicit read-only projection.
+
 Status: **OWNER-APPROVED LOGIC CONTRACT — not yet an executable work order**
 
 Authority: Owner decisions locked in navigator session and reconciled with the
