@@ -5,8 +5,34 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6**
-- Next local revision: **R6.01**
+- Current revision after this entry is committed: **R6.01**
+- Next local revision: **R6.02**
+
+## R6.01 — 2026-09-06 — docs(contracts): lock R6.1 decision delta
+
+Status: **local contract patch — Phase 1 audit + Phase 2 contract update**
+
+### Changed
+
+- **`docs/apps/bq-contract.md`** bumped to R0.3 with the following R6.1 additions:
+  - §3 Hierarchy: added canonical user-facing terminology table — Work Item (L1), Component Group (L2), Cost Component (L3); internal Prisma names unchanged.
+  - §7 Snapshot: added `source_price_snapshot` as immutable baseline field alongside editable `harga_snapshot`; documented Override/Revert semantics — `isOverridden` is derived (`source_price_snapshot IS NOT NULL AND harga_snapshot ≠ source_price_snapshot`), not persisted; Custom Cost Component (source_type=CUSTOM) has no Revert.
+  - §10 BQ Project: lifecycle extended from `DRAFT/LOCKED` to `ACTIVE/LOCKED/ARCHIVED` with full transition table and service-layer enforcement requirement.
+  - §15 Locked decisions: added K-17 (lifecycle), K-18 (snapshot/revert), K-19 (library type→kategori deterministic), K-20 (unit SSOT from Master Data), K-21 (source picker tabs + Custom type picker), K-22 (template recommendations at Section AND Subsection level), K-23 (Component Group = container only).
+
+- **`UI_ENGINE.md`**: added §3.1 Three-tier composition model (Primitive / Pattern / Application), §3.2 Directory pattern canonicalization (DirectoryShell, EntityPrimaryCell with status dot, RowActionMenu, viewport-aware flex layout — no magic heights), §3.3 Dialog sizing convention (sm/md/lg; no arbitrary app-level width overrides).
+
+### Schema changes locked (not yet migrated)
+
+The following schema changes are required and will be executed in the next revision:
+- `BqProjectStatus` enum: rename `DRAFT` → `ACTIVE`; add `ARCHIVED`.
+- `BqLineItem`: add `source_price_snapshot NUMERIC(18,4) NULL`.
+
+### Verification
+
+- No code changed; contract/doc-only revision.
+- `git diff --check`: passed (whitespace).
+
 
 ## R6 — 2026-09-06 — release: publish Master Data and UI hardening
 

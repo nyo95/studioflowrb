@@ -79,6 +79,61 @@ Generic structure and reusable templates, e.g. PageHeader, PageSection, SplitPan
 ### patterns
 Shared interaction contracts, e.g. inline editing, row actions, filter/search toolbar, dialog form, drawer detail.
 
+## 3.1 Three-tier composition model (R6.1)
+
+Every UI capability in this engine belongs to exactly one tier:
+
+| Tier | What it is | Examples |
+|---|---|---|
+| **Primitive** | Atomic building block — single responsibility, no composition assumed | `Button`, `Badge`, `Input`, `StatusMarker`, `IconButton` |
+| **Pattern** | Reusable interaction contract combining primitives — still domain-agnostic | `DraftDialog`, `RowActionMenu`, `InlineEdit`, `DirectoryShell`, `Pagination` |
+| **Application composition** | App-owned assembly of patterns + primitives with domain knowledge | `BrandDirectory`, `VendorDirectory`, `ProjectEditor` |
+
+Rules:
+- Patterns must not import domain types, services, Prisma models, or app-specific constants.
+- A capability that requires domain vocabulary to be meaningful is Application composition — keep it in the app.
+- When an Application composition is replicated across ≥2 apps, extract the domain-agnostic core as a Pattern.
+
+## 3.2 Directory pattern (R6.1 addition)
+
+The following shared directory pattern is canonicalized for all entity list pages:
+
+```text
+DirectoryShell
+├── DirectoryToolbar (search, filters, primary action button)
+├── DataTable
+│   ├── EntityPrimaryCell (● StatusDot + Primary name + secondary metadata line)
+│   └── RowActionMenu (⋯ ellipsis — all ordinary CRUD: edit, archive, restore, delete)
+└── Pagination
+```
+
+**EntityPrimaryCell convention:**
+- Status indicator = colored dot (● green = active, ● red = archived). No separate Status column.
+- Primary = entity name, bold.
+- Secondary = metadata line below: updated date, type tags, counts — whatever is contextually relevant.
+
+**RowActionMenu convention:**
+- All ordinary CRUD (Edit, Archive, Restore, Request Deletion) go behind ⋯.
+- Icon actions (not ⋯) reserved only for: reorder handles, inline manipulation, highly contextual editor controls.
+
+**Layout viewport-awareness:**
+- DirectoryShell fills remaining viewport height (`flex: 1; min-height: 0`).
+- DataTable body scrolls internally (`overflow-y: auto`).
+- Sticky header and sticky action column are the table's responsibility.
+- Do NOT use fixed or magic heights (`60vh`, `maxBodyHeight="..."`) — use flex layout.
+
+## 3.3 Dialog sizing convention (R6.1)
+
+| Size | When to use |
+|---|---|
+| `sm` | Ordinary CRUD (create/edit a single entity with a few fields) |
+| `md` | Moderately complex CRUD (entity with several sections, related items) |
+| `lg` | Editor / workspace (BQ project editor, template editor) |
+
+App-level code must not pass arbitrary `width` or `maxWidth` overrides. If an existing dialog needs a different size, fix the shared size tier.
+
+`DraftDialog` remains the standard container for all CRUD dialogs with unsaved-draft protection.
+
 ## 4. What UI Engine Does Not Own
 
 Keep domain UI inside the app:

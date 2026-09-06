@@ -1,8 +1,8 @@
 # BQ Contract — Bill of Quantity
 
 **Status:** LOCKED — semua keputusan di bawah sudah dikonfirmasi owner
-**Versi:** R0.2
-**Tanggal:** 2026-09-01
+**Versi:** R0.3 (R6.1 decision delta)
+**Tanggal:** 2026-09-06
 **Prerequisite:** Master Data public read contract aligned di R4.13 ✓
 
 ---
@@ -63,6 +63,16 @@ Section           (PRELIMINARIES, INTERIOR WORKS, FURNITURE WORKS...)
 - L1: selalu ada. Ini item BQ yang dikerjakan.
 - L2: **opsional**. Hanya muncul saat L1 perlu dipecah ke komponen (fixture kompleks). L1 sederhana langsung punya L3.
 - L3: **terminal**. Tidak ada level di bawah L3. Semua kalkulasi terjadi di sini.
+
+**Canonical user-facing terminology (R6.1):**
+| Internal (Prisma) | User-facing |
+|---|---|
+| BqItem / L1 | **Work Item** |
+| BqSubObject / L2 | **Component Group** (container saja — tidak punya business meaning sendiri) |
+| BqLineItem / L3 | **Cost Component** |
+| Section | Section |
+| Subsection | Subsection |
+Internal model names (BqItem, BqSubObject, BqLineItem) tidak diubah di persistence.
 - L3 atomic = salah satu dari: `PriceMaterial`, `PriceLabor`, `PriceMaterialLabor`.
 - **L1 boleh berdiri sendiri** tanpa L2 maupun L3. Struktur yang sah:
   - `L1 only` — L1 menyimpan `harga_snapshot` dan `koefisien` sendiri, kalkulasi langsung di level L1.
@@ -211,13 +221,22 @@ Semua tipe = snapshot. `source_type` hanya untuk traceability.
 | `purchase_unit_snapshot` | purchase_unit | |
 | `base_unit_snapshot` | base_unit | |
 | `purchase_to_base_factor_snapshot` | Sku.purchase_to_base_factor | nullable, display only |
-| `harga_snapshot` | price.amount | |
+| `source_price_snapshot` | price.amount saat import | **Immutable baseline** — tidak pernah berubah setelah import |
+| `harga_snapshot` | price.amount (working value) | Editable oleh estimator; awalnya sama dengan source |
 | `currency_snapshot` | price.currency | |
 | `kategori` | ditentukan saat import | salah satu dari 6 nilai di §4 |
 | `source_ref_id` | ID entri asal | bukan FK dengan constraint |
 | `source_imported_at` | timestamp saat import | |
 
 Setelah snapshot, semua field L3 **bisa di-override per baris** tanpa mengubah Master Data.
+
+**Override / Revert semantics (R6.1):**
+- `source_price_snapshot` = baseline immutable saat import. Tidak pernah berubah.
+- `harga_snapshot` = working value. Estimator boleh mengubah kapanpun.
+- `isOverridden` = **derived**, tidak disimpan di DB: `source_price_snapshot IS NOT NULL AND harga_snapshot ≠ source_price_snapshot`.
+- **Revert:** set `harga_snapshot ← source_price_snapshot`. Server-side only. Tidak mengubah Master Data.
+- **Custom Cost Component** (`source_type = CUSTOM`): `source_price_snapshot = NULL`, tidak punya Revert.
+- Override dan revert dicatat di audit log.
 
 ---
 
@@ -344,14 +363,25 @@ tidak ada FK lintas schema atau pembacaan tabel internal aplikasi lain.
 | `id` | uuid | PK |
 | `title` | string | Nama project BQ |
 | `client_name` | string | Teks bebas |
-| `status` | enum | `DRAFT` / `LOCKED` |
+| `status` | enum | `ACTIVE` / `LOCKED` / `ARCHIVED` |
 | `external_ref` | string? | Referensi ke project system lain (opsional) |
 | `created_by` | string | FK ke User |
 | `notes` | text? | Keterangan umum |
 | `created_at` | timestamp | |
 | `updated_at` | timestamp | |
 
-`DRAFT` = bisa diedit. `LOCKED` = read-only final. BQ Project berdiri sendiri dulu — integrasi formal ke StudioFlow via `external_ref` menyusul.
+`ACTIVE` = bisa diedit. `LOCKED` = read-only (bisa dibuka, tidak bisa dimutasi; bisa di-unlock). `ARCHIVED` = tidak bisa dimutasi, masih bisa dibaca, bisa di-restore ke `ACTIVE`.
+
+**Lifecycle transitions:**
+```
+ACTIVE ──lock──▶ LOCKED ──unlock──▶ ACTIVE
+ACTIVE ──archive──▶ ARCHIVED ──restore──▶ ACTIVE
+ARCHIVED ──▶ deletion request (terpisah)
+```
+
+**Service-layer enforcement:** setiap mutation terhadap content BQ wajib melewati guard `requireEditableProject` yang reject bila status `LOCKED` atau `ARCHIVED`. Tidak cukup hanya disable tombol di UI.
+
+BQ Project berdiri sendiri dulu — integrasi formal ke StudioFlow via `external_ref` menyusul.
 
 ---
 
@@ -493,6 +523,13 @@ Belum diverifikasi di browser sungguhan; lihat catatan keterbatasan di
 | K-14 | L1 boleh berdiri sendiri tanpa L2 maupun L3. L1 menyimpan `harga_snapshot` dan `koefisien` untuk kasus L1-only. |
 | K-15 | Semua Library Item wajib mempunyai `kategori` (enum `BqKategori`) dan `base_unit` (nullable). Validasi kategori per tipe: Material/Upah/Material+Upah sesuai jenis library; CustomItem hanya Biaya Umum/Transportasi/Alat. |
 | K-16 | Calculation engine menggunakan `DecimalString` (canonical string), bukan JavaScript `number`. Tidak ada floating-point arithmetic. Rounding policy adalah keputusan owner yang harus dikunci sebelum F3. |
+| K-17 | Project lifecycle: `ACTIVE / LOCKED / ARCHIVED`. `LOCKED` = read-only (bisa di-unlock). `ARCHIVED` = read-only (bisa di-restore). Service layer enforce — bukan UI disable saja. |
+| K-18 | `source_price_snapshot` = immutable baseline harga saat import. `harga_snapshot` = working value. `isOverridden` derived (tidak disimpan). Custom tidak punya Revert. |
+| K-19 | BQ Library type→kategori deterministic: Material→MATERIAL, Labor→UPAH, MaterialLabor→MATERIAL_UPAH. Custom: BIAYA_UMUM / TRANSPORTASI_AKOMODASI / ALAT. |
+| K-20 | Unit untuk Work Item dibaca dari Master Data public read contract. Snapshot tetap string untuk historical stability. |
+| K-21 | Source picker tabs: [Semua] [Material] [Labor] [Material+Labor] [BQ Library]. Custom picker wajib tanya Type (tidak default Material). |
+| K-22 | Template recommendations ada di Section DAN Subsection. Live pointer di Template, snapshot saat insert ke Project. |
+| K-23 | Component Group (L2) = container saja. Tidak punya business meaning mandiri. |
 
 ---
 
