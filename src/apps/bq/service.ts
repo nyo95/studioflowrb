@@ -1477,6 +1477,35 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     return lineItem;
   }
 
+
+  async function revertLineItemPrice(input: {
+    grants: PermissionGrants;
+    actor: { kind: string; userId?: string; label: string };
+    id: string;
+  }) {
+    requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+    await requireEditableProjectForLineItem(input.id);
+    // Fetch with no select so Prisma returns the full row; source_price_snapshot
+    // exists in the schema but the generated select type lags manual patches.
+    const lineItem = await db.bqLineItem.findUnique({ where: { id: input.id } });
+    if (!lineItem) throw new AppError("NOT_FOUND", "bq.line-item.not-found", "Line item not found");
+    const snap = (lineItem as unknown as Record<string, unknown>)["source_price_snapshot"];
+    if (snap == null) {
+      throw new AppError("INVARIANT", "bq.line-item.no-snapshot", "No source snapshot to revert to");
+    }
+    const updated = await db.bqLineItem.update({
+      where: { id: input.id },
+      data: { harga_snapshot: snap as string },
+    });
+    await auditWriter({
+      appId: "bq",
+      action: "bq.line-item.price-reverted",
+      entityType: "BqLineItem",
+      entityId: updated.id,
+      actor: input.actor,
+    });
+    return updated;
+  }
   async function deleteLineItem(input: {
     grants: PermissionGrants;
     actor: { kind: string; userId?: string; label: string };
@@ -1772,6 +1801,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     addLineItem,
     updateLineItem,
     deleteLineItem,
+    revertLineItemPrice,
     requestPromotion,
     listPromotionRequests,
     approvePromotion,

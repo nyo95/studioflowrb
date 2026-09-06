@@ -462,6 +462,18 @@ export async function lockProjectAction(
 
 // ─── SOURCE PICKER ────────────────────────────────────────────
 
+export async function revertLineItemPriceAction(
+  _prev: ActionResult<BqProjectDetail> | null,
+  formData: FormData,
+): Promise<ActionResult<BqProjectDetail>> {
+  return runSafeAction(async () => {
+    const { grants, actor } = await authorize();
+    const { projectId, id } = parse(TargetSchema, formData);
+    await bqService.revertLineItemPrice({ grants, actor, id });
+    return reload(projectId);
+  });
+}
+
 export type LineItemSourceOption = {
   id: string;
   sourceType: "MASTERDATA" | "BQ_LIBRARY";

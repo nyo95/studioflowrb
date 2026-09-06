@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Download, Lock, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Lock, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import {
@@ -53,6 +53,7 @@ import {
   updateSubObjectAction,
   updateSectionAction,
   updateSubsectionAction,
+  revertLineItemPriceAction,
   type LineItemSourceOption,
 } from "./actions";
 
@@ -804,6 +805,11 @@ function LineItemRow({
                 1 {line.purchaseUnitSnapshot} = {line.purchaseToBaseFactorSnapshot} {line.baseUnitSnapshot}
               </Text>
             ) : null}
+            {line.sourcePriceSnapshot !== null && line.hargaSnapshot !== line.sourcePriceSnapshot ? (
+              <Tooltip content={`Harga asli: ${formatMoney(createMoney(line.sourcePriceSnapshot, line.currencySnapshot))}`}>
+                <Badge tone="warning">Harga diubah</Badge>
+              </Tooltip>
+            ) : null}
           </div>
         </div>
       </TableCell>
@@ -830,11 +836,25 @@ function LineItemRow({
       <TableCell align="end">{money(line.biayaLine, line.currencySnapshot)}</TableCell>
       {editable ? (
         <TableCell align="end">
-          <RemoveButton
-            label={`Delete ${line.titleSnapshot}`}
-            onRemove={() => run(deleteLineItemAction, { id: line.id })}
-            disabled={pending}
-          />
+          <div className="flex items-center justify-end gap-0.5">
+            {line.sourcePriceSnapshot !== null && line.hargaSnapshot !== line.sourcePriceSnapshot ? (
+              <Tooltip content="Kembalikan ke harga snapshot asal">
+                <IconButton
+                  size="sm"
+                  variant="ghost"
+                  label="Revert harga"
+                  icon={<RotateCcw aria-hidden="true" />}
+                  disabled={pending}
+                  onClick={() => run(revertLineItemPriceAction, { id: line.id })}
+                />
+              </Tooltip>
+            ) : null}
+            <RemoveButton
+              label={`Delete ${line.titleSnapshot}`}
+              onRemove={() => run(deleteLineItemAction, { id: line.id })}
+              disabled={pending}
+            />
+          </div>
         </TableCell>
       ) : null}
     </TableRow>

@@ -5,8 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.09**
-- Next local revision: **R6.10**
+- Current revision after this entry is committed: **R6.10**
+- Next local revision: **R6.11**
+
+## R6.10 | feat(bq): price override indicator + revert-to-snapshot action
+
+### Added
+- `revertLineItemPrice` service function: reads `source_price_snapshot`, throws `INVARIANT` if null, writes `harga_snapshot = source_price_snapshot`, audit-logs `bq.line-item.price-reverted`.
+- `revertLineItemPriceAction` Server Action (follows `runSafeAction` / `TargetSchema` / `authorize` / `reload` pattern).
+- **Override indicator**: `LineItemRow` shows a `<Badge tone="warning">Harga diubah</Badge>` (with tooltip displaying the original snapshot price) when `hargaSnapshot !== sourcePriceSnapshot` and `sourcePriceSnapshot` is not null.
+- **Revert button**: `LineItemRow` actions cell shows a `RotateCcw` `IconButton` ("Kembalikan ke harga snapshot asal") when an override is active; clicking calls `revertLineItemPriceAction`.
+
+### Files changed
+- `src/apps/bq/service.ts`
+- `src/app/(platform)/bq/[id]/actions.ts`
+- `src/app/(platform)/bq/[id]/project-editor.tsx`
 
 ## R6.09 | feat(bq): source-picker tab redesign with Custom kategori grid
 
