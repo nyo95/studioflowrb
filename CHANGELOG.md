@@ -5,9 +5,16 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R5** — `d0c39ff3a2f0c1ed95b4cdb425ed968a9c2baf08` (local origin/main reference)
-- Current revision after this entry is committed: **R5.09**
-- Next local revision: **R5.10**
+- Current revision after this entry is committed: **R5.10**
+- Next local revision: **R5.11**
 - This change is local only; no new remote publication is authorized.
+
+## R5.10 — 2026-09-06 — fix(shell): attach rail control to navigation
+
+- Moved the desktop collapse/expand control from the fixed top bar into the
+  application rail so top-bar geometry remains stable and the control reads as
+  part of the navigation surface.
+- Checks: `npm run typecheck`, `npm run lint`, and whitespace check passed.
 
 ## R5.09 — 2026-09-06 — fix(bq): keep failed quick actions inline
 

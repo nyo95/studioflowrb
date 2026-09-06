@@ -113,7 +113,7 @@ export function AppShell({
               <div className={cx("min-w-0 overflow-hidden", isCollapsed && "grid place-items-center")}>
                 {railBrand}
               </div>
-              {railToggle}
+              {!topbar ? railToggle : null}
             </div>
             <div className="flex min-w-0 flex-1 items-center pl-[var(--ui-header-brand-width,232px)] max-[840px]:pl-0">{topbar}</div>
           </header>
@@ -137,6 +137,11 @@ export function AppShell({
             aria-label={navigationLabel}
             data-collapsed={isCollapsed || undefined}
           >
+            {topbar ? (
+              <div className={cx("absolute right-2 top-2 z-10", isCollapsed && "right-1")}>
+                {railToggle}
+              </div>
+            ) : null}
             {!topbar ? (
               <div
                 className={cx(
