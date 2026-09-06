@@ -290,6 +290,42 @@ export async function applyAssemblyAction(
   });
 }
 
+const AddItemAndApplyAssemblySchema = z.object({
+  projectId: Id,
+  sectionId: Id.optional(),
+  subsectionId: Id.optional(),
+  assemblyId: Id,
+  qtyPerL1: z.string().trim().optional(),
+});
+
+/** Creates an L1 at the selected footer, then applies the assembly in the same transaction. */
+export async function addItemAndApplyAssemblyAction(
+  _prev: ActionResult<BqProjectDetail> | null,
+  formData: FormData,
+): Promise<ActionResult<BqProjectDetail>> {
+  return runSafeAction(async () => {
+    const { grants, actor } = await authorize();
+    const raw = Object.fromEntries(formData.entries());
+    if (!raw.sectionId) delete raw.sectionId;
+    if (!raw.subsectionId) delete raw.subsectionId;
+    const parsed = AddItemAndApplyAssemblySchema.safeParse(raw);
+    if (!parsed.success) throw validationError(parsed.error);
+    const value = parsed.data;
+    if ((value.sectionId === undefined) === (value.subsectionId === undefined)) {
+      throw new AppError("VALIDATION", "bq.assembly.invalid-parent", "Assembly must be added to one section or subsection");
+    }
+    await bqService.addItemAndApplyAssembly({
+      grants,
+      actor,
+      sectionId: value.sectionId,
+      subsectionId: value.subsectionId,
+      assemblyId: value.assemblyId,
+      qtyPerL1: value.qtyPerL1 ? positiveDecimal(value.qtyPerL1, "Assembly quantity") : undefined,
+    });
+    return reload(value.projectId);
+  });
+}
+
 // ─── L3 ───────────────────────────────────────────────────────
 
 const KATEGORI = ["MATERIAL", "UPAH", "MATERIAL_UPAH", "BIAYA_UMUM", "TRANSPORTASI_AKOMODASI", "ALAT"] as const;

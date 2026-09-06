@@ -1759,6 +1759,38 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     return subObject;
   }
 
+  /** Creates an L1 named after the selected template, then snapshots that template into it. */
+  async function addItemAndApplyAssembly(input: {
+    grants: PermissionGrants;
+    actor: { kind: string; userId?: string; label: string };
+    sectionId?: string;
+    subsectionId?: string;
+    assemblyId: string;
+    qtyPerL1?: string;
+  }) {
+    requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+    const assembly = await db.bqAssemblyTemplate.findUnique({ where: { id: input.assemblyId } });
+    if (!assembly) throw new AppError("NOT_FOUND", "bq.assembly.not-found", "Assembly template not found");
+
+    const item = await addItem({
+      grants: input.grants,
+      actor: input.actor,
+      sectionId: input.sectionId,
+      subsectionId: input.subsectionId,
+      name: assembly.name,
+      qty: "1",
+      unit: "ls",
+    });
+    await applyAssemblyTemplate({
+      grants: input.grants,
+      actor: input.actor,
+      itemId: item.id,
+      assemblyId: input.assemblyId,
+      qtyPerL1: input.qtyPerL1,
+    });
+    return item;
+  }
+
   const operations = {
     createLibMaterial,
     updateLibMaterial,
@@ -1813,6 +1845,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     updateAssemblyLine,
     deleteAssemblyLine,
     applyAssemblyTemplate,
+    addItemAndApplyAssembly,
   };
 
   // CORE.md §2: a command that writes records plus its audit event runs in one

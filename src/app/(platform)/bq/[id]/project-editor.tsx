@@ -39,6 +39,7 @@ import type {
 
 import {
   addItemAction,
+  addItemAndApplyAssemblyAction,
   addLineItemAction,
   addSubObjectAction,
   addSubsectionAction,
@@ -71,6 +72,11 @@ type SourcePickOption =
   | LineItemSourceOption
   | { sourceType: "CUSTOM"; kategori: string };
 
+type AssemblyTarget =
+  | { via: "item"; itemId: string }
+  | { via: "section"; sectionId: string }
+  | { via: "subsection"; subsectionId: string };
+
 type Mutation = (prev: null, formData: FormData) => Promise<ActionResult<BqProjectDetail>>;
 
 /** Amounts arrive as canonical decimal strings; presentation never re-derives them. */
@@ -93,7 +99,7 @@ export function ProjectEditor({
   const [pending, startTransition] = useTransition();
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [importTarget, setImportTarget] = useState<{ itemId?: string; subObjectId?: string } | null>(null);
-  const [assemblyTarget, setAssemblyTarget] = useState<string | null>(null); // itemId
+  const [assemblyTarget, setAssemblyTarget] = useState<AssemblyTarget | null>(null);
   const [lockOpen, setLockOpen] = useState(false);
   const [transientAdd, setTransientAdd] = useState<{ kind: "item" | "subObject"; id: string } | null>(null);
 
@@ -190,6 +196,7 @@ export function ProjectEditor({
             run={run}
             commit={commit}
             onImport={setImportTarget}
+            onApplyAssembly={(itemId) => setAssemblyTarget({ via: "item", itemId })}
             transientAdd={transientAdd}
             onTransientAdd={setTransientAdd}
             columns={totalColumns}
@@ -218,6 +225,7 @@ export function ProjectEditor({
                 run={run}
                 commit={commit}
                 onImport={setImportTarget}
+                onApplyAssembly={(itemId) => setAssemblyTarget({ via: "item", itemId })}
                 transientAdd={transientAdd}
                 onTransientAdd={setTransientAdd}
                 columns={totalColumns}
@@ -230,6 +238,14 @@ export function ProjectEditor({
                     disabled={pending}
                     onAdd={(name) => run(addItemAction, { subsectionId: subsection.id, name })}
                   />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={pending}
+                    onClick={() => setAssemblyTarget({ via: "subsection", subsectionId: subsection.id })}
+                  >
+                    Terapkan Assembly
+                  </Button>
                 </div>
               ) : null}
             </div>
@@ -248,6 +264,14 @@ export function ProjectEditor({
                 disabled={pending}
                 onAdd={(name) => run(addItemAction, { sectionId: section.id, name })}
               />
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={pending}
+                onClick={() => setAssemblyTarget({ via: "section", sectionId: section.id })}
+              >
+                Terapkan Assembly
+              </Button>
             </div>
           ) : null}
         </SectionCard>
@@ -288,12 +312,18 @@ export function ProjectEditor({
 
       {assemblyTarget ? (
         <AssemblyPickerDialog
-          key={assemblyTarget}
+          key={assemblyTarget.via === "item" ? assemblyTarget.itemId : assemblyTarget.via === "section" ? assemblyTarget.sectionId : assemblyTarget.subsectionId}
           assemblies={assemblies}
           pending={pending}
           onClose={() => setAssemblyTarget(null)}
           onApply={(assemblyId, qtyPerL1) => {
-            void run(applyAssemblyAction, { itemId: assemblyTarget, assemblyId, qtyPerL1 }).catch(() => undefined).finally(() => setAssemblyTarget(null));
+            const action = assemblyTarget.via === "item" ? applyAssemblyAction : addItemAndApplyAssemblyAction;
+            const fields = assemblyTarget.via === "item"
+              ? { itemId: assemblyTarget.itemId, assemblyId, qtyPerL1 }
+              : assemblyTarget.via === "section"
+                ? { sectionId: assemblyTarget.sectionId, assemblyId, qtyPerL1 }
+                : { subsectionId: assemblyTarget.subsectionId, assemblyId, qtyPerL1 };
+            void run(action, fields).catch(() => undefined).finally(() => setAssemblyTarget(null));
           }}
         />
       ) : null}

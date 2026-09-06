@@ -5,8 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.10**
-- Next local revision: **R6.11**
+- Current revision after this entry is committed: **R6.11**
+- Next local revision: **R6.12**
+
+## R6.11 | feat(bq): assembly picker at Section and Subsection level
+
+### Added
+- Section and Subsection footers now expose a **Terapkan Assembly** trigger that creates a new L1 at that location and snapshots the selected Assembly into its L2/L3 structure.
+- `addItemAndApplyAssemblyAction` and its transactional service operation ensure the new L1 and Assembly snapshot commit or roll back together.
+
+### Changed
+- `assemblyTarget` now records whether the picker originated from an existing item, Section, or Subsection.
+- Existing item-level Assembly control is wired back to the shared picker unchanged in behavior.
+
+### Verification
+- `npx tsc --noEmit`: passed (0 errors).
+- `git diff --check`: passed.
+
+### Files changed
+- `src/app/(platform)/bq/[id]/project-editor.tsx`
+- `src/app/(platform)/bq/[id]/actions.ts`
+- `src/apps/bq/service.ts`
+- `CHANGELOG.md`
 
 ## R6.10 | feat(bq): price override indicator + revert-to-snapshot action
 
