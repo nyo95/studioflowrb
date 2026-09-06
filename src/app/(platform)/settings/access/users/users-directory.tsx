@@ -1,40 +1,22 @@
 "use client";
+import { SearchField } from "@/platform/ui_engine";
+import { RowActionMenu } from "@/platform/ui_engine";
+import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
+import { DirectoryShell,DraftDialog,Pagination,Text,usePagination } from "@/platform/ui_engine";
 
-import { useActionState, useState, useTransition } from "react";
+
 import { UserPlus } from "lucide-react";
+import { useActionState,useState,useTransition } from "react";
 
+import { Button,ConfirmDialog,DataTable,EmptyState,Field,FormActions,IconButton,InlineError,Input,Select,Spinner,StatusBadge,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar } from "@/platform/ui_engine";
 import {
-  Button,
-  ConfirmDialog,
-  DataTable,
-  Dialog,
-  EmptyState,
-  Field,
-  FormActions,
-  InlineError,
-  IconButton,
-  Input,
-  SectionCard,
-  Select,
-  Spinner,
-  StatusBadge,
-  TableBody,
-  TableCell,
-  TableCellContent,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableToolbar,
-  Text,
-} from "@/platform/ui_engine";
-import {
-  assignRoleAction,
-  createUserAction,
-  disableUserAction,
-  removeRoleAction,
-  restoreUserAction,
-  setUserPasswordAction,
-  updateUserDisplayNameAction,
+assignRoleAction,
+createUserAction,
+disableUserAction,
+removeRoleAction,
+restoreUserAction,
+setUserPasswordAction,
+updateUserDisplayNameAction,
 } from "./actions";
 
 type UserRow = {
@@ -58,53 +40,76 @@ export function UsersDirectory({
   canManage: boolean;
   canAssignRoles: boolean;
 }) {
+  const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<UserRow | null>(null);
   const [passwordTarget, setPasswordTarget] = useState<UserRow | null>(null);
   const [confirmDisable, setConfirmDisable] = useState<UserRow | null>(null);
   const [confirmRemoveRole, setConfirmRemoveRole] = useState<{ user: UserRow; roleId: string; roleName: string } | null>(null);
+  const [rowError, setRowError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  const [createState, createAction, createPending] = useActionState(createUserAction, null);
-  const [editState, editAction, editPending] = useActionState(updateUserDisplayNameAction, null);
-  const [passwordState, passwordAction, passwordPending] = useActionState(setUserPasswordAction, null);
+  const [createState, createAction, createPending] = useActionState(async (previous: Parameters<typeof createUserAction>[0], data: FormData) => { const result = await createUserAction(previous, data); if (result.ok) { setCreateOpen(false); } return result; }, null);
+  const [editState, editAction, editPending] = useActionState(async (previous: Parameters<typeof updateUserDisplayNameAction>[0], data: FormData) => { const result = await updateUserDisplayNameAction(previous, data); if (result.ok) { setEditTarget(null); } return result; }, null);
+  const [passwordState, passwordAction, passwordPending] = useActionState(async (previous: Parameters<typeof setUserPasswordAction>[0], data: FormData) => { const result = await setUserPasswordAction(previous, data); if (result.ok) { setPasswordTarget(null); } return result; }, null);
 
-  const runRowAction = (id: string, run: () => Promise<unknown>) => {
-    setPendingId(id);
+  const runRowAction = (id: string, command: () => Promise<unknown>, onSuccess?: () => void) => {
+    if (pendingId) return;
+    setPendingId(id); setRowError(null);
     startTransition(async () => {
       try {
-        await run();
-      } finally {
-        setPendingId(null);
-      }
+        const result = await command();
+        if (result && typeof result === "object" && "ok" in result && !result.ok) {
+          const failure = result as { error?: { safeMessage?: string } };
+          setRowError(failure.error?.safeMessage ?? "The action could not be completed."); return;
+        }
+        onSuccess?.();
+      } catch { setRowError("The action could not be completed. Please try again."); }
+      finally { setPendingId(null); }
     });
   };
 
-  return (
-    <SectionCard>
-      <TableToolbar actions={canManage ? (
+
+  const { locale } = useDisplaySettings();
+  const [sortKey, setSortKey] = useState<"Display name" | "Email" | "Status">("Display name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const sortValues: Record<"Display name" | "Email" | "Status", (r: UserRow) => string | number | null> = {"Display name": (r) => r.displayName, "Email": (r) => r.email, "Status": (r) => r.status};
+  const collator = new Intl.Collator(locale, { sensitivity: "base", numeric: true });
+  const filteredRecords = users.filter(row => `${row.displayName} ${row.email}`.toLowerCase().includes(query.toLowerCase()));
+  const orderedRows = [...filteredRecords].sort((a, b) => {
+    const left = sortValues[sortKey](a), right = sortValues[sortKey](b);
+    if (left === null || right === null) return left === right ? a.id.localeCompare(b.id) : left === null ? 1 : -1;
+    const result = typeof left === "number" && typeof right === "number" ? left - right : collator.compare(String(left), String(right));
+    return (sortDirection === "asc" ? result : -result) || a.id.localeCompare(b.id);
+  });
+  const paging = usePagination(orderedRows.length, 25, JSON.stringify([query, sortKey, sortDirection]));
+  const visibleRows = orderedRows.slice(paging.offset, paging.offset + 25);
+  const pageFooter = <div className="grid gap-2"><Text tone="secondary" size="sm">{orderedRows.length ? paging.offset + 1 : 0}–{Math.min(paging.offset + 25, orderedRows.length)} of {orderedRows.length} records</Text>{paging.pageCount > 1 ? <Pagination page={paging.page} pageCount={paging.pageCount} onPageChange={paging.setPage} /> : null}</div>;
+return (
+    <DirectoryShell header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
         <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
           <UserPlus aria-hidden="true" />
           <span>New user</span>
         </Button>
-      ) : undefined} />
+      ) : undefined} ><SearchField label="Search users" value={query} onChange={event => setQuery(event.target.value)} onClear={() => setQuery("")} /></TableToolbar>}>
 
-      {users.length === 0 ? (
+
+      {orderedRows.length === 0 ? (
         <EmptyState title="No users yet" description="Create the first platform account to get started." />
       ) : (
-        <DataTable minWidth={860}>
+        <DataTable framed={false} density="compact" stickyHeader maxBodyHeight="60vh" minWidth={860}>
           <TableHeader>
             <TableRow>
-              <TableHead>Email</TableHead>
-              <TableHead>Display name</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead sortable sortDirection={sortKey === "Email" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Email"); setSortDirection(direction); }}>Email</TableHead>
+              <TableHead sortable sortDirection={sortKey === "Display name" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Display name"); setSortDirection(direction); }}>Display name</TableHead>
+              <TableHead sortable sortDirection={sortKey === "Status" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Status"); setSortDirection(direction); }}>Status</TableHead>
               <TableHead>Roles</TableHead>
-              <TableHead align="end">Actions</TableHead>
+              <TableHead stickyEnd align="end">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {users.map((user) => (
+            {visibleRows.map((user) => (
               <TableRow key={user.id}>
                 <TableCell data-column="identifier">{user.email}</TableCell>
                 <TableCell>
@@ -131,19 +136,10 @@ export function UsersDirectory({
                     />
                   )}
                 </TableCell>
-                <TableCell align="end">
-                  <div className="inline-flex flex-wrap justify-end gap-1.5">
-                    {canManage ? (
-                      <>
-                        <Button type="button" variant="secondary" size="sm" onClick={() => setEditTarget(user)}>
-                          Edit
-                        </Button>
-                        <Button type="button" variant="secondary" size="sm" onClick={() => setPasswordTarget(user)}>
-                          Password
-                        </Button>
-                      </>
-                    ) : null}
-                    {canAssignRoles && roles.length > 0 ? (
+                <TableCell align="end" stickyEnd><div className="flex items-center justify-end gap-2"><RowActionMenu label={`Actions for ${user.displayName}`} pending={pendingId === user.id} items={canManage ? [
+ {label:"Edit",onSelect:()=>setEditTarget(user)}, {label:"Password",onSelect:()=>setPasswordTarget(user)},
+ user.status === "ACTIVE" ? {label:"Disable",danger:true,separatorBefore:true,onSelect:()=>setConfirmDisable(user)} : {label:"Restore",onSelect:()=>runRowAction(user.id,()=>restoreUserAction(user.id))}
+ ] : []} />{canAssignRoles && roles.length > 0 ? (
                       <RoleAssignControl
                         user={user}
                         roles={roles.filter((role) => !user.roles.some((assigned) => assigned.id === role.id))}
@@ -156,31 +152,7 @@ export function UsersDirectory({
                           if (role) setConfirmRemoveRole({ user, roleId, roleName: role.name });
                         }}
                       />
-                    ) : null}
-                    {canManage ? (
-                      user.status === "ACTIVE" ? (
-                        <Button
-                          type="button"
-                          variant="danger"
-                          size="sm"
-                          onClick={() => setConfirmDisable(user)}
-                        >
-                          Disable
-                        </Button>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          disabled={pendingId === user.id}
-                          onClick={() => runRowAction(user.id, () => restoreUserAction(user.id))}
-                        >
-                          {pendingId === user.id ? "Restoring…" : "Restore"}
-                        </Button>
-                      )
-                    ) : null}
-                  </div>
-                </TableCell>
+                    ) : null}</div></TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -188,7 +160,7 @@ export function UsersDirectory({
       )}
 
       {/* Create */}
-      <Dialog
+      <DraftDialog pending={createPending}
         open={createOpen}
         onOpenChange={setCreateOpen}
         title="New user"
@@ -217,19 +189,19 @@ export function UsersDirectory({
             <InlineError>{createState.error.safeMessage}</InlineError>
           ) : null}
           <FormActions>
-            <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
+            <Button data-dialog-cancel type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" disabled={createPending}>
+            <Button type="submit" variant="primary" pending={createPending}>
               {createPending ? <Spinner aria-hidden="true" /> : null}
               <span>Create user</span>
             </Button>
           </FormActions>
         </form>
-      </Dialog>
+      </DraftDialog>
 
       {/* Edit display name */}
-      <Dialog open={editTarget !== null} onOpenChange={() => setEditTarget(null)} title="Edit user" size="sm">
+      <DraftDialog pending={editPending} open={editTarget !== null} onOpenChange={() => setEditTarget(null)} title="Edit user" size="sm">
         {editTarget ? (
           <form
             action={(formData) => {
@@ -245,17 +217,17 @@ export function UsersDirectory({
               <Button type="button" variant="ghost" onClick={() => setEditTarget(null)}>
                 Close
               </Button>
-              <Button type="submit" variant="primary" disabled={editPending}>
+              <Button type="submit" variant="primary" pending={editPending}>
                 {editPending ? <Spinner aria-hidden="true" /> : null}
                 <span>Save</span>
               </Button>
             </FormActions>
           </form>
         ) : null}
-      </Dialog>
+      </DraftDialog>
 
       {/* Set password */}
-      <Dialog open={passwordTarget !== null} onOpenChange={() => setPasswordTarget(null)} title="Set password" description="Revokes every active session of this user." size="sm">
+      <DraftDialog pending={passwordPending} open={passwordTarget !== null} onOpenChange={() => setPasswordTarget(null)} title="Set password" description="Revokes every active session of this user." size="sm">
         {passwordTarget ? (
           <form
             action={(formData) => {
@@ -272,17 +244,17 @@ export function UsersDirectory({
               <Button type="button" variant="ghost" onClick={() => setPasswordTarget(null)}>
                 Close
               </Button>
-              <Button type="submit" variant="primary" disabled={passwordPending}>
+              <Button type="submit" variant="primary" pending={passwordPending}>
                 {passwordPending ? <Spinner aria-hidden="true" /> : null}
                 <span>Set password</span>
               </Button>
             </FormActions>
           </form>
         ) : null}
-      </Dialog>
+      </DraftDialog>
 
       {/* Disable confirmation */}
-      <ConfirmDialog
+      <ConfirmDialog error={rowError} pending={pendingId !== null}
         open={confirmDisable !== null}
         onOpenChange={() => setConfirmDisable(null)}
         title={`Disable ${confirmDisable?.displayName ?? "user"}?`}
@@ -297,7 +269,7 @@ export function UsersDirectory({
       />
 
       {/* Role removal confirmation */}
-      <ConfirmDialog
+      <ConfirmDialog error={rowError} pending={pendingId !== null}
         open={confirmRemoveRole !== null}
         onOpenChange={() => setConfirmRemoveRole(null)}
         title={`Remove ${confirmRemoveRole?.roleName ?? "role"} from ${confirmRemoveRole?.user.displayName ?? "user"}?`}
@@ -310,7 +282,7 @@ export function UsersDirectory({
           if (target) runRowAction(target.user.id, () => removeRoleAction(target.user.id, target.roleId));
         }}
       />
-    </SectionCard>
+    </DirectoryShell>
   );
 }
 

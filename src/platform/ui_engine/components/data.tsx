@@ -1,21 +1,22 @@
 "use client";
 
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, Search, X } from "lucide-react";
+import { ChevronDown,ChevronLeft,ChevronRight,ChevronUp,ChevronsUpDown,Search,X } from "lucide-react";
 import {
-  forwardRef,
-  type CSSProperties,
-  type HTMLAttributes,
-  type InputHTMLAttributes,
-  type ReactNode,
-  type TableHTMLAttributes,
-  type TdHTMLAttributes,
-  type ThHTMLAttributes,
+forwardRef,
+type CSSProperties,
+type HTMLAttributes,
+type InputHTMLAttributes,
+type ReactNode,
+type TableHTMLAttributes,
+type TdHTMLAttributes,
+type ThHTMLAttributes,
 } from "react";
 
 import { cx } from "../internal/cx";
-import { Button, IconButton, Input, Text } from "../primitives";
+import { Button,IconButton,Input,Text } from "../primitives";
 
 export type DataTableProps = TableHTMLAttributes<HTMLTableElement> & {
+  framed?: boolean;
   minWidth?: string | number;
   density?: "regular" | "compact";
   stickyHeader?: boolean;
@@ -32,6 +33,7 @@ export type DataTableProps = TableHTMLAttributes<HTMLTableElement> & {
 
 export function DataTable({
   minWidth,
+  framed = true,
   density = "regular",
   stickyHeader = false,
   maxBodyHeight,
@@ -46,8 +48,9 @@ export function DataTable({
   return (
     <div
       className={cx(
-        "overflow-hidden rounded-card border border-line bg-surface",
-        density === "compact" && "[--ui-th-height:32px] [--ui-th-py-block:6px] [--ui-td-py-block:7px]",
+        "overflow-hidden bg-surface",
+        framed && "rounded-card border border-line",
+        density === "compact" && "[--ui-th-height:32px] [--ui-th-py:6px] [--ui-td-py:7px]",
         stickyHeader && "[--ui-thead-position:sticky]",
         containerClassName,
       )}
@@ -104,6 +107,7 @@ export function TableRow({ selected, className, ...props }: HTMLAttributes<HTMLT
 export type SortDirection = "asc" | "desc";
 
 export type TableHeadProps = Omit<ThHTMLAttributes<HTMLTableCellElement>, "align"> & {
+  stickyEnd?: boolean;
   align?: "start" | "center" | "end";
   /** Render the column label as a sort control. */
   sortable?: boolean;
@@ -134,6 +138,7 @@ function isIdentifierColumn(props: Record<string, unknown>): boolean {
  * an amount is not its formatted string.
  */
 export function TableHead({
+  stickyEnd = false,
   align = "start",
   sortable = false,
   sortDirection = null,
@@ -156,6 +161,7 @@ export function TableHead({
     "h-(--ui-th-height,36px) border-b border-line-strong bg-thead-surface px-3 py-(--ui-th-py,8px) align-middle font-semibold uppercase",
     identifier ? IDENTIFIER_CLASSES + " uppercase" : "text-thead text-[0.6875rem] tracking-[0.08em]",
     TABLE_ALIGN_CLASSES[align],
+    stickyEnd && "sticky right-0 z-[2] border-l border-l-line",
     className,
   );
 
@@ -194,6 +200,7 @@ export function TableHead({
 }
 
 export function TableCell({
+  stickyEnd = false,
   align = "start",
   wrap = false,
   className,
@@ -202,15 +209,17 @@ export function TableCell({
   align?: "start" | "center" | "end";
   /** Allow prose in this cell to wrap instead of forcing a single operational line. */
   wrap?: boolean;
+  stickyEnd?: boolean;
 }) {
   const identifier = isIdentifierColumn(props as Record<string, unknown>);
   return (
     <td
       className={cx(
-        "border-b border-line-subtle px-3 py-2.5 align-middle whitespace-nowrap first:shadow-[inset_3px_0_0_var(--ui-row-marker,transparent)]",
+        "border-b border-line-subtle px-3 py-(--ui-td-py,10px) align-middle whitespace-nowrap first:shadow-[inset_3px_0_0_var(--ui-row-marker,transparent)]",
         identifier && IDENTIFIER_CLASSES,
         TABLE_ALIGN_CLASSES[align],
         wrap && "whitespace-normal",
+        stickyEnd && "sticky right-0 z-[1] border-l border-l-line bg-surface",
         className,
       )}
       data-align={align}
@@ -268,16 +277,18 @@ export function TableCellContent({
 }
 
 export type TableToolbarProps = HTMLAttributes<HTMLDivElement> & {
+  framed?: boolean;
   search?: ReactNode;
   filters?: ReactNode;
   actions?: ReactNode;
 };
 
-export function TableToolbar({ search, filters, actions, className, children, ...props }: TableToolbarProps) {
+export function TableToolbar({ framed = true, search, filters, actions, className, children, ...props }: TableToolbarProps) {
   return (
     <div
       className={cx(
-        "flex min-h-[52px] items-center justify-between gap-3 rounded-card border border-line bg-surface p-2 max-[720px]:flex-col max-[720px]:items-stretch",
+        "flex min-h-[52px] items-center justify-between gap-3 bg-surface p-2 max-[720px]:flex-col max-[720px]:items-stretch",
+        framed && "rounded-card border border-line",
         className,
       )}
       {...props}

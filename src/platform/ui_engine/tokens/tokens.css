@@ -29,10 +29,10 @@
   --ui-radius-control: 6px;
   --ui-radius-action: 4px;
   --ui-radius-pill: 9999px;
-  --ui-section-px: 20px;
-  --ui-section-py: 20px;
+  --ui-section-px: 16px;
+  --ui-section-py: 16px;
   --ui-section-gap: 16px;
-  --ui-page-padding: clamp(20px, 2.5vw, 32px);
+  --ui-page-padding: clamp(20px, 2.5vw, 24px);
   --ui-page-max: 1440px;
   --ui-control-height-sm: 32px;
   --ui-control-height-md: 36px;

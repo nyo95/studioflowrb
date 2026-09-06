@@ -1,11 +1,11 @@
 "use client";
 
-import { ChevronDown, Filter, MoreHorizontal, X } from "lucide-react";
+import { ChevronDown,Filter,MoreHorizontal,X } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
-import { Fragment, type HTMLAttributes, type ReactNode } from "react";
+import { Fragment,type HTMLAttributes,type ReactNode } from "react";
 
 import { cx } from "../internal/cx";
-import { Button, IconButton, type ButtonVariant } from "../primitives";
+import { Button,IconButton,type ButtonVariant } from "../primitives";
 
 export type RowActionItem = {
   label: string;
@@ -19,10 +19,15 @@ export type RowActionItem = {
 export function RowActionMenu({
   items,
   label = "Row actions",
+  pending = false,
+  disabled = false,
 }: {
   items: readonly RowActionItem[];
   label?: string;
+  pending?: boolean;
+  disabled?: boolean;
 }) {
+  if (items.length === 0) return null;
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
@@ -30,6 +35,8 @@ export function RowActionMenu({
           size="sm"
           variant="ghost"
           label={label}
+          pending={pending}
+          disabled={disabled}
           icon={<MoreHorizontal aria-hidden="true" />}
         />
       </DropdownMenu.Trigger>
@@ -189,4 +196,3 @@ export function SelectionBar({
     </div>
   );
 }
-

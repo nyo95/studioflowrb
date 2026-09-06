@@ -1,6 +1,6 @@
 import { cx } from "../internal/cx";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "danger-primary";
 export type ButtonSize = "sm" | "md";
 
 export const BUTTON_BASE_CLASSES =
@@ -16,6 +16,7 @@ export const BUTTON_VARIANT_CLASSES: Record<ButtonVariant, string> = {
   secondary: "bg-surface text-ink border-line enabled:hover:bg-surface-muted enabled:hover:border-line-strong",
   ghost: "bg-transparent text-ink-secondary enabled:hover:bg-surface-muted enabled:hover:text-ink",
   danger: "bg-danger-surface text-danger border-danger-line",
+  "danger-primary": "bg-danger text-ink-inverse border-danger enabled:hover:brightness-90",
 };
 
 /**

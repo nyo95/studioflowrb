@@ -1,4 +1,5 @@
 "use client";
+import { CurateShowcase } from "./curate-showcase";
 
 import { useMemo, useState } from "react";
 import { ArrowRight, CircleAlert, Filter, LayoutGrid, PanelLeftClose, PanelLeftOpen, Pencil, Sparkles, Trash2 } from "lucide-react";
@@ -202,6 +203,7 @@ export function UiEngineShowcase() {
           actions={<Button variant="primary" leadingIcon={<ArrowRight aria-hidden="true" />}>Use shared components</Button>}
         />
 
+        <CurateShowcase />
         <PageSection title="Shell" description="AppShell, PageShell, PageHeader, and the warm chrome / white plane relationship.">
           <SectionCard id="shell">
             <div className="grid gap-4">

@@ -151,10 +151,17 @@ export function useFormDraftGuard({
   confirmLabel,
   cancelLabel,
 }: FormDraftGuardOptions) {
+  const [opening, setOpening] = useState({ active, resetKey, watchedValue });
+  const changed = active !== opening.active || resetKey !== opening.resetKey;
+  if (changed) setOpening({ active, resetKey, watchedValue });
+  const initialWatched = changed ? watchedValue : opening.watchedValue;
   const [baseline, setBaseline] = useState("");
   const [value, setValue] = useState("");
+  const baselineRef = useRef("");
+  const watchedBaselineRef = useRef(watchedValue);
   const capture = useCallback(() => {
     const next = serialiseForm(formRef.current);
+    baselineRef.current = next;
     setBaseline(next);
     setValue(next);
   }, [formRef]);
@@ -164,7 +171,10 @@ export function useFormDraftGuard({
     // This runs after the opening values are mounted but before the browser can
     // process the next user input. A deferred frame could capture the first
     // keystroke as the baseline and silently lose the discard warning.
+    watchedBaselineRef.current = watchedValue;
     capture();
+    // watchedValue is intentionally captured only when the draft identity opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, capture, resetKey]);
 
   const sync = useCallback(() => setValue(serialiseForm(formRef.current)), [formRef]);
@@ -172,12 +182,24 @@ export function useFormDraftGuard({
     if (active) sync();
   }, [active, sync, watchedValue]);
 
-  const guard = useUnsavedChangesGuard({ value, initialValue: baseline, title, description, confirmLabel, cancelLabel });
-  const requestDiscard = useCallback(
-    (onDiscard?: () => void) => guard.requestDiscard(onDiscard, serialiseForm(formRef.current)),
-    [formRef, guard],
-  );
-  return { ...guard, requestDiscard, onFormChange: sync, capture, markSaved: capture };
+  const guard = useUnsavedChangesGuard({ value: JSON.stringify([value, watchedValue]), initialValue: JSON.stringify([baseline, initialWatched]), title, description, confirmLabel, cancelLabel });
+  const discardConfirm = useConfirm();
+  const requestDiscard = useCallback(async (onDiscard?: () => void) => {
+    const current = JSON.stringify([serialiseForm(formRef.current), watchedValue]);
+    const initial = JSON.stringify([baselineRef.current, watchedBaselineRef.current]);
+    if (current === initial) { onDiscard?.(); return true; }
+    const accepted = await discardConfirm.confirm({
+      title: title ?? "Discard changes?",
+      description: description ?? "You have unsaved changes. Discard them and continue?",
+      confirmLabel: confirmLabel ?? "Discard changes",
+      cancelLabel: cancelLabel ?? "Keep editing",
+      tone: "danger",
+    });
+    if (accepted) { capture(); watchedBaselineRef.current = watchedValue; onDiscard?.(); }
+    return accepted;
+  }, [cancelLabel, capture, confirmLabel, description, discardConfirm, formRef, title, watchedValue]);
+  const markSaved = useCallback(() => { capture(); watchedBaselineRef.current = watchedValue; }, [capture, watchedValue]);
+  return { ...guard, requestDiscard, onFormChange: sync, capture, markSaved, confirmDialog: discardConfirm.dialog };
 }
 
 export function useUnsavedChangesGuard<T>({

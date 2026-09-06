@@ -329,6 +329,8 @@ reachable in both expanded and collapsed desktop presentations.
 - Field help appears only when the input is ambiguous, risky, or constrained in a non-obvious way.
 - Empty, loading, and error states use a short title and at most one actionable sentence; no decorative prose or oversized illustration is required.
 - Buttons use concise verb-first labels. Icon-only actions require an accessible label and tooltip.
+- Dense directories use one shared surface around their toolbar, scrollable compact table, and pagination. Compact headers use 6px vertical padding and cells use 7px; wide tables scroll inside that surface.
+- Secondary row operations live in an intentional action menu whose accessible name identifies the record. Destructive confirmation uses the emphasized danger action only at the final confirmation step.
 - Do not repeat the same instruction in PageHeader, section description, field help, and empty state.
 - Progressive disclosure is preferred for rare metadata and advanced settings.
 

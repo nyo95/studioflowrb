@@ -1,12 +1,19 @@
 import { redirect } from "next/navigation";
 
+
 import { requirePrincipalGrants } from "@platform/core/auth";
+
 import { hasPermission } from "@platform/core/rbac";
-import { ErrorState, PageHeader, SectionCard } from "@/platform/ui_engine";
+
+import { ErrorState,PageHeader,SectionCard } from "@/platform/ui_engine";
+
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
+
 import { masterDataService } from "@/apps/masterdata/runtime";
 
+
 import { VendorDirectory } from "./vendor-directory";
+
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +27,7 @@ export default async function VendorsPage() {
   if (!canRead && !canManage) {
     return (
       <div className="grid gap-4">
-        <PageHeader eyebrow="Master Data" title="Vendors" />
+        <PageHeader title="Vendors" />
         <SectionCard>
           <ErrorState title="Access denied" description="You do not have permission to view vendors." />
         </SectionCard>
@@ -41,9 +48,7 @@ export default async function VendorsPage() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        eyebrow="Master Data"
         title="Vendors &amp; Suppliers"
-        description="Partner profiles, role dimensions, material supply permissions, and contacts directory."
       />
       <VendorDirectory
         vendors={vendors}

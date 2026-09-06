@@ -14,6 +14,34 @@ const STATUS_TONE_MARKER_CLASSES: Record<SemanticTone, string> = {
   danger: "before:bg-danger",
 };
 
+/**
+ * A compact, accessible status signal for records whose name is the primary
+ * scan target. Keep the visible dot close to that name; screen readers still
+ * receive the full status label.
+ */
+export function StatusMarker({
+  tone,
+  label,
+  className,
+  ...props
+}: HTMLAttributes<HTMLSpanElement> & { tone: SemanticTone; label: string }) {
+  return (
+    <span
+      className={cx(
+        "inline-flex h-2 w-2 shrink-0 rounded-full",
+        tone === "success" && "bg-success",
+        tone === "warning" && "bg-warning",
+        tone === "danger" && "bg-danger",
+        tone === "neutral" && "bg-ink-tertiary",
+        className,
+      )}
+      role="img"
+      aria-label={label}
+      {...props}
+    />
+  );
+}
+
 export function StatusBadge({
   tone,
   className,

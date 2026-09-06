@@ -56,7 +56,7 @@ export function SessionsTable({
           <InlineError>{state.error.safeMessage}</InlineError>
         </div>
       ) : null}
-      <DataTable minWidth={720}>
+      <DataTable density="compact" stickyHeader maxBodyHeight="60vh" minWidth={720}>
         <TableHeader>
           <TableRow>
             <TableHead>Started</TableHead>
@@ -72,7 +72,7 @@ export function SessionsTable({
             const isCurrent = session.id === currentSessionId;
             return (
               <TableRow key={session.id}>
-                <TableCell data-column="identifier">{session.createdAt}</TableCell>
+                <TableCell>{session.createdAt}</TableCell>
                 <TableCell>{session.lastSeenAt}</TableCell>
                 <TableCell>{session.expiresAt}</TableCell>
                 <TableCell wrap>
@@ -102,9 +102,9 @@ export function SessionsTable({
                         type="submit"
                         variant="secondary"
                         size="sm"
-                        disabled={pending && revokingId === session.id}
+                        disabled={pending} pending={pending && revokingId === session.id}
                       >
-                        {pending && revokingId === session.id ? "Revoking…" : "Revoke"}
+                        Revoke
                       </Button>
                     </form>
                   ) : (

@@ -1,46 +1,19 @@
 "use client";
+import { RequestDeletionDialog } from "../request-deletion-dialog";
+import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
+import { DirectoryShell,DraftDialog,Pagination,RowActionMenu,Text,usePagination } from "@/platform/ui_engine";
 
-import { useRef, useState, useTransition } from "react";
-import { Archive, Plus, RotateCcw, Trash2, UserPlus, X } from "lucide-react";
 
+import { Plus,UserPlus,X } from "lucide-react";
+import { useRef,useState,useTransition } from "react";
+
+import { Badge,Button,Combobox,ConfirmDialog,CreatableMultiSelect,DataTable,Dialog,EmptyState,Field,FormActions,IconButton,InlineError,Input,Notice,SearchField,Select,SimpleTextEditor,StatusMarker,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,useFormDraftGuard } from "@/platform/ui_engine";
 import {
-  Badge,
-  Button,
-  Combobox,
-  CreatableMultiSelect,
-  ConfirmDialog,
-  DataTable,
-  Dialog,
-  EmptyState,
-  Field,
-  FormActions,
-  IconButton,
-  InlineError,
-  Input,
-  Notice,
-  SearchField,
-  SectionCard,
-  Select,
-  SimpleTextEditor,
-  Spinner,
-  StatusBadge,
-  TableBody,
-  TableCell,
-  TableCellContent,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableToolbar,
-  Tabs,
-  Text,
-  useFormDraftGuard,
-} from "@/platform/ui_engine";
-import {
-  archiveVendorAction,
-  createVendorAction,
-  requestVendorDeletionAction,
-  restoreVendorAction,
-  updateVendorAction,
+archiveVendorAction,
+createVendorAction,
+requestVendorDeletionAction,
+restoreVendorAction,
+updateVendorAction,
 } from "./actions";
 
 const VENDOR_LINK_KINDS = [
@@ -149,6 +122,7 @@ export function VendorDirectory({
   const [confirmRestore, setConfirmRestore] = useState<VendorRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<VendorRow | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
+  const [rowError, setRowError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -189,7 +163,7 @@ export function VendorDirectory({
     formRef: editFormRef,
     resetKey: editTarget?.id ?? "",
     active: Boolean(editTarget),
-    watchedValue: JSON.stringify([editVendorTypeIds, contactsList, linksList]),
+    watchedValue: JSON.stringify([editVendorTypeIds, contactsList, linksList, newLinkKind, newLinkUrl, newLinkLabel]),
     title: "Discard changes?",
     description: "Your edits are only in this browser and have not been saved.",
   });
@@ -205,15 +179,35 @@ export function VendorDirectory({
       v.contacts.some((c) => c.person_name.toLowerCase().includes(q) || (c.email && c.email.toLowerCase().includes(q)))
     );
   });
+  const { locale, timezone } = useDisplaySettings();
+  const [sortKey, setSortKey] = useState<"Vendor" | "Name" | "Status" | "Brands">("Vendor");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const sortValues: Record<"Vendor" | "Name" | "Status" | "Brands", (r: VendorRow) => string | number | null> = {"Vendor": (r) => r.name, "Name": (r) => r.name, "Status": (r) => r.deleted_at ? "Archived" : "Active", "Brands": (r) => r._count.brand_suppliers};
+  const collator = new Intl.Collator(locale, { sensitivity: "base", numeric: true });
+  const orderedRows = [...filtered].sort((a, b) => {
+    const left = sortValues[sortKey](a), right = sortValues[sortKey](b);
+    if (left === null || right === null) return left === right ? a.id.localeCompare(b.id) : left === null ? 1 : -1;
+    const result = typeof left === "number" && typeof right === "number" ? left - right : collator.compare(String(left), String(right));
+    return (sortDirection === "asc" ? result : -result) || a.id.localeCompare(b.id);
+  });
+  const paging = usePagination(orderedRows.length, 25, JSON.stringify([query, typeFilter, sortKey, sortDirection]));
+  const visibleRows = orderedRows.slice(paging.offset, paging.offset + 25);
+  const pageFooter = <div className="grid gap-2"><Text tone="secondary" size="sm">{orderedRows.length ? paging.offset + 1 : 0}–{Math.min(paging.offset + 25, orderedRows.length)} of {orderedRows.length} records</Text>{paging.pageCount > 1 ? <Pagination page={paging.page} pageCount={paging.pageCount} onPageChange={paging.setPage} /> : null}</div>;
 
-  const runRowAction = (id: string, run: () => Promise<unknown>) => {
-    setPendingId(id);
+
+  const runRowAction = (id: string, command: () => Promise<unknown>, onSuccess?: () => void) => {
+    if (pendingId) return;
+    setPendingId(id); setRowError(null);
     startTransition(async () => {
       try {
-        await run();
-      } finally {
-        setPendingId(null);
-      }
+        const result = await command();
+        if (result && typeof result === "object" && "ok" in result && !result.ok) {
+          const failure = result as { error?: { safeMessage?: string } };
+          setRowError(failure.error?.safeMessage ?? "The action could not be completed."); return;
+        }
+        onSuccess?.();
+      } catch { setRowError("The action could not be completed. Please try again."); }
+      finally { setPendingId(null); }
     });
   };
 
@@ -300,8 +294,7 @@ export function VendorDirectory({
   };
 
   return (
-    <SectionCard>
-      <TableToolbar actions={canManage ? (
+    <DirectoryShell header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
         <Button type="button" variant="primary" onClick={openCreateDialog}>
           <Plus aria-hidden="true" />
           <span>New vendor</span>
@@ -318,33 +311,28 @@ export function VendorDirectory({
             ))}
           </Select>
         </div>
-      </TableToolbar>
+      </TableToolbar>}>
+
 
       {filtered.length === 0 ? (
         <EmptyState
           title="No vendors found"
           description={query ? "No vendors match your search filters." : "Register your first vendor partner."}
-          action={!query && canManage ? (
-            <Button type="button" variant="primary" onClick={openCreateDialog}>
-              <Plus aria-hidden="true" />
-              <span>New vendor</span>
-            </Button>
-          ) : undefined}
+
         />
       ) : (
-        <DataTable minWidth={960}>
+        <DataTable framed={false} density="compact" stickyHeader maxBodyHeight="60vh" minWidth={960}>
           <TableHeader>
             <TableRow>
               <TableHead>Vendor partner</TableHead>
               <TableHead>Types &amp; Capabilities</TableHead>
               <TableHead>Contacts</TableHead>
-              <TableHead>Status</TableHead>
               <TableHead align="end">Prices</TableHead>
-              <TableHead align="end">Actions</TableHead>
+              <TableHead stickyEnd align="end">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((vendor) => {
+            {visibleRows.map((vendor) => {
               const isPending = pendingId === vendor.id;
               const isArchived = vendor.deleted_at !== null;
               const hasMaterial = vendor.types.some((t) => t.vendor_type.can_supply_material);
@@ -356,16 +344,16 @@ export function VendorDirectory({
                 <TableRow key={vendor.id}>
                   <TableCell>
                     <TableCellContent
-                      primary={<span className="font-semibold">{vendor.name}</span>}
+                      primary={<span className="inline-flex items-center gap-2"><StatusMarker tone={isArchived ? "danger" : "success"} label={isArchived ? "Archived" : "Active"} /><span className="font-semibold">{vendor.name}</span></span>}
                       secondary={
                         <div className="grid gap-0.5 text-xs text-ink-secondary">
                           <div>
                             {vendor.legal_name ? <span>{vendor.legal_name} • </span> : null}
-                            <span className="font-mono">{vendor.slug}</span>
+                            <span className="font-ui-mono">{vendor.slug}</span>
                           </div>
                           {vendor.updated_by_label ? (
                             <span className="text-ink-tertiary">
-                              Updated by <span className="font-medium text-ink-secondary">{vendor.updated_by_label}</span> · {new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" }).format(vendor.updated_at)}
+                              Updated by <span className="font-medium text-ink-secondary">{vendor.updated_by_label}</span> · {new Intl.DateTimeFormat(locale, { timeZone: timezone, dateStyle: "medium" }).format(vendor.updated_at)}
                             </span>
                           ) : null}
                         </div>
@@ -408,39 +396,11 @@ export function VendorDirectory({
                       ) : null}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <StatusBadge tone={!isArchived ? "success" : "neutral"}>
-                      {!isArchived ? "Active" : "Archived"}
-                    </StatusBadge>
-                  </TableCell>
                   <TableCell align="end">
                     <TableCellContent align="end" primary={totalPriceCount.toLocaleString()} />
                   </TableCell>
-                  <TableCell align="end">
-                    <div className="flex items-center justify-end gap-1.5">
-                      {isPending ? <Spinner /> : null}
-                      {canManage && (
-                        <>
-                          <Button size="sm" variant="ghost" onClick={() => openEditDialog(vendor)} disabled={isPending}>
-                            Edit
-                          </Button>
-                          {!isArchived ? (
-                            <Button size="sm" variant="ghost" onClick={() => setConfirmArchive(vendor)} disabled={isPending} title="Archive">
-                              <Archive size={15} />
-                            </Button>
-                          ) : (
-                            <>
-                              <Button size="sm" variant="ghost" onClick={() => setConfirmRestore(vendor)} disabled={isPending} title="Restore">
-                                <RotateCcw size={15} />
-                              </Button>
-                              <Button size="sm" variant="danger" onClick={() => setDeleteTarget(vendor)} disabled={isPending} title="Request deletion">
-                                <Trash2 size={15} />
-                              </Button>
-                            </>
-                          )}
-                        </>
-                      )}
-                    </div>
+                  <TableCell stickyEnd align="end">
+                    <RowActionMenu label={`Actions for ${vendor.name}`} pending={pendingId === vendor.id} items={[...[],...(isPending ? [] : []),...[],...(canManage ? [...[],...[{ label: "Edit", onSelect: () => openEditDialog(vendor), disabled: isPending, danger: false, separatorBefore: false }],...[],...(!isArchived ? [{ label: "Archive", onSelect: () => setConfirmArchive(vendor), disabled: isPending, danger: false, separatorBefore: false }] : [...[],...[{ label: "Restore", onSelect: () => setConfirmRestore(vendor), disabled: isPending, danger: false, separatorBefore: false }],...[],...[{ label: "Request deletion", onSelect: () => setDeleteTarget(vendor), disabled: isPending, danger: true, separatorBefore: true }],...[]]),...[]] : []),...[]]} />
                   </TableCell>
                 </TableRow>
               );
@@ -450,7 +410,7 @@ export function VendorDirectory({
       )}
 
       {/* Create Vendor Dialog */}
-      <Dialog
+      <Dialog size="lg"
         open={createOpen}
         onOpenChange={(open) => {
           if (open) setCreateOpen(true);
@@ -480,7 +440,7 @@ export function VendorDirectory({
               setCreatePending(false);
             }
           }}
-          className="grid gap-4 max-h-[80vh] overflow-y-auto pr-1"
+          className="grid gap-4  pr-1"
         >
           {createVendorTypeIds.map((id) => <input key={id} type="hidden" name="vendorTypeIds" value={id} />)}
           {createError ? <InlineError>{createError}</InlineError> : null}
@@ -568,8 +528,8 @@ export function VendorDirectory({
             <Button type="button" variant="ghost" onClick={() => void createDraftGuard.requestDiscard(() => setCreateOpen(false))}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" disabled={createPending}>
-              {createPending ? <Spinner /> : "Create vendor"}
+            <Button type="submit" variant="primary" pending={createPending}>
+              {"Create vendor"}
             </Button>
           </FormActions>
         </form>
@@ -578,7 +538,7 @@ export function VendorDirectory({
 
       {/* Edit Vendor Dialog */}
       {editTarget ? (
-        <Dialog
+        <Dialog size="lg"
           open
           onOpenChange={(open) => {
             if (!open && !editPending) void editDraftGuard.requestDiscard(() => setEditTarget(null));
@@ -608,7 +568,7 @@ export function VendorDirectory({
                 setEditPending(false);
               }
             }}
-            className="grid gap-4 max-h-[80vh] overflow-y-auto pr-1"
+            className="grid gap-4  pr-1"
           >
             <input type="hidden" name="vendorId" value={editTarget.id} />
             {editVendorTypeIds.map((id) => <input key={id} type="hidden" name="vendorTypeIds" value={id} />)}
@@ -715,7 +675,7 @@ export function VendorDirectory({
                         <Text size="sm" weight="semibold">Reference Links</Text>
                         {linksList.map((link, idx) => (
                           <div key={idx} className="flex items-center justify-between text-xs bg-surface-muted p-2 rounded">
-                            <span className="font-mono">{VENDOR_LINK_KINDS.find((k) => k.value === link.kind)?.label ?? link.kind}: {link.label || link.url}</span>
+                            <span className="font-ui-mono">{VENDOR_LINK_KINDS.find((k) => k.value === link.kind)?.label ?? link.kind}: {link.label || link.url}</span>
                             <Button type="button" size="sm" variant="ghost" onClick={() => removeLinkDraft(idx)}>Remove</Button>
                           </div>
                         ))}
@@ -765,15 +725,15 @@ export function VendorDirectory({
 
             {editTarget.updated_by_label ? (
               <p className="text-xs text-ink-tertiary px-0.5">
-                Updated by <span className="font-medium text-ink-secondary">{editTarget.updated_by_label}</span> · {new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(editTarget.updated_at)}
+                Updated by <span className="font-medium text-ink-secondary">{editTarget.updated_by_label}</span> · {new Intl.DateTimeFormat(locale, { timeZone: timezone, dateStyle: "medium", timeStyle: "short" }).format(editTarget.updated_at)}
               </p>
             ) : null}
             <FormActions>
               <Button type="button" variant="ghost" onClick={() => void editDraftGuard.requestDiscard(() => setEditTarget(null))}>
                 Cancel
               </Button>
-              <Button type="submit" variant="primary" disabled={editPending}>
-                {editPending ? <Spinner /> : "Save changes"}
+              <Button type="submit" variant="primary" pending={editPending}>
+                {"Save changes"}
               </Button>
             </FormActions>
           </form>
@@ -783,7 +743,7 @@ export function VendorDirectory({
 
       {/* Archive Confirm */}
       {confirmArchive ? (
-        <ConfirmDialog
+        <ConfirmDialog error={rowError} pending={pendingId !== null}
           open
           onOpenChange={(open) => {
             if (!open) setConfirmArchive(null);
@@ -794,15 +754,15 @@ export function VendorDirectory({
           tone="danger"
           onConfirm={() => {
             const target = confirmArchive;
-            setConfirmArchive(null);
-            runRowAction(target.id, () => archiveVendorAction(target.id));
+
+            runRowAction(target.id, () => archiveVendorAction(target.id), () => { setConfirmArchive(null); });
           }}
         />
       ) : null}
 
       {/* Restore Confirm */}
       {confirmRestore ? (
-        <ConfirmDialog
+        <ConfirmDialog error={rowError} pending={pendingId !== null}
           open
           onOpenChange={(open) => {
             if (!open) setConfirmRestore(null);
@@ -812,51 +772,24 @@ export function VendorDirectory({
           confirmLabel="Restore vendor"
           onConfirm={() => {
             const target = confirmRestore;
-            setConfirmRestore(null);
-            runRowAction(target.id, () => restoreVendorAction(target.id));
+
+            runRowAction(target.id, () => restoreVendorAction(target.id), () => { setConfirmRestore(null); });
           }}
         />
       ) : null}
 
       {/* Request Deletion Dialog */}
       {deleteTarget ? (
-        <Dialog
-          open
-          onOpenChange={(open) => {
+        <RequestDeletionDialog open onOpenChange={(open) => {
             if (!open) setDeleteTarget(null);
-          }}
-          title={`Submit vendor "${deleteTarget.name}" for deletion`}
-          description="Archived vendors with zero owned brands and zero active prices can be permanently purged after supervisor approval."
-        >
-          <div className="grid gap-4">
-            <Field label="Reason for deletion">
-              <Input
-                value={deleteReason}
-                onChange={(e) => setDeleteReason(e.target.value)}
-                placeholder="e.g. Inactive duplicate vendor profile"
-              />
-            </Field>
-            <FormActions>
-              <Button type="button" variant="ghost" onClick={() => setDeleteTarget(null)}>
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant="danger"
-                onClick={() => {
+          }} title={`Submit vendor "${deleteTarget.name}" for deletion`} description="Archived vendors with zero owned brands and zero active prices can be permanently purged after supervisor approval." reason={deleteReason} onReasonChange={setDeleteReason} placeholder="e.g. Inactive duplicate vendor profile" pending={pendingId !== null} error={rowError} onSubmit={() => {
                   const target = deleteTarget;
                   const reason = deleteReason;
-                  setDeleteTarget(null);
-                  setDeleteReason("");
-                  runRowAction(target.id, () => requestVendorDeletionAction(target.id, reason));
-                }}
-              >
-                Submit deletion request
-              </Button>
-            </FormActions>
-          </div>
-        </Dialog>
+
+
+                  runRowAction(target.id, () => requestVendorDeletionAction(target.id, reason), () => { setDeleteTarget(null); setDeleteReason(""); });
+                }} />
       ) : null}
-    </SectionCard>
+    </DirectoryShell>
   );
 }

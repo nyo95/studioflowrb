@@ -1,37 +1,19 @@
 "use client";
+import { RequestDeletionDialog } from "../request-deletion-dialog";
+import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
+import { DirectoryShell,DraftDialog,Pagination,RowActionMenu,Text,usePagination } from "@/platform/ui_engine";
 
-import { useEffect, useState, useTransition } from "react";
-import { Archive, Plus, RotateCcw, Trash2 } from "lucide-react";
 
+import { Plus } from "lucide-react";
+import { useState,useTransition } from "react";
+
+import { Button,ConfirmDialog,DataTable,EmptyState,Field,FormActions,InlineError,Input,Notice,SearchField,StatusBadge,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar } from "@/platform/ui_engine";
 import {
-  Button,
-  ConfirmDialog,
-  DataTable,
-  Dialog,
-  EmptyState,
-  Field,
-  FormActions,
-  InlineError,
-  Input,
-  Notice,
-  SearchField,
-  SectionCard,
-  Spinner,
-  StatusBadge,
-  TableBody,
-  TableCell,
-  TableCellContent,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableToolbar,
-} from "@/platform/ui_engine";
-import {
-  archiveUnitAction,
-  createUnitAction,
-  requestUnitDeletionAction,
-  restoreUnitAction,
-  updateUnitAction,
+archiveUnitAction,
+createUnitAction,
+requestUnitDeletionAction,
+restoreUnitAction,
+updateUnitAction,
 } from "./actions";
 
 type UnitRow = {
@@ -71,6 +53,7 @@ export function UnitDirectory({
   const [confirmRestore, setConfirmRestore] = useState<UnitRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UnitRow | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
+  const [rowError, setRowError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -85,59 +68,74 @@ export function UnitDirectory({
     const q = normalizeUnitQuery(query);
     return u.name.toLowerCase().includes(q) || normalizeUnitQuery(u.code).includes(q);
   });
+  const { locale } = useDisplaySettings();
+  const [sortKey, setSortKey] = useState<"Name" | "Code">("Name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const sortValues: Record<"Name" | "Code", (r: UnitRow) => string | number | null> = {"Name": (r) => r.name, "Code": (r) => r.code};
+  const collator = new Intl.Collator(locale, { sensitivity: "base", numeric: true });
+  const orderedRows = [...filtered].sort((a, b) => {
+    const left = sortValues[sortKey](a), right = sortValues[sortKey](b);
+    if (left === null || right === null) return left === right ? a.id.localeCompare(b.id) : left === null ? 1 : -1;
+    const result = typeof left === "number" && typeof right === "number" ? left - right : collator.compare(String(left), String(right));
+    return (sortDirection === "asc" ? result : -result) || a.id.localeCompare(b.id);
+  });
+  const paging = usePagination(orderedRows.length, 25, JSON.stringify([query, sortKey, sortDirection]));
+  const visibleRows = orderedRows.slice(paging.offset, paging.offset + 25);
+  const pageFooter = <div className="grid gap-2"><Text tone="secondary" size="sm">{orderedRows.length ? paging.offset + 1 : 0}–{Math.min(paging.offset + 25, orderedRows.length)} of {orderedRows.length} records</Text>{paging.pageCount > 1 ? <Pagination page={paging.page} pageCount={paging.pageCount} onPageChange={paging.setPage} /> : null}</div>;
 
-  const runRowAction = (id: string, run: () => Promise<unknown>) => {
-    setPendingId(id);
+
+  const runRowAction = (id: string, command: () => Promise<unknown>, onSuccess?: () => void) => {
+    if (pendingId) return;
+    setPendingId(id); setRowError(null);
     startTransition(async () => {
       try {
-        await run();
-      } finally {
-        setPendingId(null);
-      }
+        const result = await command();
+        if (result && typeof result === "object" && "ok" in result && !result.ok) {
+          const failure = result as { error?: { safeMessage?: string } };
+          setRowError(failure.error?.safeMessage ?? "The action could not be completed."); return;
+        }
+        onSuccess?.();
+      } catch { setRowError("The action could not be completed. Please try again."); }
+      finally { setPendingId(null); }
     });
   };
 
   return (
-    <SectionCard>
-      {successMessage ? <Notice tone="success" title="Saved">{successMessage}</Notice> : null}
-      <TableToolbar actions={canManage ? (
+    <DirectoryShell header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
         <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
           <Plus aria-hidden="true" />
           <span>New unit</span>
         </Button>
       ) : undefined}>
         <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search units by code or name..." />
-      </TableToolbar>
+      </TableToolbar>}>
+      {successMessage ? <Notice tone="success" title="Saved">{successMessage}</Notice> : null}
+
 
       {filtered.length === 0 ? (
         <EmptyState
           title="No units found"
           description={query ? "No units match your search query." : "Create the first unit to get started."}
-          action={!query && canManage ? (
-            <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
-              <Plus aria-hidden="true" />
-              <span>New unit</span>
-            </Button>
-          ) : undefined}
+
         />
       ) : (
-        <DataTable minWidth={620}>
+        <DataTable framed={false} density="compact" stickyHeader maxBodyHeight="60vh" minWidth={620}>
           <TableHeader>
             <TableRow>
-              <TableHead>Code</TableHead>
-              <TableHead>Name</TableHead>
+              <TableHead sortable sortDirection={sortKey === "Code" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Code"); setSortDirection(direction); }}>Code</TableHead>
+              <TableHead sortable sortDirection={sortKey === "Name" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Name"); setSortDirection(direction); }}>Name</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead align="end">Actions</TableHead>
+              <TableHead stickyEnd align="end">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((unit) => {
+            {visibleRows.map((unit) => {
               const isPending = pendingId === unit.id;
 
               return (
                 <TableRow key={unit.id}>
                   <TableCell>
-                    <TableCellContent primary={<span className="font-mono font-semibold">{displayUnitCode(unit.code)}</span>} />
+                    <TableCellContent primary={<span className="font-ui-mono font-semibold">{displayUnitCode(unit.code)}</span>} />
                   </TableCell>
                   <TableCell>
                     <TableCellContent primary={unit.name} />
@@ -147,31 +145,8 @@ export function UnitDirectory({
                       {unit.status === "ACTIVE" ? "Active" : "Archived"}
                     </StatusBadge>
                   </TableCell>
-                  <TableCell align="end">
-                    <div className="flex items-center justify-end gap-1.5">
-                      {isPending ? <Spinner /> : null}
-                      {canManage && (
-                        <>
-                          <Button size="sm" variant="ghost" onClick={() => setEditTarget(unit)} disabled={isPending}>
-                            Edit
-                          </Button>
-                          {unit.status === "ACTIVE" ? (
-                            <Button size="sm" variant="ghost" onClick={() => setConfirmArchive(unit)} disabled={isPending} title="Archive">
-                              <Archive size={15} />
-                            </Button>
-                          ) : (
-                            <>
-                              <Button size="sm" variant="ghost" onClick={() => setConfirmRestore(unit)} disabled={isPending} title="Restore">
-                                <RotateCcw size={15} />
-                              </Button>
-                              <Button size="sm" variant="danger" onClick={() => setDeleteTarget(unit)} disabled={isPending} title="Request deletion">
-                                <Trash2 size={15} />
-                              </Button>
-                            </>
-                          )}
-                        </>
-                      )}
-                    </div>
+                  <TableCell stickyEnd align="end">
+                    <RowActionMenu label={`Actions for ${unit.name}`} pending={pendingId === unit.id} items={[...[],...(isPending ? [] : []),...[],...(canManage ? [...[],...[{ label: "Edit", onSelect: () => setEditTarget(unit), disabled: isPending, danger: false, separatorBefore: false }],...[],...(unit.status === "ACTIVE" ? [{ label: "Archive", onSelect: () => setConfirmArchive(unit), disabled: isPending, danger: false, separatorBefore: false }] : [...[],...[{ label: "Restore", onSelect: () => setConfirmRestore(unit), disabled: isPending, danger: false, separatorBefore: false }],...[],...[{ label: "Request deletion", onSelect: () => setDeleteTarget(unit), disabled: isPending, danger: true, separatorBefore: true }],...[]]),...[]] : []),...[]]} />
                   </TableCell>
                 </TableRow>
               );
@@ -181,7 +156,7 @@ export function UnitDirectory({
       )}
 
       {/* Create Dialog */}
-      <Dialog
+      <DraftDialog pending={createPending}
         open={createOpen}
         onOpenChange={setCreateOpen}
         title="Create measurement unit"
@@ -215,19 +190,19 @@ export function UnitDirectory({
             <Input name="name" required maxLength={64} placeholder="Pieces" />
           </Field>
           <FormActions>
-            <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
+            <Button data-dialog-cancel type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" disabled={createPending}>
-              {createPending ? <Spinner /> : "Create unit"}
+            <Button type="submit" variant="primary" pending={createPending}>
+              {"Create unit"}
             </Button>
           </FormActions>
         </form>
-      </Dialog>
+      </DraftDialog>
 
       {/* Edit Dialog */}
       {editTarget ? (
-        <Dialog
+        <DraftDialog pending={editPending}
           open
           onOpenChange={(open) => {
             if (!open) setEditTarget(null);
@@ -264,20 +239,20 @@ export function UnitDirectory({
               <Input name="name" defaultValue={editTarget.name} required maxLength={64} />
             </Field>
             <FormActions>
-              <Button type="button" variant="ghost" onClick={() => setEditTarget(null)}>
+              <Button data-dialog-cancel type="button" variant="ghost" onClick={() => setEditTarget(null)}>
                 Cancel
               </Button>
-              <Button type="submit" variant="primary" disabled={editPending}>
-                {editPending ? <Spinner /> : "Save changes"}
+              <Button type="submit" variant="primary" pending={editPending}>
+                {"Save changes"}
               </Button>
             </FormActions>
           </form>
-        </Dialog>
+        </DraftDialog>
       ) : null}
 
       {/* Archive Confirm */}
       {confirmArchive ? (
-        <ConfirmDialog
+        <ConfirmDialog error={rowError} pending={pendingId !== null}
           open
           onOpenChange={(open) => {
             if (!open) setConfirmArchive(null);
@@ -288,15 +263,15 @@ export function UnitDirectory({
           tone="danger"
           onConfirm={() => {
             const target = confirmArchive;
-            setConfirmArchive(null);
-            runRowAction(target.id, () => archiveUnitAction(target.id));
+
+            runRowAction(target.id, () => archiveUnitAction(target.id), () => { setConfirmArchive(null); });
           }}
         />
       ) : null}
 
       {/* Restore Confirm */}
       {confirmRestore ? (
-        <ConfirmDialog
+        <ConfirmDialog error={rowError} pending={pendingId !== null}
           open
           onOpenChange={(open) => {
             if (!open) setConfirmRestore(null);
@@ -306,51 +281,24 @@ export function UnitDirectory({
           confirmLabel="Restore unit"
           onConfirm={() => {
             const target = confirmRestore;
-            setConfirmRestore(null);
-            runRowAction(target.id, () => restoreUnitAction(target.id));
+
+            runRowAction(target.id, () => restoreUnitAction(target.id), () => { setConfirmRestore(null); });
           }}
         />
       ) : null}
 
       {/* Request Deletion Dialog */}
       {deleteTarget ? (
-        <Dialog
-          open
-          onOpenChange={(open) => {
+        <RequestDeletionDialog open onOpenChange={(open) => {
             if (!open) setDeleteTarget(null);
-          }}
-          title={`Submit unit ${displayUnitCode(deleteTarget.code)} for deletion`}
-          description="Archived units with zero dependencies can be permanently purged after approval by a user with the deletion approval permission."
-        >
-          <div className="grid gap-4">
-            <Field label="Reason for deletion">
-              <Input
-                value={deleteReason}
-                onChange={(e) => setDeleteReason(e.target.value)}
-                placeholder="e.g. Redundant duplicate code created by mistake"
-              />
-            </Field>
-            <FormActions>
-              <Button type="button" variant="ghost" onClick={() => setDeleteTarget(null)}>
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant="danger"
-                onClick={() => {
+          }} title={`Submit unit ${displayUnitCode(deleteTarget.code)} for deletion`} description="Archived units with zero dependencies can be permanently purged after approval by a user with the deletion approval permission." reason={deleteReason} onReasonChange={setDeleteReason} placeholder="e.g. Redundant duplicate code created by mistake" pending={pendingId !== null} error={rowError} onSubmit={() => {
                   const target = deleteTarget;
                   const reason = deleteReason;
-                  setDeleteTarget(null);
-                  setDeleteReason("");
-                  runRowAction(target.id, () => requestUnitDeletionAction(target.id, reason));
-                }}
-              >
-                Submit deletion request
-              </Button>
-            </FormActions>
-          </div>
-        </Dialog>
+
+
+                  runRowAction(target.id, () => requestUnitDeletionAction(target.id, reason), () => { setDeleteTarget(null); setDeleteReason(""); });
+                }} />
       ) : null}
-    </SectionCard>
+    </DirectoryShell>
   );
 }

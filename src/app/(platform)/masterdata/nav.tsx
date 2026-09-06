@@ -1,9 +1,12 @@
 "use client";
 
-import { Banknote, LayoutGrid, Tags, Truck } from "lucide-react";
+import { Banknote,LayoutGrid,Tags,Truck } from "lucide-react";
+
 import { usePathname } from "next/navigation";
 
-import { NavItem } from "@/platform/ui_engine";
+
+import { NavGroup,NavItem } from "@/platform/ui_engine";
+
 
 type MasterDataNavLink = {
   href: string;
@@ -30,7 +33,7 @@ export function MasterDataNav() {
   if (!pathname.startsWith("/masterdata")) return null;
 
   return (
-    <nav className="mt-2 grid gap-1 border-t border-line-subtle pt-2 max-[840px]:mt-0 max-[840px]:border-t-0 max-[840px]:pt-0 max-[840px]:contents" aria-label="Master Data navigation">
+    <NavGroup label="Master Data navigation">
       {links.map(({ href, label, icon: Icon, exact }) => {
         const isActive = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
         return (
@@ -44,6 +47,6 @@ export function MasterDataNav() {
           </NavItem>
         );
       })}
-    </nav>
+    </NavGroup>
   );
 }

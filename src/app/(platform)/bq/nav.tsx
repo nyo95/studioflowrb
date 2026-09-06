@@ -1,9 +1,12 @@
 "use client";
 
-import { FileText, Library } from "lucide-react";
+import { FileText,Library } from "lucide-react";
+
 import { usePathname } from "next/navigation";
 
-import { NavItem } from "@/platform/ui_engine";
+
+import { NavGroup,NavItem } from "@/platform/ui_engine";
+
 
 type BqNavLink = {
   href: string;
@@ -23,7 +26,7 @@ export function BqNav() {
   if (!pathname.startsWith("/bq")) return null;
 
   return (
-    <nav className="mt-2 grid gap-1 border-t border-line-subtle pt-2" aria-label="BQ navigation">
+    <NavGroup label="BQ navigation">
       {links.map(({ href, label, icon: Icon, exact }) => {
         const isActive = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
         return (
@@ -37,6 +40,6 @@ export function BqNav() {
           </NavItem>
         );
       })}
-    </nav>
+    </NavGroup>
   );
 }

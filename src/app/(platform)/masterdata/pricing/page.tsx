@@ -1,12 +1,19 @@
 import { redirect } from "next/navigation";
 
+
 import { requirePrincipalGrants } from "@platform/core/auth";
+
 import { hasPermission } from "@platform/core/rbac";
-import { ErrorState, PageHeader, SectionCard } from "@/platform/ui_engine";
+
+import { ErrorState,PageHeader,SectionCard } from "@/platform/ui_engine";
+
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
+
 import { masterDataService } from "@/apps/masterdata/runtime";
 
+
 import { PricingDirectory } from "./pricing-directory";
+
 
 export const dynamic = "force-dynamic";
 
@@ -88,7 +95,7 @@ export default async function PricingPage() {
   if (!canReadMaterial && !canReadWork && !canManageMaterial && !canManageWork) {
     return (
       <div className="grid gap-4">
-        <PageHeader eyebrow="Master Data" title="Pricing" />
+        <PageHeader title="Pricing" />
         <SectionCard>
           <ErrorState title="Access denied" description="You do not have permission to view pricing data." />
         </SectionCard>
@@ -112,9 +119,7 @@ export default async function PricingPage() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        eyebrow="Master Data"
         title="Pricing"
-        description="Material, material+labor, and labor-only pricing tables."
       />
       <PricingDirectory
         materialPrices={materialPrices}

@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R5** — `d0c39ff3a2f0c1ed95b4cdb425ed968a9c2baf08` (local origin/main reference)
-- Current revision after this entry is committed: **R5.03**
-- Next local revision: **R5.04**
+- Current revision after this entry is committed: **R5.04**
+- Next local revision: **R5.05**
 - This change is local only; no new remote publication is authorized.
 
 ## R5.03 — 2026-09-06 — docs(ui): lock design audit remediation work order
@@ -38,6 +38,33 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
   `docs/design curate.pdf`,
   `public/uploads/brand-marks/22e07e06-00d2-45c0-894b-7b11c736a545.png`,
   and `vercel.json`.
+
+## R5.04 — 2026-09-06 — fix(ui): curate shared directories, dialogs, and shell behavior
+
+- Applied the locked UI/UX remediation work order across the UI Engine, Master
+  Data, BQ lists, account controls, and shared authenticated shell without
+  changing persistence, permissions, calculation, migrations, dependencies, or
+  service mutation behavior.
+- Directories now use one compact framed surface with bounded, sticky table
+  bodies, predictable pagination/sorting, concise action menus, draft/error
+  handling, and narrower action columns. Brand, Supplier/Vendor, and Pricing
+  status now uses an accessible green/red scan marker beside the record name.
+- Brand mark and textual product mark link to the main application route. The
+  main shell no longer requests a collapse control while using the fixed compact
+  rail presentation. Account navigation uses an intentional accessible menu.
+- Brand and Vendor dialogs use the shared large dialog size and a single overlay
+  scroll owner; the UI Engine now centralizes compact status markers, directory
+  framing, paging/draft patterns, and confirmation pending/error feedback.
+- Checks: `npm run typecheck`, `npm run lint`, `npm run check:boundaries`,
+  `npm run check:legacy-runtime`, `node --test --import tsx
+  src/platform/ui_engine/ui-engine.test.ts`, and `git diff --check` passed.
+- Browser acceptance was not run: the configured local port resolves to a Docker
+  container labelled for `D:\Projects\studioflow`, not a target proven to be
+  rebuild-only. No application or database command was run against it.
+- Reserved, uncommitted owner files remain: `.env.example`, `AGENTS.md`,
+  `prisma/schema.prisma`, `docs/design curate.pdf`,
+  `public/uploads/brand-marks/22e07e06-00d2-45c0-894b-7b11c736a545.png`, and
+  `vercel.json`.
 
 ## R5.02 — 2026-09-06 — fix(promotion): move BQ approval into Master Data
 

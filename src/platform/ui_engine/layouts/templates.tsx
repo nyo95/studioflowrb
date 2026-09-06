@@ -1,7 +1,7 @@
 "use client";
 
 import { Tabs as RTabs } from "radix-ui";
-import type { HTMLAttributes, ReactNode } from "react";
+import type { HTMLAttributes,ReactNode } from "react";
 
 import { cx } from "../internal/cx";
 
@@ -9,20 +9,24 @@ export function DirectoryShell({
   header,
   toolbar,
   pagination,
+  surface = false,
   children,
   className,
   ...props
 }: HTMLAttributes<HTMLDivElement> & {
-  header: ReactNode;
+  header?: ReactNode;
+  surface?: boolean;
   toolbar?: ReactNode;
   pagination?: ReactNode;
 }) {
   return (
     <div className={cx("grid gap-4", className)} {...props}>
       {header}
-      {toolbar}
-      <div className="min-w-0">{children}</div>
-      {pagination}
+      {surface ? <div className="min-w-0 overflow-hidden rounded-card border border-line bg-surface" data-directory-surface>
+        {toolbar ? <div className="border-b border-line">{toolbar}</div> : null}
+        <div className="min-w-0">{children}</div>
+        {pagination ? <div className="border-t border-line px-4 py-3">{pagination}</div> : null}
+      </div> : <>{toolbar}<div className="min-w-0">{children}</div>{pagination}</>}
     </div>
   );
 }

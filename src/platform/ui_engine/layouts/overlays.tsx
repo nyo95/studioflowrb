@@ -1,11 +1,11 @@
 "use client";
 
 import { X } from "lucide-react";
-import { AlertDialog as RAlertDialog, Dialog as RDialog, Tooltip as RTooltip } from "radix-ui";
-import { cloneElement, isValidElement, useId, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
+import { AlertDialog as RAlertDialog,Dialog as RDialog,Tooltip as RTooltip } from "radix-ui";
+import { cloneElement,isValidElement,useId,useState,type CSSProperties,type ReactElement,type ReactNode } from "react";
 
 import { cx } from "../internal/cx";
-import { Button, Heading, IconButton, Input, Text } from "../primitives";
+import { Button,Heading,IconButton,Input,Text } from "../primitives";
 
 export type OverlaySize = "sm" | "md" | "lg" | "xl" | "full";
 
@@ -113,6 +113,7 @@ export function Drawer(props: DialogProps & { side?: "left" | "right" }) {
 }
 
 export type ConfirmDialogProps = {
+  error?: ReactNode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: ReactNode;
@@ -134,6 +135,7 @@ export type ConfirmDialogProps = {
 };
 
 export function ConfirmDialog({
+  error,
   open,
   onOpenChange,
   title,
@@ -160,7 +162,7 @@ export function ConfirmDialog({
   const typedSatisfied = !requireTypedConfirmation || typed === requireTypedConfirmation;
 
   return (
-    <RAlertDialog.Root open={open} onOpenChange={onOpenChange}>
+    <RAlertDialog.Root open={open} onOpenChange={(next) => { if (!pending) onOpenChange(next); }}>
       <RAlertDialog.Portal>
         <RAlertDialog.Overlay className="fixed inset-0 z-50 bg-[rgb(28_26_24/0.36)] backdrop-blur-[2px] animate-ui-fade-in" />
         <RAlertDialog.Content
@@ -176,6 +178,7 @@ export function ConfirmDialog({
                 <Text as="p" tone="secondary">{description}</Text>
               </RAlertDialog.Description>
             </div>
+            {error ? <div role="alert" className="mt-3 text-sm text-danger">{error}</div> : null}
             {requireTypedConfirmation ? (
               <div className="mt-3.5 grid gap-[5px]">
                 <label className="font-semibold text-ink" htmlFor={typedFieldId}>
@@ -199,10 +202,11 @@ export function ConfirmDialog({
             </RAlertDialog.Cancel>
             <RAlertDialog.Action asChild>
               <Button
-                variant={tone === "danger" ? "danger" : "primary"}
+                variant={tone === "danger" ? "danger-primary" : "primary"}
                 pending={pending}
                 disabled={!typedSatisfied}
                 onClick={(event) => {
+                  event.preventDefault();
                   if (!typedSatisfied) {
                     event.preventDefault();
                     return;

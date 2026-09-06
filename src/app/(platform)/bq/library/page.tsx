@@ -1,8 +1,11 @@
+import { prisma } from "@/platform/core/db";
+import { readPlatformGeneralSettings } from "@platform/core/settings";
+
 import { redirect } from "next/navigation";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission, hasAnyPermission } from "@platform/core/rbac";
-import { PageHeader, SectionCard, Tabs, DataTable, TableHeader, TableBody, TableRow, TableCell, TableHead, StatusBadge, EmptyState, Badge, Text } from "@/platform/ui_engine";
+import { PageHeader, SectionCard, DirectoryShell, ErrorState, Tabs, DataTable, TableHeader, TableBody, TableRow, TableCell, TableHead, StatusBadge, EmptyState, Badge, Text } from "@/platform/ui_engine";
 import { BQ_PERMISSIONS } from "@/apps/bq/service";
 import { bqPublicRead } from "@/apps/bq/runtime";
 import { Library } from "lucide-react";
@@ -17,6 +20,7 @@ export default async function BqLibraryPage() {
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { grants } = principalGrants;
+  const settings = await readPlatformGeneralSettings(prisma);
 
   const canRead = hasAnyPermission(grants, [BQ_PERMISSIONS.libraryRead, BQ_PERMISSIONS.libraryManage]);
   const canManage = hasPermission(grants, BQ_PERMISSIONS.libraryManage);
@@ -27,7 +31,7 @@ export default async function BqLibraryPage() {
       <div className="grid gap-4">
         <PageHeader eyebrow="Bill of Quantity" title="BQ Library" />
         <SectionCard>
-          <EmptyState title="Access denied" description="You do not have permission to view the BQ Library." />
+          <ErrorState title="Access denied" description="You do not have permission to view the BQ Library." />
         </SectionCard>
       </div>
     );
@@ -78,16 +82,15 @@ export default async function BqLibraryPage() {
             value: "items",
             label: "Items",
             content: (
-              <SectionCard>
+              <DirectoryShell surface>
                 {items.length === 0 ? (
                   <EmptyState
                     icon={Library}
                     title="Belum ada library items"
                     description="Mulai dengan menambahkan item baru."
-                    action={canManage ? <LibraryItemCreateButton /> : undefined}
                   />
                 ) : (
-                  <DataTable minWidth={760}>
+                  <DataTable framed={false} density="compact" stickyHeader maxBodyHeight="60vh" minWidth={900}>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Nama</TableHead>
@@ -104,7 +107,7 @@ export default async function BqLibraryPage() {
                           <TableCell className="font-medium">{item.name}</TableCell>
                           <TableCell>{item.purchaseUnit}</TableCell>
                           <TableCell align="end">
-                            {formatMoney(createMoney(item.harga, item.currency))}
+                            {formatMoney(createMoney(item.harga, item.currency), { locale: settings.locale })}
                           </TableCell>
                           <TableCell>
                             <Badge tone={kategoriTone[item.kategori] ?? "neutral"}>
@@ -129,13 +132,13 @@ export default async function BqLibraryPage() {
                     </TableBody>
                   </DataTable>
                 )}
-              </SectionCard>
+              </DirectoryShell>
             ),
           },
           {
             value: "assemblies",
             label: "Assemblies",
-            content: <SectionCard>{assemblies.length === 0 ? <EmptyState title="Belum ada assembly" description="Assembly adalah template L2 dengan daftar L3 yang akan disalin ke proyek." action={canManage ? <AssemblyCreateButton /> : undefined} /> : <div className="grid gap-4">{assemblies.map((assembly) => <div key={assembly.id} className="rounded-control border border-line p-4"><div className="flex items-start justify-between gap-2"><div><div className="font-medium">{assembly.name}</div><Text tone="tertiary" size="sm">{assembly.lineCount} baris L3 · {assembly.description ?? "Tanpa deskripsi"}</Text></div></div>{canManage ? <AssemblyActions assembly={assembly} /> : null}</div>)}</div>}</SectionCard>,
+            content: <SectionCard>{assemblies.length === 0 ? <EmptyState title="Belum ada assembly" description="Assembly adalah template L2 dengan daftar L3 yang akan disalin ke proyek." /> : <div className="grid gap-4">{assemblies.map((assembly) => <div key={assembly.id} className="rounded-control border border-line p-4"><div className="flex items-start justify-between gap-2"><div><div className="font-medium">{assembly.name}</div><Text tone="tertiary" size="sm">{assembly.lineCount} baris L3 · {assembly.description ?? "Tanpa deskripsi"}</Text></div></div>{canManage ? <AssemblyActions assembly={assembly} /> : null}</div>)}</div>}</SectionCard>,
           },
           {
             value: "templates",
@@ -146,7 +149,6 @@ export default async function BqLibraryPage() {
                   <EmptyState
                     title="Belum ada template"
                     description="Buat template untuk scaffold project baru."
-                    action={canManage ? <TemplateCreateButton /> : undefined}
                   />
                 ) : (
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

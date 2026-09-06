@@ -1,12 +1,19 @@
 import { redirect } from "next/navigation";
 
+
 import { requirePrincipalGrants } from "@platform/core/auth";
+
 import { hasPermission } from "@platform/core/rbac";
-import { ErrorState, PageHeader, SectionCard } from "@/platform/ui_engine";
+
+import { ErrorState,PageHeader,SectionCard } from "@/platform/ui_engine";
+
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
+
 import { masterDataService } from "@/apps/masterdata/runtime";
 
+
 import { BrandDirectory } from "./brand-directory";
+
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +27,7 @@ export default async function BrandsPage() {
   if (!canRead && !canManage) {
     return (
       <div className="grid gap-4">
-        <PageHeader eyebrow="Master Data" title="Brands" />
+        <PageHeader title="Brands" />
         <SectionCard>
           <ErrorState title="Access denied" description="You do not have permission to view brands." />
         </SectionCard>
@@ -39,9 +46,7 @@ export default async function BrandsPage() {
   return (
     <div className="grid gap-6">
       <PageHeader
-        eyebrow="Master Data"
         title="Brands Catalog"
-        description="Catalog brands, manufacturer profiles, discovery categories, and hashtags."
       />
       <BrandDirectory
         brands={brands}

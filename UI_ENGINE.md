@@ -699,6 +699,11 @@ Deferred patterns may remain in design prose as routing memory. They are not req
 
 - Components accept generic values, slots, callbacks, and semantic variants; they never fetch or mutate domain data.
 - DataTable owns table presentation/accessibility/overflow and the sort affordance, not columns, sort comparators, query state, or calculations.
+- `DataTable` and `TableToolbar` can opt out of their outer frame when a `DirectoryShell` owns the single directory surface. `DirectoryShell surface` groups toolbar, content, and pagination while leaving the page header outside.
+- `usePagination` owns client-side page bounds and offset math only. Apps retain filtering, sorting, page size, and domain comparators.
+- `DraftDialog` applies the shared unsaved-change prompt to native fields plus an explicit controlled-state snapshot. Apps close it after successful persistence and provide pending state while saving.
+- `ConfirmDialog` keeps its description stable, can display retryable error feedback, blocks duplicate confirmation while pending, and uses `danger-primary` only for the final destructive action.
+- `NavGroup` supplies reusable labeled navigation structure without owning routes.
 - Combobox owns generic selection/search interaction, including ArrowUp/ArrowDown
   movement across enabled options, Home/End movement within the option list,
   Enter selection, Escape close/focus return, and visible keyboard focus. It does

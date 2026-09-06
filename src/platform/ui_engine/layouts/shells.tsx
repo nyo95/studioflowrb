@@ -1,14 +1,13 @@
 "use client";
 
-import { DropdownMenu } from "radix-ui";
+import { PanelLeftClose,PanelLeftOpen } from "lucide-react";
 import Link from "next/link";
-import { createContext, useContext, useEffect, useState, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from "react";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { DropdownMenu } from "radix-ui";
+import { createContext,useContext,useEffect,useState,type AnchorHTMLAttributes,type ButtonHTMLAttributes,type HTMLAttributes,type ReactNode } from "react";
 
 import { cx } from "../internal/cx";
 import { getEffectiveRailCollapsed } from "../internal/rail-state";
-import { Heading, Text } from "../primitives";
-import { IconButton } from "../primitives";
+import { Heading,IconButton,Text } from "../primitives";
 import { Tooltip } from "./overlays";
 
 const RailContext = createContext<{ collapsed: boolean }>({ collapsed: false });
@@ -127,7 +126,7 @@ export function AppShell({
             topbar ? "min-h-[calc(100vh-4rem)]" : null,
           )}
         >
-          {/* The rail is divided from the work area by a drawn rule, not by a tone. */}
+          {/* Warm chrome and a drawn rule separate navigation from the work area. */}
           <aside
             className={cx(
               "group sticky top-16 flex h-[calc(100vh-4rem)] max-w-screen min-w-0 flex-col overflow-hidden border-r border-line",
@@ -176,6 +175,10 @@ export function AppShell({
       </div>
     </RailContext.Provider>
   );
+}
+
+export function NavGroup({ label, children }: { label: string; children: ReactNode }) {
+  return <div role="group" aria-label={label} className="grid gap-1 max-[840px]:contents">{children}</div>;
 }
 
 export type NavItemProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "children"> & {

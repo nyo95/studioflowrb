@@ -1,48 +1,23 @@
-﻿"use client";
+"use client";
+import { RequestDeletionDialog } from "../request-deletion-dialog";
+import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
+import { DirectoryShell,DraftDialog,Pagination,RowActionMenu,Text,usePagination } from "@/platform/ui_engine";
+﻿
 
-import { useRef, useState, useTransition } from "react";
-import { Archive, ExternalLink, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
+import { useRef,useState,useTransition } from "react";
 
-import {
-  Button,
-  ConfirmDialog,
-  CreatableMultiSelect,
-  CreatableSearch,
-  DataTable,
-  Dialog,
-  EmptyState,
-  Field,
-  FormActions,
-  InlineError,
-  Input,
-  Notice,
-  SearchField,
-  SectionCard,
-  Select,
-  SimpleTextEditor,
-  Spinner,
-  StatusBadge,
-  TableBody,
-  TableCell,
-  TableCellContent,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableToolbar,
-  Text,
-  useFormDraftGuard,
-  useOptionOverlay,
-} from "@/platform/ui_engine";
-import {
-  archiveBrandAction,
-  createOwnerVendorQuickAction,
-  createBrandAction,
-  requestBrandDeletionAction,
-  restoreBrandAction,
-  updateBrandAction,
-} from "./actions";
+import { Button,ConfirmDialog,CreatableMultiSelect,CreatableSearch,DataTable,Dialog,EmptyState,Field,FormActions,InlineError,Input,Notice,SearchField,Select,SimpleTextEditor,StatusMarker,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,useFormDraftGuard,useOptionOverlay } from "@/platform/ui_engine";
 import { createCategoryAction } from "../categories/actions";
-import { normalizeBrandLinks, normalizeBrandLinkUrl, type BrandLinkDraft } from "./brand-link-input";
+import {
+archiveBrandAction,
+createBrandAction,
+createOwnerVendorQuickAction,
+requestBrandDeletionAction,
+restoreBrandAction,
+updateBrandAction,
+} from "./actions";
+import { normalizeBrandLinks,normalizeBrandLinkUrl,type BrandLinkDraft } from "./brand-link-input";
 
 type BrandRow = {
   id: string;
@@ -65,23 +40,8 @@ type BrandRow = {
 
 type Option = { id: string; name: string };
 
-function BrandDiscoverySummary({ brand }: { brand: Pick<BrandRow, "categories" | "hashtags"> }) {
-  const categories = brand.categories.map(({ category }) => category.name);
-  const hashtags = brand.hashtags.map((hashtag) => `#${hashtag.label.replace(/^#/, "")}`);
-  const visibleCategories = categories.slice(0, 3);
-  const visibleHashtags = hashtags.slice(0, 2);
-  const remaining = categories.length + hashtags.length - visibleCategories.length - visibleHashtags.length;
-  const fullSummary = [...categories, ...hashtags].join(" · ");
-
-  return (
-    <div className="flex max-w-sm flex-wrap items-center gap-x-1.5 gap-y-1 text-xs" title={fullSummary || undefined}>
-      {visibleCategories.map((category, index) => <span key={category} className="text-ink-secondary">{index > 0 ? "· " : ""}{category}</span>)}
-      {visibleCategories.length > 0 && visibleHashtags.length > 0 ? <span aria-hidden="true" className="text-ink-tertiary">•</span> : null}
-      {visibleHashtags.map((hashtag) => <span key={hashtag} className="font-mono text-ink-secondary">{hashtag}</span>)}
-      {remaining > 0 ? <span className="font-medium text-ink-tertiary">+{remaining} others</span> : null}
-      {categories.length === 0 && hashtags.length === 0 ? <span className="text-ink-tertiary">—</span> : null}
-    </div>
-  );
+function DiscoverySummary({ values, limit }: { values: string[]; limit: number }) {
+ return <span className="block max-w-44 truncate text-xs text-ink-secondary" title={values.join(", ")} aria-label={values.join(", ") || "None"}>{values.slice(0, limit).join(", ") || "—"}{values.length > limit ? ` +${values.length - limit}` : ""}</span>;
 }
 
 export function BrandDirectory({
@@ -113,6 +73,7 @@ export function BrandDirectory({
   const [confirmRestore, setConfirmRestore] = useState<BrandRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BrandRow | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
+  const [rowError, setRowError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -137,7 +98,7 @@ export function BrandDirectory({
     formRef: createFormRef,
     resetKey: createDraftKey,
     active: createOpen,
-    watchedValue: JSON.stringify([createOwnerVendorId, createCategoryIds, createHashtags, linksList]),
+    watchedValue: JSON.stringify([createOwnerVendorId, createCategoryIds, createHashtags, linksList, newLinkKind, newLinkUrl, newLinkLabel]),
     title: "Discard brand draft?",
     description: "Your changes are only in this browser and have not been saved.",
   });
@@ -145,7 +106,7 @@ export function BrandDirectory({
     formRef: editFormRef,
     resetKey: editTarget?.id ?? "",
     active: Boolean(editTarget),
-    watchedValue: JSON.stringify([editOwnerVendorId, editCategoryIds, editHashtags, linksList]),
+    watchedValue: JSON.stringify([editOwnerVendorId, editCategoryIds, editHashtags, linksList, newLinkKind, newLinkUrl, newLinkLabel]),
     title: "Discard changes?",
     description: "Your edits are only in this browser and have not been saved.",
   });
@@ -160,15 +121,35 @@ export function BrandDirectory({
       b.categories.some((c) => c.category.name.toLowerCase().includes(q))
     );
   });
+  const { locale, timezone } = useDisplaySettings();
+  const [sortKey, setSortKey] = useState<"Brand" | "Status" | "SKUs" | "Suppliers" | "Resources" | "Updated">("Brand");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const sortValues: Record<"Brand" | "Status" | "SKUs" | "Suppliers" | "Resources" | "Updated", (r: BrandRow) => string | number | null> = {"Brand": (r) => r.name, "Status": (r) => r.deleted_at ? "Archived" : "Active", "SKUs": (r) => r._count.skus, "Suppliers": (r) => r._count.suppliers, "Resources": (r) => r._count.links, "Updated": (r) => new Date(r.updated_at).getTime()};
+  const collator = new Intl.Collator(locale, { sensitivity: "base", numeric: true });
+  const orderedRows = [...filtered].sort((a, b) => {
+    const left = sortValues[sortKey](a), right = sortValues[sortKey](b);
+    if (left === null || right === null) return left === right ? a.id.localeCompare(b.id) : left === null ? 1 : -1;
+    const result = typeof left === "number" && typeof right === "number" ? left - right : collator.compare(String(left), String(right));
+    return (sortDirection === "asc" ? result : -result) || a.id.localeCompare(b.id);
+  });
+  const paging = usePagination(orderedRows.length, 25, JSON.stringify([query, sortKey, sortDirection]));
+  const visibleRows = orderedRows.slice(paging.offset, paging.offset + 25);
+  const pageFooter = <div className="grid gap-2"><Text tone="secondary" size="sm">{orderedRows.length ? paging.offset + 1 : 0}–{Math.min(paging.offset + 25, orderedRows.length)} of {orderedRows.length} records</Text>{paging.pageCount > 1 ? <Pagination page={paging.page} pageCount={paging.pageCount} onPageChange={paging.setPage} /> : null}</div>;
 
-  const runRowAction = (id: string, run: () => Promise<unknown>) => {
-    setPendingId(id);
+
+  const runRowAction = (id: string, command: () => Promise<unknown>, onSuccess?: () => void) => {
+    if (pendingId) return;
+    setPendingId(id); setRowError(null);
     startTransition(async () => {
       try {
-        await run();
-      } finally {
-        setPendingId(null);
-      }
+        const result = await command();
+        if (result && typeof result === "object" && "ok" in result && !result.ok) {
+          const failure = result as { error?: { safeMessage?: string } };
+          setRowError(failure.error?.safeMessage ?? "The action could not be completed."); return;
+        }
+        onSuccess?.();
+      } catch { setRowError("The action could not be completed. Please try again."); }
+      finally { setPendingId(null); }
     });
   };
 
@@ -261,8 +242,7 @@ export function BrandDirectory({
   const hashtagOptions = (hashtags: readonly string[]) => hashtags.map((tag) => ({ id: tag, label: tag.startsWith("#") ? tag : `#${tag}` }));
 
   return (
-    <SectionCard>
-      <TableToolbar actions={canManage ? (
+    <DirectoryShell header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
           <Button
             type="button"
             variant="primary"
@@ -273,115 +253,46 @@ export function BrandDirectory({
           </Button>
       ) : undefined}>
         <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search brands by name, hashtag, category..." />
-      </TableToolbar>
+      </TableToolbar>}>
+
 
       {filtered.length === 0 ? (
         <EmptyState
           title="No brands found"
           description={query ? "No brands match your search query." : "Add your first catalog brand."}
-          action={!query && canManage ? (
-            <Button
-              type="button"
-              variant="primary"
-              leadingIcon={<Plus aria-hidden="true" />}
-              onClick={openCreateDialog}
-            >
-              New brand
-            </Button>
-          ) : undefined}
+
         />
       ) : (
-        <DataTable minWidth={900}>
+        <DataTable framed={false} density="compact" stickyHeader maxBodyHeight="60vh" minWidth={1354} className="table-fixed">
           <TableHeader>
-            <TableRow>
-              <TableHead>Brand</TableHead>
-              <TableHead>Categories &amp; Hashtags</TableHead>
-              <TableHead>Owner / Suppliers</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead align="end">SKUs</TableHead>
-              <TableHead align="end">Actions</TableHead>
-            </TableRow>
+            <TableRow><TableHead style={{ width: 240 }}  sortable sortDirection={sortKey === "Brand" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Brand"); setSortDirection(direction); }}>Brand</TableHead>
+<TableHead style={{ width: 180 }}  >Categories</TableHead>
+<TableHead style={{ width: 160 }}  >Hashtags</TableHead>
+<TableHead style={{ width: 180 }}  >Owner</TableHead>
+<TableHead style={{ width: 90 }} align="end" sortable sortDirection={sortKey === "Suppliers" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Suppliers"); setSortDirection(direction); }}>Suppliers</TableHead>
+<TableHead style={{ width: 90 }} align="end" sortable sortDirection={sortKey === "Resources" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Resources"); setSortDirection(direction); }}>Resources</TableHead>
+<TableHead style={{ width: 90 }} align="end" sortable sortDirection={sortKey === "SKUs" ? sortDirection : null} onSortChange={(direction) => { setSortKey("SKUs"); setSortDirection(direction); }}>SKUs</TableHead>
+<TableHead style={{ width: 180 }}  sortable sortDirection={sortKey === "Updated" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Updated"); setSortDirection(direction); }}>Updated</TableHead>
+<TableHead stickyEnd style={{ width: 64 }} align="end" >Actions</TableHead></TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((brand) => {
+            {visibleRows.map((brand) => {
               const isPending = pendingId === brand.id;
               const isArchived = brand.deleted_at !== null;
 
               return (
                 <TableRow key={brand.id}>
-                  <TableCell>
-                    <TableCellContent
-                      primary={<span className="font-semibold">{brand.name}</span>}
-                      secondary={
-                        <div className="grid gap-0.5 mt-0.5">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-xs text-ink-secondary">{brand.slug}</span>
-                            {brand.links.map((l) => (
-                              <a
-                                key={l.id}
-                                href={l.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-xs text-action hover:underline"
-                              >
-                                <span>{l.label || l.kind}</span>
-                                <ExternalLink size={11} />
-                              </a>
-                            ))}
-                          </div>
-                          {brand.updated_by_label ? (
-                            <span className="text-xs text-ink-tertiary">
-                              Updated by <span className="font-medium text-ink-secondary">{brand.updated_by_label}</span> · {new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" }).format(brand.updated_at)}
-                            </span>
-                          ) : null}
-                        </div>
-                      }
-                    />
-                  </TableCell>
-                  <TableCell><BrandDiscoverySummary brand={brand} /></TableCell>
-                  <TableCell>
-                    <div className="text-xs text-ink-secondary">
-                      {brand.owner_vendor ? <div>Owner: <span className="font-medium text-ink">{brand.owner_vendor.name}</span></div> : null}
-                      {brand.suppliers.length > 0 ? (
-                        <div>Suppliers: {brand.suppliers.map((s) => s.vendor.name).join(", ")}</div>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge tone={!isArchived ? "success" : "neutral"}>
-                      {!isArchived ? "Active" : "Archived"}
-                    </StatusBadge>
-                  </TableCell>
-                  <TableCell align="end">
-                    <TableCellContent align="end" primary={brand._count.skus.toLocaleString()} />
-                  </TableCell>
-                  <TableCell align="end">
-                    <div className="flex items-center justify-end gap-1.5">
-                      {isPending ? <Spinner /> : null}
-                      {canManage && (
-                        <>
-                          <Button size="sm" variant="ghost" onClick={() => openEditDialog(brand)} disabled={isPending}>
-                            Edit
-                          </Button>
-                          {!isArchived ? (
-                            <Button size="sm" variant="ghost" onClick={() => setConfirmArchive(brand)} disabled={isPending} title="Archive">
-                              <Archive size={15} />
-                            </Button>
-                          ) : (
-                            <>
-                              <Button size="sm" variant="ghost" onClick={() => setConfirmRestore(brand)} disabled={isPending} title="Restore">
-                                <RotateCcw size={15} />
-                              </Button>
-                              <Button size="sm" variant="danger" onClick={() => setDeleteTarget(brand)} disabled={isPending} title="Request deletion">
-                                <Trash2 size={15} />
-                              </Button>
-                            </>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
+ <TableCell wrap><TableCellContent primary={<span className="inline-flex items-center gap-2"><StatusMarker tone={isArchived ? "danger" : "success"} label={isArchived ? "Archived" : "Active"} /><strong>{brand.name}</strong></span>} primaryLines={2} secondary={<span className="font-ui-mono">{brand.slug}</span>} /></TableCell>
+ <TableCell><DiscoverySummary values={brand.categories.map(c => c.category.name)} limit={3} /></TableCell>
+ <TableCell><DiscoverySummary values={brand.hashtags.map(h => `#${h.label.replace(/^#/, "")}`)} limit={2} /></TableCell>
+ <TableCell wrap><TableCellContent primary={brand.owner_vendor?.name ?? "—"} primaryLines={2} /></TableCell>
+ <TableCell align="end">{brand._count.suppliers.toLocaleString(locale)}</TableCell>
+ <TableCell align="end">{brand._count.links.toLocaleString(locale)}</TableCell>
+ <TableCell align="end">{brand._count.skus.toLocaleString(locale)}</TableCell>
+ <TableCell><TableCellContent primary={brand.updated_by_label ?? "—"} secondary={new Intl.DateTimeFormat(locale, { timeZone: timezone, dateStyle: "medium" }).format(new Date(brand.updated_at))} /></TableCell>
+ <TableCell stickyEnd align="end">
+                    <RowActionMenu label={`Actions for ${brand.name}`} pending={pendingId === brand.id} items={[...[],...(isPending ? [] : []),...[],...(canManage ? [...[],...[{ label: "Edit", onSelect: () => openEditDialog(brand), disabled: isPending, danger: false, separatorBefore: false }],...[],...(!isArchived ? [{ label: "Archive", onSelect: () => setConfirmArchive(brand), disabled: isPending, danger: false, separatorBefore: false }] : [...[],...[{ label: "Restore", onSelect: () => setConfirmRestore(brand), disabled: isPending, danger: false, separatorBefore: false }],...[],...[{ label: "Request deletion", onSelect: () => setDeleteTarget(brand), disabled: isPending, danger: true, separatorBefore: true }],...[]]),...[]] : []),...[]]} />
+                  </TableCell></TableRow>
               );
             })}
           </TableBody>
@@ -389,7 +300,7 @@ export function BrandDirectory({
       )}
 
       {/* Create Brand Dialog */}
-      <Dialog
+      <Dialog size="lg"
         open={createOpen}
         onOpenChange={(open) => {
           if (open) setCreateOpen(true);
@@ -424,7 +335,7 @@ export function BrandDirectory({
               setCreatePending(false);
             }
           }}
-          className="grid gap-4 max-h-[80vh] overflow-y-auto pr-1"
+          className="grid gap-4  pr-1"
         >
           {createError ? <InlineError>{createError}</InlineError> : null}
           <Field label="Brand name" required>
@@ -458,7 +369,7 @@ export function BrandDirectory({
             <Text size="sm" weight="semibold">External links (Catalogs, Website)</Text>
             {linksList.map((link, idx) => (
               <div key={idx} className="flex items-center justify-between text-xs bg-surface-muted p-2 rounded">
-                <span className="font-mono">{link.kind}: {link.label || link.url}</span>
+                <span className="font-ui-mono">{link.kind}: {link.label || link.url}</span>
                 <Button type="button" size="sm" variant="ghost" onClick={() => removeLink(idx)}>Remove</Button>
               </div>
             ))}
@@ -486,8 +397,8 @@ export function BrandDirectory({
             <Button type="button" variant="ghost" onClick={() => void createDraftGuard.requestDiscard(() => setCreateOpen(false))}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" disabled={createPending}>
-              {createPending ? <Spinner /> : "Create brand"}
+            <Button type="submit" variant="primary" pending={createPending}>
+              {"Create brand"}
             </Button>
           </FormActions>
         </form>
@@ -496,7 +407,7 @@ export function BrandDirectory({
 
       {/* Edit Brand Dialog */}
       {editTarget ? (
-        <Dialog
+        <Dialog size="lg"
           open
           onOpenChange={(open) => {
             if (!open && !editPending) void editDraftGuard.requestDiscard(() => setEditTarget(null));
@@ -530,7 +441,7 @@ export function BrandDirectory({
                 setEditPending(false);
               }
             }}
-            className="grid gap-4 max-h-[80vh] overflow-y-auto pr-1"
+            className="grid gap-4  pr-1"
           >
             <input type="hidden" name="brandId" value={editTarget.id} />
             {editCategoryIds.map((id) => <input key={id} type="hidden" name="categoryIds" value={id} />)}
@@ -565,7 +476,7 @@ export function BrandDirectory({
               <Text size="sm" weight="semibold">External links</Text>
               {linksList.map((link, idx) => (
                 <div key={idx} className="flex items-center justify-between text-xs bg-surface-muted p-2 rounded">
-                  <span className="font-mono">{link.kind}: {link.label || link.url}</span>
+                  <span className="font-ui-mono">{link.kind}: {link.label || link.url}</span>
                   <Button type="button" size="sm" variant="ghost" onClick={() => removeLink(idx)}>Remove</Button>
                 </div>
               ))}
@@ -591,15 +502,16 @@ export function BrandDirectory({
 
             {editTarget.updated_by_label ? (
               <p className="text-xs text-ink-tertiary px-0.5">
-                Updated by <span className="font-medium text-ink-secondary">{editTarget.updated_by_label}</span> · {new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(editTarget.updated_at)}
+                Updated by <span className="font-medium text-ink-secondary">{editTarget.updated_by_label}</span> · {new Intl.DateTimeFormat(locale, { timeZone: timezone, dateStyle: "medium", timeStyle: "short" }).format(editTarget.updated_at)}
               </p>
             ) : null}
+            {editTarget.suppliers.length > 0 ? <Field label="Suppliers"><Text>{editTarget.suppliers.map(supplier => supplier.vendor.name).join(", ")}</Text></Field> : null}
             <FormActions>
               <Button type="button" variant="ghost" onClick={() => void editDraftGuard.requestDiscard(() => setEditTarget(null))}>
                 Cancel
               </Button>
-              <Button type="submit" variant="primary" disabled={editPending}>
-                {editPending ? <Spinner /> : "Save changes"}
+              <Button type="submit" variant="primary" pending={editPending}>
+                {"Save changes"}
               </Button>
             </FormActions>
           </form>
@@ -609,7 +521,7 @@ export function BrandDirectory({
 
       {/* Archive Confirm */}
       {confirmArchive ? (
-        <ConfirmDialog
+        <ConfirmDialog error={rowError} pending={pendingId !== null}
           open
           onOpenChange={(open) => {
             if (!open) setConfirmArchive(null);
@@ -620,15 +532,15 @@ export function BrandDirectory({
           tone="danger"
           onConfirm={() => {
             const target = confirmArchive;
-            setConfirmArchive(null);
-            runRowAction(target.id, () => archiveBrandAction(target.id));
+
+            runRowAction(target.id, () => archiveBrandAction(target.id), () => { setConfirmArchive(null); });
           }}
         />
       ) : null}
 
       {/* Restore Confirm */}
       {confirmRestore ? (
-        <ConfirmDialog
+        <ConfirmDialog error={rowError} pending={pendingId !== null}
           open
           onOpenChange={(open) => {
             if (!open) setConfirmRestore(null);
@@ -638,51 +550,24 @@ export function BrandDirectory({
           confirmLabel="Restore brand"
           onConfirm={() => {
             const target = confirmRestore;
-            setConfirmRestore(null);
-            runRowAction(target.id, () => restoreBrandAction(target.id));
+
+            runRowAction(target.id, () => restoreBrandAction(target.id), () => { setConfirmRestore(null); });
           }}
         />
       ) : null}
 
       {/* Request Deletion Dialog */}
       {deleteTarget ? (
-        <Dialog
-          open
-          onOpenChange={(open) => {
+        <RequestDeletionDialog open onOpenChange={(open) => {
             if (!open) setDeleteTarget(null);
-          }}
-          title={`Submit brand "${deleteTarget.name}" for deletion`}
-          description="Archived brands can be permanently purged only after approval by a user with the deletion approval permission and after their explicit relation guards pass."
-        >
-          <div className="grid gap-4">
-            <Field label="Reason for deletion">
-              <Input
-                value={deleteReason}
-                onChange={(e) => setDeleteReason(e.target.value)}
-                placeholder="e.g. Obsolete brand with discontinued catalog"
-              />
-            </Field>
-            <FormActions>
-              <Button type="button" variant="ghost" onClick={() => setDeleteTarget(null)}>
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant="danger"
-                onClick={() => {
+          }} title={`Submit brand "${deleteTarget.name}" for deletion`} description="Archived brands can be permanently purged only after approval by a user with the deletion approval permission and after their explicit relation guards pass." reason={deleteReason} onReasonChange={setDeleteReason} placeholder="e.g. Obsolete brand with discontinued catalog" pending={pendingId !== null} error={rowError} onSubmit={() => {
                   const target = deleteTarget;
                   const reason = deleteReason;
-                  setDeleteTarget(null);
-                  setDeleteReason("");
-                  runRowAction(target.id, () => requestBrandDeletionAction(target.id, reason));
-                }}
-              >
-                Submit deletion request
-              </Button>
-            </FormActions>
-          </div>
-        </Dialog>
+
+
+                  runRowAction(target.id, () => requestBrandDeletionAction(target.id, reason), () => { setDeleteTarget(null); setDeleteReason(""); });
+                }} />
       ) : null}
-    </SectionCard>
+    </DirectoryShell>
   );
 }

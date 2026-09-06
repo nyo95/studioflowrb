@@ -1,15 +1,25 @@
-import type { ReactNode } from "react";
+import { AccountMenu } from "./account-menu";
+
+import { DisplaySettingsProvider } from "./display-settings";
+
 import Link from "next/link";
-import { UserRound } from "lucide-react";
+
+import type { ReactNode } from "react";
+
 
 /* eslint-disable @next/next/no-img-element -- brand mark accepts a local path or owner-configured host. */
 
-import { AppShell, Button, Text } from "@/platform/ui_engine";
+import { AppShell,Text } from "@/platform/ui_engine";
+
 import type { SessionPrincipal } from "@platform/core/auth";
+
 import { hasPermission } from "@platform/core/rbac";
+
 import type { PlatformGeneralSettings } from "@platform/core/settings";
 
-import { AuthenticatedPlatformNavigation, HeaderApplicationNavigation, type ShellAppLink } from "./navigation";
+
+import { AuthenticatedPlatformNavigation,HeaderApplicationNavigation,type ShellAppLink } from "./navigation";
+
 
 export function AuthenticatedShell({ principal, grants, settings, apps, logoutAction, appName, appAbbreviation, domainNavigation, domainUtilityNavigation, contextSlot, children }: {
   principal: SessionPrincipal;
@@ -27,23 +37,22 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
   const productMark = settings.appTitle.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "SF";
   const subtitle = appName ?? settings.organizationName;
   return (
-    <AppShell
+    <DisplaySettingsProvider value={{ locale: settings.locale, timezone: settings.timezone }}><AppShell
       brand={settings.brandMarkUrl ? (
-        <div className="flex min-w-0 items-center">
+        <Link href="/" aria-label={`Open ${settings.appTitle} home`} className="flex min-w-0 items-center rounded-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
           <img src={settings.brandMarkUrl} alt={settings.appTitle} className="h-[38px] max-w-[190px] shrink-0 object-contain object-left" />
-        </div>
+        </Link>
       ) : (
-        <div className="flex min-w-0 items-center gap-2.5">
-        <div className="min-w-0">
-          <Text as="span" className="block truncate font-semibold">{settings.appTitle}</Text>
-          {subtitle !== settings.appTitle ? (
-            <Text as="span" tone="tertiary" size="sm" className="block truncate">{subtitle}</Text>
-          ) : null}
-        </div>
-        </div>
+        <Link href="/" aria-label={`Open ${settings.appTitle} home`} className="flex min-w-0 items-center gap-2.5 rounded-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
+          <div className="min-w-0">
+            <Text as="span" className="block truncate font-semibold">{settings.appTitle}</Text>
+            {subtitle !== settings.appTitle ? (
+              <Text as="span" tone="tertiary" size="sm" className="block truncate">{subtitle}</Text>
+            ) : null}
+          </div>
+        </Link>
       )}
       collapsedBrand={<Text as="span" weight="semibold">{appAbbreviation ?? productMark}</Text>}
-      collapsible
       railPresentation="compact"
       navigationLabel={`${settings.appTitle} navigation`}
       navigation={<AuthenticatedPlatformNavigation
@@ -56,22 +65,10 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
       topbar={<div className="flex w-full items-center gap-3 px-(--ui-page-padding)">
         <HeaderApplicationNavigation apps={apps} />
         {contextSlot}
-        <div className="group relative">
-          <Link href="/account" className="flex min-w-0 items-center gap-2 rounded-action px-2 py-1 text-sm hover:bg-surface-muted" title={`Open account settings for ${principal.displayName}`} aria-label={`Open account settings for ${principal.displayName}`}>
-            <UserRound size={17} aria-hidden="true" />
-            <span className="max-w-[220px] truncate whitespace-nowrap">{principal.displayName}</span>
-          </Link>
-          <div className="pointer-events-none absolute right-0 top-full z-30 pt-2 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-            <div className="min-w-36 rounded-card border border-line bg-surface p-1 shadow-elevated">
-              <form action={logoutAction}>
-                <Button type="submit" variant="ghost" className="w-full justify-start">Sign out</Button>
-              </form>
-            </div>
-          </div>
-        </div>
+        <AccountMenu name={principal.displayName} logoutAction={logoutAction} />
       </div>}
     >
       {children}
-    </AppShell>
+    </AppShell></DisplaySettingsProvider>
   );
 }

@@ -1,12 +1,14 @@
 "use client";
+import { IconButton } from "@/platform/ui_engine";
+import { DraftDialog,useFormDraftGuard } from "@/platform/ui_engine";
 
-import { useState, useTransition, type FormEvent } from "react";
-import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
+import { Copy,Pencil,Plus,Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useRef,useState,useTransition,type FormEvent } from "react";
 
-import { addAssemblyLineAction, createAssemblyAction, deleteAssemblyAction, deleteAssemblyLineAction, getAssemblyDetailAction, libraryItemAction, templateAction, updateAssemblyAction, updateAssemblyLineAction } from "./actions";
-import type { BqAssemblyLineRead, BqAssemblyTemplateDetail, BqAssemblyTemplateRead, BqLibItemRead, BqTemplateRead } from "@/apps/bq/public";
-import { Button, ConfirmDialog, Dialog, Field, FormActions, InlineError, Input, Select, Spinner, Textarea } from "@/platform/ui_engine";
+import type { BqAssemblyLineRead,BqAssemblyTemplateDetail,BqAssemblyTemplateRead,BqLibItemRead,BqTemplateRead } from "@/apps/bq/public";
+import { Button,ConfirmDialog,Field,FormActions,InlineError,Input,Select,Textarea } from "@/platform/ui_engine";
+import { addAssemblyLineAction,createAssemblyAction,deleteAssemblyAction,deleteAssemblyLineAction,getAssemblyDetailAction,libraryItemAction,templateAction,updateAssemblyAction,updateAssemblyLineAction } from "./actions";
 
 type ItemType = BqLibItemRead["type"];
 function useCommand() {
@@ -22,14 +24,14 @@ export function LibraryItemCreateButton() {
 
 export function AssemblyCreateButton() {
   const [open, setOpen] = useState(false); const [error, setError] = useState<string | null>(null); const [pending, startTransition] = useTransition(); const router = useRouter();
-  return <><Button type="button" variant="primary" leadingIcon={<Plus aria-hidden="true" />} onClick={() => setOpen(true)}>Add assembly</Button><Dialog open={open} onOpenChange={setOpen} title="Add Assembly Template" description="Reusable L2 breakdown. Its L3 lines are copied into each project." size="sm"><form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); startTransition(async () => { const result = await createAssemblyAction(null, data); if (!result.ok) setError(result.error.safeMessage); else { setOpen(false); router.refresh(); } }); }}>{error ? <InlineError>{error}</InlineError> : null}<Field label="Name" required><Input name="name" required maxLength={160} autoFocus /></Field><Field label="Description"><Textarea name="description" maxLength={2000} /></Field><FormActions><Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" variant="primary" pending={pending}>Add assembly</Button></FormActions></form></Dialog></>;
+  return <><Button type="button" variant="primary" leadingIcon={<Plus aria-hidden="true" />} onClick={() => setOpen(true)}>Add assembly</Button><DraftDialog pending={pending} open={open} onOpenChange={setOpen} title="Add Assembly Template" description="Reusable L2 breakdown. Its L3 lines are copied into each project." size="sm"><form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); startTransition(async () => { const result = await createAssemblyAction(null, data); if (!result.ok) setError(result.error.safeMessage); else { setOpen(false); router.refresh(); } }); }}>{error ? <InlineError>{error}</InlineError> : null}<Field label="Name" required><Input name="name" required maxLength={160} autoFocus /></Field><Field label="Description"><Textarea name="description" maxLength={2000} /></Field><FormActions><Button data-dialog-cancel type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" variant="primary" pending={pending}>Add assembly</Button></FormActions></form></DraftDialog></>;
 }
 
 export function LibraryItemActions({ item }: { item: BqLibItemRead }) {
   const [editOpen, setEditOpen] = useState(false);
   return (
     <div className="flex justify-end gap-1">
-      <Button type="button" size="sm" variant="ghost" title="Edit item" onClick={() => setEditOpen(true)}><Pencil size={15} aria-hidden="true" /></Button>
+      <IconButton type="button" size="sm" variant="ghost"  onClick={() => setEditOpen(true)} label="Edit item" icon={<Pencil size={15} aria-hidden="true" />} />
       <DeleteItemButton item={item} />
       <LibraryItemDialog item={item} open={editOpen} onOpenChange={setEditOpen} />
     </div>
@@ -51,8 +53,8 @@ function DeleteItemButton({ item }: { item: BqLibItemRead }) {
     });
   };
   return <>
-    <Button type="button" size="sm" variant="ghost" title="Delete item" onClick={() => { command.setError(null); setOpen(true); }}><Trash2 size={15} aria-hidden="true" /></Button>
-    <ConfirmDialog open={open} onOpenChange={setOpen} title={`Delete ${item.name}?`} description={command.error ?? "This library item will be permanently removed."} confirmLabel="Delete" tone="danger" pending={command.pending} onConfirm={submit} />
+    <IconButton type="button" size="sm" variant="ghost"  onClick={() => { command.setError(null); setOpen(true); }} label="Delete item" icon={<Trash2 size={15} aria-hidden="true" />} />
+    <ConfirmDialog open={open} onOpenChange={setOpen} title={`Delete ${item.name}?`} error={command.error} description={"This library item will be permanently removed."} confirmLabel="Delete" tone="danger" pending={command.pending} onConfirm={submit} />
   </>;
 }
 
@@ -75,7 +77,7 @@ function LibraryItemDialog({ item, open: controlledOpen, onOpenChange }: { item?
   };
   return <>
     {!item ? <Button type="button" variant="primary" leadingIcon={<Plus aria-hidden="true" />} onClick={() => { setType("material"); setError(null); setOpen(true); }}>Add library item</Button> : null}
-    <Dialog open={open} onOpenChange={setOpen} title={item ? "Edit library item" : "Add library item"} description="Library items can be used as recommendations in BQ templates." size="md">
+    <DraftDialog pending={pending} open={open} onOpenChange={setOpen} title={item ? "Edit library item" : "Add library item"} description="Library items can be used as recommendations in BQ templates." size="md">
       <form onSubmit={submit} className="grid gap-4">
         {error ? <InlineError>{error}</InlineError> : null}
         <input type="hidden" name="operation" value={item ? "update" : "create"} />
@@ -92,9 +94,9 @@ function LibraryItemDialog({ item, open: controlledOpen, onOpenChange }: { item?
           <Field label="Category" required><Select name="kategori" defaultValue={item?.kategori ?? (type === "custom" ? "BIAYA_UMUM" : "MATERIAL")}><option value="MATERIAL">Material</option><option value="UPAH">Upah</option><option value="MATERIAL_UPAH">Material + Upah</option><option value="BIAYA_UMUM">Biaya Umum</option><option value="TRANSPORTASI_AKOMODASI">Transportasi / Akomodasi</option><option value="ALAT">Alat</option></Select></Field>
         </div>
         <Field label="Notes"><Textarea name="notes" defaultValue={item?.notes ?? ""} maxLength={2000} /></Field>
-        <FormActions><Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={pending}>Cancel</Button><Button type="submit" variant="primary" disabled={pending}>{pending ? <Spinner /> : item ? "Save changes" : "Add item"}</Button></FormActions>
+        <FormActions><Button data-dialog-cancel type="button" variant="ghost" onClick={() => setOpen(false)} disabled={pending}>Cancel</Button><Button type="submit" variant="primary" pending={pending}>{item ? "Save changes" : "Add item"}</Button></FormActions>
       </form>
-    </Dialog>
+    </DraftDialog>
   </>;
 }
 
@@ -108,15 +110,15 @@ export function TemplateActions({ template }: { template: BqTemplateRead }) {
   const command = useCommand();
   const run = (operation: "duplicate" | "delete") => {
     const data = new FormData(); data.set("operation", operation); data.set("id", template.id); data.set("name", template.name); data.set("description", template.description ?? "");
-    command.startTransition(async () => { const result = await templateAction(null, data); if (!result.ok) command.setError(result.error.safeMessage); else command.router.refresh(); });
+    command.startTransition(async () => { const result = await templateAction(null, data); if (!result.ok) command.setError(result.error.safeMessage); else { setDeleteOpen(false); command.router.refresh(); } });
   };
   return <div className="flex flex-wrap gap-1">
-    <Button type="button" size="sm" variant="ghost" aria-label="Edit template" title="Edit template" onClick={() => setEditOpen(true)}><Pencil size={15} aria-hidden="true" /></Button>
-    <Button type="button" size="sm" variant="ghost" aria-label="Duplicate template" title="Duplicate template" onClick={() => run("duplicate")} disabled={command.pending}><Copy size={15} aria-hidden="true" /></Button>
-    <Button type="button" size="sm" variant="ghost" aria-label="Delete template" title="Delete template" onClick={() => setDeleteOpen(true)} disabled={command.pending}><Trash2 size={15} aria-hidden="true" /></Button>
+    <IconButton type="button" size="sm" variant="ghost"   onClick={() => setEditOpen(true)} label="Edit template" icon={<Pencil size={15} aria-hidden="true" />} />
+    <IconButton type="button" size="sm" variant="ghost"   onClick={() => run("duplicate")} disabled={command.pending} label="Duplicate template" icon={<Copy size={15} aria-hidden="true" />} />
+    <IconButton type="button" size="sm" variant="ghost"   onClick={() => setDeleteOpen(true)} disabled={command.pending} label="Delete template" icon={<Trash2 size={15} aria-hidden="true" />} />
     {command.error ? <InlineError>{command.error}</InlineError> : null}
     <TemplateDialog template={template} open={editOpen} onOpenChange={setEditOpen} />
-    <ConfirmDialog open={deleteOpen} onOpenChange={setDeleteOpen} title={`Delete ${template.name}?`} description={command.error ?? "This template and its scaffold sections will be permanently removed."} confirmLabel="Delete" tone="danger" pending={command.pending} onConfirm={() => { run("delete"); setDeleteOpen(false); }} />
+    <ConfirmDialog open={deleteOpen} onOpenChange={setDeleteOpen} title={`Delete ${template.name}?`} error={command.error} description={"This template and its scaffold sections will be permanently removed."} confirmLabel="Delete" tone="danger" pending={command.pending} onConfirm={() => run("delete")} />
   </div>;
 }
 
@@ -130,15 +132,15 @@ function TemplateDialog({ template, open: controlledOpen, onOpenChange }: { temp
   const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setError(null); const data = new FormData(event.currentTarget); startTransition(async () => { const result = await templateAction(null, data); if (!result.ok) setError(result.error.safeMessage); else { setOpen(false); router.refresh(); } }); };
   return <>
     {!template ? <Button type="button" variant="primary" leadingIcon={<Plus aria-hidden="true" />} onClick={() => { setError(null); setOpen(true); }}>Add template</Button> : null}
-    <Dialog open={open} onOpenChange={setOpen} title={template ? "Edit template" : "Add template"} description="A template is a reusable section and subsection scaffold for new BQ projects." size="sm">
+    <DraftDialog pending={pending} open={open} onOpenChange={setOpen} title={template ? "Edit template" : "Add template"} description="A template is a reusable section and subsection scaffold for new BQ projects." size="sm">
       <form onSubmit={submit} className="grid gap-4">
         {error ? <InlineError>{error}</InlineError> : null}
         <input type="hidden" name="operation" value={template ? "update" : "create"} /><input type="hidden" name="id" value={template?.id ?? ""} />
         <Field label="Template name" required><Input name="name" defaultValue={template?.name} maxLength={160} required autoFocus /></Field>
         <Field label="Description"><Textarea name="description" defaultValue={template?.description ?? ""} maxLength={2000} /></Field>
-        <FormActions><Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={pending}>Cancel</Button><Button type="submit" variant="primary" disabled={pending}>{pending ? <Spinner /> : template ? "Save changes" : "Add template"}</Button></FormActions>
+        <FormActions><Button data-dialog-cancel type="button" variant="ghost" onClick={() => setOpen(false)} disabled={pending}>Cancel</Button><Button type="submit" variant="primary" pending={pending}>{template ? "Save changes" : "Add template"}</Button></FormActions>
       </form>
-    </Dialog>
+    </DraftDialog>
   </>;
 }
 
@@ -173,18 +175,12 @@ export function AssemblyActions({ assembly }: { assembly: BqAssemblyTemplateRead
 
   return (
     <div className="flex flex-wrap gap-1 mt-2">
-      <Button type="button" size="sm" variant="ghost" title="Edit nama/deskripsi" onClick={() => { command.setError(null); setEditOpen(true); }}>
-        <Pencil size={14} aria-hidden="true" />
-      </Button>
-      <Button type="button" size="sm" variant="ghost" title="Kelola baris L3" onClick={openLines}>
-        <Plus size={14} aria-hidden="true" />
-      </Button>
-      <Button type="button" size="sm" variant="ghost" title="Hapus assembly" onClick={() => { command.setError(null); setDeleteOpen(true); }} disabled={command.pending}>
-        <Trash2 size={14} aria-hidden="true" />
-      </Button>
+      <IconButton type="button" size="sm" variant="ghost"  onClick={() => { command.setError(null); setEditOpen(true); }} label="Edit nama/deskripsi" icon={<Pencil size={14} aria-hidden="true" />} />
+      <IconButton type="button" size="sm" variant="ghost"  onClick={openLines} label="Kelola baris L3" icon={<Plus size={14} aria-hidden="true" />} />
+      <IconButton type="button" size="sm" variant="ghost"  onClick={() => { command.setError(null); setDeleteOpen(true); }} disabled={command.pending} label="Hapus assembly" icon={<Trash2 size={14} aria-hidden="true" />} />
 
       {/* Edit name/desc dialog */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit Assembly" size="sm">
+      <DraftDialog pending={command.pending} open={editOpen} onOpenChange={setEditOpen} title="Edit Assembly" size="sm">
         <form className="grid gap-4" onSubmit={(e) => {
           e.preventDefault();
           const data = new FormData(e.currentTarget);
@@ -199,28 +195,28 @@ export function AssemblyActions({ assembly }: { assembly: BqAssemblyTemplateRead
           <Field label="Nama" required><Input name="name" defaultValue={assembly.name} required maxLength={160} autoFocus /></Field>
           <Field label="Deskripsi"><Textarea name="description" defaultValue={assembly.description ?? ""} maxLength={2000} /></Field>
           <FormActions>
-            <Button type="button" variant="ghost" onClick={() => setEditOpen(false)}>Batal</Button>
+            <Button data-dialog-cancel type="button" variant="ghost" onClick={() => setEditOpen(false)}>Batal</Button>
             <Button type="submit" variant="primary" pending={command.pending}>Simpan</Button>
           </FormActions>
         </form>
-      </Dialog>
+      </DraftDialog>
 
       {/* Lines editor dialog */}
-      <Dialog open={linesOpen} onOpenChange={setLinesOpen} title={`Baris L3 — ${assembly.name}`} size="lg" description="Setiap baris akan disalin ke proyek saat assembly diterapkan.">
+      <DraftDialog open={linesOpen} onOpenChange={setLinesOpen} title={`Baris L3 — ${assembly.name}`} size="lg" description="Setiap baris akan disalin ke proyek saat assembly diterapkan.">
         {loadError ? <InlineError>{loadError}</InlineError> : detail ? (
           <AssemblyLineList detail={detail} onRefresh={() => {
-            getAssemblyDetailAction(assembly.id).then((d) => { if (d) setDetail(d); }).catch(() => {});
+            getAssemblyDetailAction(assembly.id).then((d) => { if (d) setDetail(d); }).catch(() => setLoadError("Gagal memuat ulang assembly. Tutup dan buka kembali untuk mencoba lagi."));
             command.router.refresh();
           }} />
         ) : <div className="py-8 text-center text-sm text-ink-secondary">Memuat…</div>}
-      </Dialog>
+      </DraftDialog>
 
       {/* Delete confirm */}
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title={`Hapus "${assembly.name}"?`}
-        description={command.error ?? "Assembly ini akan dihapus permanen beserta semua barisnya. Proyek yang sudah menggunakannya tidak terpengaruh."}
+        error={command.error} description={"Assembly ini akan dihapus permanen beserta semua barisnya. Proyek yang sudah menggunakannya tidak terpengaruh."}
         confirmLabel="Hapus"
         tone="danger"
         pending={command.pending}
@@ -310,6 +306,8 @@ function AssemblyLineRow({ line, assemblyId: _assemblyId, pending, onDelete, onS
   const [error, setError] = useState<string | null>(null);
   const [editing, startTransition] = useTransition();
 
+  const formRef = useRef<HTMLFormElement>(null);
+  const draft = useFormDraftGuard({ formRef, resetKey: line.id, active: editOpen });
   const save = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
@@ -317,25 +315,21 @@ function AssemblyLineRow({ line, assemblyId: _assemblyId, pending, onDelete, onS
     startTransition(async () => {
       const result = await updateAssemblyLineAction(null, data);
       if (!result.ok) setError(result.error.safeMessage);
-      else { setEditOpen(false); setError(null); onSaved(); }
+      else { draft.markSaved(); setEditOpen(false); setError(null); onSaved(); }
     });
   };
 
   return (
-    <div className="flex items-center gap-2 py-2">
+    <div className="flex flex-wrap items-center gap-2 py-2">
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium truncate">{line.title}</div>
         <div className="text-xs text-ink-secondary">{line.purchaseUnit} · qty {line.qty} · koef {line.koefisien} · {line.harga}</div>
       </div>
-      <Button type="button" size="sm" variant="ghost" title="Edit baris" onClick={() => { setError(null); setEditOpen(true); }}>
-        <Pencil size={13} aria-hidden="true" />
-      </Button>
-      <Button type="button" size="sm" variant="ghost" title="Hapus baris" onClick={() => setDeleteOpen(true)} disabled={pending}>
-        <Trash2 size={13} aria-hidden="true" />
-      </Button>
+      <IconButton type="button" size="sm" variant="ghost"  onClick={() => { setError(null); setEditOpen(true); }} label="Edit baris" icon={<Pencil size={13} aria-hidden="true" />} />
+      <IconButton type="button" size="sm" variant="ghost"  onClick={() => setDeleteOpen(true)} disabled={pending} label="Hapus baris" icon={<Trash2 size={13} aria-hidden="true" />} />
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit baris assembly" size="md">
-        <form className="grid gap-3" onSubmit={save}>
+      {editOpen ? <div className="basis-full border-t border-line pt-3">
+        <form ref={formRef} onChange={draft.onFormChange} className="grid gap-3" onSubmit={save}>
           {error ? <InlineError>{error}</InlineError> : null}
           <div className="grid grid-cols-2 gap-2 max-[480px]:grid-cols-1">
             <Field label="Nama item" required><Input name="title" defaultValue={line.title} required maxLength={200} autoFocus /></Field>
@@ -356,11 +350,12 @@ function AssemblyLineRow({ line, assemblyId: _assemblyId, pending, onDelete, onS
           </div>
           <Field label="Catatan"><Input name="notes" defaultValue={line.notes ?? ""} /></Field>
           <FormActions>
-            <Button type="button" variant="ghost" onClick={() => setEditOpen(false)}>Batal</Button>
+            <Button type="button" variant="ghost" onClick={() => void draft.requestDiscard(() => setEditOpen(false))}>Batal</Button>
             <Button type="submit" variant="primary" pending={editing}>Simpan</Button>
           </FormActions>
         </form>
-      </Dialog>
+      </div> : null}
+      {draft.confirmDialog}
 
       <ConfirmDialog
         open={deleteOpen}
