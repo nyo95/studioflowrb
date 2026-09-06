@@ -53,7 +53,8 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
         </Link>
       )}
       collapsedBrand={<Text as="span" weight="semibold">{appAbbreviation ?? productMark}</Text>}
-      railPresentation="compact"
+      collapsible
+      defaultCollapsed
       navigationLabel={`${settings.appTitle} navigation`}
       navigation={<AuthenticatedPlatformNavigation
         showGeneralSettings={hasPermission(grants, "platform.settings.read")}

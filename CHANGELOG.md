@@ -5,9 +5,16 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R5** — `d0c39ff3a2f0c1ed95b4cdb425ed968a9c2baf08` (local origin/main reference)
-- Current revision after this entry is committed: **R5.07**
-- Next local revision: **R5.08**
+- Current revision after this entry is committed: **R5.08**
+- Next local revision: **R5.09**
 - This change is local only; no new remote publication is authorized.
+
+## R5.08 — 2026-09-06 — fix(shell): restore collapsible navigation rail
+
+- Replaced the ambiguous permanently-compact rail with the intended default
+  collapsed rail. The header control now expands/collapses it on desktop while
+  narrow navigation keeps labels visible.
+- Checks: `npm run typecheck`, `npm run lint`, and whitespace check passed.
 
 ## R5.07 — 2026-09-06 — fix(prisma): restore Prisma 7 datasource configuration
 
