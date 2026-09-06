@@ -4,10 +4,18 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 ## Revision state
 
-- Published baseline: **R5** — `d0c39ff3a2f0c1ed95b4cdb425ed968a9c2baf08` (local origin/main reference)
-- Current revision after this entry is committed: **R5.12**
-- Next local revision: **R5.13**
-- This change is local only; no new remote publication is authorized.
+- Published baseline: **R6** — pending release commit (GitHub publication authorized)
+- Current revision after this entry is committed: **R6**
+- Next local revision: **R6.01**
+
+## R6 — 2026-09-06 — release: publish Master Data and UI hardening
+
+- Publishes local R5.01–R5.12: promotion ownership corrections, Brand-only
+  catalog resources, Supplier terminology and relationship ownership, shared
+  UI Engine curation, BQ action-error containment, and the collapsible rail.
+- Verification across the release: typecheck, lint, boundary/legacy-runtime
+  checks, UI Engine tests, Prisma client generation, and whitespace checks.
+- Reserved local-only files remain excluded from this release.
 
 ## R5.12 — 2026-09-06 — fix(shell): preserve brand mark in collapsed rail
 
