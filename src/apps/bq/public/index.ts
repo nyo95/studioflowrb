@@ -85,7 +85,7 @@ export type BqProjectSummary = {
   id: string;
   title: string;
   clientName: string;
-  status: string;
+  status: "ACTIVE" | "LOCKED" | "ARCHIVED";
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -96,7 +96,7 @@ export type BqProjectDetail = {
   id: string;
   title: string;
   clientName: string;
-  status: string;
+  status: "ACTIVE" | "LOCKED" | "ARCHIVED";
   externalRef: string | null;
   notes: string | null;
   createdBy: string;
@@ -165,6 +165,7 @@ export type BqLineItemDetail = {
   purchaseUnitSnapshot: string;
   baseUnitSnapshot: string | null;
   purchaseToBaseFactorSnapshot: string | null;
+  sourcePriceSnapshot: string | null;
   hargaSnapshot: string;
   currencySnapshot: string;
   kategori: string;
@@ -653,6 +654,7 @@ function mapLineItemDetail(li: {
   purchase_unit_snapshot: string;
   base_unit_snapshot: string | null;
   purchase_to_base_factor_snapshot: unknown;
+  source_price_snapshot?: unknown;
   harga_snapshot: unknown;
   currency_snapshot: string;
   kategori: string;
@@ -672,6 +674,7 @@ function mapLineItemDetail(li: {
     purchaseToBaseFactorSnapshot: li.purchase_to_base_factor_snapshot
       ? (li.purchase_to_base_factor_snapshot as { toString: () => string }).toString()
       : null,
+    sourcePriceSnapshot: li.source_price_snapshot != null ? (li.source_price_snapshot as { toString: () => string }).toString() : null,
     hargaSnapshot: (li.harga_snapshot as { toString: () => string }).toString(),
     currencySnapshot: li.currency_snapshot,
     kategori: li.kategori,

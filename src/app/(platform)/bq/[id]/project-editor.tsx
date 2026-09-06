@@ -88,7 +88,7 @@ export function ProjectEditor({
   const [assemblyTarget, setAssemblyTarget] = useState<string | null>(null); // itemId
   const [lockOpen, setLockOpen] = useState(false);
 
-  const locked = project.status === "LOCKED";
+  const locked = project.status === "LOCKED" || project.status === "ARCHIVED";
   const editable = canManage && !locked;
 
   const toggle = (id: string) =>

@@ -5,8 +5,30 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.01**
-- Next local revision: **R6.02**
+- Current revision after this entry is committed: **R6.02**
+- Next local revision: **R6.03**
+
+## R6.02 | feat(bq): BqProjectStatus lifecycle + source_price_snapshot
+
+### Changed
+- `prisma/schema.prisma`: `BqProjectStatus` enum — renamed `DRAFT` → `ACTIVE`, added `ARCHIVED`; `BqProject.status` default changed from `DRAFT` to `ACTIVE`
+- `prisma/schema.prisma`: `BqLineItem` — added `source_price_snapshot Decimal? @db.Decimal(18,4)` (immutable baseline from import)
+- `prisma/migrations/20260906100000_bq_snapshot_and_project_lifecycle/migration.sql` — migration written: renames DRAFT→ACTIVE via enum recreation, adds ARCHIVED, adds `source_price_snapshot` column with backfill from `harga_snapshot`
+- `src/apps/bq/service.ts`: `requireEditableProject` — now also guards `ARCHIVED` status
+- `src/apps/bq/service.ts`: `lockProject` — now guards ARCHIVED (cannot lock archived project)
+- `src/apps/bq/service.ts`: added `unlockProject` (LOCKED→ACTIVE), `archiveProject` (any→ARCHIVED), `restoreProject` (ARCHIVED→ACTIVE); all with audit log
+- `src/apps/bq/public/index.ts`: `BqProjectSummary.status` and `BqProjectDetail.status` narrowed from `string` to `"ACTIVE" | "LOCKED" | "ARCHIVED"`
+- `src/apps/bq/public/index.ts`: `BqLineItemDetail` — added `sourcePriceSnapshot: string | null`; `mapLineItemDetail` updated to map the new field
+- `src/generated/prisma/enums.ts`: `BqProjectStatus` updated to `{ACTIVE, LOCKED, ARCHIVED}` (manual patch; regenerate client after migration)
+- `src/generated/prisma/models/BqLineItem.ts`: `$BqLineItemPayload.scalars` and aggregate types updated to include `source_price_snapshot` (manual patch)
+- `src/app/(platform)/bq/[id]/edit/page.tsx`: redirect on `LOCKED || ARCHIVED`
+- `src/app/(platform)/bq/[id]/page.tsx`: `isLocked` now covers ARCHIVED
+- `src/app/(platform)/bq/[id]/project-editor.tsx`: `locked` now covers ARCHIVED
+
+### Notes
+- `BqPromotionStatus.DRAFT` is a separate enum — untouched, unrelated to this change
+- `source_price_snapshot` is the immutable baseline (`isOverridden` is derived: `harga_snapshot !== source_price_snapshot`)
+- Typecheck: ✅ Lint: ✅
 
 ## R6.01 — 2026-09-06 — docs(contracts): lock R6.1 decision delta
 

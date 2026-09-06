@@ -636,8 +636,9 @@ enum BqPromotionStatus {
 }
 
 enum BqProjectStatus {
-  DRAFT
+  ACTIVE
   LOCKED
+  ARCHIVED
 
   @@schema("bq")
 }
@@ -855,7 +856,7 @@ model BqProject {
   id           String      @id @default(cuid())
   title        String
   client_name  String
-  status       BqProjectStatus @default(DRAFT)
+  status       BqProjectStatus @default(ACTIVE)
   external_ref String?
   notes        String?
   created_by   String
@@ -961,6 +962,7 @@ model BqLineItem {
   purchase_unit_snapshot          String
   base_unit_snapshot              String?
   purchase_to_base_factor_snapshot Decimal?    @db.Decimal(18, 6)  // display only
+  source_price_snapshot           Decimal?     @db.Decimal(18, 4)  // immutable baseline from import; null = tidak ada override
   harga_snapshot                  Decimal      @db.Decimal(18, 4)
   currency_snapshot               String       @default("IDR")
   kategori                        BqKategori

@@ -84,6 +84,9 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     if (project.status === "LOCKED") {
       throw new AppError("CONFLICT", "bq.project.locked", "Cannot edit a locked project");
     }
+    if (project.status === "ARCHIVED") {
+      throw new AppError("CONFLICT", "bq.project.archived", "Cannot edit an archived project");
+    }
   }
 
   async function requireEditableProjectForSection(sectionId: string): Promise<void> {
@@ -988,6 +991,9 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     if (existing.status === "LOCKED") {
       throw new AppError("CONFLICT", "bq.project.already-locked", "Project is already locked");
     }
+    if (existing.status === "ARCHIVED") {
+      throw new AppError("CONFLICT", "bq.project.archived", "Cannot lock an archived project");
+    }
     const project = await db.bqProject.update({
       where: { id: input.id },
       data: { status: "LOCKED" },
@@ -995,6 +1001,81 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     await auditWriter({
       appId: "bq",
       action: "bq.project.locked",
+      entityType: "BqProject",
+      entityId: project.id,
+      actor: input.actor,
+    });
+    return project;
+  }
+
+  async function unlockProject(input: {
+    grants: PermissionGrants;
+    actor: { kind: string; userId?: string; label: string };
+    id: string;
+  }) {
+    requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+    const existing = await db.bqProject.findUnique({ where: { id: input.id } });
+    if (!existing) throw new AppError("NOT_FOUND", "bq.project.not-found", "Project not found");
+    if (existing.status !== "LOCKED") {
+      throw new AppError("CONFLICT", "bq.project.not-locked", "Project is not locked");
+    }
+    const project = await db.bqProject.update({
+      where: { id: input.id },
+      data: { status: "ACTIVE" },
+    });
+    await auditWriter({
+      appId: "bq",
+      action: "bq.project.unlocked",
+      entityType: "BqProject",
+      entityId: project.id,
+      actor: input.actor,
+    });
+    return project;
+  }
+
+  async function archiveProject(input: {
+    grants: PermissionGrants;
+    actor: { kind: string; userId?: string; label: string };
+    id: string;
+  }) {
+    requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+    const existing = await db.bqProject.findUnique({ where: { id: input.id } });
+    if (!existing) throw new AppError("NOT_FOUND", "bq.project.not-found", "Project not found");
+    if (existing.status === "ARCHIVED") {
+      throw new AppError("CONFLICT", "bq.project.already-archived", "Project is already archived");
+    }
+    const project = await db.bqProject.update({
+      where: { id: input.id },
+      data: { status: "ARCHIVED" },
+    });
+    await auditWriter({
+      appId: "bq",
+      action: "bq.project.archived",
+      entityType: "BqProject",
+      entityId: project.id,
+      actor: input.actor,
+    });
+    return project;
+  }
+
+  async function restoreProject(input: {
+    grants: PermissionGrants;
+    actor: { kind: string; userId?: string; label: string };
+    id: string;
+  }) {
+    requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+    const existing = await db.bqProject.findUnique({ where: { id: input.id } });
+    if (!existing) throw new AppError("NOT_FOUND", "bq.project.not-found", "Project not found");
+    if (existing.status !== "ARCHIVED") {
+      throw new AppError("CONFLICT", "bq.project.not-archived", "Project is not archived");
+    }
+    const project = await db.bqProject.update({
+      where: { id: input.id },
+      data: { status: "ACTIVE" },
+    });
+    await auditWriter({
+      appId: "bq",
+      action: "bq.project.restored",
       entityType: "BqProject",
       entityId: project.id,
       actor: input.actor,
@@ -1637,6 +1718,9 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     createProject,
     updateProject,
     lockProject,
+    unlockProject,
+    archiveProject,
+    restoreProject,
     addSection,
     addSubsection,
     addItem,

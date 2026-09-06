@@ -30,7 +30,7 @@ export default async function BqProjectDetailPage({
   const [project, assemblies] = await Promise.all([bqPublicRead.getProjectDetail(id), bqPublicRead.listAssemblyTemplates()]);
   if (!project) notFound();
 
-  const isLocked = project.status === "LOCKED";
+  const isLocked = project.status === "LOCKED" || project.status === "ARCHIVED";
 
   return (
     <div className="grid gap-6">

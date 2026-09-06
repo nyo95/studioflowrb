@@ -16,7 +16,7 @@ export default async function EditBqProjectPage({ params }: { params: Promise<{ 
   if (!hasPermission(principalGrants.grants, BQ_PERMISSIONS.projectManage)) redirect(`/bq/${id}`);
   const project = await bqPublicRead.getProjectDetail(id);
   if (!project) notFound();
-  if (project.status === "LOCKED") redirect(`/bq/${id}`);
+  if (project.status === "LOCKED" || project.status === "ARCHIVED") redirect(`/bq/${id}`);
 
   return (
     <div className="grid max-w-3xl gap-6">
