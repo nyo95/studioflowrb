@@ -51,6 +51,8 @@ import {
   updateItemAction,
   updateLineItemAction,
   updateSubObjectAction,
+  updateSectionAction,
+  updateSubsectionAction,
   type LineItemSourceOption,
 } from "./actions";
 
@@ -160,7 +162,16 @@ export function ProjectEditor({
       {project.sections.map((section) => (
         <SectionCard key={section.id} className="grid gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-semibold text-ink">{section.name}</h2>
+            {editable ? (
+              <InlineEdit
+                value={section.name}
+                label="Section name"
+                className="text-base font-semibold text-ink"
+                onCommit={(name) => run(updateSectionAction, { id: section.id, name })}
+              />
+            ) : (
+              <h2 className="text-base font-semibold text-ink">{section.name}</h2>
+            )}
             {editable ? (
               <div className="flex flex-wrap gap-1.5">
                 <AddRow
@@ -194,7 +205,16 @@ export function ProjectEditor({
           {section.subsections.map((subsection) => (
             <div key={subsection.id} className="grid gap-2 rounded-control border border-line-subtle p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-ink-secondary">{subsection.name}</h3>
+                {editable ? (
+                  <InlineEdit
+                    value={subsection.name}
+                    label="Subsection name"
+                    className="text-sm font-semibold text-ink-secondary"
+                    onCommit={(name) => run(updateSubsectionAction, { id: subsection.id, name })}
+                  />
+                ) : (
+                  <h3 className="text-sm font-semibold text-ink-secondary">{subsection.name}</h3>
+                )}
                 {editable ? (
                   <AddRow
                     label="Item"

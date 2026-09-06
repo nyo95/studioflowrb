@@ -1135,7 +1135,45 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     return subsection;
   }
 
-  async function addItem(input: {
+  async function updateSection(input: {
+    grants: PermissionGrants;
+    actor: { kind: string; userId?: string; label: string };
+    id: string;
+    name: string;
+  }) {
+    requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+    const section = await db.bqSection.findUnique({ where: { id: input.id }, select: { project_id: true } });
+    if (!section) throw new AppError("NOT_FOUND", "bq.section.not-found", "Section not found");
+    await requireEditableProject(section.project_id);
+    await db.bqSection.update({ where: { id: input.id }, data: { name: input.name } });
+    await auditWriter({
+      appId: "bq",
+      action: "bq.section.updated",
+      entityType: "BqSection",
+      entityId: input.id,
+      actor: input.actor,
+    });
+  }
+
+  async function updateSubsection(input: {
+    grants: PermissionGrants;
+    actor: { kind: string; userId?: string; label: string };
+    id: string;
+    name: string;
+  }) {
+    requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+    await requireEditableProjectForSubsection(input.id);
+    await db.bqSubsection.update({ where: { id: input.id }, data: { name: input.name } });
+    await auditWriter({
+      appId: "bq",
+      action: "bq.subsection.updated",
+      entityType: "BqSubsection",
+      entityId: input.id,
+      actor: input.actor,
+    });
+  }
+
+    async function addItem(input: {
     grants: PermissionGrants;
     actor: { kind: string; userId?: string; label: string };
     sectionId?: string;
@@ -1723,6 +1761,8 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     restoreProject,
     addSection,
     addSubsection,
+    updateSection,
+    updateSubsection,
     addItem,
     updateItem,
     deleteItem,

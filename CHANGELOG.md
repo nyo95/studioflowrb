@@ -5,8 +5,26 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.05**
-- Next local revision: **R6.06**
+- Current revision after this entry is committed: **R6.06**
+- Next local revision: **R6.07**
+
+## R6.06 | feat(bq): inline rename for Section and Subsection names
+
+### Added
+- `updateSection` service function — validates editable project state, updates `name`, emits `bq.section.updated` audit entry.
+- `updateSubsection` service function — same contract for subsections.
+- `updateSectionAction` / `updateSubsectionAction` server actions in `bq/[id]/actions.ts` with Zod validation (1–160 chars).
+
+### Changed
+- `project-editor.tsx`: section `<h2>` and subsection `<h3>` replaced with `<InlineEdit>` when `editable`; static text preserved for locked/archived/read-only viewers.
+
+### Files changed
+- `src/apps/bq/service.ts`
+- `src/app/(platform)/bq/[id]/actions.ts`
+- `src/app/(platform)/bq/[id]/project-editor.tsx`
+- `CHANGELOG.md`
+
+---
 
 ## R6.05 | fix(masterdata): rename Vendor→Supplier across all user-facing strings
 

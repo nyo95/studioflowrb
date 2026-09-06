@@ -94,6 +94,42 @@ export async function addSubsectionAction(
   });
 }
 
+const SectionNameSchema = z.object({
+  projectId: Id,
+  id: Id,
+  name: z.string().trim().min(1, "Section name is required").max(160),
+});
+
+export async function updateSectionAction(
+  _prev: ActionResult<BqProjectDetail> | null,
+  formData: FormData,
+): Promise<ActionResult<BqProjectDetail>> {
+  return runSafeAction(async () => {
+    const { grants, actor } = await authorize();
+    const { projectId, id, name } = parse(SectionNameSchema, formData);
+    await bqService.updateSection({ grants, actor, id, name });
+    return reload(projectId);
+  });
+}
+
+const SubsectionNameSchema = z.object({
+  projectId: Id,
+  id: Id,
+  name: z.string().trim().min(1, "Subsection name is required").max(160),
+});
+
+export async function updateSubsectionAction(
+  _prev: ActionResult<BqProjectDetail> | null,
+  formData: FormData,
+): Promise<ActionResult<BqProjectDetail>> {
+  return runSafeAction(async () => {
+    const { grants, actor } = await authorize();
+    const { projectId, id, name } = parse(SubsectionNameSchema, formData);
+    await bqService.updateSubsection({ grants, actor, id, name });
+    return reload(projectId);
+  });
+}
+
 const ItemSchema = z.object({
   projectId: Id,
   sectionId: Id.optional(),
