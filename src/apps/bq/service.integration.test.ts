@@ -65,6 +65,7 @@ describe("BQ R6.1 invariants", () => {
     assert.equal(stored.source_price_snapshot?.toString(), "100");
     assert.equal(stored.harga_snapshot.toString(), "125");
     await service.revertLineItemPrice({ grants: GRANTS, actor: ACTOR, id: line.id });
+    await service.revertLineItemPrice({ grants: GRANTS, actor: ACTOR, id: line.id });
     stored = await testDb.prisma.bqLineItem.findUniqueOrThrow({ where: { id: line.id } });
     assert.equal(stored.source_price_snapshot?.toString(), "100");
     assert.equal(stored.harga_snapshot.toString(), "100");
@@ -85,6 +86,10 @@ describe("BQ R6.1 invariants", () => {
     const labor = await service.createLibLabor({ grants: GRANTS, actor: ACTOR, name: "Install", purchaseUnit: "M2", harga: "50", currency: "IDR" });
     assert.equal(material.kategori, "MATERIAL"); assert.equal(material.default_koefisien.toString(), "1");
     assert.equal(labor.kategori, "UPAH"); assert.equal(labor.default_koefisien.toString(), "1");
+    await assert.rejects(
+      () => service.updateLibMaterial({ grants: GRANTS, actor: ACTOR, id: material.id, defaultKoefisien: "0" }),
+      (error: unknown) => error instanceof AppError && error.code === "bq.koefisien.not-positive",
+    );
   });
 
   it("keeps live Library recommendations on both Template Section levels", async () => {
@@ -116,6 +121,85 @@ describe("BQ R6.1 invariants", () => {
     const stored = await service.getTemplateWithSections(template.id);
     assert.equal(stored?.sections.find((row) => row.id === section.id)?.recommendations.length, 1);
     assert.equal(stored?.sections.find((row) => row.id === subsection.id)?.recommendations.length, 1);
+  });
+
+  it("does not write or audit semantically identical project-tree updates", async () => {
+    const { project, section, item } = await projectTree();
+    const group = await service.addSubObject({ grants: GRANTS, actor: ACTOR, itemId: item.id, name: "Body", qtyPerL1: "1" });
+    const line = await service.addLineItem({
+      grants: GRANTS,
+      actor: ACTOR,
+      itemId: item.id,
+      sourceType: "CUSTOM",
+      titleSnapshot: "Direct",
+      purchaseUnitSnapshot: "PCS",
+      hargaSnapshot: "10",
+      kategori: "ALAT",
+      qty: "1",
+    });
+    const old = new Date("2000-01-01T00:00:00.000Z");
+    await testDb.prisma.bqProject.update({ where: { id: project.id }, data: { updated_at: old } });
+    await testDb.prisma.bqItem.update({ where: { id: item.id }, data: { updated_at: old } });
+    await testDb.prisma.bqSubObject.update({ where: { id: group.id }, data: { updated_at: old } });
+    await testDb.prisma.bqLineItem.update({ where: { id: line.id }, data: { updated_at: old } });
+    const auditCount = await testDb.prisma.auditEvent.count();
+
+    await service.updateProject({ grants: GRANTS, actor: ACTOR, id: project.id, title: "Office", clientName: "RAD", externalRef: null, notes: null });
+    await service.updateSection({ grants: GRANTS, actor: ACTOR, id: section.id, name: "Interior" });
+    await service.updateItem({ grants: GRANTS, actor: ACTOR, id: item.id, name: "Cabinet", qty: "1.000", unit: "PCS", koefisien: "1.0", markupL1Pct: "0.00", notes: null });
+    await service.updateSubObject({ grants: GRANTS, actor: ACTOR, id: group.id, name: "Body", qtyPerL1: "1.00", markupL2Pct: "0.0", notes: null });
+    await service.updateLineItem({ grants: GRANTS, actor: ACTOR, id: line.id, titleSnapshot: "Direct", purchaseUnitSnapshot: "PCS", hargaSnapshot: "10.000", qty: "1.00", koefisien: "1.0", notes: null });
+
+    assert.equal(await testDb.prisma.auditEvent.count(), auditCount);
+    assert.equal((await testDb.prisma.bqProject.findUniqueOrThrow({ where: { id: project.id } })).updated_at.toISOString(), old.toISOString());
+    assert.equal((await testDb.prisma.bqItem.findUniqueOrThrow({ where: { id: item.id } })).updated_at.toISOString(), old.toISOString());
+    assert.equal((await testDb.prisma.bqSubObject.findUniqueOrThrow({ where: { id: group.id } })).updated_at.toISOString(), old.toISOString());
+    assert.equal((await testDb.prisma.bqLineItem.findUniqueOrThrow({ where: { id: line.id } })).updated_at.toISOString(), old.toISOString());
+  });
+
+  it("clears optional Library fields and returns fresh assembly updates without false audits", async () => {
+    const material = await service.createLibMaterial({
+      grants: GRANTS,
+      actor: ACTOR,
+      name: "Board",
+      purchaseUnit: "SHEET",
+      baseUnit: "M2",
+      harga: "100",
+      currency: "IDR",
+      notes: "Temporary",
+    });
+    const old = new Date("2000-01-01T00:00:00.000Z");
+    await testDb.prisma.bqLibMaterial.update({ where: { id: material.id }, data: { updated_at: old } });
+    const auditCount = await testDb.prisma.auditEvent.count();
+    await service.updateLibMaterial({
+      grants: GRANTS,
+      actor: ACTOR,
+      id: material.id,
+      name: "Board",
+      purchaseUnit: "SHEET",
+      baseUnit: "M2",
+      harga: "100.000",
+      currency: "IDR",
+      defaultKoefisien: "1.0",
+      notes: "Temporary",
+    });
+    assert.equal(await testDb.prisma.auditEvent.count(), auditCount);
+    assert.equal((await testDb.prisma.bqLibMaterial.findUniqueOrThrow({ where: { id: material.id } })).updated_at.toISOString(), old.toISOString());
+
+    const cleared = await service.updateLibMaterial({ grants: GRANTS, actor: ACTOR, id: material.id, baseUnit: null, notes: null });
+    assert.equal(cleared.base_unit, null);
+    assert.equal(cleared.notes, null);
+
+    const template = await service.createTemplate({ grants: GRANTS, actor: ACTOR, name: "Template", description: "Temporary" });
+    assert.equal((await service.updateTemplate({ grants: GRANTS, actor: ACTOR, id: template.id, description: null })).description, null);
+
+    const assembly = await service.createAssemblyTemplate({ grants: GRANTS, actor: ACTOR, name: "Assembly", description: "Temporary" });
+    const updatedAssembly = await service.updateAssemblyTemplate({ grants: GRANTS, actor: ACTOR, assemblyId: assembly.id, name: "Assembly revised", description: null });
+    assert.equal(updatedAssembly.name, "Assembly revised");
+    assert.equal(updatedAssembly.description, null);
+    const assemblyAuditCount = await testDb.prisma.auditEvent.count({ where: { entity_id: assembly.id } });
+    await service.updateAssemblyTemplate({ grants: GRANTS, actor: ACTOR, assemblyId: assembly.id, name: "Assembly revised", description: null });
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { entity_id: assembly.id } }), assemblyAuditCount);
   });
 
   it("permanently deletes only an archived project through an approved request", async () => {

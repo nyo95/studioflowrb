@@ -246,7 +246,7 @@ export async function updateSubObjectAction(
     const { grants, actor } = await authorize();
     const { projectId, id, field, value } = parse(SubObjectFieldSchema, formData);
 
-    const patch: Record<string, string | undefined> = {};
+    const patch: Record<string, string | null | undefined> = {};
     if (field === "name") {
       if (!value.trim()) throw new AppError("VALIDATION", "bq.sub-object.name-required", "Component Group name is required");
       patch.name = value.trim();
@@ -255,7 +255,7 @@ export async function updateSubObjectAction(
     } else if (field === "markupL2Pct") {
       patch.markupL2Pct = percent(value, "Markup");
     } else {
-      patch.notes = value.trim() || undefined;
+      patch.notes = value.trim() || null;
     }
 
     await bqService.updateSubObject({ grants, actor, id, ...patch });
@@ -445,7 +445,7 @@ export async function updateLineItemAction(
     const { grants, actor } = await authorize();
     const { projectId, id, field, value } = parse(LineItemFieldSchema, formData);
 
-    const patch: Record<string, string | undefined> = {};
+    const patch: Record<string, string | null | undefined> = {};
     if (field === "titleSnapshot") {
       if (!value.trim()) throw new AppError("VALIDATION", "bq.line-item.title-required", "Cost Component name is required");
       patch.titleSnapshot = value.trim();
@@ -462,7 +462,7 @@ export async function updateLineItemAction(
       if (!kategori.success) throw validationError(kategori.error);
       patch.kategori = kategori.data;
     } else {
-      patch.notes = value.trim() || undefined;
+      patch.notes = value.trim() || null;
     }
 
     await bqService.updateLineItem({ grants, actor, id, ...patch });

@@ -75,23 +75,23 @@ export async function libraryItemAction(
       harga: value.harga,
       currency: value.currency,
       defaultKoefisien: value.defaultKoefisien,
-      notes: value.notes || undefined,
     };
+    const notes = value.notes || undefined;
     let id: string;
     if (value.type === "custom") {
       const parsedCategory = z.enum(["BIAYA_UMUM", "TRANSPORTASI_AKOMODASI", "ALAT"]).safeParse(value.kategori);
       if (!parsedCategory.success) throw validationError(parsedCategory.error);
       const result = value.operation === "create"
-        ? await bqService.createLibCustomItem({ ...common, kategori: parsedCategory.data })
-        : await bqService.updateLibCustomItem({ ...common, id: value.id!, kategori: parsedCategory.data });
+        ? await bqService.createLibCustomItem({ ...common, notes, kategori: parsedCategory.data })
+        : await bqService.updateLibCustomItem({ ...common, notes: notes ?? null, id: value.id!, kategori: parsedCategory.data });
       id = result.id;
     } else {
-      const typedCommon = { ...common, baseUnit: value.baseUnit || undefined };
+      const baseUnit = value.baseUnit || undefined;
       const result = value.type === "material"
-        ? value.operation === "create" ? await bqService.createLibMaterial(typedCommon) : await bqService.updateLibMaterial({ ...typedCommon, id: value.id! })
+        ? value.operation === "create" ? await bqService.createLibMaterial({ ...common, notes, baseUnit }) : await bqService.updateLibMaterial({ ...common, notes: notes ?? null, baseUnit: baseUnit ?? null, id: value.id! })
         : value.type === "labor"
-          ? value.operation === "create" ? await bqService.createLibLabor(typedCommon) : await bqService.updateLibLabor({ ...typedCommon, id: value.id! })
-          : value.operation === "create" ? await bqService.createLibMaterialLabor(typedCommon) : await bqService.updateLibMaterialLabor({ ...typedCommon, id: value.id! });
+          ? value.operation === "create" ? await bqService.createLibLabor({ ...common, notes, baseUnit }) : await bqService.updateLibLabor({ ...common, notes: notes ?? null, baseUnit: baseUnit ?? null, id: value.id! })
+          : value.operation === "create" ? await bqService.createLibMaterialLabor({ ...common, notes, baseUnit }) : await bqService.updateLibMaterialLabor({ ...common, notes: notes ?? null, baseUnit: baseUnit ?? null, id: value.id! });
       id = result.id;
     }
     revalidatePath("/bq/library");
@@ -122,7 +122,7 @@ export async function templateAction(
     const result = value.operation === "create"
       ? await bqService.createTemplate({ grants, actor: templateActor, name: value.name, description: value.description || undefined })
       : value.operation === "update"
-        ? await bqService.updateTemplate({ grants, actor: templateActor, id: value.id!, name: value.name, description: value.description || undefined })
+        ? await bqService.updateTemplate({ grants, actor: templateActor, id: value.id!, name: value.name, description: value.description || null })
         : value.operation === "duplicate"
           ? await bqService.duplicateTemplate({ grants, actor: templateActor, id: value.id! })
           : await bqService.deleteTemplate({ grants, actor: templateActor, id: value.id! });
@@ -270,53 +270,6 @@ export async function requestPromotionAction(
   });
 }
 
-/**
- * bq-contract §9/K-10: promotion carries structure, never price. The Master Data
- * entry is created there by an administrator through the ordinary pricing
- * workflow; approval only records which entry it became.
- */
-export async function approvePromotionAction(
-  _prev: ActionResult<{ id: string }> | null,
-  formData: FormData,
-): Promise<ActionResult<{ id: string }>> {
-  return runSafeAction(async () => {
-    const { principal, grants } = await requirePrincipalGrants();
-    const parsed = PromotionSchema.extend({ masterdataRefId: z.string().trim().min(1, "Master Data entry ID is required").max(64) })
-      .safeParse(Object.fromEntries(formData.entries()));
-    if (!parsed.success) throw validationError(parsed.error);
-    await bqService.approvePromotion({
-      grants,
-      actor: actor(principal),
-      type: parsed.data.type,
-      libItemId: parsed.data.libItemId,
-      masterdataRefId: parsed.data.masterdataRefId,
-    });
-    revalidatePath("/bq/library");
-    return { id: parsed.data.libItemId };
-  });
-}
-
-export async function rejectPromotionAction(
-  _prev: ActionResult<{ id: string }> | null,
-  formData: FormData,
-): Promise<ActionResult<{ id: string }>> {
-  return runSafeAction(async () => {
-    const { principal, grants } = await requirePrincipalGrants();
-    const parsed = PromotionSchema.extend({ reason: z.string().trim().min(1, "A rejection must state its reason").max(500) })
-      .safeParse(Object.fromEntries(formData.entries()));
-    if (!parsed.success) throw validationError(parsed.error);
-    await bqService.rejectPromotion({
-      grants,
-      actor: actor(principal),
-      type: parsed.data.type,
-      libItemId: parsed.data.libItemId,
-      reason: parsed.data.reason,
-    });
-    revalidatePath("/bq/library");
-    return { id: parsed.data.libItemId };
-  });
-}
-
 const AssemblySchema = z.object({ name: z.string().trim().min(1).max(160), description: z.string().trim().max(2000).optional() });
 export async function createAssemblyAction(_prev: ActionResult<{ id: string }> | null, formData: FormData): Promise<ActionResult<{ id: string }>> {
   return runSafeAction(async () => {
@@ -336,8 +289,14 @@ export async function updateAssemblyAction(_prev: ActionResult<void> | null, for
     const { principal, grants } = await requirePrincipalGrants();
     const parsed = AssemblyUpdateSchema.safeParse(Object.fromEntries(formData.entries()));
     if (!parsed.success) throw validationError(parsed.error);
-    const { id, ...rest } = parsed.data;
-    await bqService.updateAssemblyTemplate({ grants, actor: actor(principal), assemblyId: id, ...rest });
+    const { id, description, ...rest } = parsed.data;
+    await bqService.updateAssemblyTemplate({
+      grants,
+      actor: actor(principal),
+      assemblyId: id,
+      ...rest,
+      description: description === undefined ? undefined : description || null,
+    });
     revalidatePath("/bq/library");
   });
 }
@@ -359,7 +318,7 @@ const AssemblyLineSchema = z.object({
   currency: z.string().trim().regex(/^[A-Z]{3}$/).optional(),
   kategori: z.enum(["MATERIAL", "UPAH", "MATERIAL_UPAH", "BIAYA_UMUM", "TRANSPORTASI_AKOMODASI", "ALAT"]).optional(),
   qty: z.string().trim().regex(/^\d+(\.\d+)?$/).max(32).optional(),
-  koefisien: z.string().trim().regex(/^\d+(\.\d+)?$/).max(32).optional(),
+  koefisien: z.string().trim().regex(/^\d+(\.\d+)?$/).max(32).refine((value) => /[1-9]/.test(value), "Coefficient must be greater than zero").optional(),
 });
 export async function addAssemblyLineAction(_prev: ActionResult<void> | null, formData: FormData): Promise<ActionResult<void>> {
   return runSafeAction(async () => {
@@ -379,7 +338,7 @@ const AssemblyLineUpdateSchema = z.object({
   harga: z.string().trim().regex(/^\d+(\.\d+)?$/).max(32).optional(),
   kategori: z.enum(["MATERIAL", "UPAH", "MATERIAL_UPAH", "BIAYA_UMUM", "TRANSPORTASI_AKOMODASI", "ALAT"]).optional(),
   qty: z.string().trim().regex(/^\d+(\.\d+)?$/).max(32).optional(),
-  koefisien: z.string().trim().regex(/^\d+(\.\d+)?$/).max(32).optional(),
+  koefisien: z.string().trim().regex(/^\d+(\.\d+)?$/).max(32).refine((value) => /[1-9]/.test(value), "Coefficient must be greater than zero").optional(),
   notes: z.string().trim().max(2000).optional(),
 });
 export async function updateAssemblyLineAction(_prev: ActionResult<void> | null, formData: FormData): Promise<ActionResult<void>> {

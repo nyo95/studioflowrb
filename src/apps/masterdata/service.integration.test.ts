@@ -588,6 +588,41 @@ describe("Master Data service", () => {
     assert.deepEqual(brands, [{ id: brand.brandId, name: "Assignment Brand" }]);
   });
 
+  it("does not rewrite identical Supplier contacts and still supports clearing optional contact fields", async () => {
+    const vendor = await service.createVendor({
+      grants: GRANTS,
+      actor: ACTOR,
+      name: "Stable Contact Supplier",
+      contacts: [{ personName: "Mira", jobTitle: "Sales", notes: "Call first" }],
+    });
+    const contact = await testDb.prisma.vendorContact.findFirstOrThrow({ where: { vendor_id: vendor.vendorId } });
+    const old = new Date("2000-01-01T00:00:00.000Z");
+    await testDb.prisma.vendorContact.update({ where: { id: contact.id }, data: { updated_at: old } });
+    const auditCount = await testDb.prisma.auditEvent.count({ where: { action: "vendor.updated", entity_id: vendor.vendorId } });
+
+    await service.updateVendor({
+      grants: GRANTS,
+      actor: ACTOR,
+      vendorId: vendor.vendorId,
+      name: "Stable Contact Supplier",
+      contacts: [{ id: contact.id, personName: "Mira", jobTitle: "Sales", notes: "Call first" }],
+    });
+    assert.equal((await testDb.prisma.vendorContact.findUniqueOrThrow({ where: { id: contact.id } })).updated_at.toISOString(), old.toISOString());
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "vendor.updated", entity_id: vendor.vendorId } }), auditCount);
+
+    await service.updateVendor({
+      grants: GRANTS,
+      actor: ACTOR,
+      vendorId: vendor.vendorId,
+      name: "Stable Contact Supplier",
+      contacts: [{ id: contact.id, personName: "Mira" }],
+    });
+    const cleared = await testDb.prisma.vendorContact.findUniqueOrThrow({ where: { id: contact.id } });
+    assert.equal(cleared.job_title, null);
+    assert.equal(cleared.notes, null);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "vendor.updated", entity_id: vendor.vendorId } }), auditCount + 1);
+  });
+
   it("keeps BrandSupplier mutation on Brand and exposes only a read projection on Supplier", async () => {
     const supplier = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Projection Supplier" });
     const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });

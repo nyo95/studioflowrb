@@ -35,6 +35,24 @@ function requireKategori(value: string): BqKategori {
   return value as BqKategori;
 }
 
+function decimalFieldUnchanged(value: string | null | undefined, current: { toString(): string } | null): boolean {
+  if (value === undefined) return true;
+  if (value === null || current === null) return value === null && current === null;
+  return toDecimalString(value) === current.toString();
+}
+
+function fieldUnchanged<T>(value: T | undefined, current: T): boolean {
+  return value === undefined || value === current;
+}
+
+function requirePositiveCoefficient(value: string): string {
+  const normalized = toDecimalString(value);
+  if (compareDecimals(normalized, toDecimalString("0")) <= 0) {
+    throw new AppError("VALIDATION", "bq.koefisien.not-positive", "Coefficient must be greater than zero");
+  }
+  return normalized;
+}
+
 type AuditInput = {
   appId: string;
   action: string;
@@ -172,7 +190,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
         base_unit: input.baseUnit ?? null,
         harga: input.harga,
         currency: input.currency,
-        default_koefisien: input.defaultKoefisien ?? "1",
+        default_koefisien: requirePositiveCoefficient(input.defaultKoefisien ?? "1"),
         kategori: "MATERIAL",
         notes: input.notes ?? null,
         created_by: input.actor.userId ?? "system",
@@ -194,13 +212,14 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     id: string;
     name?: string;
     purchaseUnit?: string;
-    baseUnit?: string;
+    baseUnit?: string | null;
     harga?: string;
     currency?: string;
     defaultKoefisien?: string;
-    notes?: string;
+    notes?: string | null;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+    if (input.defaultKoefisien !== undefined) requirePositiveCoefficient(input.defaultKoefisien);
     const existing = await db.bqLibMaterial.findUnique({ where: { id: input.id } });
     if (!existing) throw new AppError("NOT_FOUND", "bq.lib-material.not-found", "Library material not found");
     if ((input.name === undefined || input.name === existing.name) && (input.purchaseUnit === undefined || input.purchaseUnit === existing.purchase_unit) && (input.baseUnit === undefined || input.baseUnit === existing.base_unit) && (input.harga === undefined || toDecimalString(input.harga) === existing.harga.toString()) && (input.currency === undefined || input.currency === existing.currency) && (input.defaultKoefisien === undefined || toDecimalString(input.defaultKoefisien) === existing.default_koefisien.toString()) && (input.notes === undefined || input.notes === existing.notes)) return existing;
@@ -261,7 +280,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
         base_unit: input.baseUnit ?? null,
         harga: input.harga,
         currency: input.currency,
-        default_koefisien: input.defaultKoefisien ?? "1",
+        default_koefisien: requirePositiveCoefficient(input.defaultKoefisien ?? "1"),
         kategori: "UPAH",
         notes: input.notes ?? null,
         created_by: input.actor.userId ?? "system",
@@ -283,13 +302,14 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     id: string;
     name?: string;
     purchaseUnit?: string;
-    baseUnit?: string;
+    baseUnit?: string | null;
     harga?: string;
     currency?: string;
     defaultKoefisien?: string;
-    notes?: string;
+    notes?: string | null;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+    if (input.defaultKoefisien !== undefined) requirePositiveCoefficient(input.defaultKoefisien);
     const existing = await db.bqLibLabor.findUnique({ where: { id: input.id } });
     if (!existing) throw new AppError("NOT_FOUND", "bq.lib-labor.not-found", "Library labor not found");
     if ((input.name === undefined || input.name === existing.name) && (input.purchaseUnit === undefined || input.purchaseUnit === existing.purchase_unit) && (input.baseUnit === undefined || input.baseUnit === existing.base_unit) && (input.harga === undefined || toDecimalString(input.harga) === existing.harga.toString()) && (input.currency === undefined || input.currency === existing.currency) && (input.defaultKoefisien === undefined || toDecimalString(input.defaultKoefisien) === existing.default_koefisien.toString()) && (input.notes === undefined || input.notes === existing.notes)) return existing;
@@ -350,7 +370,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
         base_unit: input.baseUnit ?? null,
         harga: input.harga,
         currency: input.currency,
-        default_koefisien: input.defaultKoefisien ?? "1",
+        default_koefisien: requirePositiveCoefficient(input.defaultKoefisien ?? "1"),
         kategori: "MATERIAL_UPAH",
         notes: input.notes ?? null,
         created_by: input.actor.userId ?? "system",
@@ -372,13 +392,14 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     id: string;
     name?: string;
     purchaseUnit?: string;
-    baseUnit?: string;
+    baseUnit?: string | null;
     harga?: string;
     currency?: string;
     defaultKoefisien?: string;
-    notes?: string;
+    notes?: string | null;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+    if (input.defaultKoefisien !== undefined) requirePositiveCoefficient(input.defaultKoefisien);
     const existing = await db.bqLibMaterialLabor.findUnique({ where: { id: input.id } });
     if (!existing) throw new AppError("NOT_FOUND", "bq.lib-material-labor.not-found", "Library material+labor not found");
     if ((input.name === undefined || input.name === existing.name) && (input.purchaseUnit === undefined || input.purchaseUnit === existing.purchase_unit) && (input.baseUnit === undefined || input.baseUnit === existing.base_unit) && (input.harga === undefined || toDecimalString(input.harga) === existing.harga.toString()) && (input.currency === undefined || input.currency === existing.currency) && (input.defaultKoefisien === undefined || toDecimalString(input.defaultKoefisien) === existing.default_koefisien.toString()) && (input.notes === undefined || input.notes === existing.notes)) return existing;
@@ -438,7 +459,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
         purchase_unit: input.purchaseUnit,
         harga: input.harga,
         currency: input.currency,
-        default_koefisien: input.defaultKoefisien ?? "1",
+        default_koefisien: requirePositiveCoefficient(input.defaultKoefisien ?? "1"),
         kategori: requireKategori(input.kategori),
         notes: input.notes ?? null,
         created_by: input.actor.userId ?? "system",
@@ -464,9 +485,10 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     currency?: string;
     defaultKoefisien?: string;
     kategori?: "BIAYA_UMUM" | "TRANSPORTASI_AKOMODASI" | "ALAT";
-    notes?: string;
+    notes?: string | null;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+    if (input.defaultKoefisien !== undefined) requirePositiveCoefficient(input.defaultKoefisien);
     const existing = await db.bqLibCustomItem.findUnique({ where: { id: input.id } });
     if (!existing) throw new AppError("NOT_FOUND", "bq.lib-custom-item.not-found", "Custom Library item not found");
     if ((input.name === undefined || input.name === existing.name) && (input.purchaseUnit === undefined || input.purchaseUnit === existing.purchase_unit) && (input.harga === undefined || toDecimalString(input.harga) === existing.harga.toString()) && (input.currency === undefined || input.currency === existing.currency) && (input.defaultKoefisien === undefined || toDecimalString(input.defaultKoefisien) === existing.default_koefisien.toString()) && (input.kategori === undefined || input.kategori === existing.kategori) && (input.notes === undefined || input.notes === existing.notes)) return existing;
@@ -539,7 +561,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     actor: { kind: string; userId?: string; label: string };
     id: string;
     name?: string;
-    description?: string;
+    description?: string | null;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
     const existing = await db.bqTemplate.findUnique({ where: { id: input.id } });
@@ -754,12 +776,12 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     orderedIds: string[];
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
-    await runTransaction(async (tx) => {
+    const changed = await runTransaction(async (tx) => {
       // Renumbering is addressed by ID, so the ownership check has to be
       // explicit: without it any section ID reorders inside another template.
       const owned = await tx.bqTemplateSection.findMany({
         where: { id: { in: input.orderedIds }, template_id: input.templateId },
-        select: { id: true },
+        select: { id: true, sort_order: true },
       });
       if (owned.length !== input.orderedIds.length) {
         throw new AppError(
@@ -768,13 +790,17 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
           "Every reordered section must belong to this template",
         );
       }
+      const sortOrderById = new Map(owned.map((section) => [section.id, section.sort_order]));
+      if (input.orderedIds.every((id, index) => sortOrderById.get(id) === index)) return false;
       for (let i = 0; i < input.orderedIds.length; i++) {
         await tx.bqTemplateSection.update({
           where: { id: input.orderedIds[i] },
           data: { sort_order: i },
         });
       }
+      return true;
     });
+    if (!changed) return;
     await auditWriter({
       appId: "bq",
       action: "bq.template-sections.reordered",
@@ -964,6 +990,14 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
     await requireEditableProject(input.id);
+    const existing = await db.bqProject.findUnique({ where: { id: input.id } });
+    if (!existing) throw new AppError("NOT_FOUND", "bq.project.not-found", "Project not found");
+    if (
+      fieldUnchanged(input.title, existing.title)
+      && fieldUnchanged(input.clientName, existing.client_name)
+      && fieldUnchanged(input.externalRef, existing.external_ref)
+      && fieldUnchanged(input.notes, existing.notes)
+    ) return existing;
     const project = await db.bqProject.update({
       where: { id: input.id },
       data: {
@@ -1263,10 +1297,11 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     name: string;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
-    const section = await db.bqSection.findUnique({ where: { id: input.id }, select: { project_id: true } });
+    const section = await db.bqSection.findUnique({ where: { id: input.id }, select: { id: true, project_id: true, name: true } });
     if (!section) throw new AppError("NOT_FOUND", "bq.section.not-found", "Section not found");
     await requireEditableProject(section.project_id);
-    await db.bqSection.update({ where: { id: input.id }, data: { name: input.name } });
+    if (input.name === section.name) return section;
+    const updated = await db.bqSection.update({ where: { id: input.id }, data: { name: input.name } });
     await auditWriter({
       appId: "bq",
       action: "bq.section.updated",
@@ -1274,6 +1309,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
       entityId: input.id,
       actor: input.actor,
     });
+    return updated;
   }
 
   async function updateSubsection(input: {
@@ -1284,7 +1320,10 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
     await requireEditableProjectForSubsection(input.id);
-    await db.bqSubsection.update({ where: { id: input.id }, data: { name: input.name } });
+    const subsection = await db.bqSubsection.findUnique({ where: { id: input.id } });
+    if (!subsection) throw new AppError("NOT_FOUND", "bq.subsection.not-found", "Subsection not found");
+    if (input.name === subsection.name) return subsection;
+    const updated = await db.bqSubsection.update({ where: { id: input.id }, data: { name: input.name } });
     await auditWriter({
       appId: "bq",
       action: "bq.subsection.updated",
@@ -1292,6 +1331,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
       entityId: input.id,
       actor: input.actor,
     });
+    return updated;
   }
 
     async function addItem(input: {
@@ -1306,7 +1346,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     koefisien?: string;
     markupL1Pct?: string;
     sortOrder?: number;
-    notes?: string;
+    notes?: string | null;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
 
@@ -1328,7 +1368,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
         qty: input.qty,
         unit: input.unit,
         harga_snapshot: input.hargaSnapshot ?? null,
-        koefisien: input.koefisien ?? "1",
+        koefisien: requirePositiveCoefficient(input.koefisien ?? "1"),
         markup_l1_pct: input.markupL1Pct ?? "0",
         sort_order: input.sortOrder ?? 0,
         notes: input.notes ?? null,
@@ -1356,10 +1396,24 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     koefisien?: string;
     markupL1Pct?: string;
     sortOrder?: number;
-    notes?: string;
+    notes?: string | null;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+    if (input.koefisien !== undefined) requirePositiveCoefficient(input.koefisien);
     await requireEditableProjectForItem(input.id);
+
+    const existing = await db.bqItem.findUnique({ where: { id: input.id } });
+    if (!existing) throw new AppError("NOT_FOUND", "bq.item.not-found", "Work Item not found");
+    if (
+      fieldUnchanged(input.name, existing.name)
+      && decimalFieldUnchanged(input.qty, existing.qty)
+      && fieldUnchanged(input.unit, existing.unit)
+      && decimalFieldUnchanged(input.hargaSnapshot, existing.harga_snapshot)
+      && decimalFieldUnchanged(input.koefisien, existing.koefisien)
+      && decimalFieldUnchanged(input.markupL1Pct, existing.markup_l1_pct)
+      && fieldUnchanged(input.sortOrder, existing.sort_order)
+      && fieldUnchanged(input.notes, existing.notes)
+    ) return existing;
 
     const item = await db.bqItem.update({
       where: { id: input.id },
@@ -1410,7 +1464,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     qtyPerL1: string;
     markupL2Pct?: string;
     sortOrder?: number;
-    notes?: string;
+    notes?: string | null;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
     await requireEditableProjectForItem(input.itemId);
@@ -1447,10 +1501,20 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     qtyPerL1?: string;
     markupL2Pct?: string;
     sortOrder?: number;
-    notes?: string;
+    notes?: string | null;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
     await requireEditableProjectForSubObject(input.id);
+
+    const existing = await db.bqSubObject.findUnique({ where: { id: input.id } });
+    if (!existing) throw new AppError("NOT_FOUND", "bq.sub-object.not-found", "Component Group not found");
+    if (
+      fieldUnchanged(input.name, existing.name)
+      && decimalFieldUnchanged(input.qtyPerL1, existing.qty_per_l1)
+      && decimalFieldUnchanged(input.markupL2Pct, existing.markup_l2_pct)
+      && fieldUnchanged(input.sortOrder, existing.sort_order)
+      && fieldUnchanged(input.notes, existing.notes)
+    ) return existing;
 
     const subObject = await db.bqSubObject.update({
       where: { id: input.id },
@@ -1500,7 +1564,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     sourceImportedAt?: Date;
     titleSnapshot: string;
     purchaseUnitSnapshot: string;
-    baseUnitSnapshot?: string;
+    baseUnitSnapshot?: string | null;
     purchaseToBaseFactorSnapshot?: string;
     hargaSnapshot: string;
     currencySnapshot?: string;
@@ -1508,7 +1572,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     qty: string;
     koefisien?: string;
     sortOrder?: number;
-    notes?: string;
+    notes?: string | null;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
 
@@ -1538,7 +1602,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
         currency_snapshot: input.currencySnapshot ?? "IDR",
         kategori: requireKategori(input.kategori),
         qty: input.qty,
-        koefisien: input.koefisien ?? "1",
+        koefisien: requirePositiveCoefficient(input.koefisien ?? "1"),
         sort_order: input.sortOrder ?? 0,
         notes: input.notes ?? null,
       },
@@ -1559,7 +1623,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     id: string;
     titleSnapshot?: string;
     purchaseUnitSnapshot?: string;
-    baseUnitSnapshot?: string;
+    baseUnitSnapshot?: string | null;
     purchaseToBaseFactorSnapshot?: string | null;
     hargaSnapshot?: string;
     currencySnapshot?: string;
@@ -1567,12 +1631,26 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     qty?: string;
     koefisien?: string;
     sortOrder?: number;
-    notes?: string;
+    notes?: string | null;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+    if (input.koefisien !== undefined) requirePositiveCoefficient(input.koefisien);
     await requireEditableProjectForLineItem(input.id);
     const existing = await db.bqLineItem.findUnique({ where: { id: input.id } });
     if (!existing) throw new AppError("NOT_FOUND", "bq.line-item.not-found", "Cost Component not found");
+    if (
+      fieldUnchanged(input.titleSnapshot, existing.title_snapshot)
+      && fieldUnchanged(input.purchaseUnitSnapshot, existing.purchase_unit_snapshot)
+      && fieldUnchanged(input.baseUnitSnapshot, existing.base_unit_snapshot)
+      && decimalFieldUnchanged(input.purchaseToBaseFactorSnapshot, existing.purchase_to_base_factor_snapshot)
+      && decimalFieldUnchanged(input.hargaSnapshot, existing.harga_snapshot)
+      && fieldUnchanged(input.currencySnapshot, existing.currency_snapshot)
+      && fieldUnchanged(input.kategori, existing.kategori)
+      && decimalFieldUnchanged(input.qty, existing.qty)
+      && decimalFieldUnchanged(input.koefisien, existing.koefisien)
+      && fieldUnchanged(input.sortOrder, existing.sort_order)
+      && fieldUnchanged(input.notes, existing.notes)
+    ) return existing;
 
     const lineItem = await db.bqLineItem.update({
       where: { id: input.id },
@@ -1622,6 +1700,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     if (snap == null) {
       throw new AppError("INVARIANT", "bq.line-item.no-snapshot", "This Cost Component has no imported source price to restore");
     }
+    if (compareDecimals(toDecimalString(lineItem.harga_snapshot.toString()), toDecimalString(snap.toString())) === 0) return lineItem;
     const updated = await db.bqLineItem.update({
       where: { id: input.id },
       data: { harga_snapshot: snap },
@@ -1831,24 +1910,25 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
 
   async function addAssemblyCustomLine(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; assemblyId: string; title: string; purchaseUnit?: string; harga?: string; currency?: string; kategori?: string; qty?: string; koefisien?: string }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+    const koefisien = requirePositiveCoefficient(input.koefisien ?? "1");
     const assembly = await db.bqAssemblyTemplate.findUnique({ where: { id: input.assemblyId } });
     if (!assembly) throw new AppError("NOT_FOUND", "bq.assembly.not-found", "Assembly template not found");
     const existingCount = await db.bqAssemblyLine.count({ where: { assembly_template_id: input.assemblyId } });
-    const line = await db.bqAssemblyLine.create({ data: { assembly_template_id: assembly.id, source_type: "CUSTOM", title_snapshot: input.title, purchase_unit_snapshot: input.purchaseUnit ?? "ls", harga_snapshot: input.harga ?? "0", currency_snapshot: input.currency ?? "IDR", kategori: requireKategori(input.kategori ?? "MATERIAL"), qty: input.qty ?? "1", koefisien: input.koefisien ?? "1", sort_order: existingCount } });
+    const line = await db.bqAssemblyLine.create({ data: { assembly_template_id: assembly.id, source_type: "CUSTOM", title_snapshot: input.title, purchase_unit_snapshot: input.purchaseUnit ?? "ls", harga_snapshot: input.harga ?? "0", currency_snapshot: input.currency ?? "IDR", kategori: requireKategori(input.kategori ?? "MATERIAL"), qty: input.qty ?? "1", koefisien, sort_order: existingCount } });
     await auditWriter({ appId: "bq", action: "bq.assembly-line.created", entityType: "BqAssemblyLine", entityId: line.id, actor: input.actor });
     return line;
   }
 
-  async function updateAssemblyTemplate(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; assemblyId: string; name?: string; description?: string }) {
+  async function updateAssemblyTemplate(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; assemblyId: string; name?: string; description?: string | null }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
     const assembly = await db.bqAssemblyTemplate.findUnique({ where: { id: input.assemblyId } });
     if (!assembly) throw new AppError("NOT_FOUND", "bq.assembly.not-found", "Assembly template not found");
     const name = input.name?.trim();
     const description = input.description?.trim() ?? null;
     if ((!name || name === assembly.name) && (input.description === undefined || description === assembly.description)) return assembly;
-    await db.bqAssemblyTemplate.update({ where: { id: input.assemblyId }, data: { ...(name && { name }), ...(input.description !== undefined && { description }) } });
+    const updated = await db.bqAssemblyTemplate.update({ where: { id: input.assemblyId }, data: { ...(name && { name }), ...(input.description !== undefined && { description }) } });
     await auditWriter({ appId: "bq", action: "bq.assembly.updated", entityType: "BqAssemblyTemplate", entityId: input.assemblyId, actor: input.actor, changes: { name, description } });
-    return assembly;
+    return updated;
   }
 
   async function deleteAssemblyTemplate(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; assemblyId: string }) {
@@ -1861,11 +1941,13 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
 
   async function updateAssemblyLine(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; lineId: string; title?: string; purchaseUnit?: string; harga?: string; currency?: string; kategori?: string; qty?: string; koefisien?: string; notes?: string }) {
     requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+    if (input.koefisien !== undefined) requirePositiveCoefficient(input.koefisien);
     const line = await db.bqAssemblyLine.findUnique({ where: { id: input.lineId } });
     if (!line) throw new AppError("NOT_FOUND", "bq.assembly-line.not-found", "Assembly line not found");
     if ((input.title === undefined || input.title === line.title_snapshot) && (input.purchaseUnit === undefined || input.purchaseUnit === line.purchase_unit_snapshot) && (input.harga === undefined || toDecimalString(input.harga) === line.harga_snapshot.toString()) && (input.currency === undefined || input.currency === line.currency_snapshot) && (input.kategori === undefined || input.kategori === line.kategori) && (input.qty === undefined || toDecimalString(input.qty) === line.qty.toString()) && (input.koefisien === undefined || toDecimalString(input.koefisien) === line.koefisien.toString()) && (input.notes === undefined || (input.notes || null) === line.notes)) return line;
-    await db.bqAssemblyLine.update({ where: { id: input.lineId }, data: { ...(input.title !== undefined && { title_snapshot: input.title }), ...(input.purchaseUnit !== undefined && { purchase_unit_snapshot: input.purchaseUnit }), ...(input.harga !== undefined && { harga_snapshot: input.harga }), ...(input.currency !== undefined && { currency_snapshot: input.currency }), ...(input.kategori !== undefined && { kategori: requireKategori(input.kategori) }), ...(input.qty !== undefined && { qty: input.qty }), ...(input.koefisien !== undefined && { koefisien: input.koefisien }), ...(input.notes !== undefined && { notes: input.notes || null }) } });
+    const updated = await db.bqAssemblyLine.update({ where: { id: input.lineId }, data: { ...(input.title !== undefined && { title_snapshot: input.title }), ...(input.purchaseUnit !== undefined && { purchase_unit_snapshot: input.purchaseUnit }), ...(input.harga !== undefined && { harga_snapshot: input.harga }), ...(input.currency !== undefined && { currency_snapshot: input.currency }), ...(input.kategori !== undefined && { kategori: requireKategori(input.kategori) }), ...(input.qty !== undefined && { qty: input.qty }), ...(input.koefisien !== undefined && { koefisien: input.koefisien }), ...(input.notes !== undefined && { notes: input.notes || null }) } });
     await auditWriter({ appId: "bq", action: "bq.assembly-line.updated", entityType: "BqAssemblyLine", entityId: input.lineId, actor: input.actor });
+    return updated;
   }
 
   async function deleteAssemblyLine(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; lineId: string }) {

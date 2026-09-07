@@ -5,8 +5,33 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.27**
-- Next local revision: **R6.28**
+- Current revision after this entry is committed: **R6.28**
+- Next local revision: **R6.29**
+
+## R6.28 | 2026-09-07 | fix(bq): close update semantics and stale promotion paths
+
+### Business logic and backend integrity
+
+- Extended CORE no-op semantics across BQ projects, Sections/Subsections, Work Items, Component Groups, Cost Components, Template ordering, price revert, and Assembly updates. Semantically identical decimal values now preserve timestamps and emit no audit event.
+- Made optional BQ Library base units/notes, Template descriptions, Assembly descriptions, and project-tree notes explicitly clearable instead of silently preserving the previous value.
+- Enforced the positive-coefficient invariant in the BQ service for Library, project, and Assembly mutations, with matching Assembly action validation.
+- Fixed Assembly update commands to return the newly persisted row after a real update.
+- Removed the unused estimator-side promotion approval/rejection action and dialog that accepted a free-form Master Data ID. Approval remains exclusively in Master Data through the cross-app coordinator, which validates the canonical price type, existence, live state, and permission.
+- Supplier contact updates now skip identical rows rather than changing `updated_at` without a corresponding business change or audit event.
+
+### Dependencies and migrations
+
+- No dependency, Prisma schema, or migration change.
+
+### Verification
+
+- `npx prisma validate`: passed.
+- `npx prisma migrate deploy`: all 26 migrations passed against a fresh disposable `studioflow_rebuild_test` database.
+- `npm run typecheck`, `npm run lint`, `npm run check:boundaries`, and `npm run check:legacy-runtime`: passed.
+- `npm test`: 251 passed, 0 failed, 0 cancelled.
+- `npm run build`: passed.
+- Browser smoke check: login redirect, login layout, and browser console passed without errors; authenticated screens were not mutated during the read-only audit.
+- `git diff --check`: passed.
 
 ## R6.27 | 2026-09-07 | fix(brand): close lifecycle contract and UI contradictions
 

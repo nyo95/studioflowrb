@@ -2324,20 +2324,18 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
               brand_id: c.brandId || null,
             };
             if (c.id && existingContactById.has(c.id)) {
-              await tx.vendorContact.update({ where: { id: c.id }, data: contactData });
-              if (!contactFieldChanged) {
-                const ex = existingContactById.get(c.id)!;
-                if (
-                  ex.person_name !== contactData.person_name ||
-                  (ex.job_title || null) !== contactData.job_title ||
-                  (ex.email || null) !== contactData.email ||
-                  (ex.phone || null) !== contactData.phone ||
-                  ex.is_primary !== contactData.is_primary ||
-                  (ex.notes || null) !== contactData.notes ||
-                  (ex.brand_id || null) !== contactData.brand_id
-                ) {
-                  contactFieldChanged = true;
-                }
+              const ex = existingContactById.get(c.id)!;
+              const contactChanged =
+                ex.person_name !== contactData.person_name ||
+                (ex.job_title || null) !== contactData.job_title ||
+                (ex.email || null) !== contactData.email ||
+                (ex.phone || null) !== contactData.phone ||
+                ex.is_primary !== contactData.is_primary ||
+                (ex.notes || null) !== contactData.notes ||
+                (ex.brand_id || null) !== contactData.brand_id;
+              if (contactChanged) {
+                await tx.vendorContact.update({ where: { id: c.id }, data: contactData });
+                contactFieldChanged = true;
               }
             } else {
               await tx.vendorContact.create({
