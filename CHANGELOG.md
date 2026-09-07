@@ -4,9 +4,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 ## Revision state
 
-- Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.38**
-- Next local revision: **R6.39**
+- Published baseline: **R7** — published to GitHub
+- Current revision after this entry is committed: **R7**
+- Next local revision: **R7.01**
+
+## R7 | 2026-09-07 | release: publish shell and master data refinements
+
+### Published
+
+- Published local revisions R6.31 through R6.38 to GitHub, including the
+  Master Data directory refinements, account-menu administration placement,
+  and session-revoking sign out.
+
+### Verification
+
+- Published from `main` at commit `fbdd953`; the release marker follows.
 
 ## R6.38 | 2026-09-07 | fix(shell): move administration into account menu
 
