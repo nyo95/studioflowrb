@@ -128,7 +128,7 @@ function SupplierLinksEditor({ links, snapshot, onLinksChange, onSnapshotChange,
     <div className="grid gap-3">
       {linkError ? <InlineError>{linkError}</InlineError> : null}
       <Field label="Company information links" description="WEBSITE, INSTAGRAM, FACEBOOK, TIKTOK, YOUTUBE, LINKEDIN, or WHATSAPP. HTTP/HTTPS only.">
-        <>
+        <div className="grid gap-2">
         {links.length ? (
           <div className="grid gap-1">
             {links.map((link, idx) => (
@@ -158,11 +158,11 @@ function SupplierLinksEditor({ links, snapshot, onLinksChange, onSnapshotChange,
             </div>
           </div>
         ) : null}
-        </>
+        </div>
       </Field>
       {snapshot.length > 0 ? (
         <Field label="Links pending review" description="These links were preserved from a previous import. Accept the ones that belong to this Supplier; the rest will be discarded.">
-          <>
+          <div className="grid gap-2">
           <div className="grid gap-1 border border-line rounded p-2 bg-surface-muted/40">
             {snapshot.map((item, idx) => (
               <label key={idx} className="flex items-center gap-2 text-sm cursor-pointer select-none">
@@ -178,7 +178,7 @@ function SupplierLinksEditor({ links, snapshot, onLinksChange, onSnapshotChange,
           {canManage ? <Button type="button" size="sm" variant="secondary" onClick={handleResolveReview} className="mt-2">
             Resolve review ({acceptedIdxs.size} accepted, {snapshot.length - acceptedIdxs.size} discarded)
           </Button> : null}
-          </>
+          </div>
         </Field>
       ) : null}
     </div>

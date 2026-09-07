@@ -8,6 +8,25 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Current revision after this entry is committed: **R7.02**
 - Next local revision: **R7.03**
 
+## R7.03 | 2026-09-08 | fix(vendor): keep Field children cloneable
+
+### Fixed
+
+- Wrapped the composite company-link and pending-review contents in concrete
+  containers instead of React Fragments. The shared `Field` clones its single
+  child to inject `id` and ARIA props; passing a Fragment caused the development
+  error `Invalid prop id supplied to React.Fragment` on the Supplier directory.
+
+### Dependencies and migrations
+
+- No dependency or repository migration changes.
+
+### Verification
+
+- Targeted ESLint on the changed Vendor directory: passed.
+- `npm run typecheck`: passed.
+- Vendor form composition regression test: passed.
+
 ## R7.02 | 2026-09-08 | fix(brand): reuse hashtag suggestions and scope supplier choices
 
 ### Fixed
