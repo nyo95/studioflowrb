@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+﻿import { randomUUID } from "node:crypto";
 
 import { Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { prepareAuditEvent, type AuditActor, type AuditWriter } from "@platform/core/audit";
@@ -2297,6 +2297,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
             await tx.vendorContact.deleteMany({ where: { id: { in: removedContacts.map((c) => c.id) } } });
           }
           const existingContactById = new Map(existing.contacts.map((c) => [c.id, c] as const));
+          let contactFieldChanged = false;
           for (const c of input.contacts) {
             if (c.brandId) {
               const brand = await tx.brand.findUniqueOrThrow({ where: { id: c.brandId } });
@@ -2319,18 +2320,31 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
             };
             if (c.id && existingContactById.has(c.id)) {
               await tx.vendorContact.update({ where: { id: c.id }, data: contactData });
+              if (!contactFieldChanged) {
+                const ex = existingContactById.get(c.id)!;
+                if (
+                  ex.person_name !== contactData.person_name ||
+                  (ex.job_title || null) !== contactData.job_title ||
+                  (ex.email || null) !== contactData.email ||
+                  (ex.phone || null) !== contactData.phone ||
+                  ex.is_primary !== contactData.is_primary ||
+                  (ex.notes || null) !== contactData.notes ||
+                  (ex.brand_id || null) !== contactData.brand_id
+                ) {
+                  contactFieldChanged = true;
+                }
+              }
             } else {
               await tx.vendorContact.create({
                 data: { id: c.id || randomUUID(), vendor_id: input.vendorId, ...contactData },
               });
             }
           }
-          const beforeContacts = existing.contacts.map((c) => c.id).sort();
-          const afterContacts = input.contacts
-            .map((c, index) => c.id ?? `new:${index}`)
-            .sort();
-          if (beforeContacts.join("\u0000") !== afterContacts.join("\u0000")) {
-            changes.contacts = { from: beforeContacts.length, to: input.contacts.length };
+          const beforeContactIds = existing.contacts.map((c) => c.id).sort();
+          const afterContactIds = input.contacts.map((c, index) => c.id ?? `new:${index}`).sort();
+          const contactIdsChanged = beforeContactIds.join("\u0000") !== afterContactIds.join("\u0000");
+          if (contactIdsChanged || contactFieldChanged) {
+            changes.contacts = { from: existing.contacts.length, to: input.contacts.length };
           }
         }
 
@@ -2370,15 +2384,46 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
             seenUrls.add(url);
             normalizedLinks.push({ kind, url, label });
           }
-          const snapshot = input.linkReviewSnapshot ?? null;
-          await tx.vendor.update({
-            where: { id: input.vendorId },
-            data: {
-              info_links: normalizedLinks as Prisma.InputJsonValue,
-              ...(snapshot !== null ? { link_review_snapshot: snapshot as Prisma.InputJsonValue } : {}),
-            },
-          });
-          changes.info_links = { from: "(previous)", to: `${normalizedLinks.length} links` };
+          // No-op detection: only write + audit when content actually changed.
+          const existingLinks = Array.isArray(existing.info_links)
+            ? (existing.info_links as Array<Record<string, unknown>>).map((l) => ({
+                kind: String(l["kind"] ?? ""),
+                url: String(l["url"] ?? ""),
+                label: l["label"] != null ? String(l["label"]) : null,
+              }))
+            : [];
+          const linksChanged = JSON.stringify(existingLinks) !== JSON.stringify(normalizedLinks);
+
+          let snapshotChanged = false;
+          if (input.linkReviewSnapshot !== undefined) {
+            const existingSnapshot = Array.isArray(existing.link_review_snapshot)
+              ? existing.link_review_snapshot
+              : [];
+            snapshotChanged = JSON.stringify(existingSnapshot) !== JSON.stringify(input.linkReviewSnapshot);
+          }
+
+          if (linksChanged || snapshotChanged) {
+            await tx.vendor.update({
+              where: { id: input.vendorId },
+              data: {
+                ...(linksChanged ? { info_links: normalizedLinks as Prisma.InputJsonValue } : {}),
+                ...(snapshotChanged ? { link_review_snapshot: input.linkReviewSnapshot as Prisma.InputJsonValue } : {}),
+              },
+            });
+            if (linksChanged) {
+              changes.info_links = { from: `${existingLinks.length} links`, to: `${normalizedLinks.length} links` };
+            }
+            if (snapshotChanged) {
+              const prevLen = Array.isArray(existing.link_review_snapshot)
+                ? (existing.link_review_snapshot as unknown[]).length
+                : 0;
+              const nextLen = (input.linkReviewSnapshot as unknown[]).length;
+              changes.link_review_snapshot = {
+                from: prevLen > 0 ? `${prevLen} pending` : "none",
+                to: nextLen === 0 ? "cleared" : `${nextLen} pending`,
+              };
+            }
+          }
         }
 
         // CORE.md §5 / vendor-contract §8: one real operation, one audit event.

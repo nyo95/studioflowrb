@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
+import { AppError } from "@platform/core/errors";
 import { validationError } from "@platform/core/validation";
 import { masterDataService } from "@/apps/masterdata/runtime";
 
@@ -110,11 +111,15 @@ export async function updateVendorAction(
     let linkReviewSnapshot: unknown[] | undefined;
     const rawInfoLinks = formData.get("infoLinksJson");
     if (rawInfoLinks !== null) {
-      try { infoLinks = JSON.parse(String(rawInfoLinks)); } catch { infoLinks = []; }
+      try { infoLinks = JSON.parse(String(rawInfoLinks)); } catch {
+        throw new AppError("VALIDATION", "INFO_LINKS_JSON_INVALID", "Supplier links payload is malformed.");
+      }
     }
     const rawSnapshot = formData.get("linkSnapshotJson");
     if (rawSnapshot !== null) {
-      try { linkReviewSnapshot = JSON.parse(String(rawSnapshot)); } catch { linkReviewSnapshot = []; }
+      try { linkReviewSnapshot = JSON.parse(String(rawSnapshot)); } catch {
+        throw new AppError("VALIDATION", "LINK_SNAPSHOT_JSON_INVALID", "Link review snapshot payload is malformed.");
+      }
     }
 
     const parsed = VendorInputSchema.extend({ vendorId: z.string().uuid() }).safeParse({
