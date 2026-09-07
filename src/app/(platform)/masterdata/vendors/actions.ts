@@ -209,39 +209,3 @@ export async function requestVendorDeletionAction(
     return result;
   });
 }
-
-export async function updateVendorInfoLinksAction(
-  vendorId: string,
-  infoLinks: Array<{ kind: string; url: string; label?: string | null }>,
-): Promise<ActionResult<{ vendorId: string }>> {
-  return runSafeAction(async () => {
-    const { principal, grants } = await requirePrincipalGrants();
-    const id = parseId(vendorId);
-    const result = await masterDataService.updateVendorInfoLinks({
-      grants,
-      actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      vendorId: id,
-      infoLinks,
-    });
-    revalidateVendors();
-    return result;
-  });
-}
-
-export async function resolveVendorLinkReviewAction(
-  vendorId: string,
-  acceptedIndices: number[],
-): Promise<ActionResult<{ vendorId: string }>> {
-  return runSafeAction(async () => {
-    const { principal, grants } = await requirePrincipalGrants();
-    const id = parseId(vendorId);
-    const result = await masterDataService.resolveVendorLinkReview({
-      grants,
-      actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      vendorId: id,
-      acceptedIndices,
-    });
-    revalidateVendors();
-    return result;
-  });
-}

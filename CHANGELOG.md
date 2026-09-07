@@ -5,8 +5,34 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.24**
-- Next local revision: **R6.25**
+- Current revision after this entry is committed: **R6.25**
+- Next local revision: **R6.26**
+
+## R6.26 | 2026-09-07 | fix: restore lifecycle semantics and close contract/backend UX gaps
+
+### Business logic and backend integrity
+
+- Restored Brand lifecycle eligibility: archiving a Brand adds provenance-safe parent causes to its branded SKUs and their Material Prices; restore removes only those causes and revives only otherwise eligible records.
+- Approved Brand deletion now atomically purges the Brand, its branded SKUs, their Material Prices, archive causes, and Brand-owned relation resources. Unbranded SKUs remain valid and unaffected; BQ remains snapshot-only.
+- Supplier directory now loads and round-trips `VendorContact.notes`; unrelated contact edits no longer erase notes.
+- Removed obsolete standalone Supplier-link commands/actions. Supplier links now have one atomic mutation path through `updateVendor`.
+- BQ Library, Template, and Assembly updates return without a write or audit when their meaningful persisted values are unchanged.
+
+### UI and contract alignment
+
+- Brand owner Supplier is optional in create/edit dialogs, matching the nullable relation.
+- Ambiguous historical Supplier links must be explicitly reclassified to a canonical information-link kind before acceptance; discard remains available in the same atomic form save.
+- Supplier deletion copy now explains every relevant live or archived reference blocker.
+- Brand, Pricing, and Master Data contracts now describe the restored lifecycle and selected-existing-price promotion rule.
+
+### Regression coverage and verification
+
+- Added integration coverage for Brand archive/restore cascade, hard-delete cascade, and unbranded SKU survival.
+- `npx prisma validate`: passed.
+- `npx prisma migrate deploy`: passed against a fresh disposable `studioflow_rebuild_test` PostgreSQL database, applying all 26 migrations.
+- `npm run typecheck`, `npm run lint`, `npm run check:boundaries`, and `npm run check:legacy-runtime`: passed.
+- `npm test`: 247 passed, 0 failed, 0 cancelled using the disposable database.
+- `npm run build`: passed.
 
 ## R6.24 | 2026-09-07 | fix(vendor): Supplier link atomicity + stale contract sync
 

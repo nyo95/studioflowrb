@@ -612,6 +612,37 @@ describe("Master Data service", () => {
     assert.equal(await testDb.prisma.brandLink.count({ where: { brand_id: brand.brandId } }), 1);
   });
 
+  it("cascades Brand lifecycle with provenance and purges only its branded catalog", async () => {
+    const context = await createMaterialContext();
+    const sku = await service.createSku({
+      grants: GRANTS, actor: ACTOR, name: "Lifecycle SKU", brandId: context.brandId,
+      baseUnitId: context.unit.id, categoryId: context.categoryId,
+      priceMaterials: [{ supplierVendorId: context.vendorId, amount: "100", currency: "IDR" }],
+    });
+    const price = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: sku.skuId } });
+    const unbranded = await service.createSku({
+      grants: GRANTS, actor: ACTOR, name: "Independent SKU", baseUnitId: context.unit.id,
+      categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "200", currency: "IDR" }],
+    });
+
+    await service.archiveBrand({ grants: GRANTS, actor: ACTOR, brandId: context.brandId });
+    assert.notEqual((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: sku.skuId } })).deleted_at, null);
+    assert.notEqual((await testDb.prisma.priceMaterial.findUniqueOrThrow({ where: { id: price.id } })).deleted_at, null);
+    assert.equal((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: unbranded.skuId } })).deleted_at, null);
+
+    await service.restoreBrand({ grants: GRANTS, actor: ACTOR, brandId: context.brandId });
+    assert.equal((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: sku.skuId } })).deleted_at, null);
+    assert.equal((await testDb.prisma.priceMaterial.findUniqueOrThrow({ where: { id: price.id } })).deleted_at, null);
+
+    await service.archiveBrand({ grants: GRANTS, actor: ACTOR, brandId: context.brandId });
+    const request = await service.requestBrandDeletion({ grants: GRANTS, actor: ACTOR, brandId: context.brandId });
+    await service.approveDeletion({ grants: GRANTS, actor: ACTOR, requestId: request.requestId });
+    assert.equal(await testDb.prisma.brand.findUnique({ where: { id: context.brandId } }), null);
+    assert.equal(await testDb.prisma.sku.findUnique({ where: { id: sku.skuId } }), null);
+    assert.equal(await testDb.prisma.priceMaterial.findUnique({ where: { id: price.id } }), null);
+    assert.notEqual(await testDb.prisma.sku.findUnique({ where: { id: unbranded.skuId } }), null);
+  });
+
   it("executes approved permanent deletion atomically and preserves the final audit event", async () => {
     const created = await service.createUnit({ grants: GRANTS, actor: ACTOR, code: "TEST_BOX", name: "Test Box" });
     await service.archiveUnit({ grants: GRANTS, actor: ACTOR, unitId: created.unitId });

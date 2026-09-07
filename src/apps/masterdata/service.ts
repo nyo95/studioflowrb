@@ -1710,16 +1710,20 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
 
         await addDirectCause(tx, "brand", input.brandId);
         await tx.brand.update({ where: { id: input.brandId }, data: { deleted_at: now } });
-
-        // brand-contract §1: Brand and SKU are independent entities.
-        // Archiving a Brand does NOT cascade to its SKUs or their Prices.
-        // SKUs referencing this Brand remain live; their brand_id stays set.
+        const skuIds = await tx.sku.findMany({ where: { brand_id: input.brandId }, select: { id: true } }).then((rows) => rows.map((row) => row.id));
+        await addParentCauses(tx, "sku", "brand", input.brandId, skuIds);
+        if (skuIds.length > 0) {
+          await tx.sku.updateMany({ where: { id: { in: skuIds } }, data: { deleted_at: now } });
+          const prices = await tx.priceMaterial.findMany({ where: { sku_id: { in: skuIds } }, select: { id: true, sku_id: true } });
+          for (const skuId of skuIds) await addParentCauses(tx, "price_material", "sku", skuId, prices.filter((price) => price.sku_id === skuId).map((price) => price.id));
+          if (prices.length > 0) await tx.priceMaterial.updateMany({ where: { id: { in: prices.map((price) => price.id) } }, data: { deleted_at: now } });
+        }
         await writeAudit(tx, {
           action: "brand.archived",
           entityType: "brand",
           entityId: input.brandId,
           actor: input.actor,
-          metadata: {},
+          metadata: { skus_archived: skuIds.length },
         });
         return { brandId: input.brandId };
       });
@@ -1763,13 +1767,13 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           for (const skuId of restoredSkuIds) await assertSkuRestorable(tx, skuId);
           await tx.sku.updateMany({ where: { id: { in: restoredSkuIds } }, data: { deleted_at: null } });
 
-          for (const skuId of restoredSkuIds) {
-            const restoredPriceIds = await removeParentCausesAndFindRestored(tx, "price_material", "sku", skuId);
-            if (restoredPriceIds.length > 0) {
-              for (const priceId of restoredPriceIds) await assertPriceMaterialRestorable(tx, priceId);
-              await tx.priceMaterial.updateMany({ where: { id: { in: restoredPriceIds } }, data: { deleted_at: null } });
-              priceCount += restoredPriceIds.length;
-            }
+        }
+        for (const skuId of restoredSkuIds) {
+          const restoredPriceIds = await removeParentCausesAndFindRestored(tx, "price_material", "sku", skuId);
+          if (restoredPriceIds.length > 0) {
+            for (const priceId of restoredPriceIds) await assertPriceMaterialRestorable(tx, priceId);
+            await tx.priceMaterial.updateMany({ where: { id: { in: restoredPriceIds } }, data: { deleted_at: null } });
+            priceCount += restoredPriceIds.length;
           }
         }
 
@@ -1879,6 +1883,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
               phone: true,
               is_primary: true,
               brand_id: true,
+              notes: true,
             },
           },
           brand_suppliers: {
@@ -2436,110 +2441,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
             changes,
           });
         }
-        return { vendorId: input.vendorId };
-      });
-    },
-
-    // ── Supplier Link Management ────────────────────────────────────────────
-
-    async updateVendorInfoLinks(input: {
-      grants: PermissionGrants;
-      actor: AuditActor;
-      vendorId: string;
-      infoLinks: Array<{ kind: string; url: string; label?: string | null }>;
-    }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
-      actorIsUsable(input.actor);
-
-      // Validate before entering the transaction.
-      const ALLOWED_INFO_LINK_KINDS = new Set([
-        "WEBSITE", "INSTAGRAM", "FACEBOOK", "TIKTOK", "YOUTUBE", "LINKEDIN", "WHATSAPP",
-      ]);
-      const INFO_LINKS_MAX_COUNT = 20;
-      const INFO_LINK_URL_MAX_LEN = 2048;
-      const INFO_LINK_LABEL_MAX_LEN = 200;
-
-      if (input.infoLinks.length > INFO_LINKS_MAX_COUNT) {
-        throw new AppError("VALIDATION", "INFO_LINKS_TOO_MANY", `Maximum ${INFO_LINKS_MAX_COUNT} links allowed.`);
-      }
-
-      const normalized: Array<{ kind: string; url: string; label: string | null }> = [];
-      const seenUrls = new Set<string>();
-      for (const l of input.infoLinks) {
-        const kind = l.kind.trim().toUpperCase();
-        const url = l.url.trim();
-        const label = l.label?.trim() || null;
-
-        if (!ALLOWED_INFO_LINK_KINDS.has(kind)) {
-          throw new AppError("VALIDATION", "INFO_LINK_KIND_INVALID", `Link kind "${kind}" is not allowed.`);
-        }
-        if (!/^https?:\/\//i.test(url)) {
-          throw new AppError("VALIDATION", "INFO_LINK_URL_NOT_HTTP", "Links must use HTTP or HTTPS.");
-        }
-        try { new URL(url); } catch {
-          throw new AppError("VALIDATION", "INFO_LINK_URL_INVALID", "Each link must have a valid URL.");
-        }
-        if (url.length > INFO_LINK_URL_MAX_LEN) {
-          throw new AppError("VALIDATION", "INFO_LINK_URL_TOO_LONG", `URL exceeds ${INFO_LINK_URL_MAX_LEN} characters.`);
-        }
-        if (label && label.length > INFO_LINK_LABEL_MAX_LEN) {
-          throw new AppError("VALIDATION", "INFO_LINK_LABEL_TOO_LONG", `Label exceeds ${INFO_LINK_LABEL_MAX_LEN} characters.`);
-        }
-        if (seenUrls.has(url)) continue; // dedupe by URL, keep first occurrence
-        seenUrls.add(url);
-        normalized.push({ kind, url, label });
-      }
-
-      return runTransaction(async (tx) => {
-        const vendor = await tx.vendor.findUniqueOrThrow({ where: { id: input.vendorId } });
-        if (vendor.deleted_at !== null) throw new AppError("VALIDATION", "VENDOR_ARCHIVED", "Supplier is archived.");
-        await tx.vendor.update({ where: { id: input.vendorId }, data: { info_links: normalized as Prisma.InputJsonValue } });
-        await writeAudit(tx, {
-          action: "vendor.info-links-updated",
-          entityType: "vendor",
-          entityId: input.vendorId,
-          actor: input.actor,
-          metadata: { count: normalized.length },
-        });
-        return { vendorId: input.vendorId };
-      });
-    },
-
-    async resolveVendorLinkReview(input: {
-      grants: PermissionGrants;
-      actor: AuditActor;
-      vendorId: string;
-      /** IDs (index in snapshot array) to promote to info_links; rest are discarded. */
-      acceptedIndices: number[];
-    }) {
-      requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
-      actorIsUsable(input.actor);
-      return runTransaction(async (tx) => {
-        const vendor = await tx.vendor.findUniqueOrThrow({ where: { id: input.vendorId } });
-        if (vendor.deleted_at !== null) throw new AppError("VALIDATION", "VENDOR_ARCHIVED", "Supplier is archived.");
-        const snapshot = Array.isArray(vendor.link_review_snapshot) ? vendor.link_review_snapshot as Array<Record<string, unknown>> : [];
-        // Deduplicate indices: duplicate submissions must not double-add the same item.
-        const uniqueIndices = [...new Set(input.acceptedIndices)];
-        const validIndices = uniqueIndices.filter((i) => i >= 0 && i < snapshot.length);
-        const accepted = validIndices
-          .map((i) => {
-            const raw = snapshot[i] as Record<string, unknown>;
-            return { kind: String(raw.kind ?? "").trim(), url: String(raw.url ?? "").trim(), label: raw.label ? String(raw.label).trim() : null };
-          })
-          .filter((l) => l.kind && l.url);
-        const existing = Array.isArray(vendor.info_links) ? vendor.info_links as Array<Record<string, unknown>> : [];
-        const merged = [...existing, ...accepted];
-        await tx.vendor.update({
-          where: { id: input.vendorId },
-          data: { info_links: merged as Prisma.InputJsonValue, link_review_snapshot: [] as Prisma.InputJsonValue },
-        });
-        await writeAudit(tx, {
-          action: "vendor.link-review-resolved",
-          entityType: "vendor",
-          entityId: input.vendorId,
-          actor: input.actor,
-          metadata: { accepted: accepted.length, discarded: snapshot.length - validIndices.length },
-        });
         return { vendorId: input.vendorId };
       });
     },
@@ -4240,13 +4141,18 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
             throw new AppError("CONFLICT", "BRAND_HAS_CONTACTS", "Brand still has scoped contacts. Remove them first.");
           }
 
-          // Detach SKUs: brand_id is optional; the SKU and its Prices survive.
-          // Remove any PARENT archiveCause caused by this Brand so each SKU
-          // can be restored or managed independently after the Brand is gone.
-          await tx.archiveCause.deleteMany({
-            where: { entity_type: "sku", kind: "PARENT", parent_type: "brand", parent_id: targetId },
-          });
-          await tx.sku.updateMany({ where: { brand_id: targetId }, data: { brand_id: null } });
+          const skuIds = await tx.sku.findMany({ where: { brand_id: targetId }, select: { id: true } }).then((rows) => rows.map((row) => row.id));
+          const priceIds = skuIds.length === 0 ? [] : await tx.priceMaterial.findMany({ where: { sku_id: { in: skuIds } }, select: { id: true } }).then((rows) => rows.map((row) => row.id));
+          if (priceIds.length > 0) {
+            await tx.archiveCause.deleteMany({ where: { entity_type: "price_material", entity_id: { in: priceIds } } });
+            await tx.priceMaterial.deleteMany({ where: { id: { in: priceIds } } });
+          }
+          if (skuIds.length > 0) {
+            await tx.archiveCause.deleteMany({ where: { entity_type: "sku", entity_id: { in: skuIds } } });
+            await tx.skuCategory.deleteMany({ where: { sku_id: { in: skuIds } } });
+            await tx.brandCategoryOrigin.deleteMany({ where: { source_sku_id: { in: skuIds } } });
+            await tx.sku.deleteMany({ where: { id: { in: skuIds } } });
+          }
 
           const bcIds = await tx.brandCategory
             .findMany({ where: { brand_id: targetId }, select: { id: true } })

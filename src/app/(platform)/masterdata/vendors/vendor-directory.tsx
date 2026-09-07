@@ -45,6 +45,7 @@ type VendorRow = {
     phone: string | null;
     is_primary: boolean;
     brand_id: string | null;
+    notes: string | null;
   }>;
   brand_suppliers: Array<{
     id: string;
@@ -97,6 +98,7 @@ function SupplierLinksEditor({ links, snapshot, onLinksChange, onSnapshotChange,
   const [newUrl, setNewUrl] = useState("");
   const [newLabel, setNewLabel] = useState("");
   const [acceptedIdxs, setAcceptedIdxs] = useState<Set<number>>(new Set());
+  const [reviewKinds, setReviewKinds] = useState<Record<number, string>>({});
   const [linkError, setLinkError] = useState<string | null>(null);
 
   const handleAdd = () => {
@@ -113,7 +115,9 @@ function SupplierLinksEditor({ links, snapshot, onLinksChange, onSnapshotChange,
 
   const handleResolveReview = () => {
     const accepted = [...acceptedIdxs].filter(i => i >= 0 && i < snapshot.length);
-    const acceptedItems = accepted.map(i => snapshot[i]).filter(Boolean) as LinkEntry[];
+    const missingKind = accepted.some((index) => !LINK_KINDS.includes((snapshot[index]?.kind ?? "") as typeof LINK_KINDS[number]) && !reviewKinds[index]);
+    if (missingKind) { setLinkError("Choose a company information kind for every accepted historical link."); return; }
+    const acceptedItems = accepted.map((index) => ({ ...snapshot[index], kind: reviewKinds[index] ?? snapshot[index].kind })).filter(Boolean) as LinkEntry[];
     onLinksChange([...links, ...acceptedItems]);
     onSnapshotChange([]);
     setAcceptedIdxs(new Set());
@@ -166,6 +170,7 @@ function SupplierLinksEditor({ links, snapshot, onLinksChange, onSnapshotChange,
                 }} className="shrink-0" />
                 <span className="text-ink-tertiary text-xs uppercase shrink-0">{item.kind}</span>
                 <span className="wrap-anywhere flex-1 min-w-0">{item.label ? `${item.label} — ` : ""}{item.url}</span>
+                {!LINK_KINDS.includes(item.kind as typeof LINK_KINDS[number]) ? <Select aria-label={`Information kind for ${item.url}`} value={reviewKinds[idx] ?? ""} onChange={(event) => setReviewKinds((previous) => ({ ...previous, [idx]: event.target.value }))} className="w-36 shrink-0"><option value="">Reclassify…</option>{LINK_KINDS.map((kind) => <option key={kind} value={kind}>{kind}</option>)}</Select> : null}
               </label>
             ))}
           </div>
@@ -332,7 +337,7 @@ export function VendorDirectory({
         phone: c.phone ?? "",
         isPrimary: c.is_primary ?? false,
         brandId: c.brand_id ?? "",
-        notes: "",
+        notes: c.notes ?? "",
       })),
     );
     setEditVendorTypeIds(vendor.types.map((type) => type.vendor_type.id));
@@ -816,7 +821,7 @@ export function VendorDirectory({
       {deleteTarget ? (
         <RequestDeletionDialog open onOpenChange={(open) => {
             if (!open) setDeleteTarget(null);
-          }} title={`Submit supplier "${deleteTarget.name}" for deletion`} description="Archived suppliers with zero owned brands and zero active prices can be permanently purged after supervisor approval." reason={deleteReason} onReasonChange={setDeleteReason} placeholder="e.g. Inactive duplicate supplier profile" pending={pendingId !== null} error={rowError} onSubmit={() => {
+          }} title={`Submit supplier "${deleteTarget.name}" for deletion`} description="Permanent deletion remains blocked while any owned Brand, BrandSupplier relation, or Material, Material+Labor, or Labor price reference exists — including archived records." reason={deleteReason} onReasonChange={setDeleteReason} placeholder="e.g. Inactive duplicate supplier profile" pending={pendingId !== null} error={rowError} onSubmit={() => {
                   const target = deleteTarget;
                   const reason = deleteReason;
 

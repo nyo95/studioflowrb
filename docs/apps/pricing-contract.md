@@ -233,9 +233,9 @@ Archiving a price:
 **Cascade from parent entities:** When a parent is archived, its prices cascade:
 - Archive **Vendor** → all PriceMaterial (where supplier), PriceMaterialLabor, PriceLabor tied to that vendor → archived
 - Archive **SKU** → PriceMaterial of that SKU → archived
-- Archive **Brand** → Brand entity only (R6.21). SKUs and their Material Prices are NOT cascaded.
-  Each SKU manages its own lifecycle. Brand permanent deletion nulls `brand_id` on linked SKUs;
-  SKUs and Prices survive the Brand's removal.
+- Archive **Brand** → all branded SKUs and their Material Prices receive parent archive causes.
+  Brand restore removes only those causes, preserving any direct or other-parent archive cause.
+  Brand permanent deletion atomically purges its branded SKUs and Material Prices.
 
 ### 5.2 Restore validation
 
@@ -634,4 +634,4 @@ inferred or created by fallback.
 | Q18 | BQ readiness check | Removed — BQ handles missing prices in its own logic |
 | + | Party → Vendor rename | All FK references updated (supplier_party_id → supplier_vendor_id, etc.) |
 | + | Capability-based eligibility | Replaces role-based checks (can_supply_material / can_supply_labor) |
-| + | Cascade from parent | Vendor archived → prices archived. Brand archived → Brand entity only (R6.21); SKU/Price not affected |
+| + | Cascade from parent | Vendor archived → prices archived. Brand archived → branded SKU/Price parent causes; restore is provenance-safe |

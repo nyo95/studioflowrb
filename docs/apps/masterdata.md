@@ -20,8 +20,8 @@ Master Data also owns the approval side of the BQ Library promotion workflow:
 
 - BQ estimators may submit eligible Library items as promotion requests.
 - Master Data admin/staff see those requests in a Master Data approval queue.
-- Master Data validates the request, creates the appropriate catalog/price entry
-  through its normal pricing workflow, and returns the created record identity.
+- Master Data validates the request, selects an existing canonical price created
+  through its normal pricing workflow, and returns that record identity.
 - Only that validated identity may be linked back to the BQ Library item and
   move it to `APPROVED`; rejection requires an auditable reason.
 - BQ never writes Master Data tables and does not own an approval permission.

@@ -350,7 +350,7 @@ export function BrandDirectory({
           {createCategoryIds.map((id) => <input key={id} type="hidden" name="categoryIds" value={id} />)}
           {createSupplierIds.map((id) => <input key={id} type="hidden" name="supplierIds" value={id} />)}
           <input type="hidden" name="hashtags" value={createHashtags.join(" ")} />
-          <Field label="Owner supplier" required description="Registered manufacturer or brand owner supplier.">
+          <Field label="Owner supplier" description="Optional registered manufacturer or brand owner supplier.">
             <CreatableSearch
               label="Owner supplier"
               options={ownerVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
@@ -461,7 +461,7 @@ export function BrandDirectory({
               <Notice tone="warning">{editNameWarning}</Notice>
             ) : null}
             <input type="hidden" name="ownerVendorId" value={editOwnerVendorId} />
-            <Field label="Owner supplier" required description="Registered manufacturer or brand owner supplier.">
+          <Field label="Owner supplier" description="Optional registered manufacturer or brand owner supplier.">
               <CreatableSearch
                 label="Owner supplier"
                 options={ownerVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))}

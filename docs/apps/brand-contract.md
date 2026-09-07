@@ -165,9 +165,11 @@ In one transaction:
    scoped contacts;
 3. write one `brand.archived` primary AuditEvent.
 
-**brand-contract §1:** Brand archive does NOT cascade to its SKUs or their
-Material Prices. Each SKU and PriceMaterial manages its own lifecycle
-independently. Archived Brand records are excluded from operational pickers and
+**Lifecycle eligibility:** Brand archive cascades a persisted parent archive
+cause to every branded SKU and its Material Prices. The entities may still exist
+independently, but are excluded from operational pickers while the Brand cause
+remains. Restoring the Brand removes only its own causes; independently archived
+SKUs or prices remain archived. Archived Brand records are excluded from operational pickers and
 public reads; their SKUs and Prices remain in their current state.
 
 ### 6.2 Restore
@@ -364,9 +366,9 @@ evidence only; it does not authorize code changes.
 | Hashtags | Separate normalized discovery keywords |
 | Owner vs supplier | Independent relations; neither implies the other |
 | Resources | Many external URLs directly on Brand; internal storage deferred |
-| Archive | Staff; Brand entity only — SKUs and Prices are not affected |
-| Restore | Brand entity only — SKUs and Prices are not automatically restored |
-| Permanent delete | Staff request, explicit approver permission. Brand entity only — SKUs and Material Prices survive with brand_id nulled (R6.21) |
+| Archive | Staff; parent-causes every branded SKU and Material Price |
+| Restore | Staff; removes only Brand-created causes and restores only eligible SKU/Prices |
+| Permanent delete | Staff request, explicit approver permission. Purges the Brand, branded SKUs, and their Material Prices atomically |
 | Historical BQ | Protected by consumer snapshots |
 | UI | Directory table, trailing action menu, Dialog edit, explicit confirmations |
 | Import/export | Deferred |
