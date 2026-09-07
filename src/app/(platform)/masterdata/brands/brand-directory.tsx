@@ -19,6 +19,7 @@ restoreBrandAction,
 updateBrandAction,
 } from "./actions";
 import { normalizeBrandLinks,normalizeBrandLinkUrl,type BrandLinkDraft } from "./brand-link-input";
+import { buildBrandHashtagOptions } from "./brand-directory-options";
 
 type BrandRow = {
   id: string;
@@ -48,6 +49,7 @@ function DiscoverySummary({ values, limit }: { values: string[]; limit: number }
 export function BrandDirectory({
   brands,
   productCategories,
+  ownerVendors,
   materialVendors,
   canManage,
   canManageVendors,
@@ -55,6 +57,7 @@ export function BrandDirectory({
 }: {
   brands: BrandRow[];
   productCategories: Option[];
+  ownerVendors: Option[];
   materialVendors: Option[];
   canManage: boolean;
   canManageVendors: boolean;
@@ -93,8 +96,9 @@ export function BrandDirectory({
   const [editPending, setEditPending] = useState(false);
   const [createNameWarning, setCreateNameWarning] = useState<string | null>(null);
   const [editNameWarning, setEditNameWarning] = useState<string | null>(null);
-  const { options: ownerVendors, upsertOverlayOption } = useOptionOverlay(materialVendors);
+  const { options: ownerVendorOptions, upsertOverlayOption } = useOptionOverlay(ownerVendors);
   const { options: categoryOptions, upsertOverlayOption: upsertCategoryOption } = useOptionOverlay(productCategories);
+  const hashtagSuggestions = brands.flatMap((brand) => brand.hashtags);
   const createFormRef = useRef<HTMLFormElement>(null);
   const editFormRef = useRef<HTMLFormElement>(null);
   const createDraftGuard = useFormDraftGuard({
@@ -244,8 +248,6 @@ export function BrandDirectory({
     return option.id;
   };
 
-  const hashtagOptions = (hashtags: readonly string[]) => hashtags.map((tag) => ({ id: tag, label: tag.startsWith("#") ? tag : `#${tag}` }));
-
   return (
     <DirectoryShell fill header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
           <Button
@@ -356,7 +358,7 @@ export function BrandDirectory({
           <Field label="Owner supplier" description="Optional registered manufacturer or brand owner supplier.">
             <CreatableSearch
               label="Owner supplier"
-              options={ownerVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
+              options={ownerVendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
               value={createOwnerVendorId}
               onValueChange={setCreateOwnerVendorId}
               placeholder="Select an owner supplier"
@@ -365,13 +367,13 @@ export function BrandDirectory({
             />
           </Field>
           <Field label="Hashtags" description="Search existing discovery tags or add a new one, such as #laminate or #finish.">
-            <CreatableMultiSelect label="Hashtags" options={hashtagOptions(createHashtags)} value={createHashtags} onValueChange={setCreateHashtags} onCreate={(tag) => tag.trim()} placeholder="Add hashtags" createLabel={(tag) => `Add hashtag "${tag}"`} />
+            <CreatableMultiSelect label="Hashtags" options={buildBrandHashtagOptions(hashtagSuggestions, createHashtags)} value={createHashtags} onValueChange={setCreateHashtags} onCreate={(tag) => tag.trim()} placeholder="Add hashtags" createLabel={(tag) => `Add hashtag "${tag}"`} />
           </Field>
           <Field label="Product categories" description="Search a discovery category or create a missing one.">
             <CreatableMultiSelect label="Product categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))} value={createCategoryIds} onValueChange={setCreateCategoryIds} onCreate={canManageCategories ? (name) => createProductCategory(name, setCreateError) : undefined} createLabel={(name) => `Create product category "${name}"`} />
           </Field>
           <Field label="Suppliers" description="Organizations that supply this Brand. Managed here and shown read-only on Supplier.">
-            <CreatableMultiSelect label="Suppliers" options={ownerVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))} value={createSupplierIds} onValueChange={setCreateSupplierIds} placeholder="Select suppliers" />
+            <CreatableMultiSelect label="Suppliers" options={materialVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))} value={createSupplierIds} onValueChange={setCreateSupplierIds} placeholder="Select suppliers" />
           </Field>
           {/* Links builder */}
           <div className="grid gap-2 border-t border-line pt-3">
@@ -467,7 +469,7 @@ export function BrandDirectory({
           <Field label="Owner supplier" description="Optional registered manufacturer or brand owner supplier.">
               <CreatableSearch
                 label="Owner supplier"
-                options={ownerVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
+                options={ownerVendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
                 value={editOwnerVendorId}
                 onValueChange={setEditOwnerVendorId}
                 placeholder="Select an owner supplier"
@@ -476,13 +478,13 @@ export function BrandDirectory({
               />
             </Field>
             <Field label="Hashtags" description="Search existing discovery tags or add a new one.">
-              <CreatableMultiSelect label="Hashtags" options={hashtagOptions(editHashtags)} value={editHashtags} onValueChange={setEditHashtags} onCreate={(tag) => tag.trim()} placeholder="Add hashtags" createLabel={(tag) => `Add hashtag "${tag}"`} />
+              <CreatableMultiSelect label="Hashtags" options={buildBrandHashtagOptions(hashtagSuggestions, editHashtags)} value={editHashtags} onValueChange={setEditHashtags} onCreate={(tag) => tag.trim()} placeholder="Add hashtags" createLabel={(tag) => `Add hashtag "${tag}"`} />
             </Field>
             <Field label="Product categories" description="Manual selections keep their own provenance.">
               <CreatableMultiSelect label="Product categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))} value={editCategoryIds} onValueChange={setEditCategoryIds} onCreate={canManageCategories ? (name) => createProductCategory(name, setEditError) : undefined} createLabel={(name) => `Create product category "${name}"`} />
             </Field>
             <Field label="Suppliers" description="Organizations that supply this Brand. Changes are reflected read-only on Supplier.">
-              <CreatableMultiSelect label="Suppliers" options={ownerVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))} value={editSupplierIds} onValueChange={setEditSupplierIds} placeholder="Select suppliers" />
+              <CreatableMultiSelect label="Suppliers" options={materialVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))} value={editSupplierIds} onValueChange={setEditSupplierIds} placeholder="Select suppliers" />
             </Field>
             {/* Links builder */}
             <div className="grid gap-2 border-t border-line pt-3">

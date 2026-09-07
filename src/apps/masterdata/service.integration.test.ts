@@ -77,6 +77,28 @@ after(async () => {
 });
 
 describe("Master Data service", () => {
+  it("separates live Brand owners from material-capable supplier choices", async () => {
+    const ownerOnly = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Owner Only" });
+    const materialSupplier = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Material Supplier" });
+    const archivedSupplier = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Archived Supplier" });
+    const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    await testDb.prisma.vendorVendorType.createMany({
+      data: [materialSupplier.vendorId, archivedSupplier.vendorId].map((vendorId) => ({
+        id: crypto.randomUUID(),
+        vendor_id: vendorId,
+        vendor_type_id: supplierType.id,
+      })),
+    });
+    await service.archiveVendor({ grants: GRANTS, actor: ACTOR, vendorId: archivedSupplier.vendorId });
+
+    const refs = await service.listBrandDirectoryRefs({ grants: GRANTS });
+
+    assert.equal(refs.ownerVendors.some((vendor) => vendor.id === ownerOnly.vendorId), true);
+    assert.equal(refs.ownerVendors.some((vendor) => vendor.id === materialSupplier.vendorId), true);
+    assert.equal(refs.ownerVendors.some((vendor) => vendor.id === archivedSupplier.vendorId), false);
+    assert.deepEqual(refs.materialVendors.map((vendor) => vendor.id), [materialSupplier.vendorId]);
+  });
+
   it("offers canonical promotion choices and rejects wrong-type, archived, or unauthorized selections", async () => {
     const context = await createMaterialContext();
     const { skuId } = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Promotion SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "120", currency: "IDR" }] });

@@ -51,6 +51,7 @@ export default async function BrandsPage() {
       <BrandDirectory
         brands={brands}
         productCategories={refs.productCategories}
+        ownerVendors={refs.ownerVendors}
         materialVendors={refs.materialVendors}
         canManage={canManage}
         canManageVendors={canManageVendors}

@@ -5,8 +5,33 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.01**
-- Next local revision: **R7.02**
+- Current revision after this entry is committed: **R7.02**
+- Next local revision: **R7.03**
+
+## R7.02 | 2026-09-08 | fix(brand): reuse hashtag suggestions and scope supplier choices
+
+### Fixed
+
+- Brand create/edit forms now suggest canonical hashtags already used by other
+  Brands, deduplicated by normalized case-insensitive value while preserving the
+  display label and allowing new tags.
+- Brand owner selection now includes every live Supplier, including owner-only
+  Suppliers without material capability.
+- Brand Supplier selection now includes only live Suppliers with a live
+  `can_supply_material` capability, preventing an ineligible owner quick-entry
+  record from leaking into the Supplier picker. Server-side eligibility remains
+  enforced as the final guard.
+
+### Dependencies and migrations
+
+- No dependency or repository migration changes.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- Targeted ESLint on changed Brand/service files: passed.
+- Hashtag option unit tests: passed.
+- `npm test`: passed — 258 tests, 64 suites, 0 failed/cancelled/skipped.
 
 ## R7.01 | 2026-09-07 | fix(shell): remove empty settings rail and form warning
 
