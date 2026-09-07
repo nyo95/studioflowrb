@@ -151,8 +151,11 @@ The following remain deferred and must not be inferred during implementation:
   edit, archive, restore, or permanent deletion must not rewrite historical BQ
   meaning.
 - For material pricing, those commercial facts include base Unit, purchase Unit,
-  and `purchase_to_base_factor`. BQ calculates price per base Unit as
-  `purchase price / purchase_to_base_factor` and snapshots the factor it used.
+  and `purchase_to_base_factor`. BQ snapshots the factor for display context only
+  (`purchase_to_base_factor_snapshot` is display-only and does not enter the BQ
+  calculation formula — see `bq-contract.md` K-03 and §7.4 for the authoritative
+  engine rule). The estimator sets the koefisien independently; the factor is
+  informational.
 - No cheapest, newest, preferred, or manufacturer fallback is inferred. When
   several eligible prices exist, the consumer selects one explicitly.
 

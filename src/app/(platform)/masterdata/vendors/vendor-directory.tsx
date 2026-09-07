@@ -12,8 +12,10 @@ import {
 archiveVendorAction,
 createVendorAction,
 requestVendorDeletionAction,
+resolveVendorLinkReviewAction,
 restoreVendorAction,
 updateVendorAction,
+updateVendorInfoLinksAction,
 } from "./actions";
 
 type VendorRow = {
@@ -71,19 +73,127 @@ type VendorTypeOption = {
 
 type BrandOption = { id: string; name: string };
 
-function SupplierInformationLinks({ value, review }: { value: unknown; review: unknown }) {
-  const links = Array.isArray(value) ? value.flatMap((entry: unknown) => {
-    if (!entry || typeof entry !== "object" || !("url" in entry) || typeof entry.url !== "string") return [];
-    try {
-      const url = new URL(entry.url);
-      if (!["https:", "http:"].includes(url.protocol)) return [];
-      return [{ url: url.href, label: "label" in entry && typeof entry.label === "string" ? entry.label : url.hostname }];
-    } catch { return []; }
-  }) : [];
-  return <>
-    {links.length ? <Field label="Company information links"><div className="grid gap-1">{links.map(link => <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer" className="text-action underline wrap-anywhere">{link.label}</a>)}</div></Field> : null}
-    {Array.isArray(review) && review.length ? <Notice tone="warning">{review.length} previous links are preserved for ownership review.</Notice> : null}
-  </>;
+const LINK_KINDS = ["WEBSITE", "INSTAGRAM", "FACEBOOK", "TIKTOK", "YOUTUBE", "LINKEDIN", "WHATSAPP"] as const;
+type LinkEntry = { kind: string; url: string; label: string | null };
+function parseLinks(value: unknown): LinkEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry: unknown) => {
+    if (!entry || typeof entry !== "object") return [];
+    const e = entry as Record<string, unknown>;
+    if (typeof e.url !== "string" || !e.url) return [];
+    return [{ kind: typeof e.kind === "string" ? e.kind : "WEBSITE", url: e.url, label: typeof e.label === "string" ? e.label : null }];
+  });
+}
+
+function SupplierLinksEditor({ vendorId, initialLinks, initialSnapshot, canManage }: {
+  vendorId: string;
+  initialLinks: unknown;
+  initialSnapshot: unknown;
+  canManage: boolean;
+}) {
+  const [links, setLinks] = useState<LinkEntry[]>(() => parseLinks(initialLinks));
+  const [snapshot, setSnapshot] = useState<LinkEntry[]>(() => parseLinks(initialSnapshot));
+  const [newKind, setNewKind] = useState<string>(LINK_KINDS[0]);
+  const [newUrl, setNewUrl] = useState("");
+  const [newLabel, setNewLabel] = useState("");
+  const [acceptedIdxs, setAcceptedIdxs] = useState<Set<number>>(new Set());
+  const [linkPending, setLinkPending] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+
+  const doSaveLinks = async (updated: LinkEntry[]) => {
+    setLinkPending(true);
+    setLinkError(null);
+    const res = await updateVendorInfoLinksAction(vendorId, updated);
+    setLinkPending(false);
+    if (res.ok) { setLinks(updated); return true; }
+    setLinkError(res.error.safeMessage);
+    return false;
+  };
+
+  const handleAdd = async () => {
+    const url = newUrl.trim();
+    if (!url) return;
+    if (links.some(l => l.url === url)) { setLinkError("This URL is already in the list."); return; }
+    const ok = await doSaveLinks([...links, { kind: newKind, url, label: newLabel.trim() || null }]);
+    if (ok) { setNewUrl(""); setNewLabel(""); }
+  };
+
+  const handleRemove = (idx: number) => doSaveLinks(links.filter((_, i) => i !== idx));
+
+  const handleResolveReview = async () => {
+    setLinkPending(true);
+    setLinkError(null);
+    const accepted = [...acceptedIdxs].filter(i => i >= 0 && i < snapshot.length);
+    const res = await resolveVendorLinkReviewAction(vendorId, accepted);
+    setLinkPending(false);
+    if (res.ok) {
+      const acceptedItems = accepted.map(i => snapshot[i]).filter(Boolean) as LinkEntry[];
+      setLinks(prev => [...prev, ...acceptedItems]);
+      setSnapshot([]);
+      setAcceptedIdxs(new Set());
+    } else {
+      setLinkError(res.error.safeMessage);
+    }
+  };
+
+  return (
+    <div className="grid gap-3">
+      {linkError ? <InlineError>{linkError}</InlineError> : null}
+      <Field label="Company information links" description="WEBSITE, INSTAGRAM, FACEBOOK, TIKTOK, YOUTUBE, LINKEDIN, or WHATSAPP. HTTP/HTTPS only.">
+        <>
+        {links.length ? (
+          <div className="grid gap-1">
+            {links.map((link, idx) => (
+              <div key={link.url} className="flex items-center gap-2 text-sm">
+                <span className="text-ink-tertiary text-xs uppercase shrink-0">{link.kind}</span>
+                <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-action underline wrap-anywhere flex-1 min-w-0">{link.label || link.url}</a>
+                {canManage ? <IconButton label="Remove link" icon={<X size={12} />} size="sm" className="!h-5 !w-5 !min-h-5 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!text-ink-danger shrink-0" onClick={() => handleRemove(idx)} /> : null}
+              </div>
+            ))}
+          </div>
+        ) : <span className="text-ink-tertiary text-sm">No company links added.</span>}
+        {canManage ? (
+          <div className="mt-2 grid gap-2 border-t border-line pt-2">
+            <div className="flex gap-2 items-end">
+              <Field label="Kind" className="w-36 shrink-0">
+                <Select value={newKind} onChange={e => setNewKind(e.target.value)}>
+                  {LINK_KINDS.map(k => <option key={k} value={k}>{k.charAt(0) + k.slice(1).toLowerCase()}</option>)}
+                </Select>
+              </Field>
+              <Field label="URL" className="flex-1 min-w-0">
+                <Input value={newUrl} onChange={e => { setNewUrl(e.target.value); setLinkError(null); }} placeholder="https://..." maxLength={2048} />
+              </Field>
+              <Field label="Label (optional)" className="w-36 shrink-0">
+                <Input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Display name" maxLength={200} />
+              </Field>
+              <Button type="button" size="sm" variant="secondary" disabled={!newUrl.trim() || linkPending} onClick={handleAdd}>Add</Button>
+            </div>
+          </div>
+        ) : null}
+        </>
+      </Field>
+      {snapshot.length > 0 ? (
+        <Field label="Links pending review" description="These links were preserved from a previous import. Accept the ones that belong to this Supplier; the rest will be discarded.">
+          <>
+          <div className="grid gap-1 border border-line rounded p-2 bg-surface-muted/40">
+            {snapshot.map((item, idx) => (
+              <label key={idx} className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                <input type="checkbox" checked={acceptedIdxs.has(idx)} onChange={e => {
+                  setAcceptedIdxs(prev => { const next = new Set(prev); e.target.checked ? next.add(idx) : next.delete(idx); return next; });
+                }} className="shrink-0" />
+                <span className="text-ink-tertiary text-xs uppercase shrink-0">{item.kind}</span>
+                <span className="wrap-anywhere flex-1 min-w-0">{item.label ? `${item.label} — ` : ""}{item.url}</span>
+              </label>
+            ))}
+          </div>
+          {canManage ? <Button type="button" size="sm" variant="secondary" disabled={linkPending} onClick={handleResolveReview} className="mt-2">
+            Resolve review ({acceptedIdxs.size} accepted, {snapshot.length - acceptedIdxs.size} discarded)
+          </Button> : null}
+          </>
+        </Field>
+      ) : null}
+    </div>
+  );
 }
 
 type ContactDraft = {
@@ -554,7 +664,7 @@ export function VendorDirectory({
                       <Field label="Office / Workshop address">
                         <Input name="address" value={editAddress} maxLength={256} onChange={(e) => setEditAddress(e.target.value)} />
                       </Field>
-                      <SupplierInformationLinks value={editTarget.info_links} review={editTarget.link_review_snapshot} />
+                      <SupplierLinksEditor vendorId={editTarget.id} initialLinks={editTarget.info_links} initialSnapshot={editTarget.link_review_snapshot} canManage={canManage} />
                       <Field label="Notes">
                         <SimpleTextEditor name="notes" value={editNotes} rows={2} onChange={(e) => setEditNotes(e.target.value)} />
                       </Field>

@@ -161,31 +161,28 @@ catalog data; it never archives an owner or supplier Vendor.
 In one transaction:
 
 1. add the Brand's direct archive cause;
-2. add a Brand-parent cause to every live SKU of that Brand;
-3. through each affected SKU, add the corresponding parent cause to its live
-   PriceMaterial rows;
-4. preserve Categories/origins, hashtags, resources, owner, BrandSupplier, and
+2. preserve Categories/origins, hashtags, resources, owner, BrandSupplier, and
    scoped contacts;
-5. write one `brand.archived` primary AuditEvent with safe cascade counts.
+3. write one `brand.archived` primary AuditEvent.
 
-Archived Brand/SKU/PriceMaterial records are excluded from operational pickers
-and public reads.
+**brand-contract §1:** Brand archive does NOT cascade to its SKUs or their
+Material Prices. Each SKU and PriceMaterial manages its own lifecycle
+independently. Archived Brand records are excluded from operational pickers and
+public reads; their SKUs and Prices remain in their current state.
 
 ### 6.2 Restore
 
-Restore removes only the causes created by this Brand archive. An SKU or price
-that still has a direct or another-parent cause remains archived. Before any row
-becomes live, validate:
+Restore makes the Brand live again. Before the Brand becomes live, validate:
 
 - Brand name/slug has no live conflict;
 - owner Vendor, when retained, is live;
 - BrandSupplier Vendors are live and materially eligible;
-- Category/resource relations still satisfy their live-target rules;
-- each SKU and PriceMaterial being reactivated satisfies its owning contract;
-- PriceMaterial has no live SKU × Vendor pair conflict.
+- Category/resource relations still satisfy their live-target rules.
 
-Price age never blocks restore. Price freshness/notification cadence is a separate
-future workflow and is not implemented as restore policy.
+**brand-contract §1:** Restore does NOT automatically restore SKUs or Material
+Prices — those entities are independent. SKUs that were archived with their own
+direct cause remain archived; they can be restored independently through the
+SKU lifecycle flow.
 
 ### 6.3 Permanent deletion
 
@@ -193,12 +190,19 @@ Permanent deletion requires an approved request and an archived Brand. It is
 blocked while BrandSupplier or Brand-scoped VendorContact references remain.
 Owner linkage is a field on the Brand and is removed with it.
 
-The owner-approved Brand deletion includes its owned SKUs. In the same approved
-transaction, the service explicitly deletes dependent PriceMaterial and SKU child
-rows, then the SKUs, Brand-owned Categories/origins/hashtags/resources, and finally
-the Brand. Restrict FKs require this explicit order; database Cascade is not used
-to hide the business operation. One `brand.deleted` AuditEvent survives in Core
-with safe counts. BQ historical snapshots remain independent.
+**brand-contract §1:** Permanent deletion does NOT delete SKUs or their Material
+Prices. In the same approved transaction the service:
+
+1. nulls `brand_id` on all SKUs that referenced this Brand (valid since R6.20
+   made brand_id optional on Sku), detaching them safely;
+2. removes any remaining PARENT-kind ArchiveCause rows that link SKU archive
+   state to this Brand, so each SKU can be restored or reassigned independently;
+3. deletes Brand-owned Categories/origins/hashtags/resources;
+4. deletes the Brand itself.
+
+Restrict FKs require this explicit order; database Cascade is not used to hide
+the business operation. One `brand.deleted` AuditEvent survives in Core.
+BQ historical snapshots remain independent.
 
 ## 7. Permissions and audit
 
@@ -360,8 +364,8 @@ evidence only; it does not authorize code changes.
 | Hashtags | Separate normalized discovery keywords |
 | Owner vs supplier | Independent relations; neither implies the other |
 | Resources | Many external URLs directly on Brand; internal storage deferred |
-| Archive | Staff; cascades to Brand SKUs and their Material Prices |
-| Restore | Removes only matching cascade causes; validates live graph |
+| Archive | Staff; Brand entity only — SKUs and Prices are not affected |
+| Restore | Brand entity only — SKUs and Prices are not automatically restored |
 | Permanent delete | Staff request, explicit approver permission, includes Brand SKUs/prices |
 | Historical BQ | Protected by consumer snapshots |
 | UI | Directory table, trailing action menu, Dialog edit, explicit confirmations |

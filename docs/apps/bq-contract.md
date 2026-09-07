@@ -341,18 +341,22 @@ bq.BqTemplateRecommendation -- link template_section → library_item
 
 **Alur:**
 1. BQ Library item status → `REQUESTED`
-2. Master Data mendapat notifikasi dan menampilkan antrian promotion request
+2. Master Data menampilkan antrian promotion request di halaman pengaturan
 3. Admin/staff yang diberi kewenangan Master Data review → approve atau reject
-4. **Jika approve:** Master Data membuat entry baru melalui pricing workflow biasa (manual input harga), lalu mengembalikan ID record yang benar. Status BQ → `APPROVED` hanya setelah linkage tervalidasi.
+4. **Jika approve:** Admin memilih canonical price yang sudah ada di Master Data
+   (price dibuat terpisah melalui pricing workflow biasa) dan menghubungkannya
+   ke Library item. Status BQ → `APPROVED` hanya setelah linkage tervalidasi.
+   `masterdata_ref_id` di-set ke ID price canonical yang dipilih.
 5. **Jika reject:** Admin/staff Master Data mengisi alasan. Status → `REJECTED`. Bisa diajukan ulang setelah direvisi.
 
-**Yang TIDAK ikut dalam promosi:** harga snapshot. Harga di Master Data diisi admin secara mandiri.
-**Yang ikut:** `name`, `purchase_unit`, `base_unit`, `kategori` → menjadi SKU + price entry baru.
+**Yang TIDAK ikut dalam promosi:** harga snapshot. Harga di Master Data dikelola
+admin secara mandiri dan dipilih saat approval, bukan dibuat otomatis oleh alur promotion.
 
 **Operasi lintas aplikasi:**
 - `requestPromotion(type, libItemId)` — BQ estimator mengubah status → REQUESTED
 - `listPromotionRequests()` — Master Data admin/staff melihat antrian melalui kontrak promotion
-- `approvePromotion(type, libItemId)` — Master Data membuat entry dan mengembalikan ID tervalidasi; linkage lalu menjadikan status → APPROVED
+- `approvePromotion(type, libItemId, masterdataRefId)` — Master Data menghubungkan
+  canonical price yang dipilih; linkage lalu menjadikan status → APPROVED
 - `rejectPromotion(type, libItemId, reason)` — Master Data mencatat alasan dan status → REJECTED
 
 Approval adalah workflow milik Master Data, bukan tab atau permission BQ. BQ
@@ -500,7 +504,7 @@ yang lain (K-05).
 3. **BQ Library** — list items, form tambah, status promosi, tab Template Editor
 4. **Template Editor** — buat/edit template, atur section, tambah recommended items
 5. **Promotion status** — estimator melihat status request pada BQ Library
-6. **Master Data promotion queue** — admin/staff Master Data review, approve/reject, dan membuat entry harga
+6. **Master Data promotion queue** — admin/staff Master Data review, approve/reject, dan menghubungkan canonical price yang sudah ada
 
 ---
 
