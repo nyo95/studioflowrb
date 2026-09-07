@@ -10,7 +10,7 @@ import { promotionCoordinator } from "@/app/promotion-runtime";
 
 const PromotionSchema = z.object({
   type: z.enum(["material", "labor", "material_labor"]),
-  libItemId: z.string().uuid(),
+  libItemId: z.string().cuid(),
 });
 
 function refresh(): void {

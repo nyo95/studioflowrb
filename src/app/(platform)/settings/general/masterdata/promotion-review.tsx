@@ -1,8 +1,9 @@
-import { Button, EmptyState, Field, Input, SectionCard, Text, Textarea } from "@/platform/ui_engine";
+import { Button, EmptyState, Field, Select, SectionCard, Text, Textarea } from "@/platform/ui_engine";
 import type { BqPromotionRequest } from "@/apps/bq/public";
 import { approveBqPromotionAction, rejectBqPromotionAction } from "./promotion-actions";
+import { PromotionDecisionForm } from "./promotion-decision-form";
 
-export function PromotionReview({ requests }: { requests: readonly BqPromotionRequest[] }) {
+export function PromotionReview({ requests, references }: { requests: readonly BqPromotionRequest[]; references: readonly { id: string; type: string; label: string }[] }) {
   if (requests.length === 0) {
     return <SectionCard><EmptyState title="Tidak ada pengajuan" description="Belum ada item BQ yang menunggu approval Master Data." /></SectionCard>;
   }
@@ -18,22 +19,25 @@ export function PromotionReview({ requests }: { requests: readonly BqPromotionRe
               {request.notes ? <Text tone="tertiary" size="sm">{request.notes}</Text> : null}
             </div>
             <div className="grid gap-3">
-              <form action={async (formData) => { await approveBqPromotionAction(formData); }} className="grid gap-2">
+              <PromotionDecisionForm action={approveBqPromotionAction}>
                 <input type="hidden" name="type" value={request.type} />
                 <input type="hidden" name="libItemId" value={request.id} />
-                <Field label="Master Data price ID" required description="Buat entry melalui Pricing terlebih dahulu, lalu masukkan ID price yang aktif.">
-                  <Input name="masterdataRefId" required maxLength={64} />
+                <Field label="Master Data price" required description="Pilih harga aktif yang sesuai. Jika belum tersedia, buat melalui Pricing terlebih dahulu.">
+                  <Select name="masterdataRefId" required defaultValue="">
+                    <option value="">Select canonical price</option>
+                    {references.filter(reference => reference.type === request.type).map(reference => <option key={reference.id} value={reference.id}>{reference.label}</option>)}
+                  </Select>
                 </Field>
                 <Button type="submit" size="sm" variant="primary">Approve dan hubungkan</Button>
-              </form>
-              <form action={async (formData) => { await rejectBqPromotionAction(formData); }} className="grid gap-2">
+              </PromotionDecisionForm>
+              <PromotionDecisionForm action={rejectBqPromotionAction}>
                 <input type="hidden" name="type" value={request.type} />
                 <input type="hidden" name="libItemId" value={request.id} />
                 <Field label="Alasan reject" required>
                   <Textarea name="reason" required maxLength={500} />
                 </Field>
                 <Button type="submit" size="sm" variant="danger">Reject request</Button>
-              </form>
+              </PromotionDecisionForm>
             </div>
           </div>
         </SectionCard>

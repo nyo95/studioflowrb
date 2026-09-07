@@ -298,7 +298,7 @@ export function TableCellContent({
 }
 
 export type EntityPrimaryCellProps = {
-  /** Semantic tone for the status dot (success=ACTIVE, warning=LOCKED, neutral=ARCHIVED, danger=deleted/error) */
+  /** Semantic tone for the status dot; applications choose the final domain mapping explicitly. */
   tone: SemanticTone;
   /** Accessible label for the status dot — shown as tooltip and read by screen readers */
   statusLabel: string;

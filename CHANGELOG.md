@@ -8,6 +8,30 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Current revision after this entry is committed: **R6.19**
 - Next local revision: **R6.20**
 
+## R6.20 | 2026-09-07 | fix(regression): restore optional SKU Brand and preserve BQ/Supplier invariants
+
+- Restored nullable SKU Brand across schema, actions, service, forms, and tests;
+  valid Brand references remain enforced when supplied.
+- Corrected historical and future BQ price baselines so CUSTOM rows never receive
+  `source_price_snapshot`; imported rows retain immutable baselines.
+- Preserved Supplier company links before VendorLink purge and retained ambiguous
+  links for review; catalog ownership remains Brand-owned.
+- Decoupled BQ deletion review from project-read access, hid derived Library
+  Category fields, made the rail expanded by default, and aligned UI Engine status
+  semantics documentation.
+- Replaced promotion approval's free-text ID with a canonical Master Data price
+  selector and coordinator-backed reference list.
+
+### Verification
+
+- `npx prisma validate` — passed
+- `npx prisma migrate deploy` against office rebuild — passed
+- `npm run typecheck` — passed
+- `npm test` — 246 passed, 0 failed
+- `npm run lint` / `npm run check` — passed
+- Browser smoke checks — reviewer approval panel, collapsible expanded rail,
+  and Library Category visibility passed.
+
 ## R6.19 | docs(revisions): reconcile UI session ledger
 
 - Reconciled the revision ledger with the already committed R6.15–R6.18 UI

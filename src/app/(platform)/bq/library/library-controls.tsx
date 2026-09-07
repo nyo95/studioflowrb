@@ -94,7 +94,7 @@ function LibraryItemDialog({ item, units, open: controlledOpen, onOpenChange }: 
           <Field label="Price" required><Input name="harga" defaultValue={item?.harga ?? "0"} inputMode="decimal" required /></Field>
           <Field label="Currency" required><Input name="currency" defaultValue={item?.currency ?? "IDR"} maxLength={3} required /></Field>
           <input type="hidden" name="defaultKoefisien" value={item?.defaultKoefisien ?? "1"} />
-          {type === "custom" ? <Field label="Category" required><Select name="kategori" defaultValue={item?.kategori ?? "BIAYA_UMUM"}><option value="BIAYA_UMUM">Biaya Umum</option><option value="TRANSPORTASI_AKOMODASI">Transportasi &amp; Akomodasi</option><option value="ALAT">Alat</option></Select></Field> : <Field label="Category"><Input value={type === "material" ? "Material" : type === "labor" ? "Labor" : "Material + Labor"} disabled /></Field>}
+          {type === "custom" ? <Field label="Category" required><Select name="kategori" defaultValue={item?.kategori ?? "BIAYA_UMUM"}><option value="BIAYA_UMUM">Biaya Umum</option><option value="TRANSPORTASI_AKOMODASI">Transportasi &amp; Akomodasi</option><option value="ALAT">Alat</option></Select></Field> : null}
         </div>
         <Field label="Notes"><Textarea name="notes" defaultValue={item?.notes ?? ""} maxLength={2000} /></Field>
         <FormActions><Button data-dialog-cancel type="button" variant="ghost" onClick={() => setOpen(false)} disabled={pending}>Cancel</Button><Button type="submit" variant="primary" pending={pending}>{item ? "Save changes" : "Add item"}</Button></FormActions>

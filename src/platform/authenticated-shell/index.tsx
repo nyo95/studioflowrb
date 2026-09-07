@@ -62,7 +62,6 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
         </Link>
       )}
       collapsible
-      defaultCollapsed
       navigationLabel={`${settings.appTitle} navigation`}
       navigation={<AuthenticatedPlatformNavigation
         showGeneralSettings={hasPermission(grants, "platform.settings.read")}

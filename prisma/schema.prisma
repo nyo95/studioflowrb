@@ -313,6 +313,8 @@ model Vendor {
   legal_name String?
   address    String?
   notes      String?
+  info_links Json @default("[]")
+  link_review_snapshot Json @default("[]")
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
   deleted_at DateTime?
@@ -460,7 +462,7 @@ model BrandCategoryOrigin {
 
 model Sku {
   id                      String    @id @default(uuid())
-  brand_id                String
+  brand_id                String?
   code                    String?
   name                    String?
   slug                    String
@@ -476,7 +478,7 @@ model Sku {
   updated_at              DateTime  @updatedAt
   deleted_at              DateTime?
 
-  brand            Brand                 @relation(fields: [brand_id], references: [id], onDelete: Restrict)
+  brand            Brand?                @relation(fields: [brand_id], references: [id], onDelete: Restrict)
   base_unit        Unit                  @relation("SkuBaseUnit", fields: [base_unit_id], references: [id], onDelete: Restrict)
   purchase_unit    Unit?                 @relation("SkuPurchaseUnit", fields: [purchase_unit_id], references: [id], onDelete: Restrict)
   dimension_unit   Unit?                 @relation("SkuDimensionUnit", fields: [dimension_unit_id], references: [id], onDelete: Restrict)

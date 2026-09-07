@@ -77,6 +77,32 @@ after(async () => {
 });
 
 describe("Master Data service", () => {
+  it("offers canonical promotion choices and rejects wrong-type, archived, or unauthorized selections", async () => {
+    const context = await createMaterialContext();
+    const { skuId } = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Promotion SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "120", currency: "IDR" }] });
+    const price = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: skuId } });
+    const choices = await service.listPromotionReferences({ grants: [MASTERDATA_PERMISSIONS.promotionApprove] });
+    assert.equal(choices[0].id, price.id);
+    assert.match(choices[0].label, /Promotion SKU/);
+    assert.equal((await service.validatePromotionReference({ grants: GRANTS, type: "material", referenceId: price.id })).referenceId, price.id);
+    await assert.rejects(service.validatePromotionReference({ grants: GRANTS, type: "labor", referenceId: price.id }));
+    await assert.rejects(service.listPromotionReferences({ grants: [] }));
+    await testDb.prisma.priceMaterial.update({ where: { id: price.id }, data: { deleted_at: new Date() } });
+    assert.deepEqual(await service.listPromotionReferences({ grants: GRANTS }), []);
+    await assert.rejects(service.validatePromotionReference({ grants: GRANTS, type: "material", referenceId: price.id }));
+  });
+  it("creates an unbranded SKU, attaches a valid Brand, and removes it with enrichment cleanup", async () => {
+    const context = await createMaterialContext();
+    const input = { grants: GRANTS, actor: ACTOR, name: "Unbranded", baseUnitId: context.unit.id, categoryId: context.categoryId };
+    const { skuId } = await service.createSku({ ...input, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] });
+    assert.equal((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: skuId } })).brand_id, null);
+    await service.updateSku({ ...input, skuId, brandId: context.brandId });
+    assert.equal(await testDb.prisma.brandCategoryOrigin.count({ where: { source_sku_id: skuId } }), 1);
+    await service.updateSku({ ...input, skuId, brandId: null });
+    assert.equal((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: skuId } })).brand_id, null);
+    assert.equal(await testDb.prisma.brandCategoryOrigin.count({ where: { source_sku_id: skuId } }), 0);
+    assert.equal(await testDb.prisma.brand.count({ where: { id: context.brandId } }), 1);
+  });
   it("creates a complete SKU atomically with exact decimal material pricing", async () => {
     const context = await createMaterialContext();
     const result = await service.createSku({
@@ -219,15 +245,13 @@ describe("Master Data service", () => {
       () => service.createSku({ ...base, categoryId: "" }),
       (error: unknown) => error instanceof AppError && error.code === "SKU_CATEGORY_REQUIRED",
     );
-    await assert.rejects(
-      () => service.createSku({ ...base, brandId: "" }),
-      (error: unknown) => error instanceof AppError && error.code === "SKU_BRAND_REQUIRED",
-    );
+    const unbranded = await service.createSku({ ...base, brandId: "" });
+    assert.equal((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: unbranded.skuId } })).brand_id, null);
     await assert.rejects(
       () => service.createSku({ ...base, priceMaterials: [{ ...base.priceMaterials[0], amount: "NaN" }] }),
       (error: unknown) => error instanceof AppError && error.code === "PRICE_AMOUNT_INVALID",
     );
-    assert.equal(await testDb.prisma.sku.count(), 0);
+    assert.equal(await testDb.prisma.sku.count(), 1);
   });
 
   it("rejects non-product categories on SKU create and update", async () => {

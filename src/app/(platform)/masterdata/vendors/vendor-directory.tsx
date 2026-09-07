@@ -23,6 +23,8 @@ type VendorRow = {
   legal_name: string | null;
   address: string | null;
   notes: string | null;
+  info_links: unknown;
+  link_review_snapshot: unknown;
   updated_at: Date;
   updated_by_label: string | null;
   deleted_at: Date | null;
@@ -68,6 +70,21 @@ type VendorTypeOption = {
 };
 
 type BrandOption = { id: string; name: string };
+
+function SupplierInformationLinks({ value, review }: { value: unknown; review: unknown }) {
+  const links = Array.isArray(value) ? value.flatMap((entry: unknown) => {
+    if (!entry || typeof entry !== "object" || !("url" in entry) || typeof entry.url !== "string") return [];
+    try {
+      const url = new URL(entry.url);
+      if (!["https:", "http:"].includes(url.protocol)) return [];
+      return [{ url: url.href, label: "label" in entry && typeof entry.label === "string" ? entry.label : url.hostname }];
+    } catch { return []; }
+  }) : [];
+  return <>
+    {links.length ? <Field label="Company information links"><div className="grid gap-1">{links.map(link => <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer" className="text-action underline wrap-anywhere">{link.label}</a>)}</div></Field> : null}
+    {Array.isArray(review) && review.length ? <Notice tone="warning">{review.length} previous links are preserved for ownership review.</Notice> : null}
+  </>;
+}
 
 type ContactDraft = {
   id?: string;
@@ -537,6 +554,7 @@ export function VendorDirectory({
                       <Field label="Office / Workshop address">
                         <Input name="address" value={editAddress} maxLength={256} onChange={(e) => setEditAddress(e.target.value)} />
                       </Field>
+                      <SupplierInformationLinks value={editTarget.info_links} review={editTarget.link_review_snapshot} />
                       <Field label="Notes">
                         <SimpleTextEditor name="notes" value={editNotes} rows={2} onChange={(e) => setEditNotes(e.target.value)} />
                       </Field>

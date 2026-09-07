@@ -259,8 +259,8 @@ export function SkuDirectory({
               <Field label="SKU name">
                 <Input name="name" defaultValue={editTarget.name ?? ""} maxLength={128} autoFocus />
               </Field>
-              <Field label="Brand" required>
-                <Combobox label="SKU brand" options={brands.map((brand) => ({ id: brand.id, label: brand.name }))} value={editBrandId} onValueChange={setEditBrandId} placeholder="Select brand" searchPlaceholder="Search brands…" />
+              <Field label="Brand" description="Optional. A SKU can exist without a Brand.">
+                <Combobox label="SKU brand" options={[{ id: "", label: "No brand" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={editBrandId} onValueChange={setEditBrandId} placeholder="No brand" searchPlaceholder="Search brands…" />
               </Field>
             </div>
             <div className="grid grid-cols-2 gap-3">

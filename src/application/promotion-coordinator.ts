@@ -6,6 +6,7 @@ type Actor = { kind: "USER"; userId: string; label: string };
 
 type PromotionCoordinatorDependencies = {
   masterData: {
+    listPromotionReferences(input: { grants: PermissionGrants }): Promise<Array<{ id: string; type: PromotionType; label: string }>>;
     validatePromotionReference(input: {
       grants: PermissionGrants;
       type: PromotionType;
@@ -34,6 +35,9 @@ type PromotionCoordinatorDependencies = {
 /** Cross-app use case. Neither owning app imports the other's runtime. */
 export function createPromotionCoordinator(deps: PromotionCoordinatorDependencies) {
   return {
+    listReferences(input: { grants: PermissionGrants }) {
+      return deps.masterData.listPromotionReferences(input);
+    },
     listRequests(input: { grants: PermissionGrants }) {
       return deps.bq.listPromotionRequests(input);
     },

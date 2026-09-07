@@ -77,9 +77,9 @@ refer only to the R1.05 Git snapshot and define what must not be reintroduced.
 
 ### SKU
 
-- SKU belongs to exactly one Brand (`1`), never a Brand junction table.
-- Live identity is `(brand_id, slug)`; creating or updating an unbranded SKU is
-  rejected at the action, service, and database boundaries.
+- SKU has zero or one Brand, never a Brand junction table. Brand may have zero SKUs.
+- Live identity is `(brand_id, slug)` for branded SKUs and `slug` for unbranded
+  SKUs. A supplied Brand must exist and be active; omission persists NULL.
 - `code` is retained and nullable as an external SKU/article identifier supplied
   by the Brand or Vendor; it is not the identity of a PriceMaterial row.
 - Supplier is not stored on SKU; Supplier belongs on `PriceMaterial` (the
@@ -87,7 +87,7 @@ refer only to the R1.05 Git snapshot and define what must not be reintroduced.
 - SKU uses archive/restore and the shared permanent-deletion approval workflow.
 - SKU creation is entered from Pricing → Material, not from the standalone SKU
   directory. The flow atomically creates the SKU and its first `PriceMaterial`.
-- Create requires one active Brand, at least one of `code` or `name`, exactly one
+- Create accepts an optional active Brand and requires at least one of `code` or `name`, exactly one
   active PRODUCT `categoryId`, Unit, and at least one `PriceMaterial`; a live SKU must retain
   at least one live `PriceMaterial`.
 - `code` and `name` are stored separately and may both be present. When only

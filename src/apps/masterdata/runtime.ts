@@ -6,5 +6,6 @@ import { createMasterDataPublicRead } from "./public";
 export const masterDataService = createMasterDataService(prisma, { auditWriter, runTransaction });
 export const masterDataPublicRead = createMasterDataPublicRead(prisma);
 export const masterDataPublicCommands = {
+  listPromotionReferences: masterDataService.listPromotionReferences,
   validatePromotionReference: masterDataService.validatePromotionReference,
 };

@@ -2,9 +2,12 @@
 
 > **R5.05 owner amendment — 2026-09-06.** The persisted entity and route remain
 > `Vendor`/`/masterdata/vendors`, but every user-facing label is **Supplier**.
-> Suppliers own operational profile, capability types, and sales contacts only.
-> `VendorLink` is PURGED: suppliers never own catalog, website, product URL, or
-> other external catalog resources. Those facts belong exclusively to Brand.
+> R6.20 owner correction: Suppliers own company information links as well as
+> operational profiles and contacts. Catalog/product resources remain Brand-owned.
+> Before `VendorLink` purge, complete company/contact link records are preserved
+> in `Vendor.info_links`; ambiguous resource records stay in
+> `Vendor.link_review_snapshot` for owner review. Neither field restores a Supplier
+> catalog. Existing purged data cannot be reconstructed without a rebuild backup.
 > `BrandSupplier` remains, but mutation is owned only by Brand; Supplier displays
 > supplied Brands as an explicit read-only projection.
 

@@ -17,5 +17,6 @@ ALTER TYPE "bq"."BqProjectStatus_new" RENAME TO "BqProjectStatus";
 ALTER TABLE "bq"."bq_line_item"
   ADD COLUMN IF NOT EXISTS "source_price_snapshot" DECIMAL(18,4) NULL;
 
--- Backfill — treat current harga_snapshot as the baseline for all existing rows
-UPDATE "bq"."bq_line_item" SET "source_price_snapshot" = "harga_snapshot" WHERE "source_price_snapshot" IS NULL;
+-- Imported rows alone have a source baseline; CUSTOM has none.
+UPDATE "bq"."bq_line_item" SET "source_price_snapshot" = "harga_snapshot"
+WHERE "source_price_snapshot" IS NULL AND "source_type" IN ('MASTERDATA', 'BQ_LIBRARY');

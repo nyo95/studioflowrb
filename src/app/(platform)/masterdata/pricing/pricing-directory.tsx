@@ -304,10 +304,10 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
       <Field label="SKU code / Article #"><Input name="code" maxLength={32} placeholder="KPF 2005" autoFocus /></Field>
       <Field label="SKU name"><Input name="name" value={skuName} onChange={(event) => setSkuName(event.target.value)} maxLength={128} placeholder="Optional product name" /></Field>
       <input type="hidden" name="brandId" value={brandId} />
-      <Field label="Brand" required>
+      <Field label="Brand" description="Optional. Leave empty for an unbranded SKU.">
         <CreatableSearch
           label="Brand"
-          options={brandOptions.map((brand) => ({ id: brand.id, label: brand.name }))}
+          options={[{ id: "", label: "No brand" }, ...brandOptions.map((brand) => ({ id: brand.id, label: brand.name }))]}
           value={brandId}
           onValueChange={setBrandId}
           placeholder="Search or select brand"

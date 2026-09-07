@@ -33,13 +33,14 @@ export default async function MasterDataSettingsPage() {
   const canApprove = hasPermission(grants, MASTERDATA_PERMISSIONS.deletionApprove);
   const canApprovePromotion = hasPermission(grants, MASTERDATA_PERMISSIONS.promotionApprove);
   const promotionRequests = canApprovePromotion ? await promotionCoordinator.listRequests({ grants }) : [];
+  const promotionReferences = canApprovePromotion ? await promotionCoordinator.listReferences({ grants }) : [];
   return <PageShell size="wide"><PageHeader eyebrow="Settings" title="Master Data Settings" description="Controlled vocabularies, pricing approval, and protected deletion review." />
     <Tabs label="Master Data Settings" items={[
       { value: "units", label: "Units", content: <UnitDirectory units={units} canManage={canManage} /> },
       { value: "categories", label: "Categories", content: <CategoryDirectory categories={categories} canManage={canManage} /> },
       { value: "vendor-types", label: "Supplier types", content: <VendorTypeDirectory rows={vendorTypes} canManage={canManage} /> },
       { value: "deletions", label: "Deletion review", disabled: !canApprove, content: <DeletionDirectory pendingRequests={deletions} canApprove={canApprove} /> },
-      { value: "promotions", label: "BQ approvals", disabled: !canApprovePromotion, content: <PromotionReview requests={promotionRequests} /> },
+      { value: "promotions", label: "BQ approvals", disabled: !canApprovePromotion, content: <PromotionReview requests={promotionRequests} references={promotionReferences} /> },
     ]} />
     <p className="text-sm text-ink-secondary">Need catalog work? Return to <Link className="text-action underline" href="/masterdata">Master Data</Link>.</p>
   </PageShell>;

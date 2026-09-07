@@ -67,7 +67,7 @@ export async function createMaterialSkuAction(formData: FormData): Promise<Actio
     const schema = z.object({
       name: z.string().max(128).optional().nullable().or(z.literal("")),
       code: z.string().max(32).optional().nullable().or(z.literal("")),
-      brandId: z.string().uuid("Brand is required"),
+      brandId: z.string().uuid().or(z.literal("")),
       baseUnitId: z.string().uuid(),
       purchaseUnitId: z.string().uuid().optional().nullable().or(z.literal("")),
       dimensionLength: z.string().max(32).optional().nullable().or(z.literal("")),

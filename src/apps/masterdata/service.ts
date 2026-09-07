@@ -1882,6 +1882,8 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           legal_name: true,
           address: true,
           notes: true,
+          info_links: true,
+          link_review_snapshot: true,
           updated_at: true,
           deleted_at: true,
           types: {
@@ -2609,7 +2611,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       name?: string | null;
       code?: string | null;
       notes?: string;
-      brandId: string;
+      brandId?: string | null;
       baseUnitId: string;
       purchaseUnitId?: string;
       dimensionLength?: string;
@@ -2629,9 +2631,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       const identity = resolveSkuIdentity(input.name, input.code);
       if (!input.categoryId) {
         throw new AppError("VALIDATION", "SKU_CATEGORY_REQUIRED", "At least one category is required.");
-      }
-      if (!input.brandId) {
-        throw new AppError("VALIDATION", "SKU_BRAND_REQUIRED", "Brand is required.");
       }
       if (!input.priceMaterials || input.priceMaterials.length === 0) {
         throw new AppError("VALIDATION", "SKU_PRICE_REQUIRED", "At least one material price is required.");
@@ -2672,8 +2671,8 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           }
         }
 
-        const brand = await tx.brand.findUniqueOrThrow({ where: { id: input.brandId } });
-        if (brand.deleted_at !== null) {
+        const brand = input.brandId ? await tx.brand.findUniqueOrThrow({ where: { id: input.brandId } }) : null;
+        if (brand?.deleted_at) {
           throw new AppError("VALIDATION", "SKU_BRAND_ARCHIVED", "Brand is archived.");
         }
 
@@ -2697,7 +2696,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
               slug: identity.slug,
               code: identity.code,
               notes: input.notes?.trim() || null,
-              brand_id: input.brandId,
+              brand_id: input.brandId || null,
               base_unit_id: input.baseUnitId,
               purchase_unit_id: input.purchaseUnitId ?? null,
               ...measurement,
@@ -2714,13 +2713,13 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
 
         // Brand Category SKU enrichment
         const productCategoryIds = categories.filter((c) => c.kind === "PRODUCT").map((c) => c.id);
-        for (const catId of productCategoryIds) {
+        for (const catId of input.brandId ? productCategoryIds : []) {
           let bc = await tx.brandCategory.findUnique({
-            where: { brand_id_category_id: { brand_id: input.brandId, category_id: catId } },
+            where: { brand_id_category_id: { brand_id: input.brandId!, category_id: catId } },
           });
           if (!bc) {
             bc = await tx.brandCategory.create({
-              data: { id: randomUUID(), brand_id: input.brandId, category_id: catId },
+              data: { id: randomUUID(), brand_id: input.brandId!, category_id: catId },
             });
           }
           await tx.brandCategoryOrigin.create({
@@ -2773,7 +2772,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       name?: string | null;
       code?: string | null;
       notes?: string | null;
-      brandId: string;
+      brandId?: string | null;
       baseUnitId: string;
       purchaseUnitId?: string | null;
       dimensionLength?: string | null;
@@ -2787,9 +2786,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       const identity = resolveSkuIdentity(input.name, input.code);
       if (!input.categoryId) {
         throw new AppError("VALIDATION", "SKU_CATEGORY_REQUIRED", "At least one category is required.");
-      }
-      if (!input.brandId) {
-        throw new AppError("VALIDATION", "SKU_BRAND_REQUIRED", "Brand is required.");
       }
       const categoryIds = [input.categoryId];
 
@@ -2822,8 +2818,8 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
             };
         const measurement = await resolveSkuMeasurement(tx, measurementInput, baseUnit, purchaseUnit);
 
-        const brand = await tx.brand.findUniqueOrThrow({ where: { id: input.brandId } });
-        if (brand.deleted_at !== null) throw new AppError("VALIDATION", "SKU_BRAND_ARCHIVED", "Brand is archived.");
+        const brand = input.brandId ? await tx.brand.findUniqueOrThrow({ where: { id: input.brandId } }) : null;
+        if (brand?.deleted_at) throw new AppError("VALIDATION", "SKU_BRAND_ARCHIVED", "Brand is archived.");
 
         const categories = await tx.category.findMany({
           where: { id: { in: categoryIds } },
@@ -2850,11 +2846,11 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         const measurementChanged =
           existing.base_unit_id !== input.baseUnitId ||
           (existing.purchase_unit_id || null) !== (input.purchaseUnitId || null) ||
-          existing.dimension_length?.toString() !== nextMeasurement.dimension_length ||
-          existing.dimension_width?.toString() !== nextMeasurement.dimension_width ||
-          existing.dimension_thickness?.toString() !== nextMeasurement.dimension_thickness ||
+          (existing.dimension_length?.toString() ?? null) !== nextMeasurement.dimension_length ||
+          (existing.dimension_width?.toString() ?? null) !== nextMeasurement.dimension_width ||
+          (existing.dimension_thickness?.toString() ?? null) !== nextMeasurement.dimension_thickness ||
           (existing.dimension_unit_id || null) !== (nextMeasurement.dimension_unit_id || null) ||
-          existing.purchase_to_base_factor?.toString() !== nextMeasurement.purchase_to_base_factor;
+          (existing.purchase_to_base_factor?.toString() ?? null) !== nextMeasurement.purchase_to_base_factor;
         if (measurementChanged && liveMaterialPriceCount > 0) {
           throw new AppError(
             "CONFLICT",
@@ -2874,8 +2870,8 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         if ((existing.notes || null) !== (input.notes?.trim() || null)) {
           changes.notes = { from: existing.notes, to: input.notes?.trim() || null };
         }
-        if (existing.brand_id !== input.brandId) {
-          changes.brand_id = { from: existing.brand_id, to: input.brandId };
+        if (existing.brand_id !== (input.brandId || null)) {
+          changes.brand_id = { from: existing.brand_id, to: input.brandId || null };
         }
         const previousCategoryIds = existing.categories.map((row) => row.category_id).sort();
         const nextCategoryIds = [...categoryIds].sort();
@@ -2905,7 +2901,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
                 slug: identity.slug,
                 code: identity.code,
                 notes: input.notes?.trim() || null,
-                brand_id: input.brandId,
+                brand_id: input.brandId || null,
                 base_unit_id: input.baseUnitId,
                 purchase_unit_id: input.purchaseUnitId || null,
                 ...measurement,
@@ -2933,13 +2929,13 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           .then((rows) => rows.map((row) => row.brand_category_id));
         await tx.brandCategoryOrigin.deleteMany({ where: { source_sku_id: input.skuId } });
         const productCategoryIds = categories.filter((c) => c.kind === "PRODUCT").map((c) => c.id);
-        for (const catId of productCategoryIds) {
+        for (const catId of input.brandId ? productCategoryIds : []) {
           let bc = await tx.brandCategory.findUnique({
-            where: { brand_id_category_id: { brand_id: input.brandId, category_id: catId } },
+            where: { brand_id_category_id: { brand_id: input.brandId!, category_id: catId } },
           });
           if (!bc) {
             bc = await tx.brandCategory.create({
-              data: { id: randomUUID(), brand_id: input.brandId, category_id: catId },
+              data: { id: randomUUID(), brand_id: input.brandId!, category_id: catId },
             });
           }
           await tx.brandCategoryOrigin.create({
@@ -3924,6 +3920,20 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         });
         return { requestId };
       });
+    },
+
+    async listPromotionReferences(input: { grants: PermissionGrants }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.promotionApprove);
+      const [materials, labor, combined] = await Promise.all([
+        db.priceMaterial.findMany({ where: { deleted_at: null }, include: { sku: true, supplier_vendor: true, unit: true }, orderBy: { created_at: "desc" } }),
+        db.priceLabor.findMany({ where: { deleted_at: null }, include: { vendor: true, unit: true }, orderBy: { name: "asc" } }),
+        db.priceMaterialLabor.findMany({ where: { deleted_at: null }, include: { vendor: true, unit: true }, orderBy: { name: "asc" } }),
+      ]);
+      return [
+        ...materials.map(p => ({ id: p.id, type: "material" as const, label: `${p.sku.name ?? p.sku.code ?? "SKU"} · ${p.supplier_vendor.name} · ${p.amount} ${p.currency}/${p.unit.code}` })),
+        ...labor.map(p => ({ id: p.id, type: "labor" as const, label: `${p.name} · ${p.vendor.name} · ${p.amount} ${p.currency}/${p.unit.code}` })),
+        ...combined.map(p => ({ id: p.id, type: "material_labor" as const, label: `${p.name} · ${p.vendor.name} · ${p.amount} ${p.currency}/${p.unit.code}` })),
+      ];
     },
 
     async validatePromotionReference(input: {

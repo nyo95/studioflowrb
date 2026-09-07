@@ -216,7 +216,7 @@ describe("UI Engine foundation", () => {
     assert.equal(getEffectiveRailCollapsed(false, false, true), false);
 
     const shells = readFileSync(new URL("./layouts/shells.tsx", import.meta.url), "utf8");
-    assert.match(shells, /className="shrink-0 max-\[840px\]:hidden"/);
+    assert.match(shells, /collapsible && railPresentation !== "compact" && !narrowNavigation/);
   });
 
   it("moves combobox focus across enabled options without landing on disabled choices", () => {

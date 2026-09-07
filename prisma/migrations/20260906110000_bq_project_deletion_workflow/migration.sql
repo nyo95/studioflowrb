@@ -39,15 +39,5 @@ ON CONFLICT ("role_id", "permission_id") DO NOTHING;
 DELETE FROM "platform"."RolePermission"
 WHERE "permission_id" = 'bq.library.approve';
 
--- R6.1 makes Brand a required part of SKU identity. Refuse to guess a Brand
--- for pre-existing rows; a non-empty database must be curated before applying
--- this constraint.
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM "master_data"."Sku" WHERE "brand_id" IS NULL) THEN
-    RAISE EXCEPTION 'Cannot require SKU Brand while unbranded SKU rows still exist';
-  END IF;
-END $$;
-
-ALTER TABLE "master_data"."Sku"
-  ALTER COLUMN "brand_id" SET NOT NULL;
+-- R6.20: preserve optional SKU Brand when upgrading R5 databases.
+-- Already-applied copies are corrected by the later DROP NOT NULL migration.
