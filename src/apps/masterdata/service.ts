@@ -2354,15 +2354,50 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
     }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
       actorIsUsable(input.actor);
+
+      // Validate before entering the transaction.
+      const ALLOWED_INFO_LINK_KINDS = new Set([
+        "WEBSITE", "INSTAGRAM", "FACEBOOK", "TIKTOK", "YOUTUBE", "LINKEDIN", "WHATSAPP",
+      ]);
+      const INFO_LINKS_MAX_COUNT = 20;
+      const INFO_LINK_URL_MAX_LEN = 2048;
+      const INFO_LINK_LABEL_MAX_LEN = 200;
+
+      if (input.infoLinks.length > INFO_LINKS_MAX_COUNT) {
+        throw new AppError("VALIDATION", "INFO_LINKS_TOO_MANY", `Maximum ${INFO_LINKS_MAX_COUNT} links allowed.`);
+      }
+
+      const normalized: Array<{ kind: string; url: string; label: string | null }> = [];
+      const seenUrls = new Set<string>();
+      for (const l of input.infoLinks) {
+        const kind = l.kind.trim().toUpperCase();
+        const url = l.url.trim();
+        const label = l.label?.trim() || null;
+
+        if (!ALLOWED_INFO_LINK_KINDS.has(kind)) {
+          throw new AppError("VALIDATION", "INFO_LINK_KIND_INVALID", `Link kind "${kind}" is not allowed.`);
+        }
+        if (!/^https?:\/\//i.test(url)) {
+          throw new AppError("VALIDATION", "INFO_LINK_URL_NOT_HTTP", "Links must use HTTP or HTTPS.");
+        }
+        try { new URL(url); } catch {
+          throw new AppError("VALIDATION", "INFO_LINK_URL_INVALID", "Each link must have a valid URL.");
+        }
+        if (url.length > INFO_LINK_URL_MAX_LEN) {
+          throw new AppError("VALIDATION", "INFO_LINK_URL_TOO_LONG", `URL exceeds ${INFO_LINK_URL_MAX_LEN} characters.`);
+        }
+        if (label && label.length > INFO_LINK_LABEL_MAX_LEN) {
+          throw new AppError("VALIDATION", "INFO_LINK_LABEL_TOO_LONG", `Label exceeds ${INFO_LINK_LABEL_MAX_LEN} characters.`);
+        }
+        if (seenUrls.has(url)) continue; // dedupe by URL, keep first occurrence
+        seenUrls.add(url);
+        normalized.push({ kind, url, label });
+      }
+
       return runTransaction(async (tx) => {
         const vendor = await tx.vendor.findUniqueOrThrow({ where: { id: input.vendorId } });
         if (vendor.deleted_at !== null) throw new AppError("VALIDATION", "VENDOR_ARCHIVED", "Supplier is archived.");
-        const normalized = input.infoLinks.map((l) => ({
-          kind: l.kind.trim(),
-          url: l.url.trim(),
-          label: l.label?.trim() || null,
-        }));
-        await tx.vendor.update({ where: { id: input.vendorId }, data: { info_links: normalized } });
+        await tx.vendor.update({ where: { id: input.vendorId }, data: { info_links: normalized as Prisma.InputJsonValue } });
         await writeAudit(tx, {
           action: "vendor.info-links-updated",
           entityType: "vendor",
@@ -2387,8 +2422,10 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         const vendor = await tx.vendor.findUniqueOrThrow({ where: { id: input.vendorId } });
         if (vendor.deleted_at !== null) throw new AppError("VALIDATION", "VENDOR_ARCHIVED", "Supplier is archived.");
         const snapshot = Array.isArray(vendor.link_review_snapshot) ? vendor.link_review_snapshot as Array<Record<string, unknown>> : [];
-        const accepted = input.acceptedIndices
-          .filter((i) => i >= 0 && i < snapshot.length)
+        // Deduplicate indices: duplicate submissions must not double-add the same item.
+        const uniqueIndices = [...new Set(input.acceptedIndices)];
+        const validIndices = uniqueIndices.filter((i) => i >= 0 && i < snapshot.length);
+        const accepted = validIndices
           .map((i) => {
             const raw = snapshot[i] as Record<string, unknown>;
             return { kind: String(raw.kind ?? "").trim(), url: String(raw.url ?? "").trim(), label: raw.label ? String(raw.label).trim() : null };
@@ -2405,7 +2442,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           entityType: "vendor",
           entityId: input.vendorId,
           actor: input.actor,
-          metadata: { accepted: accepted.length, discarded: snapshot.length - input.acceptedIndices.length },
+          metadata: { accepted: accepted.length, discarded: snapshot.length - validIndices.length },
         });
         return { vendorId: input.vendorId };
       });
@@ -3316,7 +3353,9 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         if (existing.amount.toString() !== amount) changes.amount = { from: existing.amount.toString(), to: amount };
         if (existing.currency !== currency) changes.currency = { from: existing.currency, to: currency };
         if (existing.unit_id !== unitId) changes.unit_id = { from: existing.unit_id, to: unitId };
-        if ((existing.source_link_id || null) !== (input.sourceLinkId || null)) {
+        // Only treat source_link_id as changed when the caller explicitly provided it
+        // (undefined = "not touched"; null = "explicitly cleared").
+        if (input.sourceLinkId !== undefined && (existing.source_link_id || null) !== (input.sourceLinkId || null)) {
           changes.source_link_id = { from: existing.source_link_id, to: input.sourceLinkId || null };
         }
         if ((existing.notes || null) !== (input.notes?.trim() || null)) {
@@ -3333,7 +3372,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
               amount,
               currency,
               unit_id: unitId,
-              source_link_id: input.sourceLinkId || null,
+              source_link_id: input.sourceLinkId !== undefined ? (input.sourceLinkId || null) : existing.source_link_id,
               notes: input.notes?.trim() || null,
               updated_by_user_id: input.actor.userId ?? null,
               updated_by_label: input.actor.label,

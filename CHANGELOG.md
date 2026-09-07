@@ -5,8 +5,38 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.21**
-- Next local revision: **R6.22**
+- Current revision after this entry is committed: **R6.22**
+- Next local revision: **R6.23**
+
+## R6.22 | 2026-09-07 | fix(masterdata): close remaining Supplier-link and SKU identity bugs
+
+### #2 — Unbranded SKU slug uniqueness enforced at DB level
+
+- Added partial unique index `sku_unbranded_live_slug_unique` on `(slug) WHERE deleted_at IS NULL AND brand_id IS NULL`
+  in new migration `20260907092000_r6_22_sku_unbranded_unique` (DDL-only).
+- PostgreSQL NULL semantics mean the R6.21 branded index `(brand_id, slug)` did not cover orphaned
+  (unbranded) SKUs. This index closes that gap: two live orphaned SKUs with identical slugs are now
+  rejected at the DB level, preventing hidden reassignment conflicts.
+
+### #3 — `updateVendorInfoLinks` now fully validates input
+
+- Kind must be one of: `WEBSITE`, `INSTAGRAM`, `FACEBOOK`, `TIKTOK`, `YOUTUBE`, `LINKEDIN`, `WHATSAPP`.
+- URL must use HTTP or HTTPS and parse as a valid URL.
+- URL max length: 2 048 characters. Label max length: 200 characters.
+- Duplicate URLs are silently deduped (first occurrence kept) before persistence.
+- Maximum 20 links per Supplier.
+
+### #4 — `resolveVendorLinkReview` deduplicates indices and fixes audit count
+
+- `acceptedIndices` is deduped via `new Set` before processing; duplicate index submissions
+  no longer produce duplicate entries in `info_links`.
+- Audit `discarded` count now reflects `snapshot.length - validAcceptedCount` (unique, in-range
+  indices), not the raw caller-supplied array length, which could be inflated by duplicates.
+
+### Verification
+
+- `npx tsc --noEmit` — passed
+
 
 ## R6.21 | 2026-09-07 | fix(masterdata): close Brand deletion contradiction and enforce DB invariants
 
