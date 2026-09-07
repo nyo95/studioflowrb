@@ -268,7 +268,7 @@ export function BrandDirectory({
 
         />
       ) : (
-        <DataTable framed={false} density="compact" stickyHeader fill minWidth={820} className="table-fixed">
+        <DataTable framed={false} density="compact" stickyHeader fill minWidth={1258} className="table-fixed">
           <TableHeader>
             <TableRow><TableHead style={{ width: 240 }}  sortable sortDirection={sortKey === "Brand" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Brand"); setSortDirection(direction); }}>Brand</TableHead>
 <TableHead style={{ width: 180 }}  >Categories</TableHead>

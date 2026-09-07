@@ -5,8 +5,32 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.35**
-- Next local revision: **R6.36**
+- Current revision after this entry is committed: **R6.36**
+- Next local revision: **R6.37**
+
+## R6.36 | 2026-09-07 | fix(brand): preserve actions column width
+
+### Changed
+
+- Matched the Brands Catalog table minimum width to its declared columns so the
+  trailing Actions column retains its full, centered control area instead of
+  being compressed. Narrow viewports continue to use the existing horizontal
+  table scroll.
+
+### Dependencies and migrations
+
+- No dependency, environment, or database schema changes.
+
+### Verification
+
+- `npm run typecheck` and `npm run lint`: passed.
+- Browser check: `/masterdata/brands` retains a full-width, centered Actions
+  column at the reviewed desktop viewport.
+- `git diff --check`: passed.
+- `npm run build` and `npm test`: blocked by the pre-existing generated Prisma
+  client defect: `src/generated/prisma/internal/class.ts` is empty, so
+  `getPrismaClientClass` is unavailable. The failure is unrelated to this
+  presentation-only change.
 
 ## R6.35 | 2026-09-07 | feat(masterdata): centralize directory update metadata
 
