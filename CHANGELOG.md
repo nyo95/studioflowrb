@@ -5,8 +5,65 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.19**
-- Next local revision: **R6.20**
+- Current revision after this entry is committed: **R6.21**
+- Next local revision: **R6.22**
+
+## R6.21 | 2026-09-07 | fix(masterdata): close Brand deletion contradiction and enforce DB invariants
+
+### P0 — Brand deletion no longer cascades to SKUs or Prices
+
+- `archiveBrand`: removed cascade that archived all SKUs and their PriceMaterial rows when
+  a Brand was archived. Brand archive now affects the Brand entity only; each SKU's
+  lifecycle is managed independently.
+- `approveDeletion` (brand path): replaced SKU + Price hard-deletion with a detach operation —
+  `brand_id` is nulled on all linked SKUs (valid since R6.20 made it optional), and any
+  `PARENT`-kind `ArchiveCause` rows pinned to this Brand are removed so each SKU can be
+  restored or reassigned without ghost causes.
+
+### P1 — SKU live identity uniqueness enforced at DB level
+
+- Added partial unique index `sku_live_identity_unique` on `(brand_id, slug) WHERE deleted_at IS NULL`
+  in migration `20260907091000_r6_21_db_invariants` (DDL-only, no data changed).
+- Added explicit identity-conflict check in `updateSku` service method so the DB constraint
+  is matched by an application-level `CONFLICT` error before the DB ever sees the violation.
+
+### P1 — Supplier info-link management is now full CRUD, not migration-only
+
+- Added `updateVendorInfoLinks` service method: replaces the `info_links` JSONB array on a Vendor.
+- Added `resolveVendorLinkReview` service method: accepts items by index from `link_review_snapshot`,
+  merges them into `info_links`, and clears the snapshot.
+- Added corresponding server actions `updateVendorInfoLinksAction` and `resolveVendorLinkReviewAction`
+  in `src/app/(platform)/masterdata/vendors/actions.ts`.
+
+### P1 — Supplier-link migration classification documented
+
+- Added classification header to `20260906085900_preserve_supplier_information_links/migration.sql`
+  noting DDL + DML (data-preserving) classification and ordering dependency on the VendorLink purge.
+
+### P2 — BQ source baseline DB invariants
+
+- Backfill comment in `20260906100000_bq_snapshot_and_project_lifecycle` restored to original
+  (migration immutability respected; runtime correction lives in `20260907090000`).
+- `20260907090000` migration (R6.20) already handles nullifying CUSTOM `source_price_snapshot` rows.
+- Added BQ parent XOR CHECK constraints in `20260907091000_r6_21_db_invariants`:
+  - `bq_item_parent_xor`: exactly one of `section_id` / `subsection_id` non-null.
+  - `bq_line_item_parent_xor`: exactly one of `sub_object_id` / `item_id` non-null.
+
+### P2 — Schema and changelog corrections
+
+- Fixed misleading comment on `source_price_snapshot` in `prisma/schema.prisma`:
+  now reads `null = CUSTOM atau harga tidak tersedia saat import` instead of the
+  ambiguous `null = tidak ada override`.
+- Fixed R6.20/R6.21 pointer in CHANGELOG revision-state header.
+
+### Migration immutability restored
+
+- `20260906100000` and `20260906110000` reverted to their original committed content;
+  all runtime corrections from R6.20 are isolated in `20260907090000`.
+
+### Verification
+
+- `npx tsc --noEmit` — passed
 
 ## R6.20 | 2026-09-07 | fix(regression): restore optional SKU Brand and preserve BQ/Supplier invariants
 

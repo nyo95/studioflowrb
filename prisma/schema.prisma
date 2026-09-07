@@ -994,7 +994,7 @@ model BqLineItem {
   purchase_unit_snapshot          String
   base_unit_snapshot              String?
   purchase_to_base_factor_snapshot Decimal?    @db.Decimal(18, 6)  // display only
-  source_price_snapshot           Decimal?     @db.Decimal(18, 4)  // immutable baseline from import; null = tidak ada override
+  source_price_snapshot           Decimal?     @db.Decimal(18, 4)  // immutable baseline from import; null = CUSTOM atau harga tidak tersedia saat import
   harga_snapshot                  Decimal      @db.Decimal(18, 4)
   currency_snapshot               String       @default("IDR")
   kategori                        BqKategori

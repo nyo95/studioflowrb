@@ -1,3 +1,8 @@
+-- Classification: DDL + DML (data-preserving migration).
+-- Must run BEFORE 20260906090000_purge_vendor_links; the timestamp ordering
+-- guarantees this. On fresh databases VendorLink does not exist and the DO $$
+-- block is a safe no-op. On live databases the UPDATE migrates existing link
+-- data into the two new JSONB columns before the source table is dropped.
 -- Intentionally ordered before the published VendorLink purge. On databases
 -- where purge already ran, add the destination fields without fabricating data.
 ALTER TABLE "master_data"."Vendor"
