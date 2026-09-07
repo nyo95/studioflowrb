@@ -5,8 +5,27 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.30**
-- Next local revision: **R6.31**
+- Current revision after this entry is committed: **R6.31**
+- Next local revision: **R6.32**
+
+## R6.31 | 2026-09-07 | fix(ui-engine): honor wide page shell width
+
+### Changed
+
+- Made `PageShell size="wide"` use the available application workspace instead of retaining the default 1440px content cap. Operational Master Data and BQ pages that already opt into the wide shell now give their tables sufficient desktop width, including the trailing action column.
+- The default PageShell remains constrained to the shared content width; DataTable scrolling and sticky-action behavior are unchanged.
+
+### Dependencies and migrations
+
+- No dependency, Prisma schema, or migration change.
+
+### Verification
+
+- `npm run typecheck` and `npm run lint`: passed.
+- `npm test`: did not pass because the office environment does not provide the required disposable `PLATFORM_TEST_DATABASE_URL`; the fail-closed guard stopped the integration suites before any database connection or mutation.
+- `npm run build`: passed.
+- Browser check: Brands fills the expanded and collapsed desktop workspace; all eight columns, including trailing Actions, remain visible and the browser console is clear. A narrow-viewport run is unavailable in the fixed in-app browser viewport.
+- `git diff --check` and `git diff --cached --check`: passed.
 
 ## R6.30 | 2026-09-07 | refactor(bq): constrain strict no-op comparison to scalars
 
