@@ -8,6 +8,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Current revision after this entry is committed: **R6.36**
 - Next local revision: **R6.37**
 
+## R6.37 | 2026-09-07 | fix(auth): revoke session on account-menu sign out
+
+### Changed
+
+- Made the Account menu invoke its Server Action explicitly instead of relying
+  on a form nested inside a Radix menu item.
+- Ordinary sign out now revokes the current session, clears its cookie, and
+  redirects to `/login`; a pending state prevents duplicate requests.
+
+### Dependencies and migrations
+
+- No dependency, environment, or database schema changes.
+
+### Verification
+
+- Targeted ESLint on the changed files and `git diff --check`: passed.
+- Global `npm run typecheck` is blocked by pre-existing untracked StudioFlow
+  sources and stale generated Next route types; neither is owned by this patch.
+- `npm run build`, `npm test`, and live-browser verification are blocked by the
+  pre-existing generated Prisma client defect: `src/generated/prisma/internal/
+  class.ts` is empty, so `getPrismaClientClass` is unavailable.
+
 ## R6.36 | 2026-09-07 | fix(brand): preserve actions column width
 
 ### Changed
