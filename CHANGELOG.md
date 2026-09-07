@@ -5,8 +5,25 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.33**
-- Next local revision: **R6.34**
+- Current revision after this entry is committed: **R6.34**
+- Next local revision: **R6.35**
+
+## R6.34 | 2026-09-07 | fix(vendor): remove redundant directory type metadata
+
+### Changed
+
+- Removed the repeated first supplier type below the Supplier name. The complete Types & Capabilities column remains the single source of that information.
+
+### Dependencies and migrations
+
+- No dependency, Prisma schema, or migration change.
+
+### Verification
+
+- `npm run typecheck`, `npm run lint`, and `npm run build`: passed.
+- `npm test`: not rerun; the unchanged office environment lacks the required disposable `PLATFORM_TEST_DATABASE_URL`, and its fail-closed guard prevents the integration suite from touching the working database.
+- Browser check: Supplier rows now show the name once, while the Types & Capabilities column remains complete and Actions stays visible.
+- `git diff --check`: passed.
 
 ## R6.33 | 2026-09-07 | fix(ui-engine): center canonical row actions
 

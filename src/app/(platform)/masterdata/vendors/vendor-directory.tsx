@@ -419,7 +419,6 @@ export function VendorDirectory({
                       tone={isArchived ? "danger" : "success"}
                       statusLabel={isArchived ? "Archived" : "Active"}
                       name={vendor.name}
-                      secondary={vendor.types[0]?.vendor_type.name ?? undefined}
                     />
                   </TableCell>
                   <TableCell>
