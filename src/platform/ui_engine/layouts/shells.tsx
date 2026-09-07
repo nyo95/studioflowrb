@@ -350,7 +350,7 @@ export function PageShell({
       className={cx(
         "mx-auto w-full gap-6 p-(--ui-page-padding) max-[560px]:gap-5 [&>*]:min-w-0",
         fill ? "flex min-h-0 flex-1 flex-col" : "grid",
-        size === "default" ? "max-w-(--ui-page-max)" : "max-w-none",
+        size === "default" ? "max-w-(--ui-page-max)" : "max-w-(--ui-page-wide-max)",
         className,
       )}
       data-size={size}

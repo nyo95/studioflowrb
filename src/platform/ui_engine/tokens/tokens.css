@@ -34,6 +34,7 @@
   --ui-section-gap: 16px;
   --ui-page-padding: clamp(20px, 2.5vw, 24px);
   --ui-page-max: 1440px;
+  --ui-page-wide-max: 1920px;
   --ui-control-height-sm: 32px;
   --ui-control-height-md: 36px;
   --ui-dialog-sm: 420px;

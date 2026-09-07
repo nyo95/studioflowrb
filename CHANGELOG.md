@@ -5,8 +5,26 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.31**
-- Next local revision: **R6.32**
+- Current revision after this entry is committed: **R6.32**
+- Next local revision: **R6.33**
+
+## R6.32 | 2026-09-07 | fix(ui-engine): refine wide directory canvas
+
+### Changed
+
+- Bounded the shared wide PageShell at 1920px, retaining substantially more operational table room than the default 1440px width without stretching the workspace edge to edge.
+- Brands Catalog retains its existing DirectoryShell surface, which now sits inset within the restored canvas space and keeps the toolbar, table, and pagination as one card.
+
+### Dependencies and migrations
+
+- No dependency, Prisma schema, or migration change.
+
+### Verification
+
+- `npm run typecheck`, `npm run lint`, and `npm run build`: passed.
+- `npm test`: not rerun; the unchanged office environment lacks the required disposable `PLATFORM_TEST_DATABASE_URL`, and its fail-closed guard prevents the integration suite from touching the working database.
+- Browser check: Brands Catalog is centered in the 1920px wide canvas with its existing bordered directory surface inset from the surrounding canvas. Every column, including Actions, remains visible; browser console is clear.
+- `git diff --check`: passed.
 
 ## R6.31 | 2026-09-07 | fix(ui-engine): honor wide page shell width
 
