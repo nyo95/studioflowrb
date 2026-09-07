@@ -43,7 +43,7 @@ export function GeneralSettingsForm({
 
   return (
     <SectionCard>
-      <form action={action} encType="multipart/form-data">
+      <form action={action}>
         <div className="grid gap-4 md:grid-cols-2">
           <Field id="settings-organization" label="Organization name">
             <Input id="settings-organization" name="organizationName" defaultValue={settings.organizationName} required maxLength={120} disabled={disabled} />

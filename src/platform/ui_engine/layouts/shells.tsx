@@ -46,6 +46,8 @@ export type AppShellProps = {
   collapsedBrand?: ReactNode;
   expandLabel?: string;
   collapseLabel?: string;
+  /** Remove the application rail when the current surface has no navigation. */
+  railVisible?: boolean;
 };
 
 export function AppShell({
@@ -64,13 +66,14 @@ export function AppShell({
   collapsedBrand,
   expandLabel = "Expand navigation",
   collapseLabel = "Collapse navigation",
+  railVisible = true,
 }: AppShellProps) {
   const [internalCollapsed, setInternalCollapsed] = useState(defaultCollapsed);
   const narrowNavigation = useNarrowNavigation();
   const storedCollapsed = railPresentation === "compact" ? true : collapsed ?? internalCollapsed;
   // Narrow layouts always retain visible labels. The desktop preference remains
   // untouched and returns when the viewport widens again.
-  const isCollapsed = getEffectiveRailCollapsed(collapsible, narrowNavigation, storedCollapsed);
+  const isCollapsed = railVisible && getEffectiveRailCollapsed(collapsible, narrowNavigation, storedCollapsed);
 
   const toggle = () => {
     const next = !isCollapsed;
@@ -109,13 +112,15 @@ export function AppShell({
         <div
           className={cx(
             "grid overflow-x-clip transition-[grid-template-columns] duration-[160ms] motion-reduce:transition-none",
-            "grid-cols-[var(--ui-rail-width,232px)_minmax(0,1fr)] max-[840px]:grid-cols-1 max-[840px]:block",
+            railVisible
+              ? "grid-cols-[var(--ui-rail-width,232px)_minmax(0,1fr)] max-[840px]:grid-cols-1 max-[840px]:block"
+              : "grid-cols-1",
             isCollapsed && "[--ui-rail-width:60px]",
             topbar ? "min-h-[calc(100vh-4rem)]" : "min-h-screen",
           )}
         >
           {/* Warm chrome and a drawn rule separate navigation from the work area. */}
-          <aside
+          {railVisible ? <aside
             className={cx(
               "group relative sticky top-16 flex h-[calc(100vh-4rem)] max-w-screen min-w-0 flex-col overflow-hidden border-r border-line",
               "bg-[color-mix(in_srgb,var(--ui-surface-muted)_52%,var(--ui-surface))]",
@@ -168,7 +173,7 @@ export function AppShell({
                 {utility}
               </div>
             ) : null}
-          </aside>
+          </aside> : null}
           <main className="flex h-[calc(100vh-4rem)] min-h-0 min-w-0 flex-col overflow-auto max-[840px]:h-auto max-[840px]:overflow-visible">{children}</main>
         </div>
       </div>

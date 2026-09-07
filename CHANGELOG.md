@@ -5,8 +5,42 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7**
-- Next local revision: **R7.01**
+- Current revision after this entry is committed: **R7.01**
+- Next local revision: **R7.02**
+
+## R7.01 | 2026-09-07 | fix(shell): remove empty settings rail and form warning
+
+### Fixed
+
+- Removed the explicit multipart encoding from the General Settings Server
+  Action form so React owns its generated method and encoding without emitting
+  the development error overlay.
+- Added route-aware rail visibility: application navigation remains visible on
+  Master Data and BQ routes, while Account and Settings surfaces use the full
+  content width instead of retaining an empty rail.
+- Corrected Administration menu visibility so General Settings follows
+  `platform.settings.read`, independently from its manage permission, while
+  Users and Roles continue to follow their own read grants.
+- Added regression coverage for Server Action form encoding, application-route
+  matching, Administration permission combinations, and rail removal.
+
+### Dependencies and migrations
+
+- No dependency or repository migration changes.
+- Brought the isolated `masterdata_test` verification database up to the 26
+  committed migrations before running the complete integration suite.
+
+### Verification
+
+- `npm run lint`: passed.
+- `npm run typecheck`: passed.
+- `npm run check:boundaries`: passed.
+- `npm run check:legacy-runtime`: passed.
+- `npm test`: passed — 255 tests, 67 suites, 0 failed/cancelled/skipped.
+- `npm run build`: passed for all application routes.
+- Live browser verification passed at 1146×912: General Settings renders with
+  no React overlay and no empty rail; Administration links remain in the account
+  menu; navigating back to Master Data restores its labeled application rail.
 
 ## R7 | 2026-09-07 | release: publish shell and master data refinements
 

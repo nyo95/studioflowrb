@@ -9,16 +9,16 @@ import type { ReactNode } from "react";
 
 /* eslint-disable @next/next/no-img-element -- brand mark accepts a local path or owner-configured host. */
 
-import { AppShell,Text } from "@/platform/ui_engine";
+import { Text } from "@/platform/ui_engine";
 
 import type { SessionPrincipal } from "@platform/core/auth";
-
-import { hasPermission } from "@platform/core/rbac";
 
 import type { PlatformGeneralSettings } from "@platform/core/settings";
 
 
 import { AuthenticatedPlatformNavigation,HeaderApplicationNavigation,type ShellAppLink } from "./navigation";
+import { RouteAwareAppShell } from "./route-aware-app-shell";
+import { getAdministrationMenuVisibility } from "./shell-rules";
 
 
 export function AuthenticatedShell({ principal, grants, settings, apps, logoutAction, appName, appAbbreviation, domainNavigation, domainUtilityNavigation, contextSlot, children }: {
@@ -36,8 +36,10 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
 }) {
   const productMark = settings.appTitle.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "SF";
   const subtitle = appName ?? settings.organizationName;
+  const administration = getAdministrationMenuVisibility(grants);
   return (
-    <DisplaySettingsProvider value={{ locale: settings.locale, timezone: settings.timezone }}><AppShell
+    <DisplaySettingsProvider value={{ locale: settings.locale, timezone: settings.timezone }}><RouteAwareAppShell
+      appRootPaths={apps.map((app) => app.rootPath)}
       brand={settings.brandMarkUrl ? (
         <Link href="/" aria-label={`Open ${settings.appTitle} home`} className="flex min-w-0 items-center rounded-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
           <img src={settings.brandMarkUrl} alt={settings.appTitle} className="h-[38px] max-w-[190px] shrink-0 object-contain object-left" />
@@ -71,13 +73,14 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
         <AccountMenu
           name={principal.displayName}
           logoutAction={logoutAction}
-          showAdministration={hasPermission(grants, "platform.settings.manage")}
-          showUsers={hasPermission(grants, "platform.user.read")}
-          showRoles={hasPermission(grants, "platform.role.read")}
+          showAdministration={administration.showAdministration}
+          showGeneralSettings={administration.showGeneralSettings}
+          showUsers={administration.showUsers}
+          showRoles={administration.showRoles}
         />
       </div>}
     >
       {children}
-    </AppShell></DisplaySettingsProvider>
+    </RouteAwareAppShell></DisplaySettingsProvider>
   );
 }

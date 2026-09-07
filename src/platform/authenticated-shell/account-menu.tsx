@@ -6,10 +6,11 @@ import { DropdownMenu } from "radix-ui";
 import { ChevronDown, LogOut, Settings, ShieldCheck, UserRound, Users } from "lucide-react";
 import { Button } from "@/platform/ui_engine";
 
-export function AccountMenu({ name, logoutAction, showAdministration, showUsers, showRoles }: {
+export function AccountMenu({ name, logoutAction, showAdministration, showGeneralSettings, showUsers, showRoles }: {
   name: string;
   logoutAction: () => Promise<void>;
   showAdministration: boolean;
+  showGeneralSettings: boolean;
   showUsers: boolean;
   showRoles: boolean;
 }) {
@@ -22,7 +23,7 @@ export function AccountMenu({ name, logoutAction, showAdministration, showUsers,
       {showAdministration ? <>
         <DropdownMenu.Separator className="my-1 h-px bg-line" />
         <DropdownMenu.Label className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-ink-tertiary">Administration</DropdownMenu.Label>
-        <DropdownMenu.Item asChild><Link href="/settings/general" className={itemClass}><Settings size={16} aria-hidden="true" />General Settings</Link></DropdownMenu.Item>
+        {showGeneralSettings ? <DropdownMenu.Item asChild><Link href="/settings/general" className={itemClass}><Settings size={16} aria-hidden="true" />General Settings</Link></DropdownMenu.Item> : null}
         {showUsers ? <DropdownMenu.Item asChild><Link href="/settings/access/users" className={itemClass}><Users size={16} aria-hidden="true" />Users</Link></DropdownMenu.Item> : null}
         {showRoles ? <DropdownMenu.Item asChild><Link href="/settings/access/roles" className={itemClass}><ShieldCheck size={16} aria-hidden="true" />Roles &amp; Access</Link></DropdownMenu.Item> : null}
       </> : null}

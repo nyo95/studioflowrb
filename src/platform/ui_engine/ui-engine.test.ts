@@ -219,6 +219,13 @@ describe("UI Engine foundation", () => {
     assert.match(shells, /collapsible && railPresentation !== "compact" && !narrowNavigation/);
   });
 
+  it("removes the rail when a surface has no application navigation", () => {
+    const shells = readFileSync(new URL("./layouts/shells.tsx", import.meta.url), "utf8");
+
+    assert.match(shells, /railVisible \? <aside/);
+    assert.match(shells, /: "grid-cols-1"/);
+  });
+
   it("moves combobox focus across enabled options without landing on disabled choices", () => {
     const disabled = [false, true, false, false];
     assert.equal(getComboboxNavigationIndex(disabled, -1, "ArrowDown"), 0);
