@@ -1,10 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Settings, ShieldCheck, Users } from "lucide-react";
 import { usePathname } from "next/navigation";
-
-import { NavSubmenu } from "@/platform/ui_engine";
 
 export type ShellAppLink = { appId: string; name: string; rootPath: string };
 
@@ -37,25 +34,12 @@ export function HeaderApplicationNavigation({ apps }: { apps: readonly ShellAppL
   );
 }
 
-export function AuthenticatedPlatformNavigation({ showGeneralSettings, showUsers, showRoles, domainNavigation }: {
-  showGeneralSettings: boolean;
-  showUsers: boolean;
-  showRoles: boolean;
+export function AuthenticatedPlatformNavigation({ domainNavigation }: {
   domainNavigation?: React.ReactNode;
 }) {
-  const pathname = usePathname();
   return (
     <div className="grid gap-1 max-[840px]:contents">
       {domainNavigation}
-      <NavSubmenu
-        label="Administration"
-        icon={<Settings size={17} />}
-        items={[
-          ...(showGeneralSettings ? [{ href: "/settings/general", label: "General Settings", icon: <Settings size={17} />, active: activePath(pathname, "/settings/general") }] : []),
-          ...(showUsers ? [{ href: "/settings/access/users", label: "Users", icon: <Users size={17} />, active: activePath(pathname, "/settings/access/users") }] : []),
-          ...(showRoles ? [{ href: "/settings/access/roles", label: "Roles & Access", icon: <ShieldCheck size={17} />, active: activePath(pathname, "/settings/access/roles") }] : []),
-        ]}
-      />
     </div>
   );
 }

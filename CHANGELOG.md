@@ -5,8 +5,30 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.36**
-- Next local revision: **R6.37**
+- Current revision after this entry is committed: **R6.38**
+- Next local revision: **R6.39**
+
+## R6.38 | 2026-09-07 | fix(shell): move administration into account menu
+
+### Changed
+
+- Removed the Administration group from the application rail.
+- Moved its permitted links under the account menu. The group appears only to
+  users with `platform.settings.manage`; Users and Roles & Access retain their
+  respective read-permission checks.
+
+### Dependencies and migrations
+
+- No dependency, environment, or database schema changes.
+
+### Verification
+
+- Targeted ESLint on the changed shell files and `git diff --check`: passed.
+- Global typecheck is blocked by pre-existing untracked StudioFlow sources and
+  stale generated Next route types; neither is owned by this patch.
+- Production build, tests, and live-browser verification remain blocked by the
+  pre-existing generated Prisma client defect: `src/generated/prisma/internal/
+  class.ts` is empty, so `getPrismaClientClass` is unavailable.
 
 ## R6.37 | 2026-09-07 | fix(auth): revoke session on account-menu sign out
 

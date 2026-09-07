@@ -63,17 +63,18 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
       )}
       collapsible
       navigationLabel={`${settings.appTitle} navigation`}
-      navigation={<AuthenticatedPlatformNavigation
-        showGeneralSettings={hasPermission(grants, "platform.settings.read")}
-        showUsers={hasPermission(grants, "platform.user.read")}
-        showRoles={hasPermission(grants, "platform.role.read")}
-        domainNavigation={domainNavigation}
-      />}
+      navigation={<AuthenticatedPlatformNavigation domainNavigation={domainNavigation} />}
       utility={domainUtilityNavigation}
       topbar={<div className="flex w-full items-center gap-3 px-(--ui-page-padding)">
         <HeaderApplicationNavigation apps={apps} />
         {contextSlot}
-        <AccountMenu name={principal.displayName} logoutAction={logoutAction} />
+        <AccountMenu
+          name={principal.displayName}
+          logoutAction={logoutAction}
+          showAdministration={hasPermission(grants, "platform.settings.manage")}
+          showUsers={hasPermission(grants, "platform.user.read")}
+          showRoles={hasPermission(grants, "platform.role.read")}
+        />
       </div>}
     >
       {children}
