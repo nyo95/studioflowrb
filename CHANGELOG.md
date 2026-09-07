@@ -5,8 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.29**
-- Next local revision: **R6.30**
+- Current revision after this entry is committed: **R6.30**
+- Next local revision: **R6.31**
+
+## R6.30 | 2026-09-07 | refactor(bq): constrain strict no-op comparison to scalars
+
+### Changed
+
+- Constrained `fieldUnchanged` to strict-equality-safe scalar types and documented that collections or structured values require an explicit comparator.
+- Existing BQ no-op behavior is unchanged; future array/object use now fails at typecheck instead of silently comparing references.
+
+### Dependencies and migrations
+
+- No dependency, Prisma schema, or migration change.
+
+### Verification
+
+- `npx prisma validate`: passed.
+- `npx prisma migrate deploy`: all 26 migrations passed against a fresh disposable `studioflow_rebuild_test` database.
+- `npm run typecheck`, `npm run lint`, `npm run check:boundaries`, and `npm run check:legacy-runtime`: passed.
+- `npm test`: 251 passed, 0 failed, 0 cancelled against the disposable database.
+- `npm run build`: passed.
+- `git diff --check`: passed.
 
 ## R6.29 | 2026-09-07 | refactor(bq): consolidate Library no-op comparisons
 

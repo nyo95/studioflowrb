@@ -41,7 +41,10 @@ function decimalFieldUnchanged(value: string | null | undefined, current: { toSt
   return toDecimalString(value) === current.toString();
 }
 
-function fieldUnchanged<T>(value: T | undefined, current: T): boolean {
+type StrictEqualityScalar = string | number | boolean | bigint | symbol | null;
+
+/** Scalar-only by design; collections and structured values require an explicit comparator. */
+function fieldUnchanged<T extends StrictEqualityScalar>(value: T | undefined, current: T): boolean {
   return value === undefined || value === current;
 }
 
