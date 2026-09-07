@@ -5,8 +5,25 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.32**
-- Next local revision: **R6.33**
+- Current revision after this entry is committed: **R6.33**
+- Next local revision: **R6.34**
+
+## R6.33 | 2026-09-07 | fix(ui-engine): center canonical row actions
+
+### Changed
+
+- Centered the shared `RowActionsHead` label and `RowActionsCell` content so the trailing overflow menu is visually centered in canonical directory tables.
+
+### Dependencies and migrations
+
+- No dependency, Prisma schema, or migration change.
+
+### Verification
+
+- `npm run typecheck`, `npm run lint`, and `npm run build`: passed.
+- `npm test`: not rerun; the unchanged office environment lacks the required disposable `PLATFORM_TEST_DATABASE_URL`, and its fail-closed guard prevents the integration suite from touching the working database.
+- Browser check: Brands Catalog renders the `Actions` heading and each overflow menu centered in its trailing sticky column.
+- `git diff --check`: passed.
 
 ## R6.32 | 2026-09-07 | fix(ui-engine): refine wide directory canvas
 

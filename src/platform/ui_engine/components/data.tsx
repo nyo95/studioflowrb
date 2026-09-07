@@ -212,7 +212,7 @@ export function TableHead({
 
 /** Canonical sticky actions column header for entity directories. */
 export function RowActionsHead() {
-  return <TableHead stickyEnd align="end" style={{ width: 48 }}>Actions</TableHead>;
+  return <TableHead stickyEnd align="center" style={{ width: 48 }}>Actions</TableHead>;
 }
 
 export function TableCell({
@@ -247,7 +247,7 @@ export function TableCell({
 
 /** Canonical sticky actions cell for entity directories. */
 export function RowActionsCell({ children }: { children: ReactNode }) {
-  return <TableCell stickyEnd align="end" className="py-1.5">{children}</TableCell>;
+  return <TableCell stickyEnd align="center" className="py-1.5">{children}</TableCell>;
 }
 
 export type TableCellContentProps = HTMLAttributes<HTMLDivElement> & {
