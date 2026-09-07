@@ -5,8 +5,35 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.22**
-- Next local revision: **R6.23**
+- Current revision after this entry is committed: **R6.24**
+- Next local revision: **R6.25**
+
+## R6.24 | 2026-09-07 | fix(vendor): Supplier link atomicity + stale contract sync
+
+### #20 — Supplier links now atomic with Edit Supplier dialog
+
+- `SupplierLinksEditor` refactored from immediate-save to a controlled staged component.
+  Add / remove / resolve-review operations are local until the Edit Supplier dialog's Save button
+  is clicked — Cancel now correctly discards all link changes alongside profile/contact changes.
+- `updateVendor` service extended with optional `infoLinks` + `linkReviewSnapshot` parameters;
+  link validation (kind allowlist, HTTP/S, URL.parse, length, dedup) runs inside the same
+  transaction as the vendor profile update.
+- `updateVendorAction` reads `infoLinksJson` + `linkSnapshotJson` from FormData and passes
+  them to the extended service call.
+- `updateVendorInfoLinksAction` and `resolveVendorLinkReviewAction` no longer used by the
+  Edit Supplier dialog; imports removed from `vendor-directory.tsx`.
+
+### #21 — Contract sync (vendor-contract.md, masterdata.md, brand-contract.md)
+
+- `vendor-contract.md §5`: Replaced stale VendorLink sub-entity model (MARKETPLACE / DRIVE /
+  PRICE_LIST / OTHER) with current `Vendor.info_links` JSON design (R6.20/R6.21). Documents
+  allowed kinds, constraints, review snapshot, and atomic mutation surface.
+- `masterdata.md`: Removed "Supplier has no external-link mutation surface" — corrected to
+  document company link management via Edit Supplier (vendor-contract §5).
+- `brand-contract.md` locked summary: Fixed permanent delete row — "includes Brand SKUs/prices"
+  corrected to "Brand entity only — SKUs and Material Prices survive with brand_id nulled (R6.21)".
+
+## R6.23 | 2026-09-07 | fix(r6.23): Codex review — contract docs, BQ layout gate, brand dialogs, SKU pagination, Supplier link CRUD
 
 ## R6.22 | 2026-09-07 | fix(masterdata): close remaining Supplier-link and SKU identity bugs
 

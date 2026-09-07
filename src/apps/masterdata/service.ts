@@ -2194,6 +2194,10 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       notes?: string | null;
       vendorTypeIds?: string[];
       contacts?: Array<{ id?: string; personName: string; jobTitle?: string; email?: string; phone?: string; isPrimary?: boolean; notes?: string; brandId?: string }>;
+      /** vendor-contract §5: atomic info_links update; omit = preserve existing */
+      infoLinks?: Array<{ kind: string; url: string; label?: string | null }>;
+      /** Remaining snapshot after local review resolution; omit = preserve existing */
+      linkReviewSnapshot?: unknown[];
     }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
       actorIsUsable(input.actor);
@@ -2328,6 +2332,53 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           if (beforeContacts.join("\u0000") !== afterContacts.join("\u0000")) {
             changes.contacts = { from: beforeContacts.length, to: input.contacts.length };
           }
+        }
+
+        // vendor-contract §5: info_links + link_review_snapshot — atomic with vendor update.
+        if (input.infoLinks !== undefined) {
+          const ALLOWED_INFO_LINK_KINDS = new Set([
+            "WEBSITE", "INSTAGRAM", "FACEBOOK", "TIKTOK", "YOUTUBE", "LINKEDIN", "WHATSAPP",
+          ]);
+          const INFO_LINKS_MAX_COUNT = 20;
+          const INFO_LINK_URL_MAX_LEN = 2048;
+          const INFO_LINK_LABEL_MAX_LEN = 200;
+          if (input.infoLinks.length > INFO_LINKS_MAX_COUNT) {
+            throw new AppError("VALIDATION", "INFO_LINKS_TOO_MANY", `Maximum ${INFO_LINKS_MAX_COUNT} links allowed.`);
+          }
+          const normalizedLinks: Array<{ kind: string; url: string; label: string | null }> = [];
+          const seenUrls = new Set<string>();
+          for (const l of input.infoLinks) {
+            const kind = l.kind.trim().toUpperCase();
+            const url = l.url.trim();
+            const label = l.label?.trim() || null;
+            if (!ALLOWED_INFO_LINK_KINDS.has(kind)) {
+              throw new AppError("VALIDATION", "INFO_LINK_KIND_INVALID", `Link kind "${kind}" is not allowed.`);
+            }
+            if (!/^https?:\/\//i.test(url)) {
+              throw new AppError("VALIDATION", "INFO_LINK_URL_NOT_HTTP", "Links must use HTTP or HTTPS.");
+            }
+            try { new URL(url); } catch {
+              throw new AppError("VALIDATION", "INFO_LINK_URL_INVALID", "Each link must have a valid URL.");
+            }
+            if (url.length > INFO_LINK_URL_MAX_LEN) {
+              throw new AppError("VALIDATION", "INFO_LINK_URL_TOO_LONG", `URL exceeds ${INFO_LINK_URL_MAX_LEN} characters.`);
+            }
+            if (label && label.length > INFO_LINK_LABEL_MAX_LEN) {
+              throw new AppError("VALIDATION", "INFO_LINK_LABEL_TOO_LONG", `Label exceeds ${INFO_LINK_LABEL_MAX_LEN} characters.`);
+            }
+            if (seenUrls.has(url)) continue;
+            seenUrls.add(url);
+            normalizedLinks.push({ kind, url, label });
+          }
+          const snapshot = input.linkReviewSnapshot ?? null;
+          await tx.vendor.update({
+            where: { id: input.vendorId },
+            data: {
+              info_links: normalizedLinks as Prisma.InputJsonValue,
+              ...(snapshot !== null ? { link_review_snapshot: snapshot as Prisma.InputJsonValue } : {}),
+            },
+          });
+          changes.info_links = { from: "(previous)", to: `${normalizedLinks.length} links` };
         }
 
         // CORE.md §5 / vendor-contract §8: one real operation, one audit event.

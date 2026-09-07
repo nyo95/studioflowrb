@@ -12,10 +12,8 @@ import {
 archiveVendorAction,
 createVendorAction,
 requestVendorDeletionAction,
-resolveVendorLinkReviewAction,
 restoreVendorAction,
 updateVendorAction,
-updateVendorInfoLinksAction,
 } from "./actions";
 
 type VendorRow = {
@@ -85,55 +83,40 @@ function parseLinks(value: unknown): LinkEntry[] {
   });
 }
 
-function SupplierLinksEditor({ vendorId, initialLinks, initialSnapshot, canManage }: {
-  vendorId: string;
-  initialLinks: unknown;
-  initialSnapshot: unknown;
+// vendor-contract §5 (R6.24): SupplierLinksEditor is a controlled component —
+// all add/remove/resolve operations are staged locally. They are committed
+// atomically with the rest of the Vendor profile when the Edit dialog is saved.
+function SupplierLinksEditor({ links, snapshot, onLinksChange, onSnapshotChange, canManage }: {
+  links: LinkEntry[];
+  snapshot: LinkEntry[];
+  onLinksChange: (links: LinkEntry[]) => void;
+  onSnapshotChange: (snapshot: LinkEntry[]) => void;
   canManage: boolean;
 }) {
-  const [links, setLinks] = useState<LinkEntry[]>(() => parseLinks(initialLinks));
-  const [snapshot, setSnapshot] = useState<LinkEntry[]>(() => parseLinks(initialSnapshot));
   const [newKind, setNewKind] = useState<string>(LINK_KINDS[0]);
   const [newUrl, setNewUrl] = useState("");
   const [newLabel, setNewLabel] = useState("");
   const [acceptedIdxs, setAcceptedIdxs] = useState<Set<number>>(new Set());
-  const [linkPending, setLinkPending] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
 
-  const doSaveLinks = async (updated: LinkEntry[]) => {
-    setLinkPending(true);
-    setLinkError(null);
-    const res = await updateVendorInfoLinksAction(vendorId, updated);
-    setLinkPending(false);
-    if (res.ok) { setLinks(updated); return true; }
-    setLinkError(res.error.safeMessage);
-    return false;
-  };
-
-  const handleAdd = async () => {
+  const handleAdd = () => {
     const url = newUrl.trim();
     if (!url) return;
     if (links.some(l => l.url === url)) { setLinkError("This URL is already in the list."); return; }
-    const ok = await doSaveLinks([...links, { kind: newKind, url, label: newLabel.trim() || null }]);
-    if (ok) { setNewUrl(""); setNewLabel(""); }
+    setLinkError(null);
+    onLinksChange([...links, { kind: newKind, url, label: newLabel.trim() || null }]);
+    setNewUrl("");
+    setNewLabel("");
   };
 
-  const handleRemove = (idx: number) => doSaveLinks(links.filter((_, i) => i !== idx));
+  const handleRemove = (idx: number) => onLinksChange(links.filter((_, i) => i !== idx));
 
-  const handleResolveReview = async () => {
-    setLinkPending(true);
-    setLinkError(null);
+  const handleResolveReview = () => {
     const accepted = [...acceptedIdxs].filter(i => i >= 0 && i < snapshot.length);
-    const res = await resolveVendorLinkReviewAction(vendorId, accepted);
-    setLinkPending(false);
-    if (res.ok) {
-      const acceptedItems = accepted.map(i => snapshot[i]).filter(Boolean) as LinkEntry[];
-      setLinks(prev => [...prev, ...acceptedItems]);
-      setSnapshot([]);
-      setAcceptedIdxs(new Set());
-    } else {
-      setLinkError(res.error.safeMessage);
-    }
+    const acceptedItems = accepted.map(i => snapshot[i]).filter(Boolean) as LinkEntry[];
+    onLinksChange([...links, ...acceptedItems]);
+    onSnapshotChange([]);
+    setAcceptedIdxs(new Set());
   };
 
   return (
@@ -166,7 +149,7 @@ function SupplierLinksEditor({ vendorId, initialLinks, initialSnapshot, canManag
               <Field label="Label (optional)" className="w-36 shrink-0">
                 <Input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Display name" maxLength={200} />
               </Field>
-              <Button type="button" size="sm" variant="secondary" disabled={!newUrl.trim() || linkPending} onClick={handleAdd}>Add</Button>
+              <Button type="button" size="sm" variant="secondary" disabled={!newUrl.trim()} onClick={handleAdd}>Add</Button>
             </div>
           </div>
         ) : null}
@@ -186,7 +169,7 @@ function SupplierLinksEditor({ vendorId, initialLinks, initialSnapshot, canManag
               </label>
             ))}
           </div>
-          {canManage ? <Button type="button" size="sm" variant="secondary" disabled={linkPending} onClick={handleResolveReview} className="mt-2">
+          {canManage ? <Button type="button" size="sm" variant="secondary" onClick={handleResolveReview} className="mt-2">
             Resolve review ({acceptedIdxs.size} accepted, {snapshot.length - acceptedIdxs.size} discarded)
           </Button> : null}
           </>
@@ -234,6 +217,9 @@ export function VendorDirectory({
   const [contactsList, setContactsList] = useState<ContactDraft[]>([]);
   const [createVendorTypeIds, setCreateVendorTypeIds] = useState<string[]>([]);
   const [editVendorTypeIds, setEditVendorTypeIds] = useState<string[]>([]);
+  // Staged link state — committed atomically with vendor profile on Save
+  const [stagedLinks, setStagedLinks] = useState<LinkEntry[]>([]);
+  const [stagedSnapshot, setStagedSnapshot] = useState<LinkEntry[]>([]);
 
   // Controlled edit profile fields — prevents data loss when tabs re-render
   const [editName, setEditName] = useState("");
@@ -262,7 +248,7 @@ export function VendorDirectory({
     formRef: editFormRef,
     resetKey: editTarget?.id ?? "",
     active: Boolean(editTarget),
-    watchedValue: JSON.stringify([editVendorTypeIds, contactsList]),
+    watchedValue: JSON.stringify([editVendorTypeIds, contactsList, stagedLinks, stagedSnapshot]),
     title: "Discard changes?",
     description: "Your edits are only in this browser and have not been saved.",
   });
@@ -350,6 +336,8 @@ export function VendorDirectory({
       })),
     );
     setEditVendorTypeIds(vendor.types.map((type) => type.vendor_type.id));
+    setStagedLinks(parseLinks(vendor.info_links));
+    setStagedSnapshot(parseLinks(vendor.link_review_snapshot));
     setEditName(vendor.name);
     setEditLegalName(vendor.legal_name ?? "");
     setEditAddress(vendor.address ?? "");
@@ -625,6 +613,8 @@ export function VendorDirectory({
               setEditError(null);
               const fd = new FormData(e.currentTarget);
               fd.set("contactsJson", JSON.stringify(contactsList.filter((c) => c.personName?.trim())));
+              fd.set("infoLinksJson", JSON.stringify(stagedLinks));
+              fd.set("linkSnapshotJson", JSON.stringify(stagedSnapshot));
               try {
                 const res = await updateVendorAction(null, fd);
                 if (res && "ok" in res && res.ok) {
@@ -664,7 +654,7 @@ export function VendorDirectory({
                       <Field label="Office / Workshop address">
                         <Input name="address" value={editAddress} maxLength={256} onChange={(e) => setEditAddress(e.target.value)} />
                       </Field>
-                      <SupplierLinksEditor vendorId={editTarget.id} initialLinks={editTarget.info_links} initialSnapshot={editTarget.link_review_snapshot} canManage={canManage} />
+                      <SupplierLinksEditor links={stagedLinks} snapshot={stagedSnapshot} onLinksChange={setStagedLinks} onSnapshotChange={setStagedSnapshot} canManage={canManage} />
                       <Field label="Notes">
                         <SimpleTextEditor name="notes" value={editNotes} rows={2} onChange={(e) => setEditNotes(e.target.value)} />
                       </Field>

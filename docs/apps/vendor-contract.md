@@ -151,21 +151,32 @@ Brand-scoped contact validation: the Brand must be live, and the Vendor must own
 
 ---
 
-## 5. Sub-Entity: Links (`VendorLink`)
+## 5. Supplier Company Information Links (`Vendor.info_links`)
 
-Renamed from `PartyLink`. Vendor links use a curated subset of the shared `LinkKind` vocabulary — CATALOG is excluded (catalog links belong to Brand, not Vendor):
+> **R6.20 / R6.21 redesign.** The old `VendorLink` sub-entity (with MARKETPLACE / DRIVE / PRICE_LIST / OTHER kinds) has been purged. Company and contact links are now stored as a JSONB array on `Vendor.info_links`. Ambiguous records from the purge are held in `Vendor.link_review_snapshot` until an authorised user resolves them.
 
-`WEBSITE, INSTAGRAM, FACEBOOK, TIKTOK, YOUTUBE, LINKEDIN, WHATSAPP, MARKETPLACE, DRIVE, PRICE_LIST, OTHER`
+### 5.1 Schema
 
-| Field | Type | Notes |
-|---|---|---|
-| `id` | UUID | PK |
-| `vendor_id` | FK → Vendor | Required |
-| `kind` | LinkKind | |
-| `url` | String | Unique per (vendor_id, url) |
-| `archive_url` | String? | |
-| `label` | String? | |
-| `sort_order` | Int | |
+`Vendor.info_links` is a `Json @default("[]")` column (schema: `master_data`). Each element is a plain object:
+
+```json
+{ "kind": "WEBSITE", "url": "https://…", "label": "optional display name" }
+```
+
+Allowed `kind` values (exact, uppercase): `WEBSITE`, `INSTAGRAM`, `FACEBOOK`, `TIKTOK`, `YOUTUBE`, `LINKEDIN`, `WHATSAPP`.
+
+Constraints enforced by the service before any write:
+- URL must start with `http://` or `https://` and parse as a valid URL.
+- URL max length: 2048 characters. Label max length: 200 characters.
+- Maximum 20 links per Vendor. Duplicate URLs within one submission are deduplicated (first occurrence kept).
+
+### 5.2 Review snapshot
+
+`Vendor.link_review_snapshot` (`Json @default("[]")`) holds records from the purge that were ambiguous. An authorised user accepts or discards them from the Edit Supplier dialog. Accepted items are merged into `info_links`; the rest are discarded. The snapshot is cleared on resolution.
+
+### 5.3 Mutation surface (R6.23 / R6.24)
+
+Link changes are part of the **Edit Supplier** form and are committed **atomically** with the rest of the vendor profile (name, types, contacts) in a single `updateVendor` transaction. There is no separate link-only save; Cancel in the Edit dialog discards all staged changes including link edits.
 
 ---
 
@@ -435,7 +446,7 @@ instruction.
 |---|---|---|
 | `Party` model | **Vendor** | Full rename — table, fields, references |
 | `PartyContact` model | **VendorContact** | Rename `party_id` → `vendor_id` |
-| `PartyLink` model | **VendorLink** | Rename `party_id` → `vendor_id` |
+| `PartyLink` model | Purged — data migrated to `Vendor.info_links` / `link_review_snapshot` (R6.20) |
 | `BusinessType` model | **VendorType** | Add `can_supply_material`, `can_supply_labor` boolean fields |
 | `PartyBusinessType` join | **VendorVendorType** | Rename party_id → vendor_id, business_type_id → vendor_type_id |
 | `BUSINESS_TYPE_SEEDS` | **VENDOR_TYPE_SEEDS** | Add capability flag values per §2.5 |
@@ -470,7 +481,7 @@ instruction.
 | `BrandSupplier.vendor_id` FK | `onDelete: Restrict` (was Cascade on `party_id`) |
 | `BrandSupplier.brand_id` FK | `onDelete: Restrict` (was Cascade) — defense in depth |
 | `VendorContact.vendor_id` FK | `onDelete: Cascade` (children follow parent) |
-| `VendorLink.vendor_id` FK | `onDelete: Cascade` (children follow parent) |
+| `VendorLink.vendor_id` FK | Removed — model no longer exists (R6.20) |
 | `Brand.owner_vendor_id` FK | `onDelete: SetNull` (retained) + delete guard checks ownership |
 | `PriceMaterial.supplier_vendor_id` FK | Required, `onDelete: Restrict`; replaces nullable `SkuPrice.supplier_party_id` |
 | `PriceMaterialLabor.vendor_id` / `PriceLabor.vendor_id` FKs | Required, `onDelete: Restrict`; replace nullable `WorkPrice.vendor_party_id` |
@@ -532,7 +543,7 @@ them.
 | Q9 | Brand relations | Both owner + BrandSupplier retained |
 | Q10 | Lifecycle | Same pattern as Brand — independent root with provenance-safe cascade archive/restore |
 | Q11 | Archive impact on prices | **Cascade** — prices terikat ikut archived |
-| Q12 | VendorLink structure | Retained as-is (renamed) |
+| Q12 | VendorLink structure | Purged — replaced by `Vendor.info_links` JSON (R6.20) |
 | Q13 | Duplicate detection | Case-insensitive unique + near-duplicate warning |
 | Q14 | Permission model | 2-level Vendor read/manage plus shared `masterdata.deletion.approve` workflow grant |
 | Q15 | VendorType management | Holders of `masterdata.dictionary.manage` (shared with Unit) |

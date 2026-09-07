@@ -106,6 +106,17 @@ export async function updateVendorAction(
 
     const vendorTypeIds = formData.getAll("vendorTypeIds").map(String).filter(Boolean);
 
+    let infoLinks: Array<{ kind: string; url: string; label?: string | null }> | undefined;
+    let linkReviewSnapshot: unknown[] | undefined;
+    const rawInfoLinks = formData.get("infoLinksJson");
+    if (rawInfoLinks !== null) {
+      try { infoLinks = JSON.parse(String(rawInfoLinks)); } catch { infoLinks = []; }
+    }
+    const rawSnapshot = formData.get("linkSnapshotJson");
+    if (rawSnapshot !== null) {
+      try { linkReviewSnapshot = JSON.parse(String(rawSnapshot)); } catch { linkReviewSnapshot = []; }
+    }
+
     const parsed = VendorInputSchema.extend({ vendorId: z.string().uuid() }).safeParse({
       vendorId: String(formData.get("vendorId") ?? ""),
       name: String(formData.get("name") ?? ""),
@@ -136,6 +147,8 @@ export async function updateVendorAction(
         notes: c.notes || undefined,
         brandId: c.brandId || undefined,
       })),
+      infoLinks,
+      linkReviewSnapshot,
     });
     revalidateVendors();
     return result;

@@ -366,7 +366,7 @@ evidence only; it does not authorize code changes.
 | Resources | Many external URLs directly on Brand; internal storage deferred |
 | Archive | Staff; Brand entity only — SKUs and Prices are not affected |
 | Restore | Brand entity only — SKUs and Prices are not automatically restored |
-| Permanent delete | Staff request, explicit approver permission, includes Brand SKUs/prices |
+| Permanent delete | Staff request, explicit approver permission. Brand entity only — SKUs and Material Prices survive with brand_id nulled (R6.21) |
 | Historical BQ | Protected by consumer snapshots |
 | UI | Directory table, trailing action menu, Dialog edit, explicit confirmations |
 | Import/export | Deferred |

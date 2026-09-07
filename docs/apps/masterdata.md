@@ -136,7 +136,7 @@ The following remain deferred and must not be inferred during implementation:
 - Brand owns its identity/profile, categories, catalog resources/links, SKUs,
   and all `BrandSupplier` mutations.
 - Supplier owns only its identity/profile, Supplier Type capabilities, and sales
-  contacts. Supplier has no catalog-resource or external-link mutation surface.
+  contacts. Catalog-resource mutation belongs to Brand, not Supplier. Company information links (WEBSITE, INSTAGRAM, FACEBOOK, TIKTOK, YOUTUBE, LINKEDIN, WHATSAPP) are managed via the Edit Supplier dialog and committed atomically with the vendor profile — see vendor-contract.md §5.
 - A Supplier detail may show supplied Brands as a read-only projection. That
   projection does not transfer mutation authority from Brand.
 - Persisted `Vendor`, `VendorType`, and `vendor_id` names remain unchanged; all
