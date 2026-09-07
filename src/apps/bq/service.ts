@@ -222,7 +222,15 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     if (input.defaultKoefisien !== undefined) requirePositiveCoefficient(input.defaultKoefisien);
     const existing = await db.bqLibMaterial.findUnique({ where: { id: input.id } });
     if (!existing) throw new AppError("NOT_FOUND", "bq.lib-material.not-found", "Library material not found");
-    if ((input.name === undefined || input.name === existing.name) && (input.purchaseUnit === undefined || input.purchaseUnit === existing.purchase_unit) && (input.baseUnit === undefined || input.baseUnit === existing.base_unit) && (input.harga === undefined || toDecimalString(input.harga) === existing.harga.toString()) && (input.currency === undefined || input.currency === existing.currency) && (input.defaultKoefisien === undefined || toDecimalString(input.defaultKoefisien) === existing.default_koefisien.toString()) && (input.notes === undefined || input.notes === existing.notes)) return existing;
+    if (
+      fieldUnchanged(input.name, existing.name)
+      && fieldUnchanged(input.purchaseUnit, existing.purchase_unit)
+      && fieldUnchanged(input.baseUnit, existing.base_unit)
+      && decimalFieldUnchanged(input.harga, existing.harga)
+      && fieldUnchanged(input.currency, existing.currency)
+      && decimalFieldUnchanged(input.defaultKoefisien, existing.default_koefisien)
+      && fieldUnchanged(input.notes, existing.notes)
+    ) return existing;
     const item = await db.bqLibMaterial.update({
       where: { id: input.id },
       data: {
@@ -312,7 +320,15 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     if (input.defaultKoefisien !== undefined) requirePositiveCoefficient(input.defaultKoefisien);
     const existing = await db.bqLibLabor.findUnique({ where: { id: input.id } });
     if (!existing) throw new AppError("NOT_FOUND", "bq.lib-labor.not-found", "Library labor not found");
-    if ((input.name === undefined || input.name === existing.name) && (input.purchaseUnit === undefined || input.purchaseUnit === existing.purchase_unit) && (input.baseUnit === undefined || input.baseUnit === existing.base_unit) && (input.harga === undefined || toDecimalString(input.harga) === existing.harga.toString()) && (input.currency === undefined || input.currency === existing.currency) && (input.defaultKoefisien === undefined || toDecimalString(input.defaultKoefisien) === existing.default_koefisien.toString()) && (input.notes === undefined || input.notes === existing.notes)) return existing;
+    if (
+      fieldUnchanged(input.name, existing.name)
+      && fieldUnchanged(input.purchaseUnit, existing.purchase_unit)
+      && fieldUnchanged(input.baseUnit, existing.base_unit)
+      && decimalFieldUnchanged(input.harga, existing.harga)
+      && fieldUnchanged(input.currency, existing.currency)
+      && decimalFieldUnchanged(input.defaultKoefisien, existing.default_koefisien)
+      && fieldUnchanged(input.notes, existing.notes)
+    ) return existing;
     const item = await db.bqLibLabor.update({
       where: { id: input.id },
       data: {
@@ -402,7 +418,15 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     if (input.defaultKoefisien !== undefined) requirePositiveCoefficient(input.defaultKoefisien);
     const existing = await db.bqLibMaterialLabor.findUnique({ where: { id: input.id } });
     if (!existing) throw new AppError("NOT_FOUND", "bq.lib-material-labor.not-found", "Library material+labor not found");
-    if ((input.name === undefined || input.name === existing.name) && (input.purchaseUnit === undefined || input.purchaseUnit === existing.purchase_unit) && (input.baseUnit === undefined || input.baseUnit === existing.base_unit) && (input.harga === undefined || toDecimalString(input.harga) === existing.harga.toString()) && (input.currency === undefined || input.currency === existing.currency) && (input.defaultKoefisien === undefined || toDecimalString(input.defaultKoefisien) === existing.default_koefisien.toString()) && (input.notes === undefined || input.notes === existing.notes)) return existing;
+    if (
+      fieldUnchanged(input.name, existing.name)
+      && fieldUnchanged(input.purchaseUnit, existing.purchase_unit)
+      && fieldUnchanged(input.baseUnit, existing.base_unit)
+      && decimalFieldUnchanged(input.harga, existing.harga)
+      && fieldUnchanged(input.currency, existing.currency)
+      && decimalFieldUnchanged(input.defaultKoefisien, existing.default_koefisien)
+      && fieldUnchanged(input.notes, existing.notes)
+    ) return existing;
     const item = await db.bqLibMaterialLabor.update({
       where: { id: input.id },
       data: {
@@ -491,7 +515,15 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     if (input.defaultKoefisien !== undefined) requirePositiveCoefficient(input.defaultKoefisien);
     const existing = await db.bqLibCustomItem.findUnique({ where: { id: input.id } });
     if (!existing) throw new AppError("NOT_FOUND", "bq.lib-custom-item.not-found", "Custom Library item not found");
-    if ((input.name === undefined || input.name === existing.name) && (input.purchaseUnit === undefined || input.purchaseUnit === existing.purchase_unit) && (input.harga === undefined || toDecimalString(input.harga) === existing.harga.toString()) && (input.currency === undefined || input.currency === existing.currency) && (input.defaultKoefisien === undefined || toDecimalString(input.defaultKoefisien) === existing.default_koefisien.toString()) && (input.kategori === undefined || input.kategori === existing.kategori) && (input.notes === undefined || input.notes === existing.notes)) return existing;
+    if (
+      fieldUnchanged(input.name, existing.name)
+      && fieldUnchanged(input.purchaseUnit, existing.purchase_unit)
+      && decimalFieldUnchanged(input.harga, existing.harga)
+      && fieldUnchanged(input.currency, existing.currency)
+      && decimalFieldUnchanged(input.defaultKoefisien, existing.default_koefisien)
+      && fieldUnchanged(input.kategori, existing.kategori)
+      && fieldUnchanged(input.notes, existing.notes)
+    ) return existing;
     const item = await db.bqLibCustomItem.update({
       where: { id: input.id },
       data: {

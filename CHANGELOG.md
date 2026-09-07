@@ -5,8 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.28**
-- Next local revision: **R6.29**
+- Current revision after this entry is committed: **R6.29**
+- Next local revision: **R6.30**
+
+## R6.29 | 2026-09-07 | refactor(bq): consolidate Library no-op comparisons
+
+### Changed
+
+- Replaced the duplicated long-form no-op conditions in all four BQ Library item update paths with the existing scalar and decimal comparison helpers.
+- Preserved the exact update, timestamp, and audit behavior established in R6.28; this revision changes maintainability only.
+
+### Dependencies and migrations
+
+- No dependency, Prisma schema, or migration change.
+
+### Verification
+
+- `npx prisma validate`: passed.
+- `npx prisma migrate deploy`: all 26 migrations passed against a fresh disposable `studioflow_rebuild_test` database.
+- `npm run typecheck`, `npm run lint`, `npm run check:boundaries`, and `npm run check:legacy-runtime`: passed.
+- `npm test`: 251 passed, 0 failed, 0 cancelled against the disposable `studioflow_rebuild_test` database.
+- `npm run build`: passed.
+- `git diff --check`: passed.
 
 ## R6.28 | 2026-09-07 | fix(bq): close update semantics and stale promotion paths
 
