@@ -24,7 +24,7 @@ const HttpUrlSchema = z.string().url("Must be a valid URL").refine(
 
 const BrandInputSchema = z.object({
   name: z.string().min(1, "Brand name is required").max(64, "Brand name is too long"),
-  ownerVendorId: z.string().uuid("Owner supplier is required"),
+  ownerVendorId: z.union([z.string().uuid(), z.literal("")]).optional(),
   notes: z.string().max(1000).optional().nullable().or(z.literal("")),
   categoryIds: z.array(z.string().uuid()).optional(),
   hashtags: z.array(z.string()).optional(),
@@ -94,7 +94,7 @@ export async function createBrandAction(
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
       name: parsed.data.name,
-      ownerVendorId: parsed.data.ownerVendorId,
+      ownerVendorId: parsed.data.ownerVendorId || undefined,
       notes: parsed.data.notes || undefined,
       categoryIds: parsed.data.categoryIds,
       hashtags: parsed.data.hashtags,
@@ -145,7 +145,7 @@ export async function updateBrandAction(
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
       brandId: parsed.data.brandId,
       name: parsed.data.name,
-      ownerVendorId: parsed.data.ownerVendorId,
+      ownerVendorId: parsed.data.ownerVendorId || null,
       notes: parsed.data.notes,
       categoryIds: parsed.data.categoryIds,
       hashtags: parsed.data.hashtags,

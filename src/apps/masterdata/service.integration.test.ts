@@ -643,6 +643,42 @@ describe("Master Data service", () => {
     assert.notEqual(await testDb.prisma.sku.findUnique({ where: { id: unbranded.skuId } }), null);
   });
 
+  it("preserves direct SKU and Price causes when a Brand is restored", async () => {
+    const context = await createMaterialContext();
+    const alternateVendor = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Alternate Lifecycle Supplier" });
+    const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    await testDb.prisma.vendorVendorType.create({
+      data: { id: crypto.randomUUID(), vendor_id: alternateVendor.vendorId, vendor_type_id: supplierType.id },
+    });
+    const directSku = await service.createSku({
+      grants: GRANTS, actor: ACTOR, name: "Direct Archived SKU", brandId: context.brandId,
+      baseUnitId: context.unit.id, categoryId: context.categoryId,
+      priceMaterials: [{ supplierVendorId: context.vendorId, amount: "110", currency: "IDR" }],
+    });
+    const liveSku = await service.createSku({
+      grants: GRANTS, actor: ACTOR, name: "Direct Archived Price SKU", brandId: context.brandId,
+      baseUnitId: context.unit.id, categoryId: context.categoryId,
+      priceMaterials: [
+        { supplierVendorId: context.vendorId, amount: "120", currency: "IDR" },
+        { supplierVendorId: alternateVendor.vendorId, amount: "125", currency: "IDR" },
+      ],
+    });
+    const directSkuPrice = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: directSku.skuId } });
+    const directPrice = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: liveSku.skuId, supplier_vendor_id: context.vendorId } });
+
+    await service.archiveSku({ grants: GRANTS, actor: ACTOR, skuId: directSku.skuId });
+    await service.archivePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: directPrice.id });
+    await service.archiveBrand({ grants: GRANTS, actor: ACTOR, brandId: context.brandId });
+    await service.restoreBrand({ grants: GRANTS, actor: ACTOR, brandId: context.brandId });
+
+    assert.notEqual((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: directSku.skuId } })).deleted_at, null);
+    assert.notEqual((await testDb.prisma.priceMaterial.findUniqueOrThrow({ where: { id: directSkuPrice.id } })).deleted_at, null);
+    assert.equal((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: liveSku.skuId } })).deleted_at, null);
+    assert.notEqual((await testDb.prisma.priceMaterial.findUniqueOrThrow({ where: { id: directPrice.id } })).deleted_at, null);
+    assert.equal(await testDb.prisma.archiveCause.count({ where: { entity_type: "sku", entity_id: directSku.skuId, kind: "DIRECT" } }), 1);
+    assert.equal(await testDb.prisma.archiveCause.count({ where: { entity_type: "price_material", entity_id: directPrice.id, kind: "DIRECT" } }), 1);
+  });
+
   it("executes approved permanent deletion atomically and preserves the final audit event", async () => {
     const created = await service.createUnit({ grants: GRANTS, actor: ACTOR, code: "TEST_BOX", name: "Test Box" });
     await service.archiveUnit({ grants: GRANTS, actor: ACTOR, unitId: created.unitId });

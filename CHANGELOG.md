@@ -5,8 +5,31 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.25**
-- Next local revision: **R6.26**
+- Current revision after this entry is committed: **R6.27**
+- Next local revision: **R6.28**
+
+## R6.27 | 2026-09-07 | fix(brand): close lifecycle contract and UI contradictions
+
+### Corrected
+
+- Brand create/edit actions now accept an empty owner Supplier; create omits the optional relation and edit persists `null`, matching the UI, service, schema, and contract.
+- Brand archive and restore confirmations now accurately explain the SKU/Material Price cascade and provenance-safe restore behavior.
+- Replaced the remaining R6.21 lifecycle text in the authoritative Brand contract with one consistent archive, restore, and permanent-delete story.
+- Corrected the revision ledger after R6.26.
+- Added regression coverage proving a directly archived SKU and directly archived Material Price remain archived after Brand archive and restore.
+
+### Dependencies and migrations
+
+- No dependency, Prisma schema, or migration change.
+
+### Verification
+
+- `npx prisma validate`: passed.
+- `npx prisma migrate deploy`: all 26 migrations passed against a fresh disposable `studioflow_rebuild_test` database.
+- `npm run typecheck`, `npm run lint`, `npm run check:boundaries`, and `npm run check:legacy-runtime`: passed.
+- `npm test`: 248 passed, 0 failed, 0 cancelled.
+- `npm run build`: passed.
+- `git diff --check`: passed.
 
 ## R6.26 | 2026-09-07 | fix: restore lifecycle semantics and close contract/backend UX gaps
 
