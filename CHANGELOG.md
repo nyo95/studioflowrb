@@ -5,8 +5,26 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R6** — pending release commit (GitHub publication authorized)
-- Current revision after this entry is committed: **R6.34**
-- Next local revision: **R6.35**
+- Current revision after this entry is committed: **R6.35**
+- Next local revision: **R6.36**
+
+## R6.35 | 2026-09-07 | feat(masterdata): centralize directory update metadata
+
+### Changed
+
+- Added a shared Master Data `Updated` table cell, displaying each record's localized update time and actor.
+- Added that column immediately before Actions in Brands, Suppliers, and all Pricing tabs; removed update metadata from the Pricing name cells and duplicate Brand owner metadata from its name cell.
+
+### Dependencies and migrations
+
+- No dependency, Prisma schema, or migration change.
+
+### Verification
+
+- `npm run typecheck`, `npm run lint`, and `npm run build`: passed.
+- `npm test`: not rerun; the unchanged office environment lacks the required disposable `PLATFORM_TEST_DATABASE_URL`, and its fail-closed guard prevents the integration suite from touching the working database.
+- Browser check: Brands, Suppliers, and Material Pricing each show a localized update time and actor immediately before the centered Actions column; Pricing no longer repeats its update date under the record name.
+- `git diff --check`: passed.
 
 ## R6.34 | 2026-09-07 | fix(vendor): remove redundant directory type metadata
 

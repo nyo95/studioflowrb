@@ -1,5 +1,6 @@
 "use client";
 import { RequestDeletionDialog } from "../request-deletion-dialog";
+import { UpdatedCell } from "../updated-cell";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { DirectoryShell,DraftDialog,Pagination,RowActionMenu,RowActionsCell,RowActionsHead,Text,usePagination } from "@/platform/ui_engine";
 
@@ -400,6 +401,7 @@ export function VendorDirectory({
               <TableHead>Types &amp; Capabilities</TableHead>
               <TableHead>Contacts</TableHead>
               <TableHead align="end">Prices</TableHead>
+              <TableHead>Updated</TableHead>
               <RowActionsHead />
             </TableRow>
           </TableHeader>
@@ -460,6 +462,7 @@ export function VendorDirectory({
                   <TableCell align="end">
                     <TableCellContent align="end" primary={totalPriceCount.toLocaleString()} />
                   </TableCell>
+                  <UpdatedCell at={vendor.updated_at} by={vendor.updated_by_label} />
                   <RowActionsCell>
                     <RowActionMenu label={`Actions for ${vendor.name}`} pending={pendingId === vendor.id} items={[...[],...(isPending ? [] : []),...[],...(canManage ? [...[],...[{ label: "Edit", onSelect: () => openEditDialog(vendor), disabled: isPending, danger: false, separatorBefore: false }],...[],...(!isArchived ? [{ label: "Archive", onSelect: () => setConfirmArchive(vendor), disabled: isPending, danger: false, separatorBefore: false }] : [...[],...[{ label: "Restore", onSelect: () => setConfirmRestore(vendor), disabled: isPending, danger: false, separatorBefore: false }],...[],...[{ label: "Request deletion", onSelect: () => setDeleteTarget(vendor), disabled: isPending, danger: true, separatorBefore: true }],...[]]),...[]] : []),...[]]} />
                   </RowActionsCell>
