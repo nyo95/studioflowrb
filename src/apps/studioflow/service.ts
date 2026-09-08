@@ -88,6 +88,52 @@ export type SendIterationInput = { assignee_id?: string };
 export type AddIterationPointInput = { text: string };
 export type WithdrawPointInput = { reason: string };
 
+export type CreateTaskInput = {
+  project_id: string;
+  /** Omit/null for General. Phase surfaces inherit their snapshot key here. */
+  phase_scope?: string | null;
+  title: string;
+  assignee_id?: string | null;
+  due_date?: Date | null;
+  attachment_file_id?: string | null;
+};
+
+export type AssignTaskInput = { assignee_id: string | null };
+
+export type SetTaskCompletionInput = { done: boolean };
+
+export type ReorderTaskInput = {
+  /** Dragging into General supplies null; dragging onto a phase supplies its key. */
+  phase_scope: string | null;
+  sort_order: number;
+};
+
+export type WaitingOnMeItem =
+  | {
+      kind: "ITERATION";
+      id: string;
+      project: { id: string; code: string; name: string; status: "ACTIVE" | "ON_HOLD" | "COMPLETED" };
+      phase: { id: string; key: string; name: string; round_prefix: string | null };
+      iteration_number: number;
+      state: "DRAFT" | "SENT";
+      assignee_id: string | null;
+      assignee_label: string | null;
+      assignment: "MINE" | "NEEDS_ASSIGNMENT";
+      waiting_since: Date;
+    }
+  | {
+      kind: "TASK";
+      id: string;
+      project: { id: string; code: string; name: string; status: "ACTIVE" | "ON_HOLD" | "COMPLETED" };
+      phase_scope: string | null;
+      title: string;
+      assignee_id: string | null;
+      assignee_label: string | null;
+      assignment: "MINE" | "NEEDS_ASSIGNMENT";
+      due_date: Date | null;
+      waiting_since: Date;
+    };
+
 
 export type RecordFileInput = {
   project_id: string;
@@ -173,6 +219,82 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       tx,
     );
   };
+
+  function requireStudioFlowRead(grants: PermissionGrants): void {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.access);
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+  }
+
+  async function requireAssignableUser(userId: string): Promise<void> {
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: {
+        status: true,
+        user_roles: {
+          where: { role: { archived_at: null } },
+          select: { role: { select: { role_permissions: { select: { permission_id: true } } } } },
+        },
+      },
+    });
+    const grants = new Set(
+      user?.user_roles.flatMap((assignment) =>
+        assignment.role.role_permissions.map((permission) => permission.permission_id),
+      ) ?? [],
+    );
+    if (
+      user?.status !== "ACTIVE" ||
+      !grants.has(STUDIOFLOW_PERMISSIONS.access) ||
+      !grants.has(STUDIOFLOW_PERMISSIONS.projectRead)
+    ) {
+      throw new AppError(
+        "VALIDATION",
+        "studioflow.assignment.user-ineligible",
+        "Assignee must be an active StudioFlow project reader",
+      );
+    }
+  }
+
+  async function requireWritableTaskProject(projectId: string) {
+    const project = await db.sfProject.findUnique({
+      where: { id: projectId },
+      select: { id: true, deleted_at: true },
+    });
+    if (!project) throw new AppError("NOT_FOUND", "studioflow.project.not-found", "Project not found");
+    if (project.deleted_at) {
+      throw new AppError("CONFLICT", "studioflow.project.archived", "Project is archived");
+    }
+    return project;
+  }
+
+  async function validateTaskPhaseScope(projectId: string, phaseScope: string | null): Promise<void> {
+    if (phaseScope === null) return;
+    const phase = await db.sfProjectPhase.findUnique({
+      where: { project_id_key: { project_id: projectId, key: phaseScope } },
+      select: { id: true },
+    });
+    if (!phase) {
+      throw new AppError(
+        "VALIDATION",
+        "studioflow.task.phase-scope-invalid",
+        "Task phase scope does not belong to this project",
+      );
+    }
+  }
+
+  async function validateTaskAttachment(projectId: string, fileId: string | null): Promise<void> {
+    if (fileId === null) return;
+    const file = await db.sfFile.findFirst({
+      where: { id: fileId, project_id: projectId, superseded_at: null },
+      select: { id: true },
+    });
+    if (!file) {
+      throw new AppError(
+        "VALIDATION",
+        "studioflow.task.attachment-invalid",
+        "Task attachment must be a current file from the same project",
+      );
+    }
+  }
 
   // ── Client ──────────────────────────────────────────────────────────────
 
@@ -1321,6 +1443,308 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     return { files, folders: phases };
   }
 
+  // ── Tasks (§7.3) ───────────────────────────────────────────────────────
+
+  async function listTasks(
+    grants: PermissionGrants,
+    projectId: string,
+    opts?: { includeDone?: boolean; phaseScope?: string | null },
+  ) {
+    requireStudioFlowRead(grants);
+    return db.sfTask.findMany({
+      where: {
+        project_id: projectId,
+        ...(opts?.includeDone ? {} : { status: "OPEN" }),
+        ...(opts && "phaseScope" in opts ? { phase_scope: opts.phaseScope } : {}),
+      },
+      orderBy: [{ status: "asc" }, { sort_order: "asc" }, { created_at: "asc" }],
+      include: {
+        attachment_file: {
+          select: { id: true, filename: true, original_filename: true, treatment: true, bytes_released_at: true },
+        },
+      },
+    });
+  }
+
+  async function createTask(
+    grants: PermissionGrants,
+    _actor: AuditActor,
+    input: CreateTaskInput,
+  ) {
+    requireStudioFlowRead(grants);
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.taskManage);
+    const title = input.title.trim();
+    if (!title) {
+      throw new AppError("VALIDATION", "studioflow.task.title-required", "Task title is required");
+    }
+    const phaseScope = input.phase_scope ?? null;
+    const assigneeId = input.assignee_id ?? null;
+    const attachmentFileId = input.attachment_file_id ?? null;
+
+    return runTransaction(async () => {
+      await requireWritableTaskProject(input.project_id);
+      await validateTaskPhaseScope(input.project_id, phaseScope);
+      await validateTaskAttachment(input.project_id, attachmentFileId);
+      if (assigneeId) await requireAssignableUser(assigneeId);
+
+      const max = await db.sfTask.aggregate({
+        where: { project_id: input.project_id, phase_scope: phaseScope, status: "OPEN" },
+        _max: { sort_order: true },
+      });
+      return db.sfTask.create({
+        data: {
+          project_id: input.project_id,
+          phase_scope: phaseScope,
+          title,
+          assignee_id: assigneeId,
+          due_date: input.due_date ?? null,
+          attachment_file_id: attachmentFileId,
+          sort_order: (max._max.sort_order ?? 0) + 1,
+        },
+      });
+    });
+  }
+
+  async function assignTask(
+    grants: PermissionGrants,
+    actor: AuditActor,
+    taskId: string,
+    input: AssignTaskInput,
+  ) {
+    requireStudioFlowRead(grants);
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.taskManage);
+    return runTransaction(async () => {
+      const task = await db.sfTask.findUnique({
+        where: { id: taskId },
+        include: { project: { select: { deleted_at: true } } },
+      });
+      if (!task) throw new AppError("NOT_FOUND", "studioflow.task.not-found", "Task not found");
+      if (task.project.deleted_at) {
+        throw new AppError("CONFLICT", "studioflow.project.archived", "Project is archived");
+      }
+      if (input.assignee_id) await requireAssignableUser(input.assignee_id);
+      if (task.assignee_id === input.assignee_id) return task;
+
+      const updated = await db.sfTask.update({
+        where: { id: taskId },
+        data: { assignee_id: input.assignee_id },
+      });
+      await writeAudit({
+        action: "task.assign",
+        entityType: "SfTask",
+        entityId: taskId,
+        actor,
+        changes: { from: task.assignee_id, to: input.assignee_id },
+      });
+      return updated;
+    });
+  }
+
+  async function setTaskCompletion(
+    grants: PermissionGrants,
+    _actor: AuditActor,
+    taskId: string,
+    input: SetTaskCompletionInput,
+  ) {
+    requireStudioFlowRead(grants);
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.taskManage);
+    return runTransaction(async () => {
+      const task = await db.sfTask.findUnique({
+        where: { id: taskId },
+        include: { project: { select: { deleted_at: true } } },
+      });
+      if (!task) throw new AppError("NOT_FOUND", "studioflow.task.not-found", "Task not found");
+      if (task.project.deleted_at) {
+        throw new AppError("CONFLICT", "studioflow.project.archived", "Project is archived");
+      }
+      const status = input.done ? "DONE" : "OPEN";
+      if (task.status === status) return task;
+      return db.sfTask.update({ where: { id: taskId }, data: { status } });
+    });
+  }
+
+  async function reorderTask(
+    grants: PermissionGrants,
+    _actor: AuditActor,
+    taskId: string,
+    input: ReorderTaskInput,
+  ) {
+    requireStudioFlowRead(grants);
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.taskManage);
+    if (!Number.isSafeInteger(input.sort_order) || input.sort_order < 0) {
+      throw new AppError(
+        "VALIDATION",
+        "studioflow.task.sort-order-invalid",
+        "Task sort order must be a non-negative integer",
+      );
+    }
+    return runTransaction(async () => {
+      const task = await db.sfTask.findUnique({
+        where: { id: taskId },
+        include: { project: { select: { deleted_at: true } } },
+      });
+      if (!task) throw new AppError("NOT_FOUND", "studioflow.task.not-found", "Task not found");
+      if (task.project.deleted_at) {
+        throw new AppError("CONFLICT", "studioflow.project.archived", "Project is archived");
+      }
+      await validateTaskPhaseScope(task.project_id, input.phase_scope);
+      if (task.phase_scope === input.phase_scope && task.sort_order === input.sort_order) return task;
+      return db.sfTask.update({
+        where: { id: taskId },
+        data: { phase_scope: input.phase_scope, sort_order: input.sort_order },
+      });
+    });
+  }
+
+  async function deleteTask(grants: PermissionGrants, _actor: AuditActor, taskId: string) {
+    requireStudioFlowRead(grants);
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.taskManage);
+    return runTransaction(async () => {
+      const task = await db.sfTask.findUnique({
+        where: { id: taskId },
+        include: { project: { select: { deleted_at: true } } },
+      });
+      if (!task) throw new AppError("NOT_FOUND", "studioflow.task.not-found", "Task not found");
+      if (task.project.deleted_at) {
+        throw new AppError("CONFLICT", "studioflow.project.archived", "Project is archived");
+      }
+      return db.sfTask.delete({ where: { id: taskId } });
+    });
+  }
+
+  // ── Cross-project workload (§10.2) ─────────────────────────────────────
+
+  async function listWaitingOnMe(
+    grants: PermissionGrants,
+    userId: string,
+  ): Promise<WaitingOnMeItem[]> {
+    requireStudioFlowRead(grants);
+    const [iterations, tasks] = await Promise.all([
+      db.sfIteration.findMany({
+        where: {
+          state: { in: ["DRAFT", "SENT"] },
+          phase: { project: { deleted_at: null } },
+        },
+        select: {
+          id: true,
+          number: true,
+          state: true,
+          assignee_id: true,
+          created_at: true,
+          sent_at: true,
+          phase: {
+            select: {
+              id: true,
+              key: true,
+              name: true,
+              round_prefix: true,
+              project: { select: { id: true, code: true, name: true, status: true } },
+            },
+          },
+        },
+      }),
+      db.sfTask.findMany({
+        where: { status: "OPEN", project: { deleted_at: null } },
+        select: {
+          id: true,
+          phase_scope: true,
+          title: true,
+          assignee_id: true,
+          due_date: true,
+          created_at: true,
+          project: { select: { id: true, code: true, name: true, status: true } },
+        },
+      }),
+    ]);
+
+    const assigneeIds = [
+      ...new Set(
+        [...iterations, ...tasks]
+          .map((item) => item.assignee_id)
+          .filter((id): id is string => id !== null),
+      ),
+    ];
+    const users = assigneeIds.length
+      ? await db.user.findMany({
+          where: { id: { in: assigneeIds } },
+          select: {
+            id: true,
+            display_name: true,
+            status: true,
+            user_roles: {
+              where: { role: { archived_at: null } },
+              select: { role: { select: { role_permissions: { select: { permission_id: true } } } } },
+            },
+          },
+        })
+      : [];
+    const people = new Map(
+      users.map((user) => {
+        const permissionIds = new Set(
+          user.user_roles.flatMap((assignment) =>
+            assignment.role.role_permissions.map((permission) => permission.permission_id),
+          ),
+        );
+        return [
+          user.id,
+          {
+            label: user.display_name,
+            available:
+              user.status === "ACTIVE" &&
+              permissionIds.has(STUDIOFLOW_PERMISSIONS.access) &&
+              permissionIds.has(STUDIOFLOW_PERMISSIONS.projectRead),
+          },
+        ] as const;
+      }),
+    );
+    const assignmentFor = (assigneeId: string | null): "MINE" | "NEEDS_ASSIGNMENT" | null => {
+      if (!assigneeId || !people.get(assigneeId)?.available) return "NEEDS_ASSIGNMENT";
+      return assigneeId === userId ? "MINE" : null;
+    };
+
+    const rows: WaitingOnMeItem[] = [];
+    for (const iteration of iterations) {
+      const assignment = assignmentFor(iteration.assignee_id);
+      if (!assignment) continue;
+      rows.push({
+        kind: "ITERATION",
+        id: iteration.id,
+        project: iteration.phase.project,
+        phase: {
+          id: iteration.phase.id,
+          key: iteration.phase.key,
+          name: iteration.phase.name,
+          round_prefix: iteration.phase.round_prefix,
+        },
+        iteration_number: iteration.number,
+        state: iteration.state,
+        assignee_id: iteration.assignee_id,
+        assignee_label: iteration.assignee_id ? people.get(iteration.assignee_id)?.label ?? null : null,
+        assignment,
+        waiting_since: iteration.state === "SENT" ? iteration.sent_at ?? iteration.created_at : iteration.created_at,
+      });
+    }
+    for (const task of tasks) {
+      const assignment = assignmentFor(task.assignee_id);
+      if (!assignment) continue;
+      rows.push({
+        kind: "TASK",
+        id: task.id,
+        project: task.project,
+        phase_scope: task.phase_scope,
+        title: task.title,
+        assignee_id: task.assignee_id,
+        assignee_label: task.assignee_id ? people.get(task.assignee_id)?.label ?? null : null,
+        assignment,
+        due_date: task.due_date,
+        waiting_since: task.created_at,
+      });
+    }
+    return rows.sort((left, right) =>
+      left.waiting_since.getTime() - right.waiting_since.getTime() || left.id.localeCompare(right.id),
+    );
+  }
+
   // ── Public surface ───────────────────────────────────────────────────────
 
   return {
@@ -1375,5 +1799,14 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     moveFile,
     supersedeFile,
     listProjectFiles,
+    // Tasks (SF-F4)
+    listTasks,
+    createTask,
+    assignTask,
+    setTaskCompletion,
+    reorderTask,
+    deleteTask,
+    // Workload (SF-F5 read model)
+    listWaitingOnMe,
   };
 }

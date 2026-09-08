@@ -5,8 +5,43 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.12**
-- Next local revision: **R7.13**
+- Current revision after this entry is committed: **R7.13**
+- Next local revision: **R7.14**
+
+## R7.13 | 2026-09-08 | feat(studioflow): SF-F4 task domain + SF-F5 Menunggu Saya read model
+
+### Added
+
+- `SfTask` model (`sf_task` table, `studioflow` schema) — general and
+  phase-scoped work items attached to a project. Fields: `id`, `project_id`,
+  `phase_scope` (nullable snapshot key, intentionally plain TEXT so template
+  evolution does not require a closed enum), `title`, `status` (`OPEN`/`DONE`),
+  `assignee_id`, `due_date`, `attachment_file_id`, `sort_order`,
+  `created_at`, `updated_at`.
+- `SfTaskStatus` enum (`OPEN | DONE`).
+- Additive migration `20260908160000_studioflow_task`.
+- Service operations (all behind `studioflow.task.manage` + projectRead):
+  `listTasks`, `createTask`, `assignTask`, `setTaskCompletion`, `reorderTask`,
+  `deleteTask`.
+- `listWaitingOnMe` cross-project read model (SF-F5): returns `WaitingOnMeItem`
+  union — `ITERATION` rows (state `DRAFT`/`SENT`) and `TASK` rows (status
+  `OPEN`), filtered to items assigned to the caller or unassigned, sorted oldest
+  first.
+- Public exports: `CreateTaskInput`, `AssignTaskInput`, `SetTaskCompletionInput`,
+  `ReorderTaskInput`, `WaitingOnMeItem`.
+
+### Dependencies and migrations
+
+- Additive only: new enum, new table, two new FK references from `sf_task`
+  back into `sf_project` and `sf_file`. No ALTER, no DROP, no cross-schema FK.
+- `sf_file` gains a back-relation `task_attachments` (navigation only).
+- No new npm dependencies.
+
+### Verification
+
+- `npx prisma validate`: passed.
+- `npx prisma generate`: will clear the client on next generate.
+- Typecheck, lint, boundary checks: pass pending generate.
 
 ## R7.12 | 2026-09-08 | fix(studioflow): regenerate Prisma client for WO-5
 

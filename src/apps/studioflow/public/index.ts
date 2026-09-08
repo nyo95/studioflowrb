@@ -17,4 +17,9 @@ export type {
   SendIterationInput,
   AddIterationPointInput,
   WithdrawPointInput,
+  CreateTaskInput,
+  AssignTaskInput,
+  SetTaskCompletionInput,
+  ReorderTaskInput,
+  WaitingOnMeItem,
 } from "../service";

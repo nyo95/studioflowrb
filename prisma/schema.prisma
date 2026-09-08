@@ -1056,6 +1056,14 @@ enum SfPhaseClosureKind {
   @@schema("studioflow")
 }
 
+enum SfTaskStatus {
+  OPEN
+  DONE
+
+  @@map("sf_task_status")
+  @@schema("studioflow")
+}
+
 /// Studio phase template — the ordered list of phases for new projects.
 /// key is stable and immutable once any project snapshot uses it.
 model SfPhaseTemplate {
@@ -1138,6 +1146,7 @@ model SfProject {
   client SfClient       @relation(fields: [client_id], references: [id])
   phases SfProjectPhase[]
   files  SfFile[]
+  tasks  SfTask[]
 
   @@index([client_id])
   @@index([status])
@@ -1341,11 +1350,43 @@ model SfFile {
 
   project           SfProject    @relation(fields: [project_id], references: [id])
   sent_in_iteration SfIteration? @relation(fields: [sent_in_iteration_id], references: [id])
+  task_attachments  SfTask[]
 
   @@index([project_id, folder_key])
   @@index([sent_in_iteration_id])
   @@index([project_id, superseded_at])
   @@map("sf_file")
+  @@schema("studioflow")
+}
+
+/// General or phase-scoped work that is not already represented by an
+/// iteration. A null phase_scope is the intentional General scope.
+model SfTask {
+  id         String @id @default(uuid())
+  project_id String
+
+  /// Snapshot phase key from SfProjectPhase. Kept as a plain nullable value so
+  /// project-specific template evolution does not require a closed enum.
+  phase_scope String?
+  title       String
+  status      SfTaskStatus @default(OPEN)
+  assignee_id String?
+  due_date    DateTime?
+
+  /// Optional evidence of internal work; it never marks the file as sent.
+  attachment_file_id String?
+  sort_order         Int @default(0)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  project         SfProject @relation(fields: [project_id], references: [id])
+  attachment_file SfFile?   @relation(fields: [attachment_file_id], references: [id])
+
+  @@index([project_id, status, phase_scope, sort_order])
+  @@index([assignee_id, status, created_at])
+  @@index([attachment_file_id])
+  @@map("sf_task")
   @@schema("studioflow")
 }
 
