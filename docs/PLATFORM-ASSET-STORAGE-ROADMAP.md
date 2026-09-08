@@ -11,7 +11,8 @@ order must select its target local revision from `CHANGELOG.md` when it starts.
 Make production-safe image upload available through a reusable platform
 capability. The first consumer is the platform Brand mark in General Settings;
 StudioFlow may consume the same capability only when its own approved work
-order activates media support.
+order activates media support. The StudioFlow decision gates and exclusions are
+recorded in [`STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md`](STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md).
 
 The production runtime is Vercel and the application database is Supabase
 PostgreSQL. Runtime filesystem storage is not durable on Vercel and must never

@@ -5,8 +5,31 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.04**
-- Next local revision: **R7.05**
+- Current revision after this entry is committed: **R7.05**
+- Next local revision: **R7.06**
+
+## R7.05 | 2026-09-08 | docs(studioflow): record legacy audit and rebuild roadmap
+
+### Changed
+
+- Added a committed-evidence audit of the legacy StudioFlow project workspace,
+  phase/revision lifecycle, work items, schedules, MoM, files, SketchUp,
+  access, audit, Master Data, and BQ boundaries.
+- Recorded KEEP, FIX, MERGE, PURGE, and DEFER dispositions with a staged
+  rebuild sequence that starts with project workflow and excludes unapproved
+  integrations and legacy compatibility mechanisms.
+- Linked the StudioFlow decision gates to the shared asset-storage roadmap.
+
+### Dependencies and migrations
+
+- No dependency, database migration, cloud resource, secret, or application
+  code change.
+
+### Verification
+
+- Read-only legacy evidence inspected at committed reference
+  `5fc605e304a12db6b5efe0a2c0271a2d9415b2da`.
+- Documentation links and diff whitespace: passed.
 
 ## R7.04 | 2026-09-08 | docs(platform): record asset storage roadmap
 
@@ -30,7 +53,7 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 - Read-only legacy evidence inspected at committed reference
   `5fc605e304a12db6b5efe0a2c0271a2d9415b2da`.
-- Documentation links and diff whitespace will be reviewed before commit.
+- Documentation links and diff whitespace: passed.
 
 ## R7.03 | 2026-09-08 | fix(vendor): keep Field children cloneable
 
