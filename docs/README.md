@@ -22,6 +22,7 @@ order unless it says so explicitly.
 | [`CORE.md`](../CORE.md) | staged foundation: database, real identity/login, persisted RBAC, General Settings, audit, errors, validation, shared utilities, capability registry, and public boundaries |
 | [`DESIGN.md`](../DESIGN.md) | shared visual language and density |
 | [`UI_ENGINE.md`](../UI_ENGINE.md) | reusable UI components, layouts, and interaction patterns |
+| [`PLATFORM-ASSET-STORAGE-ROADMAP.md`](PLATFORM-ASSET-STORAGE-ROADMAP.md) | planned shared image preparation and Supabase Storage activation; no executable work order yet |
 | [`apps/masterdata.md`](apps/masterdata.md) | Master Data contract index, shared lifecycle/deletion rules, capability placement, and remaining deferred decisions |
 | [`apps/brand-contract.md`](apps/brand-contract.md) | owner-approved Brand identity, relations, discovery, lifecycle, deletion, UI, and public boundary |
 | [`apps/vendor-contract.md`](apps/vendor-contract.md) | owner-approved Vendor identity, types/capabilities, contacts/links, Brand relations, lifecycle, deletion, and UI |

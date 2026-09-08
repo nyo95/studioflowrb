@@ -5,8 +5,32 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.02**
-- Next local revision: **R7.03**
+- Current revision after this entry is committed: **R7.04**
+- Next local revision: **R7.05**
+
+## R7.04 | 2026-09-08 | docs(platform): record asset storage roadmap
+
+### Changed
+
+- Recorded the owner-approved roadmap for a reusable platform image-preparation
+  capability and Supabase Storage adapter, with Brand mark as the first
+  consumer and StudioFlow explicitly deferred.
+- Classified the inspected legacy browser compressor behavior as a shared
+  capability to merge, while purging its local filesystem upload design and
+  caller-controlled public upload paths.
+- Locked public-read/server-write storage, server-owned object keys, safe
+  cleanup, consumer-owned media policy, and production acceptance criteria.
+
+### Dependencies and migrations
+
+- No dependency, database migration, cloud storage resource, secret, or
+  application code change.
+
+### Verification
+
+- Read-only legacy evidence inspected at committed reference
+  `5fc605e304a12db6b5efe0a2c0271a2d9415b2da`.
+- Documentation links and diff whitespace will be reviewed before commit.
 
 ## R7.03 | 2026-09-08 | fix(vendor): keep Field children cloneable
 
