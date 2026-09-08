@@ -62,6 +62,27 @@ Before activating implementation, lock persistence details, dependency versions,
 and a target revision against the actual repository. The outline below is not
 that executable work order. Project §16 supplies required acceptance scenarios.
 
+### 1.2 R7.08 owner direction — foundation consumption
+
+This is an app rebuild on the existing Core/Utilities/UI Engine, not another
+foundation project. Project contract §13.0 names the checked existing surfaces.
+All outlines below inherit that map. Before execution, each work order includes:
+
+1. exact existing shared imports and their consuming app paths;
+2. aligned app rules and retained legacy outcomes to verify;
+3. REUSE / EXTEND / ADD / APP-OWNED / PURGE for each required capability;
+4. a narrow shared delta only when a proven gap prevents the approved workflow;
+5. app scenario checks, applicable shared/consumer regression checks, and real
+   UI acceptance under the existing design and shell.
+
+WO-1 means registration/navigation integration into the existing shell, not
+building auth, access administration or another app frame. WO-2 onward uses the
+existing DB, transaction, audit, errors, validation and UI surfaces. Revisit the
+outline against actual code at activation; do not create placeholder service
+layers simply because a path appears in the outline. Storage remains separately
+blocked. No foundation reimplementation, dependency upgrade, or executor work
+is authorized by this amendment.
+
 ## 2. Open questions
 
 ### 2.1 Blocking — nothing starts without these

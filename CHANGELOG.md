@@ -5,8 +5,36 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.07**
-- Next local revision: **R7.08**
+- Current revision after this entry is committed: **R7.08**
+- Next local revision: **R7.09**
+
+## R7.08 | 2026-09-08 | docs(studioflow): anchor PRD to existing foundation
+
+### Changed
+
+- Recorded the owner's direction to rebuild aligned StudioFlow business logic
+  on the existing rebuild Core Foundation, Utilities, and UI Engine.
+- Added a code-checked capability/ownership map for identity, grants, DB and
+  transactions, persisted audit, safe actions, utilities, shell, and UI patterns.
+- Made future work orders name existing imports and prove shared gaps before
+  extension; app-owned workflow stays in StudioFlow and existing Master Data/BQ
+  consumers must remain intact. No second foundation or private substitute.
+- Aligned UX component names with existing public exports and distinguished
+  planned private storage from already implemented shared mechanisms.
+
+### Dependencies and migrations
+
+- Documentation only; no source, schema, migration, dependency, environment,
+  database, legacy checkout, or remote changes. No executable work order activated.
+
+### Verification and limitations
+
+- Existing shared implementations and public export paths inspected at `db79fe6`.
+- Relative Markdown file links and staged diff whitespace: passed.
+- Runtime tests, build and browser checks not run for this documentation change;
+  foundation-fit and workflow checks are required when implementation activates.
+- Existing owner changes in `next-env.d.ts`, `src/app/(platform)/layout.tsx`, and
+  `_to_delete/` remain untouched and outside the commit.
 
 ## R7.07 | 2026-09-08 | docs(studioflow): resolve workflow logic debt in PRD
 

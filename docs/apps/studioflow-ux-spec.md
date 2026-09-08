@@ -1,7 +1,7 @@
 # StudioFlow UX/UI Specification
 
 **Status:** DRAFT — menunggu persetujuan owner
-**Versi:** R0.2 — koreksi logic PRD R7.07
+**Versi:** R0.3 — penegasan konsumsi foundation R7.08
 **Tanggal:** 2026-09-08
 **Dibaca bersama:** `studioflow.md`, `studioflow-project-contract.md`
 
@@ -53,9 +53,22 @@ StudioFlow memakai UI Engine terlebih dahulu. Kekurangan mekanisme generik
 diperbaiki di shared layer sebelum dipakai aplikasi
 (`studioflow-project-contract.md` §13.3).
 
-Dipakai dari `@/platform/ui_engine`: `PageHeader`, `NavGroup`, `NavItem`,
-`TableCard`, dialog/AlertDialog, dan seluruh state standar (loading, empty,
-error, permission-denied, destructive confirmation).
+Gunakan public surface `@platform/ui_engine`: `PageShell`, `PageHeader`,
+`DirectoryShell`, `DataTable`, `Field`, `Combobox`, `InlineEdit`, `DraftDialog`,
+`ConfirmDialog`, `RowActionMenu`, dan state standar. App masuk melalui shell
+terautentikasi yang sudah ada; navigasi app berupa konfigurasi/content.
+
+Project/Client List memakai pola directory yang sudah dipakai aplikasi rebuild.
+Project Detail mengomposisi halaman dan section yang tersedia untuk TODO, fase,
+dan ronde. Dialog kirim/jawaban memakai kerangka dialog dan perlindungan draft
+bersama; StudioFlow hanya memasok isi, validasi bisnis, dan aksi penyimpanan.
+Tidak membuat modal, confirmation hook, table engine, atau page frame baru.
+
+Pemilihan komponen harus cocok dengan perilaku yang diperlukan. Jika komponen
+bersama belum memenuhi kebutuhan generik, catat gap sempit lalu perbaiki di
+UI Engine; jangan menyalin implementasinya ke app. Peta bukti tersedia di
+`studioflow-project-contract.md` §13.0. Reuse tidak menggantikan pemeriksaan
+alur nyata: keyboard, input belum tersimpan, loading/error, dan viewport sempit.
 
 Warna, spasi, dan tipografi memakai design token dari CSS variables. Tidak ada
 warna hardcode. Densitas mengikuti `DESIGN.md`.
@@ -277,7 +290,7 @@ menyebutkan jumlah project yang menahannya.
 | Empty (fase belum ada ronde) | "Belum mulai" + tombol Mulai ronde, bukan ruang kosong |
 | Error | Pesan aman dan bisa ditindaklanjuti; error provider mentah tidak pernah tampil |
 | Permission denied | Rute ditolak, bukan halaman kosong |
-| Destructive | AlertDialog aplikasi, bukan `confirm()` bawaan browser |
+| Destructive | `ConfirmDialog` dari UI Engine dengan alasan/konsekuensi milik app |
 
 ## 7. Komponen StudioFlow-local
 

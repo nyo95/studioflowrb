@@ -610,12 +610,48 @@ StudioFlow consumes shared capabilities and adds no private version of any of
 them. Where something generic is missing, it is proposed as a shared-layer
 change, never built inside this app.
 
+### 13.0 Rebuild on the existing foundation — owner direction, R7.08
+
+StudioFlow is an app consumer of this rebuild repository's established platform.
+The legacy repository supplies business evidence to KEEP/FIX/MERGE/PURGE; it
+supplies neither an implementation base nor an alternative foundation. The work
+is to implement aligned, simplified app logic on the existing foundation. Do not
+rebuild login, role administration, shell, design system, audit, or DB runtime as
+part of “rebuilding StudioFlow”. Shared contracts remain the authority for their
+concern; this PRD must not redefine them.
+
+The following existing-code mapping was checked at rebuild commit `db79fe6`.
+It records usable mechanisms, not a claim that every future workflow is tested.
+
+| Need | Disposition and existing rebuild surface | StudioFlow owns |
+|---|---|---|
+| Identity and current access | **REUSE** [Core auth](../../src/platform/core/auth/request.ts), [RBAC](../../src/platform/core/rbac/index.ts), and [app registrations](../../src/app/app-registrations.ts) | Permission vocabulary, assignment eligibility and action/state guards; no new users, roles, sessions or authorization cache |
+| Persistence and atomic changes | **REUSE** [shared DB runtime](../../src/platform/core/db/index.ts) and [serializable transaction runner](../../src/platform/core/db/transactions.ts) | StudioFlow tables, command transaction scope, numbering uniqueness and expected-version checks; no second pool or app retry framework |
+| Audit | **REUSE** [audit envelope](../../src/platform/core/audit/index.ts) and [existing persistence writer](../../src/platform/core/audit/persistence.ts) | Event names, safe business metadata, response history and correction consequences; no second audit store or generic undo system |
+| Action results and validation | **REUSE** [safe actions](../../src/platform/core/actions/index.ts), [errors](../../src/platform/core/errors/index.ts), [validation](../../src/platform/core/validation/index.ts) | Input schemas and app error codes; authentication/permissions remain explicit because the safe wrapper does not perform them |
+| Dates, numbers and list mechanics | **REUSE** existing `src/platform/utilities/{date,decimal,normalization,pagination}` and Core settings | Business date/area meaning, filter/query scope and sort order; no local formatter or alternative locale/timezone settings |
+| Authenticated navigation and page frame | **REUSE** [authenticated shell](../../src/platform/authenticated-shell/index.tsx) and [UI Engine public exports](../../src/platform/ui_engine/index.ts) | App navigation entries and project content; no StudioFlow shell, account menu or separate design tokens |
+| Forms, lists and user feedback | **REUSE** UI Engine `DirectoryShell`, `PageShell`, `PageHeader`, `DataTable`, `Field`, `Combobox`, `InlineEdit`, `DraftDialog`, `ConfirmDialog`, `RowActionMenu`, and standard states | Field meaning, columns, phase/round compositions, dialog copy and command callbacks |
+| Private assets | **DEFER**, then **EXTEND/ADD** the activated shared storage capability (§13.2) | Allowed formats, attachment ownership, audience and retention; no local filesystem upload substitute |
+
+App-owned code is expected: phase/round transitions, client-answer replacement,
+point provenance, project read models and UI compositions are domain logic. They
+do not become shared merely because they use common database or React patterns.
+Conversely, a missing generic interaction is not an excuse for an app-local copy.
+
+Each future executable work order must name the existing imports it consumes,
+the app-owned behavior it adds, and any precisely demonstrated shared gap.
+REUSE is the default. EXTEND/ADD requires a named current consumer, a narrow
+shared contract change, and shared regression coverage before app consumption.
+Do not broaden Core or UI Engine for hypothetical future workflows. Existing
+Master Data and BQ are consumers to protect, not code to fork into StudioFlow.
+
 ### 13.1 Platform Core — consumed as-is
 
 | Capability | Use |
 |---|---|
 | Identity (`User`) | `lead_user_id` and both `assignee_id` fields reference it directly |
-| Persisted RBAC and grants | The only authorization mechanism. StudioFlow contributes a permission vocabulary and nothing else |
+| Persisted RBAC and grants | Core resolves explicit grants; StudioFlow declares permissions and enforces its business guards |
 | App permission registry | `studioflow` registration, per the existing composition root |
 | Audit contract | §9. StudioFlow supplies stable domain event metadata only |
 | Errors and validation | Shared `AppError` and Prisma error mapping. StudioFlow may define namespaced error codes under Core categories |
@@ -623,9 +659,11 @@ change, never built inside this app.
 
 ### 13.2 Platform Core — extension required
 
-The private large-object storage capability described in
-[`studioflow.md`](studioflow.md) §5 does not exist. It is a **shared-layer
-change to the platform storage port**, proposed there, not implemented inside
+The private large-object storage requirement described in
+[`studioflow.md`](studioflow.md) §5 remains deferred. First verify the shared port
+actually available when its work order activates; ADD the absent capability or
+EXTEND the existing one, rather than assuming a roadmap means it is implemented.
+This is a **shared-layer change**, proposed there, not implemented inside
 StudioFlow. Assets (§8) do not begin until it lands.
 
 ### 13.3 UI Engine — reuse first
@@ -701,3 +739,21 @@ client feedback provenance, correction, and unavailable-user recovery. It does
 not assert that fewer enum values alone prove non-regression. The recorded audit
 is discovery evidence; exact legacy behavior characterization and real browser
 acceptance remain required when an executable slice is authorized.
+
+### 16.1 Foundation-fit acceptance
+
+In addition to the business scenarios above, each activated slice must prove:
+
+- the real Core session and live grants authorize its routes and commands;
+- one business command and its audit commit or roll back together through the
+  shared runtime, with no app-created Prisma client, pool, or audit subsystem;
+- screens use the existing shell, tokens and interaction components, including
+  unsaved input, pending/error feedback, keyboard operation and narrow viewport;
+- any shared extension has focused regression checks and does not change Master
+  Data/BQ behavior; no business default or StudioFlow state leaks into platform;
+- the retained legacy outcome maps to the aligned app rule and its acceptance
+  scenario. Reusing components alone is not workflow acceptance.
+
+This PRD does not authorize a general foundation refactor. An actual shared
+code/contract mismatch is reported for a narrow navigator decision before an
+executor implements a substitute or changes unrelated consumers.

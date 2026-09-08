@@ -29,6 +29,19 @@ maintains numbering and status summaries (project contract §4–6).
 StudioFlow is restricted to studio staff. Clients have no account and no login;
 they are records, not users.
 
+### 1.1 Existing rebuild foundation is the implementation base
+
+Owner direction, 2026-09-08: rebuild StudioFlow's aligned and optimized business
+logic on the Core Foundation, Utilities, and UI Engine already built here.
+Legacy is evidence for useful outcomes, never the source for a second shell,
+identity system, DB runtime, audit system, or set of UI primitives.
+
+The checked reuse/ownership map is in project contract §13.0. Every future work
+order follows it: reuse existing mechanisms, keep business decisions app-owned,
+and extend shared capabilities only for a proven gap. Master Data and BQ remain
+protected existing consumers. This direction changes PRD alignment only and
+activates neither app execution nor a new foundation build.
+
 ## 2. Active contracts
 
 | Contract | Owns |
