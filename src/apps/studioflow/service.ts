@@ -100,6 +100,24 @@ export type RecordFileInput = {
   file_modified_at?: Date;
 };
 
+export type LinkFileInput = {
+  project_id: string;
+  /** Which folder (8.2). null = unsorted tray. */
+  folder_key: string | null;
+  original_filename: string;
+  /** External location (http/https only). Nothing is uploaded. */
+  external_url: string;
+  bytes?: number;
+};
+
+export type RecordResponseInput = {
+  kind: "APPROVAL" | "REVISION";
+  note?: string;
+  /** Client's own wording, one entry per revision request.
+   *  Required (non-empty) when kind is REVISION. */
+  points?: string[];
+};
+
 export type UpdateNamingTemplateInput = {
   /** Token string e.g. "{date} {project} {location} {round}".
    *  Valid tokens: {date} {project} {location} {round} {code} */
@@ -867,10 +885,49 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     return resolveFilename(settings.naming_template, project, { droppedAt: new Date(), phaseLabel }, opts.extension ?? "");
   }
 
+  /** Where a file lands (8.2 + 5.3).
+   *  A phase output folder with rounds ensures a DRAFT exists and yields its
+   *  round label for the filename. The unsorted tray yields no round. */
+  async function resolveFolderPlacement(
+    project: {
+      phases: { id: string; folder_key: string | null; state: string; has_rounds: boolean }[];
+    },
+    folderKey: string | null,
+  ): Promise<{ iteration: { id: string; number: number } | null; phaseLabel: string | null }> {
+    const targetPhase = folderKey
+      ? project.phases.find((phase) => phase.folder_key === folderKey)
+      : null;
+    if (!targetPhase?.has_rounds) return { iteration: null, phaseLabel: null };
+    if (targetPhase.state === "DONE") {
+      throw new AppError(
+        "CONFLICT",
+        "studioflow.phase.closed",
+        "Reopen the phase before adding files",
+      );
+    }
+    const result = await resolveOrOpenDraft(db, targetPhase.id);
+    const phase = await db.sfProjectPhase.findUniqueOrThrow({
+      where: { id: targetPhase.id },
+      select: { round_prefix: true, name: true },
+    });
+    if (result.opened) await recomputePhaseState(db, targetPhase.id);
+    return {
+      iteration: result.iteration,
+      phaseLabel: `${phase.round_prefix ?? phase.name} ${result.iteration.number}`,
+    };
+  }
+
   async function recordFile(grants: PermissionGrants, actor: AuditActor, input: RecordFileInput) {
     requirePermission(grants, STUDIOFLOW_PERMISSIONS.iterationManage);
     const actorUserId = actor.userId;
     if (!actorUserId) throw new AppError("INVARIANT", "studioflow.actor.user-required", "A user actor is required");
+    const originalFilename = input.original_filename.trim();
+    if (!originalFilename) {
+      throw new AppError("VALIDATION", "studioflow.file.filename-required", "Nama file wajib diisi");
+    }
+    if (!Number.isFinite(input.bytes) || input.bytes <= 0) {
+      throw new AppError("VALIDATION", "studioflow.file.bytes-invalid", "Ukuran file tidak valid");
+    }
     return runTransaction(async () => {
       const project = await db.sfProject.findUnique({
         where: { id: input.project_id },
@@ -879,23 +936,9 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       if (!project) throw new AppError("NOT_FOUND", "studioflow.project.not-found", "Project not found");
 
       const settings = await getStudioSettings();
-      const ext = input.original_filename.includes(".") ? "." + input.original_filename.split(".").pop() : "";
+      const ext = originalFilename.includes(".") ? "." + originalFilename.split(".").pop() : "";
 
-      const targetPhase = input.folder_key
-        ? project.phases.find((p) => p.folder_key === input.folder_key)
-        : null;
-
-      let iteration: { id: string; number: number } | null = null;
-      let phaseLabel: string | null = null;
-
-      if (targetPhase?.has_rounds) {
-        if (targetPhase.state === "DONE") throw new AppError("CONFLICT", "studioflow.phase.closed", "Reopen the phase before recording files");
-        const result = await resolveOrOpenDraft(db, targetPhase.id);
-        iteration = result.iteration;
-        const phase = await db.sfProjectPhase.findUniqueOrThrow({ where: { id: targetPhase.id }, select: { round_prefix: true, name: true } });
-        phaseLabel = `${phase.round_prefix ?? phase.name} ${iteration.number}`;
-        if (result.opened) await recomputePhaseState(db, targetPhase.id);
-      }
+      const { iteration, phaseLabel } = await resolveFolderPlacement(project, input.folder_key);
 
       const filename = resolveFilename(
         settings.naming_template,
@@ -910,7 +953,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
           folder_key: input.folder_key,
           treatment: "RECORDED",
           filename,
-          original_filename: input.original_filename,
+          original_filename: originalFilename,
           bytes: BigInt(input.bytes),
           file_modified_at: input.file_modified_at ?? null,
           dropped_by_id: actorUserId,
@@ -923,7 +966,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         entityType: "SfFile",
         entityId: file.id,
         actor,
-        changes: { project_id: input.project_id, folder_key: input.folder_key, filename, original_filename: input.original_filename, iteration_id: iteration?.id ?? null },
+        changes: { project_id: input.project_id, folder_key: input.folder_key, filename, original_filename: originalFilename, iteration_id: iteration?.id ?? null },
       });
 
       return { file, iteration };
@@ -956,6 +999,326 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       await writeAudit({ action: "iteration.internal_approval", entityType: "SfInternalApproval", entityId: approval.id, actor, changes: { iteration_id: iterationId, note } });
       return approval;
     });
+  }
+
+
+  // ── Client responses (WO-5, §6) ──────────────────────────────────────────
+
+  /** Record a client's answer to a SENT round.
+   *  APPROVAL  -> round becomes APPROVED.
+   *  REVISION  -> round becomes SUPERSEDED and the next round opens as DRAFT,
+   *               seeded with CLIENT_REVISION points carrying full provenance. */
+  async function recordResponse(
+    grants: PermissionGrants,
+    actor: AuditActor,
+    iterationId: string,
+    input: RecordResponseInput,
+  ) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.iterationReview);
+    const actorUserId = actor.userId;
+    if (!actorUserId) throw new AppError("INVARIANT", "studioflow.actor.user-required", "A user actor is required");
+
+    const note = input.note?.trim() || null;
+    const points = (input.points ?? []).map((text) => text.trim()).filter(Boolean);
+    if (input.kind === "REVISION" && points.length === 0) {
+      throw new AppError(
+        "VALIDATION",
+        "studioflow.response.points-required",
+        "Response revisi butuh minimal satu poin",
+      );
+    }
+
+    return runTransaction(async () => {
+      const iteration = await db.sfIteration.findUnique({
+        where: { id: iterationId },
+        select: { id: true, phase_id: true, state: true, number: true },
+      });
+      if (!iteration) {
+        throw new AppError("NOT_FOUND", "studioflow.iteration.not-found", "Round not found");
+      }
+      if (iteration.state !== "SENT") {
+        throw new AppError(
+          "CONFLICT",
+          "studioflow.iteration.not-sent",
+          "Hanya round terkirim yang bisa menerima response",
+        );
+      }
+
+      const now = new Date();
+      const response = await db.sfResponse.create({
+        data: {
+          iteration_id: iterationId,
+          kind: input.kind,
+          note,
+          received_at: now,
+          recorded_by_id: actorUserId,
+        },
+      });
+
+      const recordedPoints: { id: string; text: string }[] = [];
+      for (const [index, text] of points.entries()) {
+        const point = await db.sfResponsePoint.create({
+          data: { response_id: response.id, text, sort_order: index + 1 },
+          select: { id: true, text: true },
+        });
+        recordedPoints.push(point);
+      }
+
+      let nextIteration: { id: string; number: number } | null = null;
+
+      if (input.kind === "APPROVAL") {
+        await db.sfIteration.update({
+          where: { id: iterationId },
+          data: { state: "APPROVED", responded_at: now },
+        });
+      } else {
+        await db.sfIteration.update({
+          where: { id: iterationId },
+          data: { state: "SUPERSEDED", responded_at: now },
+        });
+        const number = await nextIterationNumber(db, iteration.phase_id);
+        nextIteration = await db.sfIteration.create({
+          data: { phase_id: iteration.phase_id, number, state: "DRAFT" },
+          select: { id: true, number: true },
+        });
+        // Carry the client's wording forward verbatim, with provenance (7.2).
+        for (const [index, point] of recordedPoints.entries()) {
+          await db.sfIterationPoint.create({
+            data: {
+              iteration_id: nextIteration.id,
+              text: point.text,
+              source: "CLIENT_REVISION",
+              source_response_id: response.id,
+              source_point_id: point.id,
+              sort_order: index + 1,
+            },
+          });
+        }
+      }
+
+      await recomputePhaseState(db, iteration.phase_id);
+      await writeAudit({
+        action: "response.record",
+        entityType: "SfResponse",
+        entityId: response.id,
+        actor,
+        changes: {
+          iteration_id: iterationId,
+          kind: input.kind,
+          point_count: recordedPoints.length,
+          next_iteration_id: nextIteration?.id ?? null,
+        },
+      });
+
+      return { response, nextIteration };
+    });
+  }
+
+  async function listResponses(grants: PermissionGrants, iterationId: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    return db.sfResponse.findMany({
+      where: { iteration_id: iterationId },
+      orderBy: { received_at: "desc" },
+      include: { points: { orderBy: { sort_order: "asc" } } },
+    });
+  }
+
+
+  // ── File management (WO-6, 8) ────────────────────────────────────────────
+
+  /** Record a LINKED file: the bytes live somewhere else, we keep the pointer. */
+  async function linkFile(grants: PermissionGrants, actor: AuditActor, input: LinkFileInput) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.iterationManage);
+    const actorUserId = actor.userId;
+    if (!actorUserId) throw new AppError("INVARIANT", "studioflow.actor.user-required", "A user actor is required");
+
+    const originalFilename = input.original_filename.trim();
+    if (!originalFilename) {
+      throw new AppError("VALIDATION", "studioflow.file.filename-required", "Nama file wajib diisi");
+    }
+    const externalUrl = input.external_url.trim();
+    let parsed: URL;
+    try {
+      parsed = new URL(externalUrl);
+    } catch {
+      throw new AppError("VALIDATION", "studioflow.file.url-invalid", "Link tidak valid");
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new AppError("VALIDATION", "studioflow.file.url-invalid", "Link harus http atau https");
+    }
+
+    return runTransaction(async () => {
+      const project = await db.sfProject.findUnique({
+        where: { id: input.project_id },
+        include: { phases: { select: { id: true, folder_key: true, state: true, has_rounds: true } } },
+      });
+      if (!project) throw new AppError("NOT_FOUND", "studioflow.project.not-found", "Project not found");
+
+      const settings = await getStudioSettings();
+      const { iteration, phaseLabel } = await resolveFolderPlacement(project, input.folder_key);
+      const ext = originalFilename.includes(".") ? "." + originalFilename.split(".").pop() : "";
+      const filename = resolveFilename(
+        settings.naming_template,
+        { name: project.name, location: project.location, code: project.code },
+        { droppedAt: new Date(), phaseLabel },
+        ext,
+      );
+
+      const file = await db.sfFile.create({
+        data: {
+          project_id: input.project_id,
+          folder_key: input.folder_key,
+          treatment: "LINKED",
+          filename,
+          original_filename: originalFilename,
+          bytes: BigInt(input.bytes && input.bytes > 0 ? input.bytes : 0),
+          external_url: externalUrl,
+          dropped_by_id: actorUserId,
+          dropped_at: new Date(),
+        },
+      });
+
+      await writeAudit({
+        action: "file.link",
+        entityType: "SfFile",
+        entityId: file.id,
+        actor,
+        changes: {
+          project_id: input.project_id,
+          folder_key: input.folder_key,
+          filename,
+          external_url: externalUrl,
+          iteration_id: iteration?.id ?? null,
+        },
+      });
+
+      return { file, iteration };
+    });
+  }
+
+  /** Move a file between folders. Landing in a phase output folder resolves or
+   *  opens that phase's DRAFT (5.3) and renames the file for that round (8.5).
+   *  A file already sent in a round is frozen (8.3). */
+  async function moveFile(
+    grants: PermissionGrants,
+    actor: AuditActor,
+    fileId: string,
+    folderKey: string | null,
+  ) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.iterationManage);
+    return runTransaction(async () => {
+      const file = await db.sfFile.findUnique({
+        where: { id: fileId },
+        select: {
+          id: true,
+          project_id: true,
+          folder_key: true,
+          original_filename: true,
+          sent_in_iteration_id: true,
+          superseded_at: true,
+        },
+      });
+      if (!file) throw new AppError("NOT_FOUND", "studioflow.file.not-found", "File not found");
+      if (file.sent_in_iteration_id) {
+        throw new AppError(
+          "CONFLICT",
+          "studioflow.file.already-sent",
+          "File yang sudah dikirim tidak bisa dipindah",
+        );
+      }
+      if (file.superseded_at) {
+        throw new AppError("CONFLICT", "studioflow.file.superseded", "File ini sudah diganti");
+      }
+      if (file.folder_key === folderKey) return file;
+
+      const project = await db.sfProject.findUniqueOrThrow({
+        where: { id: file.project_id },
+        include: { phases: { select: { id: true, folder_key: true, state: true, has_rounds: true } } },
+      });
+
+      const settings = await getStudioSettings();
+      const { iteration, phaseLabel } = await resolveFolderPlacement(project, folderKey);
+      const ext = file.original_filename.includes(".")
+        ? "." + file.original_filename.split(".").pop()
+        : "";
+      const filename = resolveFilename(
+        settings.naming_template,
+        { name: project.name, location: project.location, code: project.code },
+        { droppedAt: new Date(), phaseLabel },
+        ext,
+      );
+
+      const updated = await db.sfFile.update({
+        where: { id: fileId },
+        data: { folder_key: folderKey, filename },
+      });
+
+      await writeAudit({
+        action: "file.move",
+        entityType: "SfFile",
+        entityId: fileId,
+        actor,
+        changes: {
+          from: file.folder_key,
+          to: folderKey,
+          filename,
+          iteration_id: iteration?.id ?? null,
+        },
+      });
+
+      return updated;
+    });
+  }
+
+  /** Mark a working file as replaced (8.6). The record is kept forever;
+   *  only the bytes may be released later. */
+  async function supersedeFile(grants: PermissionGrants, actor: AuditActor, fileId: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.iterationManage);
+    return runTransaction(async () => {
+      const file = await db.sfFile.findUnique({
+        where: { id: fileId },
+        select: { id: true, superseded_at: true, sent_in_iteration_id: true },
+      });
+      if (!file) throw new AppError("NOT_FOUND", "studioflow.file.not-found", "File not found");
+      if (file.superseded_at) {
+        throw new AppError("CONFLICT", "studioflow.file.superseded", "File ini sudah ditandai diganti");
+      }
+      if (file.sent_in_iteration_id) {
+        throw new AppError(
+          "CONFLICT",
+          "studioflow.file.already-sent",
+          "File yang sudah dikirim tidak bisa ditandai diganti",
+        );
+      }
+      const updated = await db.sfFile.update({
+        where: { id: fileId },
+        data: { superseded_at: new Date() },
+      });
+      await writeAudit({
+        action: "file.supersede",
+        entityType: "SfFile",
+        entityId: fileId,
+        actor,
+      });
+      return updated;
+    });
+  }
+
+  /** Every file on a project, plus the folder vocabulary to group them by. */
+  async function listProjectFiles(grants: PermissionGrants, projectId: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    const [files, phases] = await Promise.all([
+      db.sfFile.findMany({
+        where: { project_id: projectId },
+        orderBy: [{ dropped_at: "desc" }],
+      }),
+      db.sfProjectPhase.findMany({
+        where: { project_id: projectId, folder_key: { not: null } },
+        orderBy: { sort_order: "asc" },
+        select: { id: true, name: true, folder_key: true, state: true, has_rounds: true },
+      }),
+    ]);
+    return { files, folders: phases };
   }
 
   // ── Public surface ───────────────────────────────────────────────────────
@@ -1004,5 +1367,13 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     listFiles,
     // Internal approval (WO-3)
     recordInternalApproval,
+    // Client responses (WO-5)
+    recordResponse,
+    listResponses,
+    // File management (WO-6)
+    linkFile,
+    moveFile,
+    supersedeFile,
+    listProjectFiles,
   };
 }

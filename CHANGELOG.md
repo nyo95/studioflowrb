@@ -5,8 +5,68 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.10**
-- Next local revision: **R7.11**
+- Current revision after this entry is committed: **R7.11**
+- Next local revision: **R7.12**
+
+## R7.11 | 2026-09-08 | feat(studioflow): SF-WO-5 through WO-7 + form boundary correction
+
+### Fixed
+
+- Removed the `asFormAction` unknown-cast from the phase and iteration routes.
+  The cast satisfied the compiler by discarding the `ActionResult` a Server
+  Action returns, which meant every service guard — permission denied, wrong
+  state, missing reason, closed phase — failed silently with no feedback to the
+  studio. All interactive surfaces now follow the WO-2 pattern: a client
+  component driving `useActionState`, with failures rendered via `InlineError`.
+- Phase and iteration actions now settle on the page via `revalidatePath`
+  instead of `redirect`, so they type as `ActionResult<void>` and surface errors
+  rather than forcing a navigation.
+- `recordFile` now validates filename and byte count in the service, so the
+  guard holds for every caller rather than only the one route that checked.
+
+### Added
+
+- WO-5 client responses. `SfResponse` and `SfResponsePoint` record a client's
+  answer to a SENT round. An approval closes the round as APPROVED; a revision
+  supersedes it and opens the next round as DRAFT, seeded with the client's own
+  wording as CLIENT_REVISION points carrying `source_response_id` and
+  `source_point_id` provenance.
+- WO-6 file management. `linkFile` (LINKED treatment, http/https validated),
+  `moveFile` (re-resolves the standard filename and honours §5.3 when landing in
+  a phase output folder), `supersedeFile`, and `listProjectFiles`. Files sent in
+  a round or already superseded are frozen against move and supersede.
+- A shared `resolveFolderPlacement` helper now backs `recordFile`, `linkFile`
+  and `moveFile`, so the folder→round→filename rule exists once.
+- Project files page grouped by phase output folder plus the unsorted tray.
+- WO-7 studio settings page for the file naming template, with a live preview
+  and the token vocabulary. Settings added to the StudioFlow nav.
+
+### Dependencies and migrations
+
+- Added the additive `20260908140000_studioflow_wo5_response` migration
+  (`sf_response`, `sf_response_point`, `sf_response_kind`). No ALTER, no DROP.
+- `sf_iteration_point.source_response_id` and `source_point_id` deliberately stay
+  plain TEXT with no FK constraint: adding one would be an ALTER on an existing
+  table. The service writes and guards that provenance.
+- WO-6 and WO-7 needed no migration; the WO-3 `sf_file` and `sf_studio_settings`
+  tables already carry every column they use.
+- No new npm dependencies or cross-schema foreign keys.
+
+### Verification
+
+- `npm run typecheck`: 3 errors remain, all of one kind — `sfResponse` and
+  `sfResponsePoint` are absent from the generated Prisma client because
+  `prisma generate` cannot run in this environment (binaries.prisma.sh is
+  blocked by egress policy). They clear on the next generate. Every other file
+  typechecks clean, including all WO-2 through WO-4 code, which had no
+  pre-existing errors once the cast was removed.
+- `npm run lint`: passed.
+- `npm run check:boundaries`: passed.
+- `npm run check:legacy-runtime`: passed.
+- `git diff --check`: passed.
+- Schema relation graph checked structurally: 11 studioflow models, every
+  relation resolves with a matching back-reference, no studioflow relation
+  crosses into another schema. `prisma validate` still owed on Windows.
 
 ## R7.10 | 2026-09-08 | feat(studioflow): complete SF-WO-2 through WO-4
 

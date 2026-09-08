@@ -1,132 +1,136 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { runSafeAction } from "@platform/core/actions";
 import type { ActionResult } from "@platform/core/actions";
 import { studioFlowService } from "@/apps/studioflow/runtime";
 
-// ── Phase: finish ─────────────────────────────────────────────────────────────
+const actorFrom = (principal: { userId: string; displayName: string }) => ({
+  kind: "USER" as const,
+  userId: principal.userId,
+  label: principal.displayName,
+});
+
+const refresh = (projectId: string, phaseId: string) => {
+  revalidatePath(`/studioflow/${projectId}/phases/${phaseId}`);
+  revalidatePath(`/studioflow/${projectId}`);
+};
+
+// ── Phase lifecycle ───────────────────────────────────────────────────────────
 
 export async function finishPhaseAction(
   phaseId: string,
   projectId: string,
-): Promise<ActionResult<never>> {
+  _prev: ActionResult<void> | null,
+  _formData: FormData,
+): Promise<ActionResult<void>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
-    await studioFlowService.finishPhase(grants, { kind: "USER", userId: principal.userId, label: principal.displayName }, phaseId);
-    redirect(`/studioflow/${projectId}/phases/${phaseId}`);
+    await studioFlowService.finishPhase(grants, actorFrom(principal), phaseId);
+    refresh(projectId, phaseId);
   });
 }
-
-// ── Phase: reopen ─────────────────────────────────────────────────────────────
 
 export async function reopenPhaseAction(
   phaseId: string,
   projectId: string,
+  _prev: ActionResult<void> | null,
   formData: FormData,
-): Promise<ActionResult<never>> {
+): Promise<ActionResult<void>> {
   return runSafeAction(async () => {
-    const reason = String(formData.get("reason") ?? "").trim();
     const { principal, grants } = await requirePrincipalGrants();
-    await studioFlowService.reopenPhase(grants, { kind: "USER", userId: principal.userId, label: principal.displayName }, phaseId, reason);
-    redirect(`/studioflow/${projectId}/phases/${phaseId}`);
+    await studioFlowService.reopenPhase(grants, actorFrom(principal), phaseId, String(formData.get("reason") ?? ""));
+    refresh(projectId, phaseId);
   });
 }
-
-// ── Phase: close by exception ─────────────────────────────────────────────────
 
 export async function closePhaseByExceptionAction(
   phaseId: string,
   projectId: string,
+  _prev: ActionResult<void> | null,
   formData: FormData,
-): Promise<ActionResult<never>> {
+): Promise<ActionResult<void>> {
   return runSafeAction(async () => {
-    const reason = String(formData.get("reason") ?? "").trim();
     const { principal, grants } = await requirePrincipalGrants();
-    await studioFlowService.closePhaseByException(grants, { kind: "USER", userId: principal.userId, label: principal.displayName }, phaseId, reason);
-    redirect(`/studioflow/${projectId}/phases/${phaseId}`);
+    await studioFlowService.closePhaseByException(grants, actorFrom(principal), phaseId, String(formData.get("reason") ?? ""));
+    refresh(projectId, phaseId);
   });
 }
 
-// ── Supervision: start ────────────────────────────────────────────────────────
+// ── Supervision ───────────────────────────────────────────────────────────────
 
 export async function startSupervisionAction(
   phaseId: string,
   projectId: string,
-): Promise<ActionResult<never>> {
+  _prev: ActionResult<void> | null,
+  _formData: FormData,
+): Promise<ActionResult<void>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
-    await studioFlowService.startSupervision(grants, { kind: "USER", userId: principal.userId, label: principal.displayName }, phaseId);
-    redirect(`/studioflow/${projectId}/phases/${phaseId}`);
+    await studioFlowService.startSupervision(grants, actorFrom(principal), phaseId);
+    refresh(projectId, phaseId);
   });
 }
-
-// ── Supervision: finish ───────────────────────────────────────────────────────
 
 export async function finishSupervisionAction(
   phaseId: string,
   projectId: string,
-): Promise<ActionResult<never>> {
+  _prev: ActionResult<void> | null,
+  _formData: FormData,
+): Promise<ActionResult<void>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
-    await studioFlowService.finishSupervision(grants, { kind: "USER", userId: principal.userId, label: principal.displayName }, phaseId);
-    redirect(`/studioflow/${projectId}/phases/${phaseId}`);
+    await studioFlowService.finishSupervision(grants, actorFrom(principal), phaseId);
+    refresh(projectId, phaseId);
   });
 }
-
-// ── Supervision: reopen ───────────────────────────────────────────────────────
 
 export async function reopenSupervisionAction(
   phaseId: string,
   projectId: string,
+  _prev: ActionResult<void> | null,
   formData: FormData,
-): Promise<ActionResult<never>> {
+): Promise<ActionResult<void>> {
   return runSafeAction(async () => {
-    const reason = String(formData.get("reason") ?? "").trim();
     const { principal, grants } = await requirePrincipalGrants();
-    await studioFlowService.reopenSupervision(grants, { kind: "USER", userId: principal.userId, label: principal.displayName }, phaseId, reason);
-    redirect(`/studioflow/${projectId}/phases/${phaseId}`);
+    await studioFlowService.reopenSupervision(grants, actorFrom(principal), phaseId, String(formData.get("reason") ?? ""));
+    refresh(projectId, phaseId);
   });
 }
 
-// ── Iteration: open ───────────────────────────────────────────────────────────
+// ── Iteration ─────────────────────────────────────────────────────────────────
 
 export async function openIterationAction(
   phaseId: string,
   projectId: string,
-): Promise<ActionResult<never>> {
+  _prev: ActionResult<void> | null,
+  _formData: FormData,
+): Promise<ActionResult<void>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
-    await studioFlowService.openIteration(grants, { kind: "USER", userId: principal.userId, label: principal.displayName }, phaseId);
-    redirect(`/studioflow/${projectId}/phases/${phaseId}`);
+    await studioFlowService.openIteration(grants, actorFrom(principal), phaseId);
+    refresh(projectId, phaseId);
   });
 }
 
-// ── File: record ──────────────────────────────────────────────────────────────
+// ── Files ─────────────────────────────────────────────────────────────────────
 
 export async function recordFileAction(
   projectId: string,
   phaseId: string,
+  _prev: ActionResult<void> | null,
   formData: FormData,
-): Promise<ActionResult<never>> {
+): Promise<ActionResult<void>> {
   return runSafeAction(async () => {
-    const original_filename = String(formData.get("original_filename") ?? "").trim();
-    const bytes = Number(formData.get("bytes") ?? 0);
-    const folder_key = String(formData.get("folder_key") ?? "") || null;
-    const file_modified_at_raw = formData.get("file_modified_at");
-    const file_modified_at = file_modified_at_raw ? new Date(String(file_modified_at_raw)) : undefined;
-
-    if (!original_filename) throw new Error("Nama file wajib diisi");
-    if (!bytes || bytes <= 0) throw new Error("Ukuran file tidak valid");
-
     const { principal, grants } = await requirePrincipalGrants();
-    await studioFlowService.recordFile(
-      grants,
-      { kind: "USER", userId: principal.userId, label: principal.displayName },
-      { project_id: projectId, folder_key, original_filename, bytes, file_modified_at },
-    );
-    redirect(`/studioflow/${projectId}/phases/${phaseId}`);
+    await studioFlowService.recordFile(grants, actorFrom(principal), {
+      project_id: projectId,
+      folder_key: String(formData.get("folder_key") ?? "") || null,
+      original_filename: String(formData.get("original_filename") ?? ""),
+      bytes: Number(formData.get("bytes") ?? 0),
+    });
+    refresh(projectId, phaseId);
   });
 }

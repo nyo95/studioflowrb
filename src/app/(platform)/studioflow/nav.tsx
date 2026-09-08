@@ -1,6 +1,6 @@
 "use client";
 
-import { FolderOpen, Users } from "lucide-react";
+import { FolderOpen, Settings, Users } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { NavGroup, NavItem } from "@/platform/ui_engine";
@@ -15,6 +15,7 @@ type StudioFlowNavLink = {
 const links: readonly StudioFlowNavLink[] = [
   { href: "/studioflow", label: "Projects", icon: FolderOpen, exact: true },
   { href: "/studioflow/clients", label: "Clients", icon: Users },
+  { href: "/studioflow/settings", label: "Settings", icon: Settings },
 ];
 
 /**

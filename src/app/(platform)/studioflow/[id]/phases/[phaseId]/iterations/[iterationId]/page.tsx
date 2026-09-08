@@ -1,22 +1,26 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Circle, FileText } from "lucide-react";
+import { ArrowLeft, CheckCircle2, FileText, MessageSquare } from "lucide-react";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
-import { EmptyState, Button, Field, Input, PageHeader, SectionCard, Textarea } from "@/platform/ui_engine";
+import { prisma } from "@/platform/core/db";
+import { readPlatformGeneralSettings } from "@platform/core/settings";
+import { EmptyState, PageHeader, SectionCard } from "@/platform/ui_engine";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
 import { studioFlowService } from "@/apps/studioflow/runtime";
-import {
-  addIterationPointAction,
-  approveIterationAction,
-  markPointDoneAction,
-  sendIterationAction,
-  voidIterationAction,
-  withdrawPointAction,
-} from "./actions";
+
+import { AddPointForm, IterationLifecycle, PointRow, ResponseForm } from "./iteration-controls";
 
 export const dynamic = "force-dynamic";
+
+/** Bound to the service's own return shapes so these stay correct
+ *  after `prisma generate` picks up the WO-5 models. */
+type IterationDetail = Awaited<ReturnType<typeof studioFlowService.getIteration>>;
+type IterationPoint = IterationDetail["points"][number];
+type ResponseList = Awaited<ReturnType<typeof studioFlowService.listResponses>>;
+type ResponseItem = ResponseList[number];
+type ResponsePoint = ResponseItem["points"][number];
 
 const STATE_LABELS: Record<string, string> = {
   DRAFT: "Draft",
@@ -26,84 +30,178 @@ const STATE_LABELS: Record<string, string> = {
   VOIDED: "Dibatalkan",
 };
 
-const formatDate = (value: Date | null) => (value ? new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—");
-const asFormAction = (action: unknown) => action as (formData: FormData) => void | Promise<void>;
-
 export default async function IterationDetailPage({
   params,
 }: {
   params: Promise<{ id: string; phaseId: string; iterationId: string }>;
 }) {
   const { id: projectId, phaseId, iterationId } = await params;
+
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { grants } = principalGrants;
+
   const canRead = hasPermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
   const canManage = hasPermission(grants, STUDIOFLOW_PERMISSIONS.iterationManage);
   const canReview = hasPermission(grants, STUDIOFLOW_PERMISSIONS.iterationReview);
+
   if (!canRead) {
-    return <SectionCard><EmptyState icon={FileText} title="Akses ditolak" description="Kamu tidak punya permission untuk melihat round ini." /></SectionCard>;
+    return (
+      <div className="grid gap-4">
+        <PageHeader eyebrow="StudioFlow" title="Round" />
+        <SectionCard>
+          <EmptyState icon={FileText} title="Akses ditolak" description="Kamu tidak punya permission untuk melihat round ini." />
+        </SectionCard>
+      </div>
+    );
   }
 
-  const iteration = await studioFlowService.getIteration(grants, projectId, phaseId, iterationId).catch((error: { kind?: string }) => {
-    if (error?.kind === "NOT_FOUND") return null;
-    throw error;
-  });
+  const [iteration, responses, settings] = await Promise.all([
+    studioFlowService.getIteration(grants, projectId, phaseId, iterationId).catch((error: { kind?: string }) => {
+      if (error?.kind === "NOT_FOUND") return null;
+      throw error;
+    }),
+    studioFlowService.listResponses(grants, iterationId).catch((): ResponseList => []),
+    readPlatformGeneralSettings(prisma),
+  ]);
   if (!iteration) notFound();
 
-  const open = iteration.state === "DRAFT" || iteration.state === "SENT";
-  const nonWithdrawn = iteration.points.filter((point) => !point.withdrawn_at);
-  const withdrawn = iteration.points.filter((point) => point.withdrawn_at);
+  const fmt = new Intl.DateTimeFormat(settings.locale, {
+    timeZone: settings.timezone,
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+  const showDate = (value: Date | null) => (value ? fmt.format(new Date(value)) : "—");
+
+  const editable = iteration.state === "DRAFT" || iteration.state === "SENT";
+  const live = iteration.points.filter((point: IterationPoint) => !point.withdrawn_at);
+  const withdrawn = iteration.points.filter((point: IterationPoint) => point.withdrawn_at);
+  const roundLabel = `${iteration.phase.round_prefix ?? iteration.phase.name} ${iteration.number}`;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
-      <Link href={`/studioflow/${projectId}/phases/${phaseId}`} className="inline-flex items-center gap-1 text-sm text-[var(--ui-muted)] hover:text-[var(--ui-foreground)]">
-        <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke fase
-      </Link>
-      <PageHeader
-        eyebrow={iteration.phase.name}
-        title={`${iteration.phase.round_prefix ?? iteration.phase.name} ${iteration.number}`}
-        description={`Status: ${STATE_LABELS[iteration.state] ?? iteration.state}`}
-      />
+      <div>
+        <Link
+          href={`/studioflow/${projectId}/phases/${phaseId}`}
+          className="mb-2 inline-flex items-center gap-1 text-sm text-[var(--ui-muted)] hover:text-[var(--ui-foreground)]"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Kembali ke fase
+        </Link>
+        <PageHeader
+          eyebrow={`StudioFlow · ${iteration.phase.name}`}
+          title={roundLabel}
+          description={STATE_LABELS[iteration.state] ?? iteration.state}
+        />
+      </div>
 
       <SectionCard title="Detail round">
-        <dl className="grid gap-2 text-sm sm:grid-cols-2">
-          <div><dt className="text-[var(--ui-muted)]">Assignee</dt><dd>{iteration.assignee_id ?? "—"}</dd></div>
-          <div><dt className="text-[var(--ui-muted)]">Dikirim</dt><dd>{formatDate(iteration.sent_at)}</dd></div>
-          <div><dt className="text-[var(--ui-muted)]">Direspons</dt><dd>{formatDate(iteration.responded_at)}</dd></div>
+        <dl className="grid gap-3 text-sm sm:grid-cols-3">
+          <div>
+            <dt className="text-xs text-[var(--ui-muted)]">Status</dt>
+            <dd className="font-medium">{STATE_LABELS[iteration.state] ?? iteration.state}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-[var(--ui-muted)]">Dikirim</dt>
+            <dd>{showDate(iteration.sent_at)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-[var(--ui-muted)]">Direspons</dt>
+            <dd>{showDate(iteration.responded_at)}</dd>
+          </div>
         </dl>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {iteration.state === "DRAFT" && canManage && (
-            <form action={asFormAction(sendIterationAction.bind(null, iterationId, projectId, phaseId))}><Button type="submit" variant="primary">Kirim</Button></form>
-          )}
-          {iteration.state === "SENT" && canReview && (
-            <form action={asFormAction(approveIterationAction.bind(null, iterationId, projectId, phaseId))}><Button type="submit" variant="primary">Setujui</Button></form>
-          )}
-          {open && canManage && (
-            <form action={asFormAction(voidIterationAction.bind(null, iterationId, projectId, phaseId))} className="flex items-end gap-2">
-              <Field label="Alasan batal" required><Input name="reason" required maxLength={500} /></Field>
-              <Button type="submit" variant="danger">Batalkan</Button>
-            </form>
-          )}
-        </div>
+
+        {iteration.state === "VOIDED" && iteration.void_reason && (
+          <p className="mt-3 text-sm text-[var(--ui-muted)]">Alasan batal: {iteration.void_reason}</p>
+        )}
+
+        <IterationLifecycle
+          iterationId={iterationId}
+          projectId={projectId}
+          phaseId={phaseId}
+          state={iteration.state}
+          canManage={canManage}
+          canReview={canReview}
+        />
       </SectionCard>
 
       <SectionCard title="Checklist">
-        {nonWithdrawn.length === 0 ? <EmptyState icon={CheckCircle2} title="Belum ada poin" description="Tambahkan poin checklist untuk round ini." /> : (
+        {live.length === 0 ? (
+          <EmptyState
+            icon={CheckCircle2}
+            title="Belum ada poin"
+            description={editable && canManage ? "Tambahkan poin checklist untuk round ini." : "Round ini tidak punya poin checklist."}
+          />
+        ) : (
           <div className="grid gap-2">
-            {nonWithdrawn.map((point) => (
-              <div key={point.id} className="flex items-center justify-between gap-3 rounded border border-[var(--ui-border)] px-3 py-2 text-sm">
-                <span className={point.done ? "text-[var(--ui-muted)] line-through" : ""}>{point.done ? <CheckCircle2 className="mr-2 inline h-4 w-4" /> : <Circle className="mr-2 inline h-4 w-4" />}{point.text}</span>
-                {open && canManage && <form action={asFormAction(markPointDoneAction.bind(null, point.id, iterationId, projectId, phaseId))}><input type="hidden" name="done" value={point.done ? "false" : "true"} /><Button type="submit" size="sm" variant="ghost">{point.done ? "Buka" : "Selesai"}</Button></form>}
+            {live.map((point: IterationPoint) => (
+              <PointRow
+                key={point.id}
+                point={point}
+                iterationId={iterationId}
+                projectId={projectId}
+                phaseId={phaseId}
+                editable={editable && canManage}
+              />
+            ))}
+          </div>
+        )}
+
+        {withdrawn.length > 0 && (
+          <div className="mt-4 grid gap-2">
+            <p className="text-xs font-medium text-[var(--ui-muted)]">Poin ditarik</p>
+            {withdrawn.map((point: IterationPoint) => (
+              <div
+                key={point.id}
+                className="rounded border border-dashed border-[var(--ui-border)] px-3 py-2 text-sm text-[var(--ui-muted)]"
+              >
+                <span className="line-through">{point.text}</span>
+                {point.withdrawal_reason && <span className="ml-2 text-xs">({point.withdrawal_reason})</span>}
               </div>
             ))}
           </div>
         )}
-        {withdrawn.length > 0 && <div className="mt-4 grid gap-2 text-sm text-[var(--ui-muted)]"><p className="font-medium">Poin ditarik</p>{withdrawn.map((point) => <div key={point.id} className="rounded border border-dashed border-[var(--ui-border)] px-3 py-2"><span className="line-through">{point.text}</span><span className="ml-2">({point.withdrawal_reason})</span></div>)}</div>}
-        {open && canManage && <form action={asFormAction(addIterationPointAction.bind(null, iterationId, projectId, phaseId))} className="mt-4 flex items-end gap-2"><Field label="Poin baru" required><Textarea name="text" required maxLength={1000} rows={2} /></Field><Button type="submit" variant="primary">Tambah poin</Button></form>}
+
+        {editable && canManage && (
+          <AddPointForm iterationId={iterationId} projectId={projectId} phaseId={phaseId} />
+        )}
       </SectionCard>
 
-      {open && canManage && nonWithdrawn.length > 0 && <SectionCard title="Tarik poin"><div className="grid gap-2">{nonWithdrawn.map((point) => <form key={point.id} action={asFormAction(withdrawPointAction.bind(null, point.id, iterationId, projectId, phaseId))} className="flex items-end gap-2"><span className="flex-1 text-sm">{point.text}</span><Input name="reason" required maxLength={500} placeholder="Alasan" /><Button type="submit" variant="danger" size="sm">Tarik</Button></form>)}</div></SectionCard>}
+      {iteration.state === "SENT" && canReview && (
+        <SectionCard title="Catat response klien">
+          <p className="mb-3 text-xs text-[var(--ui-muted)]">
+            Approve menutup round ini. Minta revisi membuat round berikutnya otomatis,
+            dengan poin klien terbawa apa adanya.
+          </p>
+          <ResponseForm iterationId={iterationId} projectId={projectId} phaseId={phaseId} />
+        </SectionCard>
+      )}
+
+      {responses.length > 0 && (
+        <SectionCard title="Riwayat response">
+          <div className="grid gap-3">
+            {responses.map((response: ResponseItem) => (
+              <div key={response.id} className="rounded border border-[var(--ui-border)] px-4 py-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-2 font-medium">
+                    <MessageSquare className="h-4 w-4 text-[var(--ui-muted)]" />
+                    {response.kind === "APPROVAL" ? "Disetujui klien" : "Minta revisi"}
+                  </span>
+                  <span className="text-xs text-[var(--ui-muted)]">{fmt.format(new Date(response.received_at))}</span>
+                </div>
+                {response.note && <p className="mt-2 text-[var(--ui-muted)]">{response.note}</p>}
+                {response.points.length > 0 && (
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    {response.points.map((point: ResponsePoint) => (
+                      <li key={point.id}>{point.text}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
     </div>
   );
 }

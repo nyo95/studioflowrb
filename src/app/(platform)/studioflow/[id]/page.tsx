@@ -73,6 +73,16 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         description={`${project.code} · ${TYPE_LABELS[project.type] ?? project.type} · Dibuka ${fmt.format(new Date(project.opened_at))}`}
       />
 
+      <div>
+        <Link
+          href={`/studioflow/${id}/files`}
+          className="inline-flex items-center gap-1 text-sm text-action hover:underline"
+        >
+          <FolderOpen className="h-3.5 w-3.5" />
+          Lihat semua file project
+        </Link>
+      </div>
+
       {/* Status */}
       <SectionCard title="Status project">
         <p className="text-sm">

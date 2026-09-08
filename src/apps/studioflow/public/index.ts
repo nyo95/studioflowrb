@@ -13,6 +13,7 @@ export type {
   EditProjectInput,
   RecordFileInput,
   UpdateNamingTemplateInput,
+  RecordResponseInput,
   SendIterationInput,
   AddIterationPointInput,
   WithdrawPointInput,

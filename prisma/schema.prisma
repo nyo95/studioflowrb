@@ -1261,6 +1261,7 @@ model SfIteration {
   points            SfIterationPoint[]
   internal_approval SfInternalApproval?
   sent_files        SfFile[]
+  responses         SfResponse[]
 
   @@unique([phase_id, number])
   @@index([phase_id, state])
@@ -1345,5 +1346,52 @@ model SfFile {
   @@index([sent_in_iteration_id])
   @@index([project_id, superseded_at])
   @@map("sf_file")
+  @@schema("studioflow")
+}
+
+// ── WO-5: Client responses ───────────────────────────────────────────────────
+
+enum SfResponseKind {
+  APPROVAL
+  REVISION
+
+  @@map("sf_response_kind")
+  @@schema("studioflow")
+}
+
+/// A recorded client answer to a SENT round (§6).
+/// APPROVAL closes the round as APPROVED.
+/// REVISION supersedes the round and seeds the next one with CLIENT_REVISION points.
+model SfResponse {
+  id           String @id @default(uuid())
+  iteration_id String
+
+  kind SfResponseKind
+  note String?
+
+  received_at    DateTime @default(now())
+  recorded_by_id String
+
+  iteration SfIteration       @relation(fields: [iteration_id], references: [id])
+  points    SfResponsePoint[]
+
+  @@index([iteration_id])
+  @@map("sf_response")
+  @@schema("studioflow")
+}
+
+/// One revision request inside a client response.
+/// `text` is the client's own wording and is never edited after recording (§7.2).
+model SfResponsePoint {
+  id          String @id @default(uuid())
+  response_id String
+
+  text       String
+  sort_order Int    @default(0)
+
+  response SfResponse @relation(fields: [response_id], references: [id])
+
+  @@index([response_id])
+  @@map("sf_response_point")
   @@schema("studioflow")
 }
