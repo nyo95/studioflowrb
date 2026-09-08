@@ -24,6 +24,12 @@ order unless it says so explicitly.
 | [`UI_ENGINE.md`](../UI_ENGINE.md) | reusable UI components, layouts, and interaction patterns |
 | [`PLATFORM-ASSET-STORAGE-ROADMAP.md`](PLATFORM-ASSET-STORAGE-ROADMAP.md) | planned shared image preparation and Supabase Storage activation; no executable work order yet |
 | [`STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md`](STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md) | read-only legacy audit and staged StudioFlow rebuild roadmap; no executable app work order yet |
+| [`apps/studioflow.md`](apps/studioflow.md) | StudioFlow contract index, permission vocabulary, cross-app boundaries, storage dependency, and deferred decisions |
+| [`apps/studioflow-project-contract.md`](apps/studioflow-project-contract.md) | StudioFlow PRD: Client, Project, assignment, Phase, Iteration, corrected client review exchange, work items, and assets; no implementation authorized |
+| [`apps/studioflow-ux-spec.md`](apps/studioflow-ux-spec.md) | StudioFlow surface specification: the single project page, iteration rows, send/response dialogs, and required states |
+| [`apps/studioflow-schedule-contract.md`](apps/studioflow-schedule-contract.md) | deferred domain brief for Library and Product Schedule; not implementable until its owner decisions are locked |
+| [`apps/studioflow-mom-contract.md`](apps/studioflow-mom-contract.md) | deferred domain brief for Minutes of Meeting; not implementable until its owner decisions are locked |
+| [`apps/studioflow-work-orders.md`](apps/studioflow-work-orders.md) | StudioFlow locked decisions, open owner questions, and the staged work order sequence; no work order is activated |
 | [`apps/masterdata.md`](apps/masterdata.md) | Master Data contract index, shared lifecycle/deletion rules, capability placement, and remaining deferred decisions |
 | [`apps/brand-contract.md`](apps/brand-contract.md) | owner-approved Brand identity, relations, discovery, lifecycle, deletion, UI, and public boundary |
 | [`apps/vendor-contract.md`](apps/vendor-contract.md) | owner-approved Vendor identity, types/capabilities, contacts/links, Brand relations, lifecycle, deletion, and UI |

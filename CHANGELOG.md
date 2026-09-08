@@ -5,8 +5,47 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.06**
-- Next local revision: **R7.07**
+- Current revision after this entry is committed: **R7.07**
+- Next local revision: **R7.08**
+
+## R7.07 | 2026-09-08 | docs(studioflow): resolve workflow logic debt in PRD
+
+### Changed
+
+- Reviewed the owner's existing StudioFlow PRD drafts and resolved L1–L9 across
+  the project contract, permission index, UX specification, and planning outline.
+- Separated round approval from explicit phase-scope completion while retaining
+  four phase states; replaced arbitrary overrides with reasoned exceptional
+  closure and defined normal Supervision actions.
+- Defined immutable replacement answers, preserved successor work and original
+  client-point provenance, and explicit round stopping (`VOIDED`) so correction
+  never needs data deletion or a fabricated client approval.
+- Unified start/upload/revision draft allocation; retained visibility of pending
+  client replies while a successor draft is being worked on.
+- Defined disabled-user reassignment visibility, work-item warnings versus state
+  guards, distinct project/phase completion labels, and deferred permissions.
+- Synchronized the existing documentation index and retained Schedule/MoM briefs
+  as deferred. No executable work order is activated. Added behavior acceptance
+  scenarios for subsequent implementation review.
+
+### Dependencies and migrations
+
+- Documentation only. No application code, schema, migration, dependency,
+  database, deployment, or remote change. Office configuration was read privately;
+  no database command or legacy checkout access occurred.
+
+### Verification and limitations
+
+- Cross-document logic review against L1–L9 and correction/closure/concurrency
+  scenarios: completed. Relative Markdown file-link check: passed.
+- Staged diff review and `git diff --cached --check`: passed.
+- Runtime tests/build/browser checks not run: this change only updates PRD.
+  Scenarios are future acceptance requirements, not executed application tests.
+- Legacy comparison uses the recorded R7.05 audit, not a fresh code inspection;
+  exact legacy characterization and implemented non-regression remain gates
+  before accepting a future executable slice.
+- Pre-existing `next-env.d.ts`, `src/app/(platform)/layout.tsx`, and `_to_delete/`
+  owner work remains outside this commit and untouched.
 
 ## R7.06 | 2026-09-08 | perf(platform): reduce serverless render fan-out
 
