@@ -136,34 +136,58 @@ boundary.
   Party and never references one. Master Data Party models supply and vendor
   relationships; the two vocabularies are not merged.
 
-## 5. Storage dependency — blocking
+## 5. Storage — no longer on the critical path
 
-StudioFlow assets cannot be implemented until the platform storage capability
-exists **and is extended**. The current
-[`PLATFORM-ASSET-STORAGE-ROADMAP.md`](../PLATFORM-ASSET-STORAGE-ROADMAP.md) is
-written for exactly one consumer, the public Brand mark: PNG only, at most
-2 MB, anonymous read. Every one of those properties is wrong for StudioFlow.
+**Owner decision, 2026-09-08.** The studio's own machines were always the real
+archive for working files, and finals belong in Google Drive. The platform was
+therefore never going to be the document store, and building one for files that
+only pass through would be work paid for by nothing.
 
-StudioFlow requires, and the storage roadmap must be amended to provide:
+The project contract §8.1 splits files into three treatments:
 
-| Need | Brand mark today | StudioFlow requirement |
+| Treatment | Needs platform storage? |
+|---|---|
+| `RECORDED` — working `.skp`, `.dwg`; metadata only | **No.** Nothing is uploaded |
+| `STORED` — delivered PDF, render, client survey | Yes, but only small files |
+| `LINKED` — archived final on Drive | No. An external URL |
+
+This removes the expensive requirement. Earlier drafts of this section demanded
+a private large-object capability able to stream hundreds of megabytes; the
+`RECORDED` treatment deletes that need, because a working model is never
+uploaded at all. Rounds, phases, sending, and the whole client exchange ship
+with **no StudioFlow storage whatsoever**.
+
+What `STORED` still needs, when its work order activates, is modest and must be
+verified against the port that actually exists rather than assumed from a
+roadmap:
+
+| Need | Brand mark today | `STORED` requirement |
 |---|---|---|
-| Visibility | Public anonymous read | **Private.** Access only through short-lived server-issued signed URLs, authorized per request |
-| Formats | PNG only | `.skp`, `.dwg`, `.dxf`, PDF, and common image formats |
-| Size | ≤ 2 MB after preparation | Large binaries; a working SketchUp model is routinely in the hundreds of MB. Needs a resumable or direct-to-storage upload path, not an in-memory request body |
-| Preparation | Browser crop and compress | **None.** A CAD or model file must arrive byte-identical; checksum is recorded at upload |
-| Lifecycle | Replace and delete | Retention tied to project archival, per the project contract |
+| Visibility | Public anonymous read | **Private.** Short-lived server-issued signed URLs, authorized per request |
+| Formats | PNG only | PDF and common image formats; small `.dwg` |
+| Size | ≤ 2 MB after preparation | Tens of megabytes. No streaming or resumable upload needed |
+| Preparation | Browser crop and compress | **None.** A drawing must arrive byte-identical; checksum recorded |
 
-This matches the storage roadmap's own rule: *"Future consumers must declare
-their allowed formats, dimensions, retention, access model, and lifecycle
-separately."* Section 5 is that declaration.
+This is the declaration the storage roadmap asks every future consumer to make:
+*"Future consumers must declare their allowed formats, dimensions, retention,
+access model, and lifecycle separately."*
 
-**Owner sequencing decision (2026-09-08):** platform asset storage is completed
-first, including the private-object capability above. StudioFlow contracts are
-written in parallel and do not wait. No StudioFlow upload code begins before
-the storage port exists. Local filesystem upload is **PURGE** and is never
-reintroduced — the production runtime is Vercel and its filesystem is not
-durable.
+Local filesystem upload stays **PURGE** and is never reintroduced — the
+production runtime is Vercel and its filesystem is not durable.
+
+### 5.1 Google Drive — contracted, deferred
+
+Finals belong on Drive, and the `LINKED` treatment exists so that activating it
+later changes no rule in §8. Two properties make Drive the natural home rather
+than a workaround: it is where the studio already archives, and it is a real
+filesystem, so the app can create the standard folders and write a
+standard-named copy — which a browser can never do to a local disk.
+
+Deferred, with its costs recorded honestly: one studio account rather than
+personal accounts, a token that can expire, links that a person can move or
+delete, and **an egress question that must be answered before it is committed** —
+whether the production runtime may call Google's API at all. If it may not, the
+integration has to run from the browser instead, which is a different design.
 
 ## 6. Deferred, with reasons
 
@@ -176,7 +200,8 @@ or placeholder export is created for anything below.
 | Minutes of Meeting | Its own module once the project surface is proven in real use |
 | SketchUp plugin exchange | An authenticated, idempotent integration with retry and reconciliation. No plugin endpoint enters the first release |
 | Checklist templates and template-seeded requirements | Legacy root checklists were template requirements users could not create. Reintroduce only if a confirmed workflow needs them |
-| Cross-project Today / Upcoming feeds | Built on the same read model once the single project surface is proven |
+| Legacy's Today's View feature set — saved filters, auto-hide, event feed | The one list that replaces it ships in the first release (project contract §10.2). What stays deferred is the accumulation that made legacy's version unreadable |
+| Google Drive archive (`LINKED` files) | Contracted in §5.1 so nothing must be redesigned later. Needs an egress answer and a studio account first |
 | Legacy data migration | The rebuild starts from zero. No connection to legacy PostgreSQL, ever |
 
 ## 7. Remaining open decisions

@@ -73,6 +73,37 @@ alur nyata: keyboard, input belum tersimpan, loading/error, dan viewport sempit.
 Warna, spasi, dan tipografi memakai design token dari CSS variables. Tidak ada
 warna hardcode. Densitas mengikuti `DESIGN.md`.
 
+## 2a. Halaman: Menunggu Saya (layar pembuka)
+
+Ini halaman pertama yang dibuka tiap pagi, bukan daftar project. Desainer dengan
+delapan project tidak berpikir per-project — ia berpikir *"hari ini ngapain"*.
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ Menunggu saya                                               │
+├────────────────────────────────────────────────────────────┤
+│ Sociolla Funan   · 3D · D4      belum digarap    · 2 hari   │
+│ Alam Sutera      · CD · CD2     dari drafter     · 1 hari   │
+│ Sociolla Funan   ○ Telepon klien soal handle                │
+├────────────────────────────────────────────────────────────┤
+│ Menunggu klien                                              │
+│ Bintaro House    · 3D · D3      dikirim          · 9 hari   │
+├────────────────────────────────────────────────────────────┤
+│ Belum ada penanggung jawab                                  │
+│ Alam Sutera      · Layout · Layout 2                        │
+└────────────────────────────────────────────────────────────┘
+```
+
+Urut dari yang **paling lama menganggur**, bukan dari tanggal jatuh tempo. Yang
+sembilan hari menunggu klien harus terasa mengganggu.
+
+Sengaja **tidak** ada: filter tersimpan, auto-hide setelah 7 hari, dan feed semua
+kejadian. Itu yang membuat Today's View legacy melar sampai tidak terbaca. Yang
+ada cuma: punya saya, belum selesai, yang tertua di atas.
+
+Ronde yang di-assign ulang oleh drafter muncul di sini. Itulah sinyal serah
+terima — tidak perlu status review internal untuk menyatakannya.
+
 ## 3. Halaman: Project Detail (layar utama)
 
 Ini satu-satunya layar kerja. Tidak ada halaman fase terpisah.
@@ -239,6 +270,29 @@ lingkup lain, pengguna mulai ronde berikutnya; tidak perlu override.
 Selesaikan fase juga tersedia setelah approval sebagai aksi tersendiri.
 Tampilkan jumlah poin/tugas terbuka sebagai peringatan, bukan penghalang.
 
+### 3.8b Jawaban klien bisa dicicil
+
+Feedback jarang datang sekaligus. Dialog Catat jawaban punya **Simpan sebagai
+draft**: poin ditambah sesuai tanggal datangnya, ronde tetap "nunggu klien", dan
+umurnya terus berjalan.
+
+Selama draft tidak terjadi apa-apa — tidak ada ronde terbuka, fase tidak bergerak.
+Baru waktu **Simpan jawaban** ditekan, seluruh konsekuensinya jalan.
+
+Draft ditampilkan sebagai `menyusun jawaban · 2 poin` di baris ronde, supaya jelas
+bedanya dengan ronde yang belum dijawab sama sekali.
+
+### 3.8c ACC internal
+
+Tombol **ACC** di baris ronde, untuk pemegang `iteration.review`. Sekali klik:
+"Di-ACC Budi · 8 Sep". Tidak mengubah status ronde, tidak masuk status fase.
+
+Kalau phase-nya disetel `requires_internal_approval` dan belum ada ACC, dialog
+Kirim memperingatkan — dan tetap mengizinkan lanjut, sama seperti poin revisi.
+
+Untuk ronde yang tidak butuh ACC, **tidak ada apa pun di layar.** Fitur ini tidak
+menagih perhatian saat tidak dipakai.
+
 ### 3.9 Menu baris (⋯)
 
 Muncul saat hover/focus, tetap terlihat saat menu terbuka. Isi tergantung
@@ -292,6 +346,95 @@ menyebutkan jumlah project yang menahannya.
 | Permission denied | Rute ditolak, bukan halaman kosong |
 | Destructive | `ConfirmDialog` dari UI Engine dengan alasan/konsekuensi milik app |
 
+## 6a. Menyeret file
+
+Satu gerakan, dan sebisa mungkin tanpa pertanyaan.
+
+### 6a.1 Yang terjadi saat file dilepas
+
+1. Aplikasi membaca **nama, ukuran, dan tanggal** file — tanpa mengunggah apa pun.
+2. Ekstensi menentukan foldernya dari template (`.skp` → folder 3D). Kalau
+   foldernya jelas, **tidak ada dialog sama sekali.**
+3. Kalau fase itu belum punya ronde terbuka, ronde baru terbuka. Kalau sudah,
+   file bergabung ke ronde itu — nomornya tidak bertambah.
+4. Nama standar ditampilkan beserta tombol salin:
+   `20260908 Sociolla Funan D1.skp`.
+
+Langkah 4 harus jujur. Untuk file kerja aplikasi **tidak** mengganti nama file di
+komputermu — browser tidak bisa. Ia menunjukkan nama yang benar untuk kamu salin.
+Jangan pernah menulis "berhasil diganti nama" untuk file `RECORDED`.
+
+### 6a.2 Kapan bertanya
+
+Hanya kalau tidak bisa disimpulkan. PDF bisa datang dari klien (`IN`) atau
+disiapkan untuk keluar — di situ baru muncul satu pertanyaan, dengan tebakan
+sistem sudah terpilih:
+
+```
+PDF ini apa?
+  (•) Dari luar — masuk ke IN
+  ( ) Dari kantor untuk dikirim
+      └ ☐ sudah dikirim ke klien
+```
+
+**Tidak pernah ada pertanyaan "internal atau external".** Jawabannya sudah
+mengalir dari §5.3: kalau ronde terakhir sudah terkirim, file berikutnya membuka
+nomor baru; kalau belum, ia bergabung. Menanyakannya berarti meminta kamu
+menyatakan ulang yang sistem sudah tahu.
+
+Centang "sudah dikirim" ada karena kamu biasanya mengirim lewat WhatsApp
+*sebelum* membuka aplikasi. Mencentangnya menyelesaikan aksi Kirim di dialog yang
+sama — satu dialog, bukan dua layar. Aturannya tidak berubah: yang menutup ronde
+tetap aksi Kirim, bukan drop-nya.
+
+`.skp`, `.dwg`, dan format yang jelas satu arah **tidak pernah ditanya.** Kalau
+setiap file memunculkan dialog, aplikasi cuma memindahkan kelelahan dari
+mengetik status ke menutup pertanyaan.
+
+### 6a.2b Banyak file sekaligus
+
+Blok lima belas file dari folder unduhan WhatsApp, lepas semuanya, klasifikasi di
+**satu layar** — bukan lima belas dialog.
+
+Yang tidak jelas foldernya mendarat di **Belum disortir**, tidak ditolak dan
+tidak memaksa keputusan saat itu juga. File di sana sudah tercatat: sudah punya
+nama, tanggal, dan pemilik. Menyortirnya nanti memberi folder, bukan membuat
+catatannya.
+
+Merapikan filing adalah alasan aplikasi ini dibuat. Kalau memasukkan file ke sini
+lebih repot daripada membiarkannya di WhatsApp, aplikasinya gagal di alasan
+keberadaannya sendiri.
+
+### 6a.2c Nama muncul sebelum filenya ada
+
+Di tiap ronde ada baris nama berikutnya dengan tombol salin:
+
+```
+File berikutnya:  20260908 Sociolla Funan D1.skp   [salin]
+```
+
+Kamu Save As dengan nama itu langsung dari SketchUp. Ini urutan kerja desainer
+yang sebenarnya — menamai saat menyimpan, bukan menyeret dulu lalu rename.
+
+### 6a.3 Mengganti file kerja
+
+Menyeret file kerja pengganti ke ronde yang sama menaikkan `D1.1` → `D1.2`.
+Yang lama ditandai tergantikan. Ronde-nya tidak tutup dan nomornya tidak naik.
+
+**Menyeret file tidak pernah menutup ronde.** Menandai file "untuk dikirim"
+hanya menyiapkannya; tombol Kirim yang menutup, dan file itu sudah terpasang di
+dialognya. Satu klik lagi, dan klik itulah catatan resmi bahwa barang keluar
+studio.
+
+### 6a.4 Tampilan "yang sudah dikirim"
+
+Bukan folder. Daftar hasil penyaringan file bertanda terkirim, dikelompokkan per
+ronde — bentuk yang selama ini kantor buat manual sebagai subfolder
+`20260906 Sociolla Funan D1` di dalam `OUT`.
+
+Folder `OUT` tidak ada di aplikasi ini. Layout PDF tinggal di folder Layout dan
+bertanda "dikirim di Layout 1" — satu file, dua keterangan, nol salinan.
+
 ## 7. Komponen StudioFlow-local
 
 Dibuat di `src/apps/studioflow/components/`, **tidak** dipromosikan ke UI Engine
@@ -301,12 +444,13 @@ karena mengandung kebijakan bisnis; mekanisme generik tetap milik UI Engine:
 - `IterationRow` — kartu ronde beserta checklist poinnya
 - `SendDialog` dan `ResponseDialog`
 - `GeneralTaskBlock` — blok pinned di atas
+- `WaitingOnMeList` — daftar lintas project (§2a)
+- `DropTray` — lepas banyak file + kotak belum disortir
 
 ## 8. Yang sengaja tidak dibuat
 
 Tidak ada dashboard lintas project, tidak ada kalender, tidak ada grafik
-progress, tidak ada notifikasi, tidak ada drag-drop file (diblokir storage,
-`studioflow.md` §5), dan tidak ada tampilan timeline/Gantt.
+progress, tidak ada notifikasi, dan tidak ada tampilan timeline/Gantt.
 
 Semuanya menarik. Tidak satu pun menjawab tiga pertanyaan di §1.2.
 

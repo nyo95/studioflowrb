@@ -27,6 +27,7 @@ order unless it says so explicitly.
 | [`apps/studioflow.md`](apps/studioflow.md) | StudioFlow contract index, permission vocabulary, cross-app boundaries, storage dependency, and deferred decisions |
 | [`apps/studioflow-project-contract.md`](apps/studioflow-project-contract.md) | StudioFlow PRD: Client, Project, assignment, Phase, Iteration, corrected client review exchange, work items, and assets; no implementation authorized |
 | [`apps/studioflow-ux-spec.md`](apps/studioflow-ux-spec.md) | StudioFlow surface specification: the single project page, iteration rows, send/response dialogs, and required states |
+| [`apps/studioflow-implementation-plan.md`](apps/studioflow-implementation-plan.md) | StudioFlow execution rules, phase sequence and gates, theme-evolution limits, and Master Data/BQ non-regression protection; work-order breakdown belongs to the navigator |
 | [`apps/studioflow-schedule-contract.md`](apps/studioflow-schedule-contract.md) | deferred domain brief for Library and Product Schedule; not implementable until its owner decisions are locked |
 | [`apps/studioflow-mom-contract.md`](apps/studioflow-mom-contract.md) | deferred domain brief for Minutes of Meeting; not implementable until its owner decisions are locked |
 | [`apps/studioflow-work-orders.md`](apps/studioflow-work-orders.md) | StudioFlow locked decisions, open owner questions, and the staged work order sequence; no work order is activated |

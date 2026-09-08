@@ -47,4 +47,19 @@ export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [
       "bq.library.promote",
     ],
   },
+  {
+    appId: "studioflow",
+    name: "StudioFlow",
+    rootPath: "/studioflow",
+    permissions: [
+      "studioflow.access",
+      "studioflow.project.read",
+      "studioflow.project.manage",
+      "studioflow.project-deletion.approve",
+      "studioflow.iteration.manage",
+      "studioflow.iteration.review",
+      "studioflow.phase.override",
+      "studioflow.task.manage",
+    ],
+  },
 ];

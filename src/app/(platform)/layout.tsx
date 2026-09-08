@@ -8,6 +8,7 @@ import { getPermissionRegistry } from "@platform/core/rbac/registry";
 import { readPlatformGeneralSettings } from "@platform/core/settings";
 import { logoutAction } from "./logout-action";
 import { BqNav } from "./bq/nav";
+import { StudioFlowNav } from "./studioflow/nav";
 import { MasterDataNav } from "./masterdata/nav";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,7 @@ export default async function PlatformLayout({ children }: { children: ReactNode
   const domainNavigation = <>
     {apps.some((app) => app.appId === "masterdata") ? <MasterDataNav /> : null}
     {apps.some((app) => app.appId === "bq") ? <BqNav /> : null}
+    {apps.some((app) => app.appId === "studioflow") ? <StudioFlowNav /> : null}
   </>;
 
   return <AuthenticatedShell principal={principal} grants={grants} settings={settings} apps={apps} logoutAction={logoutAction} domainNavigation={domainNavigation}>

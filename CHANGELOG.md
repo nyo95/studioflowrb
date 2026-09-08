@@ -5,8 +5,63 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.08**
-- Next local revision: **R7.09**
+- Current revision after this entry is committed: **R7.09**
+- Next local revision: **R7.10**
+
+## R7.09 | 2026-09-08 | feat(studioflow): SF-WO-1 — app scaffold, permissions, route group, nav
+
+### Changed
+
+- Added `src/apps/studioflow/service.ts` defining `STUDIOFLOW_PERMISSIONS` (8 keys:
+  `access`, `projectRead`, `projectManage`, `projectDeletionApprove`,
+  `iterationManage`, `iterationReview`, `phaseOverride`, `taskManage`) as a typed
+  `const` object, matching the permission index in `studioflow.md`.
+- Added `src/apps/studioflow/public/index.ts` re-exporting `STUDIOFLOW_PERMISSIONS`
+  as the app's sole public boundary, consistent with `masterdata` and `bq` patterns.
+- Added `src/app/(platform)/studioflow/layout.tsx`: server component; calls
+  `requirePrincipalGrants()` — redirects `/login` on no session, redirects `/`
+  on missing `studioflow.access`; wraps children in `PageShell size="wide" fill`.
+- Added `src/app/(platform)/studioflow/nav.tsx`: client component; `FolderOpen`
+  link to `/studioflow` (Projects), `Users` link to `/studioflow/clients`
+  (Clients); renders only when `pathname.startsWith("/studioflow")`.
+- Added `src/app/(platform)/studioflow/page.tsx`: Project List stub; checks
+  `projectRead` / `projectManage`; renders access-denied or empty-state
+  `EmptyState`. Real data domain deferred to SF-WO-2.
+- Added `src/app/(platform)/studioflow/clients/page.tsx`: Client List stub;
+  checks `projectManage`; renders access-denied or empty-state `EmptyState`.
+  Real data domain deferred to SF-WO-2.
+- Edited `src/app/app-registrations.ts` additively: registered `studioflow`
+  with all 8 permission strings. Existing `masterdata` and `bq` entries untouched.
+- Edited `src/app/(platform)/layout.tsx` additively: imported `StudioFlowNav` and
+  rendered it inside `domainNavigation` conditional. Existing nav entries untouched.
+- Edited `tsconfig.json`: added `"_to_delete/**"` to `exclude` to suppress a
+  pre-existing TS2307 error from owner-staged files never committed to git. No
+  other compiler options changed.
+
+### Dependencies and migrations
+
+- No schema changes, no migrations, no new npm dependencies, no environment
+  variables, no legacy checkout, no remote changes.
+- All new imports resolve against existing platform exports (`requirePrincipalGrants`,
+  `hasPermission`, `PageShell`, `EmptyState`, `PageHeader`, `SectionCard` from
+  `@/platform/...`).
+
+### Verification and limitations
+
+- `tsc --noEmit`: clean (zero errors) on all touched and new files.
+- `eslint` on all touched paths: clean (no output).
+- Boundary checker (scripts/test-boundaries-checker.mjs): PASS — no cross-app
+  internal imports introduced; public boundary pattern followed.
+- Legacy-runtime checker (scripts/test-legacy-runtime-checker.mjs): PASS — no
+  legacy imports introduced.
+- Full TS test suite (`npm test`) and `npm run build`: cannot run in device-bridge
+  Linux VM due to pre-existing esbuild platform mismatch (win32-x64 vs linux-x64);
+  these gates are pre-existing failures unrelated to SF-WO-1 changes. Owner to
+  verify on Windows before merging.
+- No new test files added; no existing tests modified; masterdata and bq route
+  group files untouched.
+- Existing owner changes in `next-env.d.ts`, `_to_delete/`, and docs files
+  remain outside this commit.
 
 ## R7.08 | 2026-09-08 | docs(studioflow): anchor PRD to existing foundation
 

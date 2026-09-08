@@ -69,6 +69,7 @@ the Client explicitly before restoring a project. No silent cascading restore.
 | `name` | String | Required |
 | `client_id` | FK → Client | Required |
 | `lead_user_id` | FK → User? | Nullable. Who is accountable for the engagement. Plain reference to the platform `User` table |
+| `location` | String? | Short site label used in file names, e.g. "Funan" (§8.5). Not a postal address |
 | `address` | String? | Site address; independent of the Client address |
 | `area` | Decimal? | Square metres |
 | `type` | Enum | `RESIDENTIAL` / `COMMERCIAL` / `HOSPITALITY` / `OTHER` |
@@ -83,19 +84,44 @@ distinct from phase state, which is workflow and is derived. A project may be
 `ON_HOLD` while a phase is `WAITING_CLIENT`; neither implies the other.
 
 Creating a project requires `studioflow.project.manage` and, in the same
-transaction, seeds its five phases (§4.1).
+transaction, snapshots the studio phase template into its phases (§4.1).
 
 Permanent deletion is deferred (§12). Its future two-step request/approval
 policy is StudioFlow-owned and will require `studioflow.project-deletion.approve`.
 
 ## 4. Phase
 
-### 4.1 The five phases
+### 4.1 Phases come from a studio template
 
-`MOODBOARD`, `LAYOUT`, `DESIGN_3D`, `CD`, `SUPERVISION`.
+Phases are **not hardcoded**. The studio keeps one ordered phase template in
+settings; every new project copies it. Owner decision 2026-09-08: legacy's fixed
+enum could not express a phase the studio later decides to standardise, and
+every such change needed a developer.
 
-Every project has exactly these five, seeded at creation, in this order. They
-are not user-creatable, not renameable, and not deletable.
+Each template entry carries:
+
+| Field | Rule |
+|---|---|
+| `key` | Stable identifier, immutable once any project uses it |
+| `name` | Display name |
+| `sort_order` | Presentation order |
+| `has_rounds` | Whether this phase uses numbered rounds (§5) |
+| `round_prefix` | Label prefix when `has_rounds` — `MB`, `Layout`, `D`, `CD` |
+| `folder_key` | The output folder this phase owns (§8.2) |
+| `requires_internal_approval` | Default off. When on, Send warns if no internal approval exists (§6.7) |
+
+The studio's current standard seeds Moodboard (`MB`), Layout (`Layout`),
+Design 3D (`D`), CD (`CD`), and Supervision with `has_rounds = false`.
+
+`has_rounds` replaces the hardcoded Supervision exception. A phase without
+rounds is an ordinary template choice, not a special case in code, and the
+studio can add another one without a developer.
+
+A project **snapshots** the template at creation. Editing the studio template
+never rewrites a running project — the same snapshot rule the schedule uses for
+catalog facts. On an individual project, `project.manage` may add a phase, or
+remove one that holds no rounds; a phase that holds rounds is closed by
+exception (§4.5), never deleted.
 
 Legacy's sixth value `COMPLETED` is **PURGE**. It was a terminal marker stored
 inside the phase enum, which made "which phase" and "is it finished" the same
@@ -200,6 +226,7 @@ included. `SUPERVISION` has none (§4.4).
 | `assignee_id` | FK → User? | Who is holding this round. Plain reference to the platform `User` table; carries the designer/drafter handoff |
 | `sent_at` | DateTime? | Set on `SENT`, cleared only by audited withdrawal back to draft; retained if round is voided |
 | `responded_at` | DateTime? | Timestamp of the effective response; previous timestamps remain in response history |
+| `working_revision` | Int | Starts at 0. Incremented when the round's working file is replaced (§5.4). Display only; not a state |
 | `voided_at` / `voided_by` / `void_reason` | Nullable | Required together for `VOIDED`; nonblank reason |
 | `created_at` / `updated_at` | DateTime | UTC instants |
 
@@ -209,12 +236,12 @@ never implies client rejection or approval.
 
 ### 5.2 Label is derived, never stored
 
-| Phase | Label |
-|---|---|
-| `MOODBOARD` | `MB 1`, `MB 2`, … |
-| `LAYOUT` | `Layout 1`, `Layout 2`, … |
-| `DESIGN_3D` | `D1`, `D2`, … |
-| `CD` | `CD 1`, `CD 2`, … |
+The label combines the phase's `round_prefix` (§4.1) with the round number:
+`MB 1`, `Layout 2`, `D4`, `CD 1`. A phase whose template gives no prefix falls
+back to its name. Because the prefix lives in the template, a phase the studio
+adds later gets a working numbering scheme without a code change.
+
+Working revisions within one round display as `D1.1`, `D1.2` (§5.4).
 
 A stored label would be a second copy of `(phase, number)` and could disagree
 with it. This follows the legacy B1 decision that document structure is
@@ -228,9 +255,10 @@ if one exists, reuse it. Otherwise create the next number, starting at 1.
 Never delete a numbered round or reuse its number. Allocate under the same
 phase-level concurrency guard for every caller.
 
-The triggers are **Start round** (`iteration.manage`), the first deliverable
-upload (`iteration.manage`, only once storage is activated), and a recorded
-revision request (`iteration.review`). They call this same rule. Start round
+The triggers are **Start round** (`iteration.manage`), the first file recorded
+into the phase (`iteration.manage`), and a recorded revision request
+(`iteration.review`). Recording a file needs no upload (§8.1), so no trigger
+waits on storage. They call this same rule. Start round
 works before files exist; an upload into a draft does not create another number.
 For a revision request, newly entered points join that draft, even if it already
 contains work. Nothing already there is replaced or copied again.
@@ -239,9 +267,25 @@ Work may start while one earlier round is `SENT`. Its pending answer remains
 visible and keeps the phase `WAITING_CLIENT`; the new draft cannot be sent until
 that answer is recorded or the earlier round is explicitly voided. No queue of simultaneous
 client reviews is introduced. Closed phases require explicit reopening first.
-Failed uploads do not leave a numbered empty round; opening and asset metadata
-attachment occur only at successful upload finalization. Concurrent retries of
+A failed upload does not leave a numbered empty round: for a stored file the
+round opens only when the upload finalizes. A recorded file has no upload step
+and opens the round immediately. Concurrent retries of
 the same command must not create duplicate rounds, assets, or points.
+
+### 5.4 Working revisions do not consume a round number
+
+A round number is expensive: it marks something that left the studio. Updating
+the working file inside an unsent round is cheap and must stay cheap.
+
+Replacing the working file of a `DRAFT` round increments `working_revision`
+and supersedes the previous working file (§8.6). The round keeps its number and
+displays as `D1.1`, `D1.2`, and so on.
+
+This is not a new rule. §5.3 already said an upload into an existing draft does
+not create another number; `working_revision` only makes that visible, which is
+what the studio previously expressed by hand as `versi6` in a filename.
+
+`working_revision` never appears on a frozen round and is never editable.
 
 ## 6. The client review exchange
 
@@ -263,6 +307,7 @@ one transaction.
 | `note` | String? | Client wording where possible |
 | `points` | Immutable ordered values | Stable point id and original text for each discrete request |
 | `replaces_response_id` | FK → Response? | Null for first answer; otherwise the immediately preceding effective answer of the same iteration |
+| `state` | Enum | `DRAFT` / `EFFECTIVE`. A draft answer changes nothing until committed (§6.6) |
 | `correction_reason` | String? | Nonblank for a correction |
 | `recorded_by` / `recorded_at` | User / DateTime | Actor and UTC instant |
 
@@ -296,10 +341,11 @@ closure is possible. Thus an unnecessary D4 can be stopped without deleting it
 or forcing a fake send/approval merely to finish the phase.
 
 Send records an external action already performed by the studio; it does not
-email or deliver files. Storage is not a prerequisite. Confirmation requires a
-nonblank delivery note describing what was sent and by which channel, retained
-in the send audit. Even a round without uploaded assets can therefore be recorded
-honestly. It does not turn all internal assets into externally delivered files.
+email or deliver files. Storage is not a prerequisite. Confirmation records the delivery
+channel. A written note of what was sent is required only when no file is
+attached to the send; when candidate files are attached (§8.3) they are that
+record and no retyping is asked for. Even a round with no file at all can
+therefore be recorded honestly. It does not turn all internal assets into externally delivered files.
 
 The response, affected iteration state/timestamps, draft creation/point changes,
 phase summary/closure, and one primary audit event are one atomic command. That
@@ -354,6 +400,73 @@ The dialog previews the affected round, closure, and any successor work.
 
 This is a small replacement chain, not an undo engine. It guarantees correction
 of the record without pretending later human work can be reversed automatically.
+
+### 6.6 An answer may be collected before it is committed
+
+Client feedback rarely arrives as one clean review. It dribbles in over days —
+"move the sofa" on Monday, "warmer lighting" on Wednesday, "not that carpet" on
+Thursday. A model that accepts only a single instantaneous answer forces the
+studio to either commit early and lose Wednesday's remark, or record nothing for
+three days.
+
+An answer may therefore be **saved as a draft and committed later**. While
+`DRAFT`:
+
+- the round stays `SENT` and the phase stays `WAITING_CLIENT` — which is the
+  truth, because the client has not finished answering;
+- points are added as they arrive, each with the date it was received;
+- the outcome may still change (approval becomes revision, or the reverse);
+- **nothing else happens.** No round opens, no phase moves, no point is copied.
+
+Committing makes it `EFFECTIVE` and fires every consequence in §6.2 exactly as
+before. One command, one transaction, unchanged.
+
+At most one `DRAFT` answer per round. A draft is not an answer: it never
+satisfies phase closure (§4.3), never ends `WAITING_CLIENT`, and its age keeps
+counting. Discarding a draft is permitted and unaudited; it recorded nothing.
+
+The correction chain (§6.5) applies only to `EFFECTIVE` answers. Editing a draft
+is ordinary editing, not correction, and needs no reason. A **correction** may
+likewise be composed as a draft, under the same rule: it changes nothing until
+committed, and its reason is required only at commit.
+
+Stopping a round (`VOIDED`) discards any draft answer on it — a draft recorded
+nothing, so nothing is lost and nothing is audited. An `EFFECTIVE` answer is
+never discarded this way; §6.2 already forbids answering a voided round.
+
+### 6.7 Internal approval is a record, not a state
+
+Sometimes work must be signed off inside the studio before it goes out, and the
+owner needs to see that it was. Not always — but when it matters, it matters.
+
+Legacy's error was not recording this. It was making it a **mandatory state**:
+every round had to pass `ON_REVIEW_INTERNAL` → `APPROVED_INTERNAL` whether anyone
+cared or not, which is the fatigue §4.2 removed.
+
+So it returns as an optional record:
+
+| Field | Type | Rule |
+|---|---|---|
+| `iteration_id` | FK → Iteration | At most one approval per round |
+| `approved_by` / `approved_at` | User / DateTime | Actor and UTC instant |
+| `note` | String? | Optional |
+
+It requires `iteration.review`, which a drafter does not hold — so nobody signs
+off their own work, using the split already in force. It **does not** change
+round state, does not enter the four-state phase machine, and does not gate
+anything by itself. Unused, it leaves no trace at all.
+
+To make its absence meaningful where the studio wants it to be, the phase
+template (§4.1) carries `requires_internal_approval`, default off. When on and
+missing, **Send warns with that fact and still proceeds** — the same warn-never-
+block rule as open points (§7.4), for the same reason.
+
+An approval survives everything that happens to its round afterwards, including
+voiding and answer correction. It records that a person looked at the work on a
+date, which stays true regardless of what the round later became.
+
+This is what the drafter/designer handoff needed, and it costs nothing on the
+rounds that never need it.
 
 ## 7. Work items
 
@@ -410,7 +523,12 @@ retain their send-time snapshot.
 | `status` | Enum | `OPEN` / `DONE` |
 | `assignee_id` | FK → User? | Optional |
 | `due_date` | DateTime? | Optional |
+| `attachment_file_id` | FK → File? | Optional evidence that the task was done |
 | `sort_order` | Int | Manual ordering |
+
+A task attachment is **never** a deliverable. Only §8.3 makes a file something
+that left the studio. Evidence of internal work and goods delivered to a client
+are different claims and are not merged.
 
 `phase_scope` is set only two ways: inherited when the task is created from
 within a phase view, or assigned later by dragging the task onto a phase. **A
@@ -435,56 +553,247 @@ completion rules across `Activity` and `ProjectChecklist` are **PURGE**. A hard
 block was rejected on the grounds that it teaches people to tick boxes
 untruthfully in order to proceed.
 
-## 8. Assets
+## 8. Files
 
-**Implementation is blocked** on the platform storage port and its private-object
-extension ([`studioflow.md`](studioflow.md) §5). The model is contracted now so
-that nothing else waits on it.
+Every file carries **two facts that must stay separate**:
 
-### 8.1 Fields
+- **where it belongs** — a folder, by kind of work (§8.2);
+- **whether it left the studio** — a link to the round it was sent in (§8.3).
+
+Legacy answered the second question with a folder named `OUT`, inside a list
+that otherwise answers the first. That single conflation produced the studio's
+whole filing debt: exported renders and internal decks piled up in `OUT` without
+ever being sent, while layout PDFs that genuinely were sent stayed in `Drawings`
+and had to be copied to appear as deliverables at all. **`OUT` is PURGE**, and
+so is this contract's earlier `audience` field, which stated the same fact a
+second time.
+
+**Every dropped file creates a permanent record.** The bytes may or may not be
+kept (§8.1, §8.6); the record never disappears. That distinction is what makes
+this a filing system rather than a file store — and a filing system is what the
+studio actually lacks, because the NAS and Drive already store perfectly well.
+
+### 8.1 Three treatments
+
+| Treatment | Example | What the platform holds |
+|---|---|---|
+| `RECORDED` | `.skp`, large working `.dwg` | **Metadata only.** The file stays on the studio's own machines |
+| `STORED` | delivered PDF, render sent out, client survey | The bytes |
+| `LINKED` | archived final | An external URL; the bytes live elsewhere |
+
+`RECORDED` is what makes the workflow independent of storage. Dropping a `.skp`
+registers the round, advances the phase, and names the file **with no upload at
+all** — the browser reads name, size and date without reading the contents. The
+studio's own machines remain the archive for working files, which is where they
+already are.
+
+The folder template (§8.2) sets the default treatment per folder. The person
+dropping a file may lower it (`STORED` → `RECORDED`) but never silently raise
+it, because raising it uploads bytes.
+
+First release ships `RECORDED` and `STORED`. `LINKED` is contracted here and
+deferred with the Google Drive work ([`studioflow.md`](studioflow.md) §5), so
+that activating it later changes no rule above.
+
+### 8.2 Folders
+
+Two kinds, from one template:
+
+| Kind | Source |
+|---|---|
+| Project input folders | A fixed template list: `Data`, `References`, `IN` |
+| Phase output folders | One per phase, from `folder_key` in the phase template (§4.1) |
+
+Because output folders come from the phase template, adding a phase adds its
+folder. Two gaps in the studio's current structure close by themselves:
+Moodboard and Supervision had no folder, though supervision plainly produces
+site photographs.
+
+Ordering is a `sort_order` field, **never a numeric prefix inside the name**.
+The studio's `1. Data … 7. CD` forces a rename of everything to insert a folder
+in the middle — the same renumbering fault already purged from Schedule.
+
+The displayed path is derived from metadata. No user types a path and no request
+supplies one; the legacy upload endpoint that accepted a caller-selected folder
+is PURGE on security grounds as well as structural ones.
+
+### 8.3 Sending is a link, not a folder
+
+A file that left the studio carries `sent_in_iteration_id`. That one link is the
+whole mechanism:
+
+| Question | Answered by |
+|---|---|
+| What kind of file is this? | `folder_key` |
+| Did it leave the studio, and when? | `sent_in_iteration_id` |
+| What did the client say about it? | that round's response (§6) |
+
+**Marking a file as a send candidate never changes round state.** Only **Send to
+client** (§6.2) does. Candidate files are attached to that send and receive the
+link atomically with it.
+
+This is deliberate. A drop that could close a round would create a second way to
+close one, and two closers eventually disagree. Dropping a file may *open* a
+round (§5.3); only sending closes one.
+
+A file in an input folder cannot be a candidate — `IN` means it arrived from
+outside. "Everything we sent" is a **view over this link**, never a place files
+are copied to.
+
+The same layout PDF therefore lives once, in `Drawings`, and is marked sent in
+`Layout 1`. No copy, no `OUT`, and no contradiction between the two.
+
+### 8.4 Fields
 
 | Field | Type | Rule |
 |---|---|---|
 | `id` | UUID | Primary key |
 | `project_id` | FK → Project | Required |
-| `iteration_id` | FK → Iteration? | Null for project-level input files |
-| `group` | Enum | `DATA` / `REFERENCE` / `IN` / `OUT` |
-| `storage_key` | String | Server-generated, opaque, immutable. **Never supplied by the client** |
-| `filename` | String | Original name, for display only. Never part of the storage key |
-| `mime_type` | String | Recorded at upload |
-| `bytes` | BigInt | Recorded at upload |
-| `checksum` | String | Recorded at upload; a working file must arrive byte-identical |
-| `audience` | Enum | `INTERNAL` / `EXTERNAL` |
-| `uploaded_by` | FK → User | Actor |
-| `uploaded_at` | DateTime | UTC instant |
+| `folder_key` | String? | Which folder (§8.2). A phase output folder implies its phase. **Null means unsorted** (§8.8) |
+| `treatment` | Enum | `RECORDED` / `STORED` / `LINKED` |
+| `filename` | String | Standard name from the naming template (§8.5) |
+| `original_filename` | String | What the person actually dropped; kept so they recognise it |
+| `bytes` | BigInt | Read from the drop; present for every treatment |
+| `file_modified_at` | DateTime? | The dropped file's own timestamp, when the browser reports it |
+| `dropped_by` / `dropped_at` | User / DateTime | Always recorded |
+| `sent_in_iteration_id` | FK → Iteration? | Set only by a send (§8.3); immutable afterwards |
+| `storage_key` | String? | `STORED` only. Server-generated, opaque, **never client-supplied** |
+| `checksum` | String? | `STORED` only |
+| `external_url` | String? | `LINKED` only |
+| `superseded_at` | DateTime? | Set when a working file is replaced in the same round (§8.6) |
+| `bytes_released_at` | DateTime? | Set when the bytes were released (§8.6). The record stays; the object is gone |
 
-Invariant: `group = OUT` if and only if `iteration_id` is set. Deliverables
-belong to a round; inputs do not.
+Invariants: `storage_key` is present exactly when `treatment = STORED`;
+`external_url` exactly when `LINKED`; a file with `sent_in_iteration_id` is
+never in an input folder, and its `folder_key` and `filename` are frozen.
 
-### 8.2 Folders are virtual
+### 8.5 Standard naming, and one honest limit
 
-The displayed structure is derived from metadata:
+The studio keeps one naming template built from a **fixed token vocabulary**,
+each token resolving to a named field. A template referring to anything else is
+rejected when saved, not when a file is dropped.
 
-| Displayed as | Derived from |
+| Token | Resolves to |
 |---|---|
-| `Data`, `References`, `IN` | `group`, no iteration |
-| `3D / D4`, `CD / CD 2`, … | `group = OUT`, the phase, and the iteration number |
+| `{date}` | The drop date, `YYYYMMDD`, in the platform's configured timezone |
+| `{project}` | `Project.name` |
+| `{location}` | `Project.location` — a short site label such as "Funan". Distinct from `address`, which is a postal string and unusable in a filename |
+| `{round}` | The round label (§5.2), or empty for a file with no round |
+| `{code}` | `Project.code` |
 
-No user types a path, and no request supplies one. The legacy general upload
-endpoint accepted a caller-selected folder and validated only the path that
-followed it; that design is **PURGE** on security grounds as well as
-structural ones.
+The studio's current convention is `{date} {project} {location} {round}`,
+producing `20260908 Sociolla Funan D1.skp`. An empty optional token collapses
+without leaving a double space.
 
-Renaming a project, renumbering nothing, or reclassifying a file never moves a
-stored object, because the object key is opaque and unrelated to the display
-structure.
+`Project.location` is added by this rule (§3) precisely because the naming
+convention needs it and `address` cannot serve.
 
-### 8.3 Audience
+It fills `filename` for **every** treatment, so the record reads consistently
+even when the bytes were never uploaded. `original_filename` is kept beside it,
+however untidy it was.
 
-`EXTERNAL` marks what genuinely left the studio. `INTERNAL` is working
-material. The distinction is independent of `group` and of storage location,
-and it drives retention at project archival — a decision still open
-([`studioflow.md`](studioflow.md) §7.1).
+**The next name is offered before the file exists.** Each round shows the name
+its next file should carry, with a copy control:
+`20260908 Sociolla Funan D1.skp`. The designer saves from SketchUp under that
+name directly.
+
+This is the order designers actually work in — naming happens at Save As, not
+after the fact. Requiring a file to be dropped in order to learn its name would
+invert the sequence and produce a rename loop.
+
+**A browser cannot rename a file on the studio's own disk.** That is a browser
+limit, not a design choice. So for `RECORDED` files the app *shows* the standard
+name for the person to copy, and never claims to have renamed anything. For
+`STORED` and `LINKED` files the copy does carry the standard name, because the
+app created that copy.
+
+### 8.6 Retention — the record is permanent, the bytes are not
+
+**Owner decision 2026-09-08.** The studio's own machines hold every file, the
+client holds what was sent to them, and finals go to Drive. A third copy on the
+platform earns nothing, so the platform keeps the newest bytes only.
+
+Per phase, at most two files hold bytes:
+
+| Kept | Why |
+|---|---|
+| The current working file | What is being worked on now |
+| The most recently **sent** file | Answers "please resend what you sent last" without opening the NAS |
+
+Everything older has its bytes released. **Its record never is.** Name, standard
+name, original name, size, date, who dropped it, which round, whether it was
+sent, and the client's answer all remain readable forever.
+
+This is the line that matters: releasing bytes is not deleting history. Six
+months later the app still answers *"what was D2, when did it go out, and what
+did the client say"* — it simply cannot hand back the file, which the studio and
+the client both already have.
+
+Evidence in a dispute is the response chain (§6), not the bytes. The client's
+own words, the send record, and the date are what a disagreement turns on, and
+none of them is ever released.
+
+**Release happens on the event that displaces the file** — a new send, or a new
+working file — inside that command's own transaction. There is **no scheduled
+cleanup job and no reconciler.** Reintroducing one would restore exactly the
+machinery this decision removed.
+
+The record is authoritative: `bytes_released_at` is written in the transaction,
+and the stored object is deleted **best-effort afterwards**. A failed object
+delete never rolls back or blocks the send; it leaves an unreferenced object that
+costs a little money and no correctness, and it is logged. Nothing in the
+application reads an object whose record says released.
+
+`RECORDED` files never held bytes, so release does not apply to them.
+
+A task attachment (§7.3) is **not** covered by the two-per-phase rule. A General
+task has no phase, and evidence of internal work is not a deliverable. Task
+attachments are small by policy and are released only when the task is deleted.
+
+### 8.7 Dropping files
+
+**No file drop asks "internal or external".** The answer already follows from
+§5.3: once a round is sent, the next file opens the next number; while it is
+unsent, files join it. Asking would be asking the user to restate something the
+system knows — the fault this contract exists to remove.
+
+Ask only what cannot be inferred. The folder template maps extensions, so `.skp`
+files silently. A PDF is genuinely ambiguous — a client's survey (`IN`) or work
+going out — so only then is there a question, with the inferred answer preselected.
+
+**Deliverables that already went out.** In practice a file is sent by WhatsApp or
+email *before* the studio opens the app. The drop dialog for a deliverable
+therefore offers "already sent to the client?" and, when answered yes, completes
+the send (§6.2) in the same interaction. One dialog, not two screens. The
+underlying rule is unchanged: the send is what closes the round, never the drop
+(§8.3).
+
+### 8.8 Bulk intake and the unsorted tray
+
+Tidying filing is the reason this application exists. If incoming files are
+harder to file here than to leave in a chat thread, the application has failed at
+its own purpose, so intake is built for how administration actually gets done —
+in one sitting, not per file as each arrives.
+
+- **Many at once.** Drop fifteen files together and classify them on one screen,
+  not through fifteen dialogs.
+- **An unsorted tray.** A file whose folder is unclear lands in *unsorted* rather
+  than being refused or forcing an immediate decision. Drop everything now, sort
+  it later.
+
+Files in the unsorted tray are already recorded — they have a name, a date, and
+an owner — and count as present in the project. Sorting assigns a folder; it does
+not create the record.
+
+**An unsorted file has no phase, so it never opens a round** (§5.3). Sorting one
+into a phase output folder is what triggers the round-opening rule, through the
+same resolver every other trigger uses. Dropping a hundred unsorted files
+therefore changes no workflow state at all — which is what makes dumping them
+safe.
+
+No chat or mail integration is contracted. Desktop WhatsApp already writes media
+to a folder on disk, so the files are reachable; the expensive part was never
+fetching them but sorting them one at a time, and §8.8 is the answer to that.
 
 ## 9. Audit
 
@@ -494,10 +803,13 @@ schema-capability probes are **PURGE**.
 
 Audited: project create/edit/archive/delete, phase start/close/reopen and
 exception closure, iteration open/send/withdraw-send/stop, response and correction,
-assignment changes, client-point reword/withdraw/restore, asset upload and delete.
+assignment changes, client-point reword/withdraw/restore, internal approval,
+file drop, supersede and byte release, and studio template edits.
 Reasons are required where the governing section specifies them.
 
-Not audited: task create/complete, checklist point toggle, reordering. These
+Not audited: task create/complete, checklist point toggle, reordering, sorting a
+file out of the unsorted tray, and saving or discarding a draft answer (§6.6) —
+a draft records nothing. These
 are high-frequency and low-consequence; auditing them would bury the events
 that matter.
 
@@ -545,6 +857,39 @@ for the corresponding field; assignment changes are audited. This operational
 read view ships with the project surface; a cross-project personal dashboard
 remains deferred. Restoring access makes the existing assignment usable again.
 
+### 10.2 What is waiting on me — across projects
+
+A designer runs several projects at once and does not think project by project.
+The first question of the day is *"what do I have to do"*, and answering it by
+opening eight project pages is how a person ends up keeping their own list
+somewhere else — at which point the application has lost them.
+
+One list, scoped to the signed-in person, ordered by what has been waiting
+longest:
+
+| Row | Source |
+|---|---|
+| Rounds assigned to me in `DRAFT` | my work now |
+| Rounds I sent, still `WAITING_CLIENT`, with age | chase the client |
+| `OPEN` tasks assigned to me | everything else |
+| Open rounds and tasks with no assignee, or an unavailable one | §10.1 |
+
+Archived projects are excluded. `ON_HOLD` projects are shown but visually
+separated — the work is real and paused, not gone.
+
+**This introduces no table and no field.** It is one read model over records that
+already exist, which is why it belongs in the first release rather than a later
+one: the data was always there, only the question was missing.
+
+It is deliberately not legacy's Today's View. No saved filter sets, no auto-hide
+after seven days, no feed of every event — those grew legacy past the point of
+being readable. Mine, unfinished, oldest first.
+
+It also answers the drafter handoff without any new lifecycle: the drafter
+finishes and reassigns the round, and it appears here. Reassignment is the
+handoff signal, so no internal-review state is needed to express one (§6.7 covers
+the separate question of recording sign-off).
+
 ## 11. Legacy classification
 
 | Legacy behavior | Disposition | Destination |
@@ -559,8 +904,11 @@ remains deferred. Restoring access makes the existing assignment usable again.
 | `Activity` as task carrier, phase-tagged deferred activities | **MERGE** | `Task` (§7.3) |
 | `ProjectChecklist` + `ChecklistTemplate` | **MERGE** for the in-round case (§7.2); templates **DEFER** ([`studioflow.md`](studioflow.md) §6) |
 | `assertNoPendingTasks` hard blocking | **PURGE** | Warn-only (§7.4) |
-| Flat `File` under `Revision`; local disk writes; caller-selected folders | **PURGE** | §8, platform storage port |
+| Flat `File` under `Revision`; local disk writes; caller-selected folders | **PURGE** | §8 |
 | B1 virtual folder structure from metadata | **KEEP** | §8.2 — the one legacy design conclusion adopted intact |
+| `OUT` folder as the record of what was sent | **PURGE** | §8.3 — a link on the file, not a place to copy it to |
+| Numeric prefixes inside folder names (`1. Data`) | **FIX** | §8.2 — ordering is a field |
+| Studio filing every version of a working model | **FIX** | §8.6 — one current working file per round; sent files never released |
 | `Role` enum and RBAC compatibility adapter | **PURGE** | Permission vocabulary only ([`studioflow.md`](studioflow.md) §3) |
 | Audit compatibility readers | **PURGE** | §9 |
 | Direct Prisma queries in page components | **PURGE** | Thin routes calling one application service |
@@ -575,7 +923,9 @@ invariant, not authorization.
 |---|---|---|
 | Read any project, phase, iteration, task, asset | `project.read` | — |
 | Create / edit Client | `project.manage` | A Client with live Projects cannot be archived |
-| Create Project | `project.manage` | Seeds five phases in the same transaction |
+| Create Project | `project.manage` | Snapshots the phase template in the same transaction |
+| Edit the studio phase, folder and naming templates | `project.manage` | Never rewrites a running project (§4.1, §8.2) |
+| Add / remove a phase on one project | `project.manage` | Remove only while it holds no rounds |
 | Edit Project fields, set `lead_user_id` | `project.manage` | `code` is immutable |
 | Archive Project (`deleted_at`) | `project.manage` | Reversible |
 | Permanently delete Project | `project-deletion.approve` | Deferred: no destructive action until retention and deletion policy is approved |
@@ -590,6 +940,9 @@ invariant, not authorization.
 | Finish / reopen phase; start Supervision | `iteration.review` | §4.3–4.4; no arbitrary state choice |
 | Close phase by exception | `phase.override` | §4.5; reason, audit, no unresolved round |
 | Create / assign / complete / reorder / delete tasks | `task.manage` | — |
+| Save or discard a draft client answer | `iteration.review` | Changes no state until committed (§6.6) |
+| Record internal approval | `iteration.review` | At most one per round; never gates by itself (§6.7) |
+| Drop, classify and sort files | `iteration.manage` | Every drop is recorded permanently (§8) |
 
 Phase completion is an explicit scope decision (§4.3). Closing a project is
 `Project.status = COMPLETED` and needs `project.manage`; show unfinished phases
@@ -632,7 +985,7 @@ It records usable mechanisms, not a claim that every future workflow is tested.
 | Dates, numbers and list mechanics | **REUSE** existing `src/platform/utilities/{date,decimal,normalization,pagination}` and Core settings | Business date/area meaning, filter/query scope and sort order; no local formatter or alternative locale/timezone settings |
 | Authenticated navigation and page frame | **REUSE** [authenticated shell](../../src/platform/authenticated-shell/index.tsx) and [UI Engine public exports](../../src/platform/ui_engine/index.ts) | App navigation entries and project content; no StudioFlow shell, account menu or separate design tokens |
 | Forms, lists and user feedback | **REUSE** UI Engine `DirectoryShell`, `PageShell`, `PageHeader`, `DataTable`, `Field`, `Combobox`, `InlineEdit`, `DraftDialog`, `ConfirmDialog`, `RowActionMenu`, and standard states | Field meaning, columns, phase/round compositions, dialog copy and command callbacks |
-| Private assets | **DEFER**, then **EXTEND/ADD** the activated shared storage capability (§13.2) | Allowed formats, attachment ownership, audience and retention; no local filesystem upload substitute |
+| Stored file bytes | **DEFER**, then **EXTEND/ADD** the activated shared storage capability (§13.2). `RECORDED` files need none of it | Folder and treatment rules, send links, naming, supersession; no local filesystem upload substitute |
 
 App-owned code is expected: phase/round transitions, client-answer replacement,
 point provenance, project read models and UI compositions are domain logic. They
@@ -659,12 +1012,15 @@ Master Data and BQ are consumers to protect, not code to fork into StudioFlow.
 
 ### 13.2 Platform Core — extension required
 
-The private large-object storage requirement described in
-[`studioflow.md`](studioflow.md) §5 remains deferred. First verify the shared port
-actually available when its work order activates; ADD the absent capability or
-EXTEND the existing one, rather than assuming a roadmap means it is implemented.
-This is a **shared-layer change**, proposed there, not implemented inside
-StudioFlow. Assets (§8) do not begin until it lands.
+Owner decision 2026-09-08 removed the large private-object requirement from the
+critical path. `RECORDED` files (§8.1) need no storage at all, so rounds, phases,
+sending and the client exchange ship without it.
+
+`STORED` files still need a shared capability. Verify what the port actually
+offers when that work order activates; ADD the absent capability or EXTEND the
+existing one, rather than assuming a roadmap means it is implemented. This is a
+**shared-layer change**, proposed there, never built inside StudioFlow. Only the
+`STORED` treatment waits on it; nothing else in §8 does.
 
 ### 13.3 UI Engine — reuse first
 
@@ -698,14 +1054,17 @@ Recorded so a reviewer can test them rather than inherit them.
 | R4 | Supervision uses explicit start/finish/reopen (§4.4) | These business events need to match actual site work | Deliberately left minimal so it is cheap to change |
 | R5 | Warn-only sending may let unfinished revision points ship | A client receives a round missing a point they asked for | Owner-stated, 2026-09-08. The warning must name the count, not merely exist |
 | R6 | No project-scoped authorization assumes a small, fully trusted team | Any reviewer can act on any project | [`studioflow.md`](studioflow.md) §3.2. Revisit before any contractor or client-adjacent account exists |
-| R7 | Large private-object storage is unbuilt, and its cost and transfer behavior at hundreds of MB per file are unmeasured | Asset work could prove far more expensive than the rest of the app combined | Storage lands first, as its own work, before any StudioFlow upload code |
+| R7 | `RECORDED` files keep the studio's own machines as the archive. The platform holds a name, not the bytes | If a working file is moved or deleted locally, the record points at something no longer findable | Owner decision 2026-09-08: the local machines were always the real archive. The record's value is that the round happened, not that bytes are retrievable |
+| R9 | Only one round per phase may be awaiting a client answer (§5.3), and draft answers (§6.6) hold a round in `SENT` for longer | A studio running CD area by area could be blocked from sending the bedroom set while the kitchen set is still being answered. Collecting feedback over days widens that window rather than narrowing it | Unproven, and knowingly widened by D32. The workaround is to commit the pending answer first. This is the first constraint to revisit if area-parallel review turns out to be routine |
 | R8 | Derived participants (§10) means a new project shows nobody until something is assigned | May read as a bug rather than a fact | `lead_user_id` can be set at creation |
 
 ## 15. Out of scope for the first release
 
 Library and Product Schedule, Minutes of Meeting, SketchUp exchange, checklist
-templates, cross-project feeds, client-facing links, project archival with
-retention manifest, and any legacy data migration. See
+templates, legacy's Today's View feature set (§10.2 ships the one list that
+replaces it), client-facing links, the `LINKED` treatment and
+its Google Drive archive, project archival with retention manifest, and any
+legacy data migration. See
 [`studioflow.md`](studioflow.md) §6 and §7.
 
 ## 16. PRD acceptance scenarios and simplification ledger
@@ -732,6 +1091,25 @@ round-opening rule, and one client-answer correction mechanism.
 | L9: register first slice | Register only eight core permissions; four proposed Schedule/MoM permissions remain deferred |
 | No uploaded file yet | Start round and record externally performed delivery with a delivery note; no dependency on upload availability |
 | Repeated or racing corrections | One effective answer, no fork or duplicate consequence; loser reloads |
+| Drop `.skp` with no storage available | Round opens, phase advances, standard name shown for copying; nothing uploaded and no error |
+| Replace the working file twice in one draft | Still one round; displays `D1.2`; previous working files superseded, none of them sent |
+| Sent layout PDF | Lives once in the Layout folder, marked sent in `Layout 1`; appears under "sent" without being copied anywhere |
+| Render export and internal deck | Filed in the 3D folder, never marked sent, never counted as a deliverable |
+| Mark a candidate file but do not send | Round state unchanged; only Send closes a round |
+| Studio adds a phase to the template | New projects get it with its folder and round prefix; running projects unchanged |
+| Phase with `has_rounds = false` | Explicit start/finish/reopen only; no round, no numbering, no fictional review |
+| Feedback arrives Monday, Wednesday, Thursday | Draft answer collects all three; round stays `SENT` and its age keeps counting; committing once opens exactly one next draft |
+| Draft answer never committed | Phase stays `WAITING_CLIENT`; closure refused; no round opened |
+| Internal approval required but missing | Send warns and proceeds; the round carries no approval record |
+| Internal approval never used | No trace anywhere; no phase state changes |
+| Designer with eight projects opens the app | One list answers what is waiting on them, without opening any project |
+| D2 sent, then D3 sent | D1's bytes released, D2's kept as latest sent, D3 kept as current; all three records intact with their answers |
+| Ask for a released file | The record, dates and client answer are shown; the app states plainly that the bytes live on the studio's machines |
+| Fifteen files dropped at once | Classified on one screen; ambiguous ones land in the unsorted tray, already recorded |
+| A hundred files dropped to unsorted | No round opens, no phase moves. Sorting one into a phase folder is what opens a round |
+| Object delete fails during release | The send still succeeds; the record reads released; the orphan object is logged and never read |
+| Naming template references an unknown token | Rejected when the template is saved, never at drop time |
+| Draft answer on a round that is then stopped | Draft discarded silently; nothing audited, because nothing was recorded |
 
 The simplification removes redundant status entry, role enums, phase sequencing,
 and duplicate task types. It preserves scope completion, work-ahead visibility,

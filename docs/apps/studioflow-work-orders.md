@@ -9,6 +9,15 @@ then this file is a plan, not an authorization.
 Branch: all StudioFlow work happens on `studioflow/contracts` and its
 successors. `main` is the production source and is not touched.
 
+**Owner decision 2026-09-08 — the navigator owns the work-order breakdown.**
+[`studioflow-implementation-plan.md`](studioflow-implementation-plan.md) is now
+the authority on execution rules, phase sequence and gates. The WO-0…WO-8 sketch
+in §3 below is retained as **reference only**: it records one workable slicing,
+not a mandate. Where the two disagree, the implementation plan wins.
+
+What stays authoritative in this file: the locked decision ledger (§1), the open
+questions (§2), and the deploy and merge gate (§5).
+
 ## 1. Locked decisions
 
 Owner-confirmed across the contract sessions of 2026-09-07 and 2026-09-08.
@@ -33,8 +42,40 @@ PRD review in §1.1. This is a ledger, not a second source of truth.
 | D14 | A task's phase is never asked for at creation. Null means General, and that is a correct value | project §7.3 |
 | D15 | **No membership table.** Access is persisted RBAC role plus page access. `Project.lead_user_id` and the two `assignee_id` fields reference platform `User` directly | index §3.2, project §10 |
 | D16 | Legacy `pic_drafter_id` is dropped. A drafter is whoever is assigned the CD iterations | project §10 |
-| D17 | Platform asset storage is completed first, including a private large-object capability. No StudioFlow upload code begins before it | index §5 |
+| D17 | ~~Platform asset storage is completed first~~ — **superseded 2026-09-08 by D21.** Storage is no longer on the critical path | index §5 |
 | D18 | Virtual folders derived from metadata; no client-supplied storage path, ever | project §8.2 |
+
+### 1.1 Second decision block — 2026-09-08, later session
+
+| # | Decision | Recorded in |
+|---|---|---|
+| D19 | **Phases are not hardcoded.** A studio phase template is snapshotted per project; editing it never rewrites a running project | project §4.1 |
+| D20 | `has_rounds` on the template replaces the hardcoded Supervision exception. A phase without rounds is an ordinary template choice, not a special case in code | project §4.1, §4.4 |
+| D21 | **Three file treatments.** `RECORDED` holds metadata only and needs no storage, so the entire workflow ships without any platform storage. This supersedes D17 | project §8.1, index §5 |
+| D22 | **The `OUT` folder is PURGE.** Whether a file left the studio is a link to the round it was sent in, not a place it is copied to | project §8.3 |
+| D23 | The `audience` field is PURGE — it stated the same fact as the send link | project §8.3 |
+| D24 | **A drop never closes a round; only Send does.** A drop may open one. Two closers would eventually disagree | project §8.3 |
+| D25 | Working revisions (`D1.1`, `D1.2`) do not consume a round number. One current working file per round; sent files are never superseded or released | project §5.4, §8.6 |
+| D26 | A browser cannot rename a file on the studio's disk. For `RECORDED` files the app shows the standard name to copy and never claims to have renamed anything | project §8.5 |
+| D27 | **A schedule template carries the studio's actually chosen products**, not empty category rows. Legacy's row skeleton is why the feature went unused | schedule §2 |
+| D28 | Google Drive is the archive for finals, contracted as the `LINKED` treatment and deferred. Its egress question must be answered before it is committed | index §5.1 |
+| D29 | Ordering is a `sort_order` field, never a numeric prefix inside a folder name | project §8.2 |
+| D30 | A task may carry an attachment as evidence of internal work. It is never a deliverable; only a send makes a file something that left the studio | project §7.3 |
+
+### 1.2 Third decision block — 2026-09-08, user-testimony review
+
+Written after walking the contract as the designer who must use it daily.
+
+| # | Decision | Recorded in |
+|---|---|---|
+| D31 | **"What is waiting on me" across projects ships in the first release.** One read model, no new table or field. Legacy's Today's View feature set stays deferred | project §10.2 |
+| D32 | **A client answer may be collected as a draft and committed later.** Feedback arrives over days; a model accepting only one instantaneous answer forces early commitment or silence | project §6.6 |
+| D33 | **Internal approval returns as an optional record, never a state.** Legacy's error was making it mandatory, not recording it. `requires_internal_approval` per phase makes its absence meaningful only where the studio wants it to be | project §6.7, §4.1 |
+| D34 | The next file's standard name is offered **before the file exists**. Designers name at Save As; requiring a drop to learn the name inverts the order | project §8.5 |
+| D35 | **No drop asks "internal or external".** The answer already follows from §5.3. A drop of an already-sent deliverable may complete the send in the same dialog | project §8.7 |
+| D36 | **Bulk intake and an unsorted tray.** Tidying filing is why the app exists; if filing here is harder than leaving files in a chat thread, it has failed | project §8.8 |
+| D37 | **Bytes are released; records never are.** At most two files per phase hold bytes — the current one and the latest sent. Evidence in a dispute is the response chain, not the bytes. Supersedes the earlier rule that sent files are never released | project §8.6 |
+| D38 | Every dropped file creates a permanent record. This is a filing system, not a file store | project §8 |
 
 ### 1.1 R7.07 navigator PRD amendments — requested 2026-09-08
 
@@ -85,19 +126,22 @@ is authorized by this amendment.
 
 ## 2. Open questions
 
-### 2.1 Blocking — nothing starts without these
+### 2.1 Formerly blocking — both now answered
+
+**Nothing in this section blocks work any more.** Kept as a record of what was
+asked and how it was settled.
 
 | # | Question | Blocks |
 |---|---|---|
-| Q1 | **What is the migration target database?** The brief requires development and preview to run on a database isolated from production Master Data. Does one exist, or must it be provisioned? | WO-0, and therefore every WO that migrates |
+| Q1 | **Answered 2026-09-08: the local database is the target.** Work proceeds locally; nothing is blocked. The remaining question — which database a Vercel preview of this branch points at — belongs to the deploy gate (§5) and is not needed to build | Nothing |
 | Q2 | **Resolved by R7.07 PRD:** explicit Start round uses the same draft resolver as upload/revision | No longer a product blocker; work-order activation still required |
 
 ### 2.2 Needed before the domain they govern
 
 | # | Question | Blocks |
 |---|---|---|
-| Q3 | Project archival and retention. Legacy specified a `FINAL` flag with a destructive manifest. What is kept, what is purged, and after how long? | Assets (WO-7) |
-| Q4 | Is an `EXTERNAL` asset ever exposed through a link a client can open, or do files always leave the studio by other means? Decides the storage access model | Platform storage extension |
+| Q3 | Project archival and retention. Much reduced by the file decision — `RECORDED` files hold no bytes to purge. What remains is `STORED` files and how long a closed project keeps them | `STORED` files only |
+| Q4 | **Reshaped by the 2026-09-08 file decision.** Files leave the studio by the channels the studio already uses; the app records that they did. What remains is whether the Google Drive archive (`LINKED`) is activated, and whether production egress may reach Google's API at all | Drive work only; nothing in the core |
 | Q5 | **Resolved by R7.07 PRD:** Supervision uses explicit start/finish/reopen, never task-derived state | No longer a product blocker |
 | Q6 | Schedule: entry scoped to phase or project; whether clients genuinely choose among options; what a position's identity is | Schedule domain entirely |
 | Q7 | MoM: does an action item become a StudioFlow `Task`? If yes, MoM gains a write path into the project core | MoM domain entirely |
@@ -108,34 +152,36 @@ is authorized by this amendment.
 |---|---|
 | Q8 | Do these contracts land on `main` as documentation (the R7.05 precedent for the legacy audit), or stay on the StudioFlow branch until the app merges? |
 
-## 3. Work order sequence
+## 3. Work order sequence *(reference sketch — the navigator decides the real slicing)*
 
 Each work order is a vertical slice: schema, service, route, and tests together.
 Each is independently reviewable and safe to merge. None may exceed its scope.
 
 ---
 
-### WO-0 — Database target and isolated environment
+### WO-0 — Confirm the local target *(answered; no work pending)*
 
-**Scope.** No application code. Confirm or provision the development/preview
-database, confirm the migration target, and record both. Verify the StudioFlow
-branch's preview deployment points at the isolated database and never at
-production Master Data.
+**Owner decision 2026-09-08: build locally first.** Deployment and merge are a
+later gate (§5), not a precondition.
 
-**Files.** Environment configuration and `docs/apps/studioflow-work-orders.md`
-(record the answer to Q1). No source change.
+**State, checked at rebuild commit `db79fe6`.** Development runs against a local
+PostgreSQL — `localhost:5433/studioflow_rebuild` — holding the `platform`,
+`master_data` and `bq` schemas. The owner keeps one such database at home and
+another at the office; their contents differ and neither is production.
 
-**Acceptance.** A named development database exists, is reachable from the
-StudioFlow branch preview, and is demonstrably not the production database.
-Master Data and BQ production data are untouched and unreachable from it.
+StudioFlow adds a **fourth schema**, `studioflow`, exactly as `bq` was added.
+Purely additive: no object in another schema is created, altered or dropped, and
+the dependency law already forbids a foreign key crossing between them.
 
-**Test plan.** Connection check against the dev database. Confirm the production
-connection string appears in no StudioFlow branch configuration.
+**Acceptance.** The first migration creates only `studioflow` objects.
+`git diff` on the migration shows no `platform`, `master_data` or `bq` identifier
+outside a comment.
 
-**Migration impact.** None. This work order exists precisely so that the first
-migration has an approved destination.
+**Migration impact.** The first StudioFlow migration lands here, in the local
+database. That is approved.
 
-**Blocked by.** Q1.
+**Blocked by.** Nothing. Local isolation already exists because it is a different
+machine from production.
 
 ---
 
@@ -191,7 +237,10 @@ Client, Project, and Phase tables (including state and closure metadata). Purely
 
 ### WO-3 — Iteration and derived phase state
 
-**Scope.** `SfIteration` per project contract §5. The numbering rule (§5.3), the
+**Scope.** `SfIteration` per project contract §5, **plus `RECORDED` files**
+(§8.1–8.7): folder template, drag-drop registration, standard naming, working
+revisions (`D1.1`), and supersession. Recording needs no storage, so it belongs
+here rather than in a blocked later slice. The numbering rule (§5.3), the
 explicit open action (§5.3), and service-maintained phase state (§4.3). Supervision actions, reopening, and
 exceptional closure with reason and audit (§4.3–4.5). Normal deliverable-phase
 closure ships in WO-4 with real client approval; do not fabricate an approval
@@ -208,7 +257,10 @@ Exception closure obeys §4.5. Labels render per §5.2.
 
 **Test plan.** Numbering under concurrent opens on the same phase. The rule's
 negative property: repeated opens against a `DRAFT` iteration do not advance the
-number. Projection and closure invariants after every transition; review
+number. Dropping a `.skp` with no storage configured opens the round and records
+the file without error; replacing a working file twice yields `D1.2` and one
+current file; a drop never changes round state (§8.3).
+Projection and closure invariants after every transition; review
 permission for ordinary closure, override permission for exception closure.
 Include applicable project §16 scenarios and disabled-user assignment recovery;
 client-exchange scenarios run in WO-4, Task scenarios in WO-5/6.
@@ -221,8 +273,9 @@ client-exchange scenarios run in WO-4, Task scenarios in WO-5/6.
 
 ### WO-4 — The client review exchange
 
-**Scope.** `SfIterationResponse` and `SfIterationPoint` per project contract §6
-and §7.2. Send, record approval, record revision request, withdraw send, stop round (`VOIDED`), correct answer. Warn-on-send
+**Scope.** `SfIterationResponse` (including draft answers, §6.6),
+`SfIterationPoint`, and the optional internal approval record (§6.7) per project
+contract §6 and §7.2. Send, record approval, record revision request, withdraw send, stop round (`VOIDED`), correct answer. Warn-on-send
 (§7.4). Revision points carried to the next iteration with
 `source = CLIENT_REVISION`.
 
@@ -270,15 +323,18 @@ creation. Blocker projection test: an open task never prevents a send.
 
 ### WO-6 — Project surface consolidation
 
-**Scope.** The single project page: General tasks pinned at top and visible
+**Scope.** The cross-project "waiting on me" list (§10.2) — one read model, no
+schema — and the single project page: General tasks pinned at top and visible
 under any phase filter; phases with their iterations; phase as filter rather
 than as a separate page. Empty, loading, error, and permission states. Apply the Supervision actions resolved in §1.1 and the Needs assignment view.
 
 **Files.** StudioFlow routes and StudioFlow-local components only. Reuse UI Engine; any proven generic gap needs a scoped shared extension ([`studioflow-project-contract.md`](studioflow-project-contract.md)
 §13.3).
 
-**Acceptance.** Every piece of work in a project is reachable from one page.
-Filtering by phase never hides General tasks. Opening a phase shows the same
+**Acceptance.** A designer with several projects sees what is waiting on them
+without opening any project, oldest first, including unassigned and
+unavailable-assignee work. Every piece of work in a project is reachable from one
+page. Filtering by phase never hides General tasks. Opening a phase shows the same
 items the project page showed for it. `WAITING_CLIENT` displays its age (risk
 R2).
 
@@ -289,44 +345,112 @@ Filter consistency between project and phase views.
 
 ---
 
-### WO-7 — Assets *(blocked)*
+### WO-7 — `STORED` files
 
-**Scope.** Project contract §8. Cannot start.
+**Scope.** Only the `STORED` treatment of project contract §8.1 — holding bytes
+for delivered PDFs, renders and client surveys. `RECORDED` files shipped with
+WO-3 and need nothing here.
 
-**Blocked by.** D17 and Q3, Q4. The platform storage port and its private
-large-object extension must land first, as platform work, not StudioFlow work.
+**Files.** Schema (nullable `storage_key`, `checksum`), service, upload UI.
+
+**Acceptance.** A `STORED` file uploads, downloads through a short-lived signed
+URL, and is refused to a user without `project.read`. A superseded working file's
+bytes are released; a **sent** file's bytes are never released. A failed upload
+leaves no numbered empty round (§5.3).
+
+**Migration impact.** Additive columns only.
+
+**Blocked by.** The shared storage capability (PLAT-WO-A) and Q3.
 
 ---
 
-### PLAT-WO-A — Storage port: private large-object extension *(platform, not StudioFlow)*
+### WO-8 — Google Drive archive (`LINKED`) *(deferred)*
 
-**Scope.** Extend the platform storage capability per
-[`studioflow.md`](studioflow.md) §5: private objects with short-lived
-server-issued signed URLs, large binaries without in-memory buffering,
-checksum recorded at upload, and no image preparation. Owned by the platform,
-proposed as a shared-layer change, never built inside StudioFlow.
+**Scope.** [`studioflow.md`](studioflow.md) §5.1. Contracted so that activating
+it changes no rule in §8; not planned.
 
-**Sequencing.** Owner decision D17 places this before WO-7 and independent of
-WO-1 through WO-6. It should be contracted as an amendment to
-`PLATFORM-ASSET-STORAGE-ROADMAP.md`, which is currently written for one public
-2 MB PNG consumer.
+**Blocked by.** Q4 — a studio account, and confirmation that production egress
+may reach Google's API. If it may not, the integration must run from the browser,
+which is a different design and a different work order.
 
-**Blocked by.** Q4.
+---
+
+### PLAT-WO-A — Storage port: private small-object access *(platform, not StudioFlow)*
+
+**Scope, much reduced by the 2026-09-08 file decision.** StudioFlow no longer
+needs streaming of hundreds of megabytes, because working models are never
+uploaded (`RECORDED`). What remains is private objects with short-lived
+server-issued signed URLs, tens of megabytes, checksum at upload, and no image
+preparation.
+
+**Sequencing.** No longer on the critical path. WO-1 through WO-6 ship without
+it. Verify what the port actually provides when this activates rather than
+assuming the roadmap describes something implemented.
+
+**Blocked by.** Nothing in StudioFlow.
 
 ## 4. Merge order and parallelism
 
 ```
 WO-0 ──► WO-1 ──► WO-2 ──► WO-3 ──► WO-4 ──► WO-5 ──► WO-6
-                                                        │
-PLAT-WO-A (platform, parallel) ─────────────────────────┴──► WO-7
+                            (RECORDED files ship here)
+PLAT-WO-A (platform, whenever) ─────────────────────► WO-7 ──► WO-8 (deferred)
 ```
 
-WO-1 needs no database and can merge while Q1 is still open. Everything from
+WO-1 needs no database at all. Everything from
 WO-2 onward is strictly sequential — each depends on the tables the previous one
-created. `PLAT-WO-A` runs in parallel on the platform side and joins only at
-WO-7.
+created.
 
-## 5. What is deliberately not planned
+The 2026-09-08 file decision took storage off the critical path entirely. The
+whole workflow — rounds, numbering, sending, the client exchange, and the files
+that evidence it — reaches the studio through WO-6 with **no platform storage at
+all**. WO-7 adds held bytes for the small files that benefit from them; WO-8 adds
+the Drive archive. Both are improvements to a working app, not prerequisites.
+
+## 5. The deploy and merge gate — later, not now
+
+Owner decision 2026-09-08: build and test locally; work out a non-destructive
+merge afterwards. This section records what that will require, so the answer is
+not improvised under pressure on the day.
+
+### 5.1 Why a StudioFlow migration can hurt other apps
+
+Not by touching their data. StudioFlow's migrations only create objects inside
+its own schema, and no foreign key crosses a schema boundary.
+
+The shared thing is the **migration ledger**: one ordered record of applied
+migrations per database, covering every schema. A migration that fails halfway
+leaves the ledger stopped on a failed entry, and Prisma then refuses to apply
+anything after it — including a Master Data or BQ migration that has nothing to
+do with StudioFlow.
+
+The blast radius is therefore *shipping*, not data. That is smaller than it
+sounds and worth stating precisely, because a vague fear leads to the wrong
+precautions.
+
+### 5.2 What makes the merge non-destructive
+
+| Requirement | Why |
+|---|---|
+| The migration is additive only: `CREATE SCHEMA`, `CREATE TYPE`, `CREATE TABLE`, `CREATE INDEX` | Nothing existing is altered, so nothing existing can break |
+| No `ALTER` or `DROP` on `platform`, `master_data` or `bq` | A StudioFlow slice never edits another app's objects |
+| No foreign key crossing a schema boundary | Already the platform dependency law |
+| Applied against a copy of production first, and the ledger verified clean | A failure is discovered where it costs nothing |
+| Master Data and BQ regression checks pass after it is applied | Proves the additive claim rather than asserting it |
+| `prisma migrate deploy` stays out of the build script | Structure changes remain a deliberate human act; this is why the present risk is small |
+
+### 5.3 The one thing to settle before a preview deployment
+
+A Vercel project has one `DATABASE_URL` per environment by default, so a preview
+build of this branch may point at **production**. That is not a migration risk —
+it is a usage risk: a test project created in a preview would be written into the
+real database.
+
+So before this branch is ever deployed, Preview must carry its own
+`DATABASE_URL`, separate from Production. Until the branch is deployed, this
+costs nothing and blocks nothing.
+
+## 6. What is deliberately not planned
 
 No event system, no workflow engine, no abstraction layer, no notification jobs,
 no invitation flow, no integration adapter, and no upload service beyond the
