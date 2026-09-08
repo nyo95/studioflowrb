@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["platform", "master_data", "bq"]
+  schemas  = ["platform", "master_data", "bq", "studioflow"]
 }
 
 // ============================================================================
@@ -1010,4 +1010,340 @@ model BqLineItem {
 
   @@map("bq_line_item")
   @@schema("bq")
+}
+
+// ============================================================================
+// STUDIOFLOW — Project management app (SF-WO-2)
+// No foreign keys into platform, master_data, or bq tables.
+// Cross-schema user references (lead_user_id, closed_by_id, etc.) are plain
+// String? columns — app resolves them via platform service, never via FK.
+// ============================================================================
+
+enum SfProjectType {
+  RESIDENTIAL
+  COMMERCIAL
+  HOSPITALITY
+  OTHER
+
+  @@map("sf_project_type")
+  @@schema("studioflow")
+}
+
+enum SfProjectStatus {
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+
+  @@map("sf_project_status")
+  @@schema("studioflow")
+}
+
+enum SfPhaseState {
+  NOT_STARTED
+  IN_PROGRESS
+  WAITING_CLIENT
+  DONE
+
+  @@map("sf_phase_state")
+  @@schema("studioflow")
+}
+
+enum SfPhaseClosureKind {
+  NORMAL
+  EXCEPTION
+
+  @@map("sf_phase_closure_kind")
+  @@schema("studioflow")
+}
+
+/// Studio phase template — the ordered list of phases for new projects.
+/// key is stable and immutable once any project snapshot uses it.
+model SfPhaseTemplate {
+  id           String  @id @default(uuid())
+  key          String  @unique
+  name         String
+  sort_order   Int
+  has_rounds   Boolean @default(true)
+
+  /// Label prefix for round headings when has_rounds is true (e.g. "MB", "D", "CD").
+  round_prefix String?
+
+  /// Which output folder this phase owns (used in file-naming, SF-WO-3).
+  folder_key   String?
+
+  /// When true, Send action warns if no internal approval exists (SF-WO-4).
+  requires_internal_approval Boolean @default(false)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  phases SfProjectPhase[]
+
+  @@map("sf_phase_template")
+  @@schema("studioflow")
+}
+
+/// A StudioFlow Client — paying counterparty of a project.
+/// Independent of Master Data; no FK into master_data schema.
+model SfClient {
+  id            String  @id @default(uuid())
+  name          String
+  contact_name  String?
+  contact_phone String?
+  contact_email String?
+  address       String?
+  notes         String?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  /// Archive state. A Client with live (non-archived) Projects cannot be archived.
+  deleted_at DateTime?
+
+  projects SfProject[]
+
+  @@index([deleted_at])
+  @@map("sf_client")
+  @@schema("studioflow")
+}
+
+/// A StudioFlow Project — the engagement with a Client.
+model SfProject {
+  id  String @id @default(uuid())
+
+  /// Server-generated unique code (e.g. "SF26-0001"). Immutable after creation.
+  code String @unique
+
+  name         String
+  client_id    String
+  lead_user_id String? // plain FK to platform.User; no Prisma relation
+
+  /// Short site label used in file names. Not a postal address.
+  location String?
+
+  /// Site address; independent of Client.address.
+  address  String?
+  area     Decimal?        @db.Decimal(10, 2)
+  type     SfProjectType
+  status   SfProjectStatus @default(ACTIVE)
+
+  /// Ordering hint for the project list; not a workflow input.
+  priority   Int      @default(0)
+  opened_at  DateTime
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  client SfClient       @relation(fields: [client_id], references: [id])
+  phases SfProjectPhase[]
+  files  SfFile[]
+
+  @@index([client_id])
+  @@index([status])
+  @@index([deleted_at])
+  @@map("sf_project")
+  @@schema("studioflow")
+}
+
+/// A phase on a specific project — snapshot of SfPhaseTemplate at project creation.
+/// state is persisted and maintained by the service (§4.3).
+model SfProjectPhase {
+  id          String @id @default(uuid())
+  project_id  String
+  template_id String
+
+  // ── Snapshot fields (immutable; survive template edits) ───────────────────
+  key          String
+  name         String
+  sort_order   Int
+  has_rounds   Boolean
+  round_prefix String?
+  folder_key   String?
+  requires_internal_approval Boolean @default(false)
+
+  // ── Service-maintained state (§4.3) ───────────────────────────────────────
+  state SfPhaseState @default(NOT_STARTED)
+
+  // ── Closure metadata (populated only when state = DONE) ──────────────────
+  closed_at      DateTime?
+  closed_by_id   String?            // plain FK to platform.User
+  closure_reason String?
+  closure_kind   SfPhaseClosureKind?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  project  SfProject       @relation(fields: [project_id], references: [id])
+  template SfPhaseTemplate @relation(fields: [template_id], references: [id])
+  iterations SfIteration[]
+
+  /// One phase-key per project; the snapshot is the authority.
+  @@unique([project_id, key])
+  @@index([project_id, sort_order])
+  @@map("sf_project_phase")
+  @@schema("studioflow")
+}
+
+// ── WO-3: Iteration, Files, Settings ─────────────────────────────────────────
+
+enum SfIterationState {
+  DRAFT
+  SENT
+  APPROVED
+  SUPERSEDED
+  VOIDED
+
+  @@map("sf_iteration_state")
+  @@schema("studioflow")
+}
+
+enum SfIterationPointSource {
+  CLIENT_REVISION
+  INTERNAL
+
+  @@map("sf_iteration_point_source")
+  @@schema("studioflow")
+}
+
+enum SfFileTreatment {
+  RECORDED
+  STORED
+  LINKED
+
+  @@map("sf_file_treatment")
+  @@schema("studioflow")
+}
+
+/// Studio-wide settings. One row, id is always "studio".
+/// naming_template token vocabulary: {date} {project} {location} {round} {code}
+model SfStudioSettings {
+  id String @id @default("studio")
+
+  /// Naming template for standard filenames (§8.5).
+  /// Default: "{date} {project} {location} {round}"
+  naming_template String @default("{date} {project} {location} {round}")
+
+  updated_at    DateTime @updatedAt
+  updated_by_id String?
+
+  @@map("sf_studio_settings")
+  @@schema("studioflow")
+}
+
+/// One numbered round of work in a phase. Replaces legacy Revision.
+/// `number` is server-assigned, sequential, gapless within the phase (§5.3).
+model SfIteration {
+  id       String @id @default(uuid())
+  phase_id String
+
+  /// Sequential and gapless within the phase, starting at 1. Server-assigned.
+  number Int
+
+  state       SfIterationState @default(DRAFT)
+  assignee_id String?
+
+  sent_at      DateTime?
+  responded_at DateTime?
+
+  /// Starts at 0. Incremented when the working file is replaced (§5.4).
+  working_revision Int @default(0)
+
+  voided_at    DateTime?
+  voided_by_id String?
+  void_reason  String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  phase SfProjectPhase @relation(fields: [phase_id], references: [id])
+
+  points            SfIterationPoint[]
+  internal_approval SfInternalApproval?
+  sent_files        SfFile[]
+
+  @@unique([phase_id, number])
+  @@index([phase_id, state])
+  @@map("sf_iteration")
+  @@schema("studioflow")
+}
+
+/// A checklist item inside a round. `source` is immutable.
+model SfIterationPoint {
+  id           String @id @default(uuid())
+  iteration_id String
+
+  text String
+  done Boolean @default(false)
+
+  /// Immutable. CLIENT_REVISION = created by a client answer; INTERNAL = studio.
+  source SfIterationPointSource
+
+  source_response_id String?
+  source_point_id    String?
+
+  withdrawn_at      DateTime?
+  withdrawn_by_id   String?
+  withdrawal_reason String?
+
+  sort_order Int @default(0)
+
+  iteration SfIteration @relation(fields: [iteration_id], references: [id])
+
+  @@index([iteration_id, source])
+  @@map("sf_iteration_point")
+  @@schema("studioflow")
+}
+
+/// Optional internal sign-off on a round. At most one per iteration.
+model SfInternalApproval {
+  id           String @id @default(uuid())
+  iteration_id String @unique
+
+  approved_by_id String
+  approved_at    DateTime @default(now())
+  note           String?
+
+  iteration SfIteration @relation(fields: [iteration_id], references: [id])
+
+  @@map("sf_internal_approval")
+  @@schema("studioflow")
+}
+
+/// A permanent file record. The bytes may be released (§8.6); the record never is.
+/// folder_key = null means the unsorted tray (§8.8).
+model SfFile {
+  id         String @id @default(uuid())
+  project_id String
+
+  folder_key String?
+  treatment  SfFileTreatment
+
+  filename          String
+  original_filename String
+
+  bytes            BigInt
+  file_modified_at DateTime?
+
+  dropped_by_id String
+  dropped_at    DateTime @default(now())
+
+  /// Set only by a Send action (§8.3); immutable afterwards.
+  sent_in_iteration_id String?
+
+  storage_key String?
+  checksum    String?
+  external_url String?
+
+  superseded_at     DateTime?
+  bytes_released_at DateTime?
+
+  project           SfProject    @relation(fields: [project_id], references: [id])
+  sent_in_iteration SfIteration? @relation(fields: [sent_in_iteration_id], references: [id])
+
+  @@index([project_id, folder_key])
+  @@index([sent_in_iteration_id])
+  @@index([project_id, superseded_at])
+  @@map("sf_file")
+  @@schema("studioflow")
 }

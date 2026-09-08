@@ -5,8 +5,39 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.09**
-- Next local revision: **R7.10**
+- Current revision after this entry is committed: **R7.10**
+- Next local revision: **R7.11**
+
+## R7.10 | 2026-09-08 | feat(studioflow): complete SF-WO-2 through WO-4
+
+### Changed
+
+- Completed StudioFlow Client and Project persistence, server-generated project
+  codes, phase-template snapshotting, client lifecycle, project/phase reads, and
+  WO-3 iteration/file foundations.
+- Added WO-4 iteration lifecycle transitions and checklist-point operations with
+  transactional phase-state recomputation and audit events where required.
+- Added iteration detail routes/actions and linked phase rounds to their detail
+  pages. Added the WO-4 public input types.
+- Corrected StudioFlow route/action typing against the Next.js form boundary and
+  UI Engine button variants.
+
+### Dependencies and migrations
+
+- Added the additive StudioFlow WO-2 and WO-3 migrations; no WO-4 migration was
+  needed because the WO-3 schema already contains iteration/checklist tables.
+- No new npm dependencies or cross-schema foreign keys.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `npm run check:boundaries`: passed.
+- `npm run check:legacy-runtime`: passed.
+- `git diff --check`: passed.
+- `npm test`: executed; database integration suites fail-closed because this
+  office environment lacks matching disposable `DATABASE_URL` and
+  `PLATFORM_TEST_DATABASE_URL`; non-database tests ran successfully.
 
 ## R7.09 | 2026-09-08 | feat(studioflow): SF-WO-1 — app scaffold, permissions, route group, nav
 

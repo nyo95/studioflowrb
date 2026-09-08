@@ -1,10 +1,19 @@
 /**
  * StudioFlow public boundary.
  *
- * Only this module may be imported by other apps or the platform shell.
- * Importing from @/apps/studioflow/service or deeper is cross-app internal
- * and is forbidden by the dependency law (studioflow.md §4).
+ * Only this file may be imported by other apps. StudioFlow's internals
+ * (service.ts, runtime.ts, components) are private.
  */
-import { STUDIOFLOW_PERMISSIONS } from "../service";
 
-export { STUDIOFLOW_PERMISSIONS };
+export { STUDIOFLOW_PERMISSIONS } from "../service";
+export type {
+  CreateClientInput,
+  EditClientInput,
+  CreateProjectInput,
+  EditProjectInput,
+  RecordFileInput,
+  UpdateNamingTemplateInput,
+  SendIterationInput,
+  AddIterationPointInput,
+  WithdrawPointInput,
+} from "../service";
