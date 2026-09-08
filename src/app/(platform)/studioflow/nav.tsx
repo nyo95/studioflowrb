@@ -1,6 +1,6 @@
 "use client";
 
-import { FolderOpen, Settings, Users } from "lucide-react";
+import { ClipboardCheck, FolderOpen, Library, Settings, Users } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { NavGroup, NavItem } from "@/platform/ui_engine";
@@ -10,11 +10,19 @@ type StudioFlowNavLink = {
   label: string;
   icon: typeof FolderOpen;
   exact?: boolean;
+  disabled?: boolean;
 };
 
 const links: readonly StudioFlowNavLink[] = [
-  { href: "/studioflow", label: "Projects", icon: FolderOpen, exact: true },
+  { href: "/studioflow", label: "Menunggu saya", icon: ClipboardCheck, exact: true },
+  { href: "/studioflow/projects", label: "Semua project", icon: FolderOpen },
   { href: "/studioflow/clients", label: "Clients", icon: Users },
+  {
+    href: "/studioflow/library",
+    label: "Library",
+    icon: Library,
+    disabled: true,
+  },
   { href: "/studioflow/settings", label: "Settings", icon: Settings },
 ];
 
@@ -29,11 +37,12 @@ export function StudioFlowNav() {
 
   return (
     <NavGroup label="StudioFlow navigation">
-      {links.map(({ href, label, icon: Icon, exact }) => {
+      {links.map(({ href, label, icon: Icon, exact, disabled }) => {
         const isActive =
-          exact
+          !disabled &&
+          (exact
             ? pathname === href
-            : pathname === href || pathname.startsWith(`${href}/`);
+            : pathname === href || pathname.startsWith(`${href}/`));
         return (
           <NavItem
             key={href}
@@ -41,6 +50,7 @@ export function StudioFlowNav() {
             active={isActive}
             href={href}
             prefetch={false}
+            disabled={disabled}
           >
             {label}
           </NavItem>

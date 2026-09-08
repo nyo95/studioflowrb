@@ -5,8 +5,36 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.13**
-- Next local revision: **R7.14**
+- Current revision after this entry is committed: **R7.14**
+- Next local revision: **R7.15**
+
+## R7.14 | 2026-09-08 | feat(studioflow): UX — Menunggu Saya, Projects directory, GeneralTaskBlock
+
+### Changed
+
+- `/studioflow` (root) is now the **Menunggu Saya** page (SF-F5 read model).
+  Three buckets — Menunggu saya / Menunggu klien / Belum ada penanggung jawab —
+  ordered oldest-first per spec §2a. Each row links to its project.
+- `/studioflow/projects` is the new project directory (previously at root).
+  Title changed to "Semua project"; added Status column.
+
+### Added
+
+- `GeneralTaskBlock` client component pinned at the top of every project
+  workspace: add task (Enter to save), toggle done/open, delete on hover.
+  General tasks only (`phase_scope = null`); reads with `includeDone: true`.
+- Task server actions (`task-actions.ts`): `createTaskAction`,
+  `setTaskCompletionAction`, `deleteTaskAction` — all follow the
+  `runSafeAction` + `revalidatePath` pattern.
+- StudioFlow nav updated: Menunggu saya · Semua project · Clients ·
+  Library (disabled placeholder, pending schedule contract) · Settings.
+
+### Verification
+
+- `npm run typecheck`: passes; `sfTask` errors remain until `prisma generate`
+  clears them (same class as R7.12/R7.13 — client not regenerated in this env).
+- `npm run lint`: passed.
+- `npm run check:boundaries`: passed.
 
 ## R7.13 | 2026-09-08 | feat(studioflow): SF-F4 task domain + SF-F5 Menunggu Saya read model
 

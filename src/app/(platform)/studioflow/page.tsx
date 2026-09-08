@@ -1,141 +1,238 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { FolderOpen, Plus } from "lucide-react";
+import { ClipboardCheck, Clock, Users } from "lucide-react";
+import Link from "next/link";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
-import { prisma } from "@/platform/core/db";
-import { readPlatformGeneralSettings } from "@platform/core/settings";
 import {
-  buttonClasses,
-  DataTable,
-  DirectoryShell,
   EmptyState,
-  EntityPrimaryCell,
   PageHeader,
   SectionCard,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
 } from "@/platform/ui_engine";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
+import type { WaitingOnMeItem } from "@/apps/studioflow/public";
 import { studioFlowService } from "@/apps/studioflow/runtime";
 
 export const dynamic = "force-dynamic";
 
-const STATUS_LABELS: Record<string, string> = {
-  ACTIVE: "Aktif",
-  ON_HOLD: "Ditahan",
-  COMPLETED: "Selesai",
-};
+// ── helpers ──────────────────────────────────────────────────────────────────
 
-const TYPE_LABELS: Record<string, string> = {
-  RESIDENTIAL: "Residensial",
-  COMMERCIAL: "Komersial",
-  HOSPITALITY: "Hospitality",
-  OTHER: "Lainnya",
-};
+function ageLabel(since: Date): string {
+  const ms = Date.now() - since.getTime();
+  const days = Math.floor(ms / 86_400_000);
+  if (days === 0) return "hari ini";
+  if (days === 1) return "1 hari";
+  return `${days} hari`;
+}
 
-export default async function StudioFlowProjectsPage() {
+function iterationLabel(item: Extract<WaitingOnMeItem, { kind: "ITERATION" }>): string {
+  const prefix = item.phase.round_prefix ?? item.phase.key;
+  return `${prefix}${item.iteration_number}`;
+}
+
+// ── row components ────────────────────────────────────────────────────────────
+
+function IterationRow({
+  item,
+  section,
+}: {
+  item: Extract<WaitingOnMeItem, { kind: "ITERATION" }>;
+  section: "mine" | "waiting-client" | "unassigned";
+}) {
+  const label = iterationLabel(item);
+  const age = ageLabel(item.waiting_since);
+  const stateLabel =
+    item.state === "SENT"
+      ? section === "waiting-client"
+        ? `dikirim · ${age}`
+        : `menunggu klien · ${age}`
+      : `belum digarap · ${age}`;
+
+  return (
+    <div className="flex items-center gap-3 py-2.5 border-b border-[var(--color-border)] last:border-0">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link
+            href={`/studioflow/${item.project.id}`}
+            className="font-medium text-[var(--color-text-primary)] hover:text-action hover:underline truncate"
+          >
+            {item.project.name}
+          </Link>
+          <span className="text-xs text-[var(--color-text-secondary)] shrink-0">
+            · {item.phase.name} · {label}
+          </span>
+        </div>
+        {item.assignee_label && section !== "unassigned" && (
+          <p className="text-xs text-[var(--color-text-tertiary)] mt-0.5">
+            dari {item.assignee_label}
+          </p>
+        )}
+      </div>
+      <span className="text-xs text-[var(--color-text-secondary)] shrink-0 tabular-nums">
+        {stateLabel}
+      </span>
+    </div>
+  );
+}
+
+function TaskRow({ item }: { item: Extract<WaitingOnMeItem, { kind: "TASK" }> }) {
+  const age = ageLabel(item.waiting_since);
+  return (
+    <div className="flex items-center gap-3 py-2.5 border-b border-[var(--color-border)] last:border-0">
+      <span className="text-[var(--color-text-tertiary)] shrink-0" aria-hidden="true">○</span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link
+            href={`/studioflow/${item.project.id}`}
+            className="text-sm text-[var(--color-text-primary)] hover:text-action hover:underline truncate"
+          >
+            {item.project.name}
+          </Link>
+          <span className="text-xs text-[var(--color-text-secondary)] shrink-0">
+            · {item.title}
+          </span>
+        </div>
+        {item.due_date && (
+          <p className="text-xs text-[var(--color-text-tertiary)] mt-0.5">
+            jatuh tempo {new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" }).format(item.due_date)}
+          </p>
+        )}
+      </div>
+      <span className="text-xs text-[var(--color-text-secondary)] shrink-0 tabular-nums">
+        {age}
+      </span>
+    </div>
+  );
+}
+
+// ── page ─────────────────────────────────────────────────────────────────────
+
+export default async function WaitingOnMePage() {
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
-  const { grants } = principalGrants;
+  const { principal, grants } = principalGrants;
 
   const canRead = hasPermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
-  const canManage = hasPermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
 
   if (!canRead) {
     return (
-      <div className="grid gap-4">
-        <PageHeader eyebrow="StudioFlow" title="Projects" />
+      <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
+        <PageHeader eyebrow="StudioFlow" title="Menunggu saya" />
         <SectionCard>
           <EmptyState
-            icon={FolderOpen}
+            icon={ClipboardCheck}
             title="Akses ditolak"
-            description="Kamu tidak punya permission untuk melihat project."
+            description="Kamu tidak punya permission untuk melihat workload StudioFlow."
           />
         </SectionCard>
       </div>
     );
   }
 
-  const [projects, settings] = await Promise.all([
-    studioFlowService.listProjects(grants),
-    readPlatformGeneralSettings(prisma),
-  ]);
+  const items = await studioFlowService.listWaitingOnMe(grants, principal.userId);
 
-  const fmt = new Intl.DateTimeFormat(settings.locale, {
-    timeZone: settings.timezone,
-    dateStyle: "medium",
-  });
+  // Partition into three buckets per spec §2a
+  const mine: WaitingOnMeItem[] = [];
+  const waitingClient: WaitingOnMeItem[] = [];
+  const unassigned: WaitingOnMeItem[] = [];
+
+  for (const item of items) {
+    if (item.assignment === "NEEDS_ASSIGNMENT") {
+      unassigned.push(item);
+    } else if (
+      item.kind === "ITERATION" &&
+      item.state === "SENT" &&
+      item.assignment === "MINE"
+    ) {
+      // Sent iterations assigned to me = waiting on client response
+      waitingClient.push(item);
+    } else {
+      mine.push(item);
+    }
+  }
+
+  const isEmpty = mine.length === 0 && waitingClient.length === 0 && unassigned.length === 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
       <PageHeader
         eyebrow="StudioFlow"
-        title="Projects"
-        description="Project desain aktif studio"
-        actions={
-          canManage ? (
-            <Link href="/studioflow/new" className={buttonClasses("primary", "md")}>
-              <Plus size={16} aria-hidden="true" /> Project baru
-            </Link>
-          ) : null
-        }
+        title="Menunggu saya"
+        description="Yang harus dikerjakan hari ini — urut dari yang paling lama menganggur"
       />
-      {projects.length === 0 ? (
+
+      {isEmpty ? (
         <SectionCard>
           <EmptyState
-            icon={FolderOpen}
-            title="Belum ada project"
-            description={canManage ? "Buat project pertama studio." : "Belum ada project aktif."}
+            icon={ClipboardCheck}
+            title="Semua beres"
+            description="Tidak ada ronde atau task yang menunggu kamu."
           />
         </SectionCard>
       ) : (
-        <DirectoryShell surface fill>
-          <DataTable framed={false} density="compact" stickyHeader fill minWidth={700}>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Project</TableHead>
-                <TableHead>Klien</TableHead>
-                <TableHead>Tipe</TableHead>
-                <TableHead>Dibuka</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {projects.map((project) => (
-                <TableRow key={project.id}>
-                  <TableCell>
-                    <EntityPrimaryCell
-                      tone={
-                        project.status === "ACTIVE"
-                          ? "success"
-                          : project.status === "COMPLETED"
-                            ? "neutral"
-                            : "warning"
-                      }
-                      statusLabel={STATUS_LABELS[project.status] ?? project.status}
-                      name={
-                        <Link
-                          href={`/studioflow/${project.id}`}
-                          className="font-medium text-action hover:underline"
-                        >
-                          {project.name}
-                        </Link>
-                      }
-                      secondary={project.code}
-                    />
-                  </TableCell>
-                  <TableCell>{project.client.name}</TableCell>
-                  <TableCell>{TYPE_LABELS[project.type] ?? project.type}</TableCell>
-                  <TableCell>{fmt.format(new Date(project.opened_at))}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </DataTable>
-        </DirectoryShell>
+        <div className="flex flex-col gap-4">
+          {/* ── Menunggu saya ───────────────────────────────── */}
+          {mine.length > 0 && (
+            <SectionCard>
+              <div className="px-4 pt-3 pb-1 border-b border-[var(--color-border)]">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                  Menunggu saya
+                </h2>
+              </div>
+              <div className="px-4 py-1">
+                {mine.map((item) =>
+                  item.kind === "ITERATION" ? (
+                    <IterationRow key={item.id} item={item} section="mine" />
+                  ) : (
+                    <TaskRow key={item.id} item={item} />
+                  ),
+                )}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ── Menunggu klien ──────────────────────────────── */}
+          {waitingClient.length > 0 && (
+            <SectionCard>
+              <div className="px-4 pt-3 pb-1 border-b border-[var(--color-border)]">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] flex items-center gap-1.5">
+                  <Clock size={12} aria-hidden="true" />
+                  Menunggu klien
+                </h2>
+              </div>
+              <div className="px-4 py-1">
+                {waitingClient.map((item) =>
+                  item.kind === "ITERATION" ? (
+                    <IterationRow key={item.id} item={item} section="waiting-client" />
+                  ) : (
+                    <TaskRow key={item.id} item={item} />
+                  ),
+                )}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ── Belum ada penanggung jawab ──────────────────── */}
+          {unassigned.length > 0 && (
+            <SectionCard>
+              <div className="px-4 pt-3 pb-1 border-b border-[var(--color-border)]">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] flex items-center gap-1.5">
+                  <Users size={12} aria-hidden="true" />
+                  Belum ada penanggung jawab
+                </h2>
+              </div>
+              <div className="px-4 py-1">
+                {unassigned.map((item) =>
+                  item.kind === "ITERATION" ? (
+                    <IterationRow key={item.id} item={item} section="unassigned" />
+                  ) : (
+                    <TaskRow key={item.id} item={item} />
+                  ),
+                )}
+              </div>
+            </SectionCard>
+          )}
+        </div>
       )}
     </div>
   );
