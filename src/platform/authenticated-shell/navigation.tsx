@@ -21,6 +21,7 @@ export function HeaderApplicationNavigation({ apps }: { apps: readonly ShellAppL
           <Link
             key={app.appId}
             href={app.rootPath}
+            prefetch={false}
             aria-current={active ? "page" : undefined}
             className={`inline-flex min-h-8 items-center rounded-action px-2.5 text-sm transition-colors ${
               active ? "bg-surface-muted font-semibold text-ink" : "text-ink-secondary hover:bg-surface-muted hover:text-ink"

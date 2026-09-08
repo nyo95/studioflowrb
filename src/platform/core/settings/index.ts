@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { Prisma, PrismaClient } from "@/generated/prisma/client";
+import { Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { prepareAuditEvent, type AuditActor, type AuditWriter } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
@@ -136,28 +136,38 @@ function rowToSettings(row: SettingsRow): PlatformGeneralSettings {
 }
 
 /**
- * Reads the singleton, atomically seeding the locked defaults when absent.
- * `upsert` is a single race-safe statement and remains valid inside a
- * PostgreSQL transaction; it never catches a uniqueness error after the
- * transaction has already been aborted.
+ * Reads the singleton without writing on the normal path, seeding locked
+ * defaults only when absent. A concurrent first read may lose the create race;
+ * it re-reads the row after that expected unique conflict.
  */
 export async function readPlatformGeneralSettings(db: DbClient): Promise<PlatformGeneralSettings> {
   const defaults = DEFAULT_PLATFORM_GENERAL_SETTINGS;
-  const row = await db.platformGeneralSettings.upsert({
+  const existing = await db.platformGeneralSettings.findUnique({
     where: { id: PLATFORM_GENERAL_SETTINGS_ID },
-    create: {
-      id: PLATFORM_GENERAL_SETTINGS_ID,
-      organization_name: defaults.organizationName,
-      app_title: defaults.appTitle,
-      locale: defaults.locale,
-      timezone: defaults.timezone,
-      currency: defaults.currency,
-      week_starts_on: defaults.weekStartsOn,
-      brand_mark_url: defaults.brandMarkUrl,
-    },
-    update: {},
   });
-  return rowToSettings(row);
+  if (existing) return rowToSettings(existing);
+
+  try {
+    const created = await db.platformGeneralSettings.create({
+      data: {
+        id: PLATFORM_GENERAL_SETTINGS_ID,
+        organization_name: defaults.organizationName,
+        app_title: defaults.appTitle,
+        locale: defaults.locale,
+        timezone: defaults.timezone,
+        currency: defaults.currency,
+        week_starts_on: defaults.weekStartsOn,
+        brand_mark_url: defaults.brandMarkUrl,
+      },
+    });
+    return rowToSettings(created);
+  } catch (error) {
+    // Another request may seed the singleton between our read and create.
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
+    const raced = await db.platformGeneralSettings.findUnique({ where: { id: PLATFORM_GENERAL_SETTINGS_ID } });
+    if (!raced) throw error;
+    return rowToSettings(raced);
+  }
 }
 
 export type SettingsUpdateResult = { changed: boolean; settings: PlatformGeneralSettings };

@@ -187,6 +187,8 @@ export function NavGroup({ label, children }: { label: string; children: ReactNo
 
 export type NavItemProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "children"> & {
   icon?: ReactNode;
+  /** Opt out of route prefetching for dense, database-backed application rails. */
+  prefetch?: boolean;
   /** Marks the current location. Sets aria-current="page". */
   active?: boolean;
   /** An unavailable destination stays visible and disabled with its reason in `title`. */
@@ -214,7 +216,7 @@ const NAV_ITEM_STATE_CLASSES = {
  * When the rail is collapsed the label is hidden visually but kept for assistive
  * tech, and a tooltip restores it for sighted users.
  */
-export function NavItem({ icon, active = false, disabled = false, children, className, ...props }: NavItemProps) {
+export function NavItem({ icon, active = false, disabled = false, children, className, prefetch, ...props }: NavItemProps) {
   const { collapsed } = useContext(RailContext);
 
   /* Visually hidden, NOT display:none. display:none also strips the label from the
@@ -247,7 +249,7 @@ export function NavItem({ icon, active = false, disabled = false, children, clas
       {content}
     </button>
   ) : (
-    <Link href={props.href ?? "#"} className={itemClasses} data-active={active || undefined} aria-current={active ? "page" : undefined} {...props}>
+    <Link href={props.href ?? "#"} prefetch={prefetch} className={itemClasses} data-active={active || undefined} aria-current={active ? "page" : undefined} {...props}>
       {content}
     </Link>
   );

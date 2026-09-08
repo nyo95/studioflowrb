@@ -42,6 +42,7 @@ export function MasterDataNav() {
             icon={<Icon size={17} />}
             active={isActive}
             href={href}
+            prefetch={false}
           >
             {label}
           </NavItem>

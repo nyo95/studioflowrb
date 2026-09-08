@@ -117,6 +117,17 @@ describe("general settings service", () => {
     assert.equal(rows.length, 1);
   });
 
+  it("reads an existing singleton without a write and handles concurrent first reads", async () => {
+    const first = await readPlatformGeneralSettings(db.prisma);
+    const second = await readPlatformGeneralSettings(db.prisma);
+    assert.deepEqual(second, first);
+
+    await truncatePlatformTables(db);
+    const concurrent = await Promise.all(Array.from({ length: 6 }, () => readPlatformGeneralSettings(db.prisma)));
+    assert.ok(concurrent.every((settings) => settings.appTitle === "StudioFlow"));
+    assert.equal(await db.prisma.platformGeneralSettings.count(), 1);
+  });
+
   it("requires platform.settings.read and platform.settings.manage", async () => {
     await assert.rejects(
       () => service.read({ grants: [] }),

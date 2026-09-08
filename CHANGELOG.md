@@ -5,8 +5,37 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.05**
-- Next local revision: **R7.06**
+- Current revision after this entry is committed: **R7.06**
+- Next local revision: **R7.07**
+
+## R7.06 | 2026-09-08 | perf(platform): reduce serverless render fan-out
+
+### Changed
+
+- Disabled automatic route prefetching for the dense Master Data and BQ rails
+  and the application switcher. This prevents an idle page load from invoking
+  many database-backed dynamic routes before the user selects one.
+- Deduplicated the live principal-and-grant resolution within one React server
+  render. Authentication and authorization remain live on every subsequent
+  request; no cross-request permission cache was introduced.
+- Changed the general-settings singleton read from an unconditional database
+  upsert to a read-first path. A first-use create remains race-safe and is
+  covered by a concurrent-read integration scenario.
+
+### Dependencies and migrations
+
+- No dependency, database migration, secret, pool-size, or deployment
+  configuration change.
+
+### Verification
+
+- Targeted ESLint on all changed TypeScript/TSX files: passed.
+- `npm run typecheck`: passed.
+- `npm run build`: did not complete because the local build host could not
+  fetch the existing Inter and Lora Google Fonts; it did not report an
+  application-code error before that external fetch failure.
+- Settings integration test was not run: this office checkout has no local
+  `.env.test.local` or `.env.test` with an isolated test database target.
 
 ## R7.05 | 2026-09-08 | docs(studioflow): record legacy audit and rebuild roadmap
 

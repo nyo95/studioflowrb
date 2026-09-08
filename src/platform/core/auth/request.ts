@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 import { AppError } from "@platform/core/errors";
 import { prisma } from "@platform/core/db";
@@ -33,6 +34,28 @@ export type PrincipalGrants = {
   principal: SessionPrincipal;
   grants: readonly string[];
 };
+
+/**
+ * Deduplicates live grant resolution only inside one React server render.
+ * The raw opaque token is the cache key; React clears this cache for the next
+ * server request, so revocation, disabled users, and changed permissions stay
+ * authoritative on every navigation and Server Action.
+ */
+const resolvePrincipalGrantsForRequest = cache(async (rawToken: string): Promise<PrincipalGrants | null> => {
+  const resolved = await resolveSession(prisma, rawToken, { window: DEFAULT_SESSION_WINDOW });
+  if (!resolved.session) return null;
+  const { session } = resolved;
+  const { grants } = await loadLiveGrants(prisma, session.user.id);
+  return {
+    principal: {
+      userId: session.user.id,
+      roleIds: Object.freeze(session.roleIds),
+      displayName: session.user.displayName,
+      email: session.user.email,
+    },
+    grants,
+  };
+});
 
 function cookieOptions(expiresAt: Date) {
   return {
@@ -97,19 +120,7 @@ export async function requirePrincipal(): Promise<SessionPrincipal> {
 export async function getPrincipalGrants(): Promise<PrincipalGrants | null> {
   const rawToken = await getSessionCookieValue();
   if (!rawToken) return null;
-  const resolved = await resolveSession(prisma, rawToken, { window: DEFAULT_SESSION_WINDOW });
-  if (!resolved.session) return null;
-  const { session } = resolved;
-  const { grants } = await loadLiveGrants(prisma, session.user.id);
-  return {
-    principal: {
-      userId: session.user.id,
-      roleIds: Object.freeze(session.roleIds),
-      displayName: session.user.displayName,
-      email: session.user.email,
-    },
-    grants,
-  };
+  return resolvePrincipalGrantsForRequest(rawToken);
 }
 
 /** `getPrincipalGrants` or shared `UNAUTHENTICATED`. */
