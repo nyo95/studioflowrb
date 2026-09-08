@@ -5,8 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.11**
-- Next local revision: **R7.12**
+- Current revision after this entry is committed: **R7.12**
+- Next local revision: **R7.13**
+
+## R7.12 | 2026-09-08 | fix(studioflow): regenerate Prisma client for WO-5
+
+### Fixed
+
+- Regenerated the Prisma client from the current multi-schema schema so the
+  WO-5 `SfResponse` and `SfResponsePoint` delegates are available to the
+  StudioFlow service.
+
+### Verification
+
+- `npx prisma validate`: passed.
+- `npx prisma generate`: passed.
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `npm run check:boundaries`: passed.
+- `npm run check:legacy-runtime`: passed.
+- `npm run build`: passed; all StudioFlow WO-2 through WO-7 routes compiled.
+- Database integration tests remain environment-gated until matching disposable
+  PostgreSQL test URLs are configured for the office checkout.
 
 ## R7.11 | 2026-09-08 | feat(studioflow): SF-WO-5 through WO-7 + form boundary correction
 
