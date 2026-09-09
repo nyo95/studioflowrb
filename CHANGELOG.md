@@ -5,8 +5,61 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.15**
-- Next local revision: **R7.16**
+- Current revision after this entry is committed: **R7.16**
+- Next local revision: **R7.17**
+
+## R7.16 | 2026-09-09 | docs(studioflow): record Claude takeover handoff
+
+### Takeover point
+
+- Claude stopped after building the inline phase/iteration workspace across the
+  StudioFlow project route, server actions, and service, but before the working
+  tree had a coherent review, complete verification, or valid revision commit.
+- The interrupted tree also contained a broad `ActionResult` narrowing sweep in
+  Account, BQ, and Master Data that produced invalid expressions, plus draft
+  changelog claims for `R7.15` through `R7.17` while Git was still at `R7.14`.
+  Those unrelated edits and premature revision claims were not preserved.
+
+### Corrections completed by Codex in R7.15
+
+- Restored unrelated Account, BQ, and Master Data code to the `R7.14` baseline,
+  then kept the accepted work scoped to StudioFlow.
+- Corrected the lifecycle permission split: reviewers send and stop rounds;
+  managers open and edit them; override-only closure remains explicitly gated.
+- Made approval plus optional phase closure atomic, blocked a second pending
+  client send, reused an already-open successor draft for revision responses,
+  appended source-linked client points, and added runtime response validation.
+- Added the distinct Supervision reopen path and corrected UI visibility for
+  internal ACC, exception closure, send, stop, finish, and reopen controls.
+- Replaced the private overlay with UI Engine `DraftDialog`, fixed the phase
+  header's nested-interactive-control accessibility issue, and retained dialog
+  focus, Escape, pending, and unsaved-input behavior.
+- Moved the new project, Client, phase, and round reads behind the StudioFlow
+  service and removed the temporary untyped Prisma `sfTask` fallback.
+- Added three database integration scenarios covering reviewer lifecycle,
+  successor-draft reuse, and atomic response/phase closure. The final R7.15
+  verification was 263 tests passed, typecheck, lint, both boundary checks,
+  production build, and authenticated browser smoke with no console errors.
+
+### Safe continuation point
+
+- The accepted implementation is exactly `R7.15` commit `72daad0` on `main`.
+  Continue from that commit and the current contracts; do not replay the
+  interrupted working-tree sweep or recreate the discarded revision entries.
+- There is no new executable app work order in this handoff. A returning agent
+  starts as navigator and must stop for owner direction before extending product
+  behavior beyond the accepted R7.15 scope.
+- `Tarik pengiriman` remains a disabled placeholder. It was not implemented or
+  approved by this takeover and must not be inferred as the next task.
+- Existing untracked mockups, `.claude/`, uploaded media, `vercel.json`, hidden
+  fuse files, and the line-ending-only Account form status remain owner-local
+  and were deliberately excluded from R7.15 and this documentation revision.
+
+### Verification
+
+- Documentation-only revision; the complete implementation verification remains
+  recorded under R7.15.
+- `git diff --cached --check`: passed before the local commit.
 
 ## R7.15 | 2026-09-09 | feat(studioflow): complete inline phase and iteration workspace
 
