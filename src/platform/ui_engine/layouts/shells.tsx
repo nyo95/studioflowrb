@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft,ChevronRight } from "lucide-react";
+import { ChevronLeft,ChevronRight,Lock } from "lucide-react";
 import Link from "next/link";
 import { DropdownMenu } from "radix-ui";
 import { createContext,useContext,useEffect,useState,type AnchorHTMLAttributes,type ButtonHTMLAttributes,type HTMLAttributes,type ReactNode } from "react";
@@ -181,8 +181,30 @@ export function AppShell({
   );
 }
 
-export function NavGroup({ label, children }: { label: string; children: ReactNode }) {
-  return <div role="group" aria-label={label} className="grid gap-1 max-[840px]:contents">{children}</div>;
+export function NavGroup({ label, heading, children }: { label: string; heading?: string; children: ReactNode }) {
+  return (
+    <div role="group" aria-label={label} className="grid gap-1 max-[840px]:contents">
+      {heading ? (
+        <p className="mt-1.5 mb-0.5 px-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-tertiary group-data-collapsed:hidden max-[840px]:hidden">
+          {heading}
+        </p>
+      ) : null}
+      {children}
+    </div>
+  );
+}
+
+/**
+ * A thin horizontal rule separating navigation sections.
+ * Hidden when the rail is collapsed to icon-only or on narrow/mobile layouts.
+ */
+export function NavSeparator() {
+  return (
+    <div
+      role="separator"
+      className="mx-0.5 my-2 h-px bg-[--ui-border-subtle] group-data-collapsed:hidden max-[840px]:hidden"
+    />
+  );
 }
 
 export type NavItemProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "children"> & {
@@ -194,10 +216,12 @@ export type NavItemProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "childr
   /** An unavailable destination stays visible and disabled with its reason in `title`. */
   disabled?: boolean;
   children?: ReactNode;
+  /** Badge element rendered at the trailing edge — count text, status pill, etc. Hidden when the rail is collapsed. */
+  badge?: ReactNode;
 };
 
 const NAV_ITEM_BASE_CLASSES =
-  "relative flex w-full min-h-[38px] items-center gap-2.5 rounded-control border border-transparent bg-transparent px-2.5 py-2 text-left font-[inherit] text-ink-secondary no-underline max-[840px]:w-auto max-[840px]:shrink-0 max-[840px]:min-h-[34px]";
+  "relative flex w-full min-h-[38px] items-center gap-2.5 rounded-control border border-transparent bg-transparent px-2.5 py-2 text-[13px] text-left font-[inherit] text-ink-secondary no-underline max-[840px]:w-auto max-[840px]:shrink-0 max-[840px]:min-h-[34px]";
 
 const NAV_ITEM_STATE_CLASSES = {
   idle: "hover:border-line-subtle hover:bg-surface-muted hover:text-ink",
@@ -216,7 +240,7 @@ const NAV_ITEM_STATE_CLASSES = {
  * When the rail is collapsed the label is hidden visually but kept for assistive
  * tech, and a tooltip restores it for sighted users.
  */
-export function NavItem({ icon, active = false, disabled = false, children, className, prefetch, ...props }: NavItemProps) {
+export function NavItem({ icon, active = false, disabled = false, badge, children, className, prefetch, ...props }: NavItemProps) {
   const { collapsed } = useContext(RailContext);
 
   /* Visually hidden, NOT display:none. display:none also strips the label from the
@@ -237,10 +261,17 @@ export function NavItem({ icon, active = false, disabled = false, children, clas
     className,
   );
 
+  const trailing = disabled
+    ? <Lock aria-hidden="true" size={12} className="ml-auto shrink-0 text-ink-tertiary group-data-collapsed:hidden max-[840px]:group-data-collapsed:flex" />
+    : badge
+    ? <span className="ml-auto shrink-0 group-data-collapsed:hidden max-[840px]:group-data-collapsed:flex" aria-hidden="true">{badge}</span>
+    : null;
+
   const content = (
     <>
       {icon ? <span className="inline-flex shrink-0 [&_svg]:h-4 [&_svg]:w-4" aria-hidden="true">{icon}</span> : null}
       <span className={labelClasses}>{children}</span>
+      {trailing}
     </>
   );
 
@@ -403,5 +434,54 @@ export function PageHeader({
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 max-[560px]:justify-start">{actions}</div> : null}
     </header>
+  );
+}
+
+export type BreadcrumbEntry = {
+  label: ReactNode;
+  href?: string;
+};
+
+/**
+ * The page's own context line: where this record sits, plus an optional
+ * right-aligned affordance. It replaces a global topbar, so it is the only
+ * place the parent collection is named on a detail page. The last entry is
+ * the current page and is never a link.
+ */
+export function Breadcrumb({
+  entries,
+  action,
+  label = "Breadcrumb",
+  className,
+  ...props
+}: Omit<HTMLAttributes<HTMLElement>, "children"> & {
+  entries: BreadcrumbEntry[];
+  action?: ReactNode;
+  label?: string;
+}) {
+  if (entries.length === 0) return null;
+  return (
+    <nav aria-label={label} className={cx("flex items-center gap-2 text-xs text-ink-tertiary", className)} {...props}>
+      <ol className="m-0 flex min-w-0 list-none flex-wrap items-center gap-2 p-0">
+        {entries.map((entry, index) => {
+          const last = index === entries.length - 1;
+          return (
+            <li key={index} className="flex min-w-0 items-center gap-2">
+              {index > 0 ? <span aria-hidden="true">/</span> : null}
+              {entry.href && !last ? (
+                <Link href={entry.href} className="truncate no-underline hover:text-ink">
+                  {entry.label}
+                </Link>
+              ) : (
+                <span className={cx("truncate", last && "font-medium text-ink")} aria-current={last ? "page" : undefined}>
+                  {entry.label}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      {action ? <div className="ml-auto shrink-0">{action}</div> : null}
+    </nav>
   );
 }

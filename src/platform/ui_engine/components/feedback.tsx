@@ -98,6 +98,8 @@ type StateProps = HTMLAttributes<HTMLDivElement> & {
   description?: ReactNode;
   action?: ReactNode;
   icon?: LucideIcon;
+  /** Monospace reference shown under the actions, e.g. an error or request id. */
+  code?: ReactNode;
 };
 
 function State({
@@ -106,13 +108,14 @@ function State({
   description,
   action,
   icon: Icon,
+  code,
   className,
   ...props
 }: StateProps & { kind: "loading" | "empty" | "error" }) {
   return (
     <div
       className={cx(
-        "grid min-h-[156px] place-content-center justify-items-center gap-1.5 p-6 text-center",
+        "grid min-h-[156px] place-content-center justify-items-center gap-2 p-6 text-center",
         kind === "error" && "bg-danger-surface text-danger",
         className,
       )}
@@ -123,10 +126,23 @@ function State({
       {/* The surrounding State is already the live region; a nested status role
           made assistive tech announce the same loading twice. */}
       {kind === "loading" ? <Spinner decorative /> : null}
-      {kind !== "loading" && Icon ? <Icon className="mb-0.5 h-[22px] w-[22px] text-ink-tertiary" aria-hidden="true" /> : null}
-      {title ? <Heading level={4}>{title}</Heading> : null}
-      {description ? <Text as="p" tone="secondary">{description}</Text> : null}
-      {action ? <div className="mt-1.5">{action}</div> : null}
+      {/* The glyph sits in its own ring so an empty panel reads as a deliberate
+          state rather than a view that failed to paint. */}
+      {kind !== "loading" && Icon ? (
+        <span
+          aria-hidden="true"
+          className={cx(
+            "grid h-9.5 w-9.5 place-items-center rounded-pill border",
+            kind === "error" ? "border-danger-line bg-surface text-danger" : "border-line bg-surface-muted text-ink-tertiary",
+          )}
+        >
+          <Icon className="h-[18px] w-[18px]" />
+        </span>
+      ) : null}
+      {title ? <Heading level={4} className="font-display text-[1.0625rem] font-[650]">{title}</Heading> : null}
+      {description ? <Text as="p" tone="secondary" className="max-w-100 text-pretty leading-relaxed">{description}</Text> : null}
+      {action ? <div className="mt-1 flex flex-wrap items-center justify-center gap-2">{action}</div> : null}
+      {code ? <span className="font-ui-mono text-[0.6875rem] text-ink-tertiary">{code}</span> : null}
     </div>
   );
 }

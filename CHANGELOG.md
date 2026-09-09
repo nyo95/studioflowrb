@@ -5,8 +5,121 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.20**
-- Next local revision: **R7.21**
+- Current revision after this entry is committed: **R7.22**
+- Next local revision: **R7.23**
+
+## R7.22 | 2026-09-09 | feat(ui-engine,studioflow): carry the approved chrome into the StudioFlow screens
+
+### Added
+
+- UI Engine display primitives: `Avatar` (initials, three sizes, with
+  `initialsOf`), `CountBadge` (monospace count for section heads and tabs),
+  `MetaList` (dot-separated identity line), `ProgressBar` (labelled measure),
+  and `SegmentBar` (compact ordered stage bar). All carry an accessible name so
+  none of them signals by colour alone.
+- UI Engine section primitives: `CardSection` (framed section with its title in
+  its own header bar, optional count and trailing action, flush or padded body),
+  `GroupHeader` (uppercase bucket label, count, and rule), and `PipelineStrip`
+  (hairline-separated ordered stages, current stage filled and `aria-current`).
+- UI Engine chrome: `Breadcrumb` in `layouts/shells`, and `filterChipClasses` /
+  `FILTER_CHIP_BASE_CLASSES` in `primitives/button-classes` with a `FilterChip`
+  button in `primitives/actions`. The class helper is outside the client
+  boundary so server components can render chips as plain links.
+- `EmptyState` / `ErrorState` now take an optional `code` slot for a monospace
+  reference, and render their glyph inside a toned ring with a serif title, so
+  an empty panel reads as a deliberate state rather than a failed paint.
+
+### Changed
+
+- Tasks (`/studioflow`) rebuilt on the approved worklist layout: header with
+  the working date, open count, and overdue count; URL-driven scope chips
+  (`?scope=`); buckets introduced by `GroupHeader`; and one framed row list per
+  bucket with fixed columns for item, project, due, and holder. Task due dates
+  now resolve to `telat N hari` / `hari ini` / `besok` with a matching tone;
+  iterations keep their waiting age in the same column.
+- Projects directory keeps the R6.1 `DirectoryShell → DataTable` pattern and
+  gains URL-driven view chips (`?view=all|mine|review`), a no-JS `GET` filter
+  field (`?q=`), an area column, a leading-phase cell that names the phase the
+  studio is actually waiting on, a `SegmentBar` of template progress, and an
+  `Avatar` on the lead column. `updated_at` replaces `opened_at` in the last
+  column so the list sorts by what changed.
+- Project detail rebuilt as the approved spine-and-rail layout: `Breadcrumb`,
+  a header whose identity line is a `MetaList`, a `PipelineStrip` of every
+  template phase, then the existing General task block and phase workspace on
+  the spine; phase progress, project facts, and the project lead on the rail.
+- StudioFlow settings moved onto `SettingsShell` with an in-page navigation
+  column, and gained a read-only Phase template section listing the seeded
+  pipeline with its round prefix and internal-approval requirement.
+- `studioFlowService.listProjects` now orders each project's phases by
+  `sort_order` and selects their `id`, `key`, `name`, and `sort_order`, so the
+  directory can draw the pipeline in template order. Additive — no existing
+  field was removed.
+
+### Removed
+
+- The speculative `NavCount` and `NavWarningPill` helpers in the StudioFlow nav.
+  They had no data source, and the engine-level capability they anticipated is
+  already served by `NavItem`'s `badge` slot.
+
+### Dependencies and migrations
+
+- No new dependency, schema change, or migration.
+
+### Verification and limitations
+
+- `npm run check`: passed (`typecheck`, architecture boundaries, no legacy
+  runtime references).
+- `npx eslint .`: passed with zero findings.
+- `npm run build` was **not** run for this entry. It is outstanding and must be
+  run on the workstation before this revision is treated as verified.
+- Visual verification in a browser is still blocked: `/studioflow` fails to
+  render because `studioflow.sf_iteration` is absent from the local database.
+  The migration `20260908120000_studioflow_wo3_iteration` exists in the
+  repository and has not been applied; `npx prisma migrate deploy` on the
+  workstation clears the blocker.
+- Upcoming, Library, Activity, and Product Schedule remain locked nav entries
+  with no route behind them, so their screens in the approved design are not
+  implemented. Deliverables and Minutes have no persisted model yet and are
+  likewise not implemented.
+
+## R7.21 | 2026-09-09 | feat(ui-engine): NavGroup headings, NavSeparator, NavItem badge/lock; StudioFlow nav redesign
+
+### Added
+
+- `NavGroup` now accepts an optional `heading?: string` prop that renders a
+  visible section label (11 px, semibold, uppercase, tracked) above the group.
+  The heading is suppressed when the rail is collapsed and on narrow viewports
+  so the collapsed state remains clean.
+- New `NavSeparator` component exported from `ui_engine`: a thin horizontal
+  rule (`h-px`, `bg-[--ui-border-subtle]`) with `role="separator"`, also
+  hidden when the rail is collapsed.
+- `NavItem` now accepts a `badge?: ReactNode` trailing slot rendered to the
+  right of the label (hidden when the rail is collapsed). When `disabled` is
+  set, a 12 px `Lock` icon replaces any badge automatically.
+- Explicit `text-[13px]` added to `NAV_ITEM_BASE_CLASSES` to match the
+  13 px font-size token in the UI Engine design spec.
+
+### Changed
+
+- `StudioFlowNav` restructured into two `NavGroup` sections matching the
+  proposed sidebar design:
+  - **Workspace** (heading): Projects, Tasks, Upcoming (disabled).
+  - **Extensions** (heading): Library (disabled), Activity (disabled),
+    Product Schedule (disabled).
+  - A `NavSeparator` divides the two sections.
+- Settings moved out of `StudioFlowNav` into a new `StudioFlowUtilityNav`
+  export placed in the `domainUtilityNavigation` slot of `AuthenticatedShell`,
+  keeping it anchored below the rail divider at all viewport sizes.
+- `src/app/(platform)/layout.tsx` updated to import and wire
+  `StudioFlowUtilityNav` as `domainUtilityNavigation`.
+
+### Dependencies and migrations
+
+- No new dependency, schema change, or migration.
+
+### Verification
+
+- `npx tsc --noEmit`: **0 errors**.
 
 ## R7.20 | 2026-09-09 | fix(studioflow): avoid cascading render in task edit flow
 

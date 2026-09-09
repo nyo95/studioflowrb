@@ -10,7 +10,7 @@ import {
 
 import { cx } from "../internal/cx";
 
-import { buttonClasses, BUTTON_BASE_CLASSES, BUTTON_SIZE_CLASSES, BUTTON_VARIANT_CLASSES, type ButtonSize, type ButtonVariant } from "./button-classes";
+import { buttonClasses, BUTTON_BASE_CLASSES, BUTTON_SIZE_CLASSES, BUTTON_VARIANT_CLASSES, type ButtonSize, type ButtonVariant, filterChipClasses } from "./button-classes";
 
 export type { ButtonVariant, ButtonSize } from "./button-classes";
 
@@ -99,5 +99,29 @@ export function Spinner({
     >
       <LoaderCircle aria-hidden="true" />
     </span>
+  );
+}
+
+export type FilterChipProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type"> & {
+  selected?: boolean;
+  /** Optional trailing count, e.g. "Unassigned · 3". */
+  count?: ReactNode;
+};
+
+/**
+ * A single toggle in a filter row. Rendered as a real button with
+ * aria-pressed so the selected filter is announced, not merely filled.
+ */
+export function FilterChip({ selected = false, count, className, children, ...props }: FilterChipProps) {
+  return (
+    <button type="button" aria-pressed={selected} className={cx(filterChipClasses(selected), className)} {...props}>
+      {children}
+      {count !== undefined && count !== null ? (
+        <span className={cx("tabular-nums", selected ? "opacity-80" : "text-ink-tertiary")}>
+          <span aria-hidden="true">· </span>
+          {count}
+        </span>
+      ) : null}
+    </button>
   );
 }

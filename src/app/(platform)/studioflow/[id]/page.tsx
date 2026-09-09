@@ -6,7 +6,23 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
 import { prisma } from "@/platform/core/db";
 import { readPlatformGeneralSettings } from "@platform/core/settings";
-import { EmptyState, PageHeader, SectionCard } from "@/platform/ui_engine";
+import {
+  Avatar,
+  Breadcrumb,
+  buttonClasses,
+  CardSection,
+  DescriptionItem,
+  DescriptionList,
+  EmptyState,
+  PageHeader,
+  PipelineStrip,
+  type PipelineStep,
+  ProgressBar,
+  MetaList,
+  SectionCard,
+  StatusBadge,
+  Text,
+} from "@/platform/ui_engine";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
 import { studioFlowService } from "@/apps/studioflow/runtime";
 import { GeneralTaskBlock } from "./general-task-block";
@@ -27,6 +43,26 @@ const TYPE_LABELS: Record<string, string> = {
   HOSPITALITY: "Hospitality",
   OTHER: "Lainnya",
 };
+
+const PHASE_STATE_LABELS: Record<string, string> = {
+  NOT_STARTED: "Belum mulai",
+  IN_PROGRESS: "Digarap",
+  WAITING_CLIENT: "Menunggu klien",
+  DONE: "Selesai",
+};
+
+const PHASE_STEP_STATE: Record<string, PipelineStep["state"]> = {
+  DONE: "done",
+  IN_PROGRESS: "current",
+  WAITING_CLIENT: "current",
+  NOT_STARTED: "upcoming",
+};
+
+const PROJECT_STATUS_TONE = {
+  ACTIVE: "success",
+  ON_HOLD: "warning",
+  COMPLETED: "neutral",
+} as const;
 
 export default async function ProjectDetailPage({
   params,
@@ -146,73 +182,176 @@ export default async function ProjectDetailPage({
     })),
   }));
 
+  const leadUser = project.lead_user_id
+    ? await prisma.user.findUnique({
+        where: { id: project.lead_user_id },
+        select: { display_name: true },
+      })
+    : null;
+
+  /* The pipeline is the whole template in order; the leading phase is the one
+     the studio is actually waiting on, client turn ahead of our own turn. */
+  const steps: PipelineStep[] = rawPhases.map((phase) => {
+    const sent = phase.iterations.filter((iter) => iter.state === "SENT").length;
+    return {
+      id: phase.id,
+      label: phase.name,
+      note: PHASE_STATE_LABELS[phase.state] ?? phase.state,
+      detail: phase.iterations.length > 0 ? `${sent}/${phase.iterations.length} terkirim` : "—",
+      state: PHASE_STEP_STATE[phase.state] ?? "upcoming",
+    };
+  });
+
+  const leadingPhase =
+    rawPhases.find((phase) => phase.state === "WAITING_CLIENT") ??
+    rawPhases.find((phase) => phase.state === "IN_PROGRESS") ??
+    null;
+
+  const donePhases = rawPhases.filter((phase) => phase.state === "DONE").length;
+  const openTasks = tasks.filter((task) => task.status === "OPEN").length;
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
+    <div className="flex min-h-0 flex-1 flex-col gap-5 p-(--ui-page-padding)">
+      <Breadcrumb
+        entries={[
+          { label: "Project", href: "/studioflow/projects" },
+          { label: project.name },
+        ]}
+      />
+
       <PageHeader
-        eyebrow={`StudioFlow · ${project.client.name}`}
         title={project.name}
-        description={`${project.code} · ${TYPE_LABELS[project.type] ?? project.type} · ${STATUS_LABELS[project.status] ?? project.status} · Dibuka ${fmt.format(new Date(project.opened_at))}`}
-      />
-
-      {/* ── General task block — always pinned, never filtered ── */}
-      <GeneralTaskBlock
-        projectId={id}
-        tasks={tasks.map((t: { id: string; title: string; status: "OPEN" | "DONE"; [key: string]: unknown }) => ({
-          id: t.id,
-          title: t.title,
-          status: t.status,
-          phase_scope: (t.phase_scope as string | null | undefined) ?? null,
-        sort_order: (t.sort_order as number | undefined) ?? 0,
-        assignee_id: (t.assignee_id as string | null | undefined) ?? null,
-        due_date: t.due_date instanceof Date ? t.due_date.toISOString() : null,
-      }))}
-        canManage={canManageTasks}
-        phases={rawPhases.map((phase) => ({ key: phase.key, name: phase.name }))}
-        phaseScope={null}
-        users={assignableUsers}
-      />
-
-      {/* ── File shortcut ── */}
-      <div>
-        <Link
-          href={`/studioflow/${id}/files`}
-          className="inline-flex items-center gap-1 text-sm text-action hover:underline"
-        >
-          <FolderOpen className="h-3.5 w-3.5" />
-          Lihat semua file project
-        </Link>
-      </div>
-
-      {/* ── Fase — filter chips + expandable rows with iterations ── */}
-      <div>
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary mb-3">
-          Fase
-        </h2>
-        {phases.length === 0 ? (
-          <p className="text-sm text-ink-tertiary">Belum ada fase.</p>
-        ) : (
-          <PhaseSection
-            phases={phases}
-            projectId={id}
-            canManage={canManageIter}
-            canReview={canReviewIter}
-            canOverride={canOverridePhase}
-            taskPhases={rawPhases.map((phase) => ({ key: phase.key, name: phase.name }))}
-            assignableUsers={assignableUsers}
+        meta={
+          <MetaList
+            items={[
+              <span key="code" className="font-ui-mono text-xs">{project.code}</span>,
+              project.client.name,
+              TYPE_LABELS[project.type] ?? project.type,
+              project.area ? `${Number(project.area)} m²` : null,
+              project.location,
+              `Dibuka ${fmt.format(new Date(project.opened_at))}`,
+            ]}
           />
-        )}
-      </div>
+        }
+        divider
+        actions={
+          <>
+            <StatusBadge tone={PROJECT_STATUS_TONE[project.status as keyof typeof PROJECT_STATUS_TONE] ?? "neutral"}>
+              {STATUS_LABELS[project.status] ?? project.status}
+            </StatusBadge>
+            <Link href={`/studioflow/${id}/files`} className={buttonClasses("secondary", "sm")}>
+              <FolderOpen aria-hidden="true" /> File project
+            </Link>
+          </>
+        }
+      />
 
-      {/* ── Location / area ── */}
-      {(project.location || project.area) && (
-        <SectionCard title="Detail project">
-          <p className="text-sm">
-            {project.location ? `Lokasi: ${project.location}` : null}
-            {project.location && project.area ? " · " : null}
-            {project.area ? `${project.area} m²` : null}
-          </p>
-        </SectionCard>
-      )}
+      {/* Spine carries the work; the rail carries the facts that never change
+          mid-session, so the reader never loses the project's identity. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-4 max-[1080px]:grid-cols-1">
+        <div className="grid min-w-0 gap-4">
+          <CardSection
+            title="Alur fase"
+            padded={false}
+            action={
+              leadingPhase ? (
+                <Text size="sm" tone="secondary">
+                  Sedang jalan: <span className="font-medium text-ink">{leadingPhase.name}</span>
+                </Text>
+              ) : null
+            }
+          >
+            {steps.length === 0 ? (
+              <p className="px-3.5 py-3 text-sm text-ink-tertiary">Belum ada fase.</p>
+            ) : (
+              <PipelineStrip steps={steps} label="Alur fase project" />
+            )}
+          </CardSection>
+
+          <GeneralTaskBlock
+            projectId={id}
+            tasks={tasks.map((t: { id: string; title: string; status: "OPEN" | "DONE"; [key: string]: unknown }) => ({
+              id: t.id,
+              title: t.title,
+              status: t.status,
+              phase_scope: (t.phase_scope as string | null | undefined) ?? null,
+              sort_order: (t.sort_order as number | undefined) ?? 0,
+              assignee_id: (t.assignee_id as string | null | undefined) ?? null,
+              due_date: t.due_date instanceof Date ? t.due_date.toISOString() : null,
+            }))}
+            canManage={canManageTasks}
+            phases={rawPhases.map((phase) => ({ key: phase.key, name: phase.name }))}
+            phaseScope={null}
+            users={assignableUsers}
+          />
+
+          <section className="grid gap-2">
+            <h2 className="m-0 text-[0.6875rem] font-bold uppercase tracking-[0.1em] text-ink-secondary">
+              Fase
+            </h2>
+            {phases.length === 0 ? (
+              <Text as="p" tone="tertiary" size="sm">Belum ada fase.</Text>
+            ) : (
+              <PhaseSection
+                phases={phases}
+                projectId={id}
+                canManage={canManageIter}
+                canReview={canReviewIter}
+                canOverride={canOverridePhase}
+                taskPhases={rawPhases.map((phase) => ({ key: phase.key, name: phase.name }))}
+                assignableUsers={assignableUsers}
+              />
+            )}
+          </section>
+        </div>
+
+        <aside className="grid min-w-0 gap-4 max-[1080px]:order-first">
+          <CardSection title="Progres fase">
+            <div className="grid gap-2.5">
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-display text-2xl font-[650] leading-none">{donePhases}</span>
+                <Text size="sm" tone="tertiary">dari {rawPhases.length} fase selesai</Text>
+              </div>
+              <ProgressBar
+                value={donePhases}
+                max={Math.max(rawPhases.length, 1)}
+                label={`${donePhases} dari ${rawPhases.length} fase selesai`}
+              />
+              <Text size="sm" tone="secondary">
+                {openTasks === 0 ? "Tidak ada task terbuka" : `${openTasks} task terbuka`}
+              </Text>
+            </div>
+          </CardSection>
+
+          <CardSection title="Fakta project">
+            <DescriptionList columns={1}>
+              <DescriptionItem label="Kode">
+                <span className="font-ui-mono text-xs">{project.code}</span>
+              </DescriptionItem>
+              <DescriptionItem label="Klien">{project.client.name}</DescriptionItem>
+              <DescriptionItem label="Tipe">{TYPE_LABELS[project.type] ?? project.type}</DescriptionItem>
+              <DescriptionItem label="Status">{STATUS_LABELS[project.status] ?? project.status}</DescriptionItem>
+              {project.area ? <DescriptionItem label="Luas">{Number(project.area)} m²</DescriptionItem> : null}
+              {project.location ? <DescriptionItem label="Lokasi">{project.location}</DescriptionItem> : null}
+              <DescriptionItem label="Dibuka">{fmt.format(new Date(project.opened_at))}</DescriptionItem>
+            </DescriptionList>
+          </CardSection>
+
+          <CardSection title="Tim">
+            {leadUser ? (
+              <div className="flex items-center gap-2.5">
+                <Avatar name={leadUser.display_name} size="lg" />
+                <div className="grid min-w-0 gap-px">
+                  <span className="truncate text-[0.78125rem] font-medium">{leadUser.display_name}</span>
+                  <Text meta className="text-ink-tertiary">Lead project</Text>
+                </div>
+              </div>
+            ) : (
+              <Text as="p" tone="tertiary" size="sm">Belum ada lead yang ditunjuk.</Text>
+            )}
+          </CardSection>
+        </aside>
+      </div>
     </div>
   );
 }

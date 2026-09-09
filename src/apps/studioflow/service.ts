@@ -490,7 +490,13 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       include: {
         client: { select: { id: true, name: true } },
         phases: {
+          // Ordered so the directory can draw the pipeline in template order.
+          orderBy: { sort_order: "asc" },
           select: {
+            id: true,
+            key: true,
+            name: true,
+            sort_order: true,
             state: true,
             iterations: {
               where: { state: "SENT" },
