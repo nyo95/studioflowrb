@@ -76,8 +76,9 @@ terpenuhi. **Berapa work order per fase adalah keputusan navigator.**
 | **SF-F6** Menunggu Saya | Read model lintas project (§10.2 kontrak). Tanpa tabel baru | Desainer dengan beberapa project tahu apa yang menunggunya tanpa membuka satu project pun |
 | **SF-F7** Project Catalogue/Schedule + MOM | Project-owned catalogue/schedule and MoM surfaces using their approved contracts | Project detail exposes catalogue/FFNI and MOM without forcing either into the phase task model |
 | **SF-F8** Pass tema | Perubahan token yang mengenai app lain, dikerjakan sekaligus dan sadar (§5.3) | Master Data dan BQ terbukti tidak berubah tampilannya, atau perubahannya disetujui pemilik |
-| **SF-F9** File `STORED` | Byte untuk PDF/render/survey, lewat shared storage port | Unggah, unduh bertanda tangan, pelepasan byte yang tergantikan; file terkirim tidak pernah dilepas |
-| **Ditunda** | SketchUp exchange, arsip Drive (`LINKED`), client-facing links, project archival, legacy migration | Tidak menghalangi Library, project catalogue, atau MOM karena kontrak inti mereka sudah tersedia |
+| **SF-F9** Unified file intake MVP | Satu `+`/drag-drop dari What’s Today, Project, atau Phase; konteks project/fase; current file; metadata/audit | Satu file intake end-to-end bekerja tanpa halaman Deliverables terpisah atau status review berulang |
+| **SF-F10** File detail | Template foldering, `STORED` bytes, overwrite/release, mapping PDF/Presentation/CD | Detail teknis aktif setelah MVP; mapping folder tidak menjadi langkah manual |
+| **Ditunda** | Bulk intake, unsorted tray, SketchUp exchange, arsip Drive (`LINKED`), client-facing links, project archival, legacy migration | Tidak boleh ditambahkan ke MVP tanpa work order yang menyebutkannya |
 
 **Catatan urutan.** SF-F5 sengaja setelah SF-F4 karena ia membaca ronde dan task;
 tapi ia adalah pintu masuk harian aplikasi, jadi jangan digeser ke belakang lagi.

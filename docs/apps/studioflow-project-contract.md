@@ -558,6 +558,28 @@ untruthfully in order to proceed.
 
 ## 8. Files
 
+### 8.0 MVP first: one unified intake
+
+The first usable slice is deliberately small:
+
+`What’s Today / Project / Phase → + or drag-drop → project + phase → current file`
+
+If the intake starts from a project or phase, that context is prefilled. If it
+starts from `What’s Today`, the user selects the project and phase in one
+compact step. The system records the file, replaces the prior current bytes
+according to §8.6, and preserves metadata/audit. It does not send the user to a
+separate Deliverables page and does not require a sequence of internal-review,
+external-review, approval, or rejection buttons.
+
+The MVP may use a simple explicit choice of `working` or `sent` when the system
+cannot infer it. Filename, extension, source folder, and current context may
+preselect that choice, but heuristics never silently invent a project, phase, or
+client response. Ambiguity produces one confirmation, not a new workflow.
+
+Everything below this subsection is the technical contract behind that one
+intake. It must not become extra MVP screens, extra task types, or extra user
+decisions.
+
 Every file carries **two facts that must stay separate**:
 
 - **where it belongs** — a folder, by kind of work (§8.2);
@@ -765,6 +787,11 @@ never replaced. The folder template maps extensions, so `.skp` files can be
 classified silently; a genuinely ambiguous PDF may receive one short purpose
 question.
 
+The folder template is an implementation mapping, not a second filing task.
+Names such as `OUT`, `PDF`, `Presentation`, or `CD` may be produced by that
+mapping when the configured template requires them, but none of them is a
+workflow state and none may require the user to copy or move the file manually.
+
 **Deliverables that already went out.** In practice a file is sent by WhatsApp or
 email *before* the studio opens the app. The same drop intake therefore allows
 the user to mark it external/sent and completes the send (§6.2) in one
@@ -797,6 +824,24 @@ safe.
 No chat or mail integration is contracted. Desktop WhatsApp already writes media
 to a folder on disk, so the files are reachable; the expensive part was never
 fetching them but sorting them one at a time, and §8.8 is the answer to that.
+
+### 8.9 Agent implementation guardrails
+
+The implementation must follow this order:
+
+1. implement the one-intake MVP in §8.0 using existing Project, Phase,
+   Iteration, and file primitives;
+2. add only the smallest service/query needed to persist the current file and
+   its metadata/audit replacement event;
+3. activate folder-template mapping only after the MVP path works;
+4. activate advanced treatment, bulk intake, and unsorted-tray behavior only
+   when an approved work order names them.
+
+An agent must not add a new task entity, review state, approval state, folder
+entity, chat integration, external delivery integration, background reconciler,
+or speculative generic abstraction to complete the MVP. If an existing schema
+or shared port cannot support the MVP, the agent stops and reports the exact
+contract/code mismatch instead of inventing a fallback.
 
 ## 9. Audit
 

@@ -5,8 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.24**
-- Next local revision: **R7.25**
+- Current revision after this entry is committed: **R7.25**
+- Next local revision: **R7.26**
+
+## R7.25 | 2026-09-09 | docs(studioflow): constrain file intake to a simple MVP
+
+### Changed
+
+- Added an explicit first-layer file-intake MVP: `What’s Today`/Project/Phase
+  plus drag-drop, project and phase context, one current file, and permanent
+  metadata/audit.
+- Kept folder templates and PDF/Presentation/CD mappings as technical detail,
+  not extra user-facing filing steps. A technical `OUT` mapping is never a
+  workflow state or a replacement for the iteration/send record.
+- Added agent guardrails against speculative entities, review states, folder
+  systems, integrations, background jobs, or extra screens while implementing
+  the MVP. Advanced bulk, unsorted, and storage behaviors require a named work
+  order.
+
+### Verification
+
+- `git diff --check`: passed.
+- Documentation-only contract change; no runtime/schema checks required.
 
 ## R7.24 | 2026-09-09 | docs(studioflow): simplify project-phase file intake
 
