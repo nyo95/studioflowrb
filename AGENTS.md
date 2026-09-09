@@ -151,6 +151,27 @@ Any future AI starts as navigator unless the owner explicitly gives it a locked 
 
 `CHANGELOG.md` is the revision ledger. A task is not reported as finished until its cohesive changes are documented there, validated, and committed locally.
 
+### Roadmap and known-bug ledgers
+
+`roadmap.md` and `knownbug.md` are operational ledgers and must be read when
+planning or auditing StudioFlow work.
+
+- `roadmap.md` lists features that are planned but not complete. A feature may
+  be removed or struck through only after it is actually implemented and
+  verified; the implementation must still receive a `CHANGELOG.md` entry.
+- `knownbug.md` lists reproducible audit findings that are not fixed in the
+  current change set. Each entry must state the affected area, observed and
+  expected behavior, mitigation, and status.
+- Every audit must either fix a discovered bug in the same scoped change set or
+  add/update it in `knownbug.md`. Do not silently discard an unfixed finding.
+- When a bug is fixed, remove or strike through its entry in `knownbug.md` and
+  record the fix, verification, and any limitation in `CHANGELOG.md`.
+- Do not claim a roadmap item or known bug is complete merely because a route,
+  component, or schema exists; verify the end-to-end behavior, permissions,
+  persistence, error states, and relevant UI states.
+- Roadmap entries marked explicitly out of scope are not deferred work and must
+  not be reintroduced without a new owner instruction.
+
 ### Revision format
 
 - `R<N>` is the most recent owner-authorized GitHub/published baseline. The initial recorded baseline is `R1` at commit `c8e473702801510aa314bbed45242a71b600f733`.

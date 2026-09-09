@@ -5,8 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.35**
-- Next local revision: **R7.36**
+- Current revision after this entry is committed: **R7.36**
+- Next local revision: **R7.37**
+
+## R7.36 | 2026-09-10 | docs(governance): formalize roadmap and bug ledgers
+
+### Changed
+
+- Updated `AGENTS.md` with mandatory rules for reading and maintaining
+  `roadmap.md` and `knownbug.md` during planning, implementation, and audits.
+- Required every unfixed audit finding to be recorded, every fixed bug to be
+  closed in the bug ledger, and every completed roadmap item to remain backed
+  by a changelog entry.
+
+### Verification
+
+- `git diff --check`: passed.
 
 ## R7.35 | 2026-09-10 | docs(repo): add roadmap and known bug ledger
 
