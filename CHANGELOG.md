@@ -5,8 +5,23 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.34**
-- Next local revision: **R7.35**
+- Current revision after this entry is committed: **R7.35**
+- Next local revision: **R7.36**
+
+## R7.35 | 2026-09-10 | docs(repo): add roadmap and known bug ledger
+
+### Changed
+
+- Added `roadmap.md` for planned StudioFlow features, completed items, and
+  explicit out-of-scope decisions.
+- Added `knownbug.md` for reproducible audit findings that remain open, with
+  expected behavior, mitigation, and closure rules.
+- Recorded the current deliverable-driven workflow, current-file, MOM,
+  Product Catalogue/FFNI, and shared image gaps without claiming them fixed.
+
+### Verification
+
+- `git diff --check`: passed.
 
 ## R7.34 | 2026-09-09 | chore(repo): ignore session debris
 
