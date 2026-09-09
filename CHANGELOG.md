@@ -5,8 +5,66 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.14**
-- Next local revision: **R7.15**
+- Current revision after this entry is committed: **R7.15**
+- Next local revision: **R7.16**
+
+## R7.15 | 2026-09-09 | feat(studioflow): complete inline phase and iteration workspace
+
+### Changed
+
+- Replaced separate phase and iteration work pages with the contract-defined
+  inline project workspace; legacy deep links now redirect to the project page.
+- Added expandable phase rows, active-phase defaults, phase filters, round
+  history, client-revision checklists, waiting-age labels, project phase
+  summaries, lead labels, Client archive blocking context, and Indonesian
+  StudioFlow navigation labels.
+- Added server actions and permission-aware controls for opening, sending,
+  stopping, approving, finishing, reopening, and exception-closing phases and
+  rounds, including explicit Supervision transitions and optional internal ACC.
+- Client responses can preserve an already-started successor draft and append
+  source-linked revision points. Approval plus the optional phase closure is one
+  atomic command and one primary audit event.
+- Send and stop-round authorization now follows `iteration.review`; opening and
+  editing rounds remains `iteration.manage`. Sending is rejected while an older
+  round is still awaiting a client response.
+- Project, Client, phase, and round reads stay behind the StudioFlow service;
+  route components no longer query StudioFlow persistence directly for these
+  new views.
+
+### UI and correctness fixes
+
+- Reused UI Engine `DraftDialog` for focus management, pending dismissal, and
+  unsaved-input protection instead of a private modal implementation.
+- Added warn-but-allow messaging for open points and missing required internal
+  ACC, explicit consequences for client revision responses, exception/reopen
+  reasons, and preserved VOIDED-round reasons.
+- Replaced obsolete StudioFlow CSS variables with shared semantic utilities and
+  corrected `ActionResult` narrowing plus the General Task input reset flow.
+- Removed a temporary untyped Prisma fallback after confirming the generated
+  client contains `sfTask`.
+
+### Dependencies and migrations
+
+- No dependency, schema, or migration changes.
+- Applied the already-committed additive
+  `20260908160000_studioflow_task` migration to the verified rebuild-only
+  `masterdata-db` development container at `localhost:5433`; no legacy database
+  was accessed.
+- Brought the verified disposable `masterdata_test` database up to all 30
+  committed migrations before running the integration suite.
+
+### Verification and limitations
+
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `npm run check:boundaries`: passed.
+- `npm run check:legacy-runtime`: passed.
+- `npm run build`: passed with Prisma client generation and Next.js 16.3.2.
+- `npm test`: 263 passed, 0 failed, 0 cancelled, including three StudioFlow
+  round-lifecycle integration scenarios.
+- Authenticated browser smoke check passed for Menunggu Saya, project detail,
+  project directory, the Send dialog focus/Escape flow, and browser console
+  errors (none after the pending migration was applied).
 
 ## R7.14 | 2026-09-08 | feat(studioflow): UX — Menunggu Saya, Projects directory, GeneralTaskBlock
 

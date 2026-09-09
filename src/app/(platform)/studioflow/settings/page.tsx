@@ -41,7 +41,7 @@ export default async function StudioFlowSettingsPage() {
       />
 
       <SectionCard title="Template nama file">
-        <p className="mb-4 text-sm text-[var(--ui-muted)]">
+        <p className="mb-4 text-sm text-ink-tertiary">
           Nama standar yang dipakai setiap kali file dicatat. Token yang tidak dikenal
           ditolak saat simpan, bukan saat file masuk.
         </p>

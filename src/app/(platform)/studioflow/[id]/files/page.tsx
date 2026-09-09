@@ -102,7 +102,7 @@ export default async function ProjectFilesPage({
       <div>
         <Link
           href={`/studioflow/${projectId}`}
-          className="mb-2 inline-flex items-center gap-1 text-sm text-[var(--ui-muted)] hover:text-[var(--ui-foreground)]"
+          className="mb-2 inline-flex items-center gap-1 text-sm text-ink-tertiary hover:text-ink"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Kembali ke project
@@ -117,14 +117,14 @@ export default async function ProjectFilesPage({
       {canManage && (
         <>
           <SectionCard title="Catat file">
-            <p className="mb-3 text-xs text-[var(--ui-muted)]">
+            <p className="mb-3 text-xs text-ink-tertiary">
               File yang dibuat di luar sistem. Tidak ada upload — hanya metadata.
             </p>
             <RecordFileForm projectId={projectId} folders={folderOptions} />
           </SectionCard>
 
           <SectionCard title="Simpan link">
-            <p className="mb-3 text-xs text-[var(--ui-muted)]">
+            <p className="mb-3 text-xs text-ink-tertiary">
               File yang bytes-nya ada di tempat lain (Drive, WeTransfer). Kita simpan pointernya.
             </p>
             <LinkFileForm projectId={projectId} folders={folderOptions} />
@@ -145,26 +145,26 @@ export default async function ProjectFilesPage({
               {group.files.map((file) => (
                 <div
                   key={file.id}
-                  className="grid gap-2 rounded border border-[var(--ui-border)] px-4 py-3 text-sm"
+                  className="grid gap-2 rounded border border-line px-4 py-3 text-sm"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className={`font-medium ${file.superseded_at ? "text-[var(--ui-muted)] line-through" : ""}`}>
+                      <p className={`font-medium ${file.superseded_at ? "text-ink-tertiary line-through" : ""}`}>
                         {file.filename}
                       </p>
-                      <p className="text-xs text-[var(--ui-muted)]">
+                      <p className="text-xs text-ink-tertiary">
                         Asli: {file.original_filename} · {humanBytes(file.bytes)} · {fmt.format(new Date(file.dropped_at))}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2 text-xs">
-                      <span className="rounded-full bg-[var(--ui-surface-raised)] px-2 py-0.5">
+                      <span className="rounded-full bg-surface-muted px-2 py-0.5">
                         {TREATMENT_LABELS[file.treatment] ?? file.treatment}
                       </span>
                       {file.sent_in_iteration_id && (
-                        <span className="rounded-full bg-[var(--ui-surface-raised)] px-2 py-0.5">terkirim</span>
+                        <span className="rounded-full bg-surface-muted px-2 py-0.5">terkirim</span>
                       )}
                       {file.superseded_at && (
-                        <span className="rounded-full bg-[var(--ui-surface-raised)] px-2 py-0.5">diganti</span>
+                        <span className="rounded-full bg-surface-muted px-2 py-0.5">diganti</span>
                       )}
                       {file.external_url && (
                         <a

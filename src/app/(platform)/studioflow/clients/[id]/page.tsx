@@ -29,8 +29,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     );
   }
 
-  const client = await studioFlowService.getClient(grants, id).catch((e: { code?: string }) => {
-    if ((e as { kind?: string })?.kind === "NOT_FOUND") return null;
+  const client = await studioFlowService.getClient(grants, id).catch((e: { kind?: string }) => {
+    if (e?.kind === "NOT_FOUND") return null;
     throw e;
   });
   if (!client) notFound();
@@ -43,7 +43,11 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         eyebrow="StudioFlow · Klien"
         title={client.name}
       />
-      <ClientDetailView client={client} canManage={canManage} />
+      <ClientDetailView
+        client={client}
+        canManage={canManage}
+        liveProjectCount={client._count.projects}
+      />
     </div>
   );
 }

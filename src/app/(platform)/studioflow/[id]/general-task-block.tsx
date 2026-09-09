@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { CheckSquare, Plus, Square, Trash2 } from "lucide-react";
 import type { ActionResult } from "@platform/core/actions";
 import { InlineError } from "@/platform/ui_engine";
@@ -27,19 +27,21 @@ function AddTaskForm({ projectId }: { projectId: string }) {
     null as ActionResult<void> | null,
   );
   const formRef = useRef<HTMLFormElement>(null);
-  const failure = state && !state.ok ? state.error.safeMessage : null;
+  const failure = state?.ok === false ? state.error.safeMessage : null;
+
+  // Reset input after successful create
+  useEffect(() => {
+    if (state?.ok) formRef.current?.reset();
+  }, [state]);
 
   return (
     <div>
       <form
         ref={formRef}
-        action={async (fd: FormData) => {
-          await formAction(fd);
-          formRef.current?.reset();
-        }}
+        action={formAction}
         className="flex items-center gap-2"
       >
-        <span className="text-[var(--color-text-tertiary)] shrink-0" aria-hidden="true">
+        <span className="text-ink-tertiary shrink-0" aria-hidden="true">
           <Plus size={14} />
         </span>
         <input
@@ -50,7 +52,7 @@ function AddTaskForm({ projectId }: { projectId: string }) {
           minLength={1}
           maxLength={255}
           disabled={pending}
-          className="flex-1 min-w-0 bg-transparent text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)] outline-none border-0 focus:ring-0 py-1"
+          className="flex-1 min-w-0 bg-transparent text-sm text-ink placeholder:text-ink-tertiary outline-none border-0 focus:ring-0 py-1"
         />
       </form>
       {failure ? <InlineError>{failure}</InlineError> : null}
@@ -77,12 +79,12 @@ function TaskRow({
   );
   const [hovered, setHovered] = useState(false);
 
-  const completionError = completing && !completing.ok ? completing.error.safeMessage : null;
-  const deleteError = deleting && !deleting.ok ? deleting.error.safeMessage : null;
+  const completionError = completing?.ok === false ? completing.error.safeMessage : null;
+  const deleteError = deleting?.ok === false ? deleting.error.safeMessage : null;
 
   return (
     <div
-      className="group flex items-center gap-2 py-2 border-b border-[var(--color-border)] last:border-0"
+      className="group flex items-center gap-2 py-2 border-b border-line last:border-0"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -90,11 +92,11 @@ function TaskRow({
       <form action={completingAction}>
         <button
           type="submit"
-          className="shrink-0 text-[var(--color-text-tertiary)] hover:text-action focus:outline-action"
+          className="shrink-0 text-ink-tertiary hover:text-action focus:outline-action"
           title={task.status === "OPEN" ? "Tandai selesai" : "Buka kembali"}
         >
           {task.status === "DONE" ? (
-            <CheckSquare size={15} className="text-[var(--color-text-success)]" />
+            <CheckSquare size={15} className="text-success" />
           ) : (
             <Square size={15} />
           )}
@@ -105,8 +107,8 @@ function TaskRow({
       <span
         className={`flex-1 min-w-0 text-sm ${
           task.status === "DONE"
-            ? "line-through text-[var(--color-text-tertiary)]"
-            : "text-[var(--color-text-primary)]"
+            ? "line-through text-ink-tertiary"
+            : "text-ink"
         }`}
       >
         {task.title}
@@ -117,7 +119,7 @@ function TaskRow({
         <form action={deletingAction}>
           <button
             type="submit"
-            className="shrink-0 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-danger)] focus:outline-action"
+            className="shrink-0 text-ink-tertiary hover:text-danger focus:outline-action"
             title="Hapus task"
           >
             <Trash2 size={13} />
@@ -150,13 +152,13 @@ export function GeneralTaskBlock({
   const visible = showDone ? tasks : open;
 
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
+    <div className="rounded-card border border-line bg-surface overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--color-border)] bg-[var(--color-surface-muted)]">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-line bg-surface-muted">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
           TODO umum
           {open.length > 0 && (
-            <span className="ml-1.5 text-[var(--color-text-tertiary)] font-normal normal-case tracking-normal">
+            <span className="ml-1.5 text-ink-tertiary font-normal normal-case tracking-normal">
               {open.length} terbuka
             </span>
           )}
@@ -175,7 +177,7 @@ export function GeneralTaskBlock({
       {/* Rows */}
       <div className="px-4">
         {visible.length === 0 && !canManage ? (
-          <p className="py-3 text-sm text-[var(--color-text-tertiary)]">Tidak ada task terbuka.</p>
+          <p className="py-3 text-sm text-ink-tertiary">Tidak ada task terbuka.</p>
         ) : null}
 
         {visible.map((task) => (

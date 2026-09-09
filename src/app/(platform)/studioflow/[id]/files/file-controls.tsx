@@ -9,7 +9,7 @@ import { linkFileAction, moveFileAction, recordFileAction, supersedeFileAction }
 const INITIAL: ActionResult<void> | null = null;
 
 const failureOf = (state: ActionResult<void> | null) =>
-  state && !state.ok ? state.error.safeMessage : null;
+  state?.ok === false ? state.error.safeMessage : null;
 
 export type FolderOption = { folder_key: string; name: string };
 

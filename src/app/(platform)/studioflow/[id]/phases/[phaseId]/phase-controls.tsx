@@ -26,7 +26,7 @@ type BoundAction = (
 type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 
 const failureOf = (state: ActionResult<void> | null) =>
-  state && !state.ok ? state.error.safeMessage : null;
+  state?.ok === false ? state.error.safeMessage : null;
 
 /** A submit-only form (no extra input) bound to one phase action. */
 function SimpleAction({

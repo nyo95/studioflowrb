@@ -162,6 +162,8 @@ export type RecordResponseInput = {
   /** Client's own wording, one entry per revision request.
    *  Required (non-empty) when kind is REVISION. */
   points?: string[];
+  /** Explicitly close the phase with the approval in the same transaction. */
+  also_finish_phase?: boolean;
 };
 
 export type UpdateNamingTemplateInput = {
@@ -311,7 +313,14 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
 
   async function getClient(grants: PermissionGrants, id: string) {
     requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
-    const client = await db.sfClient.findUnique({ where: { id } });
+    const client = await db.sfClient.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: { projects: { where: { deleted_at: null } } },
+        },
+      },
+    });
     if (!client) throw new AppError("NOT_FOUND", "studioflow.client.not-found", "Client not found");
     return client;
   }
@@ -444,7 +453,20 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         ...(opts?.includeArchived ? {} : { deleted_at: null }),
         ...(opts?.clientId ? { client_id: opts.clientId } : {}),
       },
-      include: { client: { select: { id: true, name: true } } },
+      include: {
+        client: { select: { id: true, name: true } },
+        phases: {
+          select: {
+            state: true,
+            iterations: {
+              where: { state: "SENT" },
+              select: { sent_at: true },
+              orderBy: { sent_at: "asc" },
+              take: 1,
+            },
+          },
+        },
+      },
       orderBy: [{ priority: "desc" }, { opened_at: "desc" }],
     });
   }
@@ -721,9 +743,13 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       orderBy: { sort_order: "asc" },
       include: {
         iterations: {
-          where: { state: { not: "VOIDED" } },
           orderBy: { number: "desc" },
-          take: 5,
+          include: {
+            points: { orderBy: { sort_order: "asc" } },
+            internal_approval: {
+              select: { approved_at: true, approved_by_id: true },
+            },
+          },
         },
       },
     });
@@ -891,7 +917,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     iterationId: string,
     assigneeId?: string,
   ) {
-    requirePermission(grants, STUDIOFLOW_PERMISSIONS.iterationManage);
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.iterationReview);
     return runTransaction(async () => {
       const iteration = await db.sfIteration.findUnique({
         where: { id: iterationId },
@@ -900,6 +926,16 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       if (!iteration) throw new AppError("NOT_FOUND", "studioflow.iteration.not-found", "Round not found");
       if (iteration.state !== "DRAFT") throw new AppError("CONFLICT", "studioflow.iteration.not-draft", "Only draft rounds can be sent");
       if (iteration.phase.state === "DONE") throw new AppError("CONFLICT", "studioflow.phase.closed", "Cannot send a round in a finished phase");
+      const pendingClientResponse = await db.sfIteration.count({
+        where: { phase_id: iteration.phase_id, state: "SENT" },
+      });
+      if (pendingClientResponse > 0) {
+        throw new AppError(
+          "CONFLICT",
+          "studioflow.iteration.pending-client-response",
+          "Catat jawaban ronde sebelumnya sebelum mengirim ronde ini",
+        );
+      }
       const updated = await db.sfIteration.update({
         where: { id: iterationId },
         data: { state: "SENT", sent_at: new Date(), ...(assigneeId !== undefined ? { assignee_id: assigneeId || null } : {}) },
@@ -924,7 +960,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
   }
 
   async function voidIteration(grants: PermissionGrants, actor: AuditActor, iterationId: string, reason: string) {
-    requirePermission(grants, STUDIOFLOW_PERMISSIONS.iterationManage);
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.iterationReview);
     if (!reason.trim()) throw new AppError("VALIDATION", "studioflow.iteration.void-reason-required", "Reason is required");
     return runTransaction(async () => {
       const iteration = await db.sfIteration.findUnique({ where: { id: iterationId }, select: { id: true, phase_id: true, state: true } });
@@ -1198,10 +1234,11 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
           where: { id: iterationId },
           data: { state: "SUPERSEDED", responded_at: now },
         });
-        const number = await nextIterationNumber(db, iteration.phase_id);
-        nextIteration = await db.sfIteration.create({
-          data: { phase_id: iteration.phase_id, number, state: "DRAFT" },
-          select: { id: true, number: true },
+        const next = await resolveOrOpenDraft(db, iteration.phase_id);
+        nextIteration = { id: next.iteration.id, number: next.iteration.number };
+        const existingPointOrder = await db.sfIterationPoint.aggregate({
+          where: { iteration_id: nextIteration.id },
+          _max: { sort_order: true },
         });
         // Carry the client's wording forward verbatim, with provenance (7.2).
         for (const [index, point] of recordedPoints.entries()) {
@@ -1212,13 +1249,39 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
               source: "CLIENT_REVISION",
               source_response_id: response.id,
               source_point_id: point.id,
-              sort_order: index + 1,
+              sort_order: (existingPointOrder._max.sort_order ?? 0) + index + 1,
             },
           });
         }
       }
 
       await recomputePhaseState(db, iteration.phase_id);
+
+      let phaseClosed = false;
+      if (input.kind === "APPROVAL" && input.also_finish_phase) {
+        const openCount = await db.sfIteration.count({
+          where: { phase_id: iteration.phase_id, state: { in: ["DRAFT", "SENT"] } },
+        });
+        if (openCount > 0) {
+          throw new AppError(
+            "CONFLICT",
+            "studioflow.phase.open-iterations",
+            "Finish all open rounds before closing the phase",
+          );
+        }
+        await db.sfProjectPhase.update({
+          where: { id: iteration.phase_id },
+          data: {
+            state: "DONE",
+            closed_at: now,
+            closed_by_id: actorUserId,
+            closure_reason: null,
+            closure_kind: "NORMAL",
+          },
+        });
+        phaseClosed = true;
+      }
+
       await writeAudit({
         action: "response.record",
         entityType: "SfResponse",
@@ -1229,6 +1292,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
           kind: input.kind,
           point_count: recordedPoints.length,
           next_iteration_id: nextIteration?.id ?? null,
+          phase_closed: phaseClosed,
         },
       });
 
@@ -1717,7 +1781,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
           round_prefix: iteration.phase.round_prefix,
         },
         iteration_number: iteration.number,
-        state: iteration.state,
+        state: iteration.state as "DRAFT" | "SENT",
         assignee_id: iteration.assignee_id,
         assignee_label: iteration.assignee_id ? people.get(iteration.assignee_id)?.label ?? null : null,
         assignment,

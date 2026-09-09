@@ -31,12 +31,51 @@ const STATUS_LABELS: Record<string, string> = {
   COMPLETED: "Selesai",
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  RESIDENTIAL: "Residensial",
-  COMMERCIAL: "Komersial",
-  HOSPITALITY: "Hospitality",
-  OTHER: "Lainnya",
+// ── Phase summary helpers ─────────────────────────────────────────────────────
+
+type PhaseSummary = {
+  state: string;
+  oldestSentAt: Date | null; // earliest SENT iteration sent_at for WAITING_CLIENT
 };
+
+function ageLabel(since: Date): string {
+  const d = Math.floor((Date.now() - since.getTime()) / 86_400_000);
+  if (d === 0) return "hari ini";
+  if (d === 1) return "1 hari";
+  return `${d} hari`;
+}
+
+function phaseSummaryLabel(phases: PhaseSummary[]): { text: string; tone: "waiting" | "active" | "done" | "idle" } | null {
+  if (phases.length === 0) return null;
+
+  // WAITING_CLIENT — oldest sent_at across all waiting phases
+  const waitingPhases = phases.filter((p) => p.state === "WAITING_CLIENT");
+  if (waitingPhases.length > 0) {
+    const sentDates = waitingPhases
+      .map((p) => p.oldestSentAt)
+      .filter((d): d is Date => d !== null);
+    const oldest = sentDates.length > 0
+      ? new Date(Math.min(...sentDates.map((d) => d.getTime())))
+      : null;
+    const suffix = oldest ? ` · ${ageLabel(oldest)}` : "";
+    const label = waitingPhases.length === 1 ? "Menunggu klien" : `${waitingPhases.length} fase menunggu klien`;
+    return { text: label + suffix, tone: "waiting" };
+  }
+
+  // IN_PROGRESS
+  const inProgress = phases.filter((p) => p.state === "IN_PROGRESS");
+  if (inProgress.length > 0) {
+    const label = inProgress.length === 1 ? "Digarap" : `${inProgress.length} fase digarap`;
+    return { text: label, tone: "active" };
+  }
+
+  // All DONE
+  if (phases.every((p) => p.state === "DONE")) {
+    return { text: "Semua fase selesai", tone: "done" };
+  }
+
+  return null; // NOT_STARTED across all phases — no label needed
+}
 
 export default async function StudioFlowProjectsPage() {
   const principalGrants = await requirePrincipalGrants().catch(() => null);
@@ -65,6 +104,19 @@ export default async function StudioFlowProjectsPage() {
     studioFlowService.listProjects(grants),
     readPlatformGeneralSettings(prisma),
   ]);
+
+  // Cross-schema: resolve lead_user_id → display_name (no Prisma relation allowed)
+  const leadUserIds = Array.from(
+    new Set(projects.map((p) => p.lead_user_id).filter((id): id is string => Boolean(id))),
+  );
+  const leadUsers =
+    leadUserIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: leadUserIds } },
+          select: { id: true, display_name: true },
+        })
+      : [];
+  const leadUserMap = Object.fromEntries(leadUsers.map((u) => [u.id, u.display_name]));
 
   const fmt = new Intl.DateTimeFormat(settings.locale, {
     timeZone: settings.timezone,
@@ -95,46 +147,74 @@ export default async function StudioFlowProjectsPage() {
         </SectionCard>
       ) : (
         <DirectoryShell surface fill>
-          <DataTable framed={false} density="compact" stickyHeader fill minWidth={700}>
+          <DataTable framed={false} density="compact" stickyHeader fill minWidth={800}>
             <TableHeader>
               <TableRow>
                 <TableHead>Project</TableHead>
                 <TableHead>Klien</TableHead>
-                <TableHead>Tipe</TableHead>
+                <TableHead>Ringkasan fase</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Lead</TableHead>
                 <TableHead>Dibuka</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {projects.map((project) => (
-                <TableRow key={project.id}>
-                  <TableCell>
-                    <EntityPrimaryCell
-                      tone={
-                        project.status === "ACTIVE"
-                          ? "success"
-                          : project.status === "COMPLETED"
-                            ? "neutral"
-                            : "warning"
-                      }
-                      statusLabel={STATUS_LABELS[project.status] ?? project.status}
-                      name={
-                        <Link
-                          href={`/studioflow/${project.id}`}
-                          className="font-medium text-action hover:underline"
+              {projects.map((project) => {
+                const phases: PhaseSummary[] = project.phases.map((phase) => ({
+                  state: phase.state,
+                  oldestSentAt: phase.iterations[0]?.sent_at ?? null,
+                }));
+                const summary = phaseSummaryLabel(phases);
+                const leadName = project.lead_user_id
+                  ? (leadUserMap[project.lead_user_id] ?? "—")
+                  : "—";
+                return (
+                  <TableRow key={project.id}>
+                    <TableCell>
+                      <EntityPrimaryCell
+                        tone={
+                          project.status === "ACTIVE"
+                            ? "success"
+                            : project.status === "COMPLETED"
+                              ? "neutral"
+                              : "warning"
+                        }
+                        statusLabel={STATUS_LABELS[project.status] ?? project.status}
+                        name={
+                          <Link
+                            href={`/studioflow/${project.id}`}
+                            className="font-medium text-action hover:underline"
+                          >
+                            {project.name}
+                          </Link>
+                        }
+                        secondary={project.code}
+                      />
+                    </TableCell>
+                    <TableCell>{project.client.name}</TableCell>
+                    <TableCell>
+                      {summary ? (
+                        <span
+                          className={
+                            summary.tone === "waiting"
+                              ? "text-warning text-xs font-medium"
+                              : summary.tone === "done"
+                                ? "text-ink-tertiary text-xs"
+                                : "text-ink-secondary text-xs"
+                          }
                         >
-                          {project.name}
-                        </Link>
-                      }
-                      secondary={project.code}
-                    />
-                  </TableCell>
-                  <TableCell>{project.client.name}</TableCell>
-                  <TableCell>{TYPE_LABELS[project.type] ?? project.type}</TableCell>
-                  <TableCell>{STATUS_LABELS[project.status] ?? project.status}</TableCell>
-                  <TableCell>{fmt.format(new Date(project.opened_at))}</TableCell>
-                </TableRow>
-              ))}
+                          {summary.text}
+                        </span>
+                      ) : (
+                        <span className="text-ink-tertiary text-xs">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{STATUS_LABELS[project.status] ?? project.status}</TableCell>
+                    <TableCell className="text-sm">{leadName}</TableCell>
+                    <TableCell>{fmt.format(new Date(project.opened_at))}</TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </DataTable>
         </DirectoryShell>

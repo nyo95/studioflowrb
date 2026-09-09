@@ -23,7 +23,7 @@ type BoundAction = (
 ) => Promise<ActionResult<void>>;
 
 const failureOf = (state: ActionResult<void> | null) =>
-  state && !state.ok ? state.error.safeMessage : null;
+  state?.ok === false ? state.error.safeMessage : null;
 
 type Ids = { iterationId: string; projectId: string; phaseId: string };
 
@@ -117,13 +117,13 @@ export function PointRow({
   const failure = failureOf(toggleState) ?? failureOf(wdState);
 
   return (
-    <div className="rounded border border-[var(--ui-border)] px-3 py-2 text-sm">
+    <div className="rounded border border-line px-3 py-2 text-sm">
       <div className="flex items-center justify-between gap-3">
-        <span className={`flex items-center gap-2 ${point.done ? "text-[var(--ui-muted)] line-through" : ""}`}>
-          {point.done ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Circle className="h-4 w-4 text-[var(--ui-muted)]" />}
+        <span className={`flex items-center gap-2 ${point.done ? "text-ink-tertiary line-through" : ""}`}>
+          {point.done ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Circle className="h-4 w-4 text-ink-tertiary" />}
           {point.text}
           {point.source === "CLIENT_REVISION" && (
-            <span className="rounded-full bg-[var(--ui-surface-raised)] px-2 py-0.5 text-xs">dari klien</span>
+            <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs">dari klien</span>
           )}
         </span>
         {editable && (

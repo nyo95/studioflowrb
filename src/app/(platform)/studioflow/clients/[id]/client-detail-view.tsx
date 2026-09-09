@@ -18,12 +18,20 @@ type Client = {
 
 const INITIAL = null;
 
-export function ClientDetailView({ client, canManage }: { client: Client; canManage: boolean }) {
+export function ClientDetailView({
+  client,
+  canManage,
+  liveProjectCount,
+}: {
+  client: Client;
+  canManage: boolean;
+  liveProjectCount: number;
+}) {
   const [editState, editAction, editPending] = useActionState(editClientAction, INITIAL);
   const [archiveState, archiveAction, archivePending] = useActionState(archiveClientAction, INITIAL);
 
-  const editFailure = editState && !editState.ok ? editState.error.safeMessage : null;
-  const archiveFailure = archiveState && !archiveState.ok ? archiveState.error.safeMessage : null;
+  const editFailure = editState?.ok === false ? editState.error.safeMessage : null;
+  const archiveFailure = archiveState?.ok === false ? archiveState.error.safeMessage : null;
 
   return (
     <div className="grid gap-6">
@@ -64,12 +72,19 @@ export function ClientDetailView({ client, canManage }: { client: Client; canMan
         <SectionCard title="Arsip klien">
           {archiveFailure ? <InlineError>{archiveFailure}</InlineError> : null}
           {client.deleted_at ? (
-            <p className="text-sm text-[var(--ui-muted)]">Klien ini sudah diarsipkan.</p>
+            <p className="text-sm text-ink-tertiary">Klien ini sudah diarsipkan.</p>
+          ) : liveProjectCount > 0 ? (
+            // Spec §5: archive button must not render when client has live projects
+            <p className="text-sm text-ink-tertiary">
+              Klien ini tidak bisa diarsipkan karena memiliki{" "}
+              <strong className="text-ink">{liveProjectCount} project aktif</strong>.
+              Selesaikan atau hapus project tersebut terlebih dahulu.
+            </p>
           ) : (
             <form action={archiveAction} className="grid gap-3">
               <input type="hidden" name="id" value={client.id} />
-              <p className="text-sm text-[var(--ui-muted)]">
-                Mengarsipkan klien menyembunyikannya dari daftar aktif. Klien dengan project aktif tidak bisa diarsipkan.
+              <p className="text-sm text-ink-tertiary">
+                Mengarsipkan klien menyembunyikannya dari daftar aktif.
               </p>
               <div>
                 <Button type="submit" variant="danger" pending={archivePending}>Arsipkan klien</Button>

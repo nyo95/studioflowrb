@@ -49,26 +49,26 @@ function IterationRow({
       : `belum digarap · ${age}`;
 
   return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-[var(--color-border)] last:border-0">
+    <div className="flex items-center gap-3 py-2.5 border-b border-line last:border-0">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <Link
             href={`/studioflow/${item.project.id}`}
-            className="font-medium text-[var(--color-text-primary)] hover:text-action hover:underline truncate"
+            className="font-medium text-ink hover:text-action hover:underline truncate"
           >
             {item.project.name}
           </Link>
-          <span className="text-xs text-[var(--color-text-secondary)] shrink-0">
+          <span className="text-xs text-ink-secondary shrink-0">
             · {item.phase.name} · {label}
           </span>
         </div>
         {item.assignee_label && section !== "unassigned" && (
-          <p className="text-xs text-[var(--color-text-tertiary)] mt-0.5">
+          <p className="text-xs text-ink-tertiary mt-0.5">
             dari {item.assignee_label}
           </p>
         )}
       </div>
-      <span className="text-xs text-[var(--color-text-secondary)] shrink-0 tabular-nums">
+      <span className="text-xs text-ink-secondary shrink-0 tabular-nums">
         {stateLabel}
       </span>
     </div>
@@ -78,27 +78,27 @@ function IterationRow({
 function TaskRow({ item }: { item: Extract<WaitingOnMeItem, { kind: "TASK" }> }) {
   const age = ageLabel(item.waiting_since);
   return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-[var(--color-border)] last:border-0">
-      <span className="text-[var(--color-text-tertiary)] shrink-0" aria-hidden="true">○</span>
+    <div className="flex items-center gap-3 py-2.5 border-b border-line last:border-0">
+      <span className="text-ink-tertiary shrink-0" aria-hidden="true">○</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <Link
             href={`/studioflow/${item.project.id}`}
-            className="text-sm text-[var(--color-text-primary)] hover:text-action hover:underline truncate"
+            className="text-sm text-ink hover:text-action hover:underline truncate"
           >
             {item.project.name}
           </Link>
-          <span className="text-xs text-[var(--color-text-secondary)] shrink-0">
+          <span className="text-xs text-ink-secondary shrink-0">
             · {item.title}
           </span>
         </div>
         {item.due_date && (
-          <p className="text-xs text-[var(--color-text-tertiary)] mt-0.5">
+          <p className="text-xs text-ink-tertiary mt-0.5">
             jatuh tempo {new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" }).format(item.due_date)}
           </p>
         )}
       </div>
-      <span className="text-xs text-[var(--color-text-secondary)] shrink-0 tabular-nums">
+      <span className="text-xs text-ink-secondary shrink-0 tabular-nums">
         {age}
       </span>
     </div>
@@ -174,8 +174,8 @@ export default async function WaitingOnMePage() {
           {/* ── Menunggu saya ───────────────────────────────── */}
           {mine.length > 0 && (
             <SectionCard>
-              <div className="px-4 pt-3 pb-1 border-b border-[var(--color-border)]">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+              <div className="px-4 pt-3 pb-1 border-b border-line">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
                   Menunggu saya
                 </h2>
               </div>
@@ -194,8 +194,8 @@ export default async function WaitingOnMePage() {
           {/* ── Menunggu klien ──────────────────────────────── */}
           {waitingClient.length > 0 && (
             <SectionCard>
-              <div className="px-4 pt-3 pb-1 border-b border-[var(--color-border)]">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] flex items-center gap-1.5">
+              <div className="px-4 pt-3 pb-1 border-b border-line">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary flex items-center gap-1.5">
                   <Clock size={12} aria-hidden="true" />
                   Menunggu klien
                 </h2>
@@ -215,8 +215,8 @@ export default async function WaitingOnMePage() {
           {/* ── Belum ada penanggung jawab ──────────────────── */}
           {unassigned.length > 0 && (
             <SectionCard>
-              <div className="px-4 pt-3 pb-1 border-b border-[var(--color-border)]">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] flex items-center gap-1.5">
+              <div className="px-4 pt-3 pb-1 border-b border-line">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary flex items-center gap-1.5">
                   <Users size={12} aria-hidden="true" />
                   Belum ada penanggung jawab
                 </h2>

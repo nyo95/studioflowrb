@@ -16,14 +16,14 @@ type StudioFlowNavLink = {
 const links: readonly StudioFlowNavLink[] = [
   { href: "/studioflow", label: "Menunggu saya", icon: ClipboardCheck, exact: true },
   { href: "/studioflow/projects", label: "Semua project", icon: FolderOpen },
-  { href: "/studioflow/clients", label: "Clients", icon: Users },
+  { href: "/studioflow/clients", label: "Klien", icon: Users },
   {
     href: "/studioflow/library",
     label: "Library",
     icon: Library,
     disabled: true,
   },
-  { href: "/studioflow/settings", label: "Settings", icon: Settings },
+  { href: "/studioflow/settings", label: "Pengaturan", icon: Settings },
 ];
 
 /**
@@ -36,7 +36,7 @@ export function StudioFlowNav() {
   if (!pathname.startsWith("/studioflow")) return null;
 
   return (
-    <NavGroup label="StudioFlow navigation">
+    <NavGroup label="Navigasi StudioFlow">
       {links.map(({ href, label, icon: Icon, exact, disabled }) => {
         const isActive =
           !disabled &&

@@ -38,7 +38,7 @@ export function NamingTemplateForm({
 }) {
   const [state, formAction, pending] = useActionState(updateNamingTemplateAction, INITIAL);
   const [draft, setDraft] = useState(template);
-  const failure = state && !state.ok ? state.error.safeMessage : null;
+  const failure = state?.ok === false ? state.error.safeMessage : null;
   const saved = state?.ok === true;
 
   return (
@@ -59,18 +59,18 @@ export function NamingTemplateForm({
         />
       </Field>
 
-      <div className="rounded border border-[var(--ui-border)] bg-[var(--ui-surface-raised)] px-4 py-3">
-        <p className="text-xs text-[var(--ui-muted)]">Contoh hasil</p>
+      <div className="rounded border border-line bg-surface-muted px-4 py-3">
+        <p className="text-xs text-ink-tertiary">Contoh hasil</p>
         <p className="mt-1 font-mono text-sm">{preview(draft) || "—"}.pdf</p>
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-medium text-[var(--ui-muted)]">Token yang tersedia</p>
+        <p className="mb-2 text-xs font-medium text-ink-tertiary">Token yang tersedia</p>
         <dl className="grid gap-1 text-sm">
           {TOKENS.map((entry) => (
             <div key={entry.token} className="flex gap-3">
               <dt className="w-24 shrink-0 font-mono text-xs">{entry.token}</dt>
-              <dd className="text-[var(--ui-muted)]">{entry.label}</dd>
+              <dd className="text-ink-tertiary">{entry.label}</dd>
             </div>
           ))}
         </dl>
