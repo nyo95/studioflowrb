@@ -5,8 +5,23 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.31**
-- Next local revision: **R7.32**
+- Current revision after this entry is committed: **R7.32**
+- Next local revision: **R7.33**
+
+## R7.32 | 2026-09-09 | docs(studioflow): record workflow alignment
+
+### Changed
+
+- Added `alignment.md` as the owner-aligned explanation of the rebuild
+  contract, legacy preservation/corrections, deliverable-driven workflow,
+  shared foundation rules, explicit non-scope, and current deviations.
+- Recorded the Explorer-style viewer as fully out of scope and identified the
+  remaining deliverable-driven, MOM, Product Catalogue/FFNI, and shared-image
+  gaps without presenting them as completed.
+
+### Verification
+
+- `git diff --check`: passed.
 
 ## R7.31 | 2026-09-09 | fix(studioflow): align activity navigation
 
