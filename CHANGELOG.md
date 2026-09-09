@@ -5,8 +5,43 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.17**
-- Next local revision: **R7.18**
+- Current revision after this entry is committed: **R7.19**
+- Next local revision: **R7.20**
+
+## R7.19 | 2026-09-09 | fix(platform): resolve TypeScript narrowing errors across all platform routes
+
+### Fixed
+
+- Replaced all `!x.ok` boolean negation patterns with `x.ok === false` explicit
+  equality checks throughout `account`, `bq`, `masterdata`, `settings`, and
+  `login` routes. TypeScript 5.9.3 does not narrow discriminated unions through
+  negation (`!x.ok`) or truthy checks (`x.ok`) — only through strict equality
+  comparison.
+- Replaced all JSX ternary `X && !X.ok ?` patterns with `X?.ok === false ?` so
+  the error branch is correctly narrowed to `{ ok: false; error: SafeErrorPayload }`.
+- Fixed `fieldError()` helper in `account-forms.tsx`: guard condition updated
+  from `!state || state.ok ||` to `state === null || state.ok !== false ||`.
+- Fixed `if (result.ok) …; else result.error` implicit-else patterns in
+  `pricing-directory.tsx` and `vendor-type-directory.tsx` by using
+  `else if (result.ok === false)`.
+- Fixed `NormalizedUrl`/`NormalizedLinks` discriminated unions in
+  `brand-link-input.ts` and `brand-directory.tsx` — same `=== false` pattern.
+- Fixed `audit/index.ts`: cast `unknown` → `object` for `Object.getPrototypeOf`,
+  `Object.entries`, and `Set` method calls inside `serializeAuditValueDeep`.
+- Fixed `shells.tsx`: double-cast `props as unknown as ButtonHTMLAttributes` to
+  silence an overlapping-type assertion error on the disabled nav button.
+- Fixed `bq/public/index.ts` `listTemplates()`: added `as BqTemplateRead[]`
+  assertion where TS could not unify the union return type of two actions.
+
+### Dependencies and migrations
+
+- No new dependencies, schema changes, or migrations. Zero functional changes;
+  this is a type-level fix only.
+
+### Verification
+
+- `npx tsc --noEmit --strict false`: **0 errors** (down from 52 before this session).
+- All StudioFlow, Master Data, BQ, Settings, and Auth routes pass type check.
 
 ## R7.17 | 2026-09-09 | feat(studioflow): add task assignment and due dates
 

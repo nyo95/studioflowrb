@@ -23,7 +23,7 @@ export function normalizeBrandLinks(links: readonly BrandLinkDraft[]): Normalize
   const normalized: BrandLinkDraft[] = [];
   for (const link of links) {
     const url = normalizeBrandLinkUrl(link.url);
-    if (!url.ok) return url;
+    if (url.ok === false) return url;
     normalized.push({ ...link, url: url.value, label: link.label.trim() });
   }
   return { ok: true, value: normalized };

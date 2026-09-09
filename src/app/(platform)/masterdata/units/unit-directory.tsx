@@ -90,7 +90,7 @@ export function UnitDirectory({
     startTransition(async () => {
       try {
         const result = await command();
-        if (result && typeof result === "object" && "ok" in result && !result.ok) {
+        if (result && typeof result === "object" && "ok" in result && result.ok === false) {
           const failure = result as { error?: { safeMessage?: string } };
           setRowError(failure.error?.safeMessage ?? "The action could not be completed."); return;
         }
@@ -163,7 +163,7 @@ export function UnitDirectory({
               if (res && "ok" in res && res.ok) {
                 setCreateOpen(false);
                 setSuccessMessage("Measurement unit created.");
-              } else if (res && "ok" in res && !res.ok) {
+              } else if (res && "ok" in res && res.ok === false) {
                 setCreateError(res.error.safeMessage);
               }
             } finally {
@@ -211,7 +211,7 @@ export function UnitDirectory({
               if (res && "ok" in res && res.ok) {
                 setEditTarget(null);
                 setSuccessMessage("Measurement unit updated.");
-                } else if (res && "ok" in res && !res.ok) {
+                } else if (res && "ok" in res && res.ok === false) {
                   setEditError(res.error.safeMessage);
                 }
               } finally {

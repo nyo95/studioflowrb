@@ -32,7 +32,7 @@ export function LoginForm() {
             required
             autoFocus
             placeholder="name@example.com"
-            aria-invalid={state && !state.ok ? true : undefined}
+            aria-invalid={state?.ok === false ? true : undefined}
           />
         </Field>
         <Field id="login-password" label="Password">
@@ -42,10 +42,10 @@ export function LoginForm() {
             type="password"
             autoComplete="current-password"
             required
-            aria-invalid={state && !state.ok ? true : undefined}
+            aria-invalid={state?.ok === false ? true : undefined}
           />
         </Field>
-        {state && !state.ok ? (
+        {state?.ok === false ? (
           <div role="alert" className="mb-3">
             <InlineError>{state.error.safeMessage}</InlineError>
           </div>

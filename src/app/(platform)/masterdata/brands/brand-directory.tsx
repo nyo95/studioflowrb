@@ -150,7 +150,7 @@ export function BrandDirectory({
     startTransition(async () => {
       try {
         const result = await command();
-        if (result && typeof result === "object" && "ok" in result && !result.ok) {
+        if (result && typeof result === "object" && "ok" in result && result.ok === false) {
           const failure = result as { error?: { safeMessage?: string } };
           setRowError(failure.error?.safeMessage ?? "The action could not be completed."); return;
         }
@@ -207,7 +207,7 @@ export function BrandDirectory({
 
   const addLink = () => {
     const normalizedUrl = normalizeBrandLinkUrl(newLinkUrl);
-    if (!normalizedUrl.ok) {
+    if (normalizedUrl.ok === false) {
       setLinkError(normalizedUrl.error);
       return;
     }
@@ -224,7 +224,7 @@ export function BrandDirectory({
   const createOwnerVendor = async (name: string, setError: (error: string | null) => void) => {
     setError(null);
     const result = await createOwnerVendorQuickAction(name);
-    if (!result.ok) {
+    if (result.ok === false) {
       setError(result.error.safeMessage);
       return;
     }
@@ -239,7 +239,7 @@ export function BrandDirectory({
     formData.set("name", name);
     formData.set("kind", "PRODUCT");
     const result = await createCategoryAction(null, formData);
-    if (!result.ok) {
+    if (result.ok === false) {
       setError(result.error.safeMessage);
       return;
     }
@@ -324,7 +324,7 @@ export function BrandDirectory({
             e.preventDefault();
             setCreateError(null);
             const normalizedLinks = normalizeBrandLinks(linksList);
-            if (!normalizedLinks.ok) {
+            if (normalizedLinks.ok === false) {
               setCreateError(normalizedLinks.error);
               return;
             }
@@ -335,7 +335,7 @@ export function BrandDirectory({
               const res = await createBrandAction(null, fd);
               if (res && "ok" in res && res.ok) {
                 setCreateOpen(false);
-              } else if (res && "ok" in res && !res.ok) {
+              } else if (res && "ok" in res && res.ok === false) {
                 setCreateError(res.error.safeMessage);
               }
             } finally {
@@ -434,7 +434,7 @@ export function BrandDirectory({
               e.preventDefault();
               setEditError(null);
               const normalizedLinks = normalizeBrandLinks(linksList);
-              if (!normalizedLinks.ok) {
+              if (normalizedLinks.ok === false) {
                 setEditError(normalizedLinks.error);
                 return;
               }
@@ -445,7 +445,7 @@ export function BrandDirectory({
                 const res = await updateBrandAction(null, fd);
                 if (res && "ok" in res && res.ok) {
                   setEditTarget(null);
-                } else if (res && "ok" in res && !res.ok) {
+                } else if (res && "ok" in res && res.ok === false) {
                   setEditError(res.error.safeMessage);
                 }
               } finally {

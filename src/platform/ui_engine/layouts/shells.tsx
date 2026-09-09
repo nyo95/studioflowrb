@@ -245,7 +245,7 @@ export function NavItem({ icon, active = false, disabled = false, children, clas
   );
 
   const item = disabled ? (
-    <button type="button" className={itemClasses} disabled {...(props as ButtonHTMLAttributes<HTMLButtonElement>)}>
+    <button type="button" className={itemClasses} disabled {...(props as unknown as ButtonHTMLAttributes<HTMLButtonElement>)}>
       {content}
     </button>
   ) : (

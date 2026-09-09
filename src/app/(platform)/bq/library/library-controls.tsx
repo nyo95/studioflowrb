@@ -25,7 +25,7 @@ export function LibraryItemCreateButton({ units }: { units: UnitRead[] }) {
 
 export function AssemblyCreateButton() {
   const [open, setOpen] = useState(false); const [error, setError] = useState<string | null>(null); const [pending, startTransition] = useTransition(); const router = useRouter();
-  return <><Button type="button" variant="primary" leadingIcon={<Plus aria-hidden="true" />} onClick={() => setOpen(true)}>Add assembly</Button><DraftDialog pending={pending} open={open} onOpenChange={setOpen} title="Add Assembly Template" description="Reusable Component Group breakdown. Its Cost Components are copied into each project." size="sm"><form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); startTransition(async () => { const result = await createAssemblyAction(null, data); if (!result.ok) setError(result.error.safeMessage); else { setOpen(false); router.refresh(); } }); }}>{error ? <InlineError>{error}</InlineError> : null}<Field label="Name" required><Input name="name" required maxLength={160} autoFocus /></Field><Field label="Description"><Textarea name="description" maxLength={2000} /></Field><FormActions><Button data-dialog-cancel type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" variant="primary" pending={pending}>Add assembly</Button></FormActions></form></DraftDialog></>;
+  return <><Button type="button" variant="primary" leadingIcon={<Plus aria-hidden="true" />} onClick={() => setOpen(true)}>Add assembly</Button><DraftDialog pending={pending} open={open} onOpenChange={setOpen} title="Add Assembly Template" description="Reusable Component Group breakdown. Its Cost Components are copied into each project." size="sm"><form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); startTransition(async () => { const result = await createAssemblyAction(null, data); if (result.ok === false) setError(result.error.safeMessage); else { setOpen(false); router.refresh(); } }); }}>{error ? <InlineError>{error}</InlineError> : null}<Field label="Name" required><Input name="name" required maxLength={160} autoFocus /></Field><Field label="Description"><Textarea name="description" maxLength={2000} /></Field><FormActions><Button data-dialog-cancel type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" variant="primary" pending={pending}>Add assembly</Button></FormActions></form></DraftDialog></>;
 }
 
 export function LibraryItemActions({ item, units }: { item: BqLibItemRead; units: UnitRead[] }) {
@@ -52,7 +52,7 @@ function DeleteItemDialog({ item, open, onOpenChange }: { item: BqLibItemRead; o
     data.set("currency", item.currency); data.set("defaultKoefisien", item.defaultKoefisien);
     command.startTransition(async () => {
       const result = await libraryItemAction(null, data);
-      if (!result.ok) command.setError(result.error.safeMessage);
+      if (result.ok === false) command.setError(result.error.safeMessage);
       else { onOpenChange(false); command.router.refresh(); }
     });
   };
@@ -74,7 +74,7 @@ function LibraryItemDialog({ item, units, open: controlledOpen, onOpenChange }: 
     const formData = new FormData(event.currentTarget);
     startTransition(async () => {
       const result = await libraryItemAction(null, formData);
-      if (!result.ok) setError(result.error.safeMessage);
+      if (result.ok === false) setError(result.error.safeMessage);
       else { setOpen(false); router.refresh(); }
     });
   };
@@ -113,7 +113,7 @@ export function TemplateActions({ template }: { template: BqTemplateRead }) {
   const command = useCommand();
   const run = (operation: "duplicate" | "delete") => {
     const data = new FormData(); data.set("operation", operation); data.set("id", template.id); data.set("name", template.name); data.set("description", template.description ?? "");
-    command.startTransition(async () => { const result = await templateAction(null, data); if (!result.ok) command.setError(result.error.safeMessage); else { setDeleteOpen(false); command.router.refresh(); } });
+    command.startTransition(async () => { const result = await templateAction(null, data); if (result.ok === false) command.setError(result.error.safeMessage); else { setDeleteOpen(false); command.router.refresh(); } });
   };
   return <div className="flex flex-wrap gap-1">
     <IconButton type="button" size="sm" variant="ghost"   onClick={() => setEditOpen(true)} label="Edit template" icon={<Pencil size={15} aria-hidden="true" />} />
@@ -132,7 +132,7 @@ function TemplateDialog({ template, open: controlledOpen, onOpenChange }: { temp
   const router = useRouter();
   const open = controlledOpen ?? internalOpen;
   const setOpen = (next: boolean) => (onOpenChange ? onOpenChange(next) : setInternalOpen(next));
-  const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setError(null); const data = new FormData(event.currentTarget); startTransition(async () => { const result = await templateAction(null, data); if (!result.ok) setError(result.error.safeMessage); else { setOpen(false); router.refresh(); } }); };
+  const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setError(null); const data = new FormData(event.currentTarget); startTransition(async () => { const result = await templateAction(null, data); if (result.ok === false) setError(result.error.safeMessage); else { setOpen(false); router.refresh(); } }); };
   return <>
     {!template ? <Button type="button" variant="primary" leadingIcon={<Plus aria-hidden="true" />} onClick={() => { setError(null); setOpen(true); }}>Add template</Button> : null}
     <DraftDialog pending={pending} open={open} onOpenChange={setOpen} title={template ? "Edit template" : "Add template"} description="A template is a reusable section and subsection scaffold for new BQ projects." size="sm">
@@ -171,7 +171,7 @@ export function AssemblyActions({ assembly }: { assembly: BqAssemblyTemplateRead
     data.set("id", assembly.id);
     command.startTransition(async () => {
       const result = await deleteAssemblyAction(null, data);
-      if (!result.ok) command.setError(result.error.safeMessage);
+      if (result.ok === false) command.setError(result.error.safeMessage);
       else { setDeleteOpen(false); command.router.refresh(); }
     });
   };
@@ -189,7 +189,7 @@ export function AssemblyActions({ assembly }: { assembly: BqAssemblyTemplateRead
           const data = new FormData(e.currentTarget);
           command.startTransition(async () => {
             const result = await updateAssemblyAction(null, data);
-            if (!result.ok) command.setError(result.error.safeMessage);
+            if (result.ok === false) command.setError(result.error.safeMessage);
             else { setEditOpen(false); command.router.refresh(); }
           });
         }}>
@@ -241,7 +241,7 @@ function AssemblyLineList({ detail, onRefresh }: { detail: BqAssemblyTemplateDet
     data.set("assemblyId", detail.id);
     startTransition(async () => {
       const result = await addAssemblyLineAction(null, data);
-      if (!result.ok) setError(result.error.safeMessage);
+      if (result.ok === false) setError(result.error.safeMessage);
       else { setAddOpen(false); setError(null); onRefresh(); }
     });
   };
@@ -251,7 +251,7 @@ function AssemblyLineList({ detail, onRefresh }: { detail: BqAssemblyTemplateDet
     data.set("lineId", lineId);
     startTransition(async () => {
       const result = await deleteAssemblyLineAction(null, data);
-      if (!result.ok) setError(result.error.safeMessage);
+      if (result.ok === false) setError(result.error.safeMessage);
       else onRefresh();
     });
   };
@@ -317,7 +317,7 @@ function AssemblyLineRow({ line, assemblyId: _assemblyId, pending, onDelete, onS
     data.set("lineId", line.id);
     startTransition(async () => {
       const result = await updateAssemblyLineAction(null, data);
-      if (!result.ok) setError(result.error.safeMessage);
+      if (result.ok === false) setError(result.error.safeMessage);
       else { draft.markSaved(); setEditOpen(false); setError(null); onSaved(); }
     });
   };

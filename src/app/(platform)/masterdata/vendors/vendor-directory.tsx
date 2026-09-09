@@ -292,7 +292,7 @@ export function VendorDirectory({
     startTransition(async () => {
       try {
         const result = await command();
-        if (result && typeof result === "object" && "ok" in result && !result.ok) {
+        if (result && typeof result === "object" && "ok" in result && result.ok === false) {
           const failure = result as { error?: { safeMessage?: string } };
           setRowError(failure.error?.safeMessage ?? "The action could not be completed."); return;
         }
@@ -497,7 +497,7 @@ export function VendorDirectory({
               const res = await createVendorAction(null, fd);
               if (res && "ok" in res && res.ok) {
                 setCreateOpen(false);
-              } else if (res && "ok" in res && !res.ok) {
+              } else if (res && "ok" in res && res.ok === false) {
                 setCreateError(res.error.safeMessage);
               }
             } finally {
@@ -626,7 +626,7 @@ export function VendorDirectory({
                 const res = await updateVendorAction(null, fd);
                 if (res && "ok" in res && res.ok) {
                   setEditTarget(null);
-                } else if (res && "ok" in res && !res.ok) {
+                } else if (res && "ok" in res && res.ok === false) {
                   setEditError(res.error.safeMessage);
                 }
               } finally {

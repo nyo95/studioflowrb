@@ -13,7 +13,7 @@ export function ProjectDeletionReview({ requests }: { requests: ProjectDeletionR
   const decide = () => {
     if (!target) return;
     const data = new FormData(); data.set("requestId", target.row.id); data.set("decision", target.decision); if (target.decision === "reject") data.set("reason", "Rejected by deletion approver");
-    startTransition(async () => { const result = await decideProjectDeletionAction(data); if (!result.ok) setError(result.error.safeMessage); else { setError(null); setTarget(null); } });
+    startTransition(async () => { const result = await decideProjectDeletionAction(data); if (result.ok === false) setError(result.error.safeMessage); else { setError(null); setTarget(null); } });
   };
   return <DirectoryShell surface header={error ? <InlineError>{error}</InlineError> : undefined}>
     {requests.length === 0 ? <EmptyState title="No pending project deletions" description="Archived BQ projects stay protected until a deletion request is approved." /> : <DataTable framed={false} density="compact" stickyHeader minWidth={680}>

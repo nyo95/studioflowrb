@@ -132,7 +132,7 @@ export function ProjectEditor({
       }
       startTransition(async () => {
         const result = await action(null, data);
-        if (!result.ok) {
+        if (result.ok === false) {
           setError(result.error.safeMessage);
           reject(new Error(result.error.safeMessage));
           return;
@@ -1040,7 +1040,7 @@ function ImportDialog({
     startTransition(async () => {
       const result = await listLineItemSourcesAction(nextQuery);
       if (requestId !== request.current) return;
-      if (!result.ok) {
+      if (result.ok === false) {
         setError(result.error.safeMessage);
         return;
       }
@@ -1056,7 +1056,7 @@ function ImportDialog({
     startTransition(async () => {
       const result = await listLineItemSourcesAction("");
       if (cancelled) return;
-      if (!result.ok) {
+      if (result.ok === false) {
         setError(result.error.safeMessage);
         return;
       }

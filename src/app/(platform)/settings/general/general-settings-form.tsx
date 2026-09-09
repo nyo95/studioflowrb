@@ -79,7 +79,7 @@ export function GeneralSettingsForm({
           </Field>
         </div>
 
-        {state && !state.ok ? (
+        {state?.ok === false ? (
           <div role="alert" className="mt-3">
             <InlineError>{state.error.safeMessage}</InlineError>
           </div>

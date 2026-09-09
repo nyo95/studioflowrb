@@ -52,7 +52,7 @@ export function RolesDirectory({
     startTransition(async () => {
       try {
         const result = await command();
-        if (result && typeof result === "object" && "ok" in result && !result.ok) {
+        if (result && typeof result === "object" && "ok" in result && result.ok === false) {
           const failure = result as { error?: { safeMessage?: string } };
           setRowError(failure.error?.safeMessage ?? "The action could not be completed."); return;
         }
@@ -143,7 +143,7 @@ return (
           <Field id="role-grants" label="Permissions">
             <PermissionCheckboxes name="permissionIds" permissions={registryPermissions} />
           </Field>
-          {createState && !createState.ok ? <InlineError>{createState.error.safeMessage}</InlineError> : null}
+          {createState?.ok === false ? <InlineError>{createState.error.safeMessage}</InlineError> : null}
           <FormActions>
             <Button data-dialog-cancel type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
               Cancel
@@ -171,7 +171,7 @@ return (
             <Field id="edit-role-description" label="Description">
               <Textarea id="edit-role-description" name="description" defaultValue={editTarget.description ?? ""} maxLength={500} rows={2} />
             </Field>
-            {editState && !editState.ok ? <InlineError>{editState.error.safeMessage}</InlineError> : null}
+            {editState?.ok === false ? <InlineError>{editState.error.safeMessage}</InlineError> : null}
             <FormActions>
               <Button type="button" variant="ghost" onClick={() => setEditTarget(null)}>
                 Close
@@ -200,7 +200,7 @@ return (
               permissions={registryPermissions}
               checkedIds={grantsTarget.permissionIds}
             />
-            {grantsState && !grantsState.ok ? <InlineError>{grantsState.error.safeMessage}</InlineError> : null}
+            {grantsState?.ok === false ? <InlineError>{grantsState.error.safeMessage}</InlineError> : null}
             {grantsState?.ok ? (
               <Notice tone="success" title="Grants updated" />
             ) : null}
