@@ -87,7 +87,7 @@ type Mutation = (prev: null, formData: FormData) => Promise<ActionResult<BqProje
 
 /** Amounts arrive as canonical decimal strings; presentation never re-derives them. */
 function money(amount: string | null, currency = "IDR") {
-  if (amount === null) return <span className="text-ink-tertiary">—</span>;
+  if (!amount) return <span className="text-ink-tertiary">—</span>;
   return <>{formatMoney(createMoney(amount, currency))}</>;
 }
 
@@ -553,7 +553,7 @@ function ItemRows({
               inputMode="decimal"
               placeholder="Belum ada harga"
               value={item.hargaSnapshot ?? ""}
-              display={(value) => formatMoney(createMoney(value, "IDR"))}
+              display={(value) => value ? formatMoney(createMoney(value, "IDR")) : <span className="text-ink-tertiary">Belum ada harga</span>}
               disabled={!editable}
               onCommit={commit(updateItemAction, item.id, "hargaSnapshot")}
             />
@@ -897,7 +897,7 @@ function LineItemRow({
           inputMode="decimal"
           value={line.hargaSnapshot}
           disabled={!editable}
-          display={(value) => <>{formatMoney(createMoney(value, line.currencySnapshot))}</>}
+          display={(value) => value ? formatMoney(createMoney(value, line.currencySnapshot)) : <span className="text-ink-tertiary">Belum ada harga</span>}
           onCommit={commit(updateLineItemAction, line.id, "hargaSnapshot")}
         />
       </TableCell>

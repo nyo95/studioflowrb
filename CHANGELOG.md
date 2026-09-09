@@ -8,6 +8,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Current revision after this entry is committed: **R7.22**
 - Next local revision: **R7.23**
 
+## R7.23 | 2026-09-09 | fix(bq,ui-engine): preserve empty-price detail rendering
+
+### Fixed
+
+- BQ project detail no longer crashes when an item has no unit price. Inline
+  money presentation now keeps the empty state visible as `Belum ada harga`
+  instead of passing an empty string to `createMoney`.
+
+### Verification
+
+- Browser interaction verified BQ project navigation and empty-price row.
+- `npm run typecheck`, `npm run lint`, and `npm test`: passed; 266 tests,
+  66 suites, 0 failures.
+- `npm run build`: passed.
+
 ## R7.22 | 2026-09-09 | feat(ui-engine,platform): one page skeleton and one control ladder across StudioFlow, Master Data, and BQ
 
 > **Handover.** Everything below was implemented and type-checked by Claude.
