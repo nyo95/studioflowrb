@@ -5,8 +5,24 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.26**
-- Next local revision: **R7.27**
+- Current revision after this entry is committed: **R7.28**
+- Next local revision: **R7.29**
+
+## R7.28 | 2026-09-09 | docs(changelog): record Library discovery implementation
+
+### Changed
+
+- Records the preceding `R7.27` implementation: StudioFlow Library route and
+  rail entry, Master Data public-port category search, and the safe link back to
+  the existing Master Data brand directory.
+
+### Verification
+
+- `R7.27` checks: `npm run typecheck`, `npm run lint`, and
+  `npm run check:boundaries`: passed; `npm run build`: passed.
+- Full integration test run was attempted but could not use the required
+  disposable database environment; failures were infrastructure setup failures,
+  not recorded as a pass.
 
 ## R7.26 | 2026-09-09 | docs(governance): enforce shared capability reuse
 
