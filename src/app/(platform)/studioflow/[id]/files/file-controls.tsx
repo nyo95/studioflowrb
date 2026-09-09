@@ -15,6 +15,9 @@ export type FolderOption = { folder_key: string; name: string };
 
 export function DeliverableForm({ projectId, folders }: { projectId: string; folders: FolderOption[] }) {
   const [mode, setMode] = useState<"record" | "link">("record");
+  const [filename, setFilename] = useState("");
+  const [bytes, setBytes] = useState("");
+  const [dropActive, setDropActive] = useState(false);
   const [recordState, recordAction, recordPending] = useActionState(recordFileAction.bind(null, projectId), INITIAL);
   const [linkState, linkAction, linkPending] = useActionState(linkFileAction.bind(null, projectId), INITIAL);
   const state = mode === "record" ? recordState : linkState;
@@ -25,7 +28,24 @@ export function DeliverableForm({ projectId, folders }: { projectId: string; fol
     <form action={mode === "record" ? recordAction : linkAction} className="grid gap-3 sm:grid-cols-3">
       {failure ? <div className="sm:col-span-3"><InlineError>{failure}</InlineError></div> : null}
       <Field label="File deliverable" required>
-        <Input name="original_filename" required maxLength={300} placeholder="Denah Lantai 1.pdf" />
+        <div
+          className={`rounded-control border border-dashed px-3 py-2 transition-colors ${dropActive ? "border-action bg-action/5" : "border-line"}`}
+          onDragEnter={(event) => { event.preventDefault(); setDropActive(true); }}
+          onDragOver={(event) => { event.preventDefault(); setDropActive(true); }}
+          onDragLeave={(event) => { if (event.currentTarget === event.target) setDropActive(false); }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDropActive(false);
+            const file = event.dataTransfer.files[0];
+            if (file) {
+              setFilename(file.name);
+              setBytes(String(file.size));
+            }
+          }}
+        >
+          <Input name="original_filename" value={filename} onChange={(event) => setFilename(event.target.value)} required maxLength={300} placeholder="Tarik file ke sini atau ketik nama file" />
+          <p className="mt-1 text-xs text-ink-tertiary">Byte file tidak dikirim atau disimpan oleh aplikasi.</p>
+        </div>
       </Field>
       <Field label="Cara penyimpanan">
         <Select value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}>
@@ -35,7 +55,7 @@ export function DeliverableForm({ projectId, folders }: { projectId: string; fol
       </Field>
       {mode === "record" ? (
         <Field label="Ukuran (bytes)" required>
-          <Input name="bytes" type="number" min="1" required placeholder="2048000" />
+          <Input name="bytes" type="number" min="1" value={bytes} onChange={(event) => setBytes(event.target.value)} required placeholder="2048000" />
         </Field>
       ) : (
         <Field label="Link" required>

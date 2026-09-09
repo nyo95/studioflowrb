@@ -5,8 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.29**
-- Next local revision: **R7.30**
+- Current revision after this entry is committed: **R7.30**
+- Next local revision: **R7.31**
+
+## R7.30 | 2026-09-09 | feat(studioflow): add metadata drag-drop intake
+
+### Changed
+
+- Added drag-and-drop metadata capture to the canonical deliverable form.
+- Dropping a local file fills its name and byte size only; file bytes are not
+  uploaded or stored by StudioFlow, preserving the local-PC archive model.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `npm run build`: passed.
 
 ## R7.29 | 2026-09-09 | feat(studioflow): unify deliverable intake
 
