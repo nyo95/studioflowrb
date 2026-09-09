@@ -2,7 +2,7 @@
 
 **Status:** READY FOR EXECUTION — pemecahan work order diserahkan ke navigator
 **Versi:** R0.1
-**Tanggal:** 2026-09-08
+**Tanggal:** 2026-09-09
 **Dibaca bersama:** `studioflow.md`, `studioflow-project-contract.md`,
 `studioflow-ux-spec.md`, `studioflow-schedule-contract.md`,
 `studioflow-mom-contract.md`, `studioflow-work-orders.md`
@@ -71,11 +71,13 @@ terpenuhi. **Berapa work order per fase adalah keputusan navigator.**
 | **SF-F1** Schema & fondasi | `studioflow` schema, Client, Project, phase template + snapshot per project, migrasi pertama | Membuat project menghasilkan phase sesuai template. `code` unik dan server-generated. Migrasi hanya menyentuh schema `studioflow` |
 | **SF-F2** Ronde & file tercatat | Iteration, aturan penomoran, state phase, drop file `RECORDED`, folder template, penamaan standar, nama-berikutnya | Seret `.skp` tanpa storage apa pun: ronde terbuka, phase maju, nama muncul. Nomor gapless di bawah tekanan konkuren |
 | **SF-F3** Pertukaran klien | Kirim, catat jawaban (termasuk draft), koreksi, hentikan ronde, poin revisi + provenance, ACC internal opsional | Seluruh skenario §16 kontrak yang menyangkut jawaban klien lulus, termasuk rollback transaksi dan balapan koreksi |
-| **SF-F4** Task & permukaan project | Task umum + phase scope, lampiran task, halaman project tunggal, filter phase | Semua pekerjaan satu project terjangkau dari satu halaman. Task umum tidak hilang saat difilter |
-| **SF-F5** Menunggu Saya | Read model lintas project (§10.2 kontrak). Tanpa tabel baru | Desainer dengan beberapa project tahu apa yang menunggunya tanpa membuka satu project pun |
-| **SF-F6** Pass tema | Perubahan token yang mengenai app lain, dikerjakan sekaligus dan sadar (§5.3) | Master Data dan BQ terbukti tidak berubah tampilannya, atau perubahannya disetujui pemilik |
-| **SF-F7** File `STORED` | Byte untuk PDF/render/survey, lewat shared storage port | Unggah, unduh bertanda tangan, pelepasan byte yang tergantikan; file terkirim tidak pernah dilepas |
-| **Ditunda** | Library & Schedule, MoM, arsip Drive (`LINKED`) | Butuh keputusan pemilik yang tercatat di kontrak masing-masing |
+| **SF-F4** Task & permukaan project | Satu task vocabulary milik project, optional phase scope, lampiran task, halaman project tunggal, filter phase | Semua pekerjaan satu project terjangkau dari satu halaman. Task project-level tetap terlihat; task dari konteks fase otomatis mendapat phase scope |
+| **SF-F5** Library global | Brand discovery melalui Master Data public port: hashtag, brand, category/brand-category; reusable catalog read model | Pencarian hashtag, brand, dan kategori menghasilkan brand/katalog yang benar tanpa direct cross-schema read |
+| **SF-F6** Menunggu Saya | Read model lintas project (§10.2 kontrak). Tanpa tabel baru | Desainer dengan beberapa project tahu apa yang menunggunya tanpa membuka satu project pun |
+| **SF-F7** Project Catalogue/Schedule + MOM | Project-owned catalogue/schedule and MoM surfaces using their approved contracts | Project detail exposes catalogue/FFNI and MOM without forcing either into the phase task model |
+| **SF-F8** Pass tema | Perubahan token yang mengenai app lain, dikerjakan sekaligus dan sadar (§5.3) | Master Data dan BQ terbukti tidak berubah tampilannya, atau perubahannya disetujui pemilik |
+| **SF-F9** File `STORED` | Byte untuk PDF/render/survey, lewat shared storage port | Unggah, unduh bertanda tangan, pelepasan byte yang tergantikan; file terkirim tidak pernah dilepas |
+| **Ditunda** | SketchUp exchange, arsip Drive (`LINKED`), client-facing links, project archival, legacy migration | Tidak menghalangi Library, project catalogue, atau MOM karena kontrak inti mereka sudah tersedia |
 
 **Catatan urutan.** SF-F5 sengaja setelah SF-F4 karena ia membaca ronde dan task;
 tapi ia adalah pintu masuk harian aplikasi, jadi jangan digeser ke belakang lagi.

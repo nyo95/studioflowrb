@@ -5,8 +5,29 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.22**
-- Next local revision: **R7.23**
+- Current revision after this entry is committed: **R7.24**
+- Next local revision: **R7.25**
+
+## R7.24 | 2026-09-09 | docs(studioflow): simplify project-phase file intake
+
+### Changed
+
+- Corrected the StudioFlow project contract's file retention and drop flow to
+  keep one current file per project and phase. Internal drops replace the
+  current working bytes; an external drop replaces those bytes and records the
+  send/iteration link in the same intake.
+- Preserved permanent metadata and audit history for replaced files while
+  treating the studio's own PC storage as the primary archive. Removed the
+  duplicated two-byte working/sent retention assumption.
+- Clarified that Library, Product Catalogue/Schedule, MOM, project-owned to-dos,
+  and phase-filtered views remain part of the corrected StudioFlow scope.
+
+### Verification
+
+- Read-only legacy comparison at commit `5fc605e304a12db6b5efe0a2c0271a2d9415b2da`.
+- `git diff --check`: passed.
+- No runtime or schema changes; application tests were not required for this
+  documentation-only revision.
 
 ## R7.23 | 2026-09-09 | fix(bq,ui-engine): preserve empty-price detail rendering
 

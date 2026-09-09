@@ -1,6 +1,6 @@
 # Project Contract — StudioFlow
 
-Status: **PRD revised under owner request, 2026-09-08 — not an executable work order**
+Status: **PRD revised under owner request, 2026-09-09 — not an executable work order**
 
 R7.07 resolves L1–L9 and their dependent rules. Earlier owner decisions remain
 unless explicitly revised here. These are navigator product decisions for the
@@ -14,12 +14,12 @@ rules in [`studioflow.md`](studioflow.md) and the dispositions in
 [`STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md`](../STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md).
 Legacy code at the recorded audit commit is behavioral evidence only.
 
-Client, Project, Phase, Iteration, tasks, and assets are one contracted
-workflow. Client is a reusable counterparty across projects; transaction scope
-follows each command, not one giant aggregate spanning all clients/projects. Legacy split them across `Project`,
-`Phase`, `Revision`, `Activity`, `ProjectChecklist`, and `File`, with four
-different completion vocabularies. That split is the source of the bookkeeping
-this rebuild removes, so it is not preserved.
+Client, Project, Phase, Iteration, project-owned tasks, and assets are one
+contracted workflow. Client is a reusable counterparty across projects;
+transaction scope follows each command, not one giant aggregate spanning all
+clients/projects. Legacy split them across `Project`, `Phase`, `Revision`,
+`Activity`, `ProjectChecklist`, and `File`; the rebuild preserves the domain
+meaning and history, while removing the duplicate user-facing task surfaces.
 
 ## 1. The governing principle
 
@@ -512,13 +512,13 @@ against its obsolete response. Only active, non-withdrawn points whose source
 has not been replaced contribute to current open-point warnings. Frozen rounds
 retain their send-time snapshot.
 
-### 7.3 Task — everything else
+### 7.3 Task — project-owned work item
 
 | Field | Type | Rule |
 |---|---|---|
 | `id` | UUID | Primary key |
 | `project_id` | FK → Project | Required |
-| `phase_scope` | Enum? | **Nullable, and the creation form never asks.** Null means General |
+| `phase_scope` | Enum? | Nullable. A task remains project-owned and may point to one phase; null means project-level |
 | `title` | String | Required |
 | `status` | Enum | `OPEN` / `DONE` |
 | `assignee_id` | FK → User? | Optional |
@@ -530,10 +530,13 @@ A task attachment is **never** a deliverable. Only §8.3 makes a file something
 that left the studio. Evidence of internal work and goods delivered to a client
 are different claims and are not merged.
 
-`phase_scope` is set only two ways: inherited when the task is created from
-within a phase view, or assigned later by dragging the task onto a phase. **A
-user is never asked to choose a phase at creation time.** Tasks typed into the
-General box stay General, which is the correct outcome, not a missing value.
+`phase_scope` is selected when a task is created from a project or phase
+surface, and may be changed later by an explicit project action. The creation
+flow must offer the current phase context without forcing the user to navigate
+through a separate task type. A project-level task may remain unscoped, but a
+task created while the user is working on a phase defaults to that phase.
+`What’s Today` is only a read model over these project-owned tasks; it never
+changes their project or phase ownership.
 
 General tasks are pinned at the top of the project surface and remain visible
 when a phase filter is applied.
@@ -707,18 +710,20 @@ name for the person to copy, and never claims to have renamed anything. For
 `STORED` and `LINKED` files the copy does carry the standard name, because the
 app created that copy.
 
-### 8.6 Retention — the record is permanent, the bytes are not
+### 8.6 Retention — one current file, permanent metadata
 
-**Owner decision 2026-09-08.** The studio's own machines hold every file, the
-client holds what was sent to them, and finals go to Drive. A third copy on the
-platform earns nothing, so the platform keeps the newest bytes only.
+**Owner decision 2026-09-09.** The studio's own machines remain the primary
+archive. The application keeps at most one current file per project and phase.
+An internal working file may be replaced by the next internal file, and the
+current internal file may be replaced by the file marked external. The previous
+file's application bytes are released or deleted; its metadata and audit record
+remain permanently readable.
 
-Per phase, at most two files hold bytes:
+Per project and phase, at most one current file holds application bytes:
 
 | Kept | Why |
 |---|---|
-| The current working file | What is being worked on now |
-| The most recently **sent** file | Answers "please resend what you sent last" without opening the NAS |
+| The current working or sent file | The latest representation of the phase |
 
 Everything older has its bytes released. **Its record never is.** Name, standard
 name, original name, size, date, who dropped it, which round, whether it was
@@ -733,8 +738,8 @@ Evidence in a dispute is the response chain (§6), not the bytes. The client's
 own words, the send record, and the date are what a disagreement turns on, and
 none of them is ever released.
 
-**Release happens on the event that displaces the file** — a new send, or a new
-working file — inside that command's own transaction. There is **no scheduled
+**Release happens on the event that displaces the file** — a new internal drop,
+or a file marked external — inside that command's own transaction. There is **no scheduled
 cleanup job and no reconciler.** Reintroducing one would restore exactly the
 machinery this decision removed.
 
@@ -746,27 +751,25 @@ application reads an object whose record says released.
 
 `RECORDED` files never held bytes, so release does not apply to them.
 
-A task attachment (§7.3) is **not** covered by the two-per-phase rule. A General
+A task attachment (§7.3) is **not** covered by the one-current-file-per-phase rule. A General
 task has no phase, and evidence of internal work is not a deliverable. Task
 attachments are small by policy and are released only when the task is deleted.
 
 ### 8.7 Dropping files
 
-**No file drop asks "internal or external".** The answer already follows from
-§5.3: once a round is sent, the next file opens the next number; while it is
-unsent, files join it. Asking would be asking the user to restate something the
-system knows — the fault this contract exists to remove.
-
-Ask only what cannot be inferred. The folder template maps extensions, so `.skp`
-files silently. A PDF is genuinely ambiguous — a client's survey (`IN`) or work
-going out — so only then is there a question, with the inferred answer preselected.
+**A file drop is the single filing action.** The user may mark the dropped file
+as internal/working or external/sent in the same intake. A later internal drop
+replaces the prior working bytes; an external drop replaces the working bytes
+and links the current record to the iteration. Metadata and audit history are
+never replaced. The folder template maps extensions, so `.skp` files can be
+classified silently; a genuinely ambiguous PDF may receive one short purpose
+question.
 
 **Deliverables that already went out.** In practice a file is sent by WhatsApp or
-email *before* the studio opens the app. The drop dialog for a deliverable
-therefore offers "already sent to the client?" and, when answered yes, completes
-the send (§6.2) in the same interaction. One dialog, not two screens. The
-underlying rule is unchanged: the send is what closes the round, never the drop
-(§8.3).
+email *before* the studio opens the app. The same drop intake therefore allows
+the user to mark it external/sent and completes the send (§6.2) in one
+interaction. One dialog, not two screens. An internal drop only replaces the
+current working file; it never closes a round.
 
 ### 8.8 Bulk intake and the unsorted tray
 
@@ -1033,10 +1036,11 @@ when a shared concern already proves the need. No speculative component is added
 
 ### 13.4 Master Data
 
-Read-only, through the Master Data public read port, for the brand catalog. Used
-by Library/Schedule only, and therefore **inactive in the first release**. No
-cross-schema foreign key, ever. Selected catalog facts are snapshotted as plain
-values so later Master Data edits cannot rewrite project history.
+Read-only, through the Master Data public read port, for the global Library and
+project Product Catalogue/Schedule. Library discovery must support the three
+primary queries: hashtag, brand, and category/brand-category. No cross-schema
+foreign key, ever. Selected catalog facts are snapshotted as plain values so
+later Master Data edits cannot rewrite project history.
 
 ### 13.5 BQ
 
@@ -1058,14 +1062,18 @@ Recorded so a reviewer can test them rather than inherit them.
 | R9 | Only one round per phase may be awaiting a client answer (§5.3), and draft answers (§6.6) hold a round in `SENT` for longer | A studio running CD area by area could be blocked from sending the bedroom set while the kitchen set is still being answered. Collecting feedback over days widens that window rather than narrowing it | Unproven, and knowingly widened by D32. The workaround is to commit the pending answer first. This is the first constraint to revisit if area-parallel review turns out to be routine |
 | R8 | Derived participants (§10) means a new project shows nobody until something is assigned | May read as a bug rather than a fact | `lead_user_id` can be set at creation |
 
-## 15. Out of scope for the first release
+## 15. First-release scope correction
 
-Library and Product Schedule, Minutes of Meeting, SketchUp exchange, checklist
-templates, legacy's Today's View feature set (§10.2 ships the one list that
-replaces it), client-facing links, the `LINKED` treatment and
-its Google Drive archive, project archival with retention manifest, and any
-legacy data migration. See
-[`studioflow.md`](studioflow.md) §6 and §7.
+Library, Product Catalogue/Schedule, and MOM are in the rebuild scope as
+project/global surfaces, not optional future placeholders. Library is global
+and reads Master Data through the public port. Product Catalogue/Schedule and
+MOM belong to the Project detail surface. Their detailed lifecycle remains in
+[`studioflow-schedule-contract.md`](studioflow-schedule-contract.md) and
+[`studioflow-mom-contract.md`](studioflow-mom-contract.md). SketchUp exchange,
+client-facing links, the `LINKED` treatment and its Google Drive archive,
+project archival with retention manifest, and legacy data migration remain
+deferred. `What’s Today` is the aggregate view for project-owned tasks, not a
+second task system.
 
 ## 16. PRD acceptance scenarios and simplification ledger
 
