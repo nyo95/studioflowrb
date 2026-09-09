@@ -179,6 +179,16 @@ export function createMasterDataPublicRead(db: PrismaClient) {
                   { name: { contains: search, mode: "insensitive" } },
                   { slug: { contains: search, mode: "insensitive" } },
                   { hashtags: { some: { label: { contains: search, mode: "insensitive" } } } },
+                  {
+                    categories: {
+                      some: {
+                        category: {
+                          name: { contains: search, mode: "insensitive" },
+                          status: "ACTIVE",
+                        },
+                      },
+                    },
+                  },
                 ],
               }
             : {}),

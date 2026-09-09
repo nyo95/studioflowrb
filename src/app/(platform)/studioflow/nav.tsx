@@ -59,9 +59,8 @@ export function StudioFlowNav() {
         <NavItem
           href="/studioflow/library"
           icon={<FolderOpen size={16} />}
-          active={false}
+          active={activePath(pathname, "/studioflow/library")}
           prefetch={false}
-          disabled
         >
           Library
         </NavItem>
