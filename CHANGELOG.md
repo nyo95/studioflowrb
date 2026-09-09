@@ -5,8 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.30**
-- Next local revision: **R7.31**
+- Current revision after this entry is committed: **R7.31**
+- Next local revision: **R7.32**
+
+## R7.31 | 2026-09-09 | fix(studioflow): align activity navigation
+
+### Changed
+
+- Renamed the primary StudioFlow task navigation label to `My Activity`.
+- Kept the existing `/studioflow` route and waiting-work aggregation unchanged.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `npm run build`: passed.
 
 ## R7.30 | 2026-09-09 | feat(studioflow): add metadata drag-drop intake
 

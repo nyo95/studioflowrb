@@ -40,7 +40,7 @@ export function StudioFlowNav() {
           active={activePath(pathname, "/studioflow", true)}
           prefetch={false}
         >
-          Tasks
+          My Activity
         </NavItem>
         <NavItem
           href="/studioflow/upcoming"
