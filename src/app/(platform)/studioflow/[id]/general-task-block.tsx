@@ -109,7 +109,9 @@ function TaskRow({
   const deleteError = deleting?.ok === false ? deleting.error.safeMessage : null;
 
   useEffect(() => {
-    if (updating?.ok) setEditing(false);
+    if (!updating?.ok) return;
+    const frame = requestAnimationFrame(() => setEditing(false));
+    return () => cancelAnimationFrame(frame);
   }, [updating]);
 
   return (

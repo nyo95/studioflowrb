@@ -5,8 +5,27 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.19**
-- Next local revision: **R7.20**
+- Current revision after this entry is committed: **R7.20**
+- Next local revision: **R7.21**
+
+## R7.20 | 2026-09-09 | fix(studioflow): avoid cascading render in task edit flow
+
+### Fixed
+
+- Preserved the existing behavior that closes an inline task editor after a
+  successful update, while deferring the state update to the next animation
+  frame so the shared lint rule does not flag a synchronous state update inside
+  an effect.
+
+### Dependencies and migrations
+
+- No new dependency, schema change, or migration.
+
+### Verification
+
+- `npm run lint`: passed.
+- `npm run check`: passed.
+- `npm run build`: passed.
 
 ## R7.19 | 2026-09-09 | fix(platform): resolve TypeScript narrowing errors across all platform routes
 
