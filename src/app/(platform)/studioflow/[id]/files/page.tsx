@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, ExternalLink, FolderOpen, Inbox } from "lucide-react";
+import { ExternalLink, FolderOpen, Inbox } from "lucide-react";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
 import { prisma } from "@/platform/core/db";
 import { readPlatformGeneralSettings } from "@platform/core/settings";
-import { EmptyState, PageHeader, SectionCard } from "@/platform/ui_engine";
+import {
+  Breadcrumb,
+  EmptyState,
+  MetaList,
+  PageHeader,
+  SectionCard,
+} from "@/platform/ui_engine";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
 import { studioFlowService } from "@/apps/studioflow/runtime";
 
@@ -51,12 +57,12 @@ export default async function ProjectFilesPage({
 
   if (!canRead) {
     return (
-      <div className="grid gap-4">
-        <PageHeader eyebrow="StudioFlow" title="File" />
+      <>
+        <PageHeader eyebrow="StudioFlow" title="File" divider />
         <SectionCard>
           <EmptyState icon={FolderOpen} title="Akses ditolak" description="Kamu tidak punya permission untuk melihat file project ini." />
         </SectionCard>
-      </div>
+      </>
     );
   }
 
@@ -98,21 +104,20 @@ export default async function ProjectFilesPage({
   ];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
-      <div>
-        <Link
-          href={`/studioflow/${projectId}`}
-          className="mb-2 inline-flex items-center gap-1 text-sm text-ink-tertiary hover:text-ink"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Kembali ke project
-        </Link>
-        <PageHeader
-          eyebrow={`StudioFlow · ${project.code}`}
-          title="File project"
-          description={`${listing.files.length} file tercatat`}
-        />
-      </div>
+    <>
+      <Breadcrumb
+        entries={[
+          { label: "Project", href: "/studioflow/projects" },
+          { label: project.name, href: `/studioflow/${projectId}` },
+          { label: "File" },
+        ]}
+      />
+      <PageHeader
+        title="File project"
+        description={`${listing.files.length} file tercatat`}
+        divider
+        meta={<MetaList items={[<span key="code" className="font-ui-mono text-xs">{project.code}</span>, project.name]} />}
+      />
 
       {canManage && (
         <>
@@ -193,6 +198,6 @@ export default async function ProjectFilesPage({
           )}
         </SectionCard>
       ))}
-    </div>
+    </>
   );
 }

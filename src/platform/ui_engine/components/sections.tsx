@@ -3,8 +3,59 @@ import type { HTMLAttributes, ReactNode } from "react";
 import { cx } from "../internal/cx";
 import { CountBadge, Heading, type SemanticTone, Surface, Text } from "../primitives";
 
-export function SectionCard({ className, ...props }: HTMLAttributes<HTMLElement>) {
-  return <Surface as="section" className={cx("min-w-0 px-(--ui-section-px) py-(--ui-section-py)", className)} {...props} />;
+export type SectionCardProps = Omit<HTMLAttributes<HTMLElement>, "title"> & {
+  /** Visible section heading. Renders a header bar above a hairline. */
+  title?: ReactNode;
+  /** One-line qualifier under the title, inside the same header bar. */
+  description?: ReactNode;
+  /** Monospace count rendered beside the title. */
+  count?: ReactNode;
+  /** Right-aligned affordance in the header bar, typically a link or button. */
+  action?: ReactNode;
+  /** Padded body for prose and field stacks; flush for full-bleed row lists. */
+  padded?: boolean;
+};
+
+/**
+ * The framed section used everywhere a page groups content on a white surface.
+ *
+ * When `title` or `action` is supplied the heading sits in its own bar above a
+ * hairline, so a section reads as a labelled region rather than a floating
+ * card. Without them the card is a plain padded surface, which is what most
+ * existing call sites rely on.
+ *
+ * Row lists pass `padded={false}` so each row's divider reaches the card edge.
+ */
+export function SectionCard({
+  title,
+  description,
+  count,
+  action,
+  padded = true,
+  children,
+  className,
+  ...props
+}: SectionCardProps) {
+  const hasHeader = Boolean(title || description || action);
+  return (
+    <Surface as="section" className={cx("min-w-0 overflow-hidden", className)} {...props}>
+      {hasHeader ? (
+        <div className="flex items-center justify-between gap-3 border-b border-line-subtle px-(--ui-section-px) py-2.5">
+          <div className="grid min-w-0 gap-[2px]">
+            {title ? (
+              <div className="flex min-w-0 items-baseline gap-2">
+                <Heading level={5} className="truncate">{title}</Heading>
+                {count !== undefined && count !== null ? <CountBadge>{count}</CountBadge> : null}
+              </div>
+            ) : null}
+            {description ? <Text as="p" tone="secondary" size="sm">{description}</Text> : null}
+          </div>
+          {action ? <div className="shrink-0">{action}</div> : null}
+        </div>
+      ) : null}
+      <div className={cx("min-w-0", padded && "px-(--ui-section-px) py-(--ui-section-py)")}>{children}</div>
+    </Surface>
+  );
 }
 
 export type PageSectionProps = HTMLAttributes<HTMLElement> & {
@@ -13,6 +64,7 @@ export type PageSectionProps = HTMLAttributes<HTMLElement> & {
   action?: ReactNode;
 };
 
+/** An unframed run of content under a heading — for stacking on the page itself. */
 export function PageSection({
   title,
   description,
@@ -37,46 +89,6 @@ export function PageSection({
   );
 }
 
-export type CardSectionProps = Omit<HTMLAttributes<HTMLElement>, "title"> & {
-  title?: ReactNode;
-  /** Monospace count rendered beside the title. */
-  count?: ReactNode;
-  /** Right-aligned affordance in the header bar, typically a link out. */
-  action?: ReactNode;
-  /** Padded body for prose and stacked fields; flush for full-bleed row lists. */
-  padded?: boolean;
-};
-
-/**
- * A framed section whose title sits in its own header bar above a hairline.
- * Row lists render flush (`padded={false}`) so each row's own divider reaches
- * the card edge; prose and field stacks keep the padded body.
- */
-export function CardSection({
-  title,
-  count,
-  action,
-  padded = true,
-  children,
-  className,
-  ...props
-}: CardSectionProps) {
-  return (
-    <Surface as="section" className={cx("min-w-0 overflow-hidden", className)} {...props}>
-      {title || action ? (
-        <div className="flex items-center justify-between gap-3 border-b border-line-subtle px-3.5 py-2.5">
-          <div className="flex min-w-0 items-baseline gap-2">
-            {title ? <Heading level={5} className="truncate">{title}</Heading> : null}
-            {count !== undefined && count !== null ? <CountBadge>{count}</CountBadge> : null}
-          </div>
-          {action ? <div className="shrink-0">{action}</div> : null}
-        </div>
-      ) : null}
-      <div className={cx("min-w-0", padded && "p-3.5")}>{children}</div>
-    </Surface>
-  );
-}
-
 export type GroupHeaderProps = Omit<HTMLAttributes<HTMLDivElement>, "title"> & {
   title: ReactNode;
   count?: ReactNode;
@@ -93,7 +105,7 @@ const GROUP_HEADER_TONE_CLASSES: Record<SemanticTone, string> = {
 
 /**
  * Worklist bucket head: an uppercase label, its count, and a rule that runs to
- * the end of the measure. Used to separate stacked groups without boxing each.
+ * the end of the measure. Separates stacked groups without boxing each one.
  */
 export function GroupHeader({
   title,
@@ -116,12 +128,12 @@ export function GroupHeader({
 export type PipelineStepState = "done" | "current" | "upcoming" | "blocked";
 
 export type PipelineStep = {
-  /** Stable key; also used as the accessible list item identity. */
+  /** Stable key; also the accessible identity of the list item. */
   id: string;
   label: ReactNode;
   /** One-line qualifier under the label, e.g. "approved 2 Sep". */
   note?: ReactNode;
-  /** Monospace trailing detail, e.g. a revision number. */
+  /** Monospace trailing detail, e.g. a revision count. */
   detail?: ReactNode;
   state?: PipelineStepState;
   href?: string;
@@ -142,10 +154,10 @@ const PIPELINE_STATE_LABEL_CLASSES: Record<PipelineStepState, string> = {
 };
 
 /**
- * A horizontal strip of ordered stages. Each cell is a hairline-separated
- * column produced by a 1px grid gap over the subtle line colour, so the strip
- * reads as one band rather than a row of chips. The current stage is also
- * filled and marked `aria-current`, so its position is not colour-only.
+ * A horizontal strip of ordered stages. Cells are separated by a 1px grid gap
+ * over the subtle line colour, so the strip reads as one band rather than a
+ * row of chips. The current stage is filled and marked `aria-current`, so its
+ * position is never carried by colour alone.
  */
 export function PipelineStrip({
   steps,
@@ -157,7 +169,7 @@ export function PipelineStrip({
   return (
     <ol
       aria-label={label}
-      className={cx("m-0 grid list-none gap-px bg-line-subtle p-0", className)}
+      className={cx("m-0 grid list-none gap-px bg-line-subtle p-0 max-[720px]:grid-cols-1!", className)}
       style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}
       {...props}
     >
@@ -167,11 +179,11 @@ export function PipelineStrip({
           <>
             <div className="flex items-center gap-1.5">
               <span aria-hidden="true" className={cx("h-2 w-2 shrink-0 rounded-pill", PIPELINE_STATE_DOT_CLASSES[state])} />
-              <span className={cx("truncate text-[0.78125rem] font-semibold", PIPELINE_STATE_LABEL_CLASSES[state])}>
+              <span className={cx("truncate text-[0.8125rem] font-semibold", PIPELINE_STATE_LABEL_CLASSES[state])}>
                 {step.label}
               </span>
             </div>
-            {step.note ? <span className="truncate text-[0.71875rem] text-ink-tertiary">{step.note}</span> : null}
+            {step.note ? <span className="truncate text-xs text-ink-tertiary">{step.note}</span> : null}
             {step.detail ? <span className="font-ui-mono text-[0.6875rem] text-ink-tertiary">{step.detail}</span> : null}
           </>
         );

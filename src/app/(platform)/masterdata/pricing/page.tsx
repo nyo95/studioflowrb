@@ -5,7 +5,11 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 
 import { hasPermission } from "@platform/core/rbac";
 
-import { ErrorState,PageHeader,SectionCard } from "@/platform/ui_engine";
+import {
+  ErrorState,
+  PageHeader,
+  SectionCard,
+} from "@/platform/ui_engine";
 
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
 
@@ -94,12 +98,12 @@ export default async function PricingPage() {
 
   if (!canReadMaterial && !canReadWork && !canManageMaterial && !canManageWork) {
     return (
-      <div className="grid gap-4">
-        <PageHeader title="Pricing" />
+      <>
+        <PageHeader title="Pricing" divider />
         <SectionCard>
           <ErrorState title="Access denied" description="You do not have permission to view pricing data." />
         </SectionCard>
-      </div>
+      </>
     );
   }
 
@@ -117,9 +121,10 @@ export default async function PricingPage() {
   const laborPrices = rawLabor.map(mapWorkPrice);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
+    <>
       <PageHeader
         title="Pricing"
+        divider
       />
       <PricingDirectory
         materialPrices={materialPrices}
@@ -148,6 +153,6 @@ export default async function PricingPage() {
         workCategories={workRefs?.workCategories ?? []}
         vendorTypes={vendorTypes.map((vendorType) => ({ id: vendorType.id, name: vendorType.name, canSupplyMaterial: vendorType.can_supply_material, canSupplyLabor: vendorType.can_supply_labor }))}
       />
-    </div>
+    </>
   );
 }

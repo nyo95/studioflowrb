@@ -100,7 +100,7 @@ The following shared directory pattern is canonicalized for all entity list page
 
 ```text
 DirectoryShell
-├── DirectoryToolbar (search, filters, primary action button)
+├── TableToolbar (search, filters, primary action button) — named DirectoryToolbar in R6.1 prose
 ├── DataTable
 │   ├── EntityPrimaryCell (● StatusDot + Primary name + secondary metadata line)
 │   └── RowActionMenu (⋯ ellipsis — all ordinary CRUD: edit, archive, restore, delete)
@@ -122,6 +122,42 @@ DirectoryShell
 - Sticky header and sticky action column are the table's responsibility.
 - Do NOT use fixed or magic heights (`60vh`, `maxBodyHeight="..."`) — use flex layout.
 
+
+## 3.5 Shared chrome and display atoms (R7.22)
+
+These were added when StudioFlow's approved design was applied, and are shared
+because each one either enforces a global rule or already existed as duplicated
+inline markup in more than one app.
+
+| Component | Tier | Why it is shared |
+|---|---|---|
+| `Breadcrumb` | Pattern | There is no global topbar, so the page itself must state where the record sits. One implementation keeps that line identical everywhere. |
+| `FilterChip` / `filterChipClasses` | Primitive | Selection must reach assistive technology (`aria-pressed` on a button, `aria-current` on a link), not just fill. The class helper stays outside the client boundary so server components can render chips as links. |
+| `Avatar` / `initialsOf` | Primitive | People columns appeared inline in three places with three different sizes. |
+| `CountBadge` | Primitive | The monospace count beside a title and a tab label is one rule. |
+| `MetaList` | Primitive | The dot-separated identity line under a page title. |
+| `ProgressBar` | Primitive | A measure that always carries `role="progressbar"` and a label. |
+| `SegmentBar` | Primitive | Compact ordered stage bar for a table cell; decorative, so `label` is required. |
+| `GroupHeader` | Pattern | Worklist bucket head: uppercase label, count, rule to the end of the measure. |
+| `PipelineStrip` | Pattern | Ordered stages as one hairline-separated band; the current stage is `aria-current="step"`, never colour alone. |
+
+`Pagination` takes either `onPageChange` (client directories holding page state
+locally) or `getHref` (server-rendered directories, where paging must survive a
+reload and stay shareable). Given `total` and `pageSize` it reports the row
+range — "26–50 of 96" — instead of the page number, because the operator is
+looking for a record, not for a page. A boundary step renders as a disabled
+control rather than disappearing, so the footer does not reflow on the first and
+last page.
+
+`SectionCard` now owns the framed-section header bar (`title`, `description`,
+`count`, `action`, `padded`). Before R7.22 it accepted no `title`, so five call
+sites were passing one and silently rendering a native tooltip instead of a
+heading.
+
+Form controls take `density="regular" | "compact"`, matching `DataTable`'s
+`density`. `size` stays the native attribute it always was on `input` and
+`select`, so multi-selects that set a row count keep working.
+
 ## 3.3 Dialog sizing convention (R6.1)
 
 | Size | When to use |
@@ -140,7 +176,7 @@ Use `<DirectoryShell fill>` + `<DataTable fill>` to build viewport-tall tables w
 
 ```tsx
 // Page root must be a flex column that fills its parent
-<DirectoryShell fill surface toolbar={<DirectoryToolbar ... />}>
+<DirectoryShell fill surface toolbar={<TableToolbar ... />}>
   <DataTable fill columns={cols} rows={rows} />
 </DirectoryShell>
 ```

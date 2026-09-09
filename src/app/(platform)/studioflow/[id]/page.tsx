@@ -10,18 +10,19 @@ import {
   Avatar,
   Breadcrumb,
   buttonClasses,
-  CardSection,
   DescriptionItem,
   DescriptionList,
+  DetailShell,
   EmptyState,
-  PageHeader,
-  PipelineStrip,
-  type PipelineStep,
-  ProgressBar,
   MetaList,
+  PageHeader,
+  PageSection,
+  PipelineStrip,
+  ProgressBar,
   SectionCard,
   StatusBadge,
   Text,
+  type PipelineStep,
 } from "@/platform/ui_engine";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
 import { studioFlowService } from "@/apps/studioflow/runtime";
@@ -80,8 +81,8 @@ export default async function ProjectDetailPage({
 
   if (!canRead) {
     return (
-      <div className="grid gap-4">
-        <PageHeader eyebrow="StudioFlow" title="Detail project" />
+      <>
+        <PageHeader eyebrow="StudioFlow" title="Detail project" divider />
         <SectionCard>
           <EmptyState
             icon={FolderOpen}
@@ -89,7 +90,7 @@ export default async function ProjectDetailPage({
             description="Kamu tidak punya permission untuk melihat project ini."
           />
         </SectionCard>
-      </div>
+      </>
     );
   }
 
@@ -211,7 +212,7 @@ export default async function ProjectDetailPage({
   const openTasks = tasks.filter((task) => task.status === "OPEN").length;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-5 p-(--ui-page-padding)">
+    <>
       <Breadcrumb
         entries={[
           { label: "Project", href: "/studioflow/projects" },
@@ -246,11 +247,11 @@ export default async function ProjectDetailPage({
         }
       />
 
-      {/* Spine carries the work; the rail carries the facts that never change
-          mid-session, so the reader never loses the project's identity. */}
-      <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-4 max-[1080px]:grid-cols-1">
-        <div className="grid min-w-0 gap-4">
-          <CardSection
+      {/* The spine carries the work; the rail carries the facts that do not
+          change mid-session, so the reader never loses the project's identity. */}
+      <DetailShell
+        header={
+          <SectionCard
             title="Alur fase"
             padded={false}
             action={
@@ -262,96 +263,94 @@ export default async function ProjectDetailPage({
             }
           >
             {steps.length === 0 ? (
-              <p className="px-3.5 py-3 text-sm text-ink-tertiary">Belum ada fase.</p>
+              <p className="px-(--ui-section-px) py-3 text-sm text-ink-tertiary">Belum ada fase.</p>
             ) : (
               <PipelineStrip steps={steps} label="Alur fase project" />
             )}
-          </CardSection>
-
-          <GeneralTaskBlock
-            projectId={id}
-            tasks={tasks.map((t: { id: string; title: string; status: "OPEN" | "DONE"; [key: string]: unknown }) => ({
-              id: t.id,
-              title: t.title,
-              status: t.status,
-              phase_scope: (t.phase_scope as string | null | undefined) ?? null,
-              sort_order: (t.sort_order as number | undefined) ?? 0,
-              assignee_id: (t.assignee_id as string | null | undefined) ?? null,
-              due_date: t.due_date instanceof Date ? t.due_date.toISOString() : null,
-            }))}
-            canManage={canManageTasks}
-            phases={rawPhases.map((phase) => ({ key: phase.key, name: phase.name }))}
-            phaseScope={null}
-            users={assignableUsers}
-          />
-
-          <section className="grid gap-2">
-            <h2 className="m-0 text-[0.6875rem] font-bold uppercase tracking-[0.1em] text-ink-secondary">
-              Fase
-            </h2>
-            {phases.length === 0 ? (
-              <Text as="p" tone="tertiary" size="sm">Belum ada fase.</Text>
-            ) : (
-              <PhaseSection
-                phases={phases}
-                projectId={id}
-                canManage={canManageIter}
-                canReview={canReviewIter}
-                canOverride={canOverridePhase}
-                taskPhases={rawPhases.map((phase) => ({ key: phase.key, name: phase.name }))}
-                assignableUsers={assignableUsers}
-              />
-            )}
-          </section>
-        </div>
-
-        <aside className="grid min-w-0 gap-4 max-[1080px]:order-first">
-          <CardSection title="Progres fase">
-            <div className="grid gap-2.5">
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-display text-2xl font-[650] leading-none">{donePhases}</span>
-                <Text size="sm" tone="tertiary">dari {rawPhases.length} fase selesai</Text>
-              </div>
-              <ProgressBar
-                value={donePhases}
-                max={Math.max(rawPhases.length, 1)}
-                label={`${donePhases} dari ${rawPhases.length} fase selesai`}
-              />
-              <Text size="sm" tone="secondary">
-                {openTasks === 0 ? "Tidak ada task terbuka" : `${openTasks} task terbuka`}
-              </Text>
-            </div>
-          </CardSection>
-
-          <CardSection title="Fakta project">
-            <DescriptionList columns={1}>
-              <DescriptionItem label="Kode">
-                <span className="font-ui-mono text-xs">{project.code}</span>
-              </DescriptionItem>
-              <DescriptionItem label="Klien">{project.client.name}</DescriptionItem>
-              <DescriptionItem label="Tipe">{TYPE_LABELS[project.type] ?? project.type}</DescriptionItem>
-              <DescriptionItem label="Status">{STATUS_LABELS[project.status] ?? project.status}</DescriptionItem>
-              {project.area ? <DescriptionItem label="Luas">{Number(project.area)} m²</DescriptionItem> : null}
-              {project.location ? <DescriptionItem label="Lokasi">{project.location}</DescriptionItem> : null}
-              <DescriptionItem label="Dibuka">{fmt.format(new Date(project.opened_at))}</DescriptionItem>
-            </DescriptionList>
-          </CardSection>
-
-          <CardSection title="Tim">
-            {leadUser ? (
-              <div className="flex items-center gap-2.5">
-                <Avatar name={leadUser.display_name} size="lg" />
-                <div className="grid min-w-0 gap-px">
-                  <span className="truncate text-[0.78125rem] font-medium">{leadUser.display_name}</span>
-                  <Text meta className="text-ink-tertiary">Lead project</Text>
+          </SectionCard>
+        }
+        aside={
+          <>
+            <SectionCard title="Progres fase">
+              <div className="grid gap-2.5">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="font-display text-2xl font-[650] leading-none">{donePhases}</span>
+                  <Text size="sm" tone="tertiary">dari {rawPhases.length} fase selesai</Text>
                 </div>
+                <ProgressBar
+                  value={donePhases}
+                  max={Math.max(rawPhases.length, 1)}
+                  label={`${donePhases} dari ${rawPhases.length} fase selesai`}
+                />
+                <Text size="sm" tone="secondary">
+                  {openTasks === 0 ? "Tidak ada task terbuka" : `${openTasks} task terbuka`}
+                </Text>
               </div>
-            ) : (
-              <Text as="p" tone="tertiary" size="sm">Belum ada lead yang ditunjuk.</Text>
-            )}
-          </CardSection>
-        </aside>
-      </div>
-    </div>
+            </SectionCard>
+
+            <SectionCard title="Fakta project">
+              <DescriptionList columns={1}>
+                <DescriptionItem label="Kode">
+                  <span className="font-ui-mono text-xs">{project.code}</span>
+                </DescriptionItem>
+                <DescriptionItem label="Klien">{project.client.name}</DescriptionItem>
+                <DescriptionItem label="Tipe">{TYPE_LABELS[project.type] ?? project.type}</DescriptionItem>
+                <DescriptionItem label="Status">{STATUS_LABELS[project.status] ?? project.status}</DescriptionItem>
+                {project.area ? <DescriptionItem label="Luas">{Number(project.area)} m²</DescriptionItem> : null}
+                {project.location ? <DescriptionItem label="Lokasi">{project.location}</DescriptionItem> : null}
+                <DescriptionItem label="Dibuka">{fmt.format(new Date(project.opened_at))}</DescriptionItem>
+              </DescriptionList>
+            </SectionCard>
+
+            <SectionCard title="Tim">
+              {leadUser ? (
+                <div className="flex items-center gap-2.5">
+                  <Avatar name={leadUser.display_name} size="lg" />
+                  <div className="grid min-w-0 gap-px">
+                    <span className="truncate text-sm font-medium">{leadUser.display_name}</span>
+                    <Text meta className="text-ink-tertiary">Lead project</Text>
+                  </div>
+                </div>
+              ) : (
+                <Text as="p" tone="tertiary" size="sm">Belum ada lead yang ditunjuk.</Text>
+              )}
+            </SectionCard>
+          </>
+        }
+      >
+        <GeneralTaskBlock
+          projectId={id}
+          tasks={tasks.map((t: { id: string; title: string; status: "OPEN" | "DONE"; [key: string]: unknown }) => ({
+            id: t.id,
+            title: t.title,
+            status: t.status,
+            phase_scope: (t.phase_scope as string | null | undefined) ?? null,
+            sort_order: (t.sort_order as number | undefined) ?? 0,
+            assignee_id: (t.assignee_id as string | null | undefined) ?? null,
+            due_date: t.due_date instanceof Date ? t.due_date.toISOString() : null,
+          }))}
+          canManage={canManageTasks}
+          phases={rawPhases.map((phase) => ({ key: phase.key, name: phase.name }))}
+          phaseScope={null}
+          users={assignableUsers}
+        />
+
+        <PageSection title="Fase">
+          {phases.length === 0 ? (
+            <Text as="p" tone="tertiary" size="sm">Belum ada fase.</Text>
+          ) : (
+            <PhaseSection
+              phases={phases}
+              projectId={id}
+              canManage={canManageIter}
+              canReview={canReviewIter}
+              canOverride={canOverridePhase}
+              taskPhases={rawPhases.map((phase) => ({ key: phase.key, name: phase.name }))}
+              assignableUsers={assignableUsers}
+            />
+          )}
+        </PageSection>
+      </DetailShell>
+    </>
   );
 }

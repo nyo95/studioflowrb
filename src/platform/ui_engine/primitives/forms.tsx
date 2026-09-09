@@ -19,17 +19,31 @@ import { cx } from "../internal/cx";
 
 type InvalidProp = { invalid?: boolean };
 
+/**
+ * Control density, named to match `DataTable`'s. `compact` is for inline row
+ * editors and toolbars; `size` stays the native attribute it already was.
+ */
+export type ControlDensity = "regular" | "compact";
+
+const CONTROL_DENSITY_CLASSES: Record<ControlDensity, string> = {
+  regular: "min-h-(--ui-control-height-md) px-2.5 py-[7px]",
+  compact: "min-h-(--ui-control-height-sm) px-2 py-1 text-xs",
+};
+
 /* Shared control chrome. Hover/focus/invalid/disabled states mirror the locked
    interaction contract: warm border ladder, soft focus ring, no surprise. */
 const CONTROL_CLASSES =
-  "w-full min-h-(--ui-control-height-md) rounded-control border border-line bg-surface text-ink px-2.5 py-[7px] transition-[border-color,box-shadow] duration-[120ms] placeholder:text-ink-tertiary enabled:hover:border-line-strong focus:border-line-focus focus:outline-0 focus:shadow-[0_0_0_3px_rgb(87_83_78/0.12)] aria-invalid:border-danger disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-ink-tertiary";
+  "w-full rounded-control border border-line bg-surface text-ink transition-[border-color,box-shadow] duration-[120ms] placeholder:text-ink-tertiary enabled:hover:border-line-strong focus:border-line-focus focus:outline-0 focus:shadow-[0_0_0_3px_rgb(87_83_78/0.12)] aria-invalid:border-danger disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-ink-tertiary";
 
-export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & InvalidProp>(
-  function Input({ className, invalid, ...props }, ref) {
+export const Input = forwardRef<
+  HTMLInputElement,
+  InputHTMLAttributes<HTMLInputElement> & InvalidProp & { density?: ControlDensity }
+>(
+  function Input({ className, invalid, density = "regular", ...props }, ref) {
     return (
       <input
         ref={ref}
-        className={cx(CONTROL_CLASSES, className)}
+        className={cx(CONTROL_CLASSES, CONTROL_DENSITY_CLASSES[density], className)}
         aria-invalid={invalid || undefined}
         {...props}
       />
@@ -39,12 +53,12 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
 
 export const Textarea = forwardRef<
   HTMLTextAreaElement,
-  TextareaHTMLAttributes<HTMLTextAreaElement> & InvalidProp
->(function Textarea({ className, invalid, ...props }, ref) {
+  TextareaHTMLAttributes<HTMLTextAreaElement> & InvalidProp & { density?: ControlDensity }
+>(function Textarea({ className, invalid, density = "regular", ...props }, ref) {
   return (
     <textarea
       ref={ref}
-      className={cx(CONTROL_CLASSES, "min-h-[88px] resize-y", className)}
+      className={cx(CONTROL_CLASSES, CONTROL_DENSITY_CLASSES[density], "min-h-[88px] resize-y", className)}
       aria-invalid={invalid || undefined}
       {...props}
     />
@@ -53,13 +67,13 @@ export const Textarea = forwardRef<
 
 export const Select = forwardRef<
   HTMLSelectElement,
-  SelectHTMLAttributes<HTMLSelectElement> & InvalidProp
->(function Select({ className, invalid, children, ...props }, ref) {
+  SelectHTMLAttributes<HTMLSelectElement> & InvalidProp & { density?: ControlDensity }
+>(function Select({ className, invalid, density = "regular", children, ...props }, ref) {
   return (
     <span className={cx("relative block w-full", className)}>
       <select
         ref={ref}
-        className={cx(CONTROL_CLASSES, "appearance-none pr-8")}
+        className={cx(CONTROL_CLASSES, CONTROL_DENSITY_CLASSES[density], "appearance-none", density === "compact" ? "pr-7" : "pr-8")}
         aria-invalid={invalid || undefined}
         {...props}
       >
@@ -67,7 +81,10 @@ export const Select = forwardRef<
       </select>
       <ChevronDown
         aria-hidden="true"
-        className="pointer-events-none absolute right-2.5 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-ink-tertiary"
+        className={cx(
+          "pointer-events-none absolute top-1/2 -translate-y-1/2 text-ink-tertiary",
+          density === "compact" ? "right-1.5 h-3 w-3" : "right-2.5 h-[15px] w-[15px]",
+        )}
       />
     </span>
   );

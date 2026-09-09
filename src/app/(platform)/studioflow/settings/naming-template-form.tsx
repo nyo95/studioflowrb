@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import type { ActionResult } from "@platform/core/actions";
-import { Button, Field, FormActions, InlineError, Input } from "@/platform/ui_engine";
+import { Button, Field, FormActions, InlineError, Input, Notice } from "@/platform/ui_engine";
 
 import { updateNamingTemplateAction } from "./actions";
 
@@ -45,7 +45,7 @@ export function NamingTemplateForm({
     <form action={formAction} className="grid gap-4 max-w-xl">
       {failure ? <InlineError>{failure}</InlineError> : null}
       {saved && !failure ? (
-        <p className="text-sm text-green-600 dark:text-green-400">Template tersimpan.</p>
+        <Notice tone="success">Template tersimpan.</Notice>
       ) : null}
 
       <Field label="Template nama file" required>
@@ -59,9 +59,9 @@ export function NamingTemplateForm({
         />
       </Field>
 
-      <div className="rounded border border-line bg-surface-muted px-4 py-3">
+      <div className="rounded-control border border-line bg-surface-muted px-4 py-3">
         <p className="text-xs text-ink-tertiary">Contoh hasil</p>
-        <p className="mt-1 font-mono text-sm">{preview(draft) || "—"}.pdf</p>
+        <p className="mt-1 font-ui-mono text-sm">{preview(draft) || "—"}.pdf</p>
       </div>
 
       <div>
@@ -69,7 +69,7 @@ export function NamingTemplateForm({
         <dl className="grid gap-1 text-sm">
           {TOKENS.map((entry) => (
             <div key={entry.token} className="flex gap-3">
-              <dt className="w-24 shrink-0 font-mono text-xs">{entry.token}</dt>
+              <dt className="w-24 shrink-0 font-ui-mono text-xs">{entry.token}</dt>
               <dd className="text-ink-tertiary">{entry.label}</dd>
             </div>
           ))}

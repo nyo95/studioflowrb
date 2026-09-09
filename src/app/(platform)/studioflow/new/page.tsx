@@ -3,7 +3,12 @@ import { FolderOpen } from "lucide-react";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
-import { EmptyState, PageHeader, SectionCard } from "@/platform/ui_engine";
+import {
+  Breadcrumb,
+  EmptyState,
+  PageHeader,
+  SectionCard,
+} from "@/platform/ui_engine";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
 import { studioFlowService } from "@/apps/studioflow/runtime";
 import { ProjectForm } from "./project-form";
@@ -17,12 +22,18 @@ export default async function NewProjectPage() {
 
   if (!hasPermission(grants, STUDIOFLOW_PERMISSIONS.projectManage)) {
     return (
-      <div className="grid gap-4">
-        <PageHeader eyebrow="StudioFlow" title="Project baru" />
+      <>
+        <Breadcrumb
+        entries={[
+          { label: "Project", href: "/studioflow/projects" },
+          { label: "Project baru" },
+        ]}
+      />
+      <PageHeader title="Project baru" description="Fase disalin dari template studio saat project dibuat." divider />
         <SectionCard>
           <EmptyState icon={FolderOpen} title="Akses ditolak" description="Kamu tidak punya permission untuk membuat project." />
         </SectionCard>
-      </div>
+      </>
     );
   }
 
@@ -30,8 +41,8 @@ export default async function NewProjectPage() {
   const liveClients = clients.filter((c) => !c.deleted_at);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
-      <PageHeader eyebrow="StudioFlow" title="Project baru" />
+    <>
+      <PageHeader eyebrow="StudioFlow" title="Project baru" divider />
       {liveClients.length === 0 ? (
         <SectionCard>
           <EmptyState
@@ -45,6 +56,6 @@ export default async function NewProjectPage() {
           <ProjectForm clients={liveClients.map((c) => ({ id: c.id, name: c.name }))} />
         </SectionCard>
       )}
-    </div>
+    </>
   );
 }

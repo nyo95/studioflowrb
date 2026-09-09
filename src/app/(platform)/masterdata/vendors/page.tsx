@@ -5,7 +5,11 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 
 import { hasPermission } from "@platform/core/rbac";
 
-import { ErrorState,PageHeader,SectionCard } from "@/platform/ui_engine";
+import {
+  ErrorState,
+  PageHeader,
+  SectionCard,
+} from "@/platform/ui_engine";
 
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
 
@@ -26,12 +30,12 @@ export default async function VendorsPage() {
 
   if (!canRead && !canManage) {
     return (
-      <div className="grid gap-4">
-        <PageHeader title="Suppliers" />
+      <>
+        <PageHeader title="Suppliers" divider />
         <SectionCard>
           <ErrorState title="Access denied" description="You do not have permission to view suppliers." />
         </SectionCard>
-      </div>
+      </>
     );
   }
 
@@ -46,9 +50,10 @@ export default async function VendorsPage() {
       .sort((left, right) => left.name.localeCompare(right.name, "id"));
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
+    <>
       <PageHeader
         title="Suppliers"
+        divider
       />
       <VendorDirectory
         vendors={vendors}
@@ -56,6 +61,6 @@ export default async function VendorsPage() {
         brands={brands.map((b) => ({ id: b.id, name: b.name }))}
         canManage={canManage}
       />
-    </div>
+    </>
   );
 }

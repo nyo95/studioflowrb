@@ -139,7 +139,7 @@ function State({
           <Icon className="h-[18px] w-[18px]" />
         </span>
       ) : null}
-      {title ? <Heading level={4} className="font-display text-[1.0625rem] font-[650]">{title}</Heading> : null}
+      {title ? <Heading level={3} className="font-display font-[650]">{title}</Heading> : null}
       {description ? <Text as="p" tone="secondary" className="max-w-100 text-pretty leading-relaxed">{description}</Text> : null}
       {action ? <div className="mt-1 flex flex-wrap items-center justify-center gap-2">{action}</div> : null}
       {code ? <span className="font-ui-mono text-[0.6875rem] text-ink-tertiary">{code}</span> : null}

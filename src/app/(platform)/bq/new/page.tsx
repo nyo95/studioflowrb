@@ -22,7 +22,7 @@ export default async function NewBqProjectPage() {
 
   return (
     <div className="grid max-w-3xl gap-6">
-      <PageHeader eyebrow="Bill of Quantity" title="Buat Project" description="Mulai BQ baru; struktur Section/Subsection dapat ditambahkan setelah project dibuat." />
+      <PageHeader eyebrow="Bill of Quantity" title="Buat Project" description="Mulai BQ baru; struktur Section/Subsection dapat ditambahkan setelah project dibuat." divider />
       <SectionCard>
         <ProjectForm templates={templates} />
       </SectionCard>

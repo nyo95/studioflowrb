@@ -5,7 +5,11 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 
 import { hasPermission } from "@platform/core/rbac";
 
-import { ErrorState,PageHeader,SectionCard } from "@/platform/ui_engine";
+import {
+  ErrorState,
+  PageHeader,
+  SectionCard,
+} from "@/platform/ui_engine";
 
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
 
@@ -26,22 +30,23 @@ export default async function CategoriesPage() {
 
   if (!canRead && !canManage) {
     return (
-      <div className="grid gap-4">
-        <PageHeader title="Categories" />
+      <>
+        <PageHeader title="Categories" divider />
         <SectionCard>
           <ErrorState title="Access denied" description="You do not have permission to view categories." />
         </SectionCard>
-      </div>
+      </>
     );
   }
 
   const categories = await masterDataService.listCategories({ grants, includeDeactivated: true });
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
+    <>
       <PageHeader
         title="Product &amp; Work Categories"
+        divider
       />
       <CategoryDirectory categories={categories} canManage={canManage} />
-    </div>
+    </>
   );
 }

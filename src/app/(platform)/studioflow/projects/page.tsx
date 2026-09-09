@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { FolderOpen, Plus, Search } from "lucide-react";
+import { FolderOpen, Plus } from "lucide-react";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
@@ -15,16 +15,19 @@ import {
   EntityPrimaryCell,
   filterChipClasses,
   PageHeader,
+  Pagination,
+  SearchField,
   SectionCard,
   SegmentBar,
-  type SegmentState,
   StatusBadge,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
+  TableToolbar,
   Text,
+  type SegmentState,
 } from "@/platform/ui_engine";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
 import { studioFlowService } from "@/apps/studioflow/runtime";
@@ -64,6 +67,14 @@ function parseView(raw: string | string[] | undefined): View {
 function firstParam(raw: string | string[] | undefined): string {
   const value = Array.isArray(raw) ? raw[0] : raw;
   return (value ?? "").trim();
+}
+
+/** Rows per page. One screenful at the default measure, so paging is rare. */
+const PAGE_SIZE = 25;
+
+function parsePage(raw: string | string[] | undefined): number {
+  const parsed = Number.parseInt(firstParam(raw), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
 // ── phase summary ────────────────────────────────────────────────────────────
@@ -119,7 +130,7 @@ export default async function StudioFlowProjectsPage({
 
   if (!canRead) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
+      <>
         <PageHeader eyebrow="StudioFlow" title="Semua project" divider />
         <SectionCard>
           <EmptyState
@@ -128,13 +139,14 @@ export default async function StudioFlowProjectsPage({
             description="Kamu tidak punya permission untuk melihat project."
           />
         </SectionCard>
-      </div>
+      </>
     );
   }
 
   const params = await searchParams;
   const view = parseView(params.view);
   const query = firstParam(params.q);
+  const requestedPage = parsePage(params.page);
 
   const [projects, settings] = await Promise.all([
     studioFlowService.listProjects(grants),
@@ -187,6 +199,10 @@ export default async function StudioFlowProjectsPage({
     );
   });
 
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const page = Math.min(requestedPage, pageCount);
+  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const fmt = new Intl.DateTimeFormat(settings.locale, {
     timeZone: settings.timezone,
     dateStyle: "medium",
@@ -199,16 +215,17 @@ export default async function StudioFlowProjectsPage({
     { key: "review" as const, label: "Menunggu klien", count: counts.review },
   ];
 
-  function chipHref(key: View): string {
+  function listHref({ nextView = view, nextPage = 1 }: { nextView?: View; nextPage?: number } = {}): string {
     const next = new URLSearchParams();
-    if (key !== "all") next.set("view", key);
+    if (nextView !== "all") next.set("view", nextView);
     if (query) next.set("q", query);
+    if (nextPage > 1) next.set("page", String(nextPage));
     const suffix = next.toString();
     return suffix ? `/studioflow/projects?${suffix}` : "/studioflow/projects";
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-5 p-(--ui-page-padding)">
+    <>
       <PageHeader
         eyebrow="StudioFlow"
         title="Semua project"
@@ -225,41 +242,53 @@ export default async function StudioFlowProjectsPage({
 
       {/* View chips left, list filter right — both plain GET so the list works
           without client JS and every view is a shareable URL. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Text meta className="mr-0.5 text-ink-tertiary">Tampilan</Text>
-        {chips.map((chip) => (
-          <Link
-            key={chip.key}
-            href={chipHref(chip.key)}
-            aria-current={view === chip.key ? "page" : undefined}
-            className={filterChipClasses(view === chip.key)}
-          >
-            {chip.label}
-            <span className={view === chip.key ? "tabular-nums opacity-80" : "tabular-nums text-ink-tertiary"}>
-              <span aria-hidden="true">· </span>
-              {chip.count}
-            </span>
-          </Link>
-        ))}
-        <form method="get" action="/studioflow/projects" className="relative ml-auto w-[min(100%,240px)]">
-          {view !== "all" ? <input type="hidden" name="view" value={view} /> : null}
-          <Search
-            aria-hidden="true"
-            className="pointer-events-none absolute left-2.5 top-1/2 z-[1] h-[15px] w-[15px] -translate-y-1/2 text-ink-tertiary"
+      {/* Canonical directory chrome: the toolbar owns filters and search, so a
+          filtered-to-nothing list still shows the controls that got it there. */}
+      <DirectoryShell
+        surface
+        fill
+        pagination={
+          <Pagination
+            page={page}
+            pageCount={pageCount}
+            total={rows.length}
+            pageSize={PAGE_SIZE}
+            getHref={(nextPage) => listHref({ nextPage })}
+            label="Halaman project"
           />
-          <input
-            type="search"
-            name="q"
-            defaultValue={query}
-            aria-label="Cari project"
-            placeholder="Cari project atau klien…"
-            className="h-8 w-full min-w-0 rounded-control border border-line bg-surface pl-8 pr-2.5 text-[0.8125rem] text-ink outline-none placeholder:text-ink-tertiary focus-visible:border-line-focus"
+        }
+        toolbar={
+          <TableToolbar
+            framed={false}
+            filters={chips.map((chip) => (
+              <Link
+                key={chip.key}
+                href={listHref({ nextView: chip.key })}
+                aria-current={view === chip.key ? "page" : undefined}
+                className={filterChipClasses(view === chip.key)}
+              >
+                {chip.label}
+                <span className={view === chip.key ? "tabular-nums opacity-80" : "tabular-nums text-ink-tertiary"}>
+                  <span aria-hidden="true">· </span>
+                  {chip.count}
+                </span>
+              </Link>
+            ))}
+            search={
+              <form method="get" action="/studioflow/projects" className="contents">
+                {view !== "all" ? <input type="hidden" name="view" value={view} /> : null}
+                <SearchField
+                  name="q"
+                  defaultValue={query}
+                  label="Cari project"
+                  placeholder="Cari project atau klien…"
+                />
+              </form>
+            }
           />
-        </form>
-      </div>
-
-      {rows.length === 0 ? (
-        <SectionCard>
+        }
+      >
+        {rows.length === 0 ? (
           <EmptyState
             icon={FolderOpen}
             title={decorated.length === 0 ? "Belum ada project" : "Tidak ada yang cocok"}
@@ -271,9 +300,7 @@ export default async function StudioFlowProjectsPage({
                 : "Ubah filter atau kata kunci pencarian."
             }
           />
-        </SectionCard>
-      ) : (
-        <DirectoryShell surface fill>
+        ) : (
           <DataTable framed={false} density="compact" stickyHeader fill minWidth={980}>
             <TableHeader>
               <TableRow>
@@ -286,7 +313,7 @@ export default async function StudioFlowProjectsPage({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map(({ project, phases, leading }) => {
+              {pageRows.map(({ project, phases, leading }) => {
                 const leadName = project.lead_user_id ? leadUserMap[project.lead_user_id] : undefined;
                 const segments = phases.map((phase) => PHASE_SEGMENT_STATE[phase.state] ?? "idle");
                 const doneCount = phases.filter((phase) => phase.state === "DONE").length;
@@ -342,7 +369,7 @@ export default async function StudioFlowProjectsPage({
                       {leadName ? (
                         <span className="flex min-w-0 items-center gap-2">
                           <Avatar name={leadName} size="sm" />
-                          <span className="truncate text-[0.8125rem]">{leadName}</span>
+                          <span className="truncate text-sm">{leadName}</span>
                         </span>
                       ) : (
                         <Text size="sm" tone="tertiary">—</Text>
@@ -354,8 +381,8 @@ export default async function StudioFlowProjectsPage({
               })}
             </TableBody>
           </DataTable>
-        </DirectoryShell>
-      )}
-    </div>
+        )}
+      </DirectoryShell>
+    </>
   );
 }

@@ -37,6 +37,7 @@ export default async function AccountPage() {
         eyebrow="Account"
         title="Your account"
         description="Update your profile, secure your password, and manage active sessions."
+        divider
       />
 
       <PageSection title="Profile">

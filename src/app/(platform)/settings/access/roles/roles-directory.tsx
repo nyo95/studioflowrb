@@ -1,5 +1,8 @@
 "use client";
-import { SearchField } from "@/platform/ui_engine";
+import {
+  Checkbox,
+  SearchField,
+} from "@/platform/ui_engine";
 import { RowActionMenu } from "@/platform/ui_engine";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { DirectoryShell,DraftDialog,Pagination,Text,usePagination } from "@/platform/ui_engine";
@@ -247,16 +250,13 @@ function PermissionCheckboxes({
   return (
     <div className="grid max-h-[240px] gap-1.5 overflow-auto py-1">
       {permissions.map((permission) => (
-        <label key={permission} className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            name={name}
-            value={permission}
-            defaultChecked={checkedIds.includes(permission)}
-            className="h-[15px] w-[15px]"
-          />
-          <span className="font-ui-mono text-xs">{permission}</span>
-        </label>
+        <Checkbox
+          key={permission}
+          name={name}
+          value={permission}
+          defaultChecked={checkedIds.includes(permission)}
+          label={<span className="font-ui-mono text-xs">{permission}</span>}
+        />
       ))}
     </div>
   );

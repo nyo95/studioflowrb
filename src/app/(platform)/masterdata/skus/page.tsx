@@ -5,7 +5,11 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 
 import { hasPermission } from "@platform/core/rbac";
 
-import { ErrorState,PageHeader,SectionCard } from "@/platform/ui_engine";
+import {
+  ErrorState,
+  PageHeader,
+  SectionCard,
+} from "@/platform/ui_engine";
 
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
 
@@ -26,12 +30,12 @@ export default async function SkusPage() {
 
   if (!canRead && !canManage) {
     return (
-      <div className="grid gap-4">
-        <PageHeader title="SKUs" />
+      <>
+        <PageHeader title="SKUs" divider />
         <SectionCard>
           <ErrorState title="Access denied" description="You do not have permission to view SKUs." />
         </SectionCard>
-      </div>
+      </>
     );
   }
 
@@ -41,9 +45,10 @@ export default async function SkusPage() {
   ]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
+    <>
       <PageHeader
         title="Material SKUs Catalog"
+        divider
       />
       <SkuDirectory
         skus={skus.map((sku) => ({
@@ -62,6 +67,6 @@ export default async function SkusPage() {
         productCategories={refs.productCategories}
         canManage={canManage}
       />
-    </div>
+    </>
   );
 }

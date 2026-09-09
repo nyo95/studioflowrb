@@ -20,7 +20,7 @@ export default async function EditBqProjectPage({ params }: { params: Promise<{ 
 
   return (
     <div className="grid max-w-3xl gap-6">
-      <PageHeader eyebrow="Bill of Quantity" title="Edit Project" />
+      <PageHeader eyebrow="Bill of Quantity" title="Edit Project" divider />
       <SectionCard>
         <ProjectForm project={project} />
       </SectionCard>

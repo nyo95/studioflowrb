@@ -3,7 +3,21 @@
 import { useActionState, useState, useEffect } from "react";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
 import type { ActionResult } from "@platform/core/actions";
-import { DraftDialog, InlineError, RowActionMenu } from "@/platform/ui_engine";
+import {
+  Button,
+  Checkbox,
+  DraftDialog,
+  Field,
+  FilterChip,
+  FormActions,
+  IconButton,
+  InlineError,
+  Input,
+  RadioGroup,
+  RowActionMenu,
+  Surface,
+  Textarea,
+} from "@/platform/ui_engine";
 import { GeneralTaskBlock } from "./general-task-block";
 
 import {
@@ -133,22 +147,15 @@ function SendDialog({
 
       {error && <InlineError className="mb-3">{error}</InlineError>}
 
-      <form action={action} className="flex items-center justify-end gap-2">
-        <button
-          type="button"
-          data-dialog-cancel
-          disabled={pending}
-          className="px-3 py-1.5 text-sm rounded-action text-ink-secondary hover:bg-surface-muted transition-colors"
-        >
+      <form action={action}>
+        <FormActions>
+        <Button variant="ghost" size="sm" data-dialog-cancel disabled={pending}>
           Batal
-        </button>
-        <button
-          type="submit"
-          disabled={pending}
-          className="px-3 py-1.5 text-sm rounded-action bg-ink text-white hover:opacity-80 transition-opacity disabled:opacity-50"
-        >
+        </Button>
+        <Button variant="primary" size="sm" type="submit" disabled={pending}>
           {pending ? "Menyimpan…" : openPoints > 0 ? "Tetap kirim" : "Kirim"}
-        </button>
+          </Button>
+        </FormActions>
       </form>
     </DraftDialog>
   );
@@ -204,30 +211,16 @@ function ResponseDialog({
     >
       <form action={action} className="flex flex-col gap-4">
         {/* Kind picker */}
-        <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input
-              type="radio"
-              name="kind"
-              value="APPROVAL"
-              checked={kind === "APPROVAL"}
-              onChange={() => setKind("APPROVAL")}
-              className="accent-[var(--color-ink)]"
-            />
-            Disetujui
-          </label>
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input
-              type="radio"
-              name="kind"
-              value="REVISION"
-              checked={kind === "REVISION"}
-              onChange={() => setKind("REVISION")}
-              className="accent-[var(--color-ink)]"
-            />
-            Minta revisi
-          </label>
-        </div>
+        <RadioGroup
+          label="Respons klien"
+          name="kind"
+          value={kind}
+          onValueChange={(value) => setKind(value as typeof kind)}
+          options={[
+            { value: "APPROVAL", label: "Disetujui" },
+            { value: "REVISION", label: "Minta revisi" },
+          ]}
+        />
 
         {/* Revision points */}
         {kind === "REVISION" && (
@@ -237,32 +230,30 @@ function ResponseDialog({
             </p>
             {points.map((pt, i) => (
               <div key={i} className="flex items-center gap-1.5">
-                <input
+                <Input
                   type="text"
                   name="point"
+                  density="compact"
                   value={pt}
                   onChange={(e) => updatePoint(i, e.target.value)}
                   placeholder={`Poin ${i + 1}`}
-                  className="flex-1 min-w-0 text-sm border border-line rounded-action px-2 py-1 bg-transparent text-ink placeholder:text-ink-tertiary focus:outline-none focus:border-line-focus"
+                  className="min-w-0 flex-1"
                 />
                 {points.length > 1 && (
-                  <button
-                    type="button"
+                  <IconButton
+                    size="sm"
+                    variant="ghost"
+                    label="Hapus poin"
+                    icon={<X aria-hidden="true" />}
                     onClick={() => removePoint(i)}
-                    className="shrink-0 text-ink-tertiary hover:text-ink"
-                  >
-                    <X size={13} />
-                  </button>
+                    className="shrink-0"
+                  />
                 )}
               </div>
             ))}
-            <button
-              type="button"
-              onClick={addPoint}
-              className="self-start text-xs text-action hover:underline"
-            >
+            <Button variant="ghost" size="sm" onClick={addPoint} className="self-start">
               + Tambah poin
-            </button>
+            </Button>
             <p className="text-xs text-ink-tertiary">
               Poin akan ditambahkan ke ronde berikutnya. Ronde baru dibuat
               otomatis jika belum ada.
@@ -271,51 +262,31 @@ function ResponseDialog({
         )}
 
         {/* Optional note */}
-        <div>
-          <label className="block text-xs font-medium text-ink-secondary mb-1">
-            Catatan (opsional)
-          </label>
-          <textarea
-            name="note"
-            rows={2}
-            placeholder="Catatan dari klien…"
-            className="w-full text-sm border border-line rounded-action px-2 py-1.5 bg-transparent text-ink placeholder:text-ink-tertiary focus:outline-none focus:border-line-focus resize-none"
-          />
-        </div>
+        <Field label="Catatan (opsional)">
+          <Textarea name="note" rows={2} density="compact" placeholder="Catatan dari klien…" className="min-h-16 resize-none" />
+        </Field>
 
         {/* Sekalian selesaikan — APPROVAL only, when no other open iterations */}
         {kind === "APPROVAL" && canFinishPhase && (
-          <label className="flex items-center gap-2 text-sm cursor-pointer text-ink-secondary">
-            <input
-              type="checkbox"
-              checked={alsoFinish}
-              onChange={(e) => setAlsoFinish(e.target.checked)}
-              className="rounded accent-[var(--color-ink)]"
-            />
-            Sekalian selesaikan fase ini
-          </label>
+          <Checkbox
+            checked={alsoFinish}
+            onCheckedChange={(checked) => setAlsoFinish(checked === true)}
+            label="Sekalian selesaikan fase ini"
+            className="text-sm text-ink-secondary"
+          />
         )}
         {alsoFinish && <input type="hidden" name="also_finish" value="1" />}
 
         {error && <InlineError>{error}</InlineError>}
 
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            data-dialog-cancel
-            disabled={pending}
-            className="px-3 py-1.5 text-sm rounded-action text-ink-secondary hover:bg-surface-muted transition-colors"
-          >
+        <FormActions>
+          <Button variant="ghost" size="sm" data-dialog-cancel disabled={pending}>
             Batal
-          </button>
-          <button
-            type="submit"
-            disabled={pending}
-            className="px-3 py-1.5 text-sm rounded-action bg-ink text-white hover:opacity-80 transition-opacity disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="primary" size="sm" type="submit" disabled={pending}>
             {pending ? "Menyimpan…" : "Simpan jawaban"}
-          </button>
-        </div>
+          </Button>
+        </FormActions>
       </form>
     </DraftDialog>
   );
@@ -360,7 +331,7 @@ function VoidDialog({
           <label className="block text-xs font-medium text-ink-secondary mb-1">
             Alasan <span className="text-danger">*</span>
           </label>
-          <textarea
+          <Textarea
             name="reason"
             rows={2}
             required
@@ -369,23 +340,14 @@ function VoidDialog({
           />
         </div>
         {error && <InlineError>{error}</InlineError>}
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            data-dialog-cancel
-            disabled={pending}
-            className="px-3 py-1.5 text-sm rounded-action text-ink-secondary hover:bg-surface-muted transition-colors"
-          >
+        <FormActions>
+          <Button variant="ghost" size="sm" data-dialog-cancel disabled={pending}>
             Batal
-          </button>
-          <button
-            type="submit"
-            disabled={pending}
-            className="px-3 py-1.5 text-sm rounded-action bg-danger text-white hover:opacity-80 transition-opacity disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="danger-primary" size="sm" type="submit" disabled={pending}>
             {pending ? "Menghentikan…" : "Hentikan ronde"}
-          </button>
-        </div>
+          </Button>
+        </FormActions>
       </form>
     </DraftDialog>
   );
@@ -424,23 +386,23 @@ function ReopenPhaseDialog({
       <form action={action} className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-ink-secondary">Alasan *</label>
-          <textarea
+          <Textarea
             name="reason"
             required
             rows={2}
             placeholder="Kenapa fase ini dibuka kembali?"
-            className="w-full rounded-action border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:border-ink resize-none"
+            className="resize-none"
           />
         </div>
         {error && <InlineError>{error}</InlineError>}
-        <div className="flex items-center justify-end gap-2">
-          <button type="button" data-dialog-cancel className="rounded-action border border-line px-3 py-1.5 text-sm text-ink-secondary hover:bg-surface-muted">
+        <FormActions>
+          <Button variant="secondary" size="sm" data-dialog-cancel>
             Batal
-          </button>
-          <button type="submit" disabled={pending} className="rounded-action bg-ink text-white px-3 py-1.5 text-sm font-medium hover:bg-ink/90 disabled:opacity-50">
+          </Button>
+          <Button variant="primary" size="sm" type="submit" disabled={pending}>
             {pending ? "Membuka…" : "Buka kembali"}
-          </button>
-        </div>
+          </Button>
+        </FormActions>
       </form>
     </DraftDialog>
   );
@@ -477,23 +439,23 @@ function CloseByExceptionDialog({
       <form action={action} className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-ink-secondary">Alasan pengecualian *</label>
-          <textarea
+          <Textarea
             name="reason"
             required
             rows={2}
             placeholder="Kenapa fase ini ditutup sebelum selesai?"
-            className="w-full rounded-action border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:border-ink resize-none"
+            className="resize-none"
           />
         </div>
         {error && <InlineError>{error}</InlineError>}
-        <div className="flex items-center justify-end gap-2">
-          <button type="button" data-dialog-cancel className="rounded-action border border-line px-3 py-1.5 text-sm text-ink-secondary hover:bg-surface-muted">
+        <FormActions>
+          <Button variant="secondary" size="sm" data-dialog-cancel>
             Batal
-          </button>
-          <button type="submit" disabled={pending} className="rounded-action bg-danger text-white px-3 py-1.5 text-sm font-medium hover:bg-danger/90 disabled:opacity-50">
+          </Button>
+          <Button variant="danger-primary" size="sm" type="submit" disabled={pending}>
             {pending ? "Menutup…" : "Tutup dengan pengecualian"}
-          </button>
-        </div>
+          </Button>
+        </FormActions>
       </form>
     </DraftDialog>
   );
@@ -577,46 +539,42 @@ function IterationBlock({
 
         {isDraft && phase.requires_internal_approval && !iteration.internal_approval && canReview && (
           <form action={approvalAction}>
-            <button
-              type="submit"
-              disabled={approvalPending}
-              className="shrink-0 text-xs px-2.5 py-1 rounded-action border border-line hover:bg-surface-muted transition-colors text-ink-secondary disabled:opacity-50"
-            >
+            <Button variant="secondary" size="sm" type="submit" disabled={approvalPending}>
               {approvalPending ? "Mencatat…" : "ACC"}
-            </button>
+            </Button>
           </form>
         )}
 
         {/* Primary action — never two at once */}
         {isDraft && canReview && (
-          <button
-            type="button"
-            onClick={() =>
-              onSend(
-                iteration.id,
-                label,
-                openPoints,
-                phase.requires_internal_approval && !iteration.internal_approval,
-              )
-            }
-            className="shrink-0 text-xs px-2.5 py-1 rounded-action border border-line hover:bg-surface-muted transition-colors text-ink-secondary"
-          >
+          <Button
+
+ onClick={() =>
+ onSend(
+ iteration.id,
+ label,
+ openPoints,
+ phase.requires_internal_approval && !iteration.internal_approval,
+ )
+ }
+ variant="secondary" size="sm" className="shrink-0"
+ >
             Kirim ke klien
-          </button>
+          </Button>
         )}
         {isSent && canReview && (
-          <button
-            type="button"
-            onClick={() => {
-              const otherOpen = phase.iterations.some(
-                (i) => i.id !== iteration.id && (i.state === "DRAFT" || i.state === "SENT"),
-              );
-              onRespond(iteration.id, label, !otherOpen);
-            }}
-            className="shrink-0 text-xs px-2.5 py-1 rounded-action border border-line hover:bg-surface-muted transition-colors text-ink-secondary"
-          >
+          <Button
+
+ onClick={() => {
+ const otherOpen = phase.iterations.some(
+ (i) => i.id !== iteration.id && (i.state === "DRAFT" || i.state === "SENT"),
+ );
+ onRespond(iteration.id, label, !otherOpen);
+ }}
+ variant="secondary" size="sm" className="shrink-0"
+ >
             Catat jawaban klien
-          </button>
+          </Button>
         )}
         {/* ⋯ menu — void, withdraw send (disabled until service supports it) */}
         {(isDraft || isSent) && canReview && (
@@ -766,9 +724,7 @@ function PhaseBlock({
     (finishSupState?.ok === false ? finishSupState.error.safeMessage : null);
 
   return (
-    <div
-      className="rounded-card border border-line overflow-hidden"
-    >
+    <Surface className="overflow-hidden">
       {/* Header row */}
       <div
         className={`flex items-center gap-2 px-4 py-3 ${
@@ -810,48 +766,48 @@ function PhaseBlock({
           {/* Supervision actions */}
           {!phase.has_rounds && phase.state === "NOT_STARTED" && canReview && (
             <form action={startSupAction}>
-              <button
-                type="submit"
-                disabled={startSupPending}
-                className="text-xs px-2.5 py-1 rounded-action border border-line bg-surface hover:bg-surface-muted transition-colors disabled:opacity-50"
-              >
+              <Button
+ type="submit"
+ disabled={startSupPending}
+ variant="secondary" size="sm"
+ >
                 Mulai
-              </button>
+              </Button>
             </form>
           )}
           {!phase.has_rounds && phase.state === "IN_PROGRESS" && canReview && (
             <form action={finishSupAction}>
-              <button
-                type="submit"
-                disabled={finishSupPending}
-                className="text-xs px-2.5 py-1 rounded-action border border-line bg-surface hover:bg-surface-muted transition-colors disabled:opacity-50"
-              >
+              <Button
+ type="submit"
+ disabled={finishSupPending}
+ variant="secondary" size="sm"
+ >
                 Selesaikan
-              </button>
+              </Button>
             </form>
           )}
 
           {/* Round-bearing phase actions */}
           {canFinish && canReview && (
             <form action={finishAction}>
-              <button
-                type="submit"
-                disabled={finishPending}
-                className="text-xs px-2.5 py-1 rounded-action border border-line bg-surface hover:bg-surface-muted transition-colors disabled:opacity-50"
-              >
+              <Button
+ type="submit"
+ disabled={finishPending}
+ variant="secondary" size="sm"
+ >
                 Selesaikan fase
-              </button>
+              </Button>
             </form>
           )}
           {!canFinish && canStartRound && (
             <form action={openIterAction}>
-              <button
-                type="submit"
-                disabled={openIterPending}
-                className="text-xs px-2.5 py-1 rounded-action border border-line bg-surface hover:bg-surface-muted transition-colors disabled:opacity-50"
-              >
+              <Button
+ type="submit"
+ disabled={openIterPending}
+ variant="secondary" size="sm"
+ >
                 Mulai ronde
-              </button>
+              </Button>
             </form>
           )}
 
@@ -945,7 +901,7 @@ function PhaseBlock({
           </p>
         </div>
       )}
-    </div>
+    </Surface>
   );
 }
 
@@ -1001,30 +957,20 @@ export function PhaseSection({
       {/* Filter chips — only when multiple phases */}
       {phases.length > 1 && (
         <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
+          <FilterChip
+            selected={filter === null}
             onClick={() => setFilter(null)}
-            className={`px-3 py-1 text-sm rounded-full border transition-colors ${
-              filter === null
-                ? "bg-ink text-white border-ink"
-                : "border-line text-ink-secondary hover:bg-surface-muted"
-            }`}
-          >
-            Semua
-          </button>
-          {phases.map((phase) => (
-            <button
-              key={phase.id}
-              type="button"
-              onClick={() => setFilter(phase.id)}
-              className={`px-3 py-1 text-sm rounded-full border transition-colors ${
-                filter === phase.id
-                  ? "bg-ink text-white border-ink"
-                  : "border-line text-ink-secondary hover:bg-surface-muted"
-              }`}
             >
+            Semua
+          </FilterChip>
+          {phases.map((phase) => (
+            <FilterChip
+              key={phase.id}
+              selected={filter === phase.id}
+              onClick={() => setFilter(phase.id)}
+              >
               {phase.name}
-            </button>
+            </FilterChip>
           ))}
         </div>
       )}

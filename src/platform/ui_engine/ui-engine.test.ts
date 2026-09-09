@@ -76,6 +76,18 @@ describe("UI Engine foundation", () => {
       "useConfirm",
       "useUnsavedChangesGuard",
       "useFormDraftGuard",
+      // R7.22 — chrome and display atoms the three apps now share.
+      "Breadcrumb",
+      "FilterChip",
+      "filterChipClasses",
+      "Avatar",
+      "initialsOf",
+      "CountBadge",
+      "MetaList",
+      "ProgressBar",
+      "SegmentBar",
+      "GroupHeader",
+      "PipelineStrip",
     ]) {
       const exported = ui[name as keyof typeof ui];
       assert.ok(
@@ -86,6 +98,61 @@ describe("UI Engine foundation", () => {
     for (const deferred of ["WorkspaceShell", "SplitPane", "ReorderHandle", "FileDropZone", "DocumentSheet"]) {
       assert.equal(deferred in ui, false, `${deferred} must remain deferred`);
     }
+  });
+
+  it("gives colour-carried display atoms a text alternative", () => {
+    // Each of these signals with colour, so none may ship without a name.
+    assert.match(renderToStaticMarkup(createElement(ui.Avatar, { name: "Admin Rad" })), /aria-label="Admin Rad"/);
+    assert.match(renderToStaticMarkup(createElement(ui.Avatar, { name: "Admin Rad" })), />AR</);
+    assert.match(
+      renderToStaticMarkup(createElement(ui.ProgressBar, { value: 2, max: 4, label: "2 of 4 done" })),
+      /role="progressbar"[^>]*aria-valuenow="2"/,
+    );
+    assert.match(
+      renderToStaticMarkup(createElement(ui.SegmentBar, { segments: ["done", "idle"], label: "1 of 2" })),
+      /role="img"[^>]*aria-label="1 of 2"/,
+    );
+    const strip = renderToStaticMarkup(
+      createElement(ui.PipelineStrip, {
+        steps: [
+          { id: "a", label: "Moodboard", state: "done" },
+          { id: "b", label: "Design 3D", state: "current" },
+        ],
+      }),
+    );
+    // The current stage must be findable without reading its fill.
+    assert.match(strip, /aria-current="step"/);
+  });
+
+  it("paginates by href for server-rendered directories and by callback for client ones", () => {
+    const paginationSource = readFileSync(new URL("./components/pagination.tsx", import.meta.url), "utf8");
+    // URL pagination is rendered by server pages; importing the client Button
+    // here would make getHref cross a server/client boundary and crash Next.
+    assert.doesNotMatch(paginationSource, /from\s*["']\.\.\/primitives["']/);
+    assert.match(paginationSource, /buttonClasses\("secondary",\s*"sm"\)/);
+    const linked = renderToStaticMarkup(
+      createElement(ui.Pagination, { page: 2, pageCount: 4, total: 96, pageSize: 25, getHref: (n: number) => `?page=${n}` }),
+    );
+    // Row range beats page number: the operator is looking for a record.
+    assert.match(linked, /26–50 of 96/);
+    assert.match(linked, /href="\?page=1"/);
+    assert.match(linked, /href="\?page=3"/);
+    // A boundary step stays present but inert, so the row does not reflow.
+    const first = renderToStaticMarkup(
+      createElement(ui.Pagination, { page: 1, pageCount: 3, total: 60, pageSize: 25, getHref: (n: number) => `?page=${n}` }),
+    );
+    assert.match(first, /disabled=""/);
+    assert.doesNotMatch(first, /href="\?page=0"/);
+    // Without a total it still falls back to counting pages.
+    assert.match(
+      renderToStaticMarkup(createElement(ui.Pagination, { page: 1, pageCount: 3, onPageChange: () => {} })),
+      /Page 1 of 3/,
+    );
+  });
+
+  it("marks filter chip selection for assistive technology", () => {
+    const chip = renderToStaticMarkup(createElement(ui.FilterChip, { selected: true }, "Mine"));
+    assert.match(chip, /aria-pressed="true"/);
   });
 
   it("keeps accessibility-critical state and dialog semantics distinct", () => {

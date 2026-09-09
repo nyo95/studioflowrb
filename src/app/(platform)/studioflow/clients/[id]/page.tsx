@@ -3,7 +3,13 @@ import { Users } from "lucide-react";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
-import { EmptyState, PageHeader, SectionCard } from "@/platform/ui_engine";
+import {
+  Breadcrumb,
+  EmptyState,
+  MetaList,
+  PageHeader,
+  SectionCard,
+} from "@/platform/ui_engine";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
 import { studioFlowService } from "@/apps/studioflow/runtime";
 import { ClientDetailView } from "./client-detail-view";
@@ -20,12 +26,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     hasPermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
   if (!canRead) {
     return (
-      <div className="grid gap-4">
-        <PageHeader eyebrow="StudioFlow · Klien" title="Detail klien" />
+      <>
+        <PageHeader eyebrow="StudioFlow · Klien" title="Detail klien" divider />
         <SectionCard>
           <EmptyState icon={Users} title="Akses ditolak" description="Kamu tidak punya permission." />
         </SectionCard>
-      </div>
+      </>
     );
   }
 
@@ -38,16 +44,31 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const canManage = hasPermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
+    <>
+      <Breadcrumb
+        entries={[
+          { label: "Klien", href: "/studioflow/clients" },
+          { label: client.name },
+        ]}
+      />
       <PageHeader
-        eyebrow="StudioFlow · Klien"
         title={client.name}
+        divider
+        meta={
+          <MetaList
+            items={[
+              client.contact_name,
+              client.contact_phone,
+              `${client._count.projects} project aktif`,
+            ]}
+          />
+        }
       />
       <ClientDetailView
         client={client}
         canManage={canManage}
         liveProjectCount={client._count.projects}
       />
-    </div>
+    </>
   );
 }

@@ -5,7 +5,6 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
 import {
   Badge,
-  CardSection,
   EmptyState,
   PageHeader,
   SectionCard,
@@ -34,7 +33,7 @@ export default async function StudioFlowSettingsPage() {
 
   if (!canRead) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
+      <>
         <PageHeader eyebrow="StudioFlow" title="Pengaturan" divider />
         <SectionCard>
           <EmptyState
@@ -43,7 +42,7 @@ export default async function StudioFlowSettingsPage() {
             description="Kamu tidak punya permission untuk melihat pengaturan."
           />
         </SectionCard>
-      </div>
+      </>
     );
   }
 
@@ -53,7 +52,7 @@ export default async function StudioFlowSettingsPage() {
   ]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-5 p-(--ui-page-padding)">
+    <>
       <PageHeader
         eyebrow="StudioFlow"
         title="Pengaturan studio"
@@ -67,7 +66,7 @@ export default async function StudioFlowSettingsPage() {
           <a
             key={item.href}
             href={item.href}
-            className="rounded-control px-2.5 py-1.5 text-[0.78125rem] font-medium text-ink-secondary no-underline hover:bg-surface-muted hover:text-ink"
+            className="rounded-control px-2.5 py-1.5 text-[0.8125rem] font-medium text-ink-secondary no-underline hover:bg-surface-muted hover:text-ink"
           >
             {item.label}
           </a>
@@ -75,14 +74,14 @@ export default async function StudioFlowSettingsPage() {
       >
         {/* Read-only here on purpose: the template is seeded and versioned by the
             platform, and editing it mid-flight would re-shape live projects. */}
-        <CardSection
+        <SectionCard
           id="fase"
           title="Template fase"
           count={templates.length}
           padded={false}
           className="scroll-mt-6"
         >
-          <p className="border-b border-line-subtle px-3.5 py-2.5 text-[0.78125rem] text-ink-secondary">
+          <p className="border-b border-line-subtle px-3.5 py-2.5 text-sm text-ink-secondary">
             Pipeline default yang dipasang ke setiap project baru.
           </p>
           {templates.length === 0 ? (
@@ -102,7 +101,7 @@ export default async function StudioFlowSettingsPage() {
                     {index + 1}
                   </span>
                   <div className="grid min-w-0 gap-px">
-                    <span className="truncate text-[0.84375rem] font-semibold">{template.name}</span>
+                    <span className="truncate text-sm font-semibold">{template.name}</span>
                     <span className="font-ui-mono text-[0.6875rem] text-ink-tertiary">{template.key}</span>
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
@@ -119,16 +118,16 @@ export default async function StudioFlowSettingsPage() {
               ))}
             </ol>
           )}
-        </CardSection>
+        </SectionCard>
 
-        <CardSection id="penamaan" title="Template nama file" className="scroll-mt-6">
-          <p className="mb-4 text-[0.78125rem] text-ink-secondary">
+        <SectionCard id="penamaan" title="Template nama file" className="scroll-mt-6">
+          <p className="mb-4 text-sm text-ink-secondary">
             Nama standar yang dipakai setiap kali file dicatat. Token yang tidak dikenal
             ditolak saat simpan, bukan saat file masuk.
           </p>
           <NamingTemplateForm template={settings.naming_template} canManage={canManage} />
-        </CardSection>
+        </SectionCard>
       </SettingsShell>
-    </div>
+    </>
   );
 }

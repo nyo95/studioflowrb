@@ -5,7 +5,11 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 
 import { hasPermission } from "@platform/core/rbac";
 
-import { ErrorState,PageHeader,SectionCard } from "@/platform/ui_engine";
+import {
+  ErrorState,
+  PageHeader,
+  SectionCard,
+} from "@/platform/ui_engine";
 
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
 
@@ -26,12 +30,12 @@ export default async function BrandsPage() {
 
   if (!canRead && !canManage) {
     return (
-      <div className="grid gap-4">
-        <PageHeader title="Brands" />
+      <>
+        <PageHeader title="Brands" divider />
         <SectionCard>
           <ErrorState title="Access denied" description="You do not have permission to view brands." />
         </SectionCard>
-      </div>
+      </>
     );
   }
 
@@ -44,9 +48,10 @@ export default async function BrandsPage() {
   const canManageCategories = hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryManage);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
+    <>
       <PageHeader
         title="Brands Catalog"
+        divider
       />
       <BrandDirectory
         brands={brands}
@@ -57,6 +62,6 @@ export default async function BrandsPage() {
         canManageVendors={canManageVendors}
         canManageCategories={canManageCategories}
       />
-    </div>
+    </>
   );
 }

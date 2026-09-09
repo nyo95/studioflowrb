@@ -33,6 +33,7 @@ export default async function LauncherPage() {
         eyebrow={settings.organizationName}
         title="Workspace"
         description={`Open an application in ${settings.appTitle}.`}
+        divider
       />
       {accessible.length === 0 ? (
         <SectionCard>

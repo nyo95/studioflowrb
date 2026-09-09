@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, CheckSquare, Plus, Square, Trash2 } from "lucide-react";
 import type { ActionResult } from "@platform/core/actions";
-import { InlineError } from "@/platform/ui_engine";
+import { Button, IconButton, InlineError, Input, SectionCard, Select, Text } from "@/platform/ui_engine";
 
 import {
   createTaskAction,
@@ -51,7 +51,7 @@ function AddTaskForm({ projectId, phaseScope }: { projectId: string; phaseScope:
         <span className="text-ink-tertiary shrink-0" aria-hidden="true">
           <Plus size={14} />
         </span>
-        <input
+        <Input
           name="title"
           type="text"
           placeholder="Tambah task…"
@@ -122,24 +122,22 @@ function TaskRow({
     >
       {/* Completion toggle */}
       <form action={completingAction}>
-        <button
+        <IconButton
           type="submit"
-          className="shrink-0 text-ink-tertiary hover:text-action focus:outline-action"
-          title={task.status === "OPEN" ? "Tandai selesai" : "Buka kembali"}
-        >
-          {task.status === "DONE" ? (
-            <CheckSquare size={15} className="text-success" />
-          ) : (
-            <Square size={15} />
-          )}
-        </button>
+          size="sm"
+          variant="ghost"
+          label={task.status === "OPEN" ? "Tandai selesai" : "Buka kembali"}
+          className="shrink-0"
+          icon={task.status === "DONE" ? <CheckSquare aria-hidden="true" className="text-success" /> : <Square aria-hidden="true" />}
+        />
       </form>
 
       {/* Title */}
       {editing ? (
         <form ref={editFormRef} action={updateAction} className="flex min-w-0 flex-1 items-center gap-1">
-          <input
+          <Input
             name="title"
+            density="compact"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
@@ -147,9 +145,9 @@ function TaskRow({
               if (event.key === "Escape") { event.preventDefault(); setEditing(false); setDraft(task.title); }
             }}
             autoFocus
-            className="min-w-0 flex-1 rounded-action border border-line bg-transparent px-2 py-1 text-sm text-ink outline-none"
+            className="min-w-0 flex-1"
           />
-          <button type="submit" className="text-xs text-action hover:underline" disabled={updating?.ok === false}>Simpan</button>
+          <Button type="submit" variant="ghost" size="sm" disabled={updating?.ok === false}>Simpan</Button>
         </form>
       ) : <span
         onDoubleClick={() => setEditing(true)}
@@ -168,39 +166,42 @@ function TaskRow({
       {phases.length > 0 && (
         <form action={moveAction} className="shrink-0">
           <input type="hidden" name="sort_order" value={String(task.sort_order ?? 0)} />
-          <select
+          <Select
             name="phase_scope"
+            density="compact"
             defaultValue={task.phase_scope ?? ""}
             aria-label="Pindahkan task"
             onChange={(event) => event.currentTarget.form?.requestSubmit()}
-            className="max-w-28 rounded-action border border-line bg-transparent px-1.5 py-1 text-[11px] text-ink-secondary"
+            className="max-w-28"
           >
             <option value="">Umum</option>
             {phases.map((phase) => <option key={phase.key} value={phase.key}>{phase.name}</option>)}
-          </select>
+          </Select>
         </form>
       )}
 
       <form action={updateAction} className="flex shrink-0 items-center gap-1">
-        <select
+        <Select
           name="assignee_id"
+          density="compact"
           defaultValue={task.assignee_id ?? ""}
           aria-label="Penanggung jawab task"
           onChange={(event) => event.currentTarget.form?.requestSubmit()}
-          className="max-w-28 rounded-action border border-line bg-transparent px-1.5 py-1 text-[11px] text-ink-secondary"
+          className="max-w-28"
         >
           <option value="">Tanpa PIC</option>
           {users.map((user) => <option key={user.id} value={user.id}>{user.display_name}</option>)}
-        </select>
+        </Select>
       </form>
       <form action={updateAction} className="shrink-0">
-        <input
+        <Input
           type="date"
           name="due_date"
+          density="compact"
           defaultValue={task.due_date ? task.due_date.slice(0, 10) : ""}
           aria-label="Deadline task"
           onChange={(event) => event.currentTarget.form?.requestSubmit()}
-          className="w-28 rounded-action border border-line bg-transparent px-1.5 py-1 text-[11px] text-ink-secondary"
+          className="w-28"
         />
       </form>
 
@@ -208,29 +209,26 @@ function TaskRow({
         <form action={moveAction}>
           <input type="hidden" name="phase_scope" value={task.phase_scope ?? ""} />
           <input type="hidden" name="sort_order" value={String(Math.max(0, position - 1))} />
-          <button type="submit" disabled={position === 0} className="text-ink-tertiary hover:text-action disabled:invisible" title="Naikkan task">
-            <ArrowUp size={12} />
-          </button>
+          <IconButton type="submit" size="sm" variant="ghost" label="Naikkan task" disabled={position === 0} className="disabled:invisible" icon={<ArrowUp aria-hidden="true" />} />
         </form>
         <form action={moveAction}>
           <input type="hidden" name="phase_scope" value={task.phase_scope ?? ""} />
           <input type="hidden" name="sort_order" value={String(Math.min(total - 1, position + 1))} />
-          <button type="submit" disabled={position === total - 1} className="text-ink-tertiary hover:text-action disabled:invisible" title="Turunkan task">
-            <ArrowDown size={12} />
-          </button>
+          <IconButton type="submit" size="sm" variant="ghost" label="Turunkan task" disabled={position === total - 1} className="disabled:invisible" icon={<ArrowDown aria-hidden="true" />} />
         </form>
       </div>
 
       {/* Delete */}
       {hovered && (
         <form action={deletingAction}>
-          <button
+          <IconButton
             type="submit"
-            className="shrink-0 text-ink-tertiary hover:text-danger focus:outline-action"
-            title="Hapus task"
-          >
-            <Trash2 size={13} />
-          </button>
+            size="sm"
+            variant="ghost"
+            label="Hapus task"
+            className="shrink-0 hover:text-danger"
+            icon={<Trash2 aria-hidden="true" />}
+          />
         </form>
       )}
 
@@ -268,32 +266,21 @@ export function GeneralTaskBlock({
   const visible = showDone ? scopedTasks : open;
 
   return (
-    <div className="rounded-card border border-line bg-surface overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-line bg-surface-muted">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
-          {title}
-          {open.length > 0 && (
-            <span className="ml-1.5 text-ink-tertiary font-normal normal-case tracking-normal">
-              {open.length} terbuka
-            </span>
-          )}
-        </h2>
-        {done.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setShowDone((v) => !v)}
-            className="text-xs text-action hover:underline"
-          >
+    <SectionCard
+      title={title}
+      count={open.length > 0 ? `${open.length} terbuka` : undefined}
+      padded={false}
+      action={
+        done.length > 0 ? (
+          <Button variant="ghost" size="sm" onClick={() => setShowDone((v) => !v)}>
             {showDone ? "Sembunyikan selesai" : `Lihat ${done.length} selesai`}
-          </button>
-        )}
-      </div>
-
-      {/* Rows */}
-      <div className="px-4">
+          </Button>
+        ) : null
+      }
+    >
+      <div className="px-(--ui-section-px)">
         {visible.length === 0 && !canManage ? (
-          <p className="py-3 text-sm text-ink-tertiary">Tidak ada task terbuka.</p>
+          <Text as="p" tone="tertiary" className="py-3">Tidak ada task terbuka.</Text>
         ) : null}
 
         {visible.map((task, index) => (
@@ -306,6 +293,6 @@ export function GeneralTaskBlock({
           </div>
         )}
       </div>
-    </div>
+    </SectionCard>
   );
 }

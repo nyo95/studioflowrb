@@ -5,7 +5,23 @@ import { redirect } from "next/navigation";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission, hasAnyPermission } from "@platform/core/rbac";
-import { PageHeader, SectionCard, DirectoryShell, ErrorState, Tabs, DataTable, TableHeader, TableBody, TableRow, TableCell, TableHead, EmptyState, Badge, Text } from "@/platform/ui_engine";
+import {
+  Badge,
+  DataTable,
+  DirectoryShell,
+  EmptyState,
+  ErrorState,
+  Heading,
+  PageHeader,
+  SectionCard,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Tabs,
+  Text,
+} from "@/platform/ui_engine";
 import { BQ_PERMISSIONS } from "@/apps/bq/service";
 import { bqPublicRead, masterDataRead } from "@/apps/bq/runtime";
 import { Library } from "lucide-react";
@@ -28,12 +44,12 @@ export default async function BqLibraryPage() {
 
   if (!canRead) {
     return (
-      <div className="grid gap-4">
-        <PageHeader eyebrow="Bill of Quantity" title="BQ Library" />
+      <>
+        <PageHeader eyebrow="Bill of Quantity" title="BQ Library" divider />
         <SectionCard>
           <ErrorState title="Access denied" description="You do not have permission to view the BQ Library." />
         </SectionCard>
-      </div>
+      </>
     );
   }
 
@@ -63,12 +79,13 @@ export default async function BqLibraryPage() {
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
+    <>
       <PageHeader
         eyebrow="Bill of Quantity"
         title="BQ Library"
         description="Manage library items and templates"
         actions={canManage ? <div className="flex flex-wrap gap-2"><LibraryItemCreateButton units={units} /><AssemblyCreateButton /><TemplateCreateButton /></div> : null}
+        divider
       />
 
       <Tabs
@@ -152,7 +169,7 @@ export default async function BqLibraryPage() {
                           key={t.id}
                           className="rounded-lg border border-line p-4 hover:border-line-strong transition-colors"
                         >
-                          <h3 className="font-semibold text-sm mb-1">{t.name}</h3>
+                          <Heading level={5} className="mb-1">{t.name}</Heading>
                           <p className="text-xs text-ink-secondary mb-3">
                             {sectionCount} sections · {subCount} subsections
                           </p>
@@ -172,6 +189,6 @@ export default async function BqLibraryPage() {
           },
         ]}
       />
-    </div>
+    </>
   );
 }

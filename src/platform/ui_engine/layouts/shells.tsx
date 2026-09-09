@@ -185,7 +185,7 @@ export function NavGroup({ label, heading, children }: { label: string; heading?
   return (
     <div role="group" aria-label={label} className="grid gap-1 max-[840px]:contents">
       {heading ? (
-        <p className="mt-1.5 mb-0.5 px-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-tertiary group-data-collapsed:hidden max-[840px]:hidden">
+        <p className="mt-1.5 mb-0.5 px-2.5 text-[0.6875rem] font-bold uppercase tracking-[0.1em] text-ink-tertiary group-data-collapsed:hidden max-[840px]:hidden">
           {heading}
         </p>
       ) : null}
@@ -221,7 +221,7 @@ export type NavItemProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "childr
 };
 
 const NAV_ITEM_BASE_CLASSES =
-  "relative flex w-full min-h-[38px] items-center gap-2.5 rounded-control border border-transparent bg-transparent px-2.5 py-2 text-[13px] text-left font-[inherit] text-ink-secondary no-underline max-[840px]:w-auto max-[840px]:shrink-0 max-[840px]:min-h-[34px]";
+  "relative flex w-full min-h-[38px] items-center gap-2.5 rounded-control border border-transparent bg-transparent px-2.5 py-2 text-[0.8125rem] text-left font-[inherit] text-ink-secondary no-underline max-[840px]:w-auto max-[840px]:shrink-0 max-[840px]:min-h-[34px]";
 
 const NAV_ITEM_STATE_CLASSES = {
   idle: "hover:border-line-subtle hover:bg-surface-muted hover:text-ink",
@@ -317,7 +317,7 @@ export function NavSubmenu({
   if (!collapsed) {
     return (
       <div className="mt-3 max-[840px]:mt-0 max-[840px]:contents" role="group" aria-label={label}>
-        <p className="flex min-h-7 items-center gap-2 px-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-tertiary max-[840px]:hidden">
+        <p className="flex min-h-7 items-center gap-2 px-2.5 text-[0.6875rem] font-bold uppercase tracking-[0.1em] text-ink-tertiary max-[840px]:hidden">
           <span className="inline-flex shrink-0 [&_svg]:h-4 [&_svg]:w-4" aria-hidden="true">{icon}</span>
           {label}
         </p>
@@ -354,7 +354,7 @@ export function NavSubmenu({
           align="start"
           sideOffset={0}
         >
-          <DropdownMenu.Label className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-tertiary">
+          <DropdownMenu.Label className="px-2 py-1.5 text-[0.6875rem] font-bold uppercase tracking-[0.1em] text-ink-tertiary">
             {label}
           </DropdownMenu.Label>
           {items.map((item) => (

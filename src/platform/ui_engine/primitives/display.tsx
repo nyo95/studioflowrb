@@ -144,9 +144,9 @@ export function Surface({
 export type AvatarSize = "sm" | "md" | "lg";
 
 const AVATAR_SIZE_CLASSES: Record<AvatarSize, string> = {
-  sm: "h-[22px] w-[22px] text-[0.5625rem]",
-  md: "h-6 w-6 text-[0.59375rem]",
-  lg: "h-[26px] w-[26px] text-[0.625rem]",
+  sm: "h-[22px] w-[22px] text-[0.6875rem]",
+  md: "h-6 w-6 text-[0.6875rem]",
+  lg: "h-[26px] w-[26px] text-[0.6875rem]",
 };
 
 /** Initials derived from a display name: at most two leading letters. */

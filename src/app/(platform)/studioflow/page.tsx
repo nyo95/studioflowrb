@@ -87,7 +87,7 @@ function WaitingRow({
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_190px_112px_24px] items-center gap-3 border-b border-line-subtle px-3.5 py-2.5 last:border-0 hover:bg-surface-muted max-[840px]:grid-cols-[minmax(0,1fr)_24px]">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="truncate text-[0.84375rem] text-ink">{title}</span>
+        <span className="truncate text-sm text-ink">{title}</span>
         {item.kind === "ITERATION" && item.state === "SENT" ? (
           <Text size="sm" tone="tertiary" className="shrink-0">terkirim</Text>
         ) : null}
@@ -123,7 +123,7 @@ function WaitingRow({
           aria-label="Belum ditugaskan"
           title="Belum ditugaskan"
           role="img"
-          className="grid h-6 w-6 shrink-0 place-items-center rounded-pill border border-dashed border-line-strong text-[0.59375rem] text-ink-tertiary max-[840px]:row-start-1 max-[840px]:col-start-2"
+          className="grid h-6 w-6 shrink-0 place-items-center rounded-pill border border-dashed border-line-strong text-[0.6875rem] text-ink-tertiary max-[840px]:row-start-1 max-[840px]:col-start-2"
         >
           —
         </span>
@@ -145,7 +145,7 @@ export default async function WaitingOnMePage({
 
   if (!hasPermission(grants, STUDIOFLOW_PERMISSIONS.projectRead)) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
+      <>
         <PageHeader eyebrow="StudioFlow" title="Menunggu saya" divider />
         <SectionCard>
           <EmptyState
@@ -154,7 +154,7 @@ export default async function WaitingOnMePage({
             description="Kamu tidak punya permission untuk melihat workload StudioFlow."
           />
         </SectionCard>
-      </div>
+      </>
     );
   }
 
@@ -219,7 +219,7 @@ export default async function WaitingOnMePage({
   ];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-5 p-(--ui-page-padding)">
+    <>
       <PageHeader
         eyebrow="StudioFlow"
         title="Menunggu saya"
@@ -282,6 +282,6 @@ export default async function WaitingOnMePage({
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }

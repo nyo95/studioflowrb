@@ -8,79 +8,207 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Current revision after this entry is committed: **R7.22**
 - Next local revision: **R7.23**
 
-## R7.22 | 2026-09-09 | feat(ui-engine,studioflow): carry the approved chrome into the StudioFlow screens
+## R7.22 | 2026-09-09 | feat(ui-engine,platform): one page skeleton and one control ladder across StudioFlow, Master Data, and BQ
+
+> **Handover.** Everything below was implemented and type-checked by Claude.
+> Schema, build, and commit are Codex's — see **For Codex** at the end of this
+> entry. Nothing in this revision has been committed.
+
+### Fixed
+
+- `Pagination` no longer imports the client primitive barrel from its shared
+  data module. Server-rendered directory pages were passing `getHref` through
+  that client boundary and crashed at runtime on `/studioflow/projects` (and
+  `/studioflow`). Pagination now lives in a client-free engine module while
+  retaining callback mode for client directories.
+- `SectionCard` accepted no `title` prop, so five call sites that passed one
+  were setting a native tooltip and rendering no heading at all
+  (`clients/[id]/client-detail-view.tsx` ×2, `[id]/files/page.tsx` ×3). It now
+  owns a real header bar and those sections show their titles.
+- Every page in Master Data, BQ, and StudioFlow wrapped itself in a hand-rolled
+  `flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)` div **inside** an
+  app layout that already renders `<PageShell fill>`. Padding was applied twice
+  on all 18 pages. The wrapper is removed; the layout's `PageShell` is now the
+  only page shell, which is what `DESIGN.md` §6 and §16 require.
+- `-brand` utility classes in the BQ project editor (`text-brand`,
+  `border-brand`, `hover:border-brand`) referenced a `--color-brand` token that
+  is not defined anywhere, so the active tab indicator and the option-picker
+  hover state had no effect. Replaced with `action` / `line-strong`.
+- The Klien directory passed `statusLabel=""` for live clients, giving the
+  status dot an empty accessible name, and toned live clients `neutral` instead
+  of `success`.
 
 ### Added
 
-- UI Engine display primitives: `Avatar` (initials, three sizes, with
-  `initialsOf`), `CountBadge` (monospace count for section heads and tabs),
-  `MetaList` (dot-separated identity line), `ProgressBar` (labelled measure),
-  and `SegmentBar` (compact ordered stage bar). All carry an accessible name so
-  none of them signals by colour alone.
-- UI Engine section primitives: `CardSection` (framed section with its title in
-  its own header bar, optional count and trailing action, flush or padded body),
-  `GroupHeader` (uppercase bucket label, count, and rule), and `PipelineStrip`
-  (hairline-separated ordered stages, current stage filled and `aria-current`).
-- UI Engine chrome: `Breadcrumb` in `layouts/shells`, and `filterChipClasses` /
-  `FILTER_CHIP_BASE_CLASSES` in `primitives/button-classes` with a `FilterChip`
-  button in `primitives/actions`. The class helper is outside the client
-  boundary so server components can render chips as plain links.
-- `EmptyState` / `ErrorState` now take an optional `code` slot for a monospace
-  reference, and render their glyph inside a toned ring with a serif title, so
-  an empty panel reads as a deliberate state rather than a failed paint.
+- UI Engine chrome and display atoms, documented in `UI_ENGINE.md` §3.5 with
+  the tier each belongs to: `Breadcrumb`, `FilterChip` / `filterChipClasses`,
+  `Avatar` / `initialsOf`, `CountBadge`, `MetaList`, `ProgressBar`,
+  `SegmentBar`, `GroupHeader`, `PipelineStrip`. Each signals with a text
+  alternative as well as colour — `aria-pressed`, `aria-current="step"`,
+  `role="progressbar"`, or an `aria-label`.
+- `SectionCard` gains `title`, `description`, `count`, `action`, and `padded`.
+  Row lists pass `padded={false}` so dividers reach the card edge.
+- Form controls gain `density="regular" | "compact"`, named to match
+  `DataTable`'s existing `density`. `size` is left as the native attribute, so
+  the multi-select in the roles editor that sets a visible row count still
+  works.
+- `EmptyState` / `ErrorState` render their glyph in a toned ring with a serif
+  title, and take an optional `code` slot for a monospace reference.
+- UI Engine contract tests now assert the new exports exist, that the
+  colour-carrying atoms expose a text alternative, and that `FilterChip`
+  reports its selection. The showcase page gained a section for them so the
+  catalog stays true.
 
 ### Changed
 
-- Tasks (`/studioflow`) rebuilt on the approved worklist layout: header with
-  the working date, open count, and overdue count; URL-driven scope chips
-  (`?scope=`); buckets introduced by `GroupHeader`; and one framed row list per
-  bucket with fixed columns for item, project, due, and holder. Task due dates
-  now resolve to `telat N hari` / `hari ini` / `besok` with a matching tone;
-  iterations keep their waiting age in the same column.
-- Projects directory keeps the R6.1 `DirectoryShell → DataTable` pattern and
-  gains URL-driven view chips (`?view=all|mine|review`), a no-JS `GET` filter
-  field (`?q=`), an area column, a leading-phase cell that names the phase the
-  studio is actually waiting on, a `SegmentBar` of template progress, and an
-  `Avatar` on the lead column. `updated_at` replaces `opened_at` in the last
-  column so the list sorts by what changed.
-- Project detail rebuilt as the approved spine-and-rail layout: `Breadcrumb`,
-  a header whose identity line is a `MetaList`, a `PipelineStrip` of every
-  template phase, then the existing General task block and phase workspace on
-  the spine; phase progress, project facts, and the project lead on the rail.
-- StudioFlow settings moved onto `SettingsShell` with an in-page navigation
-  column, and gained a read-only Phase template section listing the seeded
-  pipeline with its round prefix and internal-approval requirement.
-- `studioFlowService.listProjects` now orders each project's phases by
-  `sort_order` and selects their `id`, `key`, `name`, and `sort_order`, so the
-  directory can draw the pipeline in template order. Additive — no existing
-  field was removed.
+- Tasks (`/studioflow`) rebuilt as the approved worklist: header with working
+  date, open count, and overdue count; URL-driven scope chips; `GroupHeader`
+  buckets; one framed row list per bucket with fixed columns for item,
+  project, due, and holder. Task due dates resolve to `telat N hari` /
+  `hari ini` / `besok` with a matching tone.
+- Projects directory now uses the canonical directory chrome end to end —
+  `DirectoryShell` with a `TableToolbar` holding the view chips and a no-JS
+  `GET` filter field, so a filtered-to-nothing list still shows the controls
+  that got it there. Adds an area column, a leading-phase cell naming the phase
+  the studio is actually waiting on, a `SegmentBar` of template progress, and
+  an `Avatar` on the lead column.
+- Project detail rebuilt on the shared `DetailShell` (it had a hand-rolled
+  spine/rail grid): `Breadcrumb`, a `MetaList` identity line, a
+  `PipelineStrip` of every template phase, then the task block and phase
+  workspace on the spine; phase progress, project facts, and lead on the rail.
+- `phase-section.tsx` and `general-task-block.tsx` moved onto engine
+  primitives. They previously hand-rolled every control — `bg-ink text-white
+  hover:opacity-80` buttons, `border-0 focus:ring-0` inputs, raw radios and
+  checkboxes — inside the redesigned detail page. Now `Button`, `IconButton`,
+  `Input`, `Select`, `Textarea`, `Checkbox`, `RadioGroup`, `Field`,
+  `FormActions`, and `FilterChip`. Raw checkboxes in the Master Data vendor
+  directory and the roles editor were migrated the same way.
+- StudioFlow settings moved onto `SettingsShell` and gained a read-only Phase
+  template section listing the seeded pipeline.
+- Files, new project, new client, client list, and client detail brought onto
+  the same chrome: `Breadcrumb` where nested, `divider` on the page header,
+  and the access-denied branch shaped like every other page.
+- `PageHeader divider` applied to all 50 page headers across the three apps and
+  platform settings; it was on 13 before, so header treatment was inconsistent
+  screen to screen.
+- StudioFlow's layout drops `size="wide"` for the default 1440px measure, which
+  is what the approved design specifies. Master Data and BQ keep `wide`.
+- `studioFlowService.listProjects` orders each project's phases by `sort_order`
+  and selects `id`, `key`, `name`, `sort_order`. Additive; no field removed.
 
 ### Removed
 
-- The speculative `NavCount` and `NavWarningPill` helpers in the StudioFlow nav.
-  They had no data source, and the engine-level capability they anticipated is
-  already served by `NavItem`'s `badge` slot.
+- The speculative `NavCount` and `NavWarningPill` helpers in the StudioFlow
+  nav. They had no data source, and the capability they anticipated is already
+  served by `NavItem`'s `badge` slot.
+- `CardSection`, folded into `SectionCard` before it could become a second way
+  to draw the same thing.
+
+### Design-conformance pass
+
+Run against `DESIGN.md` §2–§5 and §14 after the work above, because applying a
+pixel-drawn mockup is exactly how off-scale values get in.
+
+- Seven invented type sizes were introduced during this revision and have been
+  snapped back onto roles that already exist here: 9px/9.5px/10px → 11px meta,
+  11.5px → 12px, 12.5px/13.5px → 13px, and the empty-state title's 17px → the
+  H3 role. `text-[11px]`/`text-[13px]` were also respelled so each size has one
+  spelling. The operational scale is now 14 / 13 / 12 / 11 plus the heading
+  roles, against `DESIGN.md` §2's "do not invent arbitrary sizes".
+- `text-green-600 dark:text-green-400` in the naming-template form and
+  `text-green-500` in the iteration controls were the last raw Tailwind palette
+  colours in the codebase, and the `dark:` variant belonged to a mode this
+  product does not have. Now `Notice tone="success"` and `text-success`.
+  Hardcoded hex outside `tokens.css`: none.
+- `font-mono` (Tailwind's stack) replaced with `font-ui-mono` (the `--ui-font-mono`
+  token) in the four places that used it, per §3's data-face rule.
+- Five raw `<h1>`–`<h3>` elements in BQ and StudioFlow now use `Heading`, so the
+  type roles come from one place. Raw heading tags in app code: none.
+- `GeneralTaskBlock` drew its own card and header bar; it now uses `SectionCard`.
+  The phase card in `phase-section.tsx` now uses `Surface`, so it carries the
+  border and white ground §4 requires rather than sitting transparent on the
+  ground.
+- Two `rounded` (4px) surfaces corrected to `rounded-control` (6px) per §4.
+
+### Owner decisions taken
+
+The owner delegated both open questions. Resolved as follows, and both contracts
+updated so the reasoning is not carried only in this entry.
+
+**13px is a real role, and I had been misapplying it.** Auditing what actually
+used it showed the 13px usages are all chrome — nav items, menu items, badges,
+notices, the meta line, the mono identifier face — while the ones I had added
+during this revision included content: task titles, table cell values, and
+descriptive paragraphs. The approved design uses 13px for chrome throughout and
+14px for content, which is the same distinction. So `DESIGN.md` §2 gains a
+**Control/chrome** row at 13px with the rule that chrome sits one step below the
+content it frames, and content never drops to 13px to win space. Six content
+usages were snapped back to Body. The ten that remain are all chrome.
+
+**Pagination belongs in every dense directory, including one-page ones.** The
+approved Projects directory shows `1–7 of 7` with both steps disabled, so the
+design already answers this: the footer is part of the surface, not something
+that appears once a list grows. `Pagination` gained a `getHref` mode so
+server-rendered directories can page by URL — paging now survives a reload and
+is shareable — plus an optional row-range summary, since an operator hunting a
+record reads "26–50 of 96" better than "Page 2 of 4". Applied to StudioFlow
+projects and clients, BQ projects, and the BQ deletion-review queue. The BQ
+library is tabs of cards rather than a dense table, so `DESIGN.md` §14 now says
+explicitly that pagination is not required there. Every `DirectoryShell` in the
+codebase that renders a table now has a pagination footer.
 
 ### Dependencies and migrations
 
-- No new dependency, schema change, or migration.
+- No new dependency. No schema change authored in this revision.
 
-### Verification and limitations
+### Verification performed by Claude
 
-- `npm run check`: passed (`typecheck`, architecture boundaries, no legacy
-  runtime references).
-- `npx eslint .`: passed with zero findings.
-- `npm run build` was **not** run for this entry. It is outstanding and must be
-  run on the workstation before this revision is treated as verified.
-- Visual verification in a browser is still blocked: `/studioflow` fails to
-  render because `studioflow.sf_iteration` is absent from the local database.
-  The migration `20260908120000_studioflow_wo3_iteration` exists in the
-  repository and has not been applied; `npx prisma migrate deploy` on the
-  workstation clears the blocker.
-- Upcoming, Library, Activity, and Product Schedule remain locked nav entries
-  with no route behind them, so their screens in the approved design are not
-  implemented. Deliverables and Minutes have no persisted model yet and are
-  likewise not implemented.
+- `npm run check`: passed — `typecheck`, `check:boundaries`, `check:legacy-runtime`.
+- `npx eslint .`: passed, zero findings.
+
+### Verification performed by Codex
+
+- `STUDIOFLOW_LOCATION=kantor npx prisma migrate deploy`: no pending
+  migrations; `npx prisma migrate status`: database up to date.
+- `npx prisma generate`: passed with the Windows Prisma engine.
+- `npm run typecheck`, `npm run check:boundaries`,
+  `npm run check:legacy-runtime`, and `npm run lint`: passed.
+- `npm run build`: passed; all listed application routes compiled.
+- `npm test` against isolated `studioflow_rebuild_test`: 266 tests passed,
+  66 suites passed, 0 failed.
+- Browser smoke verification: StudioFlow tasks/projects/settings/new, all
+  Master Data directories, BQ projects/library, and the repaired server
+  pagination route rendered without runtime error overlays.
+
+### For Codex
+
+Claude could not run these from its environment: `node_modules` is installed
+for Windows, and the Linux side has neither the platform binaries nor the
+network to fetch them. Every one of these is outstanding, not verified.
+
+1. **Migration status.** Resolved on the kantor rebuild database; all 30
+   migrations are applied and `npx prisma migrate status` is clean.
+2. **`npx prisma generate`** — fails on the Linux side with a 403 fetching
+   `schema-engine`; only `schema-engine-windows.exe` is present.
+3. **`npm run build`** — never run for this revision. `next build` aborts
+   fetching `@next/swc-linux-x64-gnu`.
+4. **`npm test`** — all 32 suites abort with an esbuild `TransformError`
+   (`@esbuild/linux-x64` missing against a Windows install). The two suites
+   that need no transform pass. The UI Engine contract tests gained new
+   assertions in this revision and have therefore never actually executed.
+5. **Delete `.git/index.lock`.** Resolved; the empty lock file was removed.
+6. **Then commit.** Resolved by the Codex handover commit for this entry.
+
+### Known gaps, deliberately not built
+
+- Upcoming, Library, Activity, and Product Schedule are locked nav entries with
+  no route behind them, so their screens in the approved design are not
+  implemented.
+- Deliverables and Minutes have no persisted model, so the design's tabs for
+  them do not exist.
+- Login and the app launcher (option 2j) were not touched.
+- Visual verification in a browser has not happened for any screen in this
+  revision — item 1 above is the blocker.
 
 ## R7.21 | 2026-09-09 | feat(ui-engine): NavGroup headings, NavSeparator, NavItem badge/lock; StudioFlow nav redesign
 
