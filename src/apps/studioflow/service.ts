@@ -102,7 +102,13 @@ export type AssignTaskInput = { assignee_id: string | null };
 
 export type SetTaskCompletionInput = { done: boolean };
 
-export type UpdateTaskInput = { title: string };
+export type UpdateTaskInput = {
+  title?: string;
+  assignee_id?: string | null;
+  due_date?: Date | null;
+};
+
+export type AssignableUser = { id: string; display_name: string };
 
 export type ReorderTaskInput = {
   /** Dragging into General supplies null; dragging onto a phase supplies its key. */
@@ -256,6 +262,32 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         "Assignee must be an active StudioFlow project reader",
       );
     }
+  }
+
+  async function listAssignableUsers(grants: PermissionGrants): Promise<AssignableUser[]> {
+    requireStudioFlowRead(grants);
+    const users = await db.user.findMany({
+      where: { status: "ACTIVE" },
+      select: {
+        id: true,
+        display_name: true,
+        user_roles: {
+          where: { role: { archived_at: null } },
+          select: { role: { select: { role_permissions: { select: { permission_id: true } } } } },
+        },
+      },
+      orderBy: { display_name: "asc" },
+    });
+    return users
+      .filter((user) => {
+        const permissions = new Set(
+          user.user_roles.flatMap((assignment) =>
+            assignment.role.role_permissions.map((permission) => permission.permission_id),
+          ),
+        );
+        return permissions.has(STUDIOFLOW_PERMISSIONS.access) && permissions.has(STUDIOFLOW_PERMISSIONS.projectRead);
+      })
+      .map(({ id, display_name }) => ({ id, display_name }));
   }
 
   async function requireWritableTaskProject(projectId: string) {
@@ -1637,9 +1669,12 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
   ) {
     requireStudioFlowRead(grants);
     requirePermission(grants, STUDIOFLOW_PERMISSIONS.taskManage);
-    const title = input.title.trim();
-    if (!title) {
+    const title = input.title === undefined ? undefined : input.title.trim();
+    if (title !== undefined && !title) {
       throw new AppError("VALIDATION", "studioflow.task.title-required", "Task title is required");
+    }
+    if (input.due_date && Number.isNaN(input.due_date.getTime())) {
+      throw new AppError("VALIDATION", "studioflow.task.due-date-invalid", "Task due date is invalid");
     }
     return runTransaction(async () => {
       const task = await db.sfTask.findUnique({
@@ -1650,14 +1685,26 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       if (task.project.deleted_at) {
         throw new AppError("CONFLICT", "studioflow.project.archived", "Project is archived");
       }
-      if (task.title === title) return task;
-      const updated = await db.sfTask.update({ where: { id: taskId }, data: { title } });
+      if (input.assignee_id) await requireAssignableUser(input.assignee_id);
+      const dueDate = input.due_date === undefined ? task.due_date : input.due_date;
+      const assigneeId = input.assignee_id === undefined ? task.assignee_id : input.assignee_id;
+      const data = {
+        ...(title !== undefined ? { title } : {}),
+        assignee_id: assigneeId,
+        due_date: dueDate,
+      };
+      if (task.title === (title ?? task.title) && task.assignee_id === assigneeId && task.due_date?.getTime() === dueDate?.getTime()) return task;
+      const updated = await db.sfTask.update({ where: { id: taskId }, data });
       await writeAudit({
         action: "task.update",
         entityType: "SfTask",
         entityId: taskId,
         actor,
-        changes: { title: { from: task.title, to: title } },
+        changes: {
+          ...(title !== undefined && task.title !== title ? { title: { from: task.title, to: title } } : {}),
+          ...(task.assignee_id !== assigneeId ? { assignee_id: { from: task.assignee_id, to: assigneeId } } : {}),
+          ...(task.due_date?.getTime() !== dueDate?.getTime() ? { due_date: { from: task.due_date, to: dueDate } } : {}),
+        },
       });
       return updated;
     });
@@ -1930,6 +1977,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     listProjectFiles,
     // Tasks (SF-F4)
     listTasks,
+    listAssignableUsers,
     createTask,
     updateTask,
     assignTask,

@@ -62,7 +62,7 @@ export default async function ProjectDetailPage({
   const canReviewIter = hasPermission(grants, STUDIOFLOW_PERMISSIONS.iterationReview);
   const canOverridePhase = hasPermission(grants, STUDIOFLOW_PERMISSIONS.phaseOverride);
 
-  const [project, settings, tasks, rawPhases] = await Promise.all([
+  const [project, settings, tasks, rawPhases, assignableUsers] = await Promise.all([
     studioFlowService.getProject(grants, id).catch((e: { kind?: string }) => {
       if (e?.kind === "NOT_FOUND") return null;
       throw e;
@@ -74,6 +74,7 @@ export default async function ProjectDetailPage({
           .catch(() => [])
       : Promise.resolve([]),
     studioFlowService.listProjectPhases(grants, id),
+    canManageTasks ? studioFlowService.listAssignableUsers(grants) : Promise.resolve([] as Array<{ id: string; display_name: string }>),
   ]);
 
   // Resolve approved_by_id → display_name for ACC indicators
@@ -119,6 +120,8 @@ export default async function ProjectDetailPage({
         status: task.status as "OPEN" | "DONE",
         phase_scope: task.phase_scope,
         sort_order: task.sort_order,
+        assignee_id: task.assignee_id,
+        due_date: task.due_date ? task.due_date.toISOString() : null,
       })),
     iterations: phase.iterations.map((iter) => ({
       id: iter.id,
@@ -159,11 +162,14 @@ export default async function ProjectDetailPage({
           title: t.title,
           status: t.status,
           phase_scope: (t.phase_scope as string | null | undefined) ?? null,
-          sort_order: (t.sort_order as number | undefined) ?? 0,
-        }))}
+        sort_order: (t.sort_order as number | undefined) ?? 0,
+        assignee_id: (t.assignee_id as string | null | undefined) ?? null,
+        due_date: t.due_date instanceof Date ? t.due_date.toISOString() : null,
+      }))}
         canManage={canManageTasks}
         phases={rawPhases.map((phase) => ({ key: phase.key, name: phase.name }))}
         phaseScope={null}
+        users={assignableUsers}
       />
 
       {/* ── File shortcut ── */}
@@ -192,6 +198,7 @@ export default async function ProjectDetailPage({
             canReview={canReviewIter}
             canOverride={canOverridePhase}
             taskPhases={rawPhases.map((phase) => ({ key: phase.key, name: phase.name }))}
+            assignableUsers={assignableUsers}
           />
         )}
       </div>

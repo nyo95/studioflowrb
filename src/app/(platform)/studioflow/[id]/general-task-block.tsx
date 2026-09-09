@@ -21,6 +21,8 @@ export type TaskItem = {
   status: "OPEN" | "DONE";
   phase_scope?: string | null;
   sort_order?: number;
+  assignee_id?: string | null;
+  due_date?: string | null;
 };
 
 // ── Add task form ─────────────────────────────────────────────────────────────
@@ -73,12 +75,14 @@ function TaskRow({
   phases,
   position,
   total,
+  users,
 }: {
   task: TaskItem;
   projectId: string;
   phases: Array<{ key: string; name: string }>;
   position: number;
   total: number;
+  users: Array<{ id: string; display_name: string }>;
 }) {
   const [completing, completingAction] = useActionState(
     setTaskCompletionAction.bind(null, projectId, task.id, task.status === "OPEN"),
@@ -103,6 +107,10 @@ function TaskRow({
 
   const completionError = completing?.ok === false ? completing.error.safeMessage : null;
   const deleteError = deleting?.ok === false ? deleting.error.safeMessage : null;
+
+  useEffect(() => {
+    if (updating?.ok) setEditing(false);
+  }, [updating]);
 
   return (
     <div
@@ -162,6 +170,7 @@ function TaskRow({
             name="phase_scope"
             defaultValue={task.phase_scope ?? ""}
             aria-label="Pindahkan task"
+            onChange={(event) => event.currentTarget.form?.requestSubmit()}
             className="max-w-28 rounded-action border border-line bg-transparent px-1.5 py-1 text-[11px] text-ink-secondary"
           >
             <option value="">Umum</option>
@@ -169,6 +178,29 @@ function TaskRow({
           </select>
         </form>
       )}
+
+      <form action={updateAction} className="flex shrink-0 items-center gap-1">
+        <select
+          name="assignee_id"
+          defaultValue={task.assignee_id ?? ""}
+          aria-label="Penanggung jawab task"
+          onChange={(event) => event.currentTarget.form?.requestSubmit()}
+          className="max-w-28 rounded-action border border-line bg-transparent px-1.5 py-1 text-[11px] text-ink-secondary"
+        >
+          <option value="">Tanpa PIC</option>
+          {users.map((user) => <option key={user.id} value={user.id}>{user.display_name}</option>)}
+        </select>
+      </form>
+      <form action={updateAction} className="shrink-0">
+        <input
+          type="date"
+          name="due_date"
+          defaultValue={task.due_date ? task.due_date.slice(0, 10) : ""}
+          aria-label="Deadline task"
+          onChange={(event) => event.currentTarget.form?.requestSubmit()}
+          className="w-28 rounded-action border border-line bg-transparent px-1.5 py-1 text-[11px] text-ink-secondary"
+        />
+      </form>
 
       <div className="flex shrink-0 items-center gap-0.5">
         <form action={moveAction}>
@@ -216,6 +248,7 @@ export function GeneralTaskBlock({
   phases = [],
   title = "TODO umum",
   phaseScope = null,
+  users = [],
 }: {
   projectId: string;
   tasks: TaskItem[];
@@ -223,6 +256,7 @@ export function GeneralTaskBlock({
   phases?: Array<{ key: string; name: string }>;
   title?: string;
   phaseScope?: string | null;
+  users?: Array<{ id: string; display_name: string }>;
 }) {
   const scopedTasks = tasks.filter((task) => (task.phase_scope ?? null) === phaseScope);
   const open = scopedTasks.filter((t) => t.status === "OPEN");
@@ -261,7 +295,7 @@ export function GeneralTaskBlock({
         ) : null}
 
         {visible.map((task, index) => (
-          <TaskRow key={task.id} task={task} projectId={projectId} phases={phases} position={index} total={visible.length} />
+          <TaskRow key={task.id} task={task} projectId={projectId} phases={phases} position={index} total={visible.length} users={users} />
         ))}
 
         {canManage && (

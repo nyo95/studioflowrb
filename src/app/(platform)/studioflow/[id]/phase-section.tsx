@@ -698,6 +698,7 @@ function PhaseBlock({
   onReopen,
   onCloseByException,
   taskPhases,
+  assignableUsers,
 }: {
   phase: PhaseItem;
   projectId: string;
@@ -711,6 +712,7 @@ function PhaseBlock({
   onReopen: (id: string, name: string) => void;
   onCloseByException: (id: string, name: string) => void;
   taskPhases: Array<{ key: string; name: string }>;
+  assignableUsers: Array<{ id: string; display_name: string }>;
 }) {
   const [open, setOpen] = useState(defaultOpen);
 
@@ -898,6 +900,7 @@ function PhaseBlock({
             phases={taskPhases}
             title={`TODO ${phase.name}`}
             phaseScope={phase.key}
+            users={assignableUsers}
           />
           {phase.iterations.length === 0 ? (
             <p className="text-sm text-ink-tertiary py-0.5">
@@ -931,6 +934,7 @@ function PhaseBlock({
             phases={taskPhases}
             title={`TODO ${phase.name}`}
             phaseScope={phase.key}
+            users={assignableUsers}
           />
           <p className="text-sm text-ink-tertiary">
             {phase.state === "NOT_STARTED"
@@ -954,6 +958,7 @@ export function PhaseSection({
   canReview,
   canOverride,
   taskPhases,
+  assignableUsers,
 }: {
   phases: PhaseItem[];
   projectId: string;
@@ -961,6 +966,7 @@ export function PhaseSection({
   canReview: boolean;
   canOverride: boolean;
   taskPhases: Array<{ key: string; name: string }>;
+  assignableUsers: Array<{ id: string; display_name: string }>;
 }) {
   const [filter, setFilter] = useState<string | null>(null);
   const [sendDialog, setSendDialog] = useState<{
@@ -1049,6 +1055,7 @@ export function PhaseSection({
             }}
             onCloseByException={(id, name) => setCloseByExDialog({ id, name })}
             taskPhases={taskPhases}
+            assignableUsers={assignableUsers}
           />
         ))}
       </div>

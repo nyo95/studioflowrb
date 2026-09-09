@@ -64,9 +64,14 @@ export async function updateTaskAction(
 ): Promise<ActionResult<void>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
-    await studioFlowService.updateTask(grants, actorFrom(principal), taskId, {
-      title: String(formData.get("title") ?? ""),
-    });
+    const input: { title?: string; assignee_id?: string | null; due_date?: Date | null } = {};
+    if (formData.has("title")) input.title = String(formData.get("title") ?? "");
+    if (formData.has("assignee_id")) input.assignee_id = String(formData.get("assignee_id") ?? "") || null;
+    if (formData.has("due_date")) {
+      const value = String(formData.get("due_date") ?? "");
+      input.due_date = value ? new Date(`${value}T00:00:00`) : null;
+    }
+    await studioFlowService.updateTask(grants, actorFrom(principal), taskId, input);
     refresh(projectId);
   });
 }

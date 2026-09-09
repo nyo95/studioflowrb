@@ -5,8 +5,30 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.15**
-- Next local revision: **R7.16**
+- Current revision after this entry is committed: **R7.17**
+- Next local revision: **R7.18**
+
+## R7.17 | 2026-09-09 | feat(studioflow): add task assignment and due dates
+
+### Added
+
+- StudioFlow task rows now expose active StudioFlow project readers as
+  assignees and allow a date-only due date for both General and phase-scoped
+  tasks.
+- Task updates share one service command for title, assignee, and due date;
+  eligible users are validated centrally and changes are audited.
+
+### Dependencies and migrations
+
+- No new dependency, schema change, or migration. Master Data, BQ, and shared
+  UI Engine files remain untouched.
+
+### Verification
+
+- `npm run check`: passed.
+- `npm run build`: passed; StudioFlow, Master Data, and BQ routes compiled.
+- Database integration tests were not run in this slice; the office test
+  database remains environment-gated.
 
 ## R7.16 | 2026-09-09 | fix(studioflow): restore task phase workspace parity
 
