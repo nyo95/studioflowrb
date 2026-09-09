@@ -5,8 +5,20 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.33**
-- Next local revision: **R7.34**
+- Current revision after this entry is committed: **R7.34**
+- Next local revision: **R7.35**
+
+## R7.34 | 2026-09-09 | chore(repo): ignore session debris
+
+### Changed
+
+- Ignored `Claude outputs/` and `_to_delete/` so session debris cannot be
+  accidentally committed.
+- Kept tracked `next-env.d.ts` untouched as an existing repository file.
+
+### Verification
+
+- `git diff --check`: passed.
 
 ## R7.33 | 2026-09-09 | fix(docs): clean alignment artifact
 
