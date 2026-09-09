@@ -113,15 +113,15 @@ Every feature identifies the capabilities it needs before app implementation:
 - keep business policy **APP-OWNED**;
 - **PURGE** unsafe or contradicted behavior.
 
-Core, Utilities, and UI Engine must stay reusable by Master Data, StudioFlow, BQ, and future apps. A missing generic mechanism is added to the shared layer and tested there; an app does not create a private substitute. Core may own platform identity, UserRole assignments, and grant persistence, but shared layers never contain app-entity roles, contextual business authorization, app persistence policy, or business defaults.
+Core, Utilities, and UI Engine must stay reusable by Master Data, StudioFlow, BQ, and future apps. A missing generic mechanism is added to the shared layer and tested there; an app does not create a private substitute. Every shared capability has one canonical implementation, one public export, and an explicit consumer matrix. A capability is not considered shared merely because its contract says so: each consumer must import the canonical export, and boundary checks/tests must prove that no duplicate app-local implementation exists. If the canonical API is insufficient, improve it once at the shared layer and update all affected consumers in the same change set. Core may own platform identity, UserRole assignments, and grant persistence, but shared layers never contain app-entity roles, contextual business authorization, app persistence policy, or business defaults.
 
 A documented deferred capability is not permission to implement it. Activate it only when a locked stage or approved consumer proves the need. Do not create empty modules, speculative dependencies, or broad generic helpers merely to reserve a name.
 
 ## UI quality gate
 
-Component reuse alone is not completion. Verify the running workflow for information hierarchy, search, filters, sorting, pagination, selection, quick entry, detail/edit flow, destructive confirmation, unsaved input, loading/empty/error/disabled/archived/permission states, long content, desktop, collapsed rail, and narrow viewport.
+Component reuse alone is not completion. Verify the running workflow for information hierarchy, search, filters, sorting, pagination, selection, quick entry, detail/edit flow, destructive confirmation, unsaved input, loading/empty/error/disabled/archived/permission states, long content, desktop, collapsed rail, and narrow viewport. For every shared capability used by more than one app, the acceptance evidence must name the canonical export and exercise each listed consumer for both behavior and visual consistency. A passing single-app smoke test is not evidence of shared reuse.
 
-Raw legacy `ui-*` classes may not bypass an available UI Engine component. If the shared component is weak, improve it once at the engine level and then consume it from the app.
+Raw legacy `ui-*` classes may not bypass an available UI Engine component. If the shared component is weak, improve it once at the engine level and then consume it from the app. Private copies or app-local wrappers that reproduce an existing shared capability are prohibited unless the contract explicitly documents a genuinely different domain behavior; such an exception must name the canonical component, explain the difference, and add a regression test preventing accidental convergence drift.
 
 ## Manager-first execution
 

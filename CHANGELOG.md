@@ -5,8 +5,24 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.25**
-- Next local revision: **R7.26**
+- Current revision after this entry is committed: **R7.26**
+- Next local revision: **R7.27**
+
+## R7.26 | 2026-09-09 | docs(governance): enforce shared capability reuse
+
+### Changed
+
+- Strengthened `AGENTS.md` so a shared capability requires one canonical
+  implementation, public export, consumer matrix, and boundary/test evidence.
+- Prohibited app-local copies of existing shared UI/utility capabilities unless
+  a documented domain distinction and drift-prevention regression test exist.
+- Required cross-consumer behavioral and visual acceptance evidence; one-app
+  smoke testing no longer proves shared reuse.
+
+### Verification
+
+- `git diff --check`: passed.
+- Documentation-only governance change; no runtime/schema checks required.
 
 ## R7.25 | 2026-09-09 | docs(studioflow): constrain file intake to a simple MVP
 
