@@ -5,8 +5,19 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.38**
-- Next local revision: **R7.39**
+- Current revision after this entry is committed: **R7.39**
+- Next local revision: **R7.40**
+
+## R7.39 | 2026-09-10 | chore(next): refresh generated route types
+
+### Changed
+
+- Committed the tracked Next.js generated type references produced by the
+  current Next.js build tooling.
+
+### Verification
+
+- `git diff --check`: passed.
 
 ## R7.38 | 2026-09-10 | docs(roadmap): record foundation and productivity ideas
 
