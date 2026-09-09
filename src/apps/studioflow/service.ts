@@ -102,6 +102,8 @@ export type AssignTaskInput = { assignee_id: string | null };
 
 export type SetTaskCompletionInput = { done: boolean };
 
+export type UpdateTaskInput = { title: string };
+
 export type ReorderTaskInput = {
   /** Dragging into General supplies null; dragging onto a phase supplies its key. */
   phase_scope: string | null;
@@ -1627,6 +1629,40 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     });
   }
 
+  async function updateTask(
+    grants: PermissionGrants,
+    actor: AuditActor,
+    taskId: string,
+    input: UpdateTaskInput,
+  ) {
+    requireStudioFlowRead(grants);
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.taskManage);
+    const title = input.title.trim();
+    if (!title) {
+      throw new AppError("VALIDATION", "studioflow.task.title-required", "Task title is required");
+    }
+    return runTransaction(async () => {
+      const task = await db.sfTask.findUnique({
+        where: { id: taskId },
+        include: { project: { select: { deleted_at: true } } },
+      });
+      if (!task) throw new AppError("NOT_FOUND", "studioflow.task.not-found", "Task not found");
+      if (task.project.deleted_at) {
+        throw new AppError("CONFLICT", "studioflow.project.archived", "Project is archived");
+      }
+      if (task.title === title) return task;
+      const updated = await db.sfTask.update({ where: { id: taskId }, data: { title } });
+      await writeAudit({
+        action: "task.update",
+        entityType: "SfTask",
+        entityId: taskId,
+        actor,
+        changes: { title: { from: task.title, to: title } },
+      });
+      return updated;
+    });
+  }
+
   async function reorderTask(
     grants: PermissionGrants,
     _actor: AuditActor,
@@ -1652,11 +1688,40 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         throw new AppError("CONFLICT", "studioflow.project.archived", "Project is archived");
       }
       await validateTaskPhaseScope(task.project_id, input.phase_scope);
-      if (task.phase_scope === input.phase_scope && task.sort_order === input.sort_order) return task;
-      return db.sfTask.update({
-        where: { id: taskId },
-        data: { phase_scope: input.phase_scope, sort_order: input.sort_order },
+      const sourceSiblings = await db.sfTask.findMany({
+        where: { project_id: task.project_id, phase_scope: task.phase_scope, id: { not: taskId } },
+        orderBy: [{ sort_order: "asc" }, { created_at: "asc" }, { id: "asc" }],
+        select: { id: true },
       });
+      const targetSiblings = task.phase_scope === input.phase_scope
+        ? sourceSiblings
+        : await db.sfTask.findMany({
+            where: { project_id: task.project_id, phase_scope: input.phase_scope },
+            orderBy: [{ sort_order: "asc" }, { created_at: "asc" }, { id: "asc" }],
+            select: { id: true },
+          });
+      const targetIndex = Math.min(input.sort_order, targetSiblings.length);
+      const orderedIds = [...targetSiblings.map((sibling) => sibling.id)];
+      orderedIds.splice(targetIndex, 0, taskId);
+      if (task.phase_scope !== input.phase_scope) {
+        for (const [index, sibling] of sourceSiblings.entries()) {
+          await db.sfTask.update({ where: { id: sibling.id }, data: { sort_order: index } });
+        }
+      }
+      for (const [index, id] of orderedIds.entries()) {
+        await db.sfTask.update({
+          where: { id },
+          data: { phase_scope: input.phase_scope, sort_order: index },
+        });
+      }
+      await writeAudit({
+        action: "task.reorder",
+        entityType: "SfTask",
+        entityId: taskId,
+        actor: _actor,
+        changes: { fromPhase: task.phase_scope, toPhase: input.phase_scope, toIndex: targetIndex },
+      });
+      return db.sfTask.findUniqueOrThrow({ where: { id: taskId } });
     });
   }
 
@@ -1866,6 +1931,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     // Tasks (SF-F4)
     listTasks,
     createTask,
+    updateTask,
     assignTask,
     setTaskCompletion,
     reorderTask,

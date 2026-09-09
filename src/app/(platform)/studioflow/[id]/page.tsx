@@ -70,7 +70,7 @@ export default async function ProjectDetailPage({
     readPlatformGeneralSettings(prisma),
     canManageTasks || canRead
       ? studioFlowService
-          .listTasks(grants, id, { includeDone: true, phaseScope: null })
+          .listTasks(grants, id, { includeDone: true })
           .catch(() => [])
       : Promise.resolve([]),
     studioFlowService.listProjectPhases(grants, id),
@@ -111,6 +111,15 @@ export default async function ProjectDetailPage({
     has_rounds: phase.has_rounds,
     round_prefix: phase.round_prefix,
     requires_internal_approval: phase.requires_internal_approval,
+    tasks: tasks
+      .filter((task) => task.phase_scope === phase.key)
+      .map((task) => ({
+        id: task.id,
+        title: task.title,
+        status: task.status as "OPEN" | "DONE",
+        phase_scope: task.phase_scope,
+        sort_order: task.sort_order,
+      })),
     iterations: phase.iterations.map((iter) => ({
       id: iter.id,
       number: iter.number,
@@ -149,8 +158,12 @@ export default async function ProjectDetailPage({
           id: t.id,
           title: t.title,
           status: t.status,
+          phase_scope: (t.phase_scope as string | null | undefined) ?? null,
+          sort_order: (t.sort_order as number | undefined) ?? 0,
         }))}
         canManage={canManageTasks}
+        phases={rawPhases.map((phase) => ({ key: phase.key, name: phase.name }))}
+        phaseScope={null}
       />
 
       {/* ── File shortcut ── */}
@@ -178,6 +191,7 @@ export default async function ProjectDetailPage({
             canManage={canManageIter}
             canReview={canReviewIter}
             canOverride={canOverridePhase}
+            taskPhases={rawPhases.map((phase) => ({ key: phase.key, name: phase.name }))}
           />
         )}
       </div>

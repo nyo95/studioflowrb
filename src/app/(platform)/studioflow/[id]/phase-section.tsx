@@ -4,6 +4,7 @@ import { useActionState, useState, useEffect } from "react";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
 import type { ActionResult } from "@platform/core/actions";
 import { DraftDialog, InlineError, RowActionMenu } from "@/platform/ui_engine";
+import { GeneralTaskBlock } from "./general-task-block";
 
 import {
   openIterationAction,
@@ -48,6 +49,7 @@ export type PhaseItem = {
   has_rounds: boolean;
   round_prefix: string | null;
   requires_internal_approval: boolean;
+  tasks: import("./general-task-block").TaskItem[];
   iterations: IterationItem[];
 };
 
@@ -695,6 +697,7 @@ function PhaseBlock({
   onVoid,
   onReopen,
   onCloseByException,
+  taskPhases,
 }: {
   phase: PhaseItem;
   projectId: string;
@@ -707,6 +710,7 @@ function PhaseBlock({
   onVoid: (id: string, label: string) => void;
   onReopen: (id: string, name: string) => void;
   onCloseByException: (id: string, name: string) => void;
+  taskPhases: Array<{ key: string; name: string }>;
 }) {
   const [open, setOpen] = useState(defaultOpen);
 
@@ -887,6 +891,14 @@ function PhaseBlock({
       {/* Body — round-bearing */}
       {open && phase.has_rounds && (
         <div className="border-t border-line px-4 py-2.5 flex flex-col gap-1.5 bg-surface">
+          <GeneralTaskBlock
+            projectId={projectId}
+            tasks={phase.tasks}
+            canManage={canManage}
+            phases={taskPhases}
+            title={`TODO ${phase.name}`}
+            phaseScope={phase.key}
+          />
           {phase.iterations.length === 0 ? (
             <p className="text-sm text-ink-tertiary py-0.5">
               Belum ada ronde.
@@ -912,6 +924,14 @@ function PhaseBlock({
       {/* Body — supervision */}
       {open && !phase.has_rounds && (
         <div className="border-t border-line px-4 py-3 bg-surface">
+          <GeneralTaskBlock
+            projectId={projectId}
+            tasks={phase.tasks}
+            canManage={canManage}
+            phases={taskPhases}
+            title={`TODO ${phase.name}`}
+            phaseScope={phase.key}
+          />
           <p className="text-sm text-ink-tertiary">
             {phase.state === "NOT_STARTED"
               ? "Supervisi belum dimulai."
@@ -933,12 +953,14 @@ export function PhaseSection({
   canManage,
   canReview,
   canOverride,
+  taskPhases,
 }: {
   phases: PhaseItem[];
   projectId: string;
   canManage: boolean;
   canReview: boolean;
   canOverride: boolean;
+  taskPhases: Array<{ key: string; name: string }>;
 }) {
   const [filter, setFilter] = useState<string | null>(null);
   const [sendDialog, setSendDialog] = useState<{
@@ -1026,6 +1048,7 @@ export function PhaseSection({
               if (phase) setReopenDialog({ id, name, hasRounds: phase.has_rounds });
             }}
             onCloseByException={(id, name) => setCloseByExDialog({ id, name })}
+            taskPhases={taskPhases}
           />
         ))}
       </div>

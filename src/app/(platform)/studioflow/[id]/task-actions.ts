@@ -27,9 +27,10 @@ export async function createTaskAction(
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
     const title = String(formData.get("title") ?? "").trim();
+    const phaseScopeValue = String(formData.get("phase_scope") ?? "");
     await studioFlowService.createTask(grants, actorFrom(principal), {
       project_id: projectId,
-      phase_scope: null,
+      phase_scope: phaseScopeValue || null,
       title,
     });
     refresh(projectId);
@@ -51,6 +52,38 @@ export async function setTaskCompletionAction(
       taskId,
       { done },
     );
+    refresh(projectId);
+  });
+}
+
+export async function updateTaskAction(
+  projectId: string,
+  taskId: string,
+  _prev: ActionResult<void> | null,
+  formData: FormData,
+): Promise<ActionResult<void>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    await studioFlowService.updateTask(grants, actorFrom(principal), taskId, {
+      title: String(formData.get("title") ?? ""),
+    });
+    refresh(projectId);
+  });
+}
+
+export async function moveTaskAction(
+  projectId: string,
+  taskId: string,
+  _prev: ActionResult<void> | null,
+  formData: FormData,
+): Promise<ActionResult<void>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const phaseScope = String(formData.get("phase_scope") ?? "");
+    await studioFlowService.reorderTask(grants, actorFrom(principal), taskId, {
+      phase_scope: phaseScope || null,
+      sort_order: Number(formData.get("sort_order") ?? 0),
+    });
     refresh(projectId);
   });
 }

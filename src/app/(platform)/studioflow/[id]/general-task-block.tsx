@@ -1,27 +1,31 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { CheckSquare, Plus, Square, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, CheckSquare, Plus, Square, Trash2 } from "lucide-react";
 import type { ActionResult } from "@platform/core/actions";
 import { InlineError } from "@/platform/ui_engine";
 
 import {
   createTaskAction,
   deleteTaskAction,
+  moveTaskAction,
   setTaskCompletionAction,
+  updateTaskAction,
 } from "./task-actions";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type TaskItem = {
+export type TaskItem = {
   id: string;
   title: string;
   status: "OPEN" | "DONE";
+  phase_scope?: string | null;
+  sort_order?: number;
 };
 
 // ── Add task form ─────────────────────────────────────────────────────────────
 
-function AddTaskForm({ projectId }: { projectId: string }) {
+function AddTaskForm({ projectId, phaseScope }: { projectId: string; phaseScope: string | null }) {
   const [state, formAction, pending] = useActionState(
     createTaskAction.bind(null, projectId),
     null as ActionResult<void> | null,
@@ -41,6 +45,7 @@ function AddTaskForm({ projectId }: { projectId: string }) {
         action={formAction}
         className="flex items-center gap-2"
       >
+        <input type="hidden" name="phase_scope" value={phaseScope ?? ""} />
         <span className="text-ink-tertiary shrink-0" aria-hidden="true">
           <Plus size={14} />
         </span>
@@ -65,9 +70,15 @@ function AddTaskForm({ projectId }: { projectId: string }) {
 function TaskRow({
   task,
   projectId,
+  phases,
+  position,
+  total,
 }: {
   task: TaskItem;
   projectId: string;
+  phases: Array<{ key: string; name: string }>;
+  position: number;
+  total: number;
 }) {
   const [completing, completingAction] = useActionState(
     setTaskCompletionAction.bind(null, projectId, task.id, task.status === "OPEN"),
@@ -78,6 +89,17 @@ function TaskRow({
     null as ActionResult<void> | null,
   );
   const [hovered, setHovered] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(task.title);
+  const editFormRef = useRef<HTMLFormElement>(null);
+  const [updating, updateAction] = useActionState(
+    updateTaskAction.bind(null, projectId, task.id),
+    null as ActionResult<void> | null,
+  );
+  const [moving, moveAction] = useActionState(
+    moveTaskAction.bind(null, projectId, task.id),
+    null as ActionResult<void> | null,
+  );
 
   const completionError = completing?.ok === false ? completing.error.safeMessage : null;
   const deleteError = deleting?.ok === false ? deleting.error.safeMessage : null;
@@ -104,15 +126,66 @@ function TaskRow({
       </form>
 
       {/* Title */}
-      <span
-        className={`flex-1 min-w-0 text-sm ${
+      {editing ? (
+        <form ref={editFormRef} action={updateAction} className="flex min-w-0 flex-1 items-center gap-1">
+          <input
+            name="title"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") { event.preventDefault(); editFormRef.current?.requestSubmit(); }
+              if (event.key === "Escape") { event.preventDefault(); setEditing(false); setDraft(task.title); }
+            }}
+            autoFocus
+            className="min-w-0 flex-1 rounded-action border border-line bg-transparent px-2 py-1 text-sm text-ink outline-none"
+          />
+          <button type="submit" className="text-xs text-action hover:underline" disabled={updating?.ok === false}>Simpan</button>
+        </form>
+      ) : <span
+        onDoubleClick={() => setEditing(true)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(event) => { if (event.key === "Enter") setEditing(true); }}
+        className={`flex-1 min-w-0 text-sm cursor-text ${
           task.status === "DONE"
             ? "line-through text-ink-tertiary"
             : "text-ink"
         }`}
       >
         {task.title}
-      </span>
+      </span>}
+
+      {phases.length > 0 && (
+        <form action={moveAction} className="shrink-0">
+          <input type="hidden" name="sort_order" value={String(task.sort_order ?? 0)} />
+          <select
+            name="phase_scope"
+            defaultValue={task.phase_scope ?? ""}
+            aria-label="Pindahkan task"
+            className="max-w-28 rounded-action border border-line bg-transparent px-1.5 py-1 text-[11px] text-ink-secondary"
+          >
+            <option value="">Umum</option>
+            {phases.map((phase) => <option key={phase.key} value={phase.key}>{phase.name}</option>)}
+          </select>
+        </form>
+      )}
+
+      <div className="flex shrink-0 items-center gap-0.5">
+        <form action={moveAction}>
+          <input type="hidden" name="phase_scope" value={task.phase_scope ?? ""} />
+          <input type="hidden" name="sort_order" value={String(Math.max(0, position - 1))} />
+          <button type="submit" disabled={position === 0} className="text-ink-tertiary hover:text-action disabled:invisible" title="Naikkan task">
+            <ArrowUp size={12} />
+          </button>
+        </form>
+        <form action={moveAction}>
+          <input type="hidden" name="phase_scope" value={task.phase_scope ?? ""} />
+          <input type="hidden" name="sort_order" value={String(Math.min(total - 1, position + 1))} />
+          <button type="submit" disabled={position === total - 1} className="text-ink-tertiary hover:text-action disabled:invisible" title="Turunkan task">
+            <ArrowDown size={12} />
+          </button>
+        </form>
+      </div>
 
       {/* Delete */}
       {hovered && (
@@ -127,8 +200,8 @@ function TaskRow({
         </form>
       )}
 
-      {completionError || deleteError ? (
-        <InlineError>{completionError ?? deleteError}</InlineError>
+      {completionError || deleteError || moving?.ok === false ? (
+        <InlineError>{completionError ?? deleteError ?? (moving?.ok === false ? moving.error.safeMessage : null)}</InlineError>
       ) : null}
     </div>
   );
@@ -140,23 +213,30 @@ export function GeneralTaskBlock({
   projectId,
   tasks,
   canManage,
+  phases = [],
+  title = "TODO umum",
+  phaseScope = null,
 }: {
   projectId: string;
   tasks: TaskItem[];
   canManage: boolean;
+  phases?: Array<{ key: string; name: string }>;
+  title?: string;
+  phaseScope?: string | null;
 }) {
-  const open = tasks.filter((t) => t.status === "OPEN");
-  const done = tasks.filter((t) => t.status === "DONE");
+  const scopedTasks = tasks.filter((task) => (task.phase_scope ?? null) === phaseScope);
+  const open = scopedTasks.filter((t) => t.status === "OPEN");
+  const done = scopedTasks.filter((t) => t.status === "DONE");
   const [showDone, setShowDone] = useState(false);
 
-  const visible = showDone ? tasks : open;
+  const visible = showDone ? scopedTasks : open;
 
   return (
     <div className="rounded-card border border-line bg-surface overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-line bg-surface-muted">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
-          TODO umum
+          {title}
           {open.length > 0 && (
             <span className="ml-1.5 text-ink-tertiary font-normal normal-case tracking-normal">
               {open.length} terbuka
@@ -180,13 +260,13 @@ export function GeneralTaskBlock({
           <p className="py-3 text-sm text-ink-tertiary">Tidak ada task terbuka.</p>
         ) : null}
 
-        {visible.map((task) => (
-          <TaskRow key={task.id} task={task} projectId={projectId} />
+        {visible.map((task, index) => (
+          <TaskRow key={task.id} task={task} projectId={projectId} phases={phases} position={index} total={visible.length} />
         ))}
 
         {canManage && (
           <div className="py-2">
-            <AddTaskForm projectId={projectId} />
+            <AddTaskForm projectId={projectId} phaseScope={phaseScope} />
           </div>
         )}
       </div>

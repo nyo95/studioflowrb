@@ -8,6 +8,37 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Current revision after this entry is committed: **R7.15**
 - Next local revision: **R7.16**
 
+## R7.16 | 2026-09-09 | fix(studioflow): restore task phase workspace parity
+
+### Fixed
+
+- StudioFlow project pages now load general and phase-scoped tasks together;
+  phase tasks are rendered inside their phase workspace instead of becoming
+  invisible after the SF-F4 domain slice.
+- General and phase task blocks share one component and keep completed-task
+  visibility, inline title editing, scope movement, and deterministic
+  up/down reordering.
+- Task title updates and scope/order changes now pass through the StudioFlow
+  service with project lifecycle guards and audit events; sibling ordering is
+  normalized transactionally rather than assigning colliding sort numbers.
+
+### Dependencies and migrations
+
+- No new dependency and no migration. Master Data, BQ, shared UI Engine, and
+  cross-schema ownership remain untouched.
+
+### Verification and limitations
+
+- `npm run typecheck`: passed.
+- Focused ESLint on all changed StudioFlow files: passed.
+- `npm run check:boundaries`: passed.
+- `npm run check:legacy-runtime`: passed.
+- `git diff --check`: passed.
+- `npm run build`: passed; StudioFlow, Master Data, and BQ routes compiled.
+- Native drag-and-drop phase filing and task assignment controls remain a
+  follow-up; this slice provides explicit scope selection and reorder controls
+  while the final interaction contract is reconciled with legacy evidence.
+
 ## R7.15 | 2026-09-09 | feat(studioflow): complete inline phase and iteration workspace
 
 ### Changed
