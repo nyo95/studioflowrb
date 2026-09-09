@@ -16,7 +16,7 @@ import {
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
 import { studioFlowService } from "@/apps/studioflow/runtime";
 
-import { FileRowControls, LinkFileForm, RecordFileForm } from "./file-controls";
+import { DeliverableForm, FileRowControls } from "./file-controls";
 import type { FolderOption } from "./file-controls";
 
 export const dynamic = "force-dynamic";
@@ -121,18 +121,12 @@ export default async function ProjectFilesPage({
 
       {canManage && (
         <>
-          <SectionCard title="Catat file">
+          <SectionCard title="Tambah deliverable">
             <p className="mb-3 text-xs text-ink-tertiary">
-              File yang dibuat di luar sistem. Tidak ada upload — hanya metadata.
+              Simpan satu catatan deliverable dari sini. File tetap berada di PC atau storage asalnya;
+              StudioFlow menyimpan metadata dan filing project.
             </p>
-            <RecordFileForm projectId={projectId} folders={folderOptions} />
-          </SectionCard>
-
-          <SectionCard title="Simpan link">
-            <p className="mb-3 text-xs text-ink-tertiary">
-              File yang bytes-nya ada di tempat lain (Drive, WeTransfer). Kita simpan pointernya.
-            </p>
-            <LinkFileForm projectId={projectId} folders={folderOptions} />
+            <DeliverableForm projectId={projectId} folders={folderOptions} />
           </SectionCard>
         </>
       )}

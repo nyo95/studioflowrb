@@ -5,8 +5,26 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.28**
-- Next local revision: **R7.29**
+- Current revision after this entry is committed: **R7.29**
+- Next local revision: **R7.30**
+
+## R7.29 | 2026-09-09 | feat(studioflow): unify deliverable intake
+
+### Changed
+
+- Replaced the separate file-metadata and external-link forms with one shared
+  `DeliverableForm` entry point while preserving the existing service actions,
+  permissions, folder mapping, and audit behavior.
+- Kept the Explorer-style folder viewer deferred; the current screen remains a
+  legacy-compatible project file list with technical folder grouping.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `git diff --check`: passed.
+- Full integration tests remain unavailable without the disposable rebuild-only
+  database environment; no database behavior was changed in this revision.
 
 ## R7.28 | 2026-09-09 | docs(changelog): record Library discovery implementation
 

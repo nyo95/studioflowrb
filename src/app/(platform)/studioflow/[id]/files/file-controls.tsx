@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import type { ActionResult } from "@platform/core/actions";
 import { Button, Field, InlineError, Input, Select } from "@/platform/ui_engine";
 
@@ -12,6 +12,45 @@ const failureOf = (state: ActionResult<void> | null) =>
   state?.ok === false ? state.error.safeMessage : null;
 
 export type FolderOption = { folder_key: string; name: string };
+
+export function DeliverableForm({ projectId, folders }: { projectId: string; folders: FolderOption[] }) {
+  const [mode, setMode] = useState<"record" | "link">("record");
+  const [recordState, recordAction, recordPending] = useActionState(recordFileAction.bind(null, projectId), INITIAL);
+  const [linkState, linkAction, linkPending] = useActionState(linkFileAction.bind(null, projectId), INITIAL);
+  const state = mode === "record" ? recordState : linkState;
+  const failure = failureOf(state);
+  const pending = recordPending || linkPending;
+
+  return (
+    <form action={mode === "record" ? recordAction : linkAction} className="grid gap-3 sm:grid-cols-3">
+      {failure ? <div className="sm:col-span-3"><InlineError>{failure}</InlineError></div> : null}
+      <Field label="File deliverable" required>
+        <Input name="original_filename" required maxLength={300} placeholder="Denah Lantai 1.pdf" />
+      </Field>
+      <Field label="Cara penyimpanan">
+        <Select value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}>
+          <option value="record">File di PC (catat metadata)</option>
+          <option value="link">Link file eksternal</option>
+        </Select>
+      </Field>
+      {mode === "record" ? (
+        <Field label="Ukuran (bytes)" required>
+          <Input name="bytes" type="number" min="1" required placeholder="2048000" />
+        </Field>
+      ) : (
+        <Field label="Link" required>
+          <Input name="external_url" type="url" required maxLength={2000} placeholder="https://drive.google.com/..." />
+        </Field>
+      )}
+      <Field label="Folder output">
+        <FolderSelect folders={folders} />
+      </Field>
+      <div className="sm:col-span-3">
+        <Button type="submit" variant="primary" pending={pending}>Simpan deliverable</Button>
+      </div>
+    </form>
+  );
+}
 
 function FolderSelect({ folders, defaultValue }: { folders: FolderOption[]; defaultValue?: string }) {
   return (
