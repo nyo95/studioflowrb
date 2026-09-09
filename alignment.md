@@ -1,6 +1,6 @@
 # StudioFlow Rebuild Alignment
 
-Status: owner alignment artifact, 2026-09-09  
+Status: owner alignment artifact, 2026-09-09
 Scope: minimum production-daily StudioFlow rebuild, with legacy behavior as the
 minimum baseline and the owner's workflow simplifications as the active correction.
 

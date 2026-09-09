@@ -5,8 +5,18 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.32**
-- Next local revision: **R7.33**
+- Current revision after this entry is committed: **R7.33**
+- Next local revision: **R7.34**
+
+## R7.33 | 2026-09-09 | fix(docs): clean alignment artifact
+
+### Changed
+
+- Removed the trailing whitespace reported in `alignment.md`.
+
+### Verification
+
+- `git diff --check`: passed.
 
 ## R7.32 | 2026-09-09 | docs(studioflow): record workflow alignment
 
