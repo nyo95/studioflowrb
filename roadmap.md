@@ -21,12 +21,35 @@ still be recorded in `CHANGELOG.md`.
 
 ## Shared foundation
 
+- [ ] Add configurable main-route settings: route users to the selected main
+  app (initially potentially StudioFlow) and redirect users without access to
+  an allowed landing page.
+- [ ] Redesign the UI Engine boundary between the top header and sidebar,
+  using the approved Claude design artifact for direction while preserving the
+  current semantic color system only where explicitly aligned.
 - [ ] Add one canonical UI Engine image workspace when the first approved
   consumer is activated: picker, preview, crop, zoom/pan, annotation,
   validation, progress, and error states.
 - [ ] Connect the canonical rich-text editor to MOM.
 - [ ] Audit and connect canonical date/time and project/client lookup controls
   across activated consumers.
+
+## Product and operations
+
+- [ ] Revamp the Overview / Operational Catalog surface after its information
+  hierarchy and daily workflow are locked.
+- [ ] Explore a safe Library crawler: given an approved Master Data website,
+  fetch representative logo/image metadata where technically and legally
+  possible, show results as catalog cards, and retain a reliable fallback when
+  crawling fails.
+- [ ] Explore optional AI assistance for organizing StudioFlow files; it must
+  be opt-in, auditable, reversible, and never silently change filing state.
+
+## BQ productivity
+
+- [ ] Add a safe calculator expression input for BQ values, such as
+  `=15000*3` or `0.5*80000`, with strict parsing and no arbitrary code
+  execution.
 
 ## Completed and removed from active work
 

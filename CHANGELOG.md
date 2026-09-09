@@ -5,8 +5,24 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.37**
-- Next local revision: **R7.38**
+- Current revision after this entry is committed: **R7.38**
+- Next local revision: **R7.39**
+
+## R7.38 | 2026-09-10 | docs(roadmap): record foundation and productivity ideas
+
+### Changed
+
+- Added roadmap items for configurable main routes and access redirects.
+- Added the UI Engine header/sidebar boundary redesign with Claude design
+  artifact alignment and controlled color reuse.
+- Added Overview/Operational Catalog revamp, safe Library crawling/card
+  discovery, opt-in AI file organization, and a strictly parsed BQ calculator.
+- Kept all six items planned only; no speculative implementation or dependency
+  was introduced.
+
+### Verification
+
+- `git diff --check`: passed.
 
 ## R7.37 | 2026-09-10 | docs(audit): record reported regressions
 
