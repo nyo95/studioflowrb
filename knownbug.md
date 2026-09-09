@@ -52,6 +52,69 @@ fixed, remove it or strike it through and record the fix in `CHANGELOG.md`.
   unimplemented until an approved consumer slice is built.
 - **Status:** Open.
 
+### KB-005 — Add Project regresses the legacy client/modal workflow
+
+- **Area:** StudioFlow project creation
+- **Observed:** The rebuild does not yet match legacy behavior such as creating
+  a client from the project modal; some interactions navigate away instead of
+  opening an in-context modal.
+- **Expected:** Audit the exact legacy flow first, then restore the minimum
+  useful behavior with modal client creation and the same project/client
+  relationship, using the rebuilt UI Engine.
+- **Mitigation:** Create the client first from the Clients page, then create
+  the project.
+- **Status:** Open; legacy route, modal state, server action, and persistence
+  path require read-only comparison before implementation.
+
+### KB-006 — StudioFlow UI language is mixed
+
+- **Area:** StudioFlow UI copy
+- **Observed:** Some screens mix Indonesian and English labels.
+- **Expected:** StudioFlow UI uses English consistently, including labels,
+  actions, empty states, errors, and navigation.
+- **Mitigation:** None; treat new copy as English until the correction lands.
+- **Status:** Open.
+
+### KB-007 — StudioFlow Settings structure does not match legacy
+
+- **Area:** StudioFlow settings
+- **Observed:** The rebuild settings surface is not yet aligned with the
+  legacy settings structure.
+- **Expected:** Audit legacy settings navigation and sections, then reproduce
+  the useful structure with the rebuilt UI Engine and current permissions.
+- **Mitigation:** Use the current General Settings route.
+- **Status:** Open.
+
+### KB-008 — BQ overridden prices have no Revert action
+
+- **Area:** BQ price override
+- **Observed:** An overridden price can be saved, but the UI does not expose a
+  way to restore the inherited/base value.
+- **Expected:** Provide a permission-checked, confirmed Revert action that
+  removes the override and returns to the current inherited value.
+- **Mitigation:** Manually restore the base value after checking the source.
+- **Status:** Open.
+
+### KB-009 — BQ Updated date is not functional or consistently placed
+
+- **Area:** BQ tables and detail views
+- **Observed:** Updated date is not behaving as a reliable visible field and
+  is not presented in the same dedicated column pattern used by Master Data.
+- **Expected:** Use the shared updated-date cell/pattern in a separate table
+  column, with the correct timestamp and actor where available.
+- **Mitigation:** Inspect audit/history details for recency.
+- **Status:** Open.
+
+### KB-010 — Library results redirect instead of opening resource links
+
+- **Area:** StudioFlow Library
+- **Observed:** Selecting a Library result redirects to Master Data.
+- **Expected:** Open a UI Engine modal showing the resource's website,
+  catalogue, and other links sourced from the Master Data link fields, while
+  keeping Library read-only and one-way.
+- **Mitigation:** Follow the existing Master Data link fields directly.
+- **Status:** Open.
+
 ## Closed
 
 No known bugs have been closed in this artifact revision.

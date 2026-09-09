@@ -5,8 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.36**
-- Next local revision: **R7.37**
+- Current revision after this entry is committed: **R7.37**
+- Next local revision: **R7.38**
+
+## R7.37 | 2026-09-10 | docs(audit): record reported regressions
+
+### Changed
+
+- Added KB-005 through KB-010 to `knownbug.md` for Add Project modal/client
+  parity, English-only UI copy, Settings structure, BQ price Revert, BQ
+  Updated column behavior, and Library resource-link modal behavior.
+- Marked legacy comparison as a required evidence step for the Add Project and
+  Settings fixes; no implementation was guessed or changed in this revision.
+
+### Verification
+
+- `git diff --check`: passed.
 
 ## R7.36 | 2026-09-10 | docs(governance): formalize roadmap and bug ledgers
 
