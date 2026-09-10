@@ -134,8 +134,9 @@ client response.
 | Create/edit/discard a draft and manage ordered content | `studioflow.mom.manage` |
 | Issue or supersede | `studioflow.mom.issue` |
 
-Both MOM-specific permissions remain deferred until an executable MOM work
-order activates them. Material document, block, point, image, issue, supersede,
+Both MOM-specific permissions were registered in R7.52 and are assignable to a
+platform role; `src/app/app-registrations.ts` is the authority. Material
+document, block, point, image, issue, supersede,
 and delete actions are audited. Project scope is checked on every read and
 mutation; child ids are never trusted without resolving their owning project.
 
@@ -185,3 +186,13 @@ BQ, Product Catalogue, Schedule, phase, iteration, or task dependency.
 The MOM executable work order is complete in R7.52. Production storage activation
 for `STORED` images and KB-004 environment provisioning remain technical
 dependencies and must not be reported as passed before verification.
+
+### 10.1 Correction is a draft, not an instant re-issue
+
+Recorded 2026-09-10 after the R7.55 audit. §3 places a correction on the same
+`DRAFT → ISSUED` path as any other MOM, so opening a correction must produce an
+editable draft that copies the source content; the source becomes `SUPERSEDED`
+only when that correction is issued. Creating and issuing the correction in one
+step cannot correct anything, because the copied content is immutable from the
+moment it exists. This is recorded as KB-012 and is fixed by the active work
+order, not by this contract.

@@ -1,6 +1,6 @@
 # Documentation Hub
 
-Status: reconciled through **R7.53** on 2026-09-10.
+Status: reconciled through **R7.55** on 2026-09-10.
 
 This directory contains active contracts, operational trackers, architecture
 roadmaps, and retained historical evidence. Current owner instruction remains
@@ -16,16 +16,21 @@ tests, and migrations prove implemented state.
 | [`knownbug.md`](knownbug.md) | Open and closed defects grouped by application |
 | [`REVISION-LEDGER-NOTES.md`](REVISION-LEDGER-NOTES.md) | Historical missing/skipped revision labels and how to interpret them |
 | [`SESSION-HANDOFF-PROMPT.md`](SESSION-HANDOFF-PROMPT.md) | Copy-ready prompt for coordinated Codex and Claude/OpenCode continuation |
-| [`StudioFlow R7.48 work order`](../scripts/work-orders/STUDIOFLOW-R7.48-PHASE-DELIVERABLE.md) | active executable Claude/OpenCode order for current deliverable summary and intake inside each phase |
-| [`StudioFlow R7.49 work order`](../scripts/work-orders/STUDIOFLOW-R7.49-COHERENT-WORK-SURFACE.md) | active executable order for one project work surface combining existing to-dos and phase deliverables |
-| [`StudioFlow R7.52 MOM work order`](../scripts/work-orders/STUDIOFLOW-R7.52-MOM.md) | next executable order for project-owned MOM with no task/phase/iteration relation |
-| [`StudioFlow R7.53 Product Catalogue work order`](../scripts/work-orders/STUDIOFLOW-R7.53-PRODUCT-CATALOGUE.md) | subsequent executable order for the StudioFlow-owned cross-project specification reuse pool |
+| [`StudioFlow R7.56 work order`](../scripts/work-orders/STUDIOFLOW-R7.56-WORKFLOW-CLOSURE.md) | **active executable order** — client-answer correction chain, draft answers, withdraw send, project archive/restore, and phase-template administration |
+| [`StudioFlow R7.48 work order`](../scripts/work-orders/STUDIOFLOW-R7.48-PHASE-DELIVERABLE.md) | implemented in R7.48; retained as history |
+| [`StudioFlow R7.49 work order`](../scripts/work-orders/STUDIOFLOW-R7.49-COHERENT-WORK-SURFACE.md) | implemented in R7.50; retained as history |
+| [`StudioFlow R7.52 MOM work order`](../scripts/work-orders/STUDIOFLOW-R7.52-MOM.md) | implemented in R7.52; retained as history |
+| [`StudioFlow R7.53 Product Catalogue work order`](../scripts/work-orders/STUDIOFLOW-R7.53-PRODUCT-CATALOGUE.md) | implemented in R7.53; retained as history |
 | [`R6.1-DECISION-DELTA.md`](R6.1-DECISION-DELTA.md) | Historical R6.1 convergence evidence; not the current status page |
+
+A work order marked *implemented* above is evidence of what was built, never an
+instruction to rebuild it. Only the order labelled **active executable order** may
+be executed.
 
 Earlier [`UIUX-CURATE`](../scripts/work-orders/UIUX-CURATE.md) and
 [`BQ-MASTERDATA-HARDENING`](../scripts/work-orders/BQ-MASTERDATA-HARDENING.md)
 orders remain implementation history. Where historical documents conflict with
-current owner instructions, current contracts, or R7.40 implemented evidence,
+current owner instructions, current contracts, or the implemented evidence recorded in `CHANGELOG.md`,
 the newer authority wins.
 
 This repository keeps only the shared contracts and active app contracts that
@@ -42,7 +47,7 @@ order unless it says so explicitly.
 | [`PLATFORM-ASSET-STORAGE-ROADMAP.md`](PLATFORM-ASSET-STORAGE-ROADMAP.md) | planned shared image preparation and Supabase Storage activation; no executable work order yet |
 | [`STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md`](STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md) | historical read-only audit and staged roadmap; implemented phases and remaining work are reconciled in `roadmap.md` |
 | [`apps/studioflow.md`](apps/studioflow.md) | StudioFlow contract index, permission vocabulary, cross-app boundaries, storage dependency, and deferred decisions |
-| [`apps/studioflow-project-contract.md`](apps/studioflow-project-contract.md) | StudioFlow PRD: Client, Project, assignment, Phase, Iteration, review exchange, work items, and assets; substantial slices are implemented through R7.40 |
+| [`apps/studioflow-project-contract.md`](apps/studioflow-project-contract.md) | StudioFlow PRD: Client, Project, assignment, Phase, Iteration, review exchange, work items, and assets; substantial slices are implemented through R7.55 |
 | [`apps/studioflow-ux-spec.md`](apps/studioflow-ux-spec.md) | StudioFlow surface reference; partially implemented and subordinate to current owner alignment |
 | [`apps/studioflow-implementation-plan.md`](apps/studioflow-implementation-plan.md) | Active execution/non-regression guardrails; current remaining work is in `roadmap.md` |
 | [`apps/studioflow-schedule-contract.md`](apps/studioflow-schedule-contract.md) | StudioFlow Brands, independent reusable Product Catalogue, and project Schedule logic contract; Product Catalogue is implemented in R7.53 and Schedule remains unactivated |
@@ -56,8 +61,8 @@ order unless it says so explicitly.
 Execution and continuity are governed by [`AGENTS.md`](../AGENTS.md) and
 [`CHANGELOG.md`](../CHANGELOG.md). The completed
 [`Foundation F0 work order`](../scripts/work-orders/FOUNDATION.md) is retained as
-historical implementation evidence; there is currently no executable app work
-order.
+historical implementation evidence. The executable app work order is the one
+marked active in the table above.
 
 Master Data, BQ, and the implemented StudioFlow project workflow are active
 applications. Their current contracts, schema, migrations, services, public

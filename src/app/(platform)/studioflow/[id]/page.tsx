@@ -25,6 +25,7 @@ import {
   type PipelineStep,
 } from "@/platform/ui_engine";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
+import { roundLabel } from "@/apps/studioflow/labels";
 import { studioFlowService } from "@/apps/studioflow/runtime";
 import { GeneralTaskBlock } from "./general-task-block";
 import { PhaseSection } from "./phase-section";
@@ -128,30 +129,29 @@ export default async function ProjectDetailPage({
     studioFlowService.listMomDocuments(grants, id),
   ]);
 
-  // Resolve approved_by_id → display_name for ACC indicators
-  const accUserIds = Array.from(
-    new Set(
-      rawPhases.flatMap((ph) =>
-        ph.iterations
-          .map((it) => it.internal_approval?.approved_by_id)
-          .filter((id): id is string => Boolean(id)),
-      ),
-    ),
-  );
-  const accUsers =
-    accUserIds.length > 0
-      ? await prisma.user.findMany({
-          where: { id: { in: accUserIds } },
-          select: { id: true, display_name: true },
-        })
-      : [];
-  const accUserMap = Object.fromEntries(accUsers.map((u) => [u.id, u.display_name]));
-
   if (!project) notFound();
+
+  /* Every platform user this page names — internal approvers and the project
+     lead — resolved through the app service. Route components do not query
+     Prisma directly (project contract §11). */
+  const peopleLabels = await studioFlowService.listUserLabels(grants, [
+    ...rawPhases.flatMap((phase) =>
+      phase.iterations.map((iteration) => iteration.internal_approval?.approved_by_id),
+    ),
+    project.lead_user_id,
+  ]);
+  const leadUserLabel = project.lead_user_id ? peopleLabels[project.lead_user_id] ?? null : null;
 
   const fmt = new Intl.DateTimeFormat(settings.locale, {
     timeZone: settings.timezone,
     dateStyle: "medium",
+  });
+  /* MOM carries a meeting time, and the label is formatted here so the client
+     component never falls back to the viewer's own locale/timezone (CORE §10). */
+  const fmtDateTime = new Intl.DateTimeFormat(settings.locale, {
+    timeZone: settings.timezone,
+    dateStyle: "medium",
+    timeStyle: "short",
   });
 
   // Per-phase next filename preview (projectRead permission is always present here).
@@ -185,8 +185,7 @@ export default async function ProjectDetailPage({
       const sentIter = currentRaw.sent_in_iteration_id
         ? phase.iterations.find((it) => it.id === currentRaw.sent_in_iteration_id)
         : undefined;
-      const prefix = phase.round_prefix ?? phase.key;
-      const sentRoundLabel = sentIter ? `${prefix}${sentIter.number}` : null;
+      const sentRoundLabel = sentIter ? roundLabel(phase, sentIter.number) : null;
       currentFile = {
         filename: currentRaw.filename,
         original_filename: currentRaw.original_filename,
@@ -230,7 +229,9 @@ export default async function ProjectDetailPage({
         void_reason: iter.void_reason ?? null,
         internal_approval: iter.internal_approval
           ? {
-              approver: accUserMap[iter.internal_approval.approved_by_id] ?? iter.internal_approval.approved_by_id,
+              approver:
+                peopleLabels[iter.internal_approval.approved_by_id] ??
+                iter.internal_approval.approved_by_id,
               at: iter.internal_approval.approved_at.toISOString(),
             }
           : null,
@@ -244,13 +245,6 @@ export default async function ProjectDetailPage({
       })),
     };
   });
-
-  const leadUser = project.lead_user_id
-    ? await prisma.user.findUnique({
-        where: { id: project.lead_user_id },
-        select: { display_name: true },
-      })
-    : null;
 
   /* The pipeline is the whole template in order; the leading phase is the one
      the studio is actually waiting on, client turn ahead of our own turn. */
@@ -363,11 +357,11 @@ export default async function ProjectDetailPage({
             </SectionCard>
 
             <SectionCard title="Team">
-              {leadUser ? (
+              {leadUserLabel ? (
                 <div className="flex items-center gap-2.5">
-                  <Avatar name={leadUser.display_name} size="lg" />
+                  <Avatar name={leadUserLabel} size="lg" />
                   <div className="grid min-w-0 gap-px">
-                    <span className="truncate text-sm font-medium">{leadUser.display_name}</span>
+                    <span className="truncate text-sm font-medium">{leadUserLabel}</span>
                     <Text meta className="text-ink-tertiary">Project lead</Text>
                   </div>
                 </div>
@@ -395,7 +389,19 @@ export default async function ProjectDetailPage({
           users={assignableUsers}
         />
 
-        <MomSection projectId={id} moms={moms} canManage={canManageMom} canIssue={canIssueMom} />
+        <MomSection
+          projectId={id}
+          moms={moms.map((mom) => ({
+            id: mom.id,
+            topic: mom.topic,
+            state: mom.state as "DRAFT" | "ISSUED" | "SUPERSEDED",
+            sequence: mom.sequence,
+            prepared_by_name: mom.prepared_by_name,
+            meeting_at_label: fmtDateTime.format(mom.meeting_at),
+          }))}
+          canManage={canManageMom}
+          canIssue={canIssueMom}
+        />
 
         <PageSection title="Phases">
           {phases.length === 0 ? (

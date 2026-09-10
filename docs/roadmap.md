@@ -1,6 +1,6 @@
 # Product Roadmap by Application
 
-Status: active planning ledger, reconciled through R7.44 on 2026-09-10.
+Status: active planning ledger, reconciled through R7.55 on 2026-09-10.
 
 This file answers **what remains to be built**. It does not activate work by
 itself. Completed items are struck through or removed only after verification
@@ -60,12 +60,21 @@ and must remain recorded in `CHANGELOG.md`. Bugs belong in
 
 ### Project workflow
 
-- [ ] Put current-deliverable summary and intake directly inside each phase;
-  retain the File page only as a project-wide filing view.
-- [ ] Present project-owned to-dos and phase deliverables as one coherent work
-  surface without adding a second task entity.
-- [ ] Demote Start Round/internal approval/send controls to contextual or
-  administrative actions after deliverable intake is proven end-to-end.
+- [x] Put current-deliverable summary and intake directly inside each phase;
+  retain the File page only as a project-wide filing view. R7.48.
+- [x] Present project-owned to-dos and phase deliverables as one coherent work
+  surface without adding a second task entity. R7.50.
+- [x] Demote Start Round/internal approval/send controls to contextual or
+  administrative actions after deliverable intake is proven end-to-end. R7.50.
+- [ ] Complete the client answer against project contract §6: replacement chain
+  with reasons, draft answers, and withdraw send (KB-013, KB-014, KB-015). One
+  migration and one slice; these are the largest remaining contract gap.
+- [ ] Add project archive and restore, and let a client become archivable once
+  its projects are (KB-016).
+- [ ] Add studio phase-template administration and per-project add/remove of a
+  phase, so a new phase stops requiring a seed change (KB-017).
+- [ ] Open a MOM correction as an editable draft instead of issuing a copy
+  (KB-012).
 - [x] Finish English-only UI copy across every route and state (KB-006).
 - [x] Restore Add Project parity after read-only legacy audit, including
   in-context client creation (KB-005).
@@ -76,10 +85,13 @@ and must remain recorded in `CHANGELOG.md`. Bugs belong in
 
 - [x] Integrate project-owned MOM at every phase with no Task/To-do, phase, or
   iteration linkage. Preserve the legacy ordered document/block/point/image
-  capability and reuse the canonical rich-text and image tools.
+  capability and reuse the canonical rich-text and image tools. R7.52.
 - [x] Integrate the StudioFlow-owned Product Catalogue reuse pool shared across
-  StudioFlow projects, then project FFNI/Schedule snapshots. Never read Master
-  Data SKU, unit, or pricing.
+  StudioFlow projects. Never read Master Data SKU, unit, or pricing. R7.53.
+- [ ] Add the project Schedule/FFNI slice on top of that reuse pool: entries,
+  competing options, one entry lifecycle, templates that carry filled
+  specifications, and project snapshots that later catalogue edits never
+  rewrite (KB-003, schedule contract §4–§5).
 - [ ] Complete legacy-audit phases for artifacts/MOM, schedule, SketchUp, and
   operational hardening before each related slice.
 - [ ] Rebuild SketchUp only as an authenticated, idempotent adapter with retry,
@@ -102,6 +114,10 @@ and must remain recorded in `CHANGELOG.md`. Bugs belong in
 
 ## Completed or explicitly removed
 
+- ~~Project-owned MOM with draft/issue/supersede lifecycle and images.~~ R7.52.
+- ~~StudioFlow-owned Product Catalogue reuse pool.~~ R7.53.
+- ~~Unsupported Project `type` field.~~ Removed in R7.54; it was never in the
+  audited legacy workflow.
 - ~~Global Library MVP with hashtag, brand, category, and resource links.~~ R7.40.
 - ~~My Activity / What's Today aggregation.~~ Implemented before R7.40.
 - ~~Project list/detail, add task, phase management, and phase-scoped to-dos.~~

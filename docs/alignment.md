@@ -1,6 +1,6 @@
 # StudioFlow Rebuild Alignment
 
-Status: owner alignment artifact, reconciled through R7.44 on 2026-09-10
+Status: owner alignment artifact, reconciled through R7.55 on 2026-09-10
 Scope: minimum production-daily StudioFlow rebuild, with legacy behavior as the
 minimum baseline and the owner's workflow simplifications as the active correction.
 
@@ -123,7 +123,7 @@ catalogue snapshot rules, MOM semantics, and project authorization.
 
 ## 6. Current rebuild alignment status
 
-Reconciled through R7.40. Active work and defects are tracked in
+Reconciled through R7.55. Active work and defects are tracked in
 [`roadmap.md`](roadmap.md) and [`knownbug.md`](knownbug.md).
 
 | Alignment concern | Current status |
@@ -131,12 +131,17 @@ Reconciled through R7.40. Active work and defects are tracked in
 | Deliverable intake opens/reuses the draft iteration | **Aligned in R7.40** |
 | One unsent current metadata record per project-phase/iteration | **Aligned in R7.40**; actual storage-byte release remains deferred |
 | File attaches to the iteration when sent | **Aligned in R7.40** |
-| Start Round/internal approval/send are contextual rather than the primary phase UX | **Open** |
-| To-dos and deliverables form one coherent phase work surface | **Open** |
-| Current deliverable and intake appear directly in phase detail | **Open** |
 | Drag/drop uses the canonical UI Engine boundary | **Aligned in R7.43 (KB-011)** |
-| MOM and Product Catalogue/FFNI are integrated into project detail | **Open** |
-| Shared image picker/crop/zoom/annotation exists for approved consumers | **Open** |
+| Current deliverable and intake appear directly in phase detail | **Aligned in R7.48** |
+| Start Round/internal approval/send are contextual rather than the primary phase UX | **Aligned in R7.50** |
+| To-dos and deliverables form one coherent phase work surface | **Aligned in R7.50** |
+| Shared image picker/crop/zoom/annotation exists for approved consumers | **Aligned in R7.52**; provider provisioning remains open (KB-004) |
+| MOM is integrated into project detail | **Aligned in R7.52**; correcting an issued MOM is defective (KB-012) |
+| Product Catalogue is a StudioFlow-wide reuse pool | **Aligned in R7.53** |
+| Project Schedule/FFNI is integrated into project detail | **Open** (KB-003) |
+| A recorded client answer can be corrected, drafted, or its send withdrawn | **Open** (KB-013/KB-014/KB-015) — the largest remaining gap against §6 |
+| A project can be archived and restored | **Open** (KB-016) |
+| Phases are data-driven end to end: the studio can add one without a code change | **Open** (KB-017) — phases are snapshotted from the template, but the template itself is seed-only |
 
 ## 7. Explicit non-scope
 
@@ -156,3 +161,21 @@ aggregation, deliverable intake, current-file replacement, iteration/review
 state, permissions, audit, loading/empty/error states, and the legacy-minimum
 project surface. MOM and Product Catalogue/FFNI are required project extensions
 before claiming full legacy-minimum coverage.
+
+**Where the bar actually sits, R7.55.** The deviation from legacy is meant to be
+confined to three things — the phase flow, deliverables, and the single to-do
+collection. Everything else is a KEEP that must reach legacy's level. Measured
+that way, three KEEPs are still short and are tracked as defects rather than as
+simplifications:
+
+- **the client exchange** is thinner than legacy, not simpler: legacy could
+  correct a recorded answer and this cannot (KB-013/KB-014/KB-015);
+- **project lifecycle** is thinner than legacy: a project cannot be archived or
+  restored (KB-016);
+- **project Schedule/FFNI** is absent (KB-003), and MOM's correction path does
+  not correct (KB-012).
+
+Phase administration (KB-017) is the one case where the rebuild aimed *above*
+legacy — data-driven phases instead of an enum — and has so far only reached
+half of it: projects snapshot a template that nobody can edit. None of these is
+an approved simplification; each is unfinished work.

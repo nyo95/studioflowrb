@@ -1,6 +1,6 @@
 # Revision Ledger Notes
 
-Status: historical reconciliation through R7.40, 2026-09-10.
+Status: historical reconciliation through R7.55, 2026-09-10.
 
 `CHANGELOG.md` remains authoritative. This note records gaps that must not be
 silently interpreted as missing product work or backfilled with invented

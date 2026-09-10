@@ -5,8 +5,114 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.54**
-- Next local revision: **R7.55**
+- Current revision after this entry is committed: **R7.55**
+- Next local revision: **R7.56**
+
+## R7.55 | 2026-09-10 | fix(studioflow,docs): reconcile ledgers and close audit defects
+
+### Changed — documentation reconciliation
+
+- Reconciled every stale status header to the current revision: `docs/README.md`,
+  `docs/alignment.md`, `docs/roadmap.md`, `docs/knownbug.md`,
+  `docs/REVISION-LEDGER-NOTES.md`, the StudioFlow contract index, project
+  contract, schedule contract, implementation plan, and the root `README.md`.
+- `AGENTS.md` and `docs/SESSION-HANDOFF-PROMPT.md` pointed at the R7.48 work
+  order as the active executable order while R7.48–R7.53 were already
+  implemented. Both now name the R7.56 order, and the documentation hub marks
+  the finished orders as history rather than as instructions.
+- Corrected the StudioFlow permission vocabulary: `studioflow.md` §3 still said
+  the MOM grants were unregistered, while `src/app/app-registrations.ts` has
+  registered eleven permissions since R7.52. The table now matches the registry
+  and names it as the authority. The MOM contract's matching deferral note is
+  corrected the same way.
+- Removed Minutes of Meeting and the Product Catalogue from `studioflow.md` §6
+  "deferred"; only project Schedule/FFNI remains, pointing at KB-003.
+- Reconciled `docs/alignment.md` §6: MOM, Product Catalogue, the phase
+  deliverable surface and the contextual round actions were all still recorded
+  as **Open**. Added §8's honest statement of where the legacy-minimum bar
+  actually sits.
+- Restored newest-first ordering in this file: the R7.53 entry sat below R7.52.
+  No entry text was rewritten and no revision label was reused.
+
+### Changed — contract amendments
+
+- Project contract §5.2: the derived round label is `<round_prefix><number>`
+  with no separator, and one exported helper owns the format. The section
+  previously gave `MB 1` and `CD 1` beside `D4`, which is two formats for one
+  derived value; §8.5's worked example (`… D1.skp`) settles it.
+- MOM contract §10.1: a correction opens as an editable draft and supersedes its
+  source on issue. Recorded as KB-012 rather than silently changed.
+- `docs/apps/bq-implementation-plan.md` F3-02 and its final checklist instructed
+  clearing `BqItem.harga_snapshot` when the first child is added. That is the
+  defect recorded in project memory: removing the last child then leaves the L1
+  uncalculable and nulls the project grand total. The plan now says the value is
+  retained and merely ignored while children exist. No BQ code was touched.
+
+### Fixed — StudioFlow audit defects
+
+- **Filename dates used the server's timezone.** `{date}` was read off the
+  `Date` object's local parts, so on the UTC production runtime an evening drop
+  in Asia/Jakarta filed under the previous day. Filenames now resolve `{date}`
+  in the platform's configured timezone, which project contract §8.5 always
+  required. Added `getNamingContext()` so the studio-owned template and the
+  platform-owned timezone are read together.
+- **Three different round-label formats.** The service produced `D 1`, the
+  project page produced `D1` while falling back to the phase *key* instead of
+  its name, and the phase section carried a third copy. Added
+  `src/apps/studioflow/labels.ts` as the single canonical helper and routed the
+  service, the project page and the phase section through it.
+- **Frozen rounds could still have their checklist edited.** `markPointDone`
+  accepted `SENT` and `withdrawPoint` checked no state at all, so a delivered
+  round's send-time snapshot could be rewritten. Both are now `DRAFT`-only
+  (§6.3, §7.2).
+- **A round could be approved with no answer behind it.** `approveIteration`
+  set `APPROVED` without writing an `SfResponse`, so `finishPhase` could close a
+  phase on an approval with no readable client answer. It now delegates to
+  `recordResponse`, leaving exactly one write path (§6.1, §6.2).
+- **The project page queried Prisma directly** for user display names — the
+  pattern project contract §11 marks PURGE. Added `listUserLabels` to the
+  service and removed both route-level queries.
+- **MOM meeting dates were formatted with the viewer's locale** inside a client
+  component that also renders on the server, ignoring the platform display
+  settings and mismatching on hydration. The label is formatted on the server
+  (CORE §10).
+- **A permanently disabled "Withdraw send" row** sat in the round menu. UX spec
+  §3.6 forbids a dead control; it is removed and the missing command is KB-015.
+
+### Added
+
+- `docs/knownbug.md` KB-012 … KB-019, from a full read of the StudioFlow service
+  and its surfaces against the project contract. KB-013/KB-014/KB-015 are one
+  gap seen from three sides: the client answer has no state, no replacement link
+  and no reason, so §6.5 correction and §6.6 draft answers have nowhere to live.
+  KB-016 records that a project cannot be archived or restored at all, and
+  KB-017 that the phase template — the reason the phase enum was purged — is
+  still seed-only.
+- `scripts/work-orders/STUDIOFLOW-R7.56-WORKFLOW-CLOSURE.md`, the next
+  executable order, sliced so the answer migration is reviewed on its own.
+
+### Verification
+
+- `STUDIOFLOW_LOCATION=kantor npx prisma validate`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run typecheck`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run lint`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:boundaries`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:legacy-runtime`: passed.
+- Disposable-database `npm test`: 304 passed, 0 failed.
+- `STUDIOFLOW_LOCATION=kantor npm run build`: passed.
+- Browser acceptance remains unavailable because the local test account/session
+  was not available in the running browser; no browser pass is claimed.
+
+### Remaining
+
+- `src/apps/studioflow/service.integration.test.ts` was updated in the same
+  change set for the round-label amendment (`D 1` → `D1`). No assertion was
+  weakened.
+- The route folder
+  `src/app/(platform)/studioflow/[id]/phases/[phaseId]/iterations/[iterationId]/`
+  is now audited. Its three modules only serve the redirecting route and no
+  active surface imports them; KB-018 deletion remains the R7.56 slice 5 task.
+- KB-002, KB-003 and KB-004 are unchanged and remain open.
 
 ## R7.54 | 2026-09-10 | fix(studioflow): remove unsupported project type
 
@@ -27,6 +133,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 - Existing historical migration files retain the original column definition so
   a rebuild from zero remains reproducible; the final migration removes it.
+
+## R7.53 | 2026-09-10 | feat(studioflow): add product catalogue reuse pool
+
+### Changed
+
+- Added the independent StudioFlow Product Catalogue schema, service boundary,
+  public Brand read usage, audited no-op-safe create/edit/archive/restore, and
+  project-independent permissions.
+- Added search, archived filtering, sortable/paginated list, explicit detail
+  editing, frozen-brand fallback, confirmation, unsaved protection, and
+  loading/error/empty/permission states.
+- Added integration, UI, contract, boundary, and snapshot-isolation coverage.
+
+### Verification
+
+- Full disposable-database `npm test`: 304 passed, including Catalogue CRUD,
+  search, no-op audit, archive/restore, and permission coverage.
+- Build, typecheck, lint, and boundary/legacy checks passed.
+
+### Remaining
+
+- Project schedule/FFNI snapshot selection remains a separate approved slice.
 
 ## R7.52 | 2026-09-10 | feat(studioflow): add project-owned MOM
 
@@ -60,28 +188,6 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 - Provision the approved Supabase `platform-assets` bucket and server-only
   secrets before claiming live image upload/cleanup acceptance.
-
-## R7.53 | 2026-09-10 | feat(studioflow): add product catalogue reuse pool
-
-### Changed
-
-- Added the independent StudioFlow Product Catalogue schema, service boundary,
-  public Brand read usage, audited no-op-safe create/edit/archive/restore, and
-  project-independent permissions.
-- Added search, archived filtering, sortable/paginated list, explicit detail
-  editing, frozen-brand fallback, confirmation, unsaved protection, and
-  loading/error/empty/permission states.
-- Added integration, UI, contract, boundary, and snapshot-isolation coverage.
-
-### Verification
-
-- Full disposable-database `npm test`: 304 passed, including Catalogue CRUD,
-  search, no-op audit, archive/restore, and permission coverage.
-- Build, typecheck, lint, and boundary/legacy checks passed.
-
-### Remaining
-
-- Project schedule/FFNI snapshot selection remains a separate approved slice.
 
 ## R7.51 | 2026-09-10 | work-order(studioflow): activate MOM and Product Catalogue
 

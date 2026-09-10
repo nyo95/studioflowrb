@@ -19,6 +19,7 @@ import {
   Surface,
   Textarea,
 } from "@/platform/ui_engine";
+import { roundLabel } from "@/apps/studioflow/labels";
 import { DeliverableForm } from "./files/file-controls";
 import { GeneralTaskBlock } from "./general-task-block";
 
@@ -100,9 +101,12 @@ function ageLabel(since: string): string {
   return `${days} days`;
 }
 
+/* One derived round label for the whole app (project contract §5.2). The local
+   copy this replaced fell back to the phase key instead of its name, so a phase
+   template without a prefix labelled its rounds differently here than in the
+   standard filename the same round produced. */
 function iterLabel(phase: PhaseItem, number: number): string {
-  const prefix = phase.round_prefix ?? phase.key;
-  return `${prefix}${number}`;
+  return roundLabel(phase, number);
 }
 
 const PHASE_STATE_LABELS: Record<string, string> = {
@@ -599,24 +603,16 @@ function IterationBlock({
             Record client response
           </Button>
         )}
-        {/* ⋯ menu — void, withdraw send (disabled until service supports it) */}
+        {/* ⋯ menu. An action the user can never complete is absent, not a dead
+            disabled row (UX spec §3.6) — "Withdraw send" returns here with the
+            service command that backs it (KB-015). */}
         {(isDraft || isSent) && canReview && (
           <RowActionMenu
             label={`Actions for ${label}`}
             items={[
-              ...(isSent
-                ? [
-                    {
-                      label: "Withdraw send",
-                      disabled: true,
-                      onSelect: () => {},
-                    } as const,
-                  ]
-                : []),
               {
-              label: "Stop round",
+                label: "Stop round",
                 danger: true,
-                separatorBefore: isSent,
                 onSelect: () => onVoid(iteration.id, label),
               },
             ]}

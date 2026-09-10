@@ -8,8 +8,10 @@
    plans, audits, changes, or reviews StudioFlow or shared consumers
 4. The shared contract relevant to the task: `CORE.md`, `DESIGN.md`, and/or `UI_ENGINE.md`
 5. The active work order, when one exists. The current executable app work
-   order is `scripts/work-orders/STUDIOFLOW-R7.48-PHASE-DELIVERABLE.md`.
-   `docs/apps/masterdata.md` indexes approved logic contracts only.
+   order is `scripts/work-orders/STUDIOFLOW-R7.56-WORKFLOW-CLOSURE.md`.
+   Work orders R7.48, R7.49, R7.52 and R7.53 are implemented and are retained
+   as history, not as instructions. `docs/apps/masterdata.md` indexes approved
+   logic contracts only.
 6. `prisma/schema.prisma` for the implemented persisted shape
 7. The relevant current code, tests, and migrations
 

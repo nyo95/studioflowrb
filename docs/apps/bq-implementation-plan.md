@@ -688,7 +688,11 @@ Validasi:
 - `section_id` XOR `subsection_id` di BqItem (tidak boleh keduanya null atau keduanya non-null)
 - `sub_object_id` XOR `item_id` di BqLineItem
 - L1-only: saat L1 tidak memiliki child, `harga_snapshot` wajib diisi dan `koefisien > 0`
-- L1 dengan child: `harga_snapshot` diabaikan (tidak dipakai kalkulasi). Saat updateItem yang menambahkan child pertama, `harga_snapshot` otomatis di-clear (set null) untuk mencegah dead data membingungkan.
+- L1 dengan child: `harga_snapshot` diabaikan (tidak dipakai kalkulasi) tetapi
+  **tidak boleh di-clear**. Amandemen R7.55: instruksi lama "otomatis di-clear
+  (set null) saat child pertama ditambahkan" adalah cacat — begitu child
+  terakhir dihapus, L1 menjadi tidak terhitung dan grand total project menjadi
+  null. Nilai tetap disimpan dan hanya diabaikan selama L1 punya child.
 - Library item kategori: `BqLibMaterial` hanya `MATERIAL`, `BqLibLabor` hanya `UPAH`, `BqLibMaterialLabor` hanya `MATERIAL_UPAH`, `BqLibCustomItem` hanya `BIAYA_UMUM`/`TRANSPORTASI_AKOMODASI`/`ALAT`
 
 ### F3-03: Halaman Project List + Project Detail
@@ -901,4 +905,4 @@ snapshot Library; harga diisi melalui workflow Master Data.
 - [ ] Tidak ada import `Prisma.Decimal` di calculation engine murni
 - [ ] Truncate 2 desimal di setiap intermediate step dan output final
 - [ ] BqTemplateSection: server action menolak nested > 2 level
-- [ ] L1 dengan child: harga_snapshot otomatis di-clear (set null)
+- [ ] L1 dengan child: harga_snapshot dipertahankan (TIDAK di-clear) dan hanya diabaikan oleh engine

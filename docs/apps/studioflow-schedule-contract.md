@@ -2,7 +2,7 @@
 
 Status: **OWNER-APPROVED LOGIC CONTRACT — Library discovery is partially
 implemented through R7.40; Product Catalogue reuse pool is implemented in
-R7.53; Product Schedule remains unactivated**
+R7.53; Product Schedule/FFNI remains unactivated and is tracked as KB-003**
 
 Authority: owner decisions of 2026-09-08 — the Library reads the Master Data
 **brand catalogue** only, and FF&E is composed from **snapshots exactly as legacy

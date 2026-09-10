@@ -7,7 +7,10 @@ import type { ActionResult } from "@platform/core/actions";
 import { Button, Field, InlineError, Input, SectionCard, Text, Textarea, useConfirm, useFormDraftGuard } from "@/platform/ui_engine";
 import { createMomAction, discardMomAction, issueMomAction } from "./mom-actions";
 
-type Mom = { id: string; topic: string; meeting_at: Date; state: "DRAFT" | "ISSUED" | "SUPERSEDED"; sequence: number | null; prepared_by_name: string; items: Array<{ id: string; points: Array<{ id: string; text: string }> }> };
+/* The meeting date arrives already formatted: this component also renders on
+   the server, so formatting it here against the viewer's own locale would both
+   ignore the platform display settings (CORE §10) and mismatch on hydration. */
+type Mom = { id: string; topic: string; meeting_at_label: string; state: "DRAFT" | "ISSUED" | "SUPERSEDED"; sequence: number | null; prepared_by_name: string };
 
 function CreateMomForm({ projectId }: { projectId: string }) {
   const [state, action, pending] = useActionState(createMomAction.bind(null, projectId), null as ActionResult<void> | null);
@@ -52,7 +55,7 @@ export function MomSection({ projectId, moms, canManage, canIssue }: { projectId
 
   return <SectionCard title="Minutes of Meeting" count={moms.length ? String(moms.length) : undefined}>
     {failure ? <InlineError>{failure}</InlineError> : null}
-    {moms.length === 0 ? <Text as="p" tone="tertiary" size="sm">No MOM documents yet.</Text> : <div className="grid gap-2">{moms.map((mom) => <div key={mom.id} className="flex flex-wrap items-center gap-2 border-b border-line pb-2 last:border-0"><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{mom.topic}</p><p className="text-xs text-ink-tertiary">{mom.state === "ISSUED" && mom.sequence ? `MOM ${mom.sequence} · ` : ""}{mom.state} · {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(mom.meeting_at))}</p></div><Link href={`/studioflow/${projectId}/mom/${mom.id}`} className="rounded-action px-2 py-1 text-sm font-medium text-action hover:underline">Open</Link>{mom.state === "DRAFT" && canIssue ? <Button variant="secondary" size="sm" pending={pending} onClick={() => execute("issue", mom.id, mom.topic)}>Issue</Button> : null}{mom.state === "DRAFT" && canManage ? <Button variant="ghost" size="sm" disabled={pending} onClick={() => execute("discard", mom.id, mom.topic)}>Discard</Button> : null}</div>)}</div>}
+    {moms.length === 0 ? <Text as="p" tone="tertiary" size="sm">No MOM documents yet.</Text> : <div className="grid gap-2">{moms.map((mom) => <div key={mom.id} className="flex flex-wrap items-center gap-2 border-b border-line pb-2 last:border-0"><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{mom.topic}</p><p className="text-xs text-ink-tertiary">{mom.state === "ISSUED" && mom.sequence ? `MOM ${mom.sequence} · ` : ""}{mom.state} · {mom.meeting_at_label}</p></div><Link href={`/studioflow/${projectId}/mom/${mom.id}`} className="rounded-action px-2 py-1 text-sm font-medium text-action hover:underline">Open</Link>{mom.state === "DRAFT" && canIssue ? <Button variant="secondary" size="sm" pending={pending} onClick={() => execute("issue", mom.id, mom.topic)}>Issue</Button> : null}{mom.state === "DRAFT" && canManage ? <Button variant="ghost" size="sm" disabled={pending} onClick={() => execute("discard", mom.id, mom.topic)}>Discard</Button> : null}</div>)}</div>}
     {canManage ? <CreateMomForm projectId={projectId} /> : null}
     {confirm.dialog}
   </SectionCard>;

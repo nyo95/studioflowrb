@@ -1,7 +1,7 @@
 # Project Contract — StudioFlow
 
 Status: **ACTIVE PROJECT-WORKFLOW CONTRACT — substantial slices implemented
-through R7.40; current deviations are tracked in
+through R7.55; current deviations are tracked in
 [`../knownbug.md`](../knownbug.md) and [`../roadmap.md`](../roadmap.md)**
 
 R7.07 resolved L1–L9 and their dependent rules. Later owner alignment in
@@ -239,10 +239,19 @@ never implies client rejection or approval.
 
 ### 5.2 Label is derived, never stored
 
-The label combines the phase's `round_prefix` (§4.1) with the round number:
-`MB 1`, `Layout 2`, `D4`, `CD 1`. A phase whose template gives no prefix falls
-back to its name. Because the prefix lives in the template, a phase the studio
-adds later gets a working numbering scheme without a code change.
+The label is exactly `<round_prefix><number>` with no separator — `MB1`,
+`Layout2`, `D4`, `CD1` — and a phase whose template gives no prefix falls back to
+its name. Because the prefix lives in the template, a phase the studio adds later
+gets a working numbering scheme without a code change.
+
+**Amended R7.55.** Earlier wording gave `MB 1` and `CD 1` beside `D4`, which is
+two formats for one derived value; the naming template's own worked example
+(§8.5, `20260908 Sociolla Funan D1.skp`) is the form the designer copies into
+Save As, so the separator-free form is canonical. One exported helper derives it,
+and every surface — round rows, "sent in" labels, and the `{round}` token —
+consumes that helper. A second local formatting rule is the defect this amendment
+removes; historical `SfFile.filename` values are stored, never recomputed, so no
+existing record changes.
 
 Working revisions within one round display as `D1.1`, `D1.2` (§5.4).
 

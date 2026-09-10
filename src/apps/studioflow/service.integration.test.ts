@@ -241,21 +241,22 @@ describe("StudioFlow round lifecycle", () => {
       projectId,
       phase.id,
     );
-    assert.match(filename, new RegExp(`D ${iter.iteration.number}`));
+    assert.match(filename, new RegExp(`D${iter.iteration.number}(\\.|$)`));
   });
 
   it("getNextFilename previews max+1 when no DRAFT exists", async () => {
     const { phase } = await seedRoundPhase();
     const projectId = (await testDb.prisma.sfProjectPhase.findUniqueOrThrow({ where: { id: phase.id } })).project_id;
-    // No draft yet — should preview D 1 (0 + 1)
+    // No draft yet — should preview D1 (0 + 1). §5.2: the derived round label
+    // carries no separator, and one helper owns that format.
     const filename = await service.getNextFilename(
       [STUDIOFLOW_PERMISSIONS.projectRead],
       projectId,
       phase.id,
     );
-    assert.match(filename, /D 1/);
+    assert.match(filename, /D1$/);
 
-    // Open then void — max number is 1, so next preview should be D 2
+    // Open then void — max number is 1, so next preview should be D2
     const first = await service.openIteration([STUDIOFLOW_PERMISSIONS.iterationManage], ACTOR, phase.id);
     await service.voidIteration([STUDIOFLOW_PERMISSIONS.iterationReview], ACTOR, first.iteration.id, "Test void");
     const filename2 = await service.getNextFilename(
@@ -263,7 +264,7 @@ describe("StudioFlow round lifecycle", () => {
       projectId,
       phase.id,
     );
-    assert.match(filename2, /D 2/);
+    assert.match(filename2, /D2$/);
   });
 
   it("getNextFilename rejects a phase from a different project", async () => {

@@ -19,8 +19,8 @@ existing checkout; do not create a second project or copy legacy code.
    `STUDIOFLOW_LOCATION` for repository tooling.
 3. Never access any database until its target is proven to be the isolated
    rebuild-only PostgreSQL environment.
-4. The reference at handoff creation is branch `studioflow/contracts`, commit
-   `07ecbea` (`R7.41`). Treat it only as a reference: immediately inspect HEAD,
+4. The reference at handoff creation is branch `studioflow/contracts` at
+   revision `R7.55`. Treat it only as a reference: immediately inspect HEAD,
    branch, upstream, changelog revision state, and the complete dirty-file list.
 
 ### Mandatory reading
@@ -44,10 +44,10 @@ instruction wins over every document.
 ### Active executor order
 
 Claude/OpenCode must execute only
-[`STUDIOFLOW-R7.48-PHASE-DELIVERABLE.md`](../scripts/work-orders/STUDIOFLOW-R7.48-PHASE-DELIVERABLE.md),
-then stop and hand its local commit back to Codex for review. Do not start MOM,
-Product Catalogue/Schedule, or the combined Task/deliverable redesign in the
-same change set.
+[`STUDIOFLOW-R7.56-WORKFLOW-CLOSURE.md`](../scripts/work-orders/STUDIOFLOW-R7.56-WORKFLOW-CLOSURE.md),
+then stop and hand its local commit back to Codex for review. The R7.48, R7.49,
+R7.52 and R7.53 orders are implemented history; do not re-execute them. Project
+Schedule/FFNI (KB-003) stays out of this change set and gets its own order.
 
 ### Mission
 
@@ -219,26 +219,34 @@ unless the required backend, test, and browser evidence actually exists.
 
 ---
 
-## Current handoff snapshot (R7.44)
+## Current handoff snapshot (R7.55)
 
-The rebuild checkout is on branch `studioflow/contracts` at commit
-`2348d0f14a13e4fe85ffe4938b9beef7025b1a30`. R7.43 closed UI Engine KB-011;
-R7.44 closed StudioFlow KB-005 (in-context client creation), KB-006 (English
-user-facing copy), and KB-007 (Settings navigation to functional Clients and
-Account/Profile surfaces). Database Settings is intentionally not a placeholder:
-it remains deferred until a backend contract exists.
+R7.48 put the current-deliverable summary and fixed-folder intake inside every
+phase; R7.50 moved round/supervision actions into a contextual strip; R7.52
+delivered project-owned MOM with the canonical ImageWorkspace and the Core
+storage port; R7.53 delivered the StudioFlow-owned Product Catalogue; R7.54
+removed the unsupported Project type. R7.55 was a documentation-reconciliation
+and audit-correction revision: it aligned every stale status header, corrected
+the round-label and filename-timezone rules, and opened KB-012 … KB-019 for the
+workflow gaps the audit found.
 
-The next StudioFlow gaps are the project work surface (current deliverable and
-intake inside each phase), coherent tasks plus deliverables, and contextualizing
-Start Round/internal approval/send. MOM and Product Catalogue/FFNI/Schedule are
-still unactivated project extensions. The next agent must inspect current code,
-roadmap, known bugs, and contracts before editing; do not assume R7.44 proves
-browser or database integration.
+The verified remaining gaps, all carried by the active R7.56 order except where
+noted:
+
+- the client answer has no correction chain, no draft state and no withdraw-send
+  (KB-013/KB-014/KB-015) — this is the largest gap against the project contract;
+- a project cannot be archived or restored (KB-016);
+- the studio phase template and per-project phases cannot be administered
+  (KB-017);
+- a MOM correction is issued instantly and therefore cannot correct (KB-012);
+- the redirected phase/iteration routes still carry unreachable controls
+  (KB-018);
+- Project Schedule/FFNI (KB-003) remains a separate later order.
 
 ## Recommended first slice
 
-Start with **StudioFlow phase work surface**: put current deliverable summary
-and intake directly inside each phase, then reconcile project-owned tasks with
-deliverables without adding a second task entity. This is the next application
-slice after R7.44. MOM and Product Catalogue/FFNI/Schedule must remain deferred
-until their documented decisions are locked.
+Execute the active R7.56 order in the sequence it locks: the client-answer
+record first, because the correction chain, draft answers and withdraw-send all
+persist against the same `SfResponse` shape and one migration should carry them
+together. Do not begin project archive/restore or phase-template administration
+until the answer slice is reviewed.

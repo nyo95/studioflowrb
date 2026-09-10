@@ -3,7 +3,7 @@
 A reusable platform with implemented Master Data, BQ, and StudioFlow project
 workflow slices, rebuilt under explicit contracts.
 
-Current delivery state through R7.40:
+Current delivery state through R7.55:
 
 1. retain the implemented login/session, persisted RBAC, Platform General
    Settings, Core, Utilities, Design, and UI Engine foundation;

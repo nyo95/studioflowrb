@@ -13,7 +13,9 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import type { AuditActor, AuditWriter } from "@platform/core/audit";
 import { prepareAuditEvent } from "@platform/core/audit";
 import { requirePermission, hasPermission } from "@platform/core/rbac";
+import { readPlatformGeneralSettings } from "@platform/core/settings";
 import { AppError } from "@platform/core/errors";
+import { roundLabel } from "./labels";
 
 // ── Permissions ───────────────────────────────────────────────────────────
 
@@ -329,6 +331,29 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         "Assignee must be an active StudioFlow project reader",
       );
     }
+  }
+
+  /**
+   * Display names for the platform users a StudioFlow surface already
+   * references — project lead, iteration assignee, internal approver.
+   *
+   * Routes call this instead of reaching for Prisma themselves: direct queries
+   * in page components are the legacy pattern the project contract §11 marks
+   * PURGE, and the implementation plan's handoff checklist repeats it.
+   * Unknown or since-deleted ids are simply absent from the result.
+   */
+  async function listUserLabels(
+    grants: PermissionGrants,
+    userIds: readonly (string | null | undefined)[],
+  ): Promise<Record<string, string>> {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    const ids = [...new Set(userIds.filter((id): id is string => Boolean(id)))];
+    if (ids.length === 0) return {};
+    const users = await db.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, display_name: true },
+    });
+    return Object.fromEntries(users.map((user) => [user.id, user.display_name]));
   }
 
   async function listAssignableUsers(grants: PermissionGrants): Promise<AssignableUser[]> {
@@ -797,15 +822,28 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     return true;
   }
 
+  /** §8.5: `{date}` is the drop date in the platform's configured timezone.
+   *  Reading the parts off the Date would use the server's local zone, which on
+   *  the production runtime is UTC — an evening drop in Asia/Jakarta would then
+   *  be filed under the previous day. `en-CA` formats as YYYY-MM-DD. */
+  function dateToken(instant: Date, timeZone: string): string {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+      .format(instant)
+      .replace(/-/g, "");
+  }
+
   function resolveFilename(
     template: string,
     project: { name: string; location: string | null; code: string },
-    opts: { droppedAt: Date; phaseLabel: string | null },
+    opts: { droppedAt: Date; phaseLabel: string | null; timeZone: string },
     ext: string,
   ): string {
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const d = opts.droppedAt;
-    const date = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+    const date = dateToken(opts.droppedAt, opts.timeZone);
     const name = template
       .replace("{date}", date)
       .replace("{project}", project.name)
@@ -825,6 +863,16 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       create: { id: "studio" },
       update: {},
     });
+  }
+
+  /** Everything the naming template needs: the studio-owned token string and
+   *  the platform-owned display timezone that `{date}` resolves in (§8.5). */
+  async function getNamingContext(): Promise<{ template: string; timeZone: string }> {
+    const [studio, platform] = await Promise.all([
+      getStudioSettings(),
+      readPlatformGeneralSettings(db),
+    ]);
+    return { template: studio.naming_template, timeZone: platform.timezone };
   }
 
   async function updateNamingTemplate(
@@ -1076,17 +1124,15 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     });
   }
 
+  /** §6.2: an approval is a recorded client answer, not a bare state change.
+   *  This entry point exists for callers that only need the round closed, and
+   *  it delegates to `recordResponse` so there is exactly one write path and
+   *  every APPROVED round is backed by a readable response row. A second path
+   *  that skipped the response would leave §6.1's answer history with holes and
+   *  let `finishPhase` close a phase on an approval nobody can produce. */
   async function approveIteration(grants: PermissionGrants, actor: AuditActor, iterationId: string) {
-    requirePermission(grants, STUDIOFLOW_PERMISSIONS.iterationReview);
-    return runTransaction(async () => {
-      const iteration = await db.sfIteration.findUnique({ where: { id: iterationId }, select: { id: true, phase_id: true, state: true } });
-      if (!iteration) throw new AppError("NOT_FOUND", "studioflow.iteration.not-found", "Round not found");
-      if (iteration.state !== "SENT") throw new AppError("CONFLICT", "studioflow.iteration.not-sent", "Only sent rounds can be approved");
-      const updated = await db.sfIteration.update({ where: { id: iterationId }, data: { state: "APPROVED", responded_at: new Date() } });
-      await recomputePhaseState(db, iteration.phase_id);
-      await writeAudit({ action: "iteration.approve", entityType: "SfIteration", entityId: iterationId, actor, changes: { from: "SENT", to: "APPROVED" } });
-      return updated;
-    });
+    await recordResponse(grants, actor, iterationId, { kind: "APPROVAL" });
+    return db.sfIteration.findUniqueOrThrow({ where: { id: iterationId } });
   }
 
   async function voidIteration(grants: PermissionGrants, actor: AuditActor, iterationId: string, reason: string) {
@@ -1124,7 +1170,10 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     return runTransaction(async () => {
       const point = await db.sfIterationPoint.findUnique({ where: { id: pointId }, include: { iteration: { select: { state: true } } } });
       if (!point) throw new AppError("NOT_FOUND", "studioflow.iteration-point.not-found", "Checklist point not found");
-      if (point.iteration.state !== "DRAFT" && point.iteration.state !== "SENT") throw new AppError("CONFLICT", "studioflow.iteration-point.not-open", "Only draft or sent rounds can change points");
+      // §6.3: a sent, answered or stopped round is frozen and keeps the
+      // checklist snapshot it carried at send time. Ticking a point there would
+      // rewrite delivered history, so the checklist is editable in DRAFT only.
+      if (point.iteration.state !== "DRAFT") throw new AppError("CONFLICT", "studioflow.iteration-point.not-draft", "Only draft rounds can change points");
       return db.sfIterationPoint.update({ where: { id: pointId }, data: { done } });
     });
   }
@@ -1133,8 +1182,14 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     requirePermission(grants, STUDIOFLOW_PERMISSIONS.iterationManage);
     if (!reason.trim()) throw new AppError("VALIDATION", "studioflow.iteration-point.withdraw-reason-required", "Reason is required");
     return runTransaction(async () => {
-      const point = await db.sfIterationPoint.findUnique({ where: { id: pointId }, select: { id: true, iteration_id: true, withdrawn_at: true } });
+      const point = await db.sfIterationPoint.findUnique({
+        where: { id: pointId },
+        select: { id: true, iteration_id: true, withdrawn_at: true, iteration: { select: { state: true } } },
+      });
       if (!point) throw new AppError("NOT_FOUND", "studioflow.iteration-point.not-found", "Checklist point not found");
+      // §7.2: withdrawal is a draft-time correction of work still being planned.
+      // A frozen round keeps the checklist it was sent with (§6.3).
+      if (point.iteration.state !== "DRAFT") throw new AppError("CONFLICT", "studioflow.iteration-point.not-draft", "Only draft rounds can withdraw points");
       if (point.withdrawn_at) throw new AppError("CONFLICT", "studioflow.iteration-point.already-withdrawn", "Point is already withdrawn");
       const updated = await db.sfIterationPoint.update({ where: { id: pointId }, data: { withdrawn_at: new Date(), withdrawn_by_id: actor.userId, withdrawal_reason: reason.trim() } });
       await writeAudit({ action: "iteration_point.withdraw", entityType: "SfIterationPoint", entityId: pointId, actor, changes: { iteration_id: point.iteration_id, reason: reason.trim() } });
@@ -1151,7 +1206,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     opts: { extension?: string } = {},
   ): Promise<string> {
     requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
-    const settings = await getStudioSettings();
+    const naming = await getNamingContext();
     const project = await db.sfProject.findUniqueOrThrow({
       where: { id: projectId },
       select: { name: true, location: true, code: true },
@@ -1171,17 +1226,22 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
           select: { number: true },
         });
         if (draft) {
-          phaseLabel = `${phase.round_prefix ?? phase.name} ${draft.number}`;
+          phaseLabel = roundLabel(phase, draft.number);
         } else {
           const agg = await db.sfIteration.aggregate({
             where: { phase_id: phaseId },
             _max: { number: true },
           });
-          phaseLabel = `${phase.round_prefix ?? phase.name} ${(agg._max.number ?? 0) + 1}`;
+          phaseLabel = roundLabel(phase, (agg._max.number ?? 0) + 1);
         }
       }
     }
-    return resolveFilename(settings.naming_template, project, { droppedAt: new Date(), phaseLabel }, opts.extension ?? "");
+    return resolveFilename(
+      naming.template,
+      project,
+      { droppedAt: new Date(), phaseLabel, timeZone: naming.timeZone },
+      opts.extension ?? "",
+    );
   }
 
   /** Where a file lands (8.2 + 5.3).
@@ -1213,7 +1273,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     if (result.opened) await recomputePhaseState(db, targetPhase.id);
     return {
       iteration: result.iteration,
-      phaseLabel: `${phase.round_prefix ?? phase.name} ${result.iteration.number}`,
+      phaseLabel: roundLabel(phase, result.iteration.number),
     };
   }
 
@@ -1235,7 +1295,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       });
       if (!project) throw new AppError("NOT_FOUND", "studioflow.project.not-found", "Project not found");
 
-      const settings = await getStudioSettings();
+      const naming = await getNamingContext();
       const ext = originalFilename.includes(".") ? "." + originalFilename.split(".").pop() : "";
 
       const { iteration, phaseLabel } = await resolveFolderPlacement(project, input.folder_key);
@@ -1268,9 +1328,9 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       }
 
       const filename = resolveFilename(
-        settings.naming_template,
+        naming.template,
         { name: project.name, location: project.location, code: project.code },
-        { droppedAt: new Date(), phaseLabel },
+        { droppedAt: new Date(), phaseLabel, timeZone: naming.timeZone },
         ext,
       );
 
@@ -1509,7 +1569,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       });
       if (!project) throw new AppError("NOT_FOUND", "studioflow.project.not-found", "Project not found");
 
-      const settings = await getStudioSettings();
+      const naming = await getNamingContext();
       const { iteration, phaseLabel } = await resolveFolderPlacement(project, input.folder_key);
       if (iteration && input.folder_key) {
         const current = await db.sfFile.findFirst({
@@ -1539,9 +1599,9 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       }
       const ext = originalFilename.includes(".") ? "." + originalFilename.split(".").pop() : "";
       const filename = resolveFilename(
-        settings.naming_template,
+        naming.template,
         { name: project.name, location: project.location, code: project.code },
-        { droppedAt: new Date(), phaseLabel },
+        { droppedAt: new Date(), phaseLabel, timeZone: naming.timeZone },
         ext,
       );
 
@@ -1617,15 +1677,15 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         include: { phases: { select: { id: true, folder_key: true, state: true, has_rounds: true } } },
       });
 
-      const settings = await getStudioSettings();
+      const naming = await getNamingContext();
       const { iteration, phaseLabel } = await resolveFolderPlacement(project, folderKey);
       const ext = file.original_filename.includes(".")
         ? "." + file.original_filename.split(".").pop()
         : "";
       const filename = resolveFilename(
-        settings.naming_template,
+        naming.template,
         { name: project.name, location: project.location, code: project.code },
-        { droppedAt: new Date(), phaseLabel },
+        { droppedAt: new Date(), phaseLabel, timeZone: naming.timeZone },
         ext,
       );
 
@@ -2501,6 +2561,8 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     assertMomDraftEditable,
     issueMom,
     supersedeMom,
+    // People (platform user labels for StudioFlow surfaces)
+    listUserLabels,
     // Tasks (SF-F4)
     listTasks,
     listAssignableUsers,

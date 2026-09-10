@@ -1,7 +1,7 @@
 # StudioFlow — Contract Index and Shared Rules
 
-Status: **ACTIVE CONTRACT INDEX — implemented project-workflow and Library
-slices reconciled through R7.40; remaining work is tracked in
+Status: **ACTIVE CONTRACT INDEX — implemented project-workflow, Library, MOM
+and Product Catalogue slices reconciled through R7.55; remaining work is tracked in
 [`../roadmap.md`](../roadmap.md)**
 
 Authority: owner decisions locked in the StudioFlow contract sessions of
@@ -58,10 +58,10 @@ Schedule/FFNI remains unactivated; project-owned MOM is implemented in R7.52.
 
 ## 3. Permission vocabulary
 
-This table is the project-workflow vocabulary plus the activated Product
-Catalogue write grant. Schedule still proposes `studioflow.schedule.confirm`;
-MoM proposes `studioflow.mom.manage/issue`. Those remaining permissions stay
-unregistered until their domains are activated.
+This table is the registered vocabulary: the project-workflow grants, the
+Product Catalogue write grant activated in R7.53, and the MOM grants activated
+in R7.52. Schedule still proposes `studioflow.schedule.confirm`, which remains
+unregistered until Project Schedule/FFNI is activated (KB-003).
 StudioFlow owns its vocabulary and app-domain guards; Core owns grant mechanics. It declares no
 business roles. There is no `DIC`, `DRIC`, `ESTIMATOR`, or `STAFF` enum
 anywhere in StudioFlow — the legacy `Role` enum is **PURGE**. Which persisted
@@ -79,6 +79,11 @@ app.
 | `studioflow.phase.override` | Close a phase by exception under project §4.5; no arbitrary state setter |
 | `studioflow.task.manage` | Create, assign, complete, reorder, and delete tasks |
 | `studioflow.schedule.manage` | Create, edit, archive, and restore StudioFlow Product Catalogue rows |
+| `studioflow.mom.manage` | Create, edit, discard a MOM draft and manage its ordered content |
+| `studioflow.mom.issue` | Issue a MOM, and open a correction that supersedes an issued one |
+
+The registered set is eleven permissions. `src/app/app-registrations.ts` is the
+authority; this table must be kept equal to it.
 
 ### 3.1 Owner-locked holder intent
 
@@ -200,8 +205,7 @@ or placeholder export is created for anything below.
 
 | Deferred | Reason |
 |---|---|
-| Library and Product Schedule | Needs its own contract per the audit roadmap: stable item identity, ordering, option approval, and immutable catalog snapshots |
-| Minutes of Meeting | Its own module once the project surface is proven in real use |
+| Project Schedule / FFNI | Contracted in [`studioflow-schedule-contract.md`](studioflow-schedule-contract.md) §4–§5 but not activated. Product Catalogue, its reuse pool, shipped in R7.53; the project-scoped entry/option/template slice needs its own executable work order (KB-003) |
 | SketchUp plugin exchange | An authenticated, idempotent integration with retry and reconciliation. No plugin endpoint enters the first release |
 | Checklist templates and template-seeded requirements | Legacy root checklists were template requirements users could not create. Reintroduce only if a confirmed workflow needs them |
 | Legacy's Today's View feature set — saved filters, auto-hide, event feed | The one list that replaces it ships in the first release (project contract §10.2). What stays deferred is the accumulation that made legacy's version unreadable |
