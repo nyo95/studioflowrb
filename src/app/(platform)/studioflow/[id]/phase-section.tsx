@@ -824,6 +824,39 @@ function PhaseBlock({
     (startSupState?.ok === false ? startSupState.error.safeMessage : null) ??
     (finishSupState?.ok === false ? finishSupState.error.safeMessage : null);
 
+  const contextualActions = (
+    <div className="flex flex-wrap items-center gap-2 border-t border-line pt-2">
+      {!phase.has_rounds && phase.state === "NOT_STARTED" && canReview && (
+        <form action={startSupAction}>
+          <Button type="submit" disabled={startSupPending} variant="secondary" size="sm">
+            {startSupPending ? "Starting…" : "Start supervision"}
+          </Button>
+        </form>
+      )}
+      {!phase.has_rounds && phase.state === "IN_PROGRESS" && canReview && (
+        <form action={finishSupAction}>
+          <Button type="submit" disabled={finishSupPending} variant="secondary" size="sm">
+            {finishSupPending ? "Completing…" : "Complete supervision"}
+          </Button>
+        </form>
+      )}
+      {canFinish && canReview && (
+        <form action={finishAction}>
+          <Button type="submit" disabled={finishPending} variant="secondary" size="sm">
+            {finishPending ? "Finishing…" : "Finish phase"}
+          </Button>
+        </form>
+      )}
+      {!canFinish && canStartRound && (
+        <form action={openIterAction}>
+          <Button type="submit" disabled={openIterPending} variant="secondary" size="sm">
+            {openIterPending ? "Starting…" : "Start round"}
+          </Button>
+        </form>
+      )}
+    </div>
+  );
+
   return (
     <Surface className="overflow-hidden">
       {/* Header row */}
@@ -864,54 +897,6 @@ function PhaseBlock({
             {waitingAge ? `${stateText} · ${waitingAge}` : stateText}
           </span>
 
-          {/* Supervision actions */}
-          {!phase.has_rounds && phase.state === "NOT_STARTED" && canReview && (
-            <form action={startSupAction}>
-              <Button
- type="submit"
- disabled={startSupPending}
- variant="secondary" size="sm"
- >
-                Start
-              </Button>
-            </form>
-          )}
-          {!phase.has_rounds && phase.state === "IN_PROGRESS" && canReview && (
-            <form action={finishSupAction}>
-              <Button
- type="submit"
- disabled={finishSupPending}
- variant="secondary" size="sm"
- >
-                Complete
-              </Button>
-            </form>
-          )}
-
-          {/* Round-bearing phase actions */}
-          {canFinish && canReview && (
-            <form action={finishAction}>
-              <Button
- type="submit"
- disabled={finishPending}
- variant="secondary" size="sm"
- >
-                Finish phase
-              </Button>
-            </form>
-          )}
-          {!canFinish && canStartRound && (
-            <form action={openIterAction}>
-              <Button
- type="submit"
- disabled={openIterPending}
- variant="secondary" size="sm"
- >
-                Start round
-              </Button>
-            </form>
-          )}
-
           {/* Phase-level ⋯ menu — reopen (DONE), close by exception (active) */}
           {(canReview && isDone) || (canOverride && !isDone && !hasOpenIter) ? (
             <RowActionMenu
@@ -951,6 +936,7 @@ function PhaseBlock({
       {open && phase.has_rounds && (
         <div className="border-t border-line px-4 py-2.5 flex flex-col gap-1.5 bg-surface">
           <PhaseDeliverableBlock phase={phase} projectId={projectId} canManage={canManage} />
+          {contextualActions}
           <GeneralTaskBlock
             projectId={projectId}
             tasks={phase.tasks}
@@ -986,6 +972,7 @@ function PhaseBlock({
       {open && !phase.has_rounds && (
         <div className="border-t border-line px-4 py-3 bg-surface">
           <PhaseDeliverableBlock phase={phase} projectId={projectId} canManage={canManage} />
+          {contextualActions}
           <GeneralTaskBlock
             projectId={projectId}
             tasks={phase.tasks}

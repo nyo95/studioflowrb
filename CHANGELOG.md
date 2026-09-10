@@ -5,8 +5,37 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.49**
-- Next local revision: **R7.50**
+- Current revision after this entry is committed: **R7.50**
+- Next local revision: **R7.51**
+
+## R7.50 | 2026-09-10 | feat(studioflow): unify project work surface
+
+### Changed
+
+- Moved Start round, supervision start/complete, and Finish phase actions out
+  of the dominant phase header and into a contextual action strip below the
+  phase deliverable surface.
+- Preserved the existing project-owned task collection, phase-scoped task
+  filtering, R7.48 deliverable intake, iteration actions, and DONE protection.
+- Added a focused regression test preventing phase actions from returning to
+  the header.
+
+### Verification
+
+- `STUDIOFLOW_LOCATION=kantor npm run typecheck`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run lint`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:boundaries`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:legacy-runtime`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run build`: passed.
+- Focused phase static test: pending after this test addition.
+- Full database-backed test suite and populated browser acceptance remain
+  unavailable because the office disposable test database is not configured
+  and the current browser database has no projects.
+
+### Remaining
+
+- R7.49's combined work-surface acceptance remains pending until a populated
+  project can be exercised through the browser and disposable DB integration.
 
 ## R7.49 | 2026-09-10 | work-order(studioflow): unify project work surface
 

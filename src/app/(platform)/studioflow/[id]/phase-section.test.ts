@@ -21,4 +21,14 @@ describe("Phase deliverable surface", () => {
     assert.match(source, /canManage && !isDone/);
     assert.match(source, /!isDone && nextFilename/);
   });
+
+  it("keeps phase actions contextual instead of dominant in the header", () => {
+    const headerEnd = source.indexOf("{/* Phase-level ⋯ menu");
+    const bodyStart = source.indexOf("const contextualActions");
+    assert.ok(bodyStart >= 0);
+    assert.ok(headerEnd >= 0);
+    const header = source.slice(source.indexOf("{/* Header row */"), headerEnd);
+    assert.doesNotMatch(header, /Start round|Start supervision|Complete supervision|Finish phase/);
+    assert.match(source, /\{contextualActions\}/);
+  });
 });
