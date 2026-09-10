@@ -2279,6 +2279,162 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     );
   }
 
+  function normalizeCatalogueSpec(input: CatalogueSpecInput) {
+    const product_name = input.product_name.trim();
+    if (!product_name) {
+      throw new AppError("VALIDATION", "studioflow.catalogue.product-required", "Product name is required");
+    }
+    const brand_md_id = input.brand_md_id?.trim() || null;
+    const brand_name = input.brand_name?.trim() || null;
+    if (brand_md_id && !brand_name) {
+      throw new AppError(
+        "VALIDATION",
+        "studioflow.catalogue.brand-name-required",
+        "A selected brand must freeze its name",
+      );
+    }
+    const colour = input.colour?.trim() || null;
+    const finishing = input.finishing?.trim() || null;
+    const dimension_text = input.dimension_text?.trim() || null;
+    const unit = input.unit?.trim() || null;
+    const notes = input.notes?.trim() || null;
+    return {
+      brand_md_id,
+      brand_name,
+      product_name,
+      colour,
+      finishing,
+      dimension_text,
+      unit,
+      notes,
+      search_key: deriveCatalogueSearchKey({ brand_name, product_name, colour, finishing }),
+    };
+  }
+
+  async function listCatalogueProducts(
+    grants: PermissionGrants,
+    opts?: { search?: string; includeArchived?: boolean },
+  ) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    const search = opts?.search?.trim();
+    return db.sfProductCatalogue.findMany({
+      where: {
+        ...(opts?.includeArchived ? {} : { deleted_at: null }),
+        ...(search
+          ? {
+              OR: [
+                { search_key: { contains: search.toLowerCase() } },
+                { product_name: { contains: search, mode: "insensitive" } },
+                { brand_name: { contains: search, mode: "insensitive" } },
+                { colour: { contains: search, mode: "insensitive" } },
+                { finishing: { contains: search, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ sort_order: "asc" }, { product_name: "asc" }, { created_at: "asc" }],
+    });
+  }
+
+  async function getCatalogueProduct(grants: PermissionGrants, id: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    const row = await db.sfProductCatalogue.findUnique({ where: { id } });
+    if (!row) throw new AppError("NOT_FOUND", "studioflow.catalogue.not-found", "Catalogue product not found");
+    return row;
+  }
+
+  async function createCatalogueProduct(
+    grants: PermissionGrants,
+    actor: AuditActor,
+    input: CatalogueSpecInput,
+  ) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.scheduleManage);
+    const data = normalizeCatalogueSpec(input);
+    return runTransaction(async () => {
+      const last = await db.sfProductCatalogue.findFirst({
+        orderBy: { sort_order: "desc" },
+        select: { sort_order: true },
+      });
+      const created = await db.sfProductCatalogue.create({
+        data: { ...data, sort_order: (last?.sort_order ?? 0) + 1 },
+      });
+      await writeAudit({
+        action: "catalogue.create",
+        entityType: "SfProductCatalogue",
+        entityId: created.id,
+        actor,
+        changes: snapshotCatalogueProduct(created),
+      });
+      return created;
+    });
+  }
+
+  async function editCatalogueProduct(
+    grants: PermissionGrants,
+    actor: AuditActor,
+    id: string,
+    input: EditCatalogueSpecInput,
+  ) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.scheduleManage);
+    return runTransaction(async () => {
+      const existing = await db.sfProductCatalogue.findUnique({ where: { id } });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.catalogue.not-found", "Catalogue product not found");
+      if (existing.deleted_at) {
+        throw new AppError("CONFLICT", "studioflow.catalogue.archived", "Catalogue product is archived");
+      }
+      const data = normalizeCatalogueSpec({
+        brand_md_id: input.brand_md_id === undefined ? existing.brand_md_id : input.brand_md_id,
+        brand_name: input.brand_name === undefined ? existing.brand_name : input.brand_name,
+        product_name: input.product_name === undefined ? existing.product_name : input.product_name,
+        colour: input.colour === undefined ? existing.colour : input.colour,
+        finishing: input.finishing === undefined ? existing.finishing : input.finishing,
+        dimension_text: input.dimension_text === undefined ? existing.dimension_text : input.dimension_text,
+        unit: input.unit === undefined ? existing.unit : input.unit,
+        notes: input.notes === undefined ? existing.notes : input.notes,
+      });
+      const before = snapshotCatalogueProduct(existing);
+      const after = snapshotCatalogueProduct(data);
+      if (JSON.stringify(before) === JSON.stringify(after)) return existing;
+      const updated = await db.sfProductCatalogue.update({ where: { id }, data });
+      await writeAudit({
+        action: "catalogue.edit",
+        entityType: "SfProductCatalogue",
+        entityId: id,
+        actor,
+        changes: { before: snapshotCatalogueProduct(existing), after: snapshotCatalogueProduct(updated) },
+      });
+      return updated;
+    });
+  }
+
+  async function archiveCatalogueProduct(grants: PermissionGrants, actor: AuditActor, id: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.scheduleManage);
+    return runTransaction(async () => {
+      const existing = await db.sfProductCatalogue.findUnique({ where: { id } });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.catalogue.not-found", "Catalogue product not found");
+      if (existing.deleted_at) {
+        throw new AppError("CONFLICT", "studioflow.catalogue.already-archived", "Catalogue product is already archived");
+      }
+      const archived = await db.sfProductCatalogue.update({ where: { id }, data: { deleted_at: new Date() } });
+      await writeAudit({ action: "catalogue.archive", entityType: "SfProductCatalogue", entityId: id, actor });
+      return archived;
+    });
+  }
+
+  async function restoreCatalogueProduct(grants: PermissionGrants, actor: AuditActor, id: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.scheduleManage);
+    return runTransaction(async () => {
+      const existing = await db.sfProductCatalogue.findUnique({ where: { id } });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.catalogue.not-found", "Catalogue product not found");
+      if (!existing.deleted_at) {
+        throw new AppError("CONFLICT", "studioflow.catalogue.not-archived", "Catalogue product is not archived");
+      }
+      const restored = await db.sfProductCatalogue.update({ where: { id }, data: { deleted_at: null } });
+      await writeAudit({ action: "catalogue.restore", entityType: "SfProductCatalogue", entityId: id, actor });
+      return restored;
+    });
+  }
+
   // ── Public surface ───────────────────────────────────────────────────────
 
   return {

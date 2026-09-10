@@ -1536,3 +1536,26 @@ model SfResponsePoint {
   @@map("sf_response_point")
   @@schema("studioflow")
 }
+
+model SfProductCatalogue {
+  id              String    @id @default(uuid())
+  brand_md_id     String?
+  brand_name      String?
+  product_name    String
+  colour          String?
+  finishing       String?
+  dimension_text  String?
+  unit            String?
+  notes           String?
+  search_key      String
+  sort_order      Int       @default(0)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  deleted_at      DateTime?
+
+  @@index([search_key])
+  @@index([brand_md_id])
+  @@index([deleted_at, sort_order])
+  @@map("sf_product_catalogue")
+  @@schema("studioflow")
+}

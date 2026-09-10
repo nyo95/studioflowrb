@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.52**
-- Next local revision: **R7.53**
+- Current revision after this entry is committed: **R7.53**
+- Next local revision: **R7.54**
 
 ## R7.52 | 2026-09-10 | feat(studioflow): add project-owned MOM
 
@@ -40,6 +40,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 - Provision the approved Supabase `platform-assets` bucket and server-only
   secrets before claiming live image upload/cleanup acceptance.
+
+## R7.53 | 2026-09-10 | feat(studioflow): add product catalogue reuse pool
+
+### Changed
+
+- Added the independent StudioFlow Product Catalogue schema, service boundary,
+  public Brand read usage, audited no-op-safe create/edit/archive/restore, and
+  project-independent permissions.
+- Added search, archived filtering, sortable/paginated list, explicit detail
+  editing, frozen-brand fallback, confirmation, unsaved protection, and
+  loading/error/empty/permission states.
+- Added integration, UI, contract, boundary, and snapshot-isolation coverage.
+
+### Verification
+
+- Full disposable-database `npm test`: 304 passed, including Catalogue CRUD,
+  search, no-op audit, archive/restore, and permission coverage.
+- Build, typecheck, lint, and boundary/legacy checks passed.
+
+### Remaining
+
+- Project schedule/FFNI snapshot selection remains a separate approved slice.
 
 ## R7.51 | 2026-09-10 | work-order(studioflow): activate MOM and Product Catalogue
 

@@ -1,6 +1,6 @@
 # Documentation Hub
 
-Status: reconciled through **R7.51** on 2026-09-10.
+Status: reconciled through **R7.53** on 2026-09-10.
 
 This directory contains active contracts, operational trackers, architecture
 roadmaps, and retained historical evidence. Current owner instruction remains
@@ -45,8 +45,8 @@ order unless it says so explicitly.
 | [`apps/studioflow-project-contract.md`](apps/studioflow-project-contract.md) | StudioFlow PRD: Client, Project, assignment, Phase, Iteration, review exchange, work items, and assets; substantial slices are implemented through R7.40 |
 | [`apps/studioflow-ux-spec.md`](apps/studioflow-ux-spec.md) | StudioFlow surface reference; partially implemented and subordinate to current owner alignment |
 | [`apps/studioflow-implementation-plan.md`](apps/studioflow-implementation-plan.md) | Active execution/non-regression guardrails; current remaining work is in `roadmap.md` |
-| [`apps/studioflow-schedule-contract.md`](apps/studioflow-schedule-contract.md) | StudioFlow Brands, independent reusable Product Catalogue, and project Schedule logic contract; Product Catalogue/Schedule remain unactivated |
-| [`apps/studioflow-mom-contract.md`](apps/studioflow-mom-contract.md) | owner-approved project-owned MOM logic contract; no task/phase/iteration linkage; executable work order still required |
+| [`apps/studioflow-schedule-contract.md`](apps/studioflow-schedule-contract.md) | StudioFlow Brands, independent reusable Product Catalogue, and project Schedule logic contract; Product Catalogue is implemented in R7.53 and Schedule remains unactivated |
+| [`apps/studioflow-mom-contract.md`](apps/studioflow-mom-contract.md) | implemented project-owned MOM logic contract; no task/phase/iteration linkage; delivered in R7.52 |
 | [`apps/studioflow-work-orders.md`](apps/studioflow-work-orders.md) | historical decision/work-order ledger; use `roadmap.md` for current remaining work |
 | [`apps/masterdata.md`](apps/masterdata.md) | Master Data contract index, shared lifecycle/deletion rules, capability placement, and remaining deferred decisions |
 | [`apps/brand-contract.md`](apps/brand-contract.md) | owner-approved Brand identity, relations, discovery, lifecycle, deletion, UI, and public boundary |

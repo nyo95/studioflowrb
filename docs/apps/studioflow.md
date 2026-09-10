@@ -50,18 +50,18 @@ activates neither app execution nor a new foundation build.
 | Contract | Owns |
 |---|---|
 | [`studioflow-project-contract.md`](studioflow-project-contract.md) | Client, Project, Phase, Iteration, client review exchange, tasks, assets, and how people reach a project — one workflow contract |
-| [`studioflow-schedule-contract.md`](studioflow-schedule-contract.md) | Owner-approved Brands, StudioFlow-owned Product Catalogue, and project Schedule contract; executable work remains deferred |
+| [`studioflow-schedule-contract.md`](studioflow-schedule-contract.md) | Owner-approved Brands, StudioFlow-owned Product Catalogue, and project Schedule contract; Product Catalogue is implemented in R7.53 and Schedule remains unactivated |
 | [`studioflow-mom-contract.md`](studioflow-mom-contract.md) | Owner-approved project-owned Minutes of Meeting contract; executable work order remains deferred |
 
-Schedule and MOM are owner-confirmed for the product, but neither has an
-approved executable work order.
+Product Catalogue is implemented as a StudioFlow-owned reuse pool. Project
+Schedule/FFNI remains unactivated; project-owned MOM is implemented in R7.52.
 
 ## 3. Permission vocabulary
 
-This table is the eight-permission vocabulary for the project-workflow slice,
-not an exhaustive list of future StudioFlow permissions. Schedule proposes
-`studioflow.schedule.manage/confirm`; MoM proposes `studioflow.mom.manage/issue`.
-Those four remain unregistered until their domains are approved and activated.
+This table is the project-workflow vocabulary plus the activated Product
+Catalogue write grant. Schedule still proposes `studioflow.schedule.confirm`;
+MoM proposes `studioflow.mom.manage/issue`. Those remaining permissions stay
+unregistered until their domains are activated.
 StudioFlow owns its vocabulary and app-domain guards; Core owns grant mechanics. It declares no
 business roles. There is no `DIC`, `DRIC`, `ESTIMATOR`, or `STAFF` enum
 anywhere in StudioFlow — the legacy `Role` enum is **PURGE**. Which persisted
@@ -71,13 +71,14 @@ app.
 | Permission | Grants |
 |---|---|
 | `studioflow.access` | Open the application |
-| `studioflow.project.read` | See projects, phases, iterations, tasks, and assets |
+| `studioflow.project.read` | See projects, phases, iterations, tasks, assets, and the Product Catalogue |
 | `studioflow.project.manage` | Create and edit Clients and Projects |
 | `studioflow.project-deletion.approve` | Reserved approval grant; destructive workflow deferred pending StudioFlow retention/deletion policy |
 | `studioflow.iteration.manage` | Open an iteration, add and remove its assets, edit its checklist points under provenance rules |
 | `studioflow.iteration.review` | Send/withdraw/stop rounds, record/correct answers, finish/reopen phases, operate Supervision |
 | `studioflow.phase.override` | Close a phase by exception under project §4.5; no arbitrary state setter |
 | `studioflow.task.manage` | Create, assign, complete, reorder, and delete tasks |
+| `studioflow.schedule.manage` | Create, edit, archive, and restore StudioFlow Product Catalogue rows |
 
 ### 3.1 Owner-locked holder intent
 

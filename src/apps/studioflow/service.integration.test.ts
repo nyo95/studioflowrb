@@ -25,6 +25,7 @@ let service: ReturnType<typeof createStudioFlowService>;
 async function resetStudioFlow() {
   await testDb.prisma.$executeRawUnsafe(`
     TRUNCATE TABLE
+      "studioflow"."sf_product_catalogue",
       "studioflow"."sf_client",
       "studioflow"."sf_phase_template",
       "platform"."AuditEvent"

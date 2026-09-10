@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, FolderOpen, Globe, Grid2X2, ListChecks, Settings, ShoppingBag } from "lucide-react";
+import { CalendarDays, FolderOpen, Globe, Grid2X2, Layers, ListChecks, Settings, ShoppingBag } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { NavGroup, NavItem, NavSeparator } from "@/platform/ui_engine";
@@ -63,6 +63,14 @@ export function StudioFlowNav() {
           prefetch={false}
         >
           Library
+        </NavItem>
+        <NavItem
+          href="/studioflow/catalogue"
+          icon={<Layers size={16} />}
+          active={activePath(pathname, "/studioflow/catalogue")}
+          prefetch={false}
+        >
+          Product Catalogue
         </NavItem>
         <NavItem
           href="/studioflow/activity"
