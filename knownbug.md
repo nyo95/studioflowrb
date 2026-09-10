@@ -8,27 +8,23 @@ fixed, remove it or strike it through and record the fix in `CHANGELOG.md`.
 
 ### KB-001 — Deliverable intake does not yet drive the full iteration lifecycle
 
-- **Area:** StudioFlow phase/deliverable workflow
-- **Observed:** The current UI can record file metadata or a link, but the
-  complete deliverable-driven transition to current file, send state, and next
-  revision is not end-to-end.
-- **Expected:** A deliverable in a phase opens or links the appropriate
-  iteration and becomes the phase current file without a separate round-first
-  workflow.
-- **Mitigation:** Use the existing project File page and explicit iteration
-  controls until the workflow correction is implemented.
-- **Status:** Open; not fixed in the current documentation-only change.
+**Closed in R7.40.** Phase deliverables now open/reuse the draft iteration,
+replace the previous unsent current file, and are attached to the iteration
+when it is sent. Revision requests continue through the existing successor
+draft flow.
 
 ### KB-002 — Multiple file records remain instead of one current file per phase
 
 - **Area:** StudioFlow file service
-- **Observed:** Each record/link operation currently creates a new `SfFile` row;
-  replacement and byte release semantics are not yet implemented.
+- **Observed:** Metadata rows are retained and replacement is now automatic for
+  the unsent current file, but storage-byte release is not implemented because
+  this rebuild still has no active file-storage consumer.
 - **Expected:** One current file per project-phase, with old metadata/audit
   retained and old application bytes releasable.
 - **Mitigation:** Treat the newest non-superseded record as the working view and
   keep the PC as the primary archive.
-- **Status:** Open; requires a service transaction and regression tests.
+- **Status:** Open; byte-release policy remains deferred until an approved
+  storage consumer exists.
 
 ### KB-003 — MOM and Product Catalogue/FFNI are not integrated into project detail
 
@@ -87,33 +83,21 @@ fixed, remove it or strike it through and record the fix in `CHANGELOG.md`.
 
 ### KB-008 — BQ overridden prices have no Revert action
 
-- **Area:** BQ price override
-- **Observed:** An overridden price can be saved, but the UI does not expose a
-  way to restore the inherited/base value.
-- **Expected:** Provide a permission-checked, confirmed Revert action that
-  removes the override and returns to the current inherited value.
-- **Mitigation:** Manually restore the base value after checking the source.
-- **Status:** Open.
+**Closed in R7.40.** The project editor exposes a permission-checked Revert
+action for imported lines and restores `harga_snapshot` from the immutable
+`source_price_snapshot` through the service boundary.
 
 ### KB-009 — BQ Updated date is not functional or consistently placed
 
-- **Area:** BQ tables and detail views
-- **Observed:** Updated date is not behaving as a reliable visible field and
-  is not presented in the same dedicated column pattern used by Master Data.
-- **Expected:** Use the shared updated-date cell/pattern in a separate table
-  column, with the correct timestamp and actor where available.
-- **Mitigation:** Inspect audit/history details for recency.
-- **Status:** Open.
+**Closed in R7.40.** BQ project and Library directories render their persisted
+`updatedAt` values, while Master Data pricing uses the shared Updated cell with
+the actor label.
 
 ### KB-010 — Library results redirect instead of opening resource links
 
-- **Area:** StudioFlow Library
-- **Observed:** Selecting a Library result redirects to Master Data.
-- **Expected:** Open a UI Engine modal showing the resource's website,
-  catalogue, and other links sourced from the Master Data link fields, while
-  keeping Library read-only and one-way.
-- **Mitigation:** Follow the existing Master Data link fields directly.
-- **Status:** Open.
+**Closed in R7.40.** StudioFlow Library now opens a UI Engine `Dialog` with
+the Brand's published Master Data links. The Library remains read-only and
+does not navigate to Master Data for link discovery.
 
 ## Closed
 

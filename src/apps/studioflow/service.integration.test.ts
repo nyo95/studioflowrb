@@ -61,6 +61,7 @@ async function seedRoundPhase() {
       sort_order: template.sort_order,
       has_rounds: true,
       round_prefix: template.round_prefix,
+      folder_key: "design",
     },
   });
   return { phase };
@@ -225,5 +226,25 @@ describe("StudioFlow round lifecycle", () => {
       where: { action: "response.record" },
     });
     assert.equal((responseAudit.metadata as { phase_closed?: boolean }).phase_closed, true);
+  });
+
+  it("keeps one unsent current deliverable and freezes it on send", async () => {
+    const { phase } = await seedRoundPhase();
+    const first = await service.recordFile(
+      [STUDIOFLOW_PERMISSIONS.iterationManage],
+      ACTOR,
+      { project_id: (await testDb.prisma.sfProjectPhase.findUniqueOrThrow({ where: { id: phase.id } })).project_id, folder_key: "design", original_filename: "first.skp", bytes: 10 },
+    );
+    const second = await service.recordFile(
+      [STUDIOFLOW_PERMISSIONS.iterationManage],
+      ACTOR,
+      { project_id: first.file.project_id, folder_key: "design", original_filename: "second.skp", bytes: 20 },
+    );
+    assert.equal(second.iteration?.id, first.iteration?.id);
+    assert.equal((await testDb.prisma.sfFile.findUniqueOrThrow({ where: { id: first.file.id } })).superseded_at !== null, true);
+    assert.equal((await testDb.prisma.sfIteration.findUniqueOrThrow({ where: { id: first.iteration!.id } })).working_revision, 1);
+
+    await service.sendIteration([STUDIOFLOW_PERMISSIONS.iterationReview], ACTOR, first.iteration!.id);
+    assert.equal((await testDb.prisma.sfFile.findUniqueOrThrow({ where: { id: second.file.id } })).sent_in_iteration_id, first.iteration!.id);
   });
 });

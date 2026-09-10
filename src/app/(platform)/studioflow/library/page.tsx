@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { BookOpen, Search } from "lucide-react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
@@ -8,6 +8,7 @@ import { prisma } from "@/platform/core/db";
 import { createMasterDataPublicRead } from "@/apps/masterdata/public";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
 import { EmptyState, PageHeader, SectionCard, Text } from "@/platform/ui_engine";
+import { ResourceLinksDialog } from "./resource-links-dialog";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,7 @@ export default async function StudioFlowLibraryPage({
           <div className="divide-y divide-line-subtle">
             {brands.map((brand) => (
               <article key={brand.id} className="grid gap-2 p-(--ui-section-px) sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:items-start">
-                <div className="min-w-0"><Link href={`/masterdata/brands?q=${encodeURIComponent(brand.name)}`} className="font-semibold text-ink underline-offset-2 hover:underline">{brand.name}</Link><Text as="p" tone="tertiary" size="sm">{brand.ownerVendor?.name ?? "Brand"}</Text></div>
+                <div className="min-w-0"><ResourceLinksDialog brand={brand} /><Text as="p" tone="tertiary" size="sm">{brand.ownerVendor?.name ?? "Brand"}</Text></div>
                 <div className="flex flex-wrap gap-1.5">{brand.categories.map((category) => <span key={category.id} className="rounded-full bg-surface-muted px-2 py-1 text-xs text-ink-secondary">{category.name}</span>)}{brand.hashtags.map((hashtag) => <span key={hashtag.id} className="rounded-full border border-line px-2 py-1 text-xs text-ink-tertiary">#{hashtag.label}</span>)}</div>
               </article>
             ))}

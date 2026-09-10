@@ -961,7 +961,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     return runTransaction(async () => {
       const iteration = await db.sfIteration.findUnique({
         where: { id: iterationId },
-        include: { phase: { select: { id: true, state: true } } },
+        include: { phase: { select: { id: true, state: true, project_id: true, folder_key: true } } },
       });
       if (!iteration) throw new AppError("NOT_FOUND", "studioflow.iteration.not-found", "Round not found");
       if (iteration.state !== "DRAFT") throw new AppError("CONFLICT", "studioflow.iteration.not-draft", "Only draft rounds can be sent");
@@ -980,6 +980,17 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         where: { id: iterationId },
         data: { state: "SENT", sent_at: new Date(), ...(assigneeId !== undefined ? { assignee_id: assigneeId || null } : {}) },
       });
+      if (iteration.phase.folder_key) {
+        await db.sfFile.updateMany({
+          where: {
+            project_id: iteration.phase.project_id,
+            folder_key: iteration.phase.folder_key,
+            superseded_at: null,
+            sent_in_iteration_id: null,
+          },
+          data: { sent_in_iteration_id: iterationId },
+        });
+      }
       await recomputePhaseState(db, iteration.phase_id);
       await writeAudit({ action: "iteration.send", entityType: "SfIteration", entityId: iterationId, actor, changes: { from: "DRAFT", to: "SENT", assignee_id: assigneeId ?? null } });
       return updated;
@@ -1137,6 +1148,33 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       const ext = originalFilename.includes(".") ? "." + originalFilename.split(".").pop() : "";
 
       const { iteration, phaseLabel } = await resolveFolderPlacement(project, input.folder_key);
+
+      if (iteration && input.folder_key) {
+        const current = await db.sfFile.findFirst({
+          where: {
+            project_id: input.project_id,
+            folder_key: input.folder_key,
+            superseded_at: null,
+            sent_in_iteration_id: null,
+          },
+          orderBy: { dropped_at: "desc" },
+          select: { id: true },
+        });
+        if (current) {
+          await db.sfFile.update({ where: { id: current.id }, data: { superseded_at: new Date() } });
+          await db.sfIteration.update({
+            where: { id: iteration.id },
+            data: { working_revision: { increment: 1 } },
+          });
+          await writeAudit({
+            action: "file.supersede",
+            entityType: "SfFile",
+            entityId: current.id,
+            actor,
+            changes: { reason: "working-file-replaced", iteration_id: iteration.id },
+          });
+        }
+      }
 
       const filename = resolveFilename(
         settings.naming_template,
@@ -1382,6 +1420,32 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
 
       const settings = await getStudioSettings();
       const { iteration, phaseLabel } = await resolveFolderPlacement(project, input.folder_key);
+      if (iteration && input.folder_key) {
+        const current = await db.sfFile.findFirst({
+          where: {
+            project_id: input.project_id,
+            folder_key: input.folder_key,
+            superseded_at: null,
+            sent_in_iteration_id: null,
+          },
+          orderBy: { dropped_at: "desc" },
+          select: { id: true },
+        });
+        if (current) {
+          await db.sfFile.update({ where: { id: current.id }, data: { superseded_at: new Date() } });
+          await db.sfIteration.update({
+            where: { id: iteration.id },
+            data: { working_revision: { increment: 1 } },
+          });
+          await writeAudit({
+            action: "file.supersede",
+            entityType: "SfFile",
+            entityId: current.id,
+            actor,
+            changes: { reason: "working-file-replaced", iteration_id: iteration.id },
+          });
+        }
+      }
       const ext = originalFilename.includes(".") ? "." + originalFilename.split(".").pop() : "";
       const filename = resolveFilename(
         settings.naming_template,

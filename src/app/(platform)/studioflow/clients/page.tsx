@@ -41,12 +41,12 @@ export default async function StudioFlowClientsPage({
   if (!canRead) {
     return (
       <>
-        <PageHeader eyebrow="StudioFlow" title="Klien" divider />
+        <PageHeader eyebrow="StudioFlow" title="Clients" divider />
         <SectionCard>
           <EmptyState
             icon={Users}
-            title="Akses ditolak"
-            description="Kamu tidak punya permission untuk melihat klien."
+            title="Access denied"
+            description="You do not have permission to view clients."
           />
         </SectionCard>
       </>
@@ -66,12 +66,12 @@ export default async function StudioFlowClientsPage({
     <>
       <PageHeader
         eyebrow="StudioFlow"
-        title="Klien"
+        title="Clients"
         description="Daftar klien studio"
         divider
         actions={
           <Link href="/studioflow/clients/new" className={buttonClasses("primary", "md")}>
-            <Plus size={16} aria-hidden="true" /> Klien baru
+            <Plus size={16} aria-hidden="true" /> New client
           </Link>
         }
       />
@@ -92,7 +92,7 @@ export default async function StudioFlowClientsPage({
         {clients.length === 0 ? (
           <EmptyState
             icon={Users}
-            title="Belum ada klien"
+            title="No clients yet"
             description="Tambahkan klien pertama studio."
           />
         ) : (

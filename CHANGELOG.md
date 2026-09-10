@@ -5,8 +5,35 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.39**
-- Next local revision: **R7.40**
+- Current revision after this entry is committed: **R7.40**
+- Next local revision: **R7.41**
+
+## R7.40 | 2026-09-10 | fix(studioflow,bq): close active workflow gaps
+
+### Changed
+
+- StudioFlow deliverable intake now replaces the unsent current file for a
+  phase, increments the draft working revision, preserves the superseded row
+  and audit event, and associates active phase files with the iteration when
+  it is sent.
+- StudioFlow Library now opens Master Data Brand resource links in a read-only
+  UI Engine dialog instead of redirecting to Master Data.
+- Refreshed the tracked Next.js generated route-type references as part of the
+  production build.
+- Translated the updated StudioFlow project, client, and settings entry
+  surfaces to English; remaining mixed-copy surfaces stay recorded in KB-006.
+- Closed KB-001, KB-008, KB-009, and KB-010 in the known-bug ledger. KB-002
+  remains open only for future storage-byte release, while KB-003/004 remain
+  deferred and KB-005/007 remain blocked on the required read-only legacy audit.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- Boundary and legacy-runtime checks run as part of `npm test`: passed.
+- Unit/UI tests passed; database integration tests were unavailable because
+  the required disposable rebuild-only test database variables were not set.
+- `git diff --check`: passed.
 
 ## R7.39 | 2026-09-10 | chore(next): refresh generated route types
 

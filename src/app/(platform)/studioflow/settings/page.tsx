@@ -19,8 +19,8 @@ import { NamingTemplateForm } from "./naming-template-form";
 export const dynamic = "force-dynamic";
 
 const SETTINGS_NAV = [
-  { href: "#fase", label: "Template fase" },
-  { href: "#penamaan", label: "Template nama file" },
+  { href: "#fase", label: "Phase template" },
+  { href: "#penamaan", label: "File naming template" },
 ] as const;
 
 export default async function StudioFlowSettingsPage() {
@@ -34,12 +34,12 @@ export default async function StudioFlowSettingsPage() {
   if (!canRead) {
     return (
       <>
-        <PageHeader eyebrow="StudioFlow" title="Pengaturan" divider />
+        <PageHeader eyebrow="StudioFlow" title="Settings" divider />
         <SectionCard>
           <EmptyState
             icon={Settings}
-            title="Akses ditolak"
-            description="Kamu tidak punya permission untuk melihat pengaturan."
+            title="Access denied"
+            description="You do not have permission to view StudioFlow settings."
           />
         </SectionCard>
       </>
@@ -55,8 +55,8 @@ export default async function StudioFlowSettingsPage() {
     <>
       <PageHeader
         eyebrow="StudioFlow"
-        title="Pengaturan studio"
-        description="Konfigurasi tingkat workspace. Permission role datang dari platform, bukan dari StudioFlow."
+        title="Studio settings"
+        description="Workspace-level configuration. Role permissions come from the platform."
         divider
       />
 
@@ -76,19 +76,19 @@ export default async function StudioFlowSettingsPage() {
             platform, and editing it mid-flight would re-shape live projects. */}
         <SectionCard
           id="fase"
-          title="Template fase"
+          title="Phase template"
           count={templates.length}
           padded={false}
           className="scroll-mt-6"
         >
           <p className="border-b border-line-subtle px-3.5 py-2.5 text-sm text-ink-secondary">
-            Pipeline default yang dipasang ke setiap project baru.
+            Default pipeline applied to every new project.
           </p>
           {templates.length === 0 ? (
             <EmptyState
               icon={Settings}
-              title="Template kosong"
-              description="Belum ada fase yang di-seed untuk studio ini."
+              title="No phase template"
+              description="No phases have been seeded for this studio."
             />
           ) : (
             <ol className="m-0 list-none p-0">
@@ -120,10 +120,9 @@ export default async function StudioFlowSettingsPage() {
           )}
         </SectionCard>
 
-        <SectionCard id="penamaan" title="Template nama file" className="scroll-mt-6">
+        <SectionCard id="penamaan" title="File naming template" className="scroll-mt-6">
           <p className="mb-4 text-sm text-ink-secondary">
-            Nama standar yang dipakai setiap kali file dicatat. Token yang tidak dikenal
-            ditolak saat simpan, bukan saat file masuk.
+            Standard name used whenever a file is recorded. Unknown tokens are rejected on save.
           </p>
           <NamingTemplateForm template={settings.naming_template} canManage={canManage} />
         </SectionCard>
