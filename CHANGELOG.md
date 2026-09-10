@@ -5,8 +5,25 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.50**
-- Next local revision: **R7.51**
+- Current revision after this entry is committed: **R7.51**
+- Next local revision: **R7.52**
+
+## R7.51 | 2026-09-10 | work-order(studioflow): activate MOM and Product Catalogue
+
+### Changed
+
+- Issued the sequential R7.52 MOM and R7.53 Product Catalogue work orders.
+- Locked MOM as project-owned and independent from tasks, phases, iterations,
+  Master Data, BQ, and Product Catalogue.
+- Locked Product Catalogue as a StudioFlow-owned reuse pool with Brands-only
+  Master Data reads and project snapshot selection; SKU, unit, and pricing
+  dependencies remain prohibited.
+
+### Verification
+
+- Contracts, schema shape, existing boundaries, and legacy evidence references
+  reviewed locally.
+- No application implementation or acceptance gate is claimed by this entry.
 
 ## R7.50 | 2026-09-10 | feat(studioflow): unify project work surface
 

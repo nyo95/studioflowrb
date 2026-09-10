@@ -1,6 +1,6 @@
 # Documentation Hub
 
-Status: reconciled through **R7.50** on 2026-09-10.
+Status: reconciled through **R7.51** on 2026-09-10.
 
 This directory contains active contracts, operational trackers, architecture
 roadmaps, and retained historical evidence. Current owner instruction remains
@@ -18,6 +18,8 @@ tests, and migrations prove implemented state.
 | [`SESSION-HANDOFF-PROMPT.md`](SESSION-HANDOFF-PROMPT.md) | Copy-ready prompt for coordinated Codex and Claude/OpenCode continuation |
 | [`StudioFlow R7.48 work order`](../scripts/work-orders/STUDIOFLOW-R7.48-PHASE-DELIVERABLE.md) | active executable Claude/OpenCode order for current deliverable summary and intake inside each phase |
 | [`StudioFlow R7.49 work order`](../scripts/work-orders/STUDIOFLOW-R7.49-COHERENT-WORK-SURFACE.md) | active executable order for one project work surface combining existing to-dos and phase deliverables |
+| [`StudioFlow R7.52 MOM work order`](../scripts/work-orders/STUDIOFLOW-R7.52-MOM.md) | next executable order for project-owned MOM with no task/phase/iteration relation |
+| [`StudioFlow R7.53 Product Catalogue work order`](../scripts/work-orders/STUDIOFLOW-R7.53-PRODUCT-CATALOGUE.md) | subsequent executable order for the StudioFlow-owned cross-project specification reuse pool |
 | [`R6.1-DECISION-DELTA.md`](R6.1-DECISION-DELTA.md) | Historical R6.1 convergence evidence; not the current status page |
 
 Earlier [`UIUX-CURATE`](../scripts/work-orders/UIUX-CURATE.md) and
