@@ -5,8 +5,26 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.41**
-- Next local revision: **R7.42**
+- Current revision after this entry is committed: **R7.42**
+- Next local revision: **R7.43**
+
+## R7.42 | 2026-09-10 | docs(handoff): coordinate cross-agent app completion
+
+### Changed
+
+- Added `docs/SESSION-HANDOFF-PROMPT.md`, a copy-ready continuation prompt for
+  Codex and Claude/OpenCode with environment checks, mandatory reading,
+  serialized implementation/review handoffs, per-app work order, regression
+  gates, documentation discipline, and required handoff reporting.
+- Prioritized UI Engine/StudioFlow KB-011 as the first bounded correction while
+  preserving Master Data and BQ as protected consumers.
+- Indexed the handoff prompt from `docs/README.md`.
+
+### Verification
+
+- Local Markdown link-target scan: passed.
+- `git diff --check`: passed.
+- Documentation-only change; no runtime, schema, migration, or dependency change.
 
 ## R7.41 | 2026-09-10 | docs(repo): reconcile documentation by application
 

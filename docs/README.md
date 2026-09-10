@@ -15,6 +15,7 @@ tests, and migrations prove implemented state.
 | [`roadmap.md`](roadmap.md) | Remaining planned work, grouped by Platform, UI Engine, Master Data, BQ, and StudioFlow |
 | [`knownbug.md`](knownbug.md) | Open and closed defects grouped by application |
 | [`REVISION-LEDGER-NOTES.md`](REVISION-LEDGER-NOTES.md) | Historical missing/skipped revision labels and how to interpret them |
+| [`SESSION-HANDOFF-PROMPT.md`](SESSION-HANDOFF-PROMPT.md) | Copy-ready prompt for coordinated Codex and Claude/OpenCode continuation |
 | [`R6.1-DECISION-DELTA.md`](R6.1-DECISION-DELTA.md) | Historical R6.1 convergence evidence; not the current status page |
 
 Earlier [`UIUX-CURATE`](../scripts/work-orders/UIUX-CURATE.md) and
