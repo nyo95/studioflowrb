@@ -206,10 +206,26 @@ unless the required backend, test, and browser evidence actually exists.
 
 ---
 
+## Current handoff snapshot (R7.44)
+
+The rebuild checkout is on branch `studioflow/contracts` at commit
+`2348d0f14a13e4fe85ffe4938b9beef7025b1a30`. R7.43 closed UI Engine KB-011;
+R7.44 closed StudioFlow KB-005 (in-context client creation), KB-006 (English
+user-facing copy), and KB-007 (Settings navigation to functional Clients and
+Account/Profile surfaces). Database Settings is intentionally not a placeholder:
+it remains deferred until a backend contract exists.
+
+The next StudioFlow gaps are the project work surface (current deliverable and
+intake inside each phase), coherent tasks plus deliverables, and contextualizing
+Start Round/internal approval/send. MOM and Product Catalogue/FFNI/Schedule are
+still unactivated project extensions. The next agent must inspect current code,
+roadmap, known bugs, and contracts before editing; do not assume R7.44 proves
+browser or database integration.
+
 ## Recommended first slice
 
-Start with **UI Engine + StudioFlow KB-011**. It is a bounded shared-boundary
-correction, removes a known governance violation, and establishes the canonical
-drop interaction needed by the later phase-deliverable workflow. The reviewer
-must smoke-test Master Data and BQ shell/UI consumers because the UI Engine is a
-shared dependency.
+Start with **StudioFlow phase work surface**: put current deliverable summary
+and intake directly inside each phase, then reconcile project-owned tasks with
+deliverables without adding a second task entity. This is the next application
+slice after R7.44. MOM and Product Catalogue/FFNI/Schedule must remain deferred
+until their documented decisions are locked.
