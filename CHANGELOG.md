@@ -4,9 +4,16 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 ## Revision state
 
-- Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.56**
-- Next local revision: **R7.57**
+- Published baseline: **R8** — published to GitHub by the release commit below
+- Current revision after this entry is committed: **R8**
+- Next local revision: **R8.01**
+
+## R8 | 2026-09-10 | release: publish routing and documentation corrections
+
+- Published the verified R7.56 routing, settings, registry hardening, migration,
+  documentation reconciliation, and audit ledgers from the `studioflow/contracts`
+  branch to GitHub. This release does not claim deferred StudioFlow KB-012…KB-019
+  work or UI Engine date/time consolidation.
 
 ## R7.56 | 2026-09-10 | fix(platform): verify routing and reconcile documentation
 
