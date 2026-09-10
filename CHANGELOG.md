@@ -5,8 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.53**
-- Next local revision: **R7.54**
+- Current revision after this entry is committed: **R7.54**
+- Next local revision: **R7.55**
+
+## R7.54 | 2026-09-10 | fix(studioflow): remove unsupported project type
+
+### Changed
+
+- Removed the unsupported Project type field from project creation and detail
+  surfaces; it was not present in the audited legacy workflow.
+- Removed the type from StudioFlow service inputs and project contract.
+- Added a rebuild migration dropping the speculative `sf_project.type` column
+  and enum.
+
+### Verification
+
+- Prisma schema validation, typecheck, lint, boundary checks, and full disposable
+  database tests passed after regeneration.
+
+### Remaining
+
+- Existing historical migration files retain the original column definition so
+  a rebuild from zero remains reproducible; the final migration removes it.
 
 ## R7.52 | 2026-09-10 | feat(studioflow): add project-owned MOM
 

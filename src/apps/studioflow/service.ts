@@ -74,7 +74,6 @@ export type CreateProjectInput = {
   location?: string;
   address?: string;
   area?: string;
-  type: "RESIDENTIAL" | "COMMERCIAL" | "HOSPITALITY" | "OTHER";
   opened_at: Date;
 };
 
@@ -84,7 +83,6 @@ export type EditProjectInput = {
   location?: string | null;
   address?: string | null;
   area?: string | null;
-  type?: "RESIDENTIAL" | "COMMERCIAL" | "HOSPITALITY" | "OTHER";
   status?: "ACTIVE" | "ON_HOLD" | "COMPLETED";
 };
 
@@ -643,7 +641,6 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
           location: input.location?.trim() ?? null,
           address: input.address?.trim() ?? null,
           area: input.area ?? null,
-          type: input.type,
           status: "ACTIVE",
           opened_at: input.opened_at,
           phases: {
@@ -698,7 +695,6 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
           ...(input.location !== undefined ? { location: input.location?.trim() ?? null } : {}),
           ...(input.address !== undefined ? { address: input.address?.trim() ?? null } : {}),
           ...(input.area !== undefined ? { area: input.area } : {}),
-          ...(input.type !== undefined ? { type: input.type } : {}),
           ...(input.status !== undefined ? { status: input.status } : {}),
         },
         include: {

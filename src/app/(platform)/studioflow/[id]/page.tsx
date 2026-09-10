@@ -39,13 +39,6 @@ const STATUS_LABELS: Record<string, string> = {
   COMPLETED: "Completed",
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  RESIDENTIAL: "Residential",
-  COMMERCIAL: "Commercial",
-  HOSPITALITY: "Hospitality",
-  OTHER: "Other",
-};
-
 const PHASE_STATE_LABELS: Record<string, string> = {
   NOT_STARTED: "Not started",
   IN_PROGRESS: "In progress",
@@ -296,7 +289,6 @@ export default async function ProjectDetailPage({
             items={[
               <span key="code" className="font-ui-mono text-xs">{project.code}</span>,
               project.client.name,
-              TYPE_LABELS[project.type] ?? project.type,
               project.area ? `${Number(project.area)} m²` : null,
               project.location,
               `Opened ${fmt.format(new Date(project.opened_at))}`,
@@ -363,7 +355,6 @@ export default async function ProjectDetailPage({
                   <span className="font-ui-mono text-xs">{project.code}</span>
                 </DescriptionItem>
                 <DescriptionItem label="Client">{project.client.name}</DescriptionItem>
-                <DescriptionItem label="Type">{TYPE_LABELS[project.type] ?? project.type}</DescriptionItem>
                 <DescriptionItem label="Status">{STATUS_LABELS[project.status] ?? project.status}</DescriptionItem>
                 {project.area ? <DescriptionItem label="Area">{Number(project.area)} m²</DescriptionItem> : null}
                 {project.location ? <DescriptionItem label="Location">{project.location}</DescriptionItem> : null}

@@ -49,7 +49,6 @@ async function seedRoundPhase() {
       code: "SF26-TEST",
       name: "Test project",
       client_id: client.id,
-      type: "RESIDENTIAL",
       opened_at: new Date("2026-09-09T00:00:00.000Z"),
     },
   });
@@ -275,7 +274,6 @@ describe("StudioFlow round lifecycle", () => {
         code: "SF26-OTH",
         name: "Other project",
         client_id: otherClient.id,
-        type: "RESIDENTIAL",
         opened_at: new Date("2026-09-09T00:00:00.000Z"),
       },
     });
@@ -300,7 +298,6 @@ describe("StudioFlow round lifecycle", () => {
         code: "SF26-SUP",
         name: "Sup project",
         client_id: client.id,
-        type: "RESIDENTIAL",
         opened_at: new Date("2026-09-09T00:00:00.000Z"),
       },
     });
@@ -434,7 +431,7 @@ describe("StudioFlow round lifecycle", () => {
   it("refuses cross-project MOM child mutation and issues a correction without rewriting the source", async () => {
     const { project } = await seedRoundPhase();
     const otherClient = await testDb.prisma.sfClient.create({ data: { name: "Other client" } });
-    const otherProject = await testDb.prisma.sfProject.create({ data: { code: "SF26-MOM2", name: "Other", client_id: otherClient.id, type: "OTHER", opened_at: new Date() } });
+    const otherProject = await testDb.prisma.sfProject.create({ data: { code: "SF26-MOM2", name: "Other", client_id: otherClient.id, opened_at: new Date() } });
     const draft = await service.createMomDraft([STUDIOFLOW_PERMISSIONS.momManage], ACTOR, { project_id: project.id, topic: "Original", meeting_at: new Date(), prepared_by_name: "Designer" });
     await assert.rejects(
       () => service.updateMomContent([STUDIOFLOW_PERMISSIONS.momManage], ACTOR, otherProject.id, draft.id, { items: [{ sort_order: 0, is_text_only: true, list_style: "NONE", points: [{ sort_order: 0, text: "No", style: "TEXT" }], images: [] }] }),

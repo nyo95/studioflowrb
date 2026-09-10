@@ -76,7 +76,6 @@ the Client explicitly before restoring a project. No silent cascading restore.
 | `location` | String? | Short site label used in file names, e.g. "Funan" (§8.5). Not a postal address |
 | `address` | String? | Site address; independent of the Client address |
 | `area` | Decimal? | Square metres |
-| `type` | Enum | `RESIDENTIAL` / `COMMERCIAL` / `HOSPITALITY` / `OTHER` |
 | `status` | Enum | `ACTIVE` / `ON_HOLD` / `COMPLETED` |
 | `priority` | Int | Ordering hint for the project list; not a workflow input |
 | `opened_at` | DateTime | Project opening date |

@@ -2,19 +2,12 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
-import { Button, CreatableSearch, Field, FormActions, InlineError, Input, Select, Textarea } from "@/platform/ui_engine";
+import { Button, CreatableSearch, Field, FormActions, InlineError, Input, Textarea } from "@/platform/ui_engine";
 import { createProjectAction } from "./actions";
 
 type ClientOption = { id: string; name: string };
 
 const INITIAL = null;
-
-const TYPE_OPTIONS = [
-  { value: "RESIDENTIAL", label: "Residential" },
-  { value: "COMMERCIAL", label: "Commercial" },
-  { value: "HOSPITALITY", label: "Hospitality" },
-  { value: "OTHER", label: "Other" },
-];
 
 export function ProjectForm({ clients }: { clients: ClientOption[] }) {
   const [state, formAction, pending] = useActionState(createProjectAction, INITIAL);
@@ -45,14 +38,6 @@ export function ProjectForm({ clients }: { clients: ClientOption[] }) {
           <input type="hidden" name="client_id" value={clientId} />
           <input type="hidden" name="client_name" value={clientName} />
         </div>
-      </Field>
-      <Field label="Project type" required>
-        <Select name="type" required defaultValue="">
-          <option value="" disabled>Select a type…</option>
-          {TYPE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </Select>
       </Field>
       <Field label="Opened on" required>
         <Input name="opened_at" type="date" required defaultValue={today} />

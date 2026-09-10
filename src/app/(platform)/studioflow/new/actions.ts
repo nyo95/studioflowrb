@@ -18,9 +18,6 @@ const ProjectSchema = z.object({
   location: z.string().trim().max(100).optional(),
   address: z.string().trim().max(500).optional(),
   area: z.string().trim().optional(),
-  type: z.enum(["RESIDENTIAL", "COMMERCIAL", "HOSPITALITY", "OTHER"], {
-    error: "Select a valid project type",
-  }),
   opened_at: z.string().min(1, "Opening date is required"),
 });
 
@@ -37,7 +34,6 @@ export async function createProjectAction(
       location: String(formData.get("location") ?? "") || undefined,
       address: String(formData.get("address") ?? "") || undefined,
       area: String(formData.get("area") ?? "") || undefined,
-      type: String(formData.get("type") ?? ""),
       opened_at: String(formData.get("opened_at") ?? ""),
     });
     if (!parsed.success) throw validationError(parsed.error);

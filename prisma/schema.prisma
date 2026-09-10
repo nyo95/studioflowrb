@@ -1019,16 +1019,6 @@ model BqLineItem {
 // String? columns — app resolves them via platform service, never via FK.
 // ============================================================================
 
-enum SfProjectType {
-  RESIDENTIAL
-  COMMERCIAL
-  HOSPITALITY
-  OTHER
-
-  @@map("sf_project_type")
-  @@schema("studioflow")
-}
-
 enum SfProjectStatus {
   ACTIVE
   ON_HOLD
@@ -1132,7 +1122,6 @@ model SfProject {
   /// Site address; independent of Client.address.
   address  String?
   area     Decimal?        @db.Decimal(10, 2)
-  type     SfProjectType
   status   SfProjectStatus @default(ACTIVE)
 
   /// Ordering hint for the project list; not a workflow input.
