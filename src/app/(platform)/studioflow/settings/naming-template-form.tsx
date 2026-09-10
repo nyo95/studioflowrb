@@ -10,11 +10,11 @@ const INITIAL: ActionResult<void> | null = null;
 
 /** The vocabulary the service accepts (§8.5). Anything else is rejected. */
 const TOKENS = [
-  { token: "{date}", label: "Tanggal drop, format YYYYMMDD" },
-  { token: "{project}", label: "Nama project" },
-  { token: "{location}", label: "Lokasi singkat project" },
-  { token: "{round}", label: "Label round, misal “D4 2”" },
-  { token: "{code}", label: "Kode project, misal SF26-0001" },
+  { token: "{date}", label: "Drop date, YYYYMMDD format" },
+  { token: "{project}", label: "Project name" },
+  { token: "{location}", label: "Short project location" },
+  { token: "{round}", label: "Round label, for example “D4 2”" },
+  { token: "{code}", label: "Project code, for example SF26-0001" },
 ] as const;
 
 /** Mirrors the service preview so the studio sees the shape before saving. */
@@ -45,7 +45,7 @@ export function NamingTemplateForm({
     <form action={formAction} className="grid gap-4 max-w-xl">
       {failure ? <InlineError>{failure}</InlineError> : null}
       {saved && !failure ? (
-        <Notice tone="success">Template tersimpan.</Notice>
+        <Notice tone="success">Template saved.</Notice>
       ) : null}
 
       <Field label="Template nama file" required>
@@ -78,7 +78,7 @@ export function NamingTemplateForm({
 
       {canManage && (
         <FormActions>
-          <Button type="submit" variant="primary" pending={pending}>Simpan template</Button>
+          <Button type="submit" variant="primary" pending={pending}>Save template</Button>
         </FormActions>
       )}
     </form>

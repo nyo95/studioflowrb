@@ -67,7 +67,7 @@ export default async function StudioFlowClientsPage({
       <PageHeader
         eyebrow="StudioFlow"
         title="Clients"
-        description="Daftar klien studio"
+        description="Studio client directory"
         divider
         actions={
           <Link href="/studioflow/clients/new" className={buttonClasses("primary", "md")}>
@@ -85,7 +85,7 @@ export default async function StudioFlowClientsPage({
             total={clients.length}
             pageSize={PAGE_SIZE}
             getHref={(nextPage) => (nextPage > 1 ? `/studioflow/clients?page=${nextPage}` : "/studioflow/clients")}
-            label="Halaman klien"
+            label="Client pages"
           />
         }
       >
@@ -93,15 +93,15 @@ export default async function StudioFlowClientsPage({
           <EmptyState
             icon={Users}
             title="No clients yet"
-            description="Tambahkan klien pertama studio."
+            description="Add the studio's first client."
           />
         ) : (
           <DataTable framed={false} density="compact" stickyHeader fill minWidth={560}>
             <TableHeader>
               <TableRow>
-                <TableHead>Klien</TableHead>
-                <TableHead>Kontak</TableHead>
-                <TableHead>Telepon</TableHead>
+                <TableHead>Client</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead>Phone</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

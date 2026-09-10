@@ -32,8 +32,8 @@ export function DeliverableForm({ projectId, folders }: { projectId: string; fol
             byte count, never the bytes — stays this app's decision. */}
         <FileDropZone
           label="File deliverable"
-          hint="Byte file tidak dikirim atau disimpan oleh aplikasi."
-          browseLabel="Pilih file"
+          hint="File bytes are not uploaded or stored by the application."
+          browseLabel="Choose file"
           onFiles={(files) => {
             const [file] = files;
             if (!file) return;
@@ -41,13 +41,13 @@ export function DeliverableForm({ projectId, folders }: { projectId: string; fol
             setBytes(String(file.size));
           }}
         >
-          <Input name="original_filename" value={filename} onChange={(event) => setFilename(event.target.value)} required maxLength={300} placeholder="Tarik file ke sini atau ketik nama file" />
+          <Input name="original_filename" value={filename} onChange={(event) => setFilename(event.target.value)} required maxLength={300} placeholder="Drop a file here or type its name" />
         </FileDropZone>
       </Field>
-      <Field label="Cara penyimpanan">
+      <Field label="Storage method">
         <Select value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}>
-          <option value="record">File di PC (catat metadata)</option>
-          <option value="link">Link file eksternal</option>
+          <option value="record">File on PC (record metadata)</option>
+          <option value="link">External file link</option>
         </Select>
       </Field>
       {mode === "record" ? (
@@ -63,7 +63,7 @@ export function DeliverableForm({ projectId, folders }: { projectId: string; fol
         <FolderSelect folders={folders} />
       </Field>
       <div className="sm:col-span-3">
-        <Button type="submit" variant="primary" pending={pending}>Simpan deliverable</Button>
+        <Button type="submit" variant="primary" pending={pending}>Save deliverable</Button>
       </div>
     </form>
   );
@@ -72,7 +72,7 @@ export function DeliverableForm({ projectId, folders }: { projectId: string; fol
 function FolderSelect({ folders, defaultValue }: { folders: FolderOption[]; defaultValue?: string }) {
   return (
     <Select name="folder_key" defaultValue={defaultValue ?? ""}>
-      <option value="">Tray belum disortir</option>
+      <option value="">Unsorted tray</option>
       {folders.map((folder) => (
         <option key={folder.folder_key} value={folder.folder_key}>{folder.name}</option>
       ))}
@@ -89,7 +89,7 @@ export function RecordFileForm({ projectId, folders }: { projectId: string; fold
   return (
     <form action={formAction} className="grid gap-3 sm:grid-cols-3">
       {failure ? <div className="sm:col-span-3"><InlineError>{failure}</InlineError></div> : null}
-      <Field label="Nama file asli" required>
+      <Field label="Original file name" required>
         <Input name="original_filename" required maxLength={300} placeholder="Denah Lantai 1.pdf" />
       </Field>
       <Field label="Ukuran (bytes)" required>
@@ -99,7 +99,7 @@ export function RecordFileForm({ projectId, folders }: { projectId: string; fold
         <FolderSelect folders={folders} />
       </Field>
       <div className="sm:col-span-3">
-        <Button type="submit" variant="primary" pending={pending}>Catat file</Button>
+        <Button type="submit" variant="primary" pending={pending}>Record file</Button>
       </div>
     </form>
   );
@@ -114,7 +114,7 @@ export function LinkFileForm({ projectId, folders }: { projectId: string; folder
   return (
     <form action={formAction} className="grid gap-3 sm:grid-cols-3">
       {failure ? <div className="sm:col-span-3"><InlineError>{failure}</InlineError></div> : null}
-      <Field label="Nama file" required>
+      <Field label="File name" required>
         <Input name="original_filename" required maxLength={300} placeholder="Render Ruang Tamu.jpg" />
       </Field>
       <Field label="Link" required>
@@ -124,7 +124,7 @@ export function LinkFileForm({ projectId, folders }: { projectId: string; folder
         <FolderSelect folders={folders} />
       </Field>
       <div className="sm:col-span-3">
-        <Button type="submit" variant="primary" pending={pending}>Simpan link</Button>
+        <Button type="submit" variant="primary" pending={pending}>Save link</Button>
       </div>
     </form>
   );

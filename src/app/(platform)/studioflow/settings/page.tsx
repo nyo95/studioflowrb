@@ -21,6 +21,8 @@ export const dynamic = "force-dynamic";
 const SETTINGS_NAV = [
   { href: "#fase", label: "Phase template" },
   { href: "#penamaan", label: "File naming template" },
+  { href: "/studioflow/clients", label: "Clients" },
+  { href: "/account", label: "My account" },
 ] as const;
 
 export default async function StudioFlowSettingsPage() {
@@ -61,7 +63,7 @@ export default async function StudioFlowSettingsPage() {
       />
 
       <SettingsShell
-        navigationLabel="Navigasi pengaturan"
+        navigationLabel="Settings navigation"
         navigation={SETTINGS_NAV.map((item) => (
           <a
             key={item.href}

@@ -27,9 +27,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   if (!canRead) {
     return (
       <>
-        <PageHeader eyebrow="StudioFlow · Klien" title="Detail klien" divider />
+        <PageHeader eyebrow="StudioFlow · Client" title="Client detail" divider />
         <SectionCard>
-          <EmptyState icon={Users} title="Akses ditolak" description="Kamu tidak punya permission." />
+          <EmptyState icon={Users} title="Access denied" description="You do not have permission to view this client." />
         </SectionCard>
       </>
     );
@@ -47,7 +47,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     <>
       <Breadcrumb
         entries={[
-          { label: "Klien", href: "/studioflow/clients" },
+          { label: "Clients", href: "/studioflow/clients" },
           { label: client.name },
         ]}
       />

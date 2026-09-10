@@ -83,9 +83,9 @@ function iterLabel(phase: PhaseItem, number: number): string {
 }
 
 const PHASE_STATE_LABELS: Record<string, string> = {
-  NOT_STARTED: "Belum mulai",
+  NOT_STARTED: "Not started",
   IN_PROGRESS: "Digarap",
-  WAITING_CLIENT: "Nunggu klien",
+  WAITING_CLIENT: "Waiting for client",
   DONE: "Selesai",
 };
 
@@ -130,7 +130,7 @@ function SendDialog({
       open
       pending={pending}
       onOpenChange={(open) => { if (!open) onClose(); }}
-      title={`Kirim ${label} ke klien`}
+      title={`Send ${label} to client`}
       description="Aksi ini hanya mencatat pengiriman; materi tetap dikirim lewat kanal di luar aplikasi."
       size="sm"
     >
@@ -150,10 +150,10 @@ function SendDialog({
       <form action={action}>
         <FormActions>
         <Button variant="ghost" size="sm" data-dialog-cancel disabled={pending}>
-          Batal
+          Cancel
         </Button>
         <Button variant="primary" size="sm" type="submit" disabled={pending}>
-          {pending ? "Menyimpan…" : openPoints > 0 ? "Tetap kirim" : "Kirim"}
+          {pending ? "Saving…" : openPoints > 0 ? "Send anyway" : "Send"}
           </Button>
         </FormActions>
       </form>
@@ -206,13 +206,13 @@ function ResponseDialog({
       pending={pending}
       watchedValue={JSON.stringify([kind, points, alsoFinish])}
       onOpenChange={(open) => { if (!open) onClose(); }}
-      title={`Jawaban klien untuk ${label}`}
+      title={`Client response for ${label}`}
       size="sm"
     >
       <form action={action} className="flex flex-col gap-4">
         {/* Kind picker */}
         <RadioGroup
-          label="Respons klien"
+          label="Client response"
           name="kind"
           value={kind}
           onValueChange={(value) => setKind(value as typeof kind)}
@@ -262,8 +262,8 @@ function ResponseDialog({
         )}
 
         {/* Optional note */}
-        <Field label="Catatan (opsional)">
-          <Textarea name="note" rows={2} density="compact" placeholder="Catatan dari klien…" className="min-h-16 resize-none" />
+        <Field label="Notes (optional)">
+          <Textarea name="note" rows={2} density="compact" placeholder="Notes from the client…" className="min-h-16 resize-none" />
         </Field>
 
         {/* Sekalian selesaikan — APPROVAL only, when no other open iterations */}
@@ -271,7 +271,7 @@ function ResponseDialog({
           <Checkbox
             checked={alsoFinish}
             onCheckedChange={(checked) => setAlsoFinish(checked === true)}
-            label="Sekalian selesaikan fase ini"
+            label="Finish this phase too"
             className="text-sm text-ink-secondary"
           />
         )}
@@ -281,10 +281,10 @@ function ResponseDialog({
 
         <FormActions>
           <Button variant="ghost" size="sm" data-dialog-cancel disabled={pending}>
-            Batal
+            Cancel
           </Button>
           <Button variant="primary" size="sm" type="submit" disabled={pending}>
-            {pending ? "Menyimpan…" : "Simpan jawaban"}
+            {pending ? "Saving…" : "Save response"}
           </Button>
         </FormActions>
       </form>
@@ -342,7 +342,7 @@ function VoidDialog({
         {error && <InlineError>{error}</InlineError>}
         <FormActions>
           <Button variant="ghost" size="sm" data-dialog-cancel disabled={pending}>
-            Batal
+            Cancel
           </Button>
           <Button variant="danger-primary" size="sm" type="submit" disabled={pending}>
             {pending ? "Menghentikan…" : "Hentikan ronde"}
@@ -379,7 +379,7 @@ function ReopenPhaseDialog({
       open
       pending={pending}
       onOpenChange={(open) => { if (!open) onClose(); }}
-      title={`Buka kembali fase ${phaseName}?`}
+      title={`Reopen phase ${phaseName}?`}
       description={hasRounds ? "Fase dibuka kembali; ronde baru dapat dimulai setelah ini." : "Supervisi kembali ke keadaan sedang berjalan."}
       size="sm"
     >
@@ -390,17 +390,17 @@ function ReopenPhaseDialog({
             name="reason"
             required
             rows={2}
-            placeholder="Kenapa fase ini dibuka kembali?"
+            placeholder="Why is this phase being reopened?"
             className="resize-none"
           />
         </div>
         {error && <InlineError>{error}</InlineError>}
         <FormActions>
           <Button variant="secondary" size="sm" data-dialog-cancel>
-            Batal
+          Cancel
           </Button>
           <Button variant="primary" size="sm" type="submit" disabled={pending}>
-            {pending ? "Membuka…" : "Buka kembali"}
+          {pending ? "Reopening…" : "Reopen"}
           </Button>
         </FormActions>
       </form>
@@ -432,7 +432,7 @@ function CloseByExceptionDialog({
       open
       pending={pending}
       onOpenChange={(open) => { if (!open) onClose(); }}
-      title={`Tutup fase ${phaseName} dengan pengecualian?`}
+      title={`Close phase ${phaseName} as an exception?`}
       description="Fase ditutup tanpa persetujuan ronde terakhir. Tidak boleh ada ronde yang masih DRAFT atau SENT."
       size="sm"
     >
@@ -443,14 +443,14 @@ function CloseByExceptionDialog({
             name="reason"
             required
             rows={2}
-            placeholder="Kenapa fase ini ditutup sebelum selesai?"
+            placeholder="Why is this phase closing early?"
             className="resize-none"
           />
         </div>
         {error && <InlineError>{error}</InlineError>}
         <FormActions>
           <Button variant="secondary" size="sm" data-dialog-cancel>
-            Batal
+            Cancel
           </Button>
           <Button variant="danger-primary" size="sm" type="submit" disabled={pending}>
             {pending ? "Menutup…" : "Tutup dengan pengecualian"}
@@ -559,7 +559,7 @@ function IterationBlock({
  }
  variant="secondary" size="sm" className="shrink-0"
  >
-            Kirim ke klien
+            Send to client
           </Button>
         )}
         {isSent && canReview && (
@@ -573,7 +573,7 @@ function IterationBlock({
  }}
  variant="secondary" size="sm" className="shrink-0"
  >
-            Catat jawaban klien
+            Record client response
           </Button>
         )}
         {/* ⋯ menu — void, withdraw send (disabled until service supports it) */}
@@ -782,7 +782,7 @@ function PhaseBlock({
  disabled={finishSupPending}
  variant="secondary" size="sm"
  >
-                Selesaikan
+                Complete
               </Button>
             </form>
           )}
@@ -795,7 +795,7 @@ function PhaseBlock({
  disabled={finishPending}
  variant="secondary" size="sm"
  >
-                Selesaikan fase
+                Finish phase
               </Button>
             </form>
           )}
@@ -814,12 +814,12 @@ function PhaseBlock({
           {/* Phase-level ⋯ menu — reopen (DONE), close by exception (active) */}
           {(canReview && isDone) || (canOverride && !isDone && !hasOpenIter) ? (
             <RowActionMenu
-              label={`Aksi untuk fase ${phase.name}`}
+              label={`Actions for ${phase.name} phase`}
               items={[
                 ...(isDone
                   ? [
                       {
-                        label: "Buka kembali",
+                        label: "Reopen",
                         onSelect: () => onReopen(phase.id, phase.name),
                       } as const,
                     ]
@@ -860,7 +860,7 @@ function PhaseBlock({
           />
           {phase.iterations.length === 0 ? (
             <p className="text-sm text-ink-tertiary py-0.5">
-              Belum ada ronde.
+              No rounds yet.
               {canManage && !isDone ? " Gunakan 'Mulai ronde' untuk memulai." : ""}
             </p>
           ) : (

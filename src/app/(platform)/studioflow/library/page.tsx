@@ -47,7 +47,7 @@ export default async function StudioFlowLibraryPage({
           {query ? <Link href="/studioflow/library" className="rounded-control border border-line px-3 py-2 text-sm text-ink-secondary">Reset</Link> : null}
         </form>
         {brands.length === 0 ? (
-          <div className="p-(--ui-section-px)"><EmptyState icon={BookOpen} title={query ? "Tidak ada hasil" : "Library belum berisi brand"} description={query ? `Tidak ada brand, hashtag, atau kategori yang cocok dengan “${query}”.` : "Brand dan katalog akan tampil dari Master Data."} /></div>
+          <div className="p-(--ui-section-px)"><EmptyState icon={BookOpen} title={query ? "No results" : "Library has no brands yet"} description={query ? `No brand, hashtag, or category matches “${query}”.` : "Brands and catalog links are provided by Master Data."} /></div>
         ) : (
           <div className="divide-y divide-line-subtle">
             {brands.map((brand) => (

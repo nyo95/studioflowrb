@@ -65,7 +65,8 @@ export type EditClientInput = {
 
 export type CreateProjectInput = {
   name: string;
-  client_id: string;
+  client_id?: string;
+  client_name?: string;
   lead_user_id?: string;
   location?: string;
   address?: string;
@@ -536,10 +537,24 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
   ) {
     requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
     return runTransaction(async () => {
-      // Verify client exists and is live
-      const client = await db.sfClient.findUnique({ where: { id: input.client_id } });
-      if (!client) throw new AppError("NOT_FOUND", "studioflow.client.not-found", "Client not found");
-      if (client.deleted_at) throw new AppError("CONFLICT", "studioflow.client.archived", "New projects require a live client");
+      // Select an existing live client or create the explicitly typed client in
+      // the same transaction as the project. The UI may offer creation in
+      // context, but the service remains the single policy boundary.
+      let client = input.client_id
+        ? await db.sfClient.findUnique({ where: { id: input.client_id } })
+        : null;
+      if (client?.deleted_at) throw new AppError("CONFLICT", "studioflow.client.archived", "New projects require a live client");
+      if (!client && input.client_name?.trim()) {
+        client = await db.sfClient.create({ data: { name: input.client_name.trim() } });
+        await writeAudit({
+          action: "client.create",
+          entityType: "SfClient",
+          entityId: client.id,
+          actor,
+          changes: { name: client.name, source: "project-create" },
+        });
+      }
+      if (!client) throw new AppError("VALIDATION", "studioflow.client.required", "Select or create a client");
 
       // Fetch template entries
       const templates = await db.sfPhaseTemplate.findMany({ orderBy: { sort_order: "asc" } });
@@ -555,7 +570,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         data: {
           code,
           name: input.name.trim(),
-          client_id: input.client_id,
+          client_id: client.id,
           lead_user_id: input.lead_user_id ?? null,
           location: input.location?.trim() ?? null,
           address: input.address?.trim() ?? null,

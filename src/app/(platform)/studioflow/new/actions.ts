@@ -11,16 +11,17 @@ import { validationError } from "@platform/core/validation";
 import { studioFlowService } from "@/apps/studioflow/runtime";
 
 const ProjectSchema = z.object({
-  name: z.string().trim().min(1, "Nama project wajib diisi").max(200),
-  client_id: z.string().uuid("Pilih klien yang valid"),
+  name: z.string().trim().min(1, "Project name is required").max(200),
+  client_id: z.string().uuid("Select a valid client").optional().or(z.literal("")),
+  client_name: z.string().trim().max(200).optional().or(z.literal("")),
   lead_user_id: z.string().uuid().optional().or(z.literal("")),
   location: z.string().trim().max(100).optional(),
   address: z.string().trim().max(500).optional(),
   area: z.string().trim().optional(),
   type: z.enum(["RESIDENTIAL", "COMMERCIAL", "HOSPITALITY", "OTHER"], {
-    error: "Pilih tipe project yang valid",
+    error: "Select a valid project type",
   }),
-  opened_at: z.string().min(1, "Tanggal buka wajib diisi"),
+  opened_at: z.string().min(1, "Opening date is required"),
 });
 
 export async function createProjectAction(
@@ -40,12 +41,14 @@ export async function createProjectAction(
       opened_at: String(formData.get("opened_at") ?? ""),
     });
     if (!parsed.success) throw validationError(parsed.error);
-    const { opened_at, area, lead_user_id, ...rest } = parsed.data;
+    const { opened_at, area, lead_user_id, client_id, client_name, ...rest } = parsed.data;
     const project = await studioFlowService.createProject(
       grants,
       { kind: "USER", userId: principal.userId, label: principal.displayName },
       {
         ...rest,
+        client_id: client_id || undefined,
+        client_name: client_name || undefined,
         lead_user_id: lead_user_id || undefined,
         area: area || undefined,
         opened_at: new Date(opened_at),

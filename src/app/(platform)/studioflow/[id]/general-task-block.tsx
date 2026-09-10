@@ -54,7 +54,7 @@ function AddTaskForm({ projectId, phaseScope }: { projectId: string; phaseScope:
         <Input
           name="title"
           type="text"
-          placeholder="Tambah task…"
+          placeholder="Add a task…"
           required
           minLength={1}
           maxLength={255}
@@ -126,7 +126,7 @@ function TaskRow({
           type="submit"
           size="sm"
           variant="ghost"
-          label={task.status === "OPEN" ? "Tandai selesai" : "Buka kembali"}
+          label={task.status === "OPEN" ? "Mark complete" : "Reopen"}
           className="shrink-0"
           icon={task.status === "DONE" ? <CheckSquare aria-hidden="true" className="text-success" /> : <Square aria-hidden="true" />}
         />
@@ -147,7 +147,7 @@ function TaskRow({
             autoFocus
             className="min-w-0 flex-1"
           />
-          <Button type="submit" variant="ghost" size="sm" disabled={updating?.ok === false}>Simpan</Button>
+          <Button type="submit" variant="ghost" size="sm" disabled={updating?.ok === false}>Save</Button>
         </form>
       ) : <span
         onDoubleClick={() => setEditing(true)}
@@ -280,7 +280,7 @@ export function GeneralTaskBlock({
     >
       <div className="px-(--ui-section-px)">
         {visible.length === 0 && !canManage ? (
-          <Text as="p" tone="tertiary" className="py-3">Tidak ada task terbuka.</Text>
+          <Text as="p" tone="tertiary" className="py-3">No open tasks.</Text>
         ) : null}
 
         {visible.map((task, index) => (

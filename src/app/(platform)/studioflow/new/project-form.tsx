@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
-import { Button, Field, FormActions, InlineError, Input, Select, Textarea } from "@/platform/ui_engine";
+import { useActionState, useState } from "react";
+import { Button, CreatableSearch, Field, FormActions, InlineError, Input, Select, Textarea } from "@/platform/ui_engine";
 import { createProjectAction } from "./actions";
 
 type ClientOption = { id: string; name: string };
@@ -18,6 +18,8 @@ const TYPE_OPTIONS = [
 
 export function ProjectForm({ clients }: { clients: ClientOption[] }) {
   const [state, formAction, pending] = useActionState(createProjectAction, INITIAL);
+  const [clientId, setClientId] = useState("");
+  const [clientName, setClientName] = useState("");
   const failure = state && !state.ok ? state.error.safeMessage : null;
 
   const today = new Date().toISOString().slice(0, 10);
@@ -28,13 +30,21 @@ export function ProjectForm({ clients }: { clients: ClientOption[] }) {
       <Field label="Project name" required>
         <Input name="name" required maxLength={200} autoFocus />
       </Field>
-      <Field label="Client" required>
-        <Select name="client_id" required defaultValue="">
-          <option value="" disabled>Select a client…</option>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </Select>
+      <Field label="Client" description="Select an existing client or create one here." required>
+        <div>
+          <CreatableSearch
+            options={clients.map((client) => ({ id: client.id, label: client.name }))}
+            value={clientId}
+            label="Client"
+            placeholder="Select a client…"
+            searchPlaceholder="Search clients…"
+            createLabel={(query) => `Create client “${query}”`}
+            onValueChange={(value) => { setClientId(value); setClientName(""); }}
+            onCreate={(name) => { setClientId(""); setClientName(name); return name; }}
+          />
+          <input type="hidden" name="client_id" value={clientId} />
+          <input type="hidden" name="client_name" value={clientName} />
+        </div>
       </Field>
       <Field label="Project type" required>
         <Select name="type" required defaultValue="">

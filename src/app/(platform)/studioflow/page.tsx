@@ -37,9 +37,9 @@ function parseScope(raw: string | string[] | undefined): Scope {
 
 function ageLabel(since: Date): string {
   const days = Math.floor((Date.now() - since.getTime()) / 86_400_000);
-  if (days <= 0) return "hari ini";
-  if (days === 1) return "1 hari";
-  return `${days} hari`;
+  if (days <= 0) return "today";
+  if (days === 1) return "1 day";
+  return `${days} days`;
 }
 
 function iterationLabel(item: Extract<WaitingOnMeItem, { kind: "ITERATION" }>): string {
@@ -59,9 +59,9 @@ const PROJECT_STATUS_TONE = {
 } as const;
 
 const PROJECT_STATUS_LABEL = {
-  ACTIVE: "Aktif",
-  ON_HOLD: "Ditahan",
-  COMPLETED: "Selesai",
+  ACTIVE: "Active",
+  ON_HOLD: "On hold",
+  COMPLETED: "Completed",
 } as const;
 
 // ── row ──────────────────────────────────────────────────────────────────────
@@ -120,8 +120,8 @@ function WaitingRow({
         <Avatar name={item.assignee_label} className="max-[840px]:row-start-1 max-[840px]:col-start-2" />
       ) : (
         <span
-          aria-label="Belum ditugaskan"
-          title="Belum ditugaskan"
+          aria-label="Unassigned"
+          title="Unassigned"
           role="img"
           className="grid h-6 w-6 shrink-0 place-items-center rounded-pill border border-dashed border-line-strong text-[0.6875rem] text-ink-tertiary max-[840px]:row-start-1 max-[840px]:col-start-2"
         >
@@ -146,12 +146,12 @@ export default async function WaitingOnMePage({
   if (!hasPermission(grants, STUDIOFLOW_PERMISSIONS.projectRead)) {
     return (
       <>
-        <PageHeader eyebrow="StudioFlow" title="Menunggu saya" divider />
+        <PageHeader eyebrow="StudioFlow" title="My Activity" divider />
         <SectionCard>
           <EmptyState
             icon={ClipboardCheck}
-            title="Akses ditolak"
-            description="Kamu tidak punya permission untuk melihat workload StudioFlow."
+            title="Access denied"
+            description="You do not have permission to view StudioFlow workload."
           />
         </SectionCard>
       </>
@@ -193,9 +193,9 @@ export default async function WaitingOnMePage({
   function dueOf(item: WaitingOnMeItem): { label: string; tone: "danger" | "warning" | "muted" } {
     if (item.kind === "TASK" && item.due_date) {
       const days = daysUntil(item.due_date);
-      if (days < 0) return { label: `telat ${Math.abs(days)} hari`, tone: "danger" };
-      if (days === 0) return { label: "hari ini", tone: "warning" };
-      if (days === 1) return { label: "besok", tone: "warning" };
+      if (days < 0) return { label: `${Math.abs(days)} days overdue`, tone: "danger" };
+      if (days === 0) return { label: "today", tone: "warning" };
+      if (days === 1) return { label: "tomorrow", tone: "warning" };
       return { label: dueFmt.format(item.due_date), tone: "muted" };
     }
     return { label: ageLabel(item.waiting_since), tone: "muted" };
@@ -206,23 +206,23 @@ export default async function WaitingOnMePage({
   ).length;
 
   const groups = [
-    { key: "mine" as const, title: "Menunggu saya", tone: "neutral" as const, items: mine },
-    { key: "client" as const, title: "Menunggu klien", tone: "warning" as const, items: waitingClient },
-    { key: "unassigned" as const, title: "Belum ada penanggung jawab", tone: "neutral" as const, items: unassigned },
+    { key: "mine" as const, title: "My turn", tone: "neutral" as const, items: mine },
+    { key: "client" as const, title: "Waiting for client", tone: "warning" as const, items: waitingClient },
+    { key: "unassigned" as const, title: "Unassigned", tone: "neutral" as const, items: unassigned },
   ].filter((group) => (scope === "all" ? group.items.length > 0 : group.key === scope));
 
   const chips = [
-    { key: "all" as const, label: "Semua", count: items.length },
-    { key: "mine" as const, label: "Menunggu saya", count: mine.length },
-    { key: "client" as const, label: "Menunggu klien", count: waitingClient.length },
-    { key: "unassigned" as const, label: "Belum ditugaskan", count: unassigned.length },
+    { key: "all" as const, label: "All", count: items.length },
+    { key: "mine" as const, label: "My turn", count: mine.length },
+    { key: "client" as const, label: "Waiting for client", count: waitingClient.length },
+    { key: "unassigned" as const, label: "Unassigned", count: unassigned.length },
   ];
 
   return (
     <>
       <PageHeader
         eyebrow="StudioFlow"
-        title="Menunggu saya"
+        title="My Activity"
         description={`${headerFmt.format(new Date())} · ${items.length} terbuka${overdue > 0 ? ` · ${overdue} telat` : ""}`}
         divider
       />
@@ -248,11 +248,11 @@ export default async function WaitingOnMePage({
         <SectionCard>
           <EmptyState
             icon={ClipboardCheck}
-            title={scope === "all" ? "Semua beres" : "Tidak ada di filter ini"}
+            title={scope === "all" ? "All clear" : "Nothing in this filter"}
             description={
               scope === "all"
-                ? "Tidak ada ronde atau task yang menunggu kamu."
-                : "Coba pilih filter lain untuk melihat pekerjaan yang tersisa."
+                ? "No rounds or tasks are waiting for you."
+                : "Try another filter to see remaining work."
             }
           />
         </SectionCard>

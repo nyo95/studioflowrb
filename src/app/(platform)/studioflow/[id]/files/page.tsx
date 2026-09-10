@@ -58,9 +58,9 @@ export default async function ProjectFilesPage({
   if (!canRead) {
     return (
       <>
-        <PageHeader eyebrow="StudioFlow" title="File" divider />
+        <PageHeader eyebrow="StudioFlow" title="Files" divider />
         <SectionCard>
-          <EmptyState icon={FolderOpen} title="Akses ditolak" description="Kamu tidak punya permission untuk melihat file project ini." />
+          <EmptyState icon={FolderOpen} title="Access denied" description="You do not have permission to view this project's files." />
         </SectionCard>
       </>
     );
@@ -121,9 +121,9 @@ export default async function ProjectFilesPage({
 
       {canManage && (
         <>
-          <SectionCard title="Tambah deliverable">
+          <SectionCard title="Add deliverable">
             <p className="mb-3 text-xs text-ink-tertiary">
-              Simpan satu catatan deliverable dari sini. File tetap berada di PC atau storage asalnya;
+              Record deliverable metadata here. The file remains on the PC or in its original storage;
               StudioFlow menyimpan metadata dan filing project.
             </p>
             <DeliverableForm projectId={projectId} folders={folderOptions} />
@@ -137,7 +137,7 @@ export default async function ProjectFilesPage({
             <EmptyState
               icon={group.key === null ? Inbox : FolderOpen}
               title="Kosong"
-              description={group.key === null ? "Semua file sudah tersortir." : "Belum ada file di folder ini."}
+              description={group.key === null ? "All files are sorted." : "No files in this folder."}
             />
           ) : (
             <div className="grid gap-2">

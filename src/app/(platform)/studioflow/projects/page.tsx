@@ -41,9 +41,9 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const PHASE_STATE_LABELS: Record<string, string> = {
-  NOT_STARTED: "Belum mulai",
+  NOT_STARTED: "Not started",
   IN_PROGRESS: "Digarap",
-  WAITING_CLIENT: "Menunggu klien",
+  WAITING_CLIENT: "Waiting for client",
   DONE: "Selesai",
 };
 
@@ -87,9 +87,9 @@ type PhaseRow = {
 
 function ageLabel(since: Date): string {
   const days = Math.floor((Date.now() - since.getTime()) / 86_400_000);
-  if (days <= 0) return "hari ini";
-  if (days === 1) return "1 hari";
-  return `${days} hari`;
+  if (days <= 0) return "today";
+  if (days === 1) return "1 day";
+  return `${days} days`;
 }
 
 /* The phase that is actually moving: the client's turn outranks our own turn,
@@ -111,7 +111,7 @@ function leadingPhase(
   const active = phases.find((phase) => phase.state === "IN_PROGRESS");
   if (active) return { name: active.name, state: "IN_PROGRESS", tone: "neutral", age: null };
   if (phases.length > 0 && phases.every((phase) => phase.state === "DONE")) {
-    return { name: "Semua fase", state: "DONE", tone: "success", age: null };
+    return { name: "All phases", state: "DONE", tone: "success", age: null };
   }
   return null;
 }
@@ -131,12 +131,12 @@ export default async function StudioFlowProjectsPage({
   if (!canRead) {
     return (
       <>
-        <PageHeader eyebrow="StudioFlow" title="Semua project" divider />
+        <PageHeader eyebrow="StudioFlow" title="All projects" divider />
         <SectionCard>
           <EmptyState
             icon={FolderOpen}
-            title="Akses ditolak"
-            description="Kamu tidak punya permission untuk melihat project."
+            title="Access denied"
+            description="You do not have permission to view projects."
           />
         </SectionCard>
       </>
@@ -212,7 +212,7 @@ export default async function StudioFlowProjectsPage({
   const chips = [
     { key: "all" as const, label: "Semua", count: counts.all },
     { key: "mine" as const, label: "Saya lead", count: counts.mine },
-    { key: "review" as const, label: "Menunggu klien", count: counts.review },
+    { key: "review" as const, label: "Waiting for client", count: counts.review },
   ];
 
   function listHref({ nextView = view, nextPage = 1 }: { nextView?: View; nextPage?: number } = {}): string {
@@ -228,13 +228,13 @@ export default async function StudioFlowProjectsPage({
     <>
       <PageHeader
         eyebrow="StudioFlow"
-        title="Semua project"
-        description="Setiap project studio, dengan fase yang sedang benar-benar jalan."
+        title="All projects"
+        description="Every studio project, with its current active phase."
         divider
         actions={
           canManage ? (
             <Link href="/studioflow/new" className={buttonClasses("primary", "md")}>
-              <Plus size={16} aria-hidden="true" /> Project baru
+              <Plus size={16} aria-hidden="true" /> New project
             </Link>
           ) : null
         }
@@ -281,7 +281,7 @@ export default async function StudioFlowProjectsPage({
                   name="q"
                   defaultValue={query}
                   label="Cari project"
-                  placeholder="Cari project atau klien…"
+              placeholder="Search projects or clients…"
                 />
               </form>
             }
@@ -291,13 +291,13 @@ export default async function StudioFlowProjectsPage({
         {rows.length === 0 ? (
           <EmptyState
             icon={FolderOpen}
-            title={decorated.length === 0 ? "Belum ada project" : "Tidak ada yang cocok"}
+            title={decorated.length === 0 ? "No projects yet" : "No matches"}
             description={
               decorated.length === 0
                 ? canManage
-                  ? "Buat project pertama studio."
-                  : "Belum ada project aktif."
-                : "Ubah filter atau kata kunci pencarian."
+                  ? "Create the studio's first project."
+                  : "There are no active projects."
+                : "Change the filter or search term."
             }
           />
         ) : (
@@ -305,8 +305,8 @@ export default async function StudioFlowProjectsPage({
             <TableHeader>
               <TableRow>
                 <TableHead>Project</TableHead>
-                <TableHead>Klien</TableHead>
-                <TableHead align="end">Luas</TableHead>
+                <TableHead>Client</TableHead>
+                <TableHead align="end">Area</TableHead>
                 <TableHead>Fase berjalan</TableHead>
                 <TableHead>Lead</TableHead>
                 <TableHead>Diperbarui</TableHead>
@@ -355,12 +355,12 @@ export default async function StudioFlowProjectsPage({
                             </span>
                           </StatusBadge>
                         ) : (
-                          <Text size="sm" tone="tertiary">Belum ada fase berjalan</Text>
+                          <Text size="sm" tone="tertiary">No active phase</Text>
                         )}
                         {segments.length > 0 ? (
                           <SegmentBar
                             segments={segments}
-                            label={`${doneCount} dari ${segments.length} fase selesai`}
+                            label={`${doneCount} of ${segments.length} phases complete`}
                           />
                         ) : null}
                       </div>

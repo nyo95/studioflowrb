@@ -22,7 +22,7 @@ function responseKindOf(formData: FormData): "APPROVAL" | "REVISION" {
     throw new AppError(
       "VALIDATION",
       "studioflow.response.kind-invalid",
-      "Pilih jenis jawaban klien",
+      "Choose a client response type",
     );
   }
   return kind;

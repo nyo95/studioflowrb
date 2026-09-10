@@ -25,13 +25,13 @@ export default async function NewProjectPage() {
       <>
         <Breadcrumb
         entries={[
-          { label: "Project", href: "/studioflow/projects" },
-          { label: "Project baru" },
+          { label: "Projects", href: "/studioflow/projects" },
+          { label: "New project" },
         ]}
       />
-      <PageHeader title="Project baru" description="Fase disalin dari template studio saat project dibuat." divider />
+      <PageHeader title="New project" description="Phase templates are copied when the project is created." divider />
         <SectionCard>
-          <EmptyState icon={FolderOpen} title="Akses ditolak" description="Kamu tidak punya permission untuk membuat project." />
+          <EmptyState icon={FolderOpen} title="Access denied" description="You do not have permission to create projects." />
         </SectionCard>
       </>
     );
@@ -42,20 +42,13 @@ export default async function NewProjectPage() {
 
   return (
     <>
-      <PageHeader eyebrow="StudioFlow" title="Project baru" divider />
-      {liveClients.length === 0 ? (
-        <SectionCard>
-          <EmptyState
-            icon={FolderOpen}
-            title="Belum ada klien"
-            description="Tambahkan klien terlebih dahulu sebelum membuat project."
-          />
-        </SectionCard>
-      ) : (
-        <SectionCard>
-          <ProjectForm clients={liveClients.map((c) => ({ id: c.id, name: c.name }))} />
-        </SectionCard>
-      )}
+      <PageHeader eyebrow="StudioFlow" title="New project" divider />
+      <SectionCard>
+        {liveClients.length === 0 ? (
+          <p className="mb-4 text-sm text-ink-secondary">No existing clients yet. You can create the first client in this form.</p>
+        ) : null}
+        <ProjectForm clients={liveClients.map((c) => ({ id: c.id, name: c.name }))} />
+      </SectionCard>
     </>
   );
 }

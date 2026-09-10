@@ -1,6 +1,6 @@
 # Known Bugs by Application
 
-Status: active defect ledger, reconciled through R7.40 on 2026-09-10.
+Status: active defect ledger, reconciled through R7.44 on 2026-09-10.
 
 Planned features belong in [`roadmap.md`](roadmap.md). When a bug is fixed, move
 it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
@@ -54,15 +54,14 @@ No open BQ bug is currently recorded.
 - **Expected:** Restore useful legacy behavior using UI Engine dialogs and the
   current project/client service boundary.
 - **Mitigation:** Create the client first, then create the project.
-- **Status:** Open; requires read-only legacy audit before implementation.
+- **Status:** Closed in R7.44. Project creation now supports selecting an
+  existing client or creating a new client in context, atomically with the
+  project and its seeded phases, with audit coverage.
 
 ### KB-006 — StudioFlow UI language remains mixed
 
-- **Observed:** R7.40 translated entry surfaces, but other routes/states remain
-  mixed Indonesian and English.
-- **Expected:** English-only StudioFlow UI copy.
-- **Mitigation:** All new StudioFlow copy must be English.
-- **Status:** Open.
+- **Closed:** R7.44. User-facing StudioFlow route and state copy is now English.
+  Remaining Indonesian matches are technical comments or internal anchor ids.
 
 ### KB-007 — Settings structure does not match useful legacy behavior
 
@@ -70,7 +69,10 @@ No open BQ bug is currently recorded.
 - **Expected:** Reproduce useful legacy structure with current permissions and
   rebuilt UI Engine components.
 - **Mitigation:** Use current General Settings.
-- **Status:** Open; requires read-only legacy audit before implementation.
+- **Status:** Closed in R7.44. Studio Settings now links the existing functional
+  Clients and Account/Profile surfaces alongside phase and naming settings.
+  Database Settings remains intentionally deferred because its backend contract
+  does not exist.
 
 ## Closed
 

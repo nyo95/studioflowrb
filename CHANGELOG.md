@@ -5,8 +5,36 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.43**
-- Next local revision: **R7.44**
+- Current revision after this entry is committed: **R7.44**
+- Next local revision: **R7.45**
+
+## R7.44 | 2026-09-10 | feat(studioflow): restore client creation and English UI
+
+### Changed
+
+- Restored Add Project in-context client creation: the form can select an
+  existing client or submit a new client name, and the service creates the new
+  client and project atomically with audit events.
+- Expanded StudioFlow Settings navigation to existing Clients and Account
+  surfaces without inventing a Database Settings placeholder.
+- Completed the user-facing English-only copy sweep across StudioFlow project,
+  activity, client, phase, iteration, file, library, and task states.
+- Closed KB-005, KB-006, and KB-007 and synchronized the roadmap and known-bug
+  ledger.
+
+### Verification
+
+- `STUDIOFLOW_LOCATION=kantor npm run typecheck`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run lint`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:boundaries`: passed.
+- Focused UI Engine tests: 37 passed.
+- Full integration tests and live browser verification remain unavailable;
+  disposable office test database variables and browser access are absent.
+  No database command was run.
+
+### Remaining
+
+- Database Settings remains deferred because no backend contract exists.
 
 ## R7.43 | 2026-09-10 | feat(ui-engine): canonicalize StudioFlow file drop
 

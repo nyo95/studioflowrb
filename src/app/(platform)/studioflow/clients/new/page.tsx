@@ -24,13 +24,13 @@ export default async function NewClientPage() {
       <>
         <Breadcrumb
         entries={[
-          { label: "Klien", href: "/studioflow/clients" },
-          { label: "Klien baru" },
+          { label: "Clients", href: "/studioflow/clients" },
+          { label: "New client" },
         ]}
       />
-      <PageHeader title="Klien baru" description="Klien harus ada sebelum project bisa dibuka." divider />
+      <PageHeader title="New client" description="Create a client for StudioFlow projects." divider />
         <SectionCard>
-          <EmptyState icon={Users} title="Akses ditolak" description="Kamu tidak punya permission untuk menambahkan klien." />
+          <EmptyState icon={Users} title="Access denied" description="You do not have permission to add clients." />
         </SectionCard>
       </>
     );
@@ -38,7 +38,7 @@ export default async function NewClientPage() {
 
   return (
     <>
-      <PageHeader eyebrow="StudioFlow · Klien" title="Klien baru" divider />
+      <PageHeader eyebrow="StudioFlow · Client" title="New client" divider />
       <SectionCard>
         <ClientForm />
       </SectionCard>

@@ -11,7 +11,7 @@ import { validationError } from "@platform/core/validation";
 import { studioFlowService } from "@/apps/studioflow/runtime";
 
 const ClientSchema = z.object({
-  name: z.string().trim().min(1, "Nama klien wajib diisi").max(200),
+  name: z.string().trim().min(1, "Client name is required").max(200),
   contact_name: z.string().trim().max(200).optional(),
   contact_phone: z.string().trim().max(50).optional(),
   contact_email: z.string().trim().email("Format email tidak valid").max(200).optional().or(z.literal("")),

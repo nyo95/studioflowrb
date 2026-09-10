@@ -1,6 +1,6 @@
 # Product Roadmap by Application
 
-Status: active planning ledger, reconciled through R7.43 on 2026-09-10.
+Status: active planning ledger, reconciled through R7.44 on 2026-09-10.
 
 This file answers **what remains to be built**. It does not activate work by
 itself. Completed items are struck through or removed only after verification
@@ -65,10 +65,11 @@ and must remain recorded in `CHANGELOG.md`. Bugs belong in
   surface without adding a second task entity.
 - [ ] Demote Start Round/internal approval/send controls to contextual or
   administrative actions after deliverable intake is proven end-to-end.
-- [ ] Finish English-only UI copy across every route and state (KB-006).
-- [ ] Restore Add Project parity after read-only legacy audit, including
+- [x] Finish English-only UI copy across every route and state (KB-006).
+- [x] Restore Add Project parity after read-only legacy audit, including
   in-context client creation (KB-005).
-- [ ] Rebuild the useful legacy Settings structure after audit (KB-007).
+- [x] Rebuild the useful legacy Settings structure after audit (KB-007),
+  excluding Database Settings until its backend contract exists.
 
 ### Project extensions
 

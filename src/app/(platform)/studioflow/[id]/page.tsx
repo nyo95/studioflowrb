@@ -46,9 +46,9 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const PHASE_STATE_LABELS: Record<string, string> = {
-  NOT_STARTED: "Belum mulai",
+  NOT_STARTED: "Not started",
   IN_PROGRESS: "Digarap",
-  WAITING_CLIENT: "Menunggu klien",
+  WAITING_CLIENT: "Waiting for client",
   DONE: "Selesai",
 };
 
@@ -82,12 +82,12 @@ export default async function ProjectDetailPage({
   if (!canRead) {
     return (
       <>
-        <PageHeader eyebrow="StudioFlow" title="Detail project" divider />
+        <PageHeader eyebrow="StudioFlow" title="Project detail" divider />
         <SectionCard>
           <EmptyState
             icon={FolderOpen}
-            title="Akses ditolak"
-            description="Kamu tidak punya permission untuk melihat project ini."
+            title="Access denied"
+            description="You do not have permission to view this project."
           />
         </SectionCard>
       </>
@@ -215,7 +215,7 @@ export default async function ProjectDetailPage({
     <>
       <Breadcrumb
         entries={[
-          { label: "Project", href: "/studioflow/projects" },
+          { label: "Projects", href: "/studioflow/projects" },
           { label: project.name },
         ]}
       />
@@ -230,7 +230,7 @@ export default async function ProjectDetailPage({
               TYPE_LABELS[project.type] ?? project.type,
               project.area ? `${Number(project.area)} m²` : null,
               project.location,
-              `Dibuka ${fmt.format(new Date(project.opened_at))}`,
+              `Opened ${fmt.format(new Date(project.opened_at))}`,
             ]}
           />
         }
@@ -252,7 +252,7 @@ export default async function ProjectDetailPage({
       <DetailShell
         header={
           <SectionCard
-            title="Alur fase"
+            title="Phase flow"
             padded={false}
             action={
               leadingPhase ? (
@@ -263,27 +263,27 @@ export default async function ProjectDetailPage({
             }
           >
             {steps.length === 0 ? (
-              <p className="px-(--ui-section-px) py-3 text-sm text-ink-tertiary">Belum ada fase.</p>
+              <p className="px-(--ui-section-px) py-3 text-sm text-ink-tertiary">No phases yet.</p>
             ) : (
-              <PipelineStrip steps={steps} label="Alur fase project" />
+          <PipelineStrip steps={steps} label="Project phase flow" />
             )}
           </SectionCard>
         }
         aside={
           <>
-            <SectionCard title="Progres fase">
+            <SectionCard title="Phase progress">
               <div className="grid gap-2.5">
                 <div className="flex items-baseline gap-1.5">
                   <span className="font-display text-2xl font-[650] leading-none">{donePhases}</span>
-                  <Text size="sm" tone="tertiary">dari {rawPhases.length} fase selesai</Text>
+                  <Text size="sm" tone="tertiary">of {rawPhases.length} phases complete</Text>
                 </div>
                 <ProgressBar
                   value={donePhases}
                   max={Math.max(rawPhases.length, 1)}
-                  label={`${donePhases} dari ${rawPhases.length} fase selesai`}
+                  label={`${donePhases} of ${rawPhases.length} phases complete`}
                 />
                 <Text size="sm" tone="secondary">
-                  {openTasks === 0 ? "Tidak ada task terbuka" : `${openTasks} task terbuka`}
+                  {openTasks === 0 ? "No open tasks" : `${openTasks} open tasks`}
                 </Text>
               </div>
             </SectionCard>
@@ -293,12 +293,12 @@ export default async function ProjectDetailPage({
                 <DescriptionItem label="Kode">
                   <span className="font-ui-mono text-xs">{project.code}</span>
                 </DescriptionItem>
-                <DescriptionItem label="Klien">{project.client.name}</DescriptionItem>
-                <DescriptionItem label="Tipe">{TYPE_LABELS[project.type] ?? project.type}</DescriptionItem>
+                <DescriptionItem label="Client">{project.client.name}</DescriptionItem>
+                <DescriptionItem label="Type">{TYPE_LABELS[project.type] ?? project.type}</DescriptionItem>
                 <DescriptionItem label="Status">{STATUS_LABELS[project.status] ?? project.status}</DescriptionItem>
-                {project.area ? <DescriptionItem label="Luas">{Number(project.area)} m²</DescriptionItem> : null}
-                {project.location ? <DescriptionItem label="Lokasi">{project.location}</DescriptionItem> : null}
-                <DescriptionItem label="Dibuka">{fmt.format(new Date(project.opened_at))}</DescriptionItem>
+                {project.area ? <DescriptionItem label="Area">{Number(project.area)} m²</DescriptionItem> : null}
+                {project.location ? <DescriptionItem label="Location">{project.location}</DescriptionItem> : null}
+                <DescriptionItem label="Opened">{fmt.format(new Date(project.opened_at))}</DescriptionItem>
               </DescriptionList>
             </SectionCard>
 
@@ -308,11 +308,11 @@ export default async function ProjectDetailPage({
                   <Avatar name={leadUser.display_name} size="lg" />
                   <div className="grid min-w-0 gap-px">
                     <span className="truncate text-sm font-medium">{leadUser.display_name}</span>
-                    <Text meta className="text-ink-tertiary">Lead project</Text>
+                    <Text meta className="text-ink-tertiary">Project lead</Text>
                   </div>
                 </div>
               ) : (
-                <Text as="p" tone="tertiary" size="sm">Belum ada lead yang ditunjuk.</Text>
+                <Text as="p" tone="tertiary" size="sm">No project lead assigned.</Text>
               )}
             </SectionCard>
           </>
@@ -337,7 +337,7 @@ export default async function ProjectDetailPage({
 
         <PageSection title="Fase">
           {phases.length === 0 ? (
-            <Text as="p" tone="tertiary" size="sm">Belum ada fase.</Text>
+                <Text as="p" tone="tertiary" size="sm">No phases yet.</Text>
           ) : (
             <PhaseSection
               phases={phases}

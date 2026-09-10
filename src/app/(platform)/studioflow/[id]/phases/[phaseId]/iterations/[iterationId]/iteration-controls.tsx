@@ -78,7 +78,7 @@ export function IterationLifecycle({
       {state === "DRAFT" && canManage && (
         <SimpleAction
           action={sendIterationAction.bind(null, iterationId, projectId, phaseId)}
-          label="Kirim ke klien"
+          label="Send to client"
         />
       )}
       {state === "SENT" && canReview && (
@@ -93,7 +93,7 @@ export function IterationLifecycle({
             <Field label="Alasan batal" required>
               <Input name="reason" required maxLength={500} placeholder="Tulis alasan…" />
             </Field>
-            <Button type="submit" variant="danger" pending={voidPending}>Batalkan round</Button>
+            <Button type="submit" variant="danger" pending={voidPending}>Cancel round</Button>
           </form>
           {voidFailure ? <InlineError>{voidFailure}</InlineError> : null}
         </div>
@@ -131,7 +131,7 @@ export function PointRow({
           {point.done ? <CheckCircle2 className="h-4 w-4 text-success" /> : <Circle className="h-4 w-4 text-ink-tertiary" />}
           {point.text}
           {point.source === "CLIENT_REVISION" && (
-            <Badge>dari klien</Badge>
+            <Badge>from client</Badge>
           )}
         </span>
         {editable && (
@@ -187,7 +187,7 @@ export function ResponseForm({ iterationId, projectId, phaseId }: Ids) {
     <div className="grid gap-1">
       <form action={formAction} className="grid gap-4 max-w-xl">
         {failure ? <InlineError>{failure}</InlineError> : null}
-        <Field label="Jawaban klien" required>
+        <Field label="Client response" required>
           <Select name="kind" required defaultValue="REVISION">
             <option value="REVISION">Minta revisi</option>
             <option value="APPROVAL">Setuju / approve</option>
@@ -199,11 +199,11 @@ export function ResponseForm({ iterationId, projectId, phaseId }: Ids) {
         >
           <Textarea name="points" rows={4} maxLength={4000} placeholder={"Warna dinding terlalu gelap\nTambah storage di dapur"} />
         </Field>
-        <Field label="Catatan">
+          <Field label="Notes">
           <Textarea name="note" rows={2} maxLength={2000} placeholder="Konteks tambahan (opsional)" />
         </Field>
         <div>
-          <Button type="submit" variant="primary" pending={pending}>Catat response</Button>
+          <Button type="submit" variant="primary" pending={pending}>Record response</Button>
         </div>
       </form>
     </div>
