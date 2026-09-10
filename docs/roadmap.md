@@ -1,6 +1,6 @@
 # Product Roadmap by Application
 
-Status: active planning ledger, reconciled through R7.40 on 2026-09-10.
+Status: active planning ledger, reconciled through R7.43 on 2026-09-10.
 
 This file answers **what remains to be built**. It does not activate work by
 itself. Completed items are struck through or removed only after verification
@@ -24,8 +24,8 @@ and must remain recorded in `CHANGELOG.md`. Bugs belong in
 
 ## UI Engine and Shared Utilities
 
-- [ ] Replace StudioFlow-local drag/drop with one canonical `FileDropZone`
-  export, shared tests, and named consumers (also KB-011).
+- [x] Replace StudioFlow-local drag/drop with one canonical `FileDropZone`
+  export, shared tests, and the StudioFlow deliverable consumer (KB-011).
 - [ ] Redesign the top-header/sidebar boundary using the approved Claude design
   artifact for direction; preserve the approved semantic colors.
 - [ ] Add one canonical image workspace when an approved consumer activates it:

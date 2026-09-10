@@ -20,17 +20,6 @@ No open Foundation bug is currently recorded.
 - **Mitigation:** Do not create app-local substitutes before activation.
 - **Status:** Open.
 
-### KB-011 — StudioFlow implements drag/drop outside the UI Engine
-
-- **Observed:** `studioflow/[id]/files/file-controls.tsx` owns `onDragOver`,
-  `onDrop`, and `dataTransfer`, while `UI_ENGINE.md` lists `FileDropZone` as
-  deferred.
-- **Expected:** One canonical `FileDropZone` imported by StudioFlow, with
-  behavior/accessibility tests and no app-local copy.
-- **Mitigation:** Keep the current narrow metadata-only drop surface and add no
-  second local implementation.
-- **Status:** Open; discovered during the R7.40 documentation audit.
-
 ## Master Data
 
 No open Master Data bug is currently recorded. Deferred media, Samples, and
@@ -102,6 +91,15 @@ No open BQ bug is currently recorded.
 ### KB-010 — Library redirected instead of exposing resource links
 
 - **Closed:** R7.40. A read-only UI Engine dialog exposes Master Data resources.
+
+### KB-011 — StudioFlow implements drag/drop outside the UI Engine
+
+- **Closed:** R7.43. UI Engine now exports the canonical metadata-only
+  `FileDropZone`; StudioFlow consumes it and no longer owns drag/drop handlers.
+  Focused UI Engine behavior/accessibility tests and the app boundary guard pass.
+- **Limitation:** Full integration tests and live browser verification remain
+  unavailable until the disposable office test database and browser workflow
+  are available.
 
 ## Audit protocol
 

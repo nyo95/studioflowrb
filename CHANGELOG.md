@@ -5,8 +5,41 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.42**
-- Next local revision: **R7.43**
+- Current revision after this entry is committed: **R7.43**
+- Next local revision: **R7.44**
+
+## R7.43 | 2026-09-10 | feat(ui-engine): canonicalize StudioFlow file drop
+
+### Changed
+
+- Added and publicly exported the domain-neutral UI Engine `FileDropZone`
+  pattern with keyboard-reachable picker, accept filtering, disabled state,
+  active drag presentation, and metadata-only file reporting.
+- Extracted pure file-selection rules into `internal/file-drop.ts`; the picker
+  has no `name`, so file bytes cannot be serialized by the surrounding form.
+- Migrated StudioFlow deliverable intake to the shared pattern and removed its
+  local drag/drop handlers.
+- Activated `FileDropZone` in `UI_ENGINE.md`, closed KB-011, and synchronized
+  the roadmap and alignment ledgers.
+
+### Verification
+
+- `STUDIOFLOW_LOCATION=kantor npm run typecheck`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run lint`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:boundaries`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:legacy-runtime`: passed.
+- Focused UI Engine suite: 37 tests passed.
+- `STUDIOFLOW_LOCATION=kantor npm run build`: passed with Next.js 16.3.2.
+- `npm test`: not a complete pass; database integration tests were cancelled
+  because the required disposable test URL variables were absent. No database
+  command was run.
+- Live browser verification: unavailable in this session.
+
+### Limitations
+
+- KB-002, KB-003, KB-004, KB-005, KB-006, and KB-007 remain open.
+- The pre-existing `Field`/drop-region label focus concern is outside this
+  slice and remains unchanged.
 
 ## R7.42 | 2026-09-10 | docs(handoff): coordinate cross-agent app completion
 

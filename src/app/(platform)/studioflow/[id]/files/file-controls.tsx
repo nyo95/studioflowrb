@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import type { ActionResult } from "@platform/core/actions";
-import { Button, Field, InlineError, Input, Select } from "@/platform/ui_engine";
+import { Button, Field, FileDropZone, InlineError, Input, Select } from "@/platform/ui_engine";
 
 import { linkFileAction, moveFileAction, recordFileAction, supersedeFileAction } from "./actions";
 
@@ -17,7 +17,6 @@ export function DeliverableForm({ projectId, folders }: { projectId: string; fol
   const [mode, setMode] = useState<"record" | "link">("record");
   const [filename, setFilename] = useState("");
   const [bytes, setBytes] = useState("");
-  const [dropActive, setDropActive] = useState(false);
   const [recordState, recordAction, recordPending] = useActionState(recordFileAction.bind(null, projectId), INITIAL);
   const [linkState, linkAction, linkPending] = useActionState(linkFileAction.bind(null, projectId), INITIAL);
   const state = mode === "record" ? recordState : linkState;
@@ -28,24 +27,22 @@ export function DeliverableForm({ projectId, folders }: { projectId: string; fol
     <form action={mode === "record" ? recordAction : linkAction} className="grid gap-3 sm:grid-cols-3">
       {failure ? <div className="sm:col-span-3"><InlineError>{failure}</InlineError></div> : null}
       <Field label="File deliverable" required>
-        <div
-          className={`rounded-control border border-dashed px-3 py-2 transition-colors ${dropActive ? "border-action bg-action/5" : "border-line"}`}
-          onDragEnter={(event) => { event.preventDefault(); setDropActive(true); }}
-          onDragOver={(event) => { event.preventDefault(); setDropActive(true); }}
-          onDragLeave={(event) => { if (event.currentTarget === event.target) setDropActive(false); }}
-          onDrop={(event) => {
-            event.preventDefault();
-            setDropActive(false);
-            const file = event.dataTransfer.files[0];
-            if (file) {
-              setFilename(file.name);
-              setBytes(String(file.size));
-            }
+        {/* Drop interaction, the accept filter, and the keyboard picker belong
+            to the shared zone. What a dropped file means here — filename plus
+            byte count, never the bytes — stays this app's decision. */}
+        <FileDropZone
+          label="File deliverable"
+          hint="Byte file tidak dikirim atau disimpan oleh aplikasi."
+          browseLabel="Pilih file"
+          onFiles={(files) => {
+            const [file] = files;
+            if (!file) return;
+            setFilename(file.name);
+            setBytes(String(file.size));
           }}
         >
           <Input name="original_filename" value={filename} onChange={(event) => setFilename(event.target.value)} required maxLength={300} placeholder="Tarik file ke sini atau ketik nama file" />
-          <p className="mt-1 text-xs text-ink-tertiary">Byte file tidak dikirim atau disimpan oleh aplikasi.</p>
-        </div>
+        </FileDropZone>
       </Field>
       <Field label="Cara penyimpanan">
         <Select value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}>

@@ -3,6 +3,7 @@ export * from "./combobox";
 export * from "./creatable-multi-select";
 export * from "./creatable-search";
 export * from "./draft-dialog";
+export * from "./file-drop-zone";
 export * from "./hooks";
 export * from "./inline-edit";
 export * from "./pagination";

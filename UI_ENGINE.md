@@ -803,6 +803,9 @@ This stage includes a real login page, authenticated app launcher, user director
 - `RowActionMenu`, `FilterBar`, `SelectionBar`;
 - `Combobox`, `CreatableSearch`, `CreatableMultiSelect`;
 - `InlineEdit` — activated in R4.56 by an approved cell-entry workflow;
+- `FileDropZone` — activated in R7.43 by the approved phase deliverable
+  intake consumer. It carries interaction only: the metadata-only intake
+  flow needs no storage or upload contract, and none is implied here;
 - `useDebouncedValue`, `useOptionOverlay`, `useConfirm`, `useUnsavedChangesGuard`, their accessible prompts, and generic pending/action feedback;
 - one internal UI Engine showcase route demonstrating realistic compositions without app/domain imports.
 
@@ -812,7 +815,6 @@ This stage includes a real login page, authenticated app launcher, user director
 |---|---|
 | `WorkspaceShell`, `SplitPane` | first approved StudioFlow/BQ workspace requiring the layout |
 | `ReorderHandle` | first persisted manual-order workflow with keyboard requirements |
-| `FileDropZone` | approved file/media storage flow and its security contract |
 | `DocumentSheet` and print helpers | first approved document/print workflow |
 
 Deferred patterns may remain in design prose as routing memory. They are not required for the active closure gate and should not remain public implementation without a real approved consumer.
@@ -832,7 +834,14 @@ Deferred patterns may remain in design prose as routing memory. They are not req
   not own remote fetching, entity vocabulary, authorization, or business ranking.
 - CreatableSearch builds on the same navigation/accessibility contract and adds only explicit clear/create interaction. CreatableMultiSelect applies the same contract to removable multiple values. Persistence, authorization, validation, normalization, reuse semantics, role assignment, audit, and app option shaping remain app-owned.
 - InlineEdit owns editing states and keyboard behavior, not validation/business saving rules.
-- FileDropZone owns input/drop interaction and file-list presentation, not storage/upload policy.
+- FileDropZone owns the drag/drop gesture, its active-target presentation, the
+  native `accept` filter, and a keyboard-reachable picker, because dragging is
+  a pointer-only gesture. It reports a dropped file's name, size, and media
+  type, and owns no storage, upload, transport, validation, or retention
+  policy. Its picker carries no `name`, so no byte is serialized by a
+  surrounding form; a consumer that needs bytes on a server sends them
+  through its own approved boundary. Apps must consume this export rather
+  than reimplement drop handlers locally.
 - StatusBadge receives an explicit semantic tone and never infers meaning from a domain status string.
 - Layouts accept app-provided navigation/content and never hardcode Master Data, BQ, or StudioFlow routes.
 - No component reads Prisma/Zod schemas to generate UI.

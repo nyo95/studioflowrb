@@ -8,6 +8,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import * as ui from "./index";
 import { getComboboxNavigationIndex } from "./internal/combobox-navigation";
+import { matchesAccept, selectFiles } from "./internal/file-drop";
 import { getEffectiveRailCollapsed } from "./internal/rail-state";
 
 describe("UI Engine foundation", () => {
@@ -70,6 +71,8 @@ describe("UI Engine foundation", () => {
       "CreatableSearch",
       "CreatableMultiSelect",
       "InlineEdit",
+      // R7.43 — activated by the phase deliverable intake consumer (KB-011).
+      "FileDropZone",
       "SimpleTextEditor",
       "useDebouncedValue",
       "useOptionOverlay",
@@ -95,7 +98,7 @@ describe("UI Engine foundation", () => {
         name,
       );
     }
-    for (const deferred of ["WorkspaceShell", "SplitPane", "ReorderHandle", "FileDropZone", "DocumentSheet"]) {
+    for (const deferred of ["WorkspaceShell", "SplitPane", "ReorderHandle", "DocumentSheet"]) {
       assert.equal(deferred in ui, false, `${deferred} must remain deferred`);
     }
   });
@@ -499,6 +502,92 @@ describe("UI Engine foundation", () => {
     assert.match(source, /catch \(failure\) \{[\s\S]*setDraft\(value\)/);
     /* The shell owns no rules about what a value may be. */
     assert.doesNotMatch(source, /parseFloat|Number\(|isNaN|required/);
+  });
+
+  it("names the drop region and keeps a keyboard route to the picker", () => {
+    const zone = renderToStaticMarkup(
+      createElement(
+        ui.FileDropZone,
+        { label: "Deliverable file", onFiles: () => {}, browseLabel: "Choose file", hint: "Bytes stay local." },
+        createElement(ui.Input, { name: "original_filename" }),
+      ),
+    );
+    /* A dashed box is a visual affordance only, so the region needs a name. */
+    assert.match(zone, /role="group"/);
+    assert.match(zone, /aria-label="Deliverable file"/);
+    /* Dragging cannot be performed from a keyboard, so a real control stays. */
+    assert.match(zone, /<button type="button"/);
+    assert.match(zone, />Choose file</);
+    /* The picker is out of the accessibility tree: the button is the affordance. */
+    assert.match(zone, /<input[^>]*type="file"[^>]*aria-hidden="true"/);
+    /* Composed controls and caller-owned copy both survive. */
+    assert.match(zone, /name="original_filename"/);
+    assert.match(zone, /Bytes stay local\./);
+  });
+
+  it("reports file facts without letting bytes ride along with a form", () => {
+    const zone = renderToStaticMarkup(
+      createElement(ui.FileDropZone, { label: "Deliverable file", onFiles: () => {} }),
+    );
+    const picker = /<input[^>]*type="file"[^>]*>/.exec(zone);
+    assert.ok(picker, "the zone must keep a real file picker");
+    /* An unnamed input is not serialized, so a submit can never carry the file. */
+    assert.doesNotMatch(picker[0], /name=/);
+    const source = readFileSync(new URL("./patterns/file-drop-zone.tsx", import.meta.url), "utf8");
+    /* Interaction only: no transport, no reading, no storage policy. */
+    assert.doesNotMatch(source, /fetch\(|FileReader|arrayBuffer|XMLHttpRequest|FormData/);
+    /* Without preventDefault the browser leaves the page and opens the file. */
+    assert.match(source, /event\.preventDefault\(\)/);
+  });
+
+  it("filters a drop by accept and hands single-select zones one file", () => {
+    const files = [
+      { name: "plan.skp", size: 12, type: "" },
+      { name: "render.PNG", size: 34, type: "image/png" },
+      { name: "notes.txt", size: 56, type: "text/plain" },
+    ];
+    const names = (chosen: ReadonlyArray<{ name: string }>) => chosen.map((file) => file.name);
+    /* An empty accept list means "anything", never "nothing". */
+    assert.deepEqual(names(selectFiles(files, { multiple: true })), ["plan.skp", "render.PNG", "notes.txt"]);
+    /* Suffix and media-type-group tokens both apply, case-insensitively. */
+    assert.deepEqual(names(selectFiles(files, { accept: ".skp, image/*", multiple: true })), ["plan.skp", "render.PNG"]);
+    /* A single-select zone never hands back the rest of a multi-file drop. */
+    assert.deepEqual(names(selectFiles(files, { accept: "image/*" })), ["render.PNG"]);
+    /* A drop of only refused files yields nothing rather than a wrong first file. */
+    assert.deepEqual(selectFiles(files, { accept: ".dwg" }), []);
+    /* A group token must not match a media type that merely starts alike. */
+    assert.equal(matchesAccept("image/*", { name: "a", size: 1, type: "imagex/png" }), false);
+    assert.equal(matchesAccept("text/plain", { name: "a", size: 1, type: "text/plain" }), true);
+    assert.equal(matchesAccept("text/plain", { name: "a", size: 1, type: "text/html" }), false);
+  });
+
+  it("keeps a disabled zone inert and marks nothing before a drag", () => {
+    const off = renderToStaticMarkup(
+      createElement(ui.FileDropZone, { label: "Zone", onFiles: () => {}, disabled: true }),
+    );
+    assert.match(off, /aria-disabled="true"/);
+    assert.match(off, /<input[^>]*disabled=""/);
+    assert.match(off, /<button type="button"[^>]*disabled=""/);
+    /* The active-target attribute appears on drag, never at rest. */
+    assert.doesNotMatch(off, /data-drop-active/);
+  });
+
+  it("forwards the control props Field injects onto the region root", () => {
+    const zone = renderToStaticMarkup(
+      createElement(ui.FileDropZone, {
+        label: "Zone",
+        onFiles: () => {},
+        id: "field-1",
+        "aria-describedby": "field-1-error",
+        "aria-invalid": true,
+        "aria-required": true,
+      }),
+    );
+    /* Field clones its single child to wire the label, description, and error. */
+    assert.match(zone, /id="field-1"/);
+    assert.match(zone, /aria-describedby="field-1-error"/);
+    assert.match(zone, /aria-invalid="true"/);
+    assert.match(zone, /aria-required="true"/);
   });
 
   it("keeps app internals and domain vocabulary out of shared UI sources", () => {

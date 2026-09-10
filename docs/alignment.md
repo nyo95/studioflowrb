@@ -1,6 +1,6 @@
 # StudioFlow Rebuild Alignment
 
-Status: owner alignment artifact, reconciled through R7.40 on 2026-09-10
+Status: owner alignment artifact, reconciled through R7.43 on 2026-09-10
 Scope: minimum production-daily StudioFlow rebuild, with legacy behavior as the
 minimum baseline and the owner's workflow simplifications as the active correction.
 
@@ -134,7 +134,7 @@ Reconciled through R7.40. Active work and defects are tracked in
 | Start Round/internal approval/send are contextual rather than the primary phase UX | **Open** |
 | To-dos and deliverables form one coherent phase work surface | **Open** |
 | Current deliverable and intake appear directly in phase detail | **Open** |
-| Drag/drop uses the canonical UI Engine boundary | **Open (KB-011)** |
+| Drag/drop uses the canonical UI Engine boundary | **Aligned in R7.43 (KB-011)** |
 | MOM and Product Catalogue/FFNI are integrated into project detail | **Open** |
 | Shared image picker/crop/zoom/annotation exists for approved consumers | **Open** |
 
