@@ -29,6 +29,7 @@ import { studioFlowService } from "@/apps/studioflow/runtime";
 import { GeneralTaskBlock } from "./general-task-block";
 import { PhaseSection } from "./phase-section";
 import type { PhaseDeliverable, PhaseItem } from "./phase-section";
+import { MomSection } from "./mom-section";
 
 export const dynamic = "force-dynamic";
 
@@ -114,8 +115,10 @@ export default async function ProjectDetailPage({
   const canManageIter = hasPermission(grants, STUDIOFLOW_PERMISSIONS.iterationManage);
   const canReviewIter = hasPermission(grants, STUDIOFLOW_PERMISSIONS.iterationReview);
   const canOverridePhase = hasPermission(grants, STUDIOFLOW_PERMISSIONS.phaseOverride);
+  const canManageMom = hasPermission(grants, STUDIOFLOW_PERMISSIONS.momManage);
+  const canIssueMom = hasPermission(grants, STUDIOFLOW_PERMISSIONS.momIssue);
 
-  const [project, settings, tasks, rawPhases, assignableUsers, allFiles] = await Promise.all([
+  const [project, settings, tasks, rawPhases, assignableUsers, allFiles, moms] = await Promise.all([
     studioFlowService.getProject(grants, id).catch((e: { kind?: string }) => {
       if (e?.kind === "NOT_FOUND") return null;
       throw e;
@@ -129,6 +132,7 @@ export default async function ProjectDetailPage({
     studioFlowService.listProjectPhases(grants, id),
     canManageTasks ? studioFlowService.listAssignableUsers(grants) : Promise.resolve([] as Array<{ id: string; display_name: string }>),
     studioFlowService.listFiles(grants, id),
+    studioFlowService.listMomDocuments(grants, id),
   ]);
 
   // Resolve approved_by_id → display_name for ACC indicators
@@ -399,6 +403,8 @@ export default async function ProjectDetailPage({
           phaseScope={null}
           users={assignableUsers}
         />
+
+        <MomSection projectId={id} moms={moms} canManage={canManageMom} canIssue={canIssueMom} />
 
         <PageSection title="Phases">
           {phases.length === 0 ? (

@@ -842,6 +842,10 @@ Deferred patterns may remain in design prose as routing memory. They are not req
   surrounding form; a consumer that needs bytes on a server sends them
   through its own approved boundary. Apps must consume this export rather
   than reimplement drop handlers locally.
+- `ImageWorkspace` owns browser selection, preview, crop through zoom/focus,
+  freehand annotation, preparation progress, and safe preparation errors. The
+  consuming app supplies format/size/dimension policy and owns authorization,
+  upload, object keys, storage, retention, and audit behavior.
 - StatusBadge receives an explicit semantic tone and never infers meaning from a domain status string.
 - Layouts accept app-provided navigation/content and never hardcode Master Data, BQ, or StudioFlow routes.
 - No component reads Prisma/Zod schemas to generate UI.

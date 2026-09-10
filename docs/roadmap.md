@@ -28,9 +28,9 @@ and must remain recorded in `CHANGELOG.md`. Bugs belong in
   export, shared tests, and the StudioFlow deliverable consumer (KB-011).
 - [ ] Redesign the top-header/sidebar boundary using the approved Claude design
   artifact for direction; preserve the approved semantic colors.
-- [ ] Add one canonical image workspace when an approved consumer activates it:
+- [x] Add one canonical image workspace for the approved MOM consumer (R7.52):
   picker, preview, crop, zoom/pan, annotation, validation, progress, and errors.
-- [ ] Connect the canonical rich-text editor to MOM when MOM is activated.
+- [x] Connect the canonical rich-text editor to MOM (R7.52).
 - [ ] Audit canonical date/time and project/client lookup controls across
   activated consumers.
 
@@ -74,10 +74,10 @@ and must remain recorded in `CHANGELOG.md`. Bugs belong in
 
 ### Project extensions
 
-- [ ] Integrate project-owned MOM at every phase with no Task/To-do, phase, or
+- [x] Integrate project-owned MOM at every phase with no Task/To-do, phase, or
   iteration linkage. Preserve the legacy ordered document/block/point/image
   capability and reuse the canonical rich-text and image tools.
-- [ ] Integrate the StudioFlow-owned Product Catalogue reuse pool shared across
+- [x] Integrate the StudioFlow-owned Product Catalogue reuse pool shared across
   StudioFlow projects, then project FFNI/Schedule snapshots. Never read Master
   Data SKU, unit, or pricing.
 - [ ] Complete legacy-audit phases for artifacts/MOM, schedule, SketchUp, and

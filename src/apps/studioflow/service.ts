@@ -26,6 +26,9 @@ export const STUDIOFLOW_PERMISSIONS = {
   iterationReview: "studioflow.iteration.review",
   phaseOverride: "studioflow.phase.override",
   taskManage: "studioflow.task.manage",
+  scheduleManage: "studioflow.schedule.manage",
+  momManage: "studioflow.mom.manage",
+  momIssue: "studioflow.mom.issue",
 } as const;
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -115,6 +118,71 @@ export type ReorderTaskInput = {
   /** Dragging into General supplies null; dragging onto a phase supplies its key. */
   phase_scope: string | null;
   sort_order: number;
+};
+
+export type CatalogueSpecInput = {
+  brand_md_id?: string | null;
+  brand_name?: string | null;
+  product_name: string;
+  colour?: string | null;
+  finishing?: string | null;
+  dimension_text?: string | null;
+  unit?: string | null;
+  notes?: string | null;
+};
+
+export type EditCatalogueSpecInput = Partial<CatalogueSpecInput>;
+
+export type CatalogueSnapshot = {
+  brand_md_id: string | null;
+  brand_name: string | null;
+  product_name: string;
+  colour: string | null;
+  finishing: string | null;
+  dimension_text: string | null;
+  unit: string | null;
+  notes: string | null;
+  search_key: string;
+};
+
+export function deriveCatalogueSearchKey(input: {
+  brand_name?: string | null;
+  product_name?: string | null;
+  colour?: string | null;
+  finishing?: string | null;
+}): string {
+  return [input.brand_name, input.product_name, input.colour, input.finishing]
+    .map((part) => part?.trim().toLowerCase() ?? "")
+    .filter((part) => part.length > 0)
+    .join("::");
+}
+
+export function snapshotCatalogueProduct(row: CatalogueSnapshot): CatalogueSnapshot {
+  return {
+    brand_md_id: row.brand_md_id,
+    brand_name: row.brand_name,
+    product_name: row.product_name,
+    colour: row.colour,
+    finishing: row.finishing,
+    dimension_text: row.dimension_text,
+    unit: row.unit,
+    notes: row.notes,
+    search_key: row.search_key,
+  };
+}
+
+export type CreateMomInput = {
+  project_id: string;
+  topic: string;
+  meeting_at: Date;
+  venue?: string | null;
+  attendees_text?: string | null;
+  prepared_by_name: string;
+};
+
+export type UpdateMomInput = Partial<Omit<CreateMomInput, "project_id">>;
+export type MomContentInput = {
+  items: Array<{ sort_order: number; is_text_only: boolean; list_style: "NONE" | "BULLET" | "NUMBERED"; points: Array<{ sort_order: number; text: string; style: "TEXT" | "BULLET" | "NUMBERED" }>; images: Array<{ sort_order: number; storage_key: string; alt_text?: string | null }> }>;
 };
 
 export type WaitingOnMeItem =
@@ -1638,6 +1706,199 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     return { files, folders: phases };
   }
 
+  // ── MOM (§ project-owned meeting record) ────────────────────────────────
+
+  const momInclude = {
+    items: {
+      orderBy: { sort_order: "asc" as const },
+      include: {
+        points: { orderBy: { sort_order: "asc" as const } },
+        images: { orderBy: { sort_order: "asc" as const } },
+      },
+    },
+  } as const;
+
+  async function listMomDocuments(grants: PermissionGrants, projectId: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    return db.sfMomDocument.findMany({
+      where: { project_id: projectId },
+      orderBy: [{ created_at: "desc" }, { sequence: "desc" }],
+      include: momInclude,
+    });
+  }
+
+  async function getMom(grants: PermissionGrants, projectId: string, momId: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    const mom = await db.sfMomDocument.findFirst({
+      where: { id: momId, project_id: projectId },
+      include: momInclude,
+    });
+    if (!mom) throw new AppError("NOT_FOUND", "studioflow.mom.not-found", "MOM not found");
+    return mom;
+  }
+
+  async function createMomDraft(grants: PermissionGrants, actor: AuditActor, input: CreateMomInput) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.momManage);
+    const actorUserId = actor.userId;
+    if (!actorUserId) throw new AppError("INVARIANT", "studioflow.actor.user-required", "A user actor is required");
+    const topic = input.topic.trim();
+    const preparedBy = input.prepared_by_name.trim();
+    if (!topic || !preparedBy) {
+      throw new AppError("VALIDATION", "studioflow.mom.required", "Topic and preparer are required");
+    }
+    return runTransaction(async () => {
+      const project = await db.sfProject.findUnique({ where: { id: input.project_id }, select: { id: true, deleted_at: true } });
+      if (!project) throw new AppError("NOT_FOUND", "studioflow.project.not-found", "Project not found");
+      if (project.deleted_at) throw new AppError("CONFLICT", "studioflow.project.archived", "Project is archived");
+      const mom = await db.sfMomDocument.create({
+        data: {
+          project_id: input.project_id,
+          topic,
+          meeting_at: input.meeting_at,
+          venue: input.venue?.trim() || null,
+          attendees_text: input.attendees_text?.trim() || null,
+          prepared_by_name: preparedBy,
+          created_by: actorUserId,
+          items: { create: { sort_order: 0, is_text_only: true, list_style: "NONE", points: { create: { sort_order: 0, text: "", style: "TEXT" } } } },
+        },
+        include: momInclude,
+      });
+      await writeAudit({ action: "mom.create", entityType: "SfMomDocument", entityId: mom.id, actor, changes: { project_id: input.project_id, topic } });
+      return mom;
+    });
+  }
+
+  async function updateMomDraft(grants: PermissionGrants, actor: AuditActor, projectId: string, momId: string, input: UpdateMomInput) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.momManage);
+    return runTransaction(async () => {
+      const existing = await db.sfMomDocument.findFirst({ where: { id: momId, project_id: projectId } });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.mom.not-found", "MOM not found");
+      if (existing.state !== "DRAFT") throw new AppError("CONFLICT", "studioflow.mom.immutable", "Only draft MOMs can be edited");
+      const topic = input.topic === undefined ? undefined : input.topic.trim();
+      const preparedBy = input.prepared_by_name === undefined ? undefined : input.prepared_by_name.trim();
+      if (topic === "" || preparedBy === "") throw new AppError("VALIDATION", "studioflow.mom.required", "Topic and preparer are required");
+      const data = { ...(topic !== undefined ? { topic } : {}), ...(input.meeting_at !== undefined ? { meeting_at: input.meeting_at } : {}), ...(input.venue !== undefined ? { venue: input.venue?.trim() || null } : {}), ...(input.attendees_text !== undefined ? { attendees_text: input.attendees_text?.trim() || null } : {}), ...(preparedBy !== undefined ? { prepared_by_name: preparedBy } : {}) };
+      const changed = Object.entries(data).some(([key, value]) => {
+        const current = existing[key as keyof typeof existing];
+        return current instanceof Date && value instanceof Date ? current.getTime() !== value.getTime() : current !== value;
+      });
+      if (!changed) return db.sfMomDocument.findUniqueOrThrow({ where: { id: momId }, include: momInclude });
+      const updated = await db.sfMomDocument.update({ where: { id: momId }, data, include: momInclude });
+      await writeAudit({ action: "mom.edit", entityType: "SfMomDocument", entityId: momId, actor, changes: { project_id: projectId } });
+      return updated;
+    });
+  }
+
+  async function discardMomDraft(grants: PermissionGrants, actor: AuditActor, projectId: string, momId: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.momManage);
+    return runTransaction(async () => {
+      const existing = await db.sfMomDocument.findFirst({ where: { id: momId, project_id: projectId }, include: momInclude });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.mom.not-found", "MOM not found");
+      if (existing.state !== "DRAFT") throw new AppError("CONFLICT", "studioflow.mom.immutable", "Only draft MOMs can be discarded");
+      await db.sfMomDocument.delete({ where: { id: momId } });
+      await writeAudit({ action: "mom.discard", entityType: "SfMomDocument", entityId: momId, actor, changes: { project_id: projectId } });
+      return { id: momId };
+    });
+  }
+
+  async function updateMomContent(grants: PermissionGrants, actor: AuditActor, projectId: string, momId: string, input: MomContentInput) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.momManage);
+    return runTransaction(async () => {
+      const existing = await db.sfMomDocument.findFirst({ where: { id: momId, project_id: projectId }, include: momInclude });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.mom.not-found", "MOM not found");
+      if (existing.state !== "DRAFT") throw new AppError("CONFLICT", "studioflow.mom.immutable", "Only draft MOMs can be edited");
+      if (input.items.length === 0) throw new AppError("VALIDATION", "studioflow.mom.item-required", "A MOM needs at least one content block");
+      if (input.items.some((item) => item.images.length > 2)) throw new AppError("VALIDATION", "studioflow.mom.image-limit", "Each MOM block supports at most two images");
+      const imagePrefix = `studioflow/mom/${projectId}/${momId}/`;
+      if (input.items.some((item) => item.images.some((image) => !image.storage_key.startsWith(imagePrefix)))) {
+        throw new AppError("VALIDATION", "studioflow.mom.image-key", "A MOM image reference is invalid");
+      }
+      if (new Set(input.items.map((item) => item.sort_order)).size !== input.items.length) {
+        throw new AppError("VALIDATION", "studioflow.mom.item-order", "MOM block order must be unique");
+      }
+      for (const item of input.items) {
+        if (new Set(item.points.map((point) => point.sort_order)).size !== item.points.length ||
+            new Set(item.images.map((image) => image.sort_order)).size !== item.images.length) {
+          throw new AppError("VALIDATION", "studioflow.mom.child-order", "MOM point and image order must be unique");
+        }
+        if (item.points.some((point) => !point.text.trim())) {
+          throw new AppError("VALIDATION", "studioflow.mom.point-required", "MOM points cannot be empty");
+        }
+      }
+      const currentContent = existing.items.map((item) => ({ sort_order: item.sort_order, is_text_only: item.is_text_only, list_style: item.list_style, points: item.points.map((point) => ({ sort_order: point.sort_order, text: point.text, style: point.style })), images: item.images.map((image) => ({ sort_order: image.sort_order, storage_key: image.storage_key, alt_text: image.alt_text })) }));
+      const nextContent = input.items.map((item) => ({ sort_order: item.sort_order, is_text_only: item.is_text_only, list_style: item.list_style, points: item.points.map((point) => ({ sort_order: point.sort_order, text: point.text.trim(), style: point.style })), images: item.images.map((image) => ({ sort_order: image.sort_order, storage_key: image.storage_key, alt_text: image.alt_text?.trim() || null })) }));
+      if (JSON.stringify(currentContent) === JSON.stringify(nextContent)) return existing;
+      await db.sfMomItem.deleteMany({ where: { document_id: momId } });
+      await db.sfMomItem.createMany({ data: input.items.map((item) => ({ document_id: momId, sort_order: item.sort_order, is_text_only: item.is_text_only, list_style: item.list_style })) });
+      const items = await db.sfMomItem.findMany({ where: { document_id: momId }, select: { id: true, sort_order: true } });
+      for (const item of input.items) {
+        const target = items.find((row) => row.sort_order === item.sort_order);
+        if (!target) continue;
+        if (item.points.length) await db.sfMomPoint.createMany({ data: item.points.map((point) => ({ item_id: target.id, sort_order: point.sort_order, text: point.text.trim(), style: point.style })) });
+        if (item.images.length) await db.sfMomImage.createMany({ data: item.images.map((image) => ({ item_id: target.id, sort_order: image.sort_order, storage_key: image.storage_key, alt_text: image.alt_text?.trim() || null })) });
+      }
+      const updated = await db.sfMomDocument.findUniqueOrThrow({ where: { id: momId }, include: momInclude });
+      await writeAudit({ action: "mom.content.edit", entityType: "SfMomDocument", entityId: momId, actor, changes: { project_id: projectId, item_count: input.items.length } });
+      return updated;
+    });
+  }
+
+  async function issueMom(grants: PermissionGrants, actor: AuditActor, projectId: string, momId: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.momIssue);
+    const actorUserId = actor.userId;
+    if (!actorUserId) throw new AppError("INVARIANT", "studioflow.actor.user-required", "A user actor is required");
+    return runTransaction(async () => {
+      const existing = await db.sfMomDocument.findFirst({ where: { id: momId, project_id: projectId }, include: momInclude });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.mom.not-found", "MOM not found");
+      if (existing.state !== "DRAFT") throw new AppError("CONFLICT", "studioflow.mom.not-draft", "Only draft MOMs can be issued");
+      if (!existing.items.length || existing.items.every((item) => item.points.every((point) => !point.text.trim()))) {
+        throw new AppError("VALIDATION", "studioflow.mom.content-required", "Add meeting content before issuing this MOM");
+      }
+      const max = await db.sfMomDocument.aggregate({ where: { project_id: projectId }, _max: { sequence: true } });
+      const updated = await db.sfMomDocument.update({ where: { id: momId }, data: { state: "ISSUED", sequence: (max._max.sequence ?? 0) + 1, issued_by: actorUserId, issued_at: new Date() }, include: momInclude });
+      await writeAudit({ action: "mom.issue", entityType: "SfMomDocument", entityId: momId, actor, changes: { project_id: projectId, sequence: updated.sequence } });
+      return updated;
+    });
+  }
+
+  async function assertMomDraftEditable(grants: PermissionGrants, projectId: string, momId: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.momManage);
+    const mom = await db.sfMomDocument.findFirst({ where: { id: momId, project_id: projectId }, select: { state: true } });
+    if (!mom) throw new AppError("NOT_FOUND", "studioflow.mom.not-found", "MOM not found");
+    if (mom.state !== "DRAFT") throw new AppError("CONFLICT", "studioflow.mom.immutable", "Only draft MOMs can be edited");
+  }
+
+  async function supersedeMom(grants: PermissionGrants, actor: AuditActor, projectId: string, momId: string, input: CreateMomInput) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.momIssue);
+    const actorUserId = actor.userId;
+    if (!actorUserId) throw new AppError("INVARIANT", "studioflow.actor.user-required", "A user actor is required");
+    const topic = input.topic.trim();
+    const preparedBy = input.prepared_by_name.trim();
+    if (!topic || !preparedBy) throw new AppError("VALIDATION", "studioflow.mom.required", "Topic and preparer are required");
+    return runTransaction(async () => {
+      const source = await db.sfMomDocument.findFirst({ where: { id: momId, project_id: projectId }, include: momInclude });
+      if (!source) throw new AppError("NOT_FOUND", "studioflow.mom.not-found", "MOM not found");
+      if (source.state !== "ISSUED") throw new AppError("CONFLICT", "studioflow.mom.not-issued", "Only an issued MOM can be corrected");
+      const created = await db.sfMomDocument.create({
+        data: {
+          project_id: projectId, topic, meeting_at: input.meeting_at,
+          venue: input.venue?.trim() || null, attendees_text: input.attendees_text?.trim() || null,
+          prepared_by_name: preparedBy, created_by: actorUserId, supersedes_id: source.id,
+          items: { create: source.items.map((item) => ({
+            sort_order: item.sort_order, is_text_only: item.is_text_only, list_style: item.list_style,
+            points: { create: item.points.map((point) => ({ sort_order: point.sort_order, text: point.text, style: point.style })) },
+            images: { create: item.images.map((image) => ({ sort_order: image.sort_order, storage_key: image.storage_key, alt_text: image.alt_text })) },
+          })) },
+        }, include: momInclude,
+      });
+      const max = await db.sfMomDocument.aggregate({ where: { project_id: projectId }, _max: { sequence: true } });
+      const issued = await db.sfMomDocument.update({ where: { id: created.id }, data: { state: "ISSUED", sequence: (max._max.sequence ?? 0) + 1, issued_by: actorUserId, issued_at: new Date() }, include: momInclude });
+      await db.sfMomDocument.update({ where: { id: source.id }, data: { state: "SUPERSEDED" } });
+      await writeAudit({ action: "mom.supersede", entityType: "SfMomDocument", entityId: issued.id, actor, changes: { project_id: projectId, supersedes_id: source.id, sequence: issued.sequence } });
+      return issued;
+    });
+  }
+
   // ── Tasks (§7.3) ───────────────────────────────────────────────────────
 
   async function listTasks(
@@ -2072,6 +2333,22 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     moveFile,
     supersedeFile,
     listProjectFiles,
+    listCatalogueProducts,
+    getCatalogueProduct,
+    createCatalogueProduct,
+    editCatalogueProduct,
+    archiveCatalogueProduct,
+    restoreCatalogueProduct,
+    // MOM
+    listMomDocuments,
+    getMom,
+    createMomDraft,
+    updateMomDraft,
+    discardMomDraft,
+    updateMomContent,
+    assertMomDraftEditable,
+    issueMom,
+    supersedeMom,
     // Tasks (SF-F4)
     listTasks,
     listAssignableUsers,

@@ -1,6 +1,6 @@
 # Minutes of Meeting Contract — StudioFlow
 
-Status: **OWNER-APPROVED LOGIC CONTRACT — not an executable work order**
+Status: **OWNER-APPROVED LOGIC CONTRACT — implemented in R7.52**
 
 Authority: owner clarification of 2026-09-10, reconciled with committed legacy
 evidence at `5fc605e304a12db6b5efe0a2c0271a2d9415b2da`. MOM belongs only to a
@@ -182,6 +182,6 @@ BQ, Product Catalogue, Schedule, phase, iteration, or task dependency.
 4. Image support is required and reuses the shared image workspace.
 5. Issue is direct with confirmation; no separate approval stage is added.
 
-No product decision remains open before a navigator writes the executable MOM
-work order. Storage activation for `STORED` images and KB-004 still remain
-technical dependencies and must not be reported as passed before verification.
+The MOM executable work order is complete in R7.52. Production storage activation
+for `STORED` images and KB-004 environment provisioning remain technical
+dependencies and must not be reported as passed before verification.

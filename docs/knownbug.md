@@ -1,6 +1,6 @@
 # Known Bugs by Application
 
-Status: active defect ledger, reconciled through R7.46 on 2026-09-10.
+Status: active defect ledger, reconciled through R7.53 on 2026-09-10.
 
 Planned features belong in [`roadmap.md`](roadmap.md). When a bug is fixed, move
 it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
@@ -11,14 +11,17 @@ No open Foundation bug is currently recorded.
 
 ## UI Engine and Shared Utilities
 
-### KB-004 — Shared image tools are not canonical across consumers
+### KB-004 — Shared image provider is not provisioned in kantor
 
-- **Observed:** No approved rebuild image workspace provides picker, crop,
-  zoom, and annotation across MOM and Schedule consumers.
+- **Observed:** R7.52 provides the canonical UI Engine ImageWorkspace, Core
+  storage port, fake seam, and server-only Supabase adapter, but `.env.kantor`
+  has no Supabase provider credentials and no production bucket has been
+  provisioned.
 - **Expected:** One public UI Engine capability with consumer-owned policy and
   cross-consumer regression evidence.
-- **Mitigation:** Do not create app-local substitutes before activation.
-- **Status:** Open.
+- **Mitigation:** MOM image persistence fails safely until the provider is
+  configured; tests use the fake adapter and no local filesystem fallback.
+- **Status:** Open; implementation complete, environment provisioning remains.
 
 ## Master Data
 
@@ -31,24 +34,25 @@ No open BQ bug is currently recorded.
 
 ## StudioFlow
 
-### KB-002 — Storage-byte release is not implemented
+### KB-002 — Storage-byte retention policy is not finalized
 
-- **Observed:** R7.40 replaces the unsent current metadata record, but no active
-  storage consumer exists, so old stored bytes cannot be released.
+- **Observed:** MOM removes unreferenced draft image objects best-effort, while
+  long-term retention and reconciliation for superseded records is not approved.
 - **Expected:** Retain metadata/audit and release bytes under approved retention.
-- **Mitigation:** Use the newest non-superseded record and keep the studio PC as
-  primary archive.
-- **Status:** Open; blocked by storage activation and retention policy.
+- **Mitigation:** Keep immutable MOM metadata and audit rows; do not claim byte
+  cleanup is complete until provider provisioning and retention policy exist.
+- **Status:** Open; blocked by retention policy/provider provisioning.
 
-### KB-003 — MOM and Product Catalogue/FFNI are absent from project detail
+### KB-003 — Project Schedule/FFNI remains absent from project detail
 
-- **Observed:** These legacy-proven extensions have no complete rebuild flow.
+- **Observed:** MOM and Product Catalogue are implemented in R7.52/R7.53;
+  Project Schedule/FFNI remains unimplemented.
 - **Expected:** Project-owned MOM and Schedule surfaces plus a StudioFlow-owned
   Product Catalogue reuse pool shared across StudioFlow projects. MOM remains
   independent from phase/iteration/Task; Product Catalogue never reads Master
   Data SKU, unit, or pricing.
-- **Mitigation:** Continue using existing operational surfaces.
-- **Status:** Open.
+- **Mitigation:** Continue using existing operational surfaces for Schedule/FFNI.
+- **Status:** Open; intentionally deferred to its own executable work order.
 
 ### KB-005 — Add Project regresses legacy client/modal behavior
 

@@ -5,8 +5,41 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.51**
-- Next local revision: **R7.52**
+- Current revision after this entry is committed: **R7.52**
+- Next local revision: **R7.53**
+
+## R7.52 | 2026-09-10 | feat(studioflow): add project-owned MOM
+
+### Changed
+
+- Added project-owned MOM documents with ordered blocks, points, list/point
+  styles, text-only blocks, and up to two ordered images per block.
+- Added draft, issue, discard, immutable issued, and superseding correction
+  lifecycle with project-scope checks, permissions, and transactional audit.
+- Added the canonical shared ImageWorkspace and Core object-storage port with a
+  server-only Supabase adapter seam; MOM image keys are server-generated and
+  private. Runtime upload remains unavailable until office Supabase secrets
+  and the `platform-assets` bucket are provisioned.
+- Added print, loading, error, permission, immutable, confirmation, and
+  unsaved-navigation states, plus focused integration/UI/contract coverage.
+- Removed sort-order uniqueness constraints from MOM children; order is
+  maintained by domain validation and remains separate from identity.
+
+### Verification
+
+- `STUDIOFLOW_LOCATION=kantor npx prisma validate`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run typecheck`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run lint`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run build`: passed.
+- Full disposable-database `npm test`: 304 passed.
+- Browser smoke reached populated project and MOM draft/editor; unsaved-change
+  confirmation was observed. Real image upload remains blocked by missing
+  Supabase configuration.
+
+### Remaining
+
+- Provision the approved Supabase `platform-assets` bucket and server-only
+  secrets before claiming live image upload/cleanup acceptance.
 
 ## R7.51 | 2026-09-10 | work-order(studioflow): activate MOM and Product Catalogue
 

@@ -76,6 +76,8 @@ describe("UI Engine foundation", () => {
       // R7.48 — canonical copy-to-clipboard button; no StudioFlow vocabulary.
       "CopyButton",
       "SimpleTextEditor",
+      // R7.52 — activated by the project MOM image consumer.
+      "ImageWorkspace",
       "useDebouncedValue",
       "useOptionOverlay",
       "useConfirm",
@@ -342,6 +344,14 @@ describe("UI Engine foundation", () => {
     /* Reference identity moved the baseline every render for a form that rebuilt
        its initial object, so the guard never saw a dirty form. */
     assert.match(hooks, /if \(!equals\(initialValue, prevInitial\)\)/);
+  });
+
+  it("can guard same-origin link navigation with the shared unsaved dialog", () => {
+    const hooks = readFileSync(new URL("./patterns/hooks.tsx", import.meta.url), "utf8");
+    assert.match(hooks, /guardNavigation/);
+    assert.match(hooks, /document\.addEventListener\("click", handleClick, true\)/);
+    assert.match(hooks, /event\.stopImmediatePropagation\(\)/);
+    assert.match(hooks, /destination\.origin !== window\.location\.origin/);
   });
 
   it("uses Next client navigation for clickable rail destinations", () => {

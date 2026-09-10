@@ -120,6 +120,8 @@ type UnsavedChangesGuardOptions<T> = {
   description?: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
+  /** Intercept ordinary same-origin link navigation and use the shared dialog. */
+  guardNavigation?: boolean;
 };
 
 type FormDraftGuardOptions = {
@@ -133,6 +135,7 @@ type FormDraftGuardOptions = {
   description?: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
+  guardNavigation?: boolean;
 };
 
 function serialiseForm(form: HTMLFormElement | null): string {
@@ -150,6 +153,7 @@ export function useFormDraftGuard({
   description,
   confirmLabel,
   cancelLabel,
+  guardNavigation = false,
 }: FormDraftGuardOptions) {
   const [opening, setOpening] = useState({ active, resetKey, watchedValue });
   const changed = active !== opening.active || resetKey !== opening.resetKey;
@@ -212,7 +216,7 @@ export function useFormDraftGuard({
     else sync();
   }, [active, capture, sync, watchedValue]);
 
-  const guard = useUnsavedChangesGuard({ value: JSON.stringify([value, watchedValue]), initialValue: JSON.stringify([baseline, initialWatched]), title, description, confirmLabel, cancelLabel });
+  const guard = useUnsavedChangesGuard({ value: JSON.stringify([value, watchedValue]), initialValue: JSON.stringify([baseline, initialWatched]), title, description, confirmLabel, cancelLabel, guardNavigation });
   const discardConfirm = useConfirm();
   const requestDiscard = useCallback(async (onDiscard?: () => void) => {
     const current = JSON.stringify([serialiseForm(formRef.current), watchedValue]);
@@ -240,6 +244,7 @@ export function useUnsavedChangesGuard<T>({
   description = "You have unsaved changes. Discard them and continue?",
   confirmLabel = "Discard changes",
   cancelLabel = "Keep editing",
+  guardNavigation = false,
 }: UnsavedChangesGuardOptions<T>) {
   const [savedBaseline, setSavedBaseline] = useState<T>(initialValue);
   const [prevInitial, setPrevInitial] = useState<T>(initialValue);
@@ -254,10 +259,12 @@ export function useUnsavedChangesGuard<T>({
 
   const isDirty = !equals(value, savedBaseline);
   const confirm = useConfirm();
+  const navigationBypassRef = useRef(false);
 
   useEffect(() => {
     if (!isDirty) return;
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (navigationBypassRef.current) return;
       event.preventDefault();
       event.returnValue = "";
     };
@@ -295,6 +302,25 @@ export function useUnsavedChangesGuard<T>({
     },
     [cancelLabel, confirm, confirmLabel, description, equals, savedBaseline, title, value],
   );
+
+  useEffect(() => {
+    if (!isDirty || !guardNavigation) return;
+    const handleClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const element = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (!(element instanceof HTMLAnchorElement) || element.target === "_blank" || element.hasAttribute("download")) return;
+      const destination = new URL(element.href, window.location.href);
+      if (destination.origin !== window.location.origin || destination.href === window.location.href) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      void requestDiscard(() => {
+        navigationBypassRef.current = true;
+        window.location.assign(destination.href);
+      });
+    };
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
+  }, [guardNavigation, isDirty, requestDiscard]);
 
   return {
     isDirty,

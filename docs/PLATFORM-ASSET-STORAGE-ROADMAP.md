@@ -2,17 +2,16 @@
 
 ## Status
 
-**PLANNED — no storage bucket, secrets, dependencies, database migration, or
-application code are activated by this roadmap.** The first executable work
-order must select its target local revision from `CHANGELOG.md` when it starts.
+**PARTIALLY ACTIVATED in R7.52.** The shared Core port, fake seam, UI Engine
+ImageWorkspace, MOM consumer, and server-only Supabase adapter are implemented.
+The provider bucket and local/production credentials are not provisioned.
 
 ## Objective
 
 Make production-safe image upload available through a reusable platform
-capability. The first consumer is the platform Brand mark in General Settings;
-StudioFlow may consume the same capability only when its own approved work
-order activates media support. The StudioFlow decision gates and exclusions are
-recorded in [`STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md`](STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md).
+capability. The first activated consumer is StudioFlow MOM in R7.52; the
+platform Brand mark remains deferred until its own work order. The StudioFlow
+decision gates and exclusions are recorded in [`STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md`](STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md).
 
 The production runtime is Vercel and the application database is Supabase
 PostgreSQL. Runtime filesystem storage is not durable on Vercel and must never
@@ -69,7 +68,7 @@ above is evidence; no working-tree legacy file is a source of behavior.
 
 ## Delivery sequence
 
-### Phase 1 — platform contract and test seam
+### Phase 1 — platform contract and test seam (complete in R7.52)
 
 - Add the storage port, object-reference model, and a fake adapter for unit
   tests.
@@ -80,7 +79,7 @@ above is evidence; no working-tree legacy file is a source of behavior.
 - Add tests for size/type/signature checks, key construction, cleanup, and
   failures that never expose provider errors.
 
-### Phase 2 — Supabase Storage infrastructure
+### Phase 2 — Supabase Storage infrastructure (adapter complete; provisioning open)
 
 - Create `platform-assets` with public-read access limited to its public asset
   paths and no anonymous write/list/delete access.

@@ -64,7 +64,7 @@ async function seedRoundPhase() {
       folder_key: "design",
     },
   });
-  return { phase };
+  return { phase, project };
 }
 
 before(async () => {
@@ -398,5 +398,68 @@ describe("StudioFlow round lifecycle", () => {
 
     await service.sendIteration([STUDIOFLOW_PERMISSIONS.iterationReview], ACTOR, first.iteration!.id);
     assert.equal((await testDb.prisma.sfFile.findUniqueOrThrow({ where: { id: second.file.id } })).sent_in_iteration_id, first.iteration!.id);
+  });
+
+  it("keeps MOM project-scoped, ordered, auditable, and immutable after issue", async () => {
+    const { project } = await seedRoundPhase();
+    const draft = await service.createMomDraft([STUDIOFLOW_PERMISSIONS.momManage], ACTOR, {
+      project_id: project.id,
+      topic: "Design review",
+      meeting_at: new Date("2026-09-10T03:00:00.000Z"),
+      prepared_by_name: "Designer",
+    });
+    assert.equal(draft.sequence, null);
+    assert.equal(draft.items.length, 1);
+
+    await service.updateMomContent([STUDIOFLOW_PERMISSIONS.momManage], ACTOR, project.id, draft.id, {
+      items: [{
+        sort_order: 0,
+        is_text_only: false,
+        list_style: "BULLET",
+        points: [{ sort_order: 0, text: "Approve tile sample", style: "BULLET" }],
+        images: [{ sort_order: 0, storage_key: `studioflow/mom/${project.id}/${draft.id}/sample.png`, alt_text: "Tile sample" }],
+      }],
+    });
+    const issued = await service.issueMom([STUDIOFLOW_PERMISSIONS.momIssue], ACTOR, project.id, draft.id);
+    assert.equal(issued.state, "ISSUED");
+    assert.equal(issued.sequence, 1);
+    await assert.rejects(
+      () => service.updateMomDraft([STUDIOFLOW_PERMISSIONS.momManage], ACTOR, project.id, draft.id, { topic: "Changed" }),
+      (error: unknown) => error instanceof AppError && error.code === "studioflow.mom.immutable",
+    );
+    assert.ok(await testDb.prisma.auditEvent.findFirst({ where: { action: "mom.issue", entity_id: draft.id } }));
+  });
+
+  it("refuses cross-project MOM child mutation and issues a correction without rewriting the source", async () => {
+    const { project } = await seedRoundPhase();
+    const otherClient = await testDb.prisma.sfClient.create({ data: { name: "Other client" } });
+    const otherProject = await testDb.prisma.sfProject.create({ data: { code: "SF26-MOM2", name: "Other", client_id: otherClient.id, type: "OTHER", opened_at: new Date() } });
+    const draft = await service.createMomDraft([STUDIOFLOW_PERMISSIONS.momManage], ACTOR, { project_id: project.id, topic: "Original", meeting_at: new Date(), prepared_by_name: "Designer" });
+    await assert.rejects(
+      () => service.updateMomContent([STUDIOFLOW_PERMISSIONS.momManage], ACTOR, otherProject.id, draft.id, { items: [{ sort_order: 0, is_text_only: true, list_style: "NONE", points: [{ sort_order: 0, text: "No", style: "TEXT" }], images: [] }] }),
+      (error: unknown) => error instanceof AppError && error.code === "studioflow.mom.not-found",
+    );
+    await service.updateMomContent([STUDIOFLOW_PERMISSIONS.momManage], ACTOR, project.id, draft.id, {
+      items: [{ sort_order: 0, is_text_only: true, list_style: "NONE", points: [{ sort_order: 0, text: "Approved content", style: "TEXT" }], images: [] }],
+    });
+    await service.issueMom([STUDIOFLOW_PERMISSIONS.momIssue], ACTOR, project.id, draft.id);
+    const correction = await service.supersedeMom([STUDIOFLOW_PERMISSIONS.momIssue], ACTOR, project.id, draft.id, { project_id: project.id, topic: "Corrected", meeting_at: new Date(), prepared_by_name: "Designer" });
+    assert.equal(correction.supersedes_id, draft.id);
+    assert.equal(correction.sequence, 2);
+    assert.equal((await testDb.prisma.sfMomDocument.findUniqueOrThrow({ where: { id: draft.id } })).state, "SUPERSEDED");
+  });
+
+  it("creates, searches, no-op edits, archives, and restores Product Catalogue rows", async () => {
+    const product = await service.createCatalogueProduct([STUDIOFLOW_PERMISSIONS.scheduleManage], ACTOR, { brand_md_id: "brand-1", brand_name: "Acme", product_name: "Tile", colour: "White", finishing: "Matte", unit: "pcs" });
+    assert.equal(product.search_key, "acme::tile::white::matte");
+    assert.equal((await service.listCatalogueProducts([STUDIOFLOW_PERMISSIONS.projectRead], { search: "WHITE" })).length, 1);
+    const beforeAudit = await testDb.prisma.auditEvent.count({ where: { action: "catalogue.edit", entity_id: product.id } });
+    await service.editCatalogueProduct([STUDIOFLOW_PERMISSIONS.scheduleManage], ACTOR, product.id, { product_name: "Tile" });
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "catalogue.edit", entity_id: product.id } }), beforeAudit);
+    await service.archiveCatalogueProduct([STUDIOFLOW_PERMISSIONS.scheduleManage], ACTOR, product.id);
+    assert.equal((await service.listCatalogueProducts([STUDIOFLOW_PERMISSIONS.projectRead])).length, 0);
+    await service.restoreCatalogueProduct([STUDIOFLOW_PERMISSIONS.scheduleManage], ACTOR, product.id);
+    assert.equal((await service.listCatalogueProducts([STUDIOFLOW_PERMISSIONS.projectRead])).length, 1);
+    await assert.rejects(() => service.createCatalogueProduct([], ACTOR, { product_name: "Forbidden" }), (error: unknown) => error instanceof AppError && error.kind === "FORBIDDEN");
   });
 });
