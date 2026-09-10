@@ -228,6 +228,158 @@ describe("StudioFlow round lifecycle", () => {
     assert.equal((responseAudit.metadata as { phase_closed?: boolean }).phase_closed, true);
   });
 
+  it("getNextFilename uses DRAFT round number when draft exists", async () => {
+    const { phase } = await seedRoundPhase();
+    const iter = await service.openIteration(
+      [STUDIOFLOW_PERMISSIONS.iterationManage],
+      ACTOR,
+      phase.id,
+    );
+    const projectId = (await testDb.prisma.sfProjectPhase.findUniqueOrThrow({ where: { id: phase.id } })).project_id;
+    const filename = await service.getNextFilename(
+      [STUDIOFLOW_PERMISSIONS.projectRead],
+      projectId,
+      phase.id,
+    );
+    assert.match(filename, new RegExp(`D ${iter.iteration.number}`));
+  });
+
+  it("getNextFilename previews max+1 when no DRAFT exists", async () => {
+    const { phase } = await seedRoundPhase();
+    const projectId = (await testDb.prisma.sfProjectPhase.findUniqueOrThrow({ where: { id: phase.id } })).project_id;
+    // No draft yet — should preview D 1 (0 + 1)
+    const filename = await service.getNextFilename(
+      [STUDIOFLOW_PERMISSIONS.projectRead],
+      projectId,
+      phase.id,
+    );
+    assert.match(filename, /D 1/);
+
+    // Open then void — max number is 1, so next preview should be D 2
+    const first = await service.openIteration([STUDIOFLOW_PERMISSIONS.iterationManage], ACTOR, phase.id);
+    await service.voidIteration([STUDIOFLOW_PERMISSIONS.iterationReview], ACTOR, first.iteration.id, "Test void");
+    const filename2 = await service.getNextFilename(
+      [STUDIOFLOW_PERMISSIONS.projectRead],
+      projectId,
+      phase.id,
+    );
+    assert.match(filename2, /D 2/);
+  });
+
+  it("getNextFilename rejects a phase from a different project", async () => {
+    const { phase } = await seedRoundPhase();
+    const otherClient = await testDb.prisma.sfClient.create({ data: { name: "Other" } });
+    const otherProject = await testDb.prisma.sfProject.create({
+      data: {
+        code: "SF26-OTH",
+        name: "Other project",
+        client_id: otherClient.id,
+        type: "RESIDENTIAL",
+        opened_at: new Date("2026-09-09T00:00:00.000Z"),
+      },
+    });
+    await assert.rejects(
+      () =>
+        service.getNextFilename(
+          [STUDIOFLOW_PERMISSIONS.projectRead],
+          otherProject.id,
+          phase.id,
+        ),
+      (err: unknown) => err instanceof AppError && err.code === "studioflow.phase.not-found",
+    );
+  });
+
+  it("DONE supervision phase refuses file intake", async () => {
+    const client = await testDb.prisma.sfClient.create({ data: { name: "SupClient" } });
+    const supTemplate = await testDb.prisma.sfPhaseTemplate.create({
+      data: { key: "SUPERVISION", name: "Supervision", sort_order: 2, has_rounds: false, round_prefix: null },
+    });
+    const project = await testDb.prisma.sfProject.create({
+      data: {
+        code: "SF26-SUP",
+        name: "Sup project",
+        client_id: client.id,
+        type: "RESIDENTIAL",
+        opened_at: new Date("2026-09-09T00:00:00.000Z"),
+      },
+    });
+    const supPhase = await testDb.prisma.sfProjectPhase.create({
+      data: {
+        project_id: project.id,
+        template_id: supTemplate.id,
+        key: supTemplate.key,
+        name: supTemplate.name,
+        sort_order: supTemplate.sort_order,
+        has_rounds: false,
+        round_prefix: null,
+        folder_key: "supervision",
+      },
+    });
+    // Start and finish supervision
+    await service.startSupervision([STUDIOFLOW_PERMISSIONS.iterationReview], ACTOR, supPhase.id);
+    await service.finishSupervision([STUDIOFLOW_PERMISSIONS.iterationReview], ACTOR, supPhase.id);
+
+    await assert.rejects(
+      () =>
+        service.recordFile(
+          [STUDIOFLOW_PERMISSIONS.iterationManage],
+          ACTOR,
+          { project_id: project.id, folder_key: "supervision", original_filename: "site.skp", bytes: 100 },
+        ),
+      (err: unknown) => err instanceof AppError && err.code === "studioflow.phase.closed",
+    );
+  });
+
+  it("DONE round-bearing phases refuse both record and link intake", async () => {
+    const { phase } = await seedRoundPhase();
+    const projectId = (await testDb.prisma.sfProjectPhase.findUniqueOrThrow({ where: { id: phase.id } })).project_id;
+    await testDb.prisma.sfProjectPhase.update({ where: { id: phase.id }, data: { state: "DONE" } });
+
+    await assert.rejects(
+      () => service.recordFile(
+        [STUDIOFLOW_PERMISSIONS.iterationManage],
+        ACTOR,
+        { project_id: projectId, folder_key: "design", original_filename: "done.skp", bytes: 100 },
+      ),
+      (err: unknown) => err instanceof AppError && err.code === "studioflow.phase.closed",
+    );
+    await assert.rejects(
+      () => service.linkFile(
+        [STUDIOFLOW_PERMISSIONS.iterationManage],
+        ACTOR,
+        { project_id: projectId, folder_key: "design", original_filename: "done.pdf", external_url: "https://example.com/done.pdf" },
+      ),
+      (err: unknown) => err instanceof AppError && err.code === "studioflow.phase.closed",
+    );
+  });
+
+  it("current file excludes superseded and respects folder", async () => {
+    const { phase } = await seedRoundPhase();
+    const projectId = (await testDb.prisma.sfProjectPhase.findUniqueOrThrow({ where: { id: phase.id } })).project_id;
+    // Drop first file (will be superseded by second)
+    const first = await service.recordFile(
+      [STUDIOFLOW_PERMISSIONS.iterationManage],
+      ACTOR,
+      { project_id: projectId, folder_key: "design", original_filename: "v1.skp", bytes: 100 },
+    );
+    const second = await service.recordFile(
+      [STUDIOFLOW_PERMISSIONS.iterationManage],
+      ACTOR,
+      { project_id: projectId, folder_key: "design", original_filename: "v2.skp", bytes: 200 },
+    );
+    await service.recordFile(
+      [STUDIOFLOW_PERMISSIONS.iterationManage],
+      ACTOR,
+      { project_id: projectId, folder_key: "other", original_filename: "other.skp", bytes: 300 },
+    );
+    const files = await service.listFiles([STUDIOFLOW_PERMISSIONS.projectRead], projectId);
+    const active = files.filter((f) => f.folder_key === "design" && f.superseded_at === null);
+    assert.equal(active.length, 1);
+    assert.equal(active[0].id, second.file.id);
+    const superseded = files.filter((f) => f.id === first.file.id);
+    assert.ok(superseded[0].superseded_at !== null);
+  });
+
   it("keeps one unsent current deliverable and freezes it on send", async () => {
     const { phase } = await seedRoundPhase();
     const first = await service.recordFile(

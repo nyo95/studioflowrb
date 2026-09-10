@@ -28,7 +28,7 @@ import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
 import { studioFlowService } from "@/apps/studioflow/runtime";
 import { GeneralTaskBlock } from "./general-task-block";
 import { PhaseSection } from "./phase-section";
-import type { PhaseItem } from "./phase-section";
+import type { PhaseDeliverable, PhaseItem } from "./phase-section";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +65,22 @@ const PROJECT_STATUS_TONE = {
   COMPLETED: "neutral",
 } as const;
 
+function formatBytes(value: bigint): string {
+  const units = ["B", "KB", "MB", "GB"];
+  const base = 1024n;
+  let unit = 0;
+  let whole = value;
+  let remainder = 0n;
+  while (whole >= base && unit < units.length - 1) {
+    remainder = whole % base;
+    whole /= base;
+    unit += 1;
+  }
+  if (unit === 0) return `${whole.toString()} ${units[unit]}`;
+  const hundredths = Number((remainder * 100n) / base);
+  return `${whole.toString()}.${String(hundredths).padStart(2, "0")} ${units[unit]}`;
+}
+
 export default async function ProjectDetailPage({
   params,
 }: {
@@ -99,7 +115,7 @@ export default async function ProjectDetailPage({
   const canReviewIter = hasPermission(grants, STUDIOFLOW_PERMISSIONS.iterationReview);
   const canOverridePhase = hasPermission(grants, STUDIOFLOW_PERMISSIONS.phaseOverride);
 
-  const [project, settings, tasks, rawPhases, assignableUsers] = await Promise.all([
+  const [project, settings, tasks, rawPhases, assignableUsers, allFiles] = await Promise.all([
     studioFlowService.getProject(grants, id).catch((e: { kind?: string }) => {
       if (e?.kind === "NOT_FOUND") return null;
       throw e;
@@ -112,6 +128,7 @@ export default async function ProjectDetailPage({
       : Promise.resolve([]),
     studioFlowService.listProjectPhases(grants, id),
     canManageTasks ? studioFlowService.listAssignableUsers(grants) : Promise.resolve([] as Array<{ id: string; display_name: string }>),
+    studioFlowService.listFiles(grants, id),
   ]);
 
   // Resolve approved_by_id → display_name for ACC indicators
@@ -140,48 +157,96 @@ export default async function ProjectDetailPage({
     dateStyle: "medium",
   });
 
+  // Per-phase next filename preview (projectRead permission is always present here).
+  const phaseNextFilenames: Record<string, string> = {};
+  await Promise.all(
+    rawPhases
+      .filter((ph) => ph.state !== "DONE" && ph.folder_key != null)
+      .map(async (ph) => {
+        // Infer extension from the current file for this phase, if any.
+        const currentRaw = allFiles.find(
+          (f) => f.folder_key === ph.folder_key && f.superseded_at === null,
+        );
+        const ext = currentRaw?.original_filename.includes(".")
+          ? "." + currentRaw.original_filename.split(".").pop()
+          : undefined;
+        const name = await studioFlowService
+          .getNextFilename(grants, id, ph.id, ext ? { extension: ext } : {});
+        phaseNextFilenames[ph.id] = name;
+      }),
+  );
+
   // Serialize dates for client component boundary
-  const phases: PhaseItem[] = rawPhases.map((phase) => ({
-    id: phase.id,
-    name: phase.name,
-    key: phase.key,
-    state: phase.state as PhaseItem["state"],
-    has_rounds: phase.has_rounds,
-    round_prefix: phase.round_prefix,
-    requires_internal_approval: phase.requires_internal_approval,
-    tasks: tasks
-      .filter((task) => task.phase_scope === phase.key)
-      .map((task) => ({
-        id: task.id,
-        title: task.title,
-        status: task.status as "OPEN" | "DONE",
-        phase_scope: task.phase_scope,
-        sort_order: task.sort_order,
-        assignee_id: task.assignee_id,
-        due_date: task.due_date ? task.due_date.toISOString() : null,
+  const phases: PhaseItem[] = rawPhases.map((phase) => {
+    // Derive current deliverable file for this phase (newest non-superseded in its folder).
+    const currentRaw = phase.folder_key != null
+      ? allFiles.find((f) => f.folder_key === phase.folder_key && f.superseded_at === null)
+      : undefined;
+    let currentFile: PhaseDeliverable | null = null;
+    if (currentRaw) {
+      // Resolve the round label from already-loaded iterations.
+      const sentIter = currentRaw.sent_in_iteration_id
+        ? phase.iterations.find((it) => it.id === currentRaw.sent_in_iteration_id)
+        : undefined;
+      const prefix = phase.round_prefix ?? phase.key;
+      const sentRoundLabel = sentIter ? `${prefix}${sentIter.number}` : null;
+      currentFile = {
+        filename: currentRaw.filename,
+        original_filename: currentRaw.original_filename,
+        treatment: currentRaw.treatment as "RECORDED" | "LINKED",
+        bytes: String(currentRaw.bytes),
+        bytes_label: formatBytes(currentRaw.bytes),
+        dropped_at: currentRaw.dropped_at.toISOString(),
+        dropped_at_label: fmt.format(currentRaw.dropped_at),
+        external_url: currentRaw.external_url ?? null,
+        sent_round_label: sentRoundLabel,
+      };
+    }
+    return {
+      id: phase.id,
+      name: phase.name,
+      key: phase.key,
+      folder_key: phase.folder_key ?? null,
+      state: phase.state as PhaseItem["state"],
+      has_rounds: phase.has_rounds,
+      round_prefix: phase.round_prefix,
+      requires_internal_approval: phase.requires_internal_approval,
+      currentFile,
+      nextFilename: phaseNextFilenames[phase.id] ?? null,
+      tasks: tasks
+        .filter((task) => task.phase_scope === phase.key)
+        .map((task) => ({
+          id: task.id,
+          title: task.title,
+          status: task.status as "OPEN" | "DONE",
+          phase_scope: task.phase_scope,
+          sort_order: task.sort_order,
+          assignee_id: task.assignee_id,
+          due_date: task.due_date ? task.due_date.toISOString() : null,
+        })),
+      iterations: phase.iterations.map((iter) => ({
+        id: iter.id,
+        number: iter.number,
+        state: iter.state as PhaseItem["iterations"][number]["state"],
+        sent_at: iter.sent_at ? iter.sent_at.toISOString() : null,
+        created_at: iter.created_at.toISOString(),
+        void_reason: iter.void_reason ?? null,
+        internal_approval: iter.internal_approval
+          ? {
+              approver: accUserMap[iter.internal_approval.approved_by_id] ?? iter.internal_approval.approved_by_id,
+              at: iter.internal_approval.approved_at.toISOString(),
+            }
+          : null,
+        points: iter.points.map((pt) => ({
+          id: pt.id,
+          text: pt.text,
+          done: pt.done,
+          source: pt.source as "INTERNAL" | "CLIENT_REVISION",
+          withdrawn_at: pt.withdrawn_at ? pt.withdrawn_at.toISOString() : null,
+        })),
       })),
-    iterations: phase.iterations.map((iter) => ({
-      id: iter.id,
-      number: iter.number,
-      state: iter.state as PhaseItem["iterations"][number]["state"],
-      sent_at: iter.sent_at ? iter.sent_at.toISOString() : null,
-      created_at: iter.created_at.toISOString(),
-      void_reason: iter.void_reason ?? null,
-      internal_approval: iter.internal_approval
-        ? {
-            approver: accUserMap[iter.internal_approval.approved_by_id] ?? iter.internal_approval.approved_by_id,
-            at: iter.internal_approval.approved_at.toISOString(),
-          }
-        : null,
-      points: iter.points.map((pt) => ({
-        id: pt.id,
-        text: pt.text,
-        done: pt.done,
-        source: pt.source as "INTERNAL" | "CLIENT_REVISION",
-        withdrawn_at: pt.withdrawn_at ? pt.withdrawn_at.toISOString() : null,
-      })),
-    })),
-  }));
+    };
+  });
 
   const leadUser = project.lead_user_id
     ? await prisma.user.findUnique({

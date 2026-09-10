@@ -13,7 +13,16 @@ const failureOf = (state: ActionResult<void> | null) =>
 
 export type FolderOption = { folder_key: string; name: string };
 
-export function DeliverableForm({ projectId, folders }: { projectId: string; folders: FolderOption[] }) {
+export function DeliverableForm({
+  projectId,
+  folders = [],
+  fixedFolderKey,
+}: {
+  projectId: string;
+  folders?: FolderOption[];
+  /** When set, locks the folder without showing a selector. */
+  fixedFolderKey?: string;
+}) {
   const [mode, setMode] = useState<"record" | "link">("record");
   const [filename, setFilename] = useState("");
   const [bytes, setBytes] = useState("");
@@ -59,9 +68,13 @@ export function DeliverableForm({ projectId, folders }: { projectId: string; fol
           <Input name="external_url" type="url" required maxLength={2000} placeholder="https://drive.google.com/..." />
         </Field>
       )}
-      <Field label="Output folder">
-        <FolderSelect folders={folders} />
-      </Field>
+      {fixedFolderKey !== undefined ? (
+        <input type="hidden" name="folder_key" value={fixedFolderKey} />
+      ) : (
+        <Field label="Output folder">
+          <FolderSelect folders={folders} />
+        </Field>
+      )}
       <div className="sm:col-span-3">
         <Button type="submit" variant="primary" pending={pending}>Save deliverable</Button>
       </div>

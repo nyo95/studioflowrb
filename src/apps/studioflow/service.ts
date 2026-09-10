@@ -1096,14 +1096,25 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     if (phaseId) {
       const phase = await db.sfProjectPhase.findUniqueOrThrow({
         where: { id: phaseId },
-        select: { round_prefix: true, name: true, has_rounds: true },
+        select: { project_id: true, round_prefix: true, name: true, has_rounds: true },
       });
+      if (phase.project_id !== projectId) {
+        throw new AppError("NOT_FOUND", "studioflow.phase.not-found", "Phase not found in this project");
+      }
       if (phase.has_rounds) {
-        const latest = await db.sfIteration.findFirst({
+        const draft = await db.sfIteration.findFirst({
           where: { phase_id: phaseId, state: "DRAFT" },
           select: { number: true },
         });
-        if (latest) phaseLabel = `${phase.round_prefix ?? phase.name} ${latest.number}`;
+        if (draft) {
+          phaseLabel = `${phase.round_prefix ?? phase.name} ${draft.number}`;
+        } else {
+          const agg = await db.sfIteration.aggregate({
+            where: { phase_id: phaseId },
+            _max: { number: true },
+          });
+          phaseLabel = `${phase.round_prefix ?? phase.name} ${(agg._max.number ?? 0) + 1}`;
+        }
       }
     }
     return resolveFilename(settings.naming_template, project, { droppedAt: new Date(), phaseLabel }, opts.extension ?? "");
@@ -1121,7 +1132,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     const targetPhase = folderKey
       ? project.phases.find((phase) => phase.folder_key === folderKey)
       : null;
-    if (!targetPhase?.has_rounds) return { iteration: null, phaseLabel: null };
+    if (!targetPhase) return { iteration: null, phaseLabel: null };
     if (targetPhase.state === "DONE") {
       throw new AppError(
         "CONFLICT",
@@ -1129,6 +1140,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         "Reopen the phase before adding files",
       );
     }
+    if (!targetPhase.has_rounds) return { iteration: null, phaseLabel: null };
     const result = await resolveOrOpenDraft(db, targetPhase.id);
     const phase = await db.sfProjectPhase.findUniqueOrThrow({
       where: { id: targetPhase.id },

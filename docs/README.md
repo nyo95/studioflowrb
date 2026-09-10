@@ -1,6 +1,6 @@
 # Documentation Hub
 
-Status: reconciled through **R7.47** on 2026-09-10.
+Status: reconciled through **R7.48** on 2026-09-10.
 
 This directory contains active contracts, operational trackers, architecture
 roadmaps, and retained historical evidence. Current owner instruction remains

@@ -73,6 +73,8 @@ describe("UI Engine foundation", () => {
       "InlineEdit",
       // R7.43 — activated by the phase deliverable intake consumer (KB-011).
       "FileDropZone",
+      // R7.48 — canonical copy-to-clipboard button; no StudioFlow vocabulary.
+      "CopyButton",
       "SimpleTextEditor",
       "useDebouncedValue",
       "useOptionOverlay",
@@ -588,6 +590,41 @@ describe("UI Engine foundation", () => {
     assert.match(zone, /aria-describedby="field-1-error"/);
     assert.match(zone, /aria-invalid="true"/);
     assert.match(zone, /aria-required="true"/);
+  });
+
+  it("CopyButton renders with its idle accessible label", () => {
+    const btn = renderToStaticMarkup(
+      createElement(ui.CopyButton, { value: "SF26-TEST D1", label: "Copy filename" }),
+    );
+    assert.match(btn, /aria-label="Copy filename"/);
+  });
+
+  it("CopyButton source awaits clipboard write before changing state", () => {
+    const source = readFileSync(
+      new URL("./patterns/copy-button.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(source, /await navigator\.clipboard\.writeText/);
+  });
+
+  it("CopyButton source handles clipboard failure", () => {
+    const source = readFileSync(
+      new URL("./patterns/copy-button.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(source, /catch/);
+  });
+
+  it("CopyButton failure label is accessible from source", () => {
+    const source = readFileSync(
+      new URL("./patterns/copy-button.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(source, /failureLabel/);
+    assert.match(source, /role="status"/);
+    assert.match(source, /aria-live="polite"/);
+    assert.match(source, /clearTimeout/);
+    assert.match(source, /label=\{label\}/);
   });
 
   it("keeps app internals and domain vocabulary out of shared UI sources", () => {

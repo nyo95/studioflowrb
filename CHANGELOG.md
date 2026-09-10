@@ -5,8 +5,50 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.47**
-- Next local revision: **R7.48**
+- Current revision after this entry is committed: **R7.48**
+- Next local revision: **R7.49**
+
+## R7.48 | 2026-09-10 | feat(studioflow): put deliverable intake in phases
+
+### Changed
+
+- Added current deliverable summaries and fixed-folder metadata/link intake to
+  every project phase with an output folder, while keeping the project-wide
+  Files page intact.
+- Added read-only next-filename preview that uses an existing draft number or
+  previews the next server iteration number without creating state.
+- Corrected completed-phase intake protection for both round-bearing and
+  no-round phases.
+- Added the canonical UI Engine `CopyButton` with stable accessible naming,
+  live success/failure status, cleanup, and race-safe reset behavior.
+- Preserved metadata-only file handling: the picker does not submit bytes, and
+  current-file props serialize BigInt sizes as decimal strings.
+- Added focused regression coverage for filename preview, project scope,
+  completed phases, current-file filtering, fixed folders, phase presentation,
+  and copy control behavior.
+
+### Verification
+
+- `STUDIOFLOW_LOCATION=kantor npm run typecheck`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run lint`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:boundaries`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:legacy-runtime`: passed.
+- `STUDIOFLOW_LOCATION=kantor npx prisma validate`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run build`: passed.
+- UI Engine tests: 41 passed.
+- Focused phase deliverable tests: 2 passed; file-control tests: 2 passed;
+  StudioFlow copy regression test: 1 passed.
+- Full `npm test` was attempted and is not a pass: database-backed suites
+  refused to run because `PLATFORM_TEST_DATABASE_URL` is not configured for an
+  explicitly disposable database. No development or legacy database was used.
+- Live browser acceptance was not run, so the related roadmap/alignment items
+  remain open.
+
+### Remaining
+
+- R7.48 is implemented locally but pending disposable-database integration and
+  browser acceptance review. Do not close the phase-surface roadmap item or
+  KB-003/KB-004 based on this commit alone.
 
 ## R7.47 | 2026-09-10 | docs(studioflow): issue phase deliverable work order
 
