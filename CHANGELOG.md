@@ -5,8 +5,24 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.48**
-- Next local revision: **R7.49**
+- Current revision after this entry is committed: **R7.49**
+- Next local revision: **R7.50**
+
+## R7.49 | 2026-09-10 | work-order(studioflow): unify project work surface
+
+### Changed
+
+- Issued the next locked StudioFlow work order for composing project-owned
+  to-dos and phase deliverables into one work surface.
+- Explicitly preserves one project-owned task collection, keeps MOM unrelated
+  to tasks/phases/iterations, and makes round actions contextual.
+- No implementation is claimed by this entry; the work order remains active
+  until its executor commit and acceptance evidence exist.
+
+### Verification
+
+- Documentation and work-order consistency reviewed locally.
+- No application gates were run for this planning-only revision.
 
 ## R7.48 | 2026-09-10 | feat(studioflow): put deliverable intake in phases
 
