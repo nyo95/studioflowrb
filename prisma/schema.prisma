@@ -155,6 +155,14 @@ model PlatformGeneralSettings {
   week_starts_on    Int
   brand_mark_url    String?
 
+  /// Owner-configured launcher routing (roadmap "configurable main-route
+  /// settings"). Both are advisory: an id that is null, unknown, or no
+  /// longer accessible to the current user is ignored at read time, never
+  /// enforced or validated against the app registry here (Core stays
+  /// domain-neutral and never imports app code).
+  main_app_id    String?
+  landing_app_id String?
+
   updated_at DateTime @updatedAt
 
   @@schema("platform")

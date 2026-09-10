@@ -29,7 +29,7 @@ Read in this order before editing:
 9. `prisma/schema.prisma`, current migrations, relevant code, and tests;
 10. the applicable Next.js 16 guides under `node_modules/next/dist/docs/` before changing routing, proxy, forms/actions, caching, cookies, or rendering.
 
-`docs/apps/masterdata.md` is consumer evidence only. Do not resume Master Data product development. The only allowed Master Data edits are deterministic replacement of the unsafe configured operator with the new request identity, exposure of its permission registry through `public/`, and compatibility needed to protect its already-existing routes.
+`docs/apps/masterdata/masterdata.md` is consumer evidence only. Do not resume Master Data product development. The only allowed Master Data edits are deterministic replacement of the unsafe configured operator with the new request identity, exposure of its permission registry through `public/`, and compatibility needed to protect its already-existing routes.
 
 This completed work order used historical committed evidence recorded at commit
 `6377ac0971e7a7cc0fd8fb58a8360c069675f9a5`; that record does not establish a

@@ -83,7 +83,7 @@ export function composePermissionRegistry(
     if (typeof name !== "string" || name.trim().length === 0) {
       throw new AppError("INVARIANT", "REGISTRY_INVALID_APP_NAME", "An app registration is invalid.");
     }
-    if (typeof rootPath !== "string" || !rootPath.startsWith("/") || /\s/.test(rootPath)) {
+    if (typeof rootPath !== "string" || !/^\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(rootPath)) {
       throw new AppError("INVARIANT", "REGISTRY_INVALID_APP_PATH", "An app registration is invalid.");
     }
     const accessPermission = `${appId}.access`;

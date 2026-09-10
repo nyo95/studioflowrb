@@ -98,7 +98,7 @@ explicitly changes priority.
   setting, safe fallback, permission-aware redirect order, loop prevention, and
   tests for users with different grants.
 - Continue asset storage only from
-  `docs/PLATFORM-ASSET-STORAGE-ROADMAP.md`; never use runtime local filesystem.
+  `docs/apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md`; never use runtime local filesystem.
 - Keep identity, RBAC, audit, settings, validation, errors, and DB runtime
   domain-neutral.
 - Do not put StudioFlow/BQ/Master Data business roles or policy in Core.

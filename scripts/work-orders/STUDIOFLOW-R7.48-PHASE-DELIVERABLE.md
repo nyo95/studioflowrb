@@ -132,7 +132,7 @@ directly related need:
 - focused tests beside those StudioFlow files
 - the minimum UI Engine primitive/component, public export, and focused UI
   Engine tests required by §3.3
-- `docs/apps/studioflow-ux-spec.md`
+- `docs/apps/studioflow/studioflow-ux-spec.md`
 - `docs/alignment.md`, `docs/roadmap.md`, `docs/knownbug.md`, and `CHANGELOG.md`
   only after their claims match verified implementation state
 

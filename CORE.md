@@ -306,6 +306,14 @@ type Money = {
 
 ## 11. Platform General Settings
 
+R7.56 activates nullable `mainAppId` and `landingAppId` preferences under
+`platform.settings.manage`. Core validates and persists opaque app IDs; the
+launcher composition selects among live granted app registrations. An unset main
+means Master Data; otherwise the configured main wins when accessible, then the
+configured landing, then Master Data or the first accessible app. Unknown IDs
+fall back safely. No accessible apps means no redirect. Registered roots must be
+local non-root paths without query strings, fragments, or traversal segments.
+
 General Settings is a small typed platform aggregate shared by every app, not a generic key/value dump and not StudioFlow project configuration.
 
 Initial fields are:

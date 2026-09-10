@@ -8,6 +8,7 @@ import { getPermissionRegistry } from "@platform/core/rbac/registry";
 import { hasPermission } from "@platform/core/rbac";
 import { prisma } from "@platform/core/db";
 import { readPlatformGeneralSettings } from "@platform/core/settings";
+import { resolveMainRoute } from "./main-route";
 
 export const dynamic = "force-dynamic";
 
@@ -20,11 +21,17 @@ export default async function LauncherPage() {
   const registry = getPermissionRegistry();
   const accessible = registry.apps.filter((app) => hasPermission(grants, app.accessPermission));
 
-  // The launcher is intentionally bypassed. Master Data is the owner-selected
-  // default; a user without that grant still lands in their first allowed app.
-  const defaultApp = accessible.find((app) => app.appId === "masterdata") ?? accessible[0];
-  if (defaultApp) {
-    redirect(defaultApp.rootPath);
+  // The launcher is intentionally bypassed. See `resolveMainRoute`: an
+  // eligible user goes to the owner-configured main app; otherwise the
+  // configured landing app if they can reach it, else the previous fixed
+  // default (Master Data, then first accessible app).
+  const target = resolveMainRoute(
+    accessible.map(({ appId, rootPath }) => ({ appId, rootPath })),
+    settings.mainAppId,
+    settings.landingAppId,
+  );
+  if (target) {
+    redirect(target);
   }
 
   return (

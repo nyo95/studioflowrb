@@ -7,7 +7,18 @@ it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
 
 ## Platform Foundation
 
-No open Foundation bug is currently recorded.
+### KB-020 — Office rebuild migration history contains an untracked migration
+
+- **Observed (R7.56):** `prisma migrate status` reports database-only migration
+  `20260904153201_add_updated_by_label_vendor_brand` on the isolated office
+  rebuild database. No matching file was found in repository history.
+- **Expected:** Applied migration history is reproducible from committed files.
+- **Mitigation:** The reviewed additive routing migration was applied with
+  `migrate deploy`; all 35 repository migrations also deploy successfully to a
+  fresh isolated test database. Do not reset the office database or fabricate
+  the missing SQL/checksum. Recover the original migration and reconcile its
+  provenance before using `migrate dev` against this existing database.
+- **Status:** Open, pre-existing environment/history gap; not a routing failure.
 
 ## UI Engine and Shared Utilities
 
@@ -35,7 +46,7 @@ No open BQ bug is currently recorded.
 ## StudioFlow
 
 The R7.55 audit read the whole StudioFlow surface against
-[`apps/studioflow-project-contract.md`](apps/studioflow-project-contract.md) and
+[`apps/studioflow/studioflow-project-contract.md`](apps/studioflow/studioflow-project-contract.md) and
 opened KB-012 … KB-019 below. KB-013, KB-014 and KB-015 are one gap seen from
 three sides: the client answer is persisted as a single immutable `SfResponse`
 with no state, no replacement link and no reason, so the contract's whole §6.5

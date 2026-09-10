@@ -5,8 +5,45 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.55**
-- Next local revision: **R7.56**
+- Current revision after this entry is committed: **R7.56**
+- Next local revision: **R7.57**
+
+## R7.56 | 2026-09-10 | fix(platform): verify routing and reconcile documentation
+
+- Accepted the pending owner-directed routing implementation: two nullable
+  settings columns (`main_app_id`, `landing_app_id`), audited persistence,
+  Settings controls, and permission-filtered launcher resolution. Locked the
+  activated behavior in `CORE.md`; no new dependency.
+- Corrected unset-main precedence (Master Data before configured landing),
+  preserved unavailable app IDs when saving unrelated settings, and restricted
+  registered app roots to non-root canonical local paths (no launcher loops,
+  external URLs, queries, traversal, or fragments).
+- Browser review reproduced a successful-save form reset to old values.
+  Key the form by refreshed persisted settings so native resets use the saved
+  defaults without discarding the action result. Require settings-management
+  permission before any brand-mark file write.
+- Accepted the pending per-app documentation reorganization and redirect stubs,
+  UI Engine date/time/client-lookup audit, and separate review ledger. Date/time
+  consolidation and header/sidebar redesign are recommendations, not shipped
+  changes. BQ client lookup remains app-owned as documented.
+- Reconciled the paused StudioFlow workflow order with owner priorities; its
+  old R7.56 filename does not reserve or authorize that revision. KB-012 through
+  KB-019 and other deferred app work are not claimed fixed by this release.
+- Verification: `npm run check`, `npm run lint`, `prisma validate`, Prisma
+  generation, `npm test` (314 pass, 74 suites), and production build passed.
+  Local documentation link audit found zero missing targets. Browser tested
+  persisted main/landing selection, BQ and StudioFlow destinations, revoked
+  main-app grant fallback, null-main Master Data priority, stale-ID preservation
+  and fallback, read-only controls, and save at desktop and 375px viewport.
+  Canonical controls: UI Engine `Select`, `Field`, `Button`, `Notice`; no new
+  shared component or cross-app UI redesign is introduced.
+- Migration `20260910160000_platform_main_route_settings` applied successfully
+  to the verified rebuild-only kantor database. All 35 migrations also applied
+  to fresh `studioflow_rebuild_browser_test`; no legacy resource was accessed.
+  Existing kantor migration-history mismatch remains KB-020; no reset or
+  history rewrite was performed. Test browser server is temporary; the existing
+  development server on port 3001 is preserved.
+
 
 ## R7.55 | 2026-09-10 | fix(studioflow,docs): reconcile ledgers and close audit defects
 

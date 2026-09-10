@@ -27,6 +27,14 @@ export type PlatformGeneralSettings = {
   currency: string;
   weekStartsOn: 0 | 1;
   brandMarkUrl: string | null;
+  /**
+   * Owner-chosen launcher routing (roadmap: configurable main-route
+   * settings). Advisory only — resolved defensively against the current
+   * user's accessible apps at read time; see `resolveMainRoute` in
+   * `src/app/(platform)/main-route.ts`. `null` means no preference recorded.
+   */
+  mainAppId: string | null;
+  landingAppId: string | null;
 };
 
 export const DEFAULT_PLATFORM_GENERAL_SETTINGS: PlatformGeneralSettings = Object.freeze({
@@ -37,6 +45,8 @@ export const DEFAULT_PLATFORM_GENERAL_SETTINGS: PlatformGeneralSettings = Object
   currency: "IDR",
   weekStartsOn: 1,
   brandMarkUrl: null,
+  mainAppId: null,
+  landingAppId: null,
 });
 
 export type DbClient = PrismaClient | Prisma.TransactionClient;
@@ -74,6 +84,17 @@ function isSupportedCurrency(value: string): boolean {
   }
 }
 
+/**
+ * Shape-only check for an app id referenced by a setting. Core validates the
+ * pattern, never membership in the app registry — platform must not depend
+ * on app code, and an id that later stops matching a registered app should
+ * degrade gracefully (see `resolveMainRoute`), not throw here or at write
+ * time.
+ */
+function isAppIdShape(value: string): boolean {
+  return /^[a-z][a-z0-9-]*$/.test(value) && value.length <= 64;
+}
+
 /** Safe brand mark target: absolute https URL or a site-relative root path. */
 function isSafeBrandMarkUrl(value: string): boolean {
   if (value.startsWith("/")) {
@@ -95,6 +116,8 @@ export const PlatformGeneralSettingsSchema = z.strictObject({
   currency: z.string().refine(isSupportedCurrency, "Unsupported ISO-4217 currency code"),
   weekStartsOn: z.union([z.literal(0), z.literal(1)]),
   brandMarkUrl: z.string().refine(isSafeBrandMarkUrl, "Unsafe brand mark URL").nullable(),
+  mainAppId: z.string().refine(isAppIdShape, "Invalid app id").nullable(),
+  landingAppId: z.string().refine(isAppIdShape, "Invalid app id").nullable(),
 });
 
 export function parsePlatformGeneralSettingsInput(input: unknown): PlatformGeneralSettings {
@@ -108,6 +131,8 @@ export function parsePlatformGeneralSettingsInput(input: unknown): PlatformGener
     currency: result.data.currency,
     weekStartsOn: result.data.weekStartsOn as PlatformGeneralSettings["weekStartsOn"],
     brandMarkUrl: result.data.brandMarkUrl,
+    mainAppId: result.data.mainAppId,
+    landingAppId: result.data.landingAppId,
   };
 }
 
@@ -121,6 +146,8 @@ type SettingsRow = {
   currency: string;
   week_starts_on: number;
   brand_mark_url: string | null;
+  main_app_id: string | null;
+  landing_app_id: string | null;
 };
 
 function rowToSettings(row: SettingsRow): PlatformGeneralSettings {
@@ -132,6 +159,8 @@ function rowToSettings(row: SettingsRow): PlatformGeneralSettings {
     currency: row.currency,
     weekStartsOn: row.week_starts_on as PlatformGeneralSettings["weekStartsOn"],
     brandMarkUrl: row.brand_mark_url,
+    mainAppId: row.main_app_id,
+    landingAppId: row.landing_app_id,
   };
 }
 
@@ -158,6 +187,8 @@ export async function readPlatformGeneralSettings(db: DbClient): Promise<Platfor
         currency: defaults.currency,
         week_starts_on: defaults.weekStartsOn,
         brand_mark_url: defaults.brandMarkUrl,
+        main_app_id: defaults.mainAppId,
+        landing_app_id: defaults.landingAppId,
       },
     });
     return rowToSettings(created);
@@ -212,6 +243,8 @@ export function createPlatformSettingsService(ports: PlatformSettingsPorts) {
           currency: current.currency,
           weekStartsOn: current.weekStartsOn,
           brandMarkUrl: current.brandMarkUrl,
+          mainAppId: current.mainAppId,
+          landingAppId: current.landingAppId,
         };
         const after = values;
         const changedKeys = Object.keys(after).filter((key) =>
@@ -229,6 +262,8 @@ export function createPlatformSettingsService(ports: PlatformSettingsPorts) {
             currency: after.currency,
             week_starts_on: after.weekStartsOn,
             brand_mark_url: after.brandMarkUrl,
+            main_app_id: after.mainAppId,
+            landing_app_id: after.landingAppId,
           },
         });
         const changes: Record<string, { from: unknown; to: unknown }> = {};

@@ -34,16 +34,19 @@ const TIMEZONES = [
 export function GeneralSettingsForm({
   settings,
   canManage,
+  apps,
 }: {
   settings: PlatformGeneralSettings;
   canManage: boolean;
+  /** Registered apps eligible to be chosen as the main or landing app. */
+  apps: readonly { appId: string; name: string }[];
 }) {
   const [state, action, pending] = useActionState(updateGeneralSettingsAction, INITIAL);
   const disabled = !canManage || pending;
 
   return (
     <SectionCard>
-      <form action={action}>
+      <form key={JSON.stringify(settings)} action={action}>
         <div className="grid gap-4 md:grid-cols-2">
           <Field id="settings-organization" label="Organization name">
             <Input id="settings-organization" name="organizationName" defaultValue={settings.organizationName} required maxLength={120} disabled={disabled} />
@@ -76,6 +79,28 @@ export function GeneralSettingsForm({
           <input type="hidden" name="brandMarkUrl" value={settings.brandMarkUrl ?? ""} />
           <Field id="settings-brand-mark" label="Brand mark" description="Optional PNG, maximum 2 MB. It is fitted into the header mark without changing its height.">
             <Input id="settings-brand-mark" name="brandMarkFile" type="file" accept="image/png,.png" disabled={disabled} />
+          </Field>
+          <Field id="settings-main-app" label="Main application" description="Where an eligible user lands instead of the launcher. Leave as Master Data to keep the previous behavior.">
+            <Select id="settings-main-app" name="mainAppId" defaultValue={settings.mainAppId ?? ""} disabled={disabled}>
+              <option value="">Master Data (previous default)</option>
+              {settings.mainAppId && !apps.some((app) => app.appId === settings.mainAppId) ? <option value={settings.mainAppId}>Unavailable application ({settings.mainAppId})</option> : null}
+              {apps.map((app) => (
+                <option key={app.appId} value={app.appId}>
+                  {app.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field id="settings-landing-app" label="Landing page for other users" description="Where a user without access to the main application lands, if they can reach it. Leave as first accessible app to keep the previous behavior.">
+            <Select id="settings-landing-app" name="landingAppId" defaultValue={settings.landingAppId ?? ""} disabled={disabled}>
+              <option value="">First accessible app (previous default)</option>
+              {settings.landingAppId && !apps.some((app) => app.appId === settings.landingAppId) ? <option value={settings.landingAppId}>Unavailable application ({settings.landingAppId})</option> : null}
+              {apps.map((app) => (
+                <option key={app.appId} value={app.appId}>
+                  {app.name}
+                </option>
+              ))}
+            </Select>
           </Field>
         </div>
 

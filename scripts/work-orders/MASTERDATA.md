@@ -7,7 +7,7 @@ Target revisions: `R3.05+`
 
 Implement from the active Master Data contracts. Brand, Vendor, and Pricing
 contracts are authoritative over the index for their own product decisions. The
-owner-locked Unit, Category, and SKU decisions in `docs/apps/masterdata.md` are
+owner-locked Unit, Category, and SKU decisions in `docs/apps/masterdata/masterdata.md` are
 authoritative for those slices.
 
 ## Scope

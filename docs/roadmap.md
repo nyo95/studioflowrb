@@ -1,19 +1,20 @@
 # Product Roadmap by Application
 
-Status: active planning ledger, reconciled through R7.55 on 2026-09-10.
+Status: active planning ledger, reconciled through R7.56 on 2026-09-10.
 
 This file answers **what remains to be built**. It does not activate work by
 itself. Completed items are struck through or removed only after verification
-and must remain recorded in `CHANGELOG.md`. Bugs belong in
-[`knownbug.md`](knownbug.md), not here.
+and must remain recorded in `CHANGELOG.md`. Bugs belong in [`knownbug.md`](knownbug.md), not here. Implemented-but-
+unverified work belongs in [`review.md`](review.md), not here.
 
 ## Platform Foundation
 
 ### Planned features
 
-- [ ] Add configurable main-route settings. Route eligible users to the selected
-  main app and redirect users without access to an allowed landing page.
-- [ ] Execute [`PLATFORM-ASSET-STORAGE-ROADMAP.md`](PLATFORM-ASSET-STORAGE-ROADMAP.md):
+- [x] ~~Add configurable main-route settings.~~ Verified in R7.56: persistence,
+  permission-aware redirects, default/stale preferences, read-only controls,
+  and desktop/narrow browser saves. Evidence and limits: `CHANGELOG.md`.
+- [ ] Execute [`PLATFORM-ASSET-STORAGE-ROADMAP.md`](apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md):
   storage port/test seam, provider adapter, Brand mark migration, then approved
   future consumers.
 
@@ -31,8 +32,13 @@ and must remain recorded in `CHANGELOG.md`. Bugs belong in
 - [x] Add one canonical image workspace for the approved MOM consumer (R7.52):
   picker, preview, crop, zoom/pan, annotation, validation, progress, and errors.
 - [x] Connect the canonical rich-text editor to MOM (R7.52).
-- [ ] Audit canonical date/time and project/client lookup controls across
-  activated consumers.
+- [x] Audit canonical date/time and project/client lookup controls across
+  activated consumers. See
+  [`apps/ui-engine/date-time-lookup-audit-2026-09-10.md`](apps/ui-engine/date-time-lookup-audit-2026-09-10.md).
+- [ ] Consolidate the three separate hand-rolled `Intl.DateTimeFormat` call
+  sites found in Master Data, BQ, and StudioFlow behind one canonical UI
+  Engine display component, per the audit's Finding 1. Needs owner sign-off
+  before this is executed.
 
 ## Master Data
 
@@ -103,8 +109,10 @@ and must remain recorded in `CHANGELOG.md`. Bugs belong in
 - [ ] Explore a safe Library crawler that uses approved Master Data websites to
   retrieve representative logo/image metadata, with legal/technical checks and
   a deterministic fallback.
-- [ ] Explore opt-in, auditable, reversible AI file organization that never
-  silently changes filing state.
+- [ ] **Parked 2026-09-10 (owner instruction) — held until Platform routing,
+  UI Engine, and BQ land; see `README.md`'s Active sequence.** Explore opt-in,
+  auditable, reversible AI file organization that never silently changes
+  filing state.
 
 ### Lifecycle and release decisions
 

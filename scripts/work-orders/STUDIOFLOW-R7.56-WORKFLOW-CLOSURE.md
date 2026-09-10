@@ -2,7 +2,11 @@
 
 ## Status
 
-**ACTIVE EXECUTABLE WORK ORDER.** Target local revision: **R7.56**.
+**PAUSED WORK ORDER.** Owner priority is Platform routing, UI Engine, then BQ.
+The filename retains its original planning label for stable links; R7.56 is
+consumed by the routing review corrections. Before reactivation, the manager
+must rebase the instructions on current contracts and assign the next unused
+local revision. Revision/commit examples below are historical, not executable.
 
 Manager: Codex. Executor: Claude/OpenCode.
 
@@ -12,7 +16,7 @@ reads `R7.55`, with the R7.55 audit-correction commit in its history.
 ## 1. Objective
 
 Close the gaps the R7.55 audit opened against
-[`docs/apps/studioflow-project-contract.md`](../../docs/apps/studioflow-project-contract.md).
+[`docs/apps/studioflow/studioflow-project-contract.md`](../../docs/apps/studioflow/studioflow-project-contract.md).
 All of them are places where the rebuild sits **below** the legacy StudioFlow
 floor while not being one of the three approved deviations (phase flow,
 deliverables, one to-do collection). In priority order:

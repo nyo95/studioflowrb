@@ -6,6 +6,7 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
 import { toSafeErrorPayload, type SafeErrorPayload } from "@platform/core/errors";
 import { platformSettings } from "@platform/runtime";
+import { getPermissionRegistry } from "@platform/core/rbac/registry";
 import type { PlatformGeneralSettings } from "@platform/core/settings";
 import { GeneralSettingsForm } from "./general-settings-form";
 
@@ -26,6 +27,8 @@ export default async function GeneralSettingsPage() {
       </PageShell>
     );
   }
+
+  const apps = getPermissionRegistry().apps.map(({ appId, name }) => ({ appId, name }));
 
   let settings: PlatformGeneralSettings | undefined;
   let failure: SafeErrorPayload | undefined;
@@ -49,7 +52,7 @@ export default async function GeneralSettingsPage() {
           <ErrorState title="Unable to load settings" description={failure.safeMessage} />
         </SectionCard>
       ) : (
-        <GeneralSettingsForm settings={settings as PlatformGeneralSettings} canManage={hasPermission(grants, "platform.settings.manage")} />
+        <GeneralSettingsForm settings={settings as PlatformGeneralSettings} canManage={hasPermission(grants, "platform.settings.manage")} apps={apps} />
       )}
     </PageShell>
   );

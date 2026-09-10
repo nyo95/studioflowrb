@@ -7,13 +7,22 @@
 3. `docs/alignment.md`, `docs/roadmap.md`, and `docs/knownbug.md` when the task
    plans, audits, changes, or reviews StudioFlow or shared consumers
 4. The shared contract relevant to the task: `CORE.md`, `DESIGN.md`, and/or `UI_ENGINE.md`
-5. The active work order, when one exists. The current executable app work
-   order is `scripts/work-orders/STUDIOFLOW-R7.56-WORKFLOW-CLOSURE.md`.
+5. The active work order, when one exists. StudioFlow workflow closure in
+   `scripts/work-orders/STUDIOFLOW-R7.56-WORKFLOW-CLOSURE.md` is paused behind
+   the owner's Platform/UI Engine/BQ priorities; its filename is not a revision reservation.
    Work orders R7.48, R7.49, R7.52 and R7.53 are implemented and are retained
-   as history, not as instructions. `docs/apps/masterdata.md` indexes approved
+   as history, not as instructions. `docs/apps/masterdata/masterdata.md` indexes approved
    logic contracts only.
 6. `prisma/schema.prisma` for the implemented persisted shape
 7. The relevant current code, tests, and migrations
+
+## Communicating with the owner
+
+When explaining plans, findings, status, trade-offs, or problems to the
+owner in conversation, use plain, everyday language and avoid unnecessary
+technical jargon — don't assume familiarity with implementation detail.
+This is about how an agent talks *to the owner*; contracts, code, commit
+messages, and this file itself still need full technical precision.
 
 ## Authority order
 

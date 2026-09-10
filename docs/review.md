@@ -1,0 +1,90 @@
+# Ready for Review
+
+Status: active verification ledger, reconciled through R7.56 on 2026-09-10.
+New file, split out of `roadmap.md`/`knownbug.md` on 2026-09-10 at owner
+request, so status is visible at a glance:
+
+- [`roadmap.md`](roadmap.md) — **not built yet.** Planned features and decision
+  gates.
+- **This file** — **built, not yet checked.** Code, schema, and/or tests exist
+  and are believed to satisfy the contract, but nobody has walked it through a
+  real browser and no integration test has run against it. Treat anything
+  listed here as "should work", not "works".
+- [`knownbug.md`](knownbug.md) — **checked, and it's wrong.** An observed,
+  reproducible defect against the contract.
+
+An item leaves this file one of two ways: verification confirms it behaves —
+delete the entry and note the evidence in `CHANGELOG.md`; or verification finds
+a real defect — move it to `knownbug.md` with what was actually observed.
+
+## Platform Foundation
+
+### Configurable main-route settings
+
+- **Observed:** Implemented 2026-09-10 per `roadmap.md`'s "Add configurable
+  main-route settings" item. Adds `mainAppId`/`landingAppId` (nullable,
+  shape-validated, not registry-validated — Core stays domain-neutral) to
+  `PlatformGeneralSettings` and its schema/migration, a pure
+  `resolveMainRoute()` in `src/app/(platform)/main-route.ts` (with a colocated
+  unit test) that the launcher's `page.tsx` now calls instead of its old
+  hardcoded "masterdata first" default, and two new selects in
+  General Settings (Main application / Landing page for other users) wired
+  through `actions.ts`.
+- **Accepted R7.56:** Check, lint, Prisma validation/generation, 314 tests, and
+  production build pass. All migrations deploy to a fresh isolated rebuild
+  browser-test database; the new two-column migration also deploys to kantor.
+  Browser evidence covers main BQ/StudioFlow redirects, inaccessible-main
+  landing, null-main Master Data priority, stale-id preservation/fallback,
+  read-only settings, and successful saves at desktop and 375px width.
+  Fixed the post-save stale selection, registry path validation, default-main
+  precedence, and authorization before brand-mark upload. This entry is retained
+  as a short handoff receipt; it is no longer pending review.
+  Pre-existing office migration-history drift is tracked separately as KB-020.
+
+## UI Engine and Shared Utilities
+
+No item currently ready for review.
+
+## Master Data
+
+No item currently ready for review.
+
+## BQ
+
+### BQ-F1 through BQ-F5 — inline editing, all three L3 sources, live totals
+
+- **Observed:** Implemented as of R4.56 (`eadd693`) per the owner decisions
+  locked 2026-09-03 in [`apps/bq/bq-contract.md`](apps/bq/bq-contract.md):
+  inline editing for every value at every level (this is what activated
+  `InlineEdit` in the UI Engine out of its deferred registry), and all three L3
+  sources including Master Data import (BQ-F4). Totals stay live without
+  client-side arithmetic — every mutation returns the server-recomputed
+  `BqProjectDetail` and the client swaps state; each L1 is computed
+  independently so one unpriced item does not blank the document.
+- **Needs:** A real browser walkthrough (add/edit/import at every level,
+  confirm totals recompute correctly, confirm one unpriced item doesn't blank
+  the document) and at least one integration test. No `InlineEdit` interaction
+  test exists yet — only markup and source-contract assertions.
+- **Not blocking review, already tracked in `roadmap.md`:** no reorder for
+  Sections/L1/L2/L3 inside a project; import picker filters client-side and
+  caps at 80 rows with no paging; no unit-conversion helper for
+  `purchase_to_base_factor`.
+- **Status:** Ready for review, not yet verified.
+
+## StudioFlow
+
+No item currently ready for review beyond what the R7.55 audit already
+reconciled — that audit read code against
+[`apps/studioflow/studioflow-project-contract.md`](apps/studioflow/studioflow-project-contract.md)
+and either fixed what it found immediately or opened it as a dated defect in
+`knownbug.md` (KB-012…KB-019). Nothing from that pass is sitting in an
+unverified middle state.
+
+## Rules
+
+- An item belongs here only when code, schema, and/or tests actually exist for
+  it — a roadmap idea with no implementation stays in `roadmap.md`.
+- Don't claim something "works" because a table exists or a component was
+  imported — see the minimum product bar in this directory's `README.md`.
+- Closing an item here requires the same evidence closing a roadmap item does:
+  end-to-end verification, not a code read.
