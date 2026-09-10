@@ -40,7 +40,7 @@ Classification of the legacy baseline:
 | Repeated review/upload clicks | FIX by making deliverable intake the trigger |
 | File/folder filing metadata | KEEP as technical filing metadata |
 | Explorer-style folder viewer | PURGE from current scope |
-| MOM and Product Catalogue/FFNI | KEEP as project extensions; rebuild integration remains required |
+| MOM and Product Catalogue/FFNI | KEEP as project extensions; MOM is project-only with no Task/phase/iteration link, while Product Catalogue is StudioFlow-owned and reusable across its projects |
 | Global Library | KEEP as a global read/discovery surface |
 
 “No regression” means preserving useful legacy outcomes, permissions, audit,
@@ -62,7 +62,7 @@ StudioFlow
 │     │  └─ review/revision history
 │     ├─ MOM
 │     └─ Product Catalogue / FFNI / project schedule
-└─ Library (global, sourced from Master Data)
+└─ Brands (global Master Data read) + Product Catalogue (StudioFlow-owned reuse pool)
 ```
 
 There is one to-do collection per project. A phase screen filters that

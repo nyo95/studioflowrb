@@ -22,8 +22,8 @@ import type { FolderOption } from "./file-controls";
 export const dynamic = "force-dynamic";
 
 const TREATMENT_LABELS: Record<string, string> = {
-  RECORDED: "Dicatat",
-  STORED: "Tersimpan",
+  RECORDED: "Recorded",
+  STORED: "Stored",
   LINKED: "Link",
 };
 
@@ -96,7 +96,7 @@ export default async function ProjectFilesPage({
     })),
     {
       key: null,
-      label: "Tray belum disortir",
+      label: "Unsorted tray",
       files: listing.files.filter(
         (file) => !file.folder_key || !folderOptions.some((f) => f.folder_key === file.folder_key),
       ),
@@ -113,8 +113,8 @@ export default async function ProjectFilesPage({
         ]}
       />
       <PageHeader
-        title="File project"
-        description={`${listing.files.length} file tercatat`}
+        title="Project files"
+        description={`${listing.files.length} files recorded`}
         divider
         meta={<MetaList items={[<span key="code" className="font-ui-mono text-xs">{project.code}</span>, project.name]} />}
       />
@@ -124,7 +124,7 @@ export default async function ProjectFilesPage({
           <SectionCard title="Add deliverable">
             <p className="mb-3 text-xs text-ink-tertiary">
               Record deliverable metadata here. The file remains on the PC or in its original storage;
-              StudioFlow menyimpan metadata dan filing project.
+              StudioFlow stores only the metadata and project filing record.
             </p>
             <DeliverableForm projectId={projectId} folders={folderOptions} />
           </SectionCard>
@@ -136,7 +136,7 @@ export default async function ProjectFilesPage({
           {group.files.length === 0 ? (
             <EmptyState
               icon={group.key === null ? Inbox : FolderOpen}
-              title="Kosong"
+              title="Empty"
               description={group.key === null ? "All files are sorted." : "No files in this folder."}
             />
           ) : (
@@ -152,7 +152,7 @@ export default async function ProjectFilesPage({
                         {file.filename}
                       </p>
                       <p className="text-xs text-ink-tertiary">
-                        Asli: {file.original_filename} · {humanBytes(file.bytes)} · {fmt.format(new Date(file.dropped_at))}
+                        Original: {file.original_filename} · {humanBytes(file.bytes)} · {fmt.format(new Date(file.dropped_at))}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2 text-xs">
@@ -160,10 +160,10 @@ export default async function ProjectFilesPage({
                         {TREATMENT_LABELS[file.treatment] ?? file.treatment}
                       </span>
                       {file.sent_in_iteration_id && (
-                        <span className="rounded-full bg-surface-muted px-2 py-0.5">terkirim</span>
+                        <span className="rounded-full bg-surface-muted px-2 py-0.5">sent</span>
                       )}
                       {file.superseded_at && (
-                        <span className="rounded-full bg-surface-muted px-2 py-0.5">diganti</span>
+                        <span className="rounded-full bg-surface-muted px-2 py-0.5">superseded</span>
                       )}
                       {file.external_url && (
                         <a
@@ -173,7 +173,7 @@ export default async function ProjectFilesPage({
                           className="inline-flex items-center gap-1 text-action hover:underline"
                         >
                           <ExternalLink className="h-3 w-3" />
-                          Buka
+                          Open
                         </a>
                       )}
                     </div>

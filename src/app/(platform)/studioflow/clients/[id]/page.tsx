@@ -59,7 +59,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             items={[
               client.contact_name,
               client.contact_phone,
-              `${client._count.projects} project aktif`,
+              `${client._count.projects} active projects`,
             ]}
           />
         }

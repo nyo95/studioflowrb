@@ -39,8 +39,9 @@ and must remain recorded in `CHANGELOG.md`. Bugs belong in
 - [ ] Define media/file behavior after shared storage exists.
 - [ ] Define the physical Samples workflow.
 - [ ] Define workbook import/export policy and error reporting.
-- [ ] Keep StudioFlow Library access read-only through the Master Data public
-  port; never add a StudioFlow write path or cross-schema foreign key.
+- [ ] Keep StudioFlow Brands/Library discovery read-only through the Master
+  Data public Brand port; this is StudioFlow's only Master Data read. Product
+  Catalogue remains independently StudioFlow-owned.
 
 ## BQ
 
@@ -73,10 +74,12 @@ and must remain recorded in `CHANGELOG.md`. Bugs belong in
 
 ### Project extensions
 
-- [ ] Integrate MOM after deciding whether action items create project `Task`
-  records.
-- [ ] Integrate Product Catalogue/FFNI/Schedule after deciding entry scope,
-  client option semantics, and position identity.
+- [ ] Integrate project-owned MOM at every phase with no Task/To-do, phase, or
+  iteration linkage. Preserve the legacy ordered document/block/point/image
+  capability and reuse the canonical rich-text and image tools.
+- [ ] Integrate the StudioFlow-owned Product Catalogue reuse pool shared across
+  StudioFlow projects, then project FFNI/Schedule snapshots. Never read Master
+  Data SKU, unit, or pricing.
 - [ ] Complete legacy-audit phases for artifacts/MOM, schedule, SketchUp, and
   operational hardening before each related slice.
 - [ ] Rebuild SketchUp only as an authenticated, idempotent adapter with retry,

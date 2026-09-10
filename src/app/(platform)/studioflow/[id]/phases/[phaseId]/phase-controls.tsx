@@ -70,7 +70,7 @@ function ReasonAction({
     <div className="grid gap-1">
       <form action={formAction} className="flex items-end gap-2">
         <Field label={reasonLabel} required>
-          <Input name="reason" required maxLength={500} placeholder="Tulis alasan…" />
+          <Input name="reason" required maxLength={500} placeholder="Write the reason…" />
         </Field>
         <Button type="submit" variant={variant} pending={pending}>{label}</Button>
       </form>

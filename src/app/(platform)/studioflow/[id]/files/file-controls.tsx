@@ -51,7 +51,7 @@ export function DeliverableForm({ projectId, folders }: { projectId: string; fol
         </Select>
       </Field>
       {mode === "record" ? (
-        <Field label="Ukuran (bytes)" required>
+        <Field label="Size (bytes)" required>
           <Input name="bytes" type="number" min="1" value={bytes} onChange={(event) => setBytes(event.target.value)} required placeholder="2048000" />
         </Field>
       ) : (
@@ -59,7 +59,7 @@ export function DeliverableForm({ projectId, folders }: { projectId: string; fol
           <Input name="external_url" type="url" required maxLength={2000} placeholder="https://drive.google.com/..." />
         </Field>
       )}
-      <Field label="Folder output">
+      <Field label="Output folder">
         <FolderSelect folders={folders} />
       </Field>
       <div className="sm:col-span-3">
@@ -92,7 +92,7 @@ export function RecordFileForm({ projectId, folders }: { projectId: string; fold
       <Field label="Original file name" required>
         <Input name="original_filename" required maxLength={300} placeholder="Denah Lantai 1.pdf" />
       </Field>
-      <Field label="Ukuran (bytes)" required>
+      <Field label="Size (bytes)" required>
         <Input name="bytes" type="number" min="1" required placeholder="2048000" />
       </Field>
       <Field label="Folder">
@@ -164,10 +164,10 @@ export function FileRowControls({
       <div className="flex items-center gap-2">
         <form action={moveAction} className="flex items-center gap-1">
           <FolderSelect folders={folders} defaultValue={currentFolder ?? ""} />
-          <Button type="submit" size="sm" variant="ghost" pending={movePending}>Pindah</Button>
+          <Button type="submit" size="sm" variant="ghost" pending={movePending}>Move</Button>
         </form>
         <form action={supAction}>
-          <Button type="submit" size="sm" variant="ghost" pending={supPending}>Tandai diganti</Button>
+          <Button type="submit" size="sm" variant="ghost" pending={supPending}>Mark superseded</Button>
         </form>
       </div>
       {failure ? <InlineError>{failure}</InlineError> : null}

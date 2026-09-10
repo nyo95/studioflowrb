@@ -84,14 +84,14 @@ export function IterationLifecycle({
       {state === "SENT" && canReview && (
         <SimpleAction
           action={approveIterationAction.bind(null, iterationId, projectId, phaseId)}
-          label="Setujui"
+          label="Approve"
         />
       )}
       {open && canManage && (
         <div className="grid gap-1">
           <form action={voidAction} className="flex items-end gap-2">
-            <Field label="Alasan batal" required>
-              <Input name="reason" required maxLength={500} placeholder="Tulis alasan…" />
+            <Field label="Cancellation reason" required>
+              <Input name="reason" required maxLength={500} placeholder="Write the reason…" />
             </Field>
             <Button type="submit" variant="danger" pending={voidPending}>Cancel round</Button>
           </form>
@@ -139,12 +139,12 @@ export function PointRow({
             <form action={toggleAction}>
               <input type="hidden" name="done" value={point.done ? "false" : "true"} />
               <Button type="submit" size="sm" variant="ghost" pending={togglePending}>
-                {point.done ? "Buka" : "Selesai"}
+                {point.done ? "Reopen" : "Complete"}
               </Button>
             </form>
             <form action={wdAction} className="flex items-center gap-1">
-              <Input name="reason" required maxLength={500} placeholder="Alasan tarik" className="h-8 w-36" />
-              <Button type="submit" size="sm" variant="danger" pending={wdPending}>Tarik</Button>
+              <Input name="reason" required maxLength={500} placeholder="Withdrawal reason" className="h-8 w-36" />
+              <Button type="submit" size="sm" variant="danger" pending={wdPending}>Withdraw</Button>
             </form>
           </div>
         )}
@@ -164,10 +164,10 @@ export function AddPointForm({ iterationId, projectId, phaseId }: Ids) {
   return (
     <div className="mt-4 grid gap-1">
       <form action={formAction} className="flex items-end gap-2">
-        <Field label="Poin baru" required>
-          <Textarea name="text" required maxLength={1000} rows={2} placeholder="Tulis poin checklist…" />
+        <Field label="New point" required>
+          <Textarea name="text" required maxLength={1000} rows={2} placeholder="Write a checklist point…" />
         </Field>
-        <Button type="submit" variant="primary" pending={pending}>Tambah poin</Button>
+        <Button type="submit" variant="primary" pending={pending}>Add point</Button>
       </form>
       {failure ? <InlineError>{failure}</InlineError> : null}
     </div>
@@ -189,18 +189,18 @@ export function ResponseForm({ iterationId, projectId, phaseId }: Ids) {
         {failure ? <InlineError>{failure}</InlineError> : null}
         <Field label="Client response" required>
           <Select name="kind" required defaultValue="REVISION">
-            <option value="REVISION">Minta revisi</option>
-            <option value="APPROVAL">Setuju / approve</option>
+            <option value="REVISION">Request revision</option>
+            <option value="APPROVAL">Approve</option>
           </Select>
         </Field>
         <Field
-          label="Poin revisi"
-          description="Satu baris = satu poin. Ditulis persis seperti kata klien. Wajib kalau minta revisi."
+          label="Revision points"
+          description="One line per point. Preserve the client's exact wording. Required for a revision request."
         >
-          <Textarea name="points" rows={4} maxLength={4000} placeholder={"Warna dinding terlalu gelap\nTambah storage di dapur"} />
+          <Textarea name="points" rows={4} maxLength={4000} placeholder={"The wall color is too dark\nAdd storage in the kitchen"} />
         </Field>
           <Field label="Notes">
-          <Textarea name="note" rows={2} maxLength={2000} placeholder="Konteks tambahan (opsional)" />
+          <Textarea name="note" rows={2} maxLength={2000} placeholder="Additional context (optional)" />
         </Field>
         <div>
           <Button type="submit" variant="primary" pending={pending}>Record response</Button>

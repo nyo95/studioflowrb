@@ -19,7 +19,7 @@ const EditClientSchema = z.object({
     .trim()
     .max(200)
     .optional()
-    .refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), "Format email tidak valid"),
+    .refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), "The email format is not valid"),
   address: z.string().trim().max(500).optional(),
   notes: z.string().trim().max(2000).optional(),
 });

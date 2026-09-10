@@ -53,7 +53,9 @@ coverage of legacy while applying the owner’s simplification:
 - one current unsent deliverable record per project-phase/iteration;
 - detailed metadata/audit remains, while repeated bookkeeping clicks disappear;
 - MOM and Product Catalogue/FFNI remain project extensions;
-- Library remains global and reads Master Data one-way through its public port;
+- the Brands/Library discovery surface remains global and is StudioFlow's only
+  Master Data read, through the public port; Product Catalogue is independently
+  StudioFlow-owned and reusable across its projects;
 - Explorer-style folder viewer is out of scope. Do not revive it.
 
 ### Collaboration protocol
@@ -140,11 +142,14 @@ Work through these in order unless the owner reprioritizes:
 4. KB-007 Settings parity using the same legacy evidence workflow.
 5. Put current deliverable/intake inside the phase work surface and make
    Start Round/internal approval/send contextual rather than the main path.
-6. Integrate MOM after the owner resolves whether MOM actions create project
-   Tasks. Reuse canonical rich-text and image tools.
-7. Integrate Product Catalogue/FFNI/Schedule after entry scope, client option
-   semantics, and position identity are resolved. Snapshot historical facts and
-   use Master Data only through its public read boundary.
+6. Integrate project-owned MOM at every phase. MOM has no Task/To-do, phase, or
+   iteration linkage; “Write today's MOM” is only an ordinary independent
+   To-do. Preserve legacy ordered blocks, points, and images, and reuse
+   canonical rich-text and image tools.
+7. Integrate the StudioFlow-owned Product Catalogue reuse pool shared across
+   StudioFlow projects, then project FFNI/Schedule snapshots. Never read Master
+   Data SKU or pricing; StudioFlow's only Master Data read is Brands through
+   the public boundary.
 8. SketchUp integration is last and must be authenticated, idempotent,
    observable, retryable, and reconcilable.
 

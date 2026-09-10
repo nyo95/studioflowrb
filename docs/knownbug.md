@@ -1,6 +1,6 @@
 # Known Bugs by Application
 
-Status: active defect ledger, reconciled through R7.44 on 2026-09-10.
+Status: active defect ledger, reconciled through R7.46 on 2026-09-10.
 
 Planned features belong in [`roadmap.md`](roadmap.md). When a bug is fixed, move
 it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
@@ -43,7 +43,10 @@ No open BQ bug is currently recorded.
 ### KB-003 — MOM and Product Catalogue/FFNI are absent from project detail
 
 - **Observed:** These legacy-proven extensions have no complete rebuild flow.
-- **Expected:** Project-bound modules with approved permissions and lifecycle.
+- **Expected:** Project-owned MOM and Schedule surfaces plus a StudioFlow-owned
+  Product Catalogue reuse pool shared across StudioFlow projects. MOM remains
+  independent from phase/iteration/Task; Product Catalogue never reads Master
+  Data SKU, unit, or pricing.
 - **Mitigation:** Continue using existing operational surfaces.
 - **Status:** Open.
 
@@ -60,8 +63,10 @@ No open BQ bug is currently recorded.
 
 ### KB-006 — StudioFlow UI language remains mixed
 
-- **Closed:** R7.44. User-facing StudioFlow route and state copy is now English.
-  Remaining Indonesian matches are technical comments or internal anchor ids.
+- **Closed:** R7.46 completes the R7.44 correction. User-facing StudioFlow
+  route, validation, service-error, nested iteration, client, file, and state
+  copy is English. Remaining Indonesian matches are technical comments,
+  sample proper names, or internal anchor ids.
 
 ### KB-007 — Settings structure does not match useful legacy behavior
 

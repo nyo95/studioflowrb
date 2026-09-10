@@ -170,11 +170,11 @@ function TaskRow({
             name="phase_scope"
             density="compact"
             defaultValue={task.phase_scope ?? ""}
-            aria-label="Pindahkan task"
+            aria-label="Move task"
             onChange={(event) => event.currentTarget.form?.requestSubmit()}
             className="max-w-28"
           >
-            <option value="">Umum</option>
+            <option value="">General</option>
             {phases.map((phase) => <option key={phase.key} value={phase.key}>{phase.name}</option>)}
           </Select>
         </form>
@@ -185,11 +185,11 @@ function TaskRow({
           name="assignee_id"
           density="compact"
           defaultValue={task.assignee_id ?? ""}
-          aria-label="Penanggung jawab task"
+          aria-label="Task assignee"
           onChange={(event) => event.currentTarget.form?.requestSubmit()}
           className="max-w-28"
         >
-          <option value="">Tanpa PIC</option>
+          <option value="">Unassigned</option>
           {users.map((user) => <option key={user.id} value={user.id}>{user.display_name}</option>)}
         </Select>
       </form>
@@ -199,7 +199,7 @@ function TaskRow({
           name="due_date"
           density="compact"
           defaultValue={task.due_date ? task.due_date.slice(0, 10) : ""}
-          aria-label="Deadline task"
+          aria-label="Task deadline"
           onChange={(event) => event.currentTarget.form?.requestSubmit()}
           className="w-28"
         />
@@ -209,12 +209,12 @@ function TaskRow({
         <form action={moveAction}>
           <input type="hidden" name="phase_scope" value={task.phase_scope ?? ""} />
           <input type="hidden" name="sort_order" value={String(Math.max(0, position - 1))} />
-          <IconButton type="submit" size="sm" variant="ghost" label="Naikkan task" disabled={position === 0} className="disabled:invisible" icon={<ArrowUp aria-hidden="true" />} />
+          <IconButton type="submit" size="sm" variant="ghost" label="Move task up" disabled={position === 0} className="disabled:invisible" icon={<ArrowUp aria-hidden="true" />} />
         </form>
         <form action={moveAction}>
           <input type="hidden" name="phase_scope" value={task.phase_scope ?? ""} />
           <input type="hidden" name="sort_order" value={String(Math.min(total - 1, position + 1))} />
-          <IconButton type="submit" size="sm" variant="ghost" label="Turunkan task" disabled={position === total - 1} className="disabled:invisible" icon={<ArrowDown aria-hidden="true" />} />
+          <IconButton type="submit" size="sm" variant="ghost" label="Move task down" disabled={position === total - 1} className="disabled:invisible" icon={<ArrowDown aria-hidden="true" />} />
         </form>
       </div>
 
@@ -225,7 +225,7 @@ function TaskRow({
             type="submit"
             size="sm"
             variant="ghost"
-            label="Hapus task"
+            label="Delete task"
             className="shrink-0 hover:text-danger"
             icon={<Trash2 aria-hidden="true" />}
           />
@@ -246,7 +246,7 @@ export function GeneralTaskBlock({
   tasks,
   canManage,
   phases = [],
-  title = "TODO umum",
+  title = "General to-dos",
   phaseScope = null,
   users = [],
 }: {
@@ -268,12 +268,12 @@ export function GeneralTaskBlock({
   return (
     <SectionCard
       title={title}
-      count={open.length > 0 ? `${open.length} terbuka` : undefined}
+      count={open.length > 0 ? `${open.length} open` : undefined}
       padded={false}
       action={
         done.length > 0 ? (
           <Button variant="ghost" size="sm" onClick={() => setShowDone((v) => !v)}>
-            {showDone ? "Sembunyikan selesai" : `Lihat ${done.length} selesai`}
+            {showDone ? "Hide completed" : `Show ${done.length} completed`}
           </Button>
         ) : null
       }

@@ -45,13 +45,13 @@ export function ClientDetailView({
           <Field label="Contact name">
             <Input name="contact_name" maxLength={200} defaultValue={client.contact_name ?? ""} disabled={!canManage || !!client.deleted_at} />
           </Field>
-          <Field label="Telepon">
+          <Field label="Phone">
             <Input name="contact_phone" type="tel" maxLength={50} defaultValue={client.contact_phone ?? ""} disabled={!canManage || !!client.deleted_at} />
           </Field>
           <Field label="Email">
             <Input name="contact_email" type="email" maxLength={200} defaultValue={client.contact_email ?? ""} disabled={!canManage || !!client.deleted_at} />
           </Field>
-          <Field label="Alamat">
+          <Field label="Address">
             <Textarea name="address" maxLength={500} rows={2} defaultValue={client.address ?? ""} disabled={!canManage || !!client.deleted_at} />
           </Field>
           <Field label="Internal notes">
@@ -59,7 +59,7 @@ export function ClientDetailView({
           </Field>
           {canManage && !client.deleted_at ? (
             <FormActions>
-              <Link href="/studioflow/clients" className="text-sm text-action hover:underline">Kembali</Link>
+              <Link href="/studioflow/clients" className="text-sm text-action hover:underline">Back</Link>
               <Button type="submit" variant="primary" pending={editPending}>Save changes</Button>
             </FormActions>
           ) : (
@@ -77,7 +77,7 @@ export function ClientDetailView({
             // Spec §5: archive button must not render when client has live projects
             <p className="text-sm text-ink-tertiary">
               This client cannot be archived because it has{" "}
-              <strong className="text-ink">{liveProjectCount} project aktif</strong>.
+              <strong className="text-ink">{liveProjectCount} active projects</strong>.
               Complete or delete those projects first.
             </p>
           ) : (

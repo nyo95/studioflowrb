@@ -35,16 +35,16 @@ import { studioFlowService } from "@/apps/studioflow/runtime";
 export const dynamic = "force-dynamic";
 
 const STATUS_LABELS: Record<string, string> = {
-  ACTIVE: "Aktif",
-  ON_HOLD: "Ditahan",
-  COMPLETED: "Selesai",
+  ACTIVE: "Active",
+  ON_HOLD: "On hold",
+  COMPLETED: "Completed",
 };
 
 const PHASE_STATE_LABELS: Record<string, string> = {
   NOT_STARTED: "Not started",
-  IN_PROGRESS: "Digarap",
+  IN_PROGRESS: "In progress",
   WAITING_CLIENT: "Waiting for client",
-  DONE: "Selesai",
+  DONE: "Complete",
 };
 
 const PHASE_SEGMENT_STATE: Record<string, SegmentState> = {
@@ -210,8 +210,8 @@ export default async function StudioFlowProjectsPage({
   const areaFmt = new Intl.NumberFormat(settings.locale, { maximumFractionDigits: 2 });
 
   const chips = [
-    { key: "all" as const, label: "Semua", count: counts.all },
-    { key: "mine" as const, label: "Saya lead", count: counts.mine },
+    { key: "all" as const, label: "All", count: counts.all },
+    { key: "mine" as const, label: "I lead", count: counts.mine },
     { key: "review" as const, label: "Waiting for client", count: counts.review },
   ];
 
@@ -254,7 +254,7 @@ export default async function StudioFlowProjectsPage({
             total={rows.length}
             pageSize={PAGE_SIZE}
             getHref={(nextPage) => listHref({ nextPage })}
-            label="Halaman project"
+            label="Project pages"
           />
         }
         toolbar={
@@ -280,7 +280,7 @@ export default async function StudioFlowProjectsPage({
                 <SearchField
                   name="q"
                   defaultValue={query}
-                  label="Cari project"
+                  label="Search projects"
               placeholder="Search projects or clients…"
                 />
               </form>
@@ -307,9 +307,9 @@ export default async function StudioFlowProjectsPage({
                 <TableHead>Project</TableHead>
                 <TableHead>Client</TableHead>
                 <TableHead align="end">Area</TableHead>
-                <TableHead>Fase berjalan</TableHead>
+                <TableHead>Active phase</TableHead>
                 <TableHead>Lead</TableHead>
-                <TableHead>Diperbarui</TableHead>
+                <TableHead>Updated</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

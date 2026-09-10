@@ -110,7 +110,7 @@ export default async function StudioFlowClientsPage({
                   <TableCell>
                     <EntityPrimaryCell
                       tone={client.deleted_at ? "danger" : "success"}
-                      statusLabel={client.deleted_at ? "Diarsipkan" : "Aktif"}
+                      statusLabel={client.deleted_at ? "Archived" : "Active"}
                       name={
                         <Link
                           href={`/studioflow/clients/${client.id}`}

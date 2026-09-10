@@ -50,11 +50,11 @@ activates neither app execution nor a new foundation build.
 | Contract | Owns |
 |---|---|
 | [`studioflow-project-contract.md`](studioflow-project-contract.md) | Client, Project, Phase, Iteration, client review exchange, tasks, assets, and how people reach a project — one workflow contract |
-| [`studioflow-schedule-contract.md`](studioflow-schedule-contract.md) | Deferred Library and Product Schedule brief; decisions remain open |
-| [`studioflow-mom-contract.md`](studioflow-mom-contract.md) | Deferred Minutes of Meeting brief; decisions remain open |
+| [`studioflow-schedule-contract.md`](studioflow-schedule-contract.md) | Owner-approved Brands, StudioFlow-owned Product Catalogue, and project Schedule contract; executable work remains deferred |
+| [`studioflow-mom-contract.md`](studioflow-mom-contract.md) | Owner-approved project-owned Minutes of Meeting contract; executable work order remains deferred |
 
-Schedule and MoM are owner-confirmed for the product, but neither has an approved executable contract
-and neither enters the first release.
+Schedule and MOM are owner-confirmed for the product, but neither has an
+approved executable work order.
 
 ## 3. Permission vocabulary
 
@@ -127,11 +127,11 @@ StudioFlow follows the platform dependency law: `app -> platform` and
 `app -> other-app/public` only. No cross-schema foreign key ever crosses an app
 boundary.
 
-- **Master Data.** StudioFlow reads the brand catalog through the Master Data
-  public read port, read-only. Library is active; Schedule remains deferred.
-  Any catalog fact whose
-  later edit must not rewrite project history is snapshotted as a plain value
-  at the moment of selection.
+- **Master Data.** StudioFlow reads only Brands through the Master Data public
+  read port, read-only. Product Catalogue is independently StudioFlow-owned and
+  shared across StudioFlow projects; it never reads Master Data SKU, unit, or
+  pricing. Schedule copies catalogue specifications into project snapshots, so
+  later edits cannot rewrite project history.
 - **BQ.** No relationship in either direction. BQ reads Master Data pricing on
   its own. A StudioFlow project and a BQ project are unrelated records and are
   not linked, joined, or synchronized.

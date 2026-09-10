@@ -33,23 +33,23 @@ import type { PhaseItem } from "./phase-section";
 export const dynamic = "force-dynamic";
 
 const STATUS_LABELS: Record<string, string> = {
-  ACTIVE: "Aktif",
-  ON_HOLD: "Ditahan",
-  COMPLETED: "Selesai",
+  ACTIVE: "Active",
+  ON_HOLD: "On hold",
+  COMPLETED: "Completed",
 };
 
 const TYPE_LABELS: Record<string, string> = {
-  RESIDENTIAL: "Residensial",
-  COMMERCIAL: "Komersial",
+  RESIDENTIAL: "Residential",
+  COMMERCIAL: "Commercial",
   HOSPITALITY: "Hospitality",
-  OTHER: "Lainnya",
+  OTHER: "Other",
 };
 
 const PHASE_STATE_LABELS: Record<string, string> = {
   NOT_STARTED: "Not started",
-  IN_PROGRESS: "Digarap",
+  IN_PROGRESS: "In progress",
   WAITING_CLIENT: "Waiting for client",
-  DONE: "Selesai",
+  DONE: "Complete",
 };
 
 const PHASE_STEP_STATE: Record<string, PipelineStep["state"]> = {
@@ -198,7 +198,7 @@ export default async function ProjectDetailPage({
       id: phase.id,
       label: phase.name,
       note: PHASE_STATE_LABELS[phase.state] ?? phase.state,
-      detail: phase.iterations.length > 0 ? `${sent}/${phase.iterations.length} terkirim` : "—",
+      detail: phase.iterations.length > 0 ? `${sent}/${phase.iterations.length} sent` : "—",
       state: PHASE_STEP_STATE[phase.state] ?? "upcoming",
     };
   });
@@ -241,7 +241,7 @@ export default async function ProjectDetailPage({
               {STATUS_LABELS[project.status] ?? project.status}
             </StatusBadge>
             <Link href={`/studioflow/${id}/files`} className={buttonClasses("secondary", "sm")}>
-              <FolderOpen aria-hidden="true" /> File project
+              <FolderOpen aria-hidden="true" /> Project files
             </Link>
           </>
         }
@@ -257,7 +257,7 @@ export default async function ProjectDetailPage({
             action={
               leadingPhase ? (
                 <Text size="sm" tone="secondary">
-                  Sedang jalan: <span className="font-medium text-ink">{leadingPhase.name}</span>
+                  In progress: <span className="font-medium text-ink">{leadingPhase.name}</span>
                 </Text>
               ) : null
             }
@@ -288,9 +288,9 @@ export default async function ProjectDetailPage({
               </div>
             </SectionCard>
 
-            <SectionCard title="Fakta project">
+            <SectionCard title="Project facts">
               <DescriptionList columns={1}>
-                <DescriptionItem label="Kode">
+                <DescriptionItem label="Code">
                   <span className="font-ui-mono text-xs">{project.code}</span>
                 </DescriptionItem>
                 <DescriptionItem label="Client">{project.client.name}</DescriptionItem>
@@ -302,7 +302,7 @@ export default async function ProjectDetailPage({
               </DescriptionList>
             </SectionCard>
 
-            <SectionCard title="Tim">
+            <SectionCard title="Team">
               {leadUser ? (
                 <div className="flex items-center gap-2.5">
                   <Avatar name={leadUser.display_name} size="lg" />
@@ -335,7 +335,7 @@ export default async function ProjectDetailPage({
           users={assignableUsers}
         />
 
-        <PageSection title="Fase">
+        <PageSection title="Phases">
           {phases.length === 0 ? (
                 <Text as="p" tone="tertiary" size="sm">No phases yet.</Text>
           ) : (

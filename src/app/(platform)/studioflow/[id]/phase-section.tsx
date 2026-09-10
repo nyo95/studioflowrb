@@ -72,9 +72,9 @@ export type PhaseItem = {
 function ageLabel(since: string): string {
   const ms = Date.now() - new Date(since).getTime();
   const days = Math.floor(ms / 86_400_000);
-  if (days === 0) return "hari ini";
-  if (days === 1) return "1 hari";
-  return `${days} hari`;
+  if (days === 0) return "today";
+  if (days === 1) return "1 day";
+  return `${days} days`;
 }
 
 function iterLabel(phase: PhaseItem, number: number): string {
@@ -84,17 +84,17 @@ function iterLabel(phase: PhaseItem, number: number): string {
 
 const PHASE_STATE_LABELS: Record<string, string> = {
   NOT_STARTED: "Not started",
-  IN_PROGRESS: "Digarap",
+  IN_PROGRESS: "In progress",
   WAITING_CLIENT: "Waiting for client",
-  DONE: "Selesai",
+  DONE: "Complete",
 };
 
 const ITER_STATE_LABELS: Record<string, string> = {
-  DRAFT: "belum digarap",
-  SENT: "dikirim",
-  APPROVED: "disetujui",
-  SUPERSEDED: "direvisi",
-  VOIDED: "dibatalkan",
+  DRAFT: "not started",
+  SENT: "sent",
+  APPROVED: "approved",
+  SUPERSEDED: "revised",
+  VOIDED: "voided",
 };
 
 // ── Send Dialog ───────────────────────────────────────────────────────────────
@@ -131,17 +131,17 @@ function SendDialog({
       pending={pending}
       onOpenChange={(open) => { if (!open) onClose(); }}
       title={`Send ${label} to client`}
-      description="Aksi ini hanya mencatat pengiriman; materi tetap dikirim lewat kanal di luar aplikasi."
+      description="This only records the send; the material still goes out through the studio's usual channel."
       size="sm"
     >
       {openPoints > 0 && (
         <div className="mb-4 text-sm text-ink-secondary bg-surface-muted rounded-action px-3 py-2 border border-line">
-          Masih ada <strong>{openPoints} poin</strong> yang belum selesai di {label}.
+          <strong>{openPoints} points</strong> in {label} are still open.
         </div>
       )}
       {missingApproval && (
         <div className="mb-4 text-sm text-ink-secondary bg-surface-muted rounded-action px-3 py-2 border border-line">
-          Ronde ini belum mendapat ACC internal. Pengiriman tetap bisa dicatat.
+          This round has no internal approval yet. The send can still be recorded.
         </div>
       )}
 
@@ -217,8 +217,8 @@ function ResponseDialog({
           value={kind}
           onValueChange={(value) => setKind(value as typeof kind)}
           options={[
-            { value: "APPROVAL", label: "Disetujui" },
-            { value: "REVISION", label: "Minta revisi" },
+            { value: "APPROVAL", label: "Approved" },
+            { value: "REVISION", label: "Revision requested" },
           ]}
         />
 
@@ -226,7 +226,7 @@ function ResponseDialog({
         {kind === "REVISION" && (
           <div className="flex flex-col gap-2 pl-4 border-l-2 border-line">
             <p className="text-xs font-medium text-ink-secondary uppercase tracking-wide">
-              Poin revisi
+              Revision points
             </p>
             {points.map((pt, i) => (
               <div key={i} className="flex items-center gap-1.5">
@@ -236,14 +236,14 @@ function ResponseDialog({
                   density="compact"
                   value={pt}
                   onChange={(e) => updatePoint(i, e.target.value)}
-                  placeholder={`Poin ${i + 1}`}
+                  placeholder={`Point ${i + 1}`}
                   className="min-w-0 flex-1"
                 />
                 {points.length > 1 && (
                   <IconButton
                     size="sm"
                     variant="ghost"
-                    label="Hapus poin"
+                    label="Remove point"
                     icon={<X aria-hidden="true" />}
                     onClick={() => removePoint(i)}
                     className="shrink-0"
@@ -252,11 +252,11 @@ function ResponseDialog({
               </div>
             ))}
             <Button variant="ghost" size="sm" onClick={addPoint} className="self-start">
-              + Tambah poin
+              + Add point
             </Button>
             <p className="text-xs text-ink-tertiary">
-              Poin akan ditambahkan ke ronde berikutnya. Ronde baru dibuat
-              otomatis jika belum ada.
+              Points are added to the next round. A new round is created
+              automatically if none exists.
             </p>
           </div>
         )}
@@ -322,20 +322,20 @@ function VoidDialog({
       open
       pending={pending}
       onOpenChange={(open) => { if (!open) onClose(); }}
-      title={`Hentikan ronde ${label}?`}
-      description="Ronde dihentikan dan tidak bisa dilanjutkan. Nomor serta isinya tetap tersimpan di riwayat."
+      title={`Stop round ${label}?`}
+      description="The round is stopped and cannot continue. Its number and contents stay in the history."
       size="sm"
     >
       <form action={action} className="flex flex-col gap-3">
         <div>
           <label className="block text-xs font-medium text-ink-secondary mb-1">
-            Alasan <span className="text-danger">*</span>
+            Reason <span className="text-danger">*</span>
           </label>
           <Textarea
             name="reason"
             rows={2}
             required
-            placeholder="Alasan pembatalan…"
+            placeholder="Why is this round being stopped?…"
             className="w-full text-sm border border-line rounded-action px-2 py-1.5 bg-transparent text-ink placeholder:text-ink-tertiary focus:outline-none focus:border-line-focus resize-none"
           />
         </div>
@@ -345,7 +345,7 @@ function VoidDialog({
             Cancel
           </Button>
           <Button variant="danger-primary" size="sm" type="submit" disabled={pending}>
-            {pending ? "Menghentikan…" : "Hentikan ronde"}
+            {pending ? "Stopping…" : "Stop round"}
           </Button>
         </FormActions>
       </form>
@@ -380,12 +380,12 @@ function ReopenPhaseDialog({
       pending={pending}
       onOpenChange={(open) => { if (!open) onClose(); }}
       title={`Reopen phase ${phaseName}?`}
-      description={hasRounds ? "Fase dibuka kembali; ronde baru dapat dimulai setelah ini." : "Supervisi kembali ke keadaan sedang berjalan."}
+      description={hasRounds ? "The phase reopens; a new round can be started after this." : "Supervision returns to in progress."}
       size="sm"
     >
       <form action={action} className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-ink-secondary">Alasan *</label>
+          <label className="text-xs font-medium text-ink-secondary">Reason *</label>
           <Textarea
             name="reason"
             required
@@ -433,12 +433,12 @@ function CloseByExceptionDialog({
       pending={pending}
       onOpenChange={(open) => { if (!open) onClose(); }}
       title={`Close phase ${phaseName} as an exception?`}
-      description="Fase ditutup tanpa persetujuan ronde terakhir. Tidak boleh ada ronde yang masih DRAFT atau SENT."
+      description="The phase closes without approving its last round. No round may still be a draft or sent."
       size="sm"
     >
       <form action={action} className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-ink-secondary">Alasan pengecualian *</label>
+          <label className="text-xs font-medium text-ink-secondary">Exception reason *</label>
           <Textarea
             name="reason"
             required
@@ -453,7 +453,7 @@ function CloseByExceptionDialog({
             Cancel
           </Button>
           <Button variant="danger-primary" size="sm" type="submit" disabled={pending}>
-            {pending ? "Menutup…" : "Tutup dengan pengecualian"}
+            {pending ? "Closing…" : "Close as exception"}
           </Button>
         </FormActions>
       </form>
@@ -492,7 +492,7 @@ function IterationBlock({
 
   const sentAgeText =
     isSent && iteration.sent_at
-      ? `dikirim ${ageLabel(iteration.sent_at)} lalu`
+      ? `sent ${ageLabel(iteration.sent_at)} ago`
       : ITER_STATE_LABELS[iteration.state] ?? iteration.state;
 
   const [approvalState, approvalAction, approvalPending] = useActionState(
@@ -540,7 +540,7 @@ function IterationBlock({
         {isDraft && phase.requires_internal_approval && !iteration.internal_approval && canReview && (
           <form action={approvalAction}>
             <Button variant="secondary" size="sm" type="submit" disabled={approvalPending}>
-              {approvalPending ? "Mencatat…" : "ACC"}
+              {approvalPending ? "Recording…" : "ACC"}
             </Button>
           </form>
         )}
@@ -579,19 +579,19 @@ function IterationBlock({
         {/* ⋯ menu — void, withdraw send (disabled until service supports it) */}
         {(isDraft || isSent) && canReview && (
           <RowActionMenu
-            label={`Aksi untuk ${label}`}
+            label={`Actions for ${label}`}
             items={[
               ...(isSent
                 ? [
                     {
-                      label: "Tarik pengiriman",
+                      label: "Withdraw send",
                       disabled: true,
                       onSelect: () => {},
                     } as const,
                   ]
                 : []),
               {
-              label: "Hentikan ronde",
+              label: "Stop round",
                 danger: true,
                 separatorBefore: isSent,
                 onSelect: () => onVoid(iteration.id, label),
@@ -634,7 +634,7 @@ function IterationBlock({
       {/* Void reason (VOIDED only) */}
       {isVoided && iteration.void_reason && (
         <p className="text-xs text-ink-tertiary mt-0.5 ml-1 italic">
-          Alasan: {iteration.void_reason}
+          Reason: {iteration.void_reason}
         </p>
       )}
     </div>
@@ -771,7 +771,7 @@ function PhaseBlock({
  disabled={startSupPending}
  variant="secondary" size="sm"
  >
-                Mulai
+                Start
               </Button>
             </form>
           )}
@@ -806,7 +806,7 @@ function PhaseBlock({
  disabled={openIterPending}
  variant="secondary" size="sm"
  >
-                Mulai ronde
+                Start round
               </Button>
             </form>
           )}
@@ -827,7 +827,7 @@ function PhaseBlock({
                 ...(canOverride && !isDone && !hasOpenIter
                   ? [
                       {
-                        label: "Tutup dengan pengecualian",
+                        label: "Close as exception",
                         danger: true,
                         onSelect: () => onCloseByException(phase.id, phase.name),
                       } as const,
@@ -861,7 +861,7 @@ function PhaseBlock({
           {phase.iterations.length === 0 ? (
             <p className="text-sm text-ink-tertiary py-0.5">
               No rounds yet.
-              {canManage && !isDone ? " Gunakan 'Mulai ronde' untuk memulai." : ""}
+              {canManage && !isDone ? " Use 'Start round' to begin." : ""}
             </p>
           ) : (
             phase.iterations.map((iter) => (
@@ -894,10 +894,10 @@ function PhaseBlock({
           />
           <p className="text-sm text-ink-tertiary">
             {phase.state === "NOT_STARTED"
-              ? "Supervisi belum dimulai."
+              ? "Supervision has not started."
               : phase.state === "IN_PROGRESS"
-              ? "Supervisi sedang berjalan."
-              : "Supervisi selesai."}
+              ? "Supervision is in progress."
+              : "Supervision is complete."}
           </p>
         </div>
       )}
@@ -961,7 +961,7 @@ export function PhaseSection({
             selected={filter === null}
             onClick={() => setFilter(null)}
             >
-            Semua
+            All
           </FilterChip>
           {phases.map((phase) => (
             <FilterChip

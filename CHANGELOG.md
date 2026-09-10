@@ -5,8 +5,64 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.44**
-- Next local revision: **R7.45**
+- Current revision after this entry is committed: **R7.46**
+- Next local revision: **R7.47**
+
+## R7.46 | 2026-09-10 | fix(studioflow): reconcile app copy and contracts
+
+### Changed
+
+- Completed the StudioFlow English-copy correction that R7.44 had reported too
+  early, including nested iteration controls, client detail/validation, file
+  metadata, route states, and safe service errors.
+- Added a one-time additive migration that changes only the exact standard
+  `supervision` phase name `Supervisi` to `Supervision` in the current template
+  and existing project snapshots; owner-customized phase names are preserved.
+- Corrected the MOM contract against owner direction and committed legacy
+  evidence: MOM belongs only to Project, is available during any phase, keeps
+  the legacy ordered document/block/point/image capability, and has no phase,
+  iteration, Task, To-do, or client-response relationship.
+- Locked Product Catalogue as a StudioFlow-owned reuse pool shared across
+  StudioFlow projects. StudioFlow reads Master Data only for Brands; Catalogue
+  and Schedule never read Master Data SKU, unit, or pricing, and projects keep
+  independent specification snapshots.
+- Reconciled the documentation hub, alignment, roadmap, known-bug ledger,
+  handoff prompt, implementation plan, and historical decision ledger with
+  those boundaries.
+
+### Verification
+
+- `STUDIOFLOW_LOCATION=kantor npm run typecheck`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run lint`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:boundaries`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:legacy-runtime`: passed.
+- `STUDIOFLOW_LOCATION=kantor npx prisma validate`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run build`: passed.
+- Focused StudioFlow Add Project, canonical file-drop consumer, and English-copy
+  regression tests: 3 passed.
+- Full `npm test` was attempted and is not a pass: database-backed suites
+  refused to run because `PLATFORM_TEST_DATABASE_URL` is not configured for an
+  explicitly disposable database. The migration was not applied, and live
+  browser behavior was not claimed as verified.
+
+### Remaining
+
+- KB-002, KB-003, and KB-004 remain open. MOM and Product Catalogue/Schedule
+  still require executable work orders and implementation; shared image/storage
+  dependencies remain explicit.
+
+## R7.45 | 2026-09-10 | docs(handoff): record StudioFlow continuation gaps
+
+### Changed
+
+- Recorded the post-R7.44 continuation order and remaining StudioFlow gaps in
+  the session handoff prompt, including phase-surface, work-surface, MOM,
+  Product Catalogue/FFNI/Schedule, image, storage, and release gates.
+
+### Verification
+
+- Documentation-only commit `2ac66983b44a05ebdb5a6a7335ade55f567b3c26`;
+  no implementation gate was claimed.
 
 ## R7.44 | 2026-09-10 | feat(studioflow): restore client creation and English UI
 

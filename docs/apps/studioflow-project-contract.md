@@ -1085,11 +1085,12 @@ when a shared concern already proves the need. No speculative component is added
 
 ### 13.4 Master Data
 
-Read-only, through the Master Data public read port, for the global Library and
-project Product Catalogue/Schedule. Library discovery must support the three
-primary queries: hashtag, brand, and category/brand-category. No cross-schema
-foreign key, ever. Selected catalog facts are snapshotted as plain values so
-later Master Data edits cannot rewrite project history.
+Read-only, through the Master Data public read port, only for StudioFlow Brands.
+Brand discovery supports hashtag, brand, and category/brand-category. Product
+Catalogue is independently owned by StudioFlow and reused across its projects;
+it never reads Master Data SKU, unit, or pricing. A project Schedule copies a
+catalogue specification into immutable plain-value history. No cross-schema
+foreign key or cross-app write, ever.
 
 ### 13.5 BQ
 
@@ -1113,10 +1114,10 @@ Recorded so a reviewer can test them rather than inherit them.
 
 ## 15. First-release scope correction
 
-Library, Product Catalogue/Schedule, and MOM are in the rebuild scope as
-project/global surfaces, not optional future placeholders. Library is global
-and reads Master Data through the public port. Product Catalogue/Schedule and
-MOM belong to the Project detail surface. Their detailed lifecycle remains in
+Brands, Product Catalogue/Schedule, and MOM are in the rebuild scope, not
+optional future placeholders. Brands is the only Master Data read. Product
+Catalogue is a StudioFlow-wide reuse pool; Schedule copies its specifications
+into a project. MOM and Schedule are exposed from Project detail. Their detailed lifecycle remains in
 [`studioflow-schedule-contract.md`](studioflow-schedule-contract.md) and
 [`studioflow-mom-contract.md`](studioflow-mom-contract.md). SketchUp exchange,
 client-facing links, the `LINKED` treatment and its Google Drive archive,

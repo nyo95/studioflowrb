@@ -28,7 +28,7 @@ PRD review in §1.1. This is a ledger, not a second source of truth.
 |---|---|---|
 | D1 | StudioFlow owns its own `Client`. It is never a Master Data Party and never references one | project §2 |
 | D2 | StudioFlow and BQ have no relationship in either direction | index §4 |
-| D3 | Library/Schedule reads the Master Data brand catalog read-only through the public port, snapshotting facts at selection | index §4, schedule §3 |
+| D3 | StudioFlow reads Master Data only for Brands through the public port. Product Catalogue is StudioFlow-owned and reusable across its projects; Schedule copies independent snapshots and never reads Master Data SKU, unit, or pricing | index §4, schedule §3 |
 | D4 | No StudioFlow role enum. The app owns a permission vocabulary; persisted RBAC decides who holds it | index §3 |
 | D5 | Phase states reduced from seven to four | project §4.2 |
 | D6 | **Internal review is not tracked.** `ON_REVIEW_INTERNAL`, `APPROVED_INTERNAL`, `READY_FOR_NEXT` are PURGE. Designer/drafter handoff is expressed by iteration assignment | project §4.2 |
@@ -144,7 +144,7 @@ asked and how it was settled.
 | Q4 | **Reshaped by the 2026-09-08 file decision.** Files leave the studio by the channels the studio already uses; the app records that they did. What remains is whether the Google Drive archive (`LINKED`) is activated, and whether production egress may reach Google's API at all | Drive work only; nothing in the core |
 | Q5 | **Resolved by R7.07 PRD:** Supervision uses explicit start/finish/reopen, never task-derived state | No longer a product blocker |
 | Q6 | Schedule: entry scoped to phase or project; whether clients genuinely choose among options; what a position's identity is | Schedule domain entirely |
-| Q7 | MoM: does an action item become a StudioFlow `Task`? If yes, MoM gains a write path into the project core | MoM domain entirely |
+| Q7 | **Resolved 2026-09-10:** MOM is project-owned and has no relationship to Task/To-do, phase, or iteration. “Write today's MOM” is only an ordinary independent To-do | No longer a product blocker; shared image/storage dependencies still apply |
 
 ### 2.3 Process
 

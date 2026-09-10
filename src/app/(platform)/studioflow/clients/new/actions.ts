@@ -14,7 +14,7 @@ const ClientSchema = z.object({
   name: z.string().trim().min(1, "Client name is required").max(200),
   contact_name: z.string().trim().max(200).optional(),
   contact_phone: z.string().trim().max(50).optional(),
-  contact_email: z.string().trim().email("Format email tidak valid").max(200).optional().or(z.literal("")),
+  contact_email: z.string().trim().email("The email format is not valid").max(200).optional().or(z.literal("")),
   address: z.string().trim().max(500).optional(),
   notes: z.string().trim().max(2000).optional(),
 });

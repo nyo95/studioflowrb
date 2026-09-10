@@ -109,12 +109,12 @@ export default async function StudioFlowSettingsPage() {
                   <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
                     {template.has_rounds ? (
                       <Badge>
-                        Ronde{template.round_prefix ? ` · ${template.round_prefix}` : ""}
+                        Rounds{template.round_prefix ? ` · ${template.round_prefix}` : ""}
                       </Badge>
                     ) : (
-                      <Text size="sm" tone="tertiary">Tanpa ronde</Text>
+                      <Text size="sm" tone="tertiary">No rounds</Text>
                     )}
-                    {template.requires_internal_approval ? <Badge tone="warning">Perlu ACC</Badge> : null}
+                    {template.requires_internal_approval ? <Badge tone="warning">Approval required</Badge> : null}
                   </div>
                 </li>
               ))}

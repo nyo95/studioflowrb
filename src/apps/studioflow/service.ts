@@ -988,7 +988,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         throw new AppError(
           "CONFLICT",
           "studioflow.iteration.pending-client-response",
-          "Catat jawaban ronde sebelumnya sebelum mengirim ronde ini",
+          "Record the previous round's response before sending this one",
         );
       }
       const updated = await db.sfIteration.update({
@@ -1147,10 +1147,10 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     if (!actorUserId) throw new AppError("INVARIANT", "studioflow.actor.user-required", "A user actor is required");
     const originalFilename = input.original_filename.trim();
     if (!originalFilename) {
-      throw new AppError("VALIDATION", "studioflow.file.filename-required", "Nama file wajib diisi");
+      throw new AppError("VALIDATION", "studioflow.file.filename-required", "A file name is required");
     }
     if (!Number.isFinite(input.bytes) || input.bytes <= 0) {
-      throw new AppError("VALIDATION", "studioflow.file.bytes-invalid", "Ukuran file tidak valid");
+      throw new AppError("VALIDATION", "studioflow.file.bytes-invalid", "The file size is not valid");
     }
     return runTransaction(async () => {
       const project = await db.sfProject.findUnique({
@@ -1275,7 +1275,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       throw new AppError(
         "VALIDATION",
         "studioflow.response.points-required",
-        "Response revisi butuh minimal satu poin",
+        "A revision response requires at least one point",
       );
     }
 
@@ -1291,7 +1291,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         throw new AppError(
           "CONFLICT",
           "studioflow.iteration.not-sent",
-          "Hanya round terkirim yang bisa menerima response",
+          "Only a sent round can receive a response",
         );
       }
 
@@ -1413,17 +1413,17 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
 
     const originalFilename = input.original_filename.trim();
     if (!originalFilename) {
-      throw new AppError("VALIDATION", "studioflow.file.filename-required", "Nama file wajib diisi");
+      throw new AppError("VALIDATION", "studioflow.file.filename-required", "A file name is required");
     }
     const externalUrl = input.external_url.trim();
     let parsed: URL;
     try {
       parsed = new URL(externalUrl);
     } catch {
-      throw new AppError("VALIDATION", "studioflow.file.url-invalid", "Link tidak valid");
+      throw new AppError("VALIDATION", "studioflow.file.url-invalid", "The link is not valid");
     }
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      throw new AppError("VALIDATION", "studioflow.file.url-invalid", "Link harus http atau https");
+      throw new AppError("VALIDATION", "studioflow.file.url-invalid", "The link must use http or https");
     }
 
     return runTransaction(async () => {
@@ -1528,11 +1528,11 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         throw new AppError(
           "CONFLICT",
           "studioflow.file.already-sent",
-          "File yang sudah dikirim tidak bisa dipindah",
+          "A file that has been sent cannot be moved",
         );
       }
       if (file.superseded_at) {
-        throw new AppError("CONFLICT", "studioflow.file.superseded", "File ini sudah diganti");
+        throw new AppError("CONFLICT", "studioflow.file.superseded", "This file has already been superseded");
       }
       if (file.folder_key === folderKey) return file;
 
@@ -1586,13 +1586,13 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       });
       if (!file) throw new AppError("NOT_FOUND", "studioflow.file.not-found", "File not found");
       if (file.superseded_at) {
-        throw new AppError("CONFLICT", "studioflow.file.superseded", "File ini sudah ditandai diganti");
+        throw new AppError("CONFLICT", "studioflow.file.superseded", "This file is already marked superseded");
       }
       if (file.sent_in_iteration_id) {
         throw new AppError(
           "CONFLICT",
           "studioflow.file.already-sent",
-          "File yang sudah dikirim tidak bisa ditandai diganti",
+          "A file that has been sent cannot be marked superseded",
         );
       }
       const updated = await db.sfFile.update({

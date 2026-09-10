@@ -2,238 +2,186 @@
 
 Status: **OWNER-APPROVED LOGIC CONTRACT — not an executable work order**
 
-Authority: owner confirmation that MoM belongs to StudioFlow and is tied to a
-project, reconciled with the shared rules in [`studioflow.md`](studioflow.md) and
-the conventions of the project contract. Legacy code at the recorded audit commit
-is behavioral evidence only.
+Authority: owner clarification of 2026-09-10, reconciled with committed legacy
+evidence at `5fc605e304a12db6b5efe0a2c0271a2d9415b2da`. MOM belongs only to a
+StudioFlow project. It has no phase, iteration, Task, or To-do relationship.
 
-## 1. Business purpose and users
+## 1. Business purpose and boundary
 
-A MoM is the studio's written account of what was agreed in a meeting, in a form
-that can be sent to the client and referred back to when a decision is later
-disputed.
+A MOM is the project's written meeting record. It is available from Project
+detail regardless of the project's current phase. Supervision was its common
+legacy use, but that usage is not a guard and does not narrow the domain.
 
-| User | Need |
-|---|---|
-| Designer / owner | Record decisions and actions during or right after a meeting |
-| Client | Receive a clean, printable record of what was agreed |
-| Drafter | See what was decided without having attended |
+The boundary is deliberately small:
 
-## 2. The governing principle
+- `Project` owns MOM documents;
+- a MOM may be created and used during any phase, including before or after
+  Supervision;
+- MOM does not reference `ProjectPhase`, `Iteration`, `Task`, or a client
+  response;
+- Task/To-do does not reference MOM;
+- “Write today's MOM” may be an ordinary project To-do, but completing that
+  To-do neither creates, issues, links, nor changes a MOM.
 
-**Its value is evidentiary, and that single property drives every rule below.**
+No text classification, action extraction, automatic task creation, or
+“convert point to task” action belongs in this feature.
 
-A record whose purpose is proof loses that purpose the moment it can be edited
-after the fact. Legacy allowed editing after issue, so a legacy MoM proves only
-what someone last typed — not what was agreed. That is **FIX**, and it is the one
-substantive change this contract makes to legacy behaviour.
+## 2. Minimum capability and legacy evidence
 
-The same reasoning already governs client answers (project contract §6.1). MoM
-follows it rather than inventing a second immutability model.
+Legacy is the minimum functional floor. Its committed implementation contains:
 
-## 3. Lifecycle
-
+```text
+Project
+└─ ProjectMomDocument
+   └─ ProjectMomItem (ordered block)
+      ├─ ProjectMomPoint[] (ordered text points)
+      └─ ProjectMomImage[] (ordered images, at most two per block)
 ```
-DRAFT  ──issue──►  ISSUED  ──superseded by a later MoM──►  SUPERSEDED
+
+The route is project-scoped, every service mutation checks `projectId`, and the
+schema has no phase, iteration, task, or to-do key. The rebuild must preserve at
+least these useful outcomes:
+
+- list and open project MOM documents;
+- create, edit, delete, and print a document;
+- edit document topic, meeting date, venue, attendees, and preparer;
+- create, delete, and reorder blocks and points;
+- support text-only blocks, list style, point style, and up to two ordered
+  images per block;
+- enforce project scope, permissions, validation, and audit for material writes.
+
+Flattening the hierarchy or omitting image blocks would fall below legacy and
+is therefore a regression unless the owner later removes that capability.
+
+## 3. Rebuild lifecycle
+
+The rebuild adds a safer evidence lifecycle without changing MOM ownership:
+
+```text
+DRAFT  --issue-->  ISSUED  --correct with a new document-->  SUPERSEDED
 ```
 
-| State | Rules |
+| State | Rule |
 |---|---|
-| `DRAFT` | Freely editable. Not part of the record. Visible only inside the studio |
-| `ISSUED` | **Immutable.** Sequence number assigned. This is the document |
-| `SUPERSEDED` | Still readable, marked corrected, and pointing at the MoM that replaced it |
+| `DRAFT` | Editable and discardable; visible only inside the studio |
+| `ISSUED` | Immutable, numbered, printable meeting record |
+| `SUPERSEDED` | Immutable and readable; points to the correcting MOM |
 
-**Issuing is the only irreversible act.** Before it, the document is working
-text; after it, nothing in it changes, ever.
+Issue is a direct, confirmed action; there is no separate internal-approval
+stage. A correction creates a new MOM and preserves the old record. Drafts do
+not consume a sequence number. At issue, the server assigns the next sequence
+number per project and records issuer and time.
 
-A correction is a **new MoM that references the one it corrects**, exactly as a
-corrected client answer is a new response rather than an edit (project contract
-§6.5). The superseded document is never deleted or rewritten — a dispute is
-usually about precisely the version someone would be tempted to tidy away.
-
-A `DRAFT` may be discarded and is not audited: it recorded nothing.
-
-### 3.1 Numbering
-
-`sequence` is assigned by the server at issue, gapless per project, starting at
-1. It is never typed, never reused, and never held by a draft — the same rule as
-round numbering (project contract §5.3), for the same reason.
-
-A draft that is never issued therefore consumes no number.
-
-## 4. Fields
+## 4. Persisted shape
 
 ### 4.1 `MomDocument`
 
-| Field | Type | Rule |
-|---|---|---|
-| `id` | UUID | Primary key |
-| `project_id` | FK → Project | Required |
-| `sequence` | Int? | Assigned at issue; null while `DRAFT`. Unique per project |
-| `state` | Enum | `DRAFT` / `ISSUED` / `SUPERSEDED` |
-| `meeting_at` | DateTime | When the meeting happened — not when the document was written |
-| `location` | String? | Where, or the platform used |
-| `title` | String | What the meeting was about |
-| `iteration_id` | FK → Iteration? | Optional. The round this meeting reviewed (§6) |
-| `supersedes_id` | FK → MomDocument? | Set when this document corrects an earlier one |
-| `issued_by` / `issued_at` | User / DateTime | Set at issue; immutable |
-| `created_by` / `created_at` / `updated_at` | | Standard |
+| Field | Rule |
+|---|---|
+| `id` | Internal identifier |
+| `project_id` | Required StudioFlow Project FK; the only business parent |
+| `topic` | Required meeting topic |
+| `meeting_at` | Required meeting date/time |
+| `venue` | Optional place or platform |
+| `attendees_text` | Optional meeting attendee text; no client account implied |
+| `prepared_by_name` | Required printable preparer name |
+| `state` | `DRAFT`, `ISSUED`, or `SUPERSEDED` |
+| `sequence` | Null in draft; server-assigned and unique per project at issue |
+| `supersedes_id` | Optional same-project MOM corrected by this document |
+| `created_by`, `created_at`, `updated_at` | Standard provenance |
+| `issued_by`, `issued_at` | Set once at issue |
 
-`meeting_at` is separate from `issued_at` on purpose: minutes are routinely
-written the next morning, and conflating the two would misdate the evidence.
+There is intentionally no `phase_id`, `iteration_id`, `task_id`, or
+`linked_task_id`.
 
-### 4.2 `MomAttendee`
+### 4.2 `MomItem`
 
-| Field | Type | Rule |
-|---|---|---|
-| `mom_id` | FK → MomDocument | Required |
-| `user_id` | FK → User? | Set for studio staff |
-| `external_name` | String? | Set for anyone else |
-| `organisation` | String? | Optional, for external attendees |
-
-Exactly one of `user_id` / `external_name` is set. Clients have no accounts
-([`studioflow.md`](studioflow.md) §1), so they are always external names — this
-is not a gap to be closed later by inviting them.
+An ordered content block belonging to one document. It stores `sort_order`,
+`is_text_only`, and `list_style`. Identity is the internal id; ordering is not
+an identity or uniqueness mechanism.
 
 ### 4.3 `MomPoint`
 
-| Field | Type | Rule |
-|---|---|---|
-| `id` | UUID | Primary key |
-| `mom_id` | FK → MomDocument | Required |
-| `sort_order` | Int | Manual ordering |
-| `text` | String | What was discussed |
-| `decision` | String? | What was agreed, when anything was |
-| `kind` | Enum | `INFO` / `DECISION` / `ACTION` |
-| `owner_user_id` | FK → User? | For `ACTION`, who owes it |
-| `owner_external` | String? | For `ACTION` owed by the client or a third party |
-| `due_date` | DateTime? | For `ACTION` |
-| `linked_task_id` | FK → Task? | Set when an action was turned into a task (§5) |
+An ordered text point belonging to one item. It stores `sort_order`, `text`,
+and the supported presentation `style`. It does not carry action kind, owner,
+due date, decision state, or task linkage.
 
-Legacy's four-level `ProjectMomDocument` → `ProjectMomItem` → `ProjectMomPoint`
-→ `ProjectMomImage` hierarchy is **MERGE** to these two levels. The middle level
-grouped points into sections, and the audit shows no evidence that a real meeting
-record needed it. A third level returns only when a meeting cannot be written
-without one.
+### 4.4 `MomImage`
 
-Images attach to points and obey the file rules in project contract §8. MoM
-images are small and are `STORED`; they are not a reason to wait for anything.
+An ordered image belonging to one item. Each item supports at most two images,
+matching legacy. Images use the canonical shared image workspace and the
+approved `STORED` file treatment; do not create a MOM-local crop, annotation,
+upload, or storage implementation.
 
-## 5. Action items become tasks — explicitly
+## 5. Project surface and interactions
 
-An `ACTION` point may be turned into a StudioFlow `Task` with one action, which:
+Project detail exposes a MOM section and document list. It is not nested under
+Supervision or any other phase. A document editor supports the complete ordered
+content structure, autosave or explicit save with clear pending/error state,
+destructive confirmation, and unsaved-input protection.
 
-- creates the task with the point's text, owner and due date;
-- sets `linked_task_id` on the point;
-- changes nothing else.
+An issued MOM has a print view containing project identity, topic, meeting
+date, venue, attendees, preparer, ordered content and images, sequence, and
+issue stamp. Sending remains outside the app: the studio may print or export
+and use its normal channel. MOM is not silently converted into a deliverable or
+client response.
 
-**It is never automatic.** A meeting produces many sentences that sound like
-actions and are not, and silently generating tasks from them would fill the
-project with work nobody committed to.
-
-The link is one-directional and informational: completing the task does not
-alter the MoM, and it must not — the MoM records what was agreed, not what later
-happened. Issuing a MoM does not require its actions to have tasks.
-
-This is the only write path from MoM into the project core, and it exists
-because retyping an agreed action is exactly the duplicated bookkeeping this
-rebuild removes.
-
-## 6. A meeting is where client feedback usually happens
-
-When a MoM is linked to a round (`iteration_id`), its points may be **offered**
-as that round's client answer, opening the draft-answer flow (project contract
-§6.6) pre-filled with the selected points.
-
-The person chooses which points are feedback, and the outcome — approval or
-revision request. Nothing is inferred from the text.
-
-The response chain remains the sole authority on what the client answered. A MoM
-does not become a response, and a response does not edit a MoM. They are two
-records of one conversation, deliberately kept separate: the MoM is what the
-meeting was, and the response is what the studio must now do about it.
-
-Without this, a designer who runs a client meeting types the same five points
-twice.
-
-## 7. Print and send
-
-An issued MoM has a print view: project identity, meeting date, attendees,
-numbered points with decisions, and the issue stamp.
-
-The studio sends it by whatever channel it already uses. If the studio wants to
-record that it went out as a project deliverable, the exported PDF is dropped
-like any other file and marked sent on a round (project contract §8.3). MoM
-itself has no separate delivery mechanism and no client-facing link.
-
-## 8. Access
+## 6. Access and audit
 
 | Action | Permission |
 |---|---|
-| Read | `studioflow.project.read` (reuse) |
-| Create and edit a draft, discard a draft | `studioflow.mom.manage` |
-| Issue — make immutable | `studioflow.mom.issue` |
-| Turn an action point into a task | `studioflow.task.manage` |
-| Offer points as a client answer | `studioflow.iteration.review` |
+| Read and print | `studioflow.project.read` |
+| Create/edit/discard a draft and manage ordered content | `studioflow.mom.manage` |
+| Issue or supersede | `studioflow.mom.issue` |
 
-`mom.issue` is separate from `mom.manage` because issuing is irreversible and
-client-facing — the same trust boundary as `iteration.review` and
-`schedule.confirm`. A studio may grant all three to the same people; that is
-RBAC's decision, not this contract's.
+Both MOM-specific permissions remain deferred until an executable MOM work
+order activates them. Material document, block, point, image, issue, supersede,
+and delete actions are audited. Project scope is checked on every read and
+mutation; child ids are never trusted without resolving their owning project.
 
-Both permissions are **deferred** and are not registered with the first release
-([`studioflow.md`](studioflow.md) §3).
+## 7. Dependencies and isolation
 
-## 9. Dependencies
+MOM consumes Core identity/audit and canonical UI Engine controls. Image work
+depends on the shared image workspace tracked by KB-004. It has no Master Data,
+BQ, Product Catalogue, Schedule, phase, iteration, or task dependency.
 
-Core and UI Engine only. No Master Data read, no BQ relationship, and no new
-shared capability: a print view is presentation, and MoM images fit the existing
-`STORED` treatment.
+## 8. Legacy classification
 
-Audited: issue, supersede, and turning a point into a task. Not audited: draft
-edits, reordering, and discarding a draft — a draft records nothing.
-
-## 10. Legacy classification
-
-| Legacy behavior | Disposition | Destination |
+| Legacy behavior | Disposition | Rebuild destination |
 |---|---|---|
-| MoM as an ordered document belonging to a project | **KEEP** | §4 |
-| Four-level document → item → point → image hierarchy | **MERGE** | Two levels (§4.3) |
-| Editable after issue | **FIX** | Immutable once issued; corrections are new documents (§3) |
-| Print view | **KEEP** | §7 |
-| Action items inside MoM points | **FIX** | Explicit, never automatic, task creation (§5) |
-| Separate MoM numbering conventions | **MERGE** | Server-assigned at issue, gapless per project (§3.1) |
+| Project-owned MOM route and service scope | **KEEP** | §1, §5–6 |
+| Document → ordered item → ordered point/image hierarchy | **KEEP** | §2, §4 |
+| Text-only/list/point styles and two images per item | **KEEP** | §2, §4 |
+| Create, edit, delete, reorder, and print | **KEEP** | §2, §5 |
+| Common use during Supervision | **KEEP as usage, PURGE as guard** | Available at every project phase (§1) |
+| Editable historical record | **FIX** | Issue/supersede lifecycle (§3) |
+| Local MOM-specific image implementation | **MERGE** | Canonical shared image workspace (§4.4) |
+| MOM-to-Task or MOM-to-Iteration behavior | **PURGE as invented scope** | No such legacy relation and no owner requirement (§1) |
 
-## 11. Risks and unproven assumptions
-
-| # | Risk or assumption | Exposure | Trigger to revisit |
-|---|---|---|---|
-| M1 | Immutability is assumed to be worth the friction | A typo in an issued MoM requires a whole new document | Deliberate. If corrections become frequent, the problem is that people issue too early — address that before weakening immutability |
-| M2 | Two levels are assumed sufficient | A long meeting becomes a flat list of thirty points | Add sections only when a real meeting cannot be recorded without them |
-| M3 | Actions are assumed to be worth linking to tasks | If nobody uses it, MoM is an island and the actions are retyped | Measure how many `ACTION` points ever gain a `linked_task_id` |
-| M4 | MoM is assumed to be written soon after the meeting | Minutes written a week later misremember, and `meeting_at` makes that visible rather than hidden | Intentional: the field exposes the delay instead of disguising it |
-
-## 12. Acceptance scenarios
+## 9. Acceptance scenarios
 
 | Scenario | Required observable result |
 |---|---|
-| Issue a MoM | Sequence assigned, document immutable, issue stamp recorded |
-| Edit an issued MoM | Refused. The only path is a new correcting document |
-| Correct an issued MoM | New document references the old; the old stays readable and is marked superseded |
-| Draft never issued | Consumes no sequence number; discarding it is silent and unaudited |
-| Action point turned into a task | Task created with text, owner and due date; point links to it; completing the task leaves the MoM untouched |
-| Meeting reviewing D3 | Selected points offered as a draft answer for D3; the MoM is not itself the response, and the response does not edit the MoM |
-| Client attendee | Recorded as an external name; no account is created or implied |
-| Minutes written the next morning | `meeting_at` shows the meeting date, `issued_at` the writing date; both visible |
-| Print an issued MoM | Renders identity, attendees, numbered points and the issue stamp |
+| Open MOM in any project phase | Same project MOM surface is available; no phase or Supervision guard |
+| Create a MOM | Project-scoped draft starts with an editable ordered block and point |
+| Reorder rich content | Blocks, points, and up to two images per block retain the chosen order |
+| Cross-project child id is submitted | Mutation is refused before any write |
+| Issue a MOM | Sequence and issue stamp are assigned atomically; document becomes immutable |
+| Correct an issued MOM | New document references the old; old document remains readable and superseded |
+| Print an issued MOM | Complete project and meeting record, ordered content, images, and issue stamp render |
+| Create To-do “Write today's MOM” | Ordinary independent To-do is created; no MOM relation or side effect exists |
+| Search schema and service boundaries | No phase, iteration, task, client-response, Master Data, or BQ dependency exists |
 
-## 13. Remaining owner decisions
+## 10. Locked owner decisions
 
-1. **Does a MoM ever need studio approval before issue** — a second person
-   confirming the record before it goes to the client? If yes, the optional
-   internal approval pattern from project contract §6.7 applies unchanged rather
-   than a new mechanism.
-2. **Are MoM images common enough to matter?** If most meetings produce none,
-   image support ships later and MoM has no file dependency at all.
+1. MOM is project-owned and usable during every phase; Supervision is not a
+   guard.
+2. MOM and Task/To-do are independent. No conversion, link, or automatic write
+   exists in either direction.
+3. The legacy ordered document/block/point/image capability is the minimum.
+4. Image support is required and reuses the shared image workspace.
+5. Issue is direct with confirmation; no separate approval stage is added.
 
-Neither blocks the model above.
+No product decision remains open before a navigator writes the executable MOM
+work order. Storage activation for `STORED` images and KB-004 still remain
+technical dependencies and must not be reported as passed before verification.

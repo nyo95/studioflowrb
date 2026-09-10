@@ -33,17 +33,17 @@ export default async function StudioFlowLibraryPage({
       <PageHeader
         eyebrow="StudioFlow · Global"
         title="Library"
-        description="Cari brand dan katalog dari Master Data berdasarkan nama, hashtag, atau kategori."
+        description="Search brands and catalog entries from Master Data by name, hashtag, or category."
         divider
       />
       <SectionCard padded={false}>
         <form method="get" className="flex flex-wrap items-center gap-2 border-b border-line-subtle p-(--ui-section-px)">
-          <label className="sr-only" htmlFor="library-search">Cari Library</label>
+          <label className="sr-only" htmlFor="library-search">Search Library</label>
           <div className="relative min-w-[min(100%,320px)] flex-1">
             <Search aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-tertiary" />
-            <input id="library-search" name="q" defaultValue={query} placeholder="Brand, hashtag, atau kategori" className="h-9 w-full rounded-control border border-line bg-surface pl-9 pr-3 text-sm outline-none focus:border-ink-tertiary" />
+            <input id="library-search" name="q" defaultValue={query} placeholder="Brand, hashtag, or category" className="h-9 w-full rounded-control border border-line bg-surface pl-9 pr-3 text-sm outline-none focus:border-ink-tertiary" />
           </div>
-          <button type="submit" className="rounded-control bg-ink px-3 py-2 text-sm font-medium text-surface">Cari</button>
+          <button type="submit" className="rounded-control bg-ink px-3 py-2 text-sm font-medium text-surface">Search</button>
           {query ? <Link href="/studioflow/library" className="rounded-control border border-line px-3 py-2 text-sm text-ink-secondary">Reset</Link> : null}
         </form>
         {brands.length === 0 ? (

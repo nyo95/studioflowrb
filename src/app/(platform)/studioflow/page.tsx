@@ -89,7 +89,7 @@ function WaitingRow({
       <div className="flex min-w-0 items-center gap-2">
         <span className="truncate text-sm text-ink">{title}</span>
         {item.kind === "ITERATION" && item.state === "SENT" ? (
-          <Text size="sm" tone="tertiary" className="shrink-0">terkirim</Text>
+          <Text size="sm" tone="tertiary" className="shrink-0">sent</Text>
         ) : null}
       </div>
 
@@ -223,7 +223,7 @@ export default async function WaitingOnMePage({
       <PageHeader
         eyebrow="StudioFlow"
         title="My Activity"
-        description={`${headerFmt.format(new Date())} · ${items.length} terbuka${overdue > 0 ? ` · ${overdue} telat` : ""}`}
+        description={`${headerFmt.format(new Date())} · ${items.length} open${overdue > 0 ? ` · ${overdue} overdue` : ""}`}
         divider
       />
 
@@ -262,7 +262,7 @@ export default async function WaitingOnMePage({
             <section key={group.key} className="grid gap-2">
               <GroupHeader title={group.title} count={group.items.length} tone={group.tone} />
               {group.items.length === 0 ? (
-                <Text as="p" tone="tertiary" size="sm">Kosong.</Text>
+                <Text as="p" tone="tertiary" size="sm">Nothing here.</Text>
               ) : (
                 <Surface className="min-w-0 overflow-hidden">
                   {group.items.map((item) => {

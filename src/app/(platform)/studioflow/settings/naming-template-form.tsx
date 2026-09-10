@@ -48,7 +48,7 @@ export function NamingTemplateForm({
         <Notice tone="success">Template saved.</Notice>
       ) : null}
 
-      <Field label="Template nama file" required>
+      <Field label="File name template" required>
         <Input
           name="naming_template"
           required
@@ -60,12 +60,12 @@ export function NamingTemplateForm({
       </Field>
 
       <div className="rounded-control border border-line bg-surface-muted px-4 py-3">
-        <p className="text-xs text-ink-tertiary">Contoh hasil</p>
+        <p className="text-xs text-ink-tertiary">Example result</p>
         <p className="mt-1 font-ui-mono text-sm">{preview(draft) || "—"}.pdf</p>
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-medium text-ink-tertiary">Token yang tersedia</p>
+        <p className="mb-2 text-xs font-medium text-ink-tertiary">Available tokens</p>
         <dl className="grid gap-1 text-sm">
           {TOKENS.map((entry) => (
             <div key={entry.token} className="flex gap-3">
