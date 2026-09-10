@@ -5,8 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.01**
-- Next local revision: **R8.02**
+- Current revision after this entry is committed: **R8.02**
+- Next local revision: **R8.03**
+
+## R8.02 | 2026-09-10 | docs(repo): purge obsolete documentation stubs and historical artifacts
+
+- Purged 17 temporary redirect stubs left in `docs/` and `docs/apps/` after the
+  2026-09-10 documentation folder reorganization.
+- Purged outdated historical reference documents (`R6.1-DECISION-DELTA.md`,
+  `docs/apps/masterdata/masterdata-handoff.md`, and legacy UI mockups zip).
+- Reconciled `docs/README.md` hub table to match remaining active documentation.
+
+### Verification
+
+- Local Markdown link-target audit: passed.
+- `npm run check`: passed.
 
 ## R8.01 | 2026-09-10 | merge(repo): integrate contracts branch into main
 

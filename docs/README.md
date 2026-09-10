@@ -23,8 +23,7 @@ tests, and migrations prove implemented state.
 | [`StudioFlow R7.48 work order`](../scripts/work-orders/STUDIOFLOW-R7.48-PHASE-DELIVERABLE.md) | implemented in R7.48; retained as history |
 | [`StudioFlow R7.49 work order`](../scripts/work-orders/STUDIOFLOW-R7.49-COHERENT-WORK-SURFACE.md) | implemented in R7.50; retained as history |
 | [`StudioFlow R7.52 MOM work order`](../scripts/work-orders/STUDIOFLOW-R7.52-MOM.md) | implemented in R7.52; retained as history |
-| [`StudioFlow R7.53 Product Catalogue work order`](../scripts/work-orders/STUDIOFLOW-R7.53-PRODUCT-CATALOGUE.md) | implemented in R7.53; retained as history |
-| [`R6.1-DECISION-DELTA.md`](R6.1-DECISION-DELTA.md) | Historical R6.1 convergence evidence; not the current status page |
+
 
 A work order marked *implemented* above is evidence of what was built, never an
 instruction to rebuild it. Only the order labelled **active executable order** may
@@ -73,7 +72,6 @@ outside any app folder because every app depends on them.
 | [`apps/masterdata/brand-contract.md`](apps/masterdata/brand-contract.md) | owner-approved Brand identity, relations, discovery, lifecycle, deletion, UI, and public boundary |
 | [`apps/masterdata/vendor-contract.md`](apps/masterdata/vendor-contract.md) | owner-approved Vendor identity, types/capabilities, contacts/links, Brand relations, lifecycle, deletion, and UI |
 | [`apps/masterdata/pricing-contract.md`](apps/masterdata/pricing-contract.md) | owner-approved three-table Pricing model, validation, lifecycle, permissions, UI, migration, and downstream reads |
-| [`apps/masterdata/masterdata-handoff.md`](apps/masterdata/masterdata-handoff.md) | historical continuation/handoff reference from an earlier revision; current remaining work is in `roadmap.md` |
 
 ### BQ
 
