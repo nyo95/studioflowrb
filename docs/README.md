@@ -1,6 +1,6 @@
 # Documentation Hub
 
-Status: reconciled through **R7.46** on 2026-09-10.
+Status: reconciled through **R7.47** on 2026-09-10.
 
 This directory contains active contracts, operational trackers, architecture
 roadmaps, and retained historical evidence. Current owner instruction remains
@@ -16,6 +16,7 @@ tests, and migrations prove implemented state.
 | [`knownbug.md`](knownbug.md) | Open and closed defects grouped by application |
 | [`REVISION-LEDGER-NOTES.md`](REVISION-LEDGER-NOTES.md) | Historical missing/skipped revision labels and how to interpret them |
 | [`SESSION-HANDOFF-PROMPT.md`](SESSION-HANDOFF-PROMPT.md) | Copy-ready prompt for coordinated Codex and Claude/OpenCode continuation |
+| [`StudioFlow R7.48 work order`](../scripts/work-orders/STUDIOFLOW-R7.48-PHASE-DELIVERABLE.md) | active executable Claude/OpenCode order for current deliverable summary and intake inside each phase |
 | [`R6.1-DECISION-DELTA.md`](R6.1-DECISION-DELTA.md) | Historical R6.1 convergence evidence; not the current status page |
 
 Earlier [`UIUX-CURATE`](../scripts/work-orders/UIUX-CURATE.md) and

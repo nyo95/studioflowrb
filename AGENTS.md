@@ -7,8 +7,9 @@
 3. `docs/alignment.md`, `docs/roadmap.md`, and `docs/knownbug.md` when the task
    plans, audits, changes, or reviews StudioFlow or shared consumers
 4. The shared contract relevant to the task: `CORE.md`, `DESIGN.md`, and/or `UI_ENGINE.md`
-5. The active work order, when one exists. There is currently no executable app
-   work order. `docs/apps/masterdata.md` indexes approved logic contracts only.
+5. The active work order, when one exists. The current executable app work
+   order is `scripts/work-orders/STUDIOFLOW-R7.48-PHASE-DELIVERABLE.md`.
+   `docs/apps/masterdata.md` indexes approved logic contracts only.
 6. `prisma/schema.prisma` for the implemented persisted shape
 7. The relevant current code, tests, and migrations
 

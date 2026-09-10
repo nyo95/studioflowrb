@@ -5,8 +5,31 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.46**
-- Next local revision: **R7.47**
+- Current revision after this entry is committed: **R7.47**
+- Next local revision: **R7.48**
+
+## R7.47 | 2026-09-10 | docs(studioflow): issue phase deliverable work order
+
+### Changed
+
+- Activated the deterministic R7.48 Claude/OpenCode work order for current
+  deliverable summary, next standard filename, copy control, and fixed-folder
+  intake directly inside each project phase.
+- Corrected the earlier composition-only plan: filename preview must predict
+  the next round without writing, and completed no-round phases must reject
+  intake just like completed round-bearing phases.
+- Locked the allowed files, shared UI Engine Copy control, service invariants,
+  tests, browser states, database safety, commit subject, and Codex handback.
+
+### Verification
+
+- Documentation/work-order change only. The manager inspected the current
+  service, project route, phase component, file actions/form, contracts, and
+  prior Claude plan; no implementation or runtime gate is claimed in R7.47.
+
+### Remaining
+
+- R7.48 implementation and all acceptance gates remain the executor's work.
 
 ## R7.46 | 2026-09-10 | fix(studioflow): reconcile app copy and contracts
 

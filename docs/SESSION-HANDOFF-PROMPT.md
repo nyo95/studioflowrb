@@ -41,6 +41,14 @@ Read these files in order before deciding or editing:
 Do not rely on this prompt as a replacement for those sources. Current owner
 instruction wins over every document.
 
+### Active executor order
+
+Claude/OpenCode must execute only
+[`STUDIOFLOW-R7.48-PHASE-DELIVERABLE.md`](../scripts/work-orders/STUDIOFLOW-R7.48-PHASE-DELIVERABLE.md),
+then stop and hand its local commit back to Codex for review. Do not start MOM,
+Product Catalogue/Schedule, or the combined Task/deliverable redesign in the
+same change set.
+
 ### Mission
 
 Finish the rebuild per application without regressing Master Data, BQ, or the
