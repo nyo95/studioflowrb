@@ -1,15 +1,40 @@
-# Active Documentation
+# Documentation Hub
 
-## Current R6.1 convergence — 2026-09-06
+Status: reconciled through **R7.55** on 2026-09-10. Contracts under `docs/apps/`
+were reorganized into one subfolder per application on 2026-09-10 at owner
+request; content is unchanged except for corrected cross-links.
 
-The owner's StudioFlow R6.1 plan is the active instruction for contract,
-domain, UI Engine, Master Data, and BQ convergence. Its audited decision delta
-and implemented-state mapping are recorded in
-[`R6.1-DECISION-DELTA.md`](R6.1-DECISION-DELTA.md). The earlier
-[`UIUX-CURATE`](../scripts/work-orders/UIUX-CURATE.md) and
+This directory contains active contracts, operational trackers, architecture
+roadmaps, and retained historical evidence. Current owner instruction remains
+the highest authority. `CHANGELOG.md` is the revision ledger; code, schema,
+tests, and migrations prove implemented state.
+
+## Operational documents
+
+| Document | Purpose |
+|---|---|
+| [`alignment.md`](alignment.md) | Owner explanation of how the StudioFlow rebuild preserves legacy outcomes while simplifying the workflow |
+| [`roadmap.md`](roadmap.md) | Remaining planned work, grouped by Platform, UI Engine, Master Data, BQ, and StudioFlow |
+| [`knownbug.md`](knownbug.md) | Open and closed defects grouped by application |
+| [`review.md`](review.md) | Implemented-but-unverified work, grouped by application — distinct from `roadmap.md` (not built) and `knownbug.md` (confirmed defect) |
+| [`REVISION-LEDGER-NOTES.md`](REVISION-LEDGER-NOTES.md) | Historical missing/skipped revision labels and how to interpret them |
+| [`SESSION-HANDOFF-PROMPT.md`](SESSION-HANDOFF-PROMPT.md) | Copy-ready prompt for coordinated Codex and Claude/OpenCode continuation |
+| [`StudioFlow workflow closure draft`](../scripts/work-orders/STUDIOFLOW-R7.56-WORKFLOW-CLOSURE.md) | **paused** by the owner priority below; assign the next unused revision when reactivated, not the historical filename's R7.56 |
+| [`StudioFlow R7.48 work order`](../scripts/work-orders/STUDIOFLOW-R7.48-PHASE-DELIVERABLE.md) | implemented in R7.48; retained as history |
+| [`StudioFlow R7.49 work order`](../scripts/work-orders/STUDIOFLOW-R7.49-COHERENT-WORK-SURFACE.md) | implemented in R7.50; retained as history |
+| [`StudioFlow R7.52 MOM work order`](../scripts/work-orders/STUDIOFLOW-R7.52-MOM.md) | implemented in R7.52; retained as history |
+| [`StudioFlow R7.53 Product Catalogue work order`](../scripts/work-orders/STUDIOFLOW-R7.53-PRODUCT-CATALOGUE.md) | implemented in R7.53; retained as history |
+| [`R6.1-DECISION-DELTA.md`](R6.1-DECISION-DELTA.md) | Historical R6.1 convergence evidence; not the current status page |
+
+A work order marked *implemented* above is evidence of what was built, never an
+instruction to rebuild it. Only the order labelled **active executable order** may
+be executed.
+
+Earlier [`UIUX-CURATE`](../scripts/work-orders/UIUX-CURATE.md) and
 [`BQ-MASTERDATA-HARDENING`](../scripts/work-orders/BQ-MASTERDATA-HARDENING.md)
-orders remain implementation history; where they conflict, the current owner
-instruction and patched contracts win.
+orders remain implementation history. Where historical documents conflict with
+current owner instructions, current contracts, or the implemented evidence recorded in `CHANGELOG.md`,
+the newer authority wins.
 
 This repository keeps only the shared contracts and active app contracts that
 have been reviewed for the current rebuild. A contract is not an executable work
@@ -17,35 +42,71 @@ order unless it says so explicitly.
 
 ## Active contracts
 
+Contracts are grouped by the application they belong to. Shared contracts sit
+outside any app folder because every app depends on them.
+
+### Shared platform (governs every app)
+
 | Contract | Owns |
 |---|---|
 | [`CORE.md`](../CORE.md) | staged foundation: database, real identity/login, persisted RBAC, General Settings, audit, errors, validation, shared utilities, capability registry, and public boundaries |
 | [`DESIGN.md`](../DESIGN.md) | shared visual language and density |
 | [`UI_ENGINE.md`](../UI_ENGINE.md) | reusable UI components, layouts, and interaction patterns |
-| [`PLATFORM-ASSET-STORAGE-ROADMAP.md`](PLATFORM-ASSET-STORAGE-ROADMAP.md) | planned shared image preparation and Supabase Storage activation; no executable work order yet |
-| [`STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md`](STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md) | read-only legacy audit and staged StudioFlow rebuild roadmap; no executable app work order yet |
-| [`apps/studioflow.md`](apps/studioflow.md) | StudioFlow contract index, permission vocabulary, cross-app boundaries, storage dependency, and deferred decisions |
-| [`apps/studioflow-project-contract.md`](apps/studioflow-project-contract.md) | StudioFlow PRD: Client, Project, assignment, Phase, Iteration, corrected client review exchange, work items, and assets; no implementation authorized |
-| [`apps/studioflow-ux-spec.md`](apps/studioflow-ux-spec.md) | StudioFlow surface specification: the single project page, iteration rows, send/response dialogs, and required states |
-| [`apps/studioflow-implementation-plan.md`](apps/studioflow-implementation-plan.md) | StudioFlow execution rules, phase sequence and gates, theme-evolution limits, and Master Data/BQ non-regression protection; work-order breakdown belongs to the navigator |
-| [`apps/studioflow-schedule-contract.md`](apps/studioflow-schedule-contract.md) | deferred domain brief for Library and Product Schedule; not implementable until its owner decisions are locked |
-| [`apps/studioflow-mom-contract.md`](apps/studioflow-mom-contract.md) | deferred domain brief for Minutes of Meeting; not implementable until its owner decisions are locked |
-| [`apps/studioflow-work-orders.md`](apps/studioflow-work-orders.md) | StudioFlow locked decisions, open owner questions, and the staged work order sequence; no work order is activated |
-| [`apps/masterdata.md`](apps/masterdata.md) | Master Data contract index, shared lifecycle/deletion rules, capability placement, and remaining deferred decisions |
-| [`apps/brand-contract.md`](apps/brand-contract.md) | owner-approved Brand identity, relations, discovery, lifecycle, deletion, UI, and public boundary |
-| [`apps/vendor-contract.md`](apps/vendor-contract.md) | owner-approved Vendor identity, types/capabilities, contacts/links, Brand relations, lifecycle, deletion, and UI |
-| [`apps/pricing-contract.md`](apps/pricing-contract.md) | owner-approved three-table Pricing model, validation, lifecycle, permissions, UI, migration, and downstream reads |
+
+### Platform Foundation
+
+| Contract | Owns |
+|---|---|
+| [`apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md`](apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md) | planned shared image preparation and Supabase Storage activation; no executable work order yet |
+
+### UI Engine
+
+| Contract | Owns |
+|---|---|
+| [`apps/ui-engine/date-time-lookup-audit-2026-09-10.md`](apps/ui-engine/date-time-lookup-audit-2026-09-10.md) | audit of canonical date/time and project/client lookup controls across Master Data, BQ, and StudioFlow; recommends a consolidation, not yet executed |
+
+### Master Data
+
+| Contract | Owns |
+|---|---|
+| [`apps/masterdata/masterdata.md`](apps/masterdata/masterdata.md) | Master Data contract index, shared lifecycle/deletion rules, capability placement, and remaining deferred decisions |
+| [`apps/masterdata/brand-contract.md`](apps/masterdata/brand-contract.md) | owner-approved Brand identity, relations, discovery, lifecycle, deletion, UI, and public boundary |
+| [`apps/masterdata/vendor-contract.md`](apps/masterdata/vendor-contract.md) | owner-approved Vendor identity, types/capabilities, contacts/links, Brand relations, lifecycle, deletion, and UI |
+| [`apps/masterdata/pricing-contract.md`](apps/masterdata/pricing-contract.md) | owner-approved three-table Pricing model, validation, lifecycle, permissions, UI, migration, and downstream reads |
+| [`apps/masterdata/masterdata-handoff.md`](apps/masterdata/masterdata-handoff.md) | historical continuation/handoff reference from an earlier revision; current remaining work is in `roadmap.md` |
+
+### BQ
+
+| Contract | Owns |
+|---|---|
+| [`apps/bq/bq-contract.md`](apps/bq/bq-contract.md) | owner-approved BQ logic contract: inline editing at every level, all three L3 sources, server-owned calculation and rounding policy |
+| [`apps/bq/bq-implementation-plan.md`](apps/bq/bq-implementation-plan.md) | phase-by-phase execution plan against the BQ contract |
+| [`apps/bq/bq-ux-spec.md`](apps/bq/bq-ux-spec.md) | BQ surface and UI component reference |
+
+### StudioFlow
+
+| Contract | Owns |
+|---|---|
+| [`apps/studioflow/studioflow.md`](apps/studioflow/studioflow.md) | StudioFlow contract index, permission vocabulary, cross-app boundaries, storage dependency, and deferred decisions |
+| [`apps/studioflow/studioflow-project-contract.md`](apps/studioflow/studioflow-project-contract.md) | StudioFlow PRD: Client, Project, assignment, Phase, Iteration, review exchange, work items, and assets; substantial slices are implemented through R7.55 |
+| [`apps/studioflow/studioflow-ux-spec.md`](apps/studioflow/studioflow-ux-spec.md) | StudioFlow surface reference; partially implemented and subordinate to current owner alignment |
+| [`apps/studioflow/studioflow-implementation-plan.md`](apps/studioflow/studioflow-implementation-plan.md) | Active execution/non-regression guardrails; current remaining work is in `roadmap.md` |
+| [`apps/studioflow/studioflow-schedule-contract.md`](apps/studioflow/studioflow-schedule-contract.md) | StudioFlow Brands, independent reusable Product Catalogue, and project Schedule logic contract; Product Catalogue is implemented in R7.53 and Schedule remains unactivated |
+| [`apps/studioflow/studioflow-mom-contract.md`](apps/studioflow/studioflow-mom-contract.md) | implemented project-owned MOM logic contract; no task/phase/iteration linkage; delivered in R7.52 |
+| [`apps/studioflow/studioflow-work-orders.md`](apps/studioflow/studioflow-work-orders.md) | historical decision/work-order ledger; use `roadmap.md` for current remaining work |
+| [`apps/studioflow/STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md`](apps/studioflow/STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md) | historical read-only audit and staged roadmap; implemented phases and remaining work are reconciled in `roadmap.md` |
 
 Execution and continuity are governed by [`AGENTS.md`](../AGENTS.md) and
 [`CHANGELOG.md`](../CHANGELOG.md). The completed
 [`Foundation F0 work order`](../scripts/work-orders/FOUNDATION.md) is retained as
-historical implementation evidence; there is currently no executable app work
-order.
+historical implementation evidence. The executable app work order is the one
+marked active in the table above.
 
-Master Data and BQ are active implemented applications. Their current contracts,
-schema, migrations, services, public boundaries, tests, and browser behavior are
-the implementation authority. Media, Samples, workbook import/export, and other
-explicitly deferred capabilities remain out of scope.
+Master Data, BQ, and the implemented StudioFlow project workflow are active
+applications. Their current contracts, schema, migrations, services, public
+boundaries, tests, and browser behavior are implementation evidence. Remaining
+features and defects are listed only in `roadmap.md` and `knownbug.md`;
+implemented-but-unverified work is listed in `review.md`.
 
 ## Authority order
 
@@ -87,10 +148,19 @@ Forbidden: `platform -> app`, cross-app internal imports, implicit cross-app wri
 
 ## Active sequence
 
-1. keep shared platform contracts reusable and domain-neutral;
-2. close Master Data against its owner-approved contract;
-3. harden BQ lifecycle, snapshots, editor, Library, and templates;
-4. keep cross-app work behind explicit public ports and application coordinators;
-5. validate schema, checks, tests, production build, and real browser behavior.
+Status: **superseded 2026-09-10 by explicit owner instruction.** The order
+below replaces the previous Master-Data-first sequence; it is the current
+execution priority, not a change to what `roadmap.md` lists as remaining.
+
+1. **Platform Foundation — routing first.** Main-route/routing settings are the
+   core app boundary everything else sits behind.
+2. **UI Engine and Shared Utilities.**
+3. **BQ.** The simplest remaining app; keep its reusable utilities in the
+   shared platform layer, not app-local — see `apps/bq/`.
+4. **AI file-organization exploration is parked**, not pursued for now (see
+   `roadmap.md`, Discovery and automation).
+5. **Everything else waits** — Master Data closure, StudioFlow's
+   client-answer/archive/phase-admin work (KB-013…KB-017), cross-app hardening,
+   and validation all hold until 1–3 above land.
 
 Documented deferred capabilities are routing memory, not implementation scope. Do not create code, folders, dependencies, or placeholder exports until a stage/consumer activates them.

@@ -5,6 +5,7 @@ import { prisma, runSerializableTransaction } from "@platform/core/db";
 import { createPlatformAccessService } from "@platform/core/rbac/services";
 import { createPlatformSettingsService } from "@platform/core/settings";
 import { createPlatformAccountService } from "@platform/core/auth/account";
+import { createConfiguredObjectStorage } from "@platform/core/storage/supabase";
 import type { Prisma } from "@/generated/prisma/client";
 
 /**
@@ -27,6 +28,7 @@ const commonPorts = {
 };
 
 export const auditWriter = commonPorts.auditWriter;
+export const objectStorage = createConfiguredObjectStorage();
 
 export const platformAccess = createPlatformAccessService({
   db: prisma,

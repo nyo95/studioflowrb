@@ -70,7 +70,7 @@ function ReasonAction({
     <div className="grid gap-1">
       <form action={formAction} className="flex items-end gap-2">
         <Field label={reasonLabel} required>
-          <Input name="reason" required maxLength={500} placeholder="Tulis alasan…" />
+          <Input name="reason" required maxLength={500} placeholder="Write the reason…" />
         </Field>
         <Button type="submit" variant={variant} pending={pending}>{label}</Button>
       </form>
@@ -96,16 +96,16 @@ export function SupervisionControls({
   return (
     <div className="mt-4 flex flex-wrap items-start gap-3">
       {state === "NOT_STARTED" && (
-        <SimpleAction action={startSupervisionAction.bind(null, phaseId, projectId)} label="Mulai supervisi" />
+        <SimpleAction action={startSupervisionAction.bind(null, phaseId, projectId)} label="Start supervision" />
       )}
       {state === "IN_PROGRESS" && (
-        <SimpleAction action={finishSupervisionAction.bind(null, phaseId, projectId)} label="Selesaikan supervisi" />
+        <SimpleAction action={finishSupervisionAction.bind(null, phaseId, projectId)} label="Finish supervision" />
       )}
       {state === "DONE" && (
         <ReasonAction
           action={reopenSupervisionAction.bind(null, phaseId, projectId)}
-          label="Buka kembali"
-          reasonLabel="Alasan reopen"
+          label="Reopen"
+          reasonLabel="Reason for reopening"
         />
       )}
     </div>
@@ -136,28 +136,28 @@ export function PhaseControls({
   return (
     <div className="mt-4 flex flex-wrap items-start gap-3">
       {open && canManage && !hasDraft && (
-        <SimpleAction action={openIterationAction.bind(null, phaseId, projectId)} label="Mulai round baru" />
+        <SimpleAction action={openIterationAction.bind(null, phaseId, projectId)} label="Start new round" />
       )}
       {open && canReview && (
         <SimpleAction
           action={finishPhaseAction.bind(null, phaseId, projectId)}
-          label="Selesaikan fase"
+          label="Finish phase"
           variant="secondary"
         />
       )}
       {open && canOverride && (
         <ReasonAction
           action={closePhaseByExceptionAction.bind(null, phaseId, projectId)}
-          label="Tutup (exception)"
-          reasonLabel="Alasan exception"
+          label="Close (exception)"
+          reasonLabel="Exception reason"
           variant="danger"
         />
       )}
       {!open && canReview && (
         <ReasonAction
           action={reopenPhaseAction.bind(null, phaseId, projectId)}
-          label="Buka kembali"
-          reasonLabel="Alasan reopen"
+          label="Reopen"
+          reasonLabel="Reason for reopening"
         />
       )}
     </div>
@@ -185,14 +185,14 @@ export function RecordFileForm({
     <form action={formAction} className="grid gap-3 sm:grid-cols-2">
       <input type="hidden" name="folder_key" value={folderKey ?? ""} />
       {failure ? <div className="sm:col-span-2"><InlineError>{failure}</InlineError></div> : null}
-      <Field label="Nama file asli" required>
+      <Field label="Original file name" required>
         <Input name="original_filename" required maxLength={300} placeholder="Denah Lantai 1.pdf" />
       </Field>
-      <Field label="Ukuran (bytes)" required>
+      <Field label="Size (bytes)" required>
         <Input name="bytes" type="number" min="1" required placeholder="2048000" />
       </Field>
       <div className="sm:col-span-2">
-        <Button type="submit" variant="primary" pending={pending}>Catat file</Button>
+        <Button type="submit" variant="primary" pending={pending}>Record file</Button>
       </div>
     </form>
   );

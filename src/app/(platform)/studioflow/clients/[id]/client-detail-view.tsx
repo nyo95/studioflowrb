@@ -35,59 +35,59 @@ export function ClientDetailView({
 
   return (
     <div className="grid gap-6">
-      <SectionCard title="Detail klien">
+      <SectionCard title="Client details">
         <form action={editAction} className="grid gap-4 max-w-lg">
           <input type="hidden" name="id" value={client.id} />
           {editFailure ? <InlineError>{editFailure}</InlineError> : null}
-          <Field label="Nama klien" required>
+          <Field label="Client name" required>
             <Input name="name" required maxLength={200} defaultValue={client.name} disabled={!canManage || !!client.deleted_at} />
           </Field>
-          <Field label="Nama kontak">
+          <Field label="Contact name">
             <Input name="contact_name" maxLength={200} defaultValue={client.contact_name ?? ""} disabled={!canManage || !!client.deleted_at} />
           </Field>
-          <Field label="Telepon">
+          <Field label="Phone">
             <Input name="contact_phone" type="tel" maxLength={50} defaultValue={client.contact_phone ?? ""} disabled={!canManage || !!client.deleted_at} />
           </Field>
           <Field label="Email">
             <Input name="contact_email" type="email" maxLength={200} defaultValue={client.contact_email ?? ""} disabled={!canManage || !!client.deleted_at} />
           </Field>
-          <Field label="Alamat">
+          <Field label="Address">
             <Textarea name="address" maxLength={500} rows={2} defaultValue={client.address ?? ""} disabled={!canManage || !!client.deleted_at} />
           </Field>
-          <Field label="Catatan internal">
+          <Field label="Internal notes">
             <Textarea name="notes" maxLength={2000} rows={2} defaultValue={client.notes ?? ""} disabled={!canManage || !!client.deleted_at} />
           </Field>
           {canManage && !client.deleted_at ? (
             <FormActions>
-              <Link href="/studioflow/clients" className="text-sm text-action hover:underline">Kembali</Link>
-              <Button type="submit" variant="primary" pending={editPending}>Simpan perubahan</Button>
+              <Link href="/studioflow/clients" className="text-sm text-action hover:underline">Back</Link>
+              <Button type="submit" variant="primary" pending={editPending}>Save changes</Button>
             </FormActions>
           ) : (
-            <Link href="/studioflow/clients" className="text-sm text-action hover:underline">← Kembali ke daftar klien</Link>
+            <Link href="/studioflow/clients" className="text-sm text-action hover:underline">← Back to clients</Link>
           )}
         </form>
       </SectionCard>
 
       {canManage && (
-        <SectionCard title="Arsip klien">
+        <SectionCard title="Archive client">
           {archiveFailure ? <InlineError>{archiveFailure}</InlineError> : null}
           {client.deleted_at ? (
-            <p className="text-sm text-ink-tertiary">Klien ini sudah diarsipkan.</p>
+            <p className="text-sm text-ink-tertiary">This client is archived.</p>
           ) : liveProjectCount > 0 ? (
             // Spec §5: archive button must not render when client has live projects
             <p className="text-sm text-ink-tertiary">
-              Klien ini tidak bisa diarsipkan karena memiliki{" "}
-              <strong className="text-ink">{liveProjectCount} project aktif</strong>.
-              Selesaikan atau hapus project tersebut terlebih dahulu.
+              This client cannot be archived because it has{" "}
+              <strong className="text-ink">{liveProjectCount} active projects</strong>.
+              Complete or delete those projects first.
             </p>
           ) : (
             <form action={archiveAction} className="grid gap-3">
               <input type="hidden" name="id" value={client.id} />
               <p className="text-sm text-ink-tertiary">
-                Mengarsipkan klien menyembunyikannya dari daftar aktif.
+                Archiving a client removes it from the active list.
               </p>
               <div>
-                <Button type="submit" variant="danger" pending={archivePending}>Arsipkan klien</Button>
+                <Button type="submit" variant="danger" pending={archivePending}>Archive client</Button>
               </div>
             </form>
           )}

@@ -26,7 +26,7 @@ export function AddSectionDialog({ projectId }: { projectId: string }) {
     const formData = new FormData(event.currentTarget);
     startTransition(async () => {
       const result = await addSectionAction(null, formData);
-      if (!result.ok) {
+      if (result.ok === false) {
         setError(result.error.safeMessage);
         return;
       }

@@ -1,17 +1,18 @@
 # StudioFlow Rebuild
 
-A reusable platform foundation from which Master Data, StudioFlow, and BQ will be
-rebuilt under explicit contracts.
+A reusable platform with implemented Master Data, BQ, and StudioFlow project
+workflow slices, rebuilt under explicit contracts.
 
-Current delivery scope is foundation-first:
+Current delivery state through R7.55:
 
 1. retain the implemented login/session, persisted RBAC, Platform General
    Settings, Core, Utilities, Design, and UI Engine foundation;
-2. keep application source and persistence absent until an approved work order
-   activates a contract slice;
-3. bring UI Engine through UI-F1 before building the first Master Data workflow;
-4. rebuild Master Data from its approved contracts; StudioFlow and BQ remain
-   deferred.
+2. Master Data and BQ are implemented applications protected against regression;
+3. StudioFlow project/client, phases, tasks, My Activity, file metadata, and
+   Library slices are implemented;
+4. remaining product work and defects are tracked by application in
+   [`docs/roadmap.md`](docs/roadmap.md) and
+   [`docs/knownbug.md`](docs/knownbug.md).
 
 ## Start here
 
@@ -30,9 +31,8 @@ Apps may depend on Platform and another app's explicit `public` surface. Platfor
 
 ## Current execution
 
-Foundation F0 is implemented; its historical locked scope remains in
-[`scripts/work-orders/FOUNDATION.md`](scripts/work-orders/FOUNDATION.md). The
-repository is currently Foundation-only: no application is registered and no app
-schema is active. The next executable work is UI-F1 review/correction, followed
-by a separately approved Master Data work order. Nothing is pushed or published
+Foundation F0 and multiple application slices are implemented; historical work
+orders remain under [`scripts/work-orders`](scripts/work-orders). Use
+[`docs/README.md`](docs/README.md) for the active documentation map and
+`CHANGELOG.md` for exact revision evidence. Nothing is pushed or published
 without a separate explicit owner instruction.

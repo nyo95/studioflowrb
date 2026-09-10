@@ -13,7 +13,9 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import type { AuditActor, AuditWriter } from "@platform/core/audit";
 import { prepareAuditEvent } from "@platform/core/audit";
 import { requirePermission, hasPermission } from "@platform/core/rbac";
+import { readPlatformGeneralSettings } from "@platform/core/settings";
 import { AppError } from "@platform/core/errors";
+import { roundLabel } from "./labels";
 
 // ── Permissions ───────────────────────────────────────────────────────────
 
@@ -26,6 +28,9 @@ export const STUDIOFLOW_PERMISSIONS = {
   iterationReview: "studioflow.iteration.review",
   phaseOverride: "studioflow.phase.override",
   taskManage: "studioflow.task.manage",
+  scheduleManage: "studioflow.schedule.manage",
+  momManage: "studioflow.mom.manage",
+  momIssue: "studioflow.mom.issue",
 } as const;
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -65,12 +70,12 @@ export type EditClientInput = {
 
 export type CreateProjectInput = {
   name: string;
-  client_id: string;
+  client_id?: string;
+  client_name?: string;
   lead_user_id?: string;
   location?: string;
   address?: string;
   area?: string;
-  type: "RESIDENTIAL" | "COMMERCIAL" | "HOSPITALITY" | "OTHER";
   opened_at: Date;
 };
 
@@ -80,7 +85,6 @@ export type EditProjectInput = {
   location?: string | null;
   address?: string | null;
   area?: string | null;
-  type?: "RESIDENTIAL" | "COMMERCIAL" | "HOSPITALITY" | "OTHER";
   status?: "ACTIVE" | "ON_HOLD" | "COMPLETED";
 };
 
@@ -102,10 +106,83 @@ export type AssignTaskInput = { assignee_id: string | null };
 
 export type SetTaskCompletionInput = { done: boolean };
 
+export type UpdateTaskInput = {
+  title?: string;
+  assignee_id?: string | null;
+  due_date?: Date | null;
+};
+
+export type AssignableUser = { id: string; display_name: string };
+
 export type ReorderTaskInput = {
   /** Dragging into General supplies null; dragging onto a phase supplies its key. */
   phase_scope: string | null;
   sort_order: number;
+};
+
+export type CatalogueSpecInput = {
+  brand_md_id?: string | null;
+  brand_name?: string | null;
+  product_name: string;
+  colour?: string | null;
+  finishing?: string | null;
+  dimension_text?: string | null;
+  unit?: string | null;
+  notes?: string | null;
+};
+
+export type EditCatalogueSpecInput = Partial<CatalogueSpecInput>;
+
+export type CatalogueSnapshot = {
+  brand_md_id: string | null;
+  brand_name: string | null;
+  product_name: string;
+  colour: string | null;
+  finishing: string | null;
+  dimension_text: string | null;
+  unit: string | null;
+  notes: string | null;
+  search_key: string;
+};
+
+export function deriveCatalogueSearchKey(input: {
+  brand_name?: string | null;
+  product_name?: string | null;
+  colour?: string | null;
+  finishing?: string | null;
+}): string {
+  return [input.brand_name, input.product_name, input.colour, input.finishing]
+    .map((part) => part?.trim().toLowerCase() ?? "")
+    .filter((part) => part.length > 0)
+    .join("::");
+}
+
+export function snapshotCatalogueProduct(row: CatalogueSnapshot): CatalogueSnapshot {
+  return {
+    brand_md_id: row.brand_md_id,
+    brand_name: row.brand_name,
+    product_name: row.product_name,
+    colour: row.colour,
+    finishing: row.finishing,
+    dimension_text: row.dimension_text,
+    unit: row.unit,
+    notes: row.notes,
+    search_key: row.search_key,
+  };
+}
+
+export type CreateMomInput = {
+  project_id: string;
+  topic: string;
+  meeting_at: Date;
+  venue?: string | null;
+  attendees_text?: string | null;
+  prepared_by_name: string;
+};
+
+export type UpdateMomInput = Partial<Omit<CreateMomInput, "project_id">>;
+export type MomContentInput = {
+  items: Array<{ sort_order: number; is_text_only: boolean; list_style: "NONE" | "BULLET" | "NUMBERED"; points: Array<{ sort_order: number; text: string; style: "TEXT" | "BULLET" | "NUMBERED" }>; images: Array<{ sort_order: number; storage_key: string; alt_text?: string | null }> }>;
 };
 
 export type WaitingOnMeItem =
@@ -254,6 +331,55 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         "Assignee must be an active StudioFlow project reader",
       );
     }
+  }
+
+  /**
+   * Display names for the platform users a StudioFlow surface already
+   * references — project lead, iteration assignee, internal approver.
+   *
+   * Routes call this instead of reaching for Prisma themselves: direct queries
+   * in page components are the legacy pattern the project contract §11 marks
+   * PURGE, and the implementation plan's handoff checklist repeats it.
+   * Unknown or since-deleted ids are simply absent from the result.
+   */
+  async function listUserLabels(
+    grants: PermissionGrants,
+    userIds: readonly (string | null | undefined)[],
+  ): Promise<Record<string, string>> {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    const ids = [...new Set(userIds.filter((id): id is string => Boolean(id)))];
+    if (ids.length === 0) return {};
+    const users = await db.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, display_name: true },
+    });
+    return Object.fromEntries(users.map((user) => [user.id, user.display_name]));
+  }
+
+  async function listAssignableUsers(grants: PermissionGrants): Promise<AssignableUser[]> {
+    requireStudioFlowRead(grants);
+    const users = await db.user.findMany({
+      where: { status: "ACTIVE" },
+      select: {
+        id: true,
+        display_name: true,
+        user_roles: {
+          where: { role: { archived_at: null } },
+          select: { role: { select: { role_permissions: { select: { permission_id: true } } } } },
+        },
+      },
+      orderBy: { display_name: "asc" },
+    });
+    return users
+      .filter((user) => {
+        const permissions = new Set(
+          user.user_roles.flatMap((assignment) =>
+            assignment.role.role_permissions.map((permission) => permission.permission_id),
+          ),
+        );
+        return permissions.has(STUDIOFLOW_PERMISSIONS.access) && permissions.has(STUDIOFLOW_PERMISSIONS.projectRead);
+      })
+      .map(({ id, display_name }) => ({ id, display_name }));
   }
 
   async function requireWritableTaskProject(projectId: string) {
@@ -456,7 +582,13 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       include: {
         client: { select: { id: true, name: true } },
         phases: {
+          // Ordered so the directory can draw the pipeline in template order.
+          orderBy: { sort_order: "asc" },
           select: {
+            id: true,
+            key: true,
+            name: true,
+            sort_order: true,
             state: true,
             iterations: {
               where: { state: "SENT" },
@@ -496,10 +628,24 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
   ) {
     requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
     return runTransaction(async () => {
-      // Verify client exists and is live
-      const client = await db.sfClient.findUnique({ where: { id: input.client_id } });
-      if (!client) throw new AppError("NOT_FOUND", "studioflow.client.not-found", "Client not found");
-      if (client.deleted_at) throw new AppError("CONFLICT", "studioflow.client.archived", "New projects require a live client");
+      // Select an existing live client or create the explicitly typed client in
+      // the same transaction as the project. The UI may offer creation in
+      // context, but the service remains the single policy boundary.
+      let client = input.client_id
+        ? await db.sfClient.findUnique({ where: { id: input.client_id } })
+        : null;
+      if (client?.deleted_at) throw new AppError("CONFLICT", "studioflow.client.archived", "New projects require a live client");
+      if (!client && input.client_name?.trim()) {
+        client = await db.sfClient.create({ data: { name: input.client_name.trim() } });
+        await writeAudit({
+          action: "client.create",
+          entityType: "SfClient",
+          entityId: client.id,
+          actor,
+          changes: { name: client.name, source: "project-create" },
+        });
+      }
+      if (!client) throw new AppError("VALIDATION", "studioflow.client.required", "Select or create a client");
 
       // Fetch template entries
       const templates = await db.sfPhaseTemplate.findMany({ orderBy: { sort_order: "asc" } });
@@ -515,12 +661,11 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         data: {
           code,
           name: input.name.trim(),
-          client_id: input.client_id,
+          client_id: client.id,
           lead_user_id: input.lead_user_id ?? null,
           location: input.location?.trim() ?? null,
           address: input.address?.trim() ?? null,
           area: input.area ?? null,
-          type: input.type,
           status: "ACTIVE",
           opened_at: input.opened_at,
           phases: {
@@ -575,7 +720,6 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
           ...(input.location !== undefined ? { location: input.location?.trim() ?? null } : {}),
           ...(input.address !== undefined ? { address: input.address?.trim() ?? null } : {}),
           ...(input.area !== undefined ? { area: input.area } : {}),
-          ...(input.type !== undefined ? { type: input.type } : {}),
           ...(input.status !== undefined ? { status: input.status } : {}),
         },
         include: {
@@ -678,15 +822,28 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     return true;
   }
 
+  /** §8.5: `{date}` is the drop date in the platform's configured timezone.
+   *  Reading the parts off the Date would use the server's local zone, which on
+   *  the production runtime is UTC — an evening drop in Asia/Jakarta would then
+   *  be filed under the previous day. `en-CA` formats as YYYY-MM-DD. */
+  function dateToken(instant: Date, timeZone: string): string {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+      .format(instant)
+      .replace(/-/g, "");
+  }
+
   function resolveFilename(
     template: string,
     project: { name: string; location: string | null; code: string },
-    opts: { droppedAt: Date; phaseLabel: string | null },
+    opts: { droppedAt: Date; phaseLabel: string | null; timeZone: string },
     ext: string,
   ): string {
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const d = opts.droppedAt;
-    const date = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+    const date = dateToken(opts.droppedAt, opts.timeZone);
     const name = template
       .replace("{date}", date)
       .replace("{project}", project.name)
@@ -706,6 +863,16 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       create: { id: "studio" },
       update: {},
     });
+  }
+
+  /** Everything the naming template needs: the studio-owned token string and
+   *  the platform-owned display timezone that `{date}` resolves in (§8.5). */
+  async function getNamingContext(): Promise<{ template: string; timeZone: string }> {
+    const [studio, platform] = await Promise.all([
+      getStudioSettings(),
+      readPlatformGeneralSettings(db),
+    ]);
+    return { template: studio.naming_template, timeZone: platform.timezone };
   }
 
   async function updateNamingTemplate(
@@ -921,7 +1088,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     return runTransaction(async () => {
       const iteration = await db.sfIteration.findUnique({
         where: { id: iterationId },
-        include: { phase: { select: { id: true, state: true } } },
+        include: { phase: { select: { id: true, state: true, project_id: true, folder_key: true } } },
       });
       if (!iteration) throw new AppError("NOT_FOUND", "studioflow.iteration.not-found", "Round not found");
       if (iteration.state !== "DRAFT") throw new AppError("CONFLICT", "studioflow.iteration.not-draft", "Only draft rounds can be sent");
@@ -933,30 +1100,39 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         throw new AppError(
           "CONFLICT",
           "studioflow.iteration.pending-client-response",
-          "Catat jawaban ronde sebelumnya sebelum mengirim ronde ini",
+          "Record the previous round's response before sending this one",
         );
       }
       const updated = await db.sfIteration.update({
         where: { id: iterationId },
         data: { state: "SENT", sent_at: new Date(), ...(assigneeId !== undefined ? { assignee_id: assigneeId || null } : {}) },
       });
+      if (iteration.phase.folder_key) {
+        await db.sfFile.updateMany({
+          where: {
+            project_id: iteration.phase.project_id,
+            folder_key: iteration.phase.folder_key,
+            superseded_at: null,
+            sent_in_iteration_id: null,
+          },
+          data: { sent_in_iteration_id: iterationId },
+        });
+      }
       await recomputePhaseState(db, iteration.phase_id);
       await writeAudit({ action: "iteration.send", entityType: "SfIteration", entityId: iterationId, actor, changes: { from: "DRAFT", to: "SENT", assignee_id: assigneeId ?? null } });
       return updated;
     });
   }
 
+  /** §6.2: an approval is a recorded client answer, not a bare state change.
+   *  This entry point exists for callers that only need the round closed, and
+   *  it delegates to `recordResponse` so there is exactly one write path and
+   *  every APPROVED round is backed by a readable response row. A second path
+   *  that skipped the response would leave §6.1's answer history with holes and
+   *  let `finishPhase` close a phase on an approval nobody can produce. */
   async function approveIteration(grants: PermissionGrants, actor: AuditActor, iterationId: string) {
-    requirePermission(grants, STUDIOFLOW_PERMISSIONS.iterationReview);
-    return runTransaction(async () => {
-      const iteration = await db.sfIteration.findUnique({ where: { id: iterationId }, select: { id: true, phase_id: true, state: true } });
-      if (!iteration) throw new AppError("NOT_FOUND", "studioflow.iteration.not-found", "Round not found");
-      if (iteration.state !== "SENT") throw new AppError("CONFLICT", "studioflow.iteration.not-sent", "Only sent rounds can be approved");
-      const updated = await db.sfIteration.update({ where: { id: iterationId }, data: { state: "APPROVED", responded_at: new Date() } });
-      await recomputePhaseState(db, iteration.phase_id);
-      await writeAudit({ action: "iteration.approve", entityType: "SfIteration", entityId: iterationId, actor, changes: { from: "SENT", to: "APPROVED" } });
-      return updated;
-    });
+    await recordResponse(grants, actor, iterationId, { kind: "APPROVAL" });
+    return db.sfIteration.findUniqueOrThrow({ where: { id: iterationId } });
   }
 
   async function voidIteration(grants: PermissionGrants, actor: AuditActor, iterationId: string, reason: string) {
@@ -994,7 +1170,10 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     return runTransaction(async () => {
       const point = await db.sfIterationPoint.findUnique({ where: { id: pointId }, include: { iteration: { select: { state: true } } } });
       if (!point) throw new AppError("NOT_FOUND", "studioflow.iteration-point.not-found", "Checklist point not found");
-      if (point.iteration.state !== "DRAFT" && point.iteration.state !== "SENT") throw new AppError("CONFLICT", "studioflow.iteration-point.not-open", "Only draft or sent rounds can change points");
+      // §6.3: a sent, answered or stopped round is frozen and keeps the
+      // checklist snapshot it carried at send time. Ticking a point there would
+      // rewrite delivered history, so the checklist is editable in DRAFT only.
+      if (point.iteration.state !== "DRAFT") throw new AppError("CONFLICT", "studioflow.iteration-point.not-draft", "Only draft rounds can change points");
       return db.sfIterationPoint.update({ where: { id: pointId }, data: { done } });
     });
   }
@@ -1003,8 +1182,14 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     requirePermission(grants, STUDIOFLOW_PERMISSIONS.iterationManage);
     if (!reason.trim()) throw new AppError("VALIDATION", "studioflow.iteration-point.withdraw-reason-required", "Reason is required");
     return runTransaction(async () => {
-      const point = await db.sfIterationPoint.findUnique({ where: { id: pointId }, select: { id: true, iteration_id: true, withdrawn_at: true } });
+      const point = await db.sfIterationPoint.findUnique({
+        where: { id: pointId },
+        select: { id: true, iteration_id: true, withdrawn_at: true, iteration: { select: { state: true } } },
+      });
       if (!point) throw new AppError("NOT_FOUND", "studioflow.iteration-point.not-found", "Checklist point not found");
+      // §7.2: withdrawal is a draft-time correction of work still being planned.
+      // A frozen round keeps the checklist it was sent with (§6.3).
+      if (point.iteration.state !== "DRAFT") throw new AppError("CONFLICT", "studioflow.iteration-point.not-draft", "Only draft rounds can withdraw points");
       if (point.withdrawn_at) throw new AppError("CONFLICT", "studioflow.iteration-point.already-withdrawn", "Point is already withdrawn");
       const updated = await db.sfIterationPoint.update({ where: { id: pointId }, data: { withdrawn_at: new Date(), withdrawn_by_id: actor.userId, withdrawal_reason: reason.trim() } });
       await writeAudit({ action: "iteration_point.withdraw", entityType: "SfIterationPoint", entityId: pointId, actor, changes: { iteration_id: point.iteration_id, reason: reason.trim() } });
@@ -1021,7 +1206,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     opts: { extension?: string } = {},
   ): Promise<string> {
     requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
-    const settings = await getStudioSettings();
+    const naming = await getNamingContext();
     const project = await db.sfProject.findUniqueOrThrow({
       where: { id: projectId },
       select: { name: true, location: true, code: true },
@@ -1030,17 +1215,33 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     if (phaseId) {
       const phase = await db.sfProjectPhase.findUniqueOrThrow({
         where: { id: phaseId },
-        select: { round_prefix: true, name: true, has_rounds: true },
+        select: { project_id: true, round_prefix: true, name: true, has_rounds: true },
       });
+      if (phase.project_id !== projectId) {
+        throw new AppError("NOT_FOUND", "studioflow.phase.not-found", "Phase not found in this project");
+      }
       if (phase.has_rounds) {
-        const latest = await db.sfIteration.findFirst({
+        const draft = await db.sfIteration.findFirst({
           where: { phase_id: phaseId, state: "DRAFT" },
           select: { number: true },
         });
-        if (latest) phaseLabel = `${phase.round_prefix ?? phase.name} ${latest.number}`;
+        if (draft) {
+          phaseLabel = roundLabel(phase, draft.number);
+        } else {
+          const agg = await db.sfIteration.aggregate({
+            where: { phase_id: phaseId },
+            _max: { number: true },
+          });
+          phaseLabel = roundLabel(phase, (agg._max.number ?? 0) + 1);
+        }
       }
     }
-    return resolveFilename(settings.naming_template, project, { droppedAt: new Date(), phaseLabel }, opts.extension ?? "");
+    return resolveFilename(
+      naming.template,
+      project,
+      { droppedAt: new Date(), phaseLabel, timeZone: naming.timeZone },
+      opts.extension ?? "",
+    );
   }
 
   /** Where a file lands (8.2 + 5.3).
@@ -1055,7 +1256,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     const targetPhase = folderKey
       ? project.phases.find((phase) => phase.folder_key === folderKey)
       : null;
-    if (!targetPhase?.has_rounds) return { iteration: null, phaseLabel: null };
+    if (!targetPhase) return { iteration: null, phaseLabel: null };
     if (targetPhase.state === "DONE") {
       throw new AppError(
         "CONFLICT",
@@ -1063,6 +1264,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         "Reopen the phase before adding files",
       );
     }
+    if (!targetPhase.has_rounds) return { iteration: null, phaseLabel: null };
     const result = await resolveOrOpenDraft(db, targetPhase.id);
     const phase = await db.sfProjectPhase.findUniqueOrThrow({
       where: { id: targetPhase.id },
@@ -1071,7 +1273,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     if (result.opened) await recomputePhaseState(db, targetPhase.id);
     return {
       iteration: result.iteration,
-      phaseLabel: `${phase.round_prefix ?? phase.name} ${result.iteration.number}`,
+      phaseLabel: roundLabel(phase, result.iteration.number),
     };
   }
 
@@ -1081,10 +1283,10 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     if (!actorUserId) throw new AppError("INVARIANT", "studioflow.actor.user-required", "A user actor is required");
     const originalFilename = input.original_filename.trim();
     if (!originalFilename) {
-      throw new AppError("VALIDATION", "studioflow.file.filename-required", "Nama file wajib diisi");
+      throw new AppError("VALIDATION", "studioflow.file.filename-required", "A file name is required");
     }
     if (!Number.isFinite(input.bytes) || input.bytes <= 0) {
-      throw new AppError("VALIDATION", "studioflow.file.bytes-invalid", "Ukuran file tidak valid");
+      throw new AppError("VALIDATION", "studioflow.file.bytes-invalid", "The file size is not valid");
     }
     return runTransaction(async () => {
       const project = await db.sfProject.findUnique({
@@ -1093,15 +1295,42 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       });
       if (!project) throw new AppError("NOT_FOUND", "studioflow.project.not-found", "Project not found");
 
-      const settings = await getStudioSettings();
+      const naming = await getNamingContext();
       const ext = originalFilename.includes(".") ? "." + originalFilename.split(".").pop() : "";
 
       const { iteration, phaseLabel } = await resolveFolderPlacement(project, input.folder_key);
 
+      if (iteration && input.folder_key) {
+        const current = await db.sfFile.findFirst({
+          where: {
+            project_id: input.project_id,
+            folder_key: input.folder_key,
+            superseded_at: null,
+            sent_in_iteration_id: null,
+          },
+          orderBy: { dropped_at: "desc" },
+          select: { id: true },
+        });
+        if (current) {
+          await db.sfFile.update({ where: { id: current.id }, data: { superseded_at: new Date() } });
+          await db.sfIteration.update({
+            where: { id: iteration.id },
+            data: { working_revision: { increment: 1 } },
+          });
+          await writeAudit({
+            action: "file.supersede",
+            entityType: "SfFile",
+            entityId: current.id,
+            actor,
+            changes: { reason: "working-file-replaced", iteration_id: iteration.id },
+          });
+        }
+      }
+
       const filename = resolveFilename(
-        settings.naming_template,
+        naming.template,
         { name: project.name, location: project.location, code: project.code },
-        { droppedAt: new Date(), phaseLabel },
+        { droppedAt: new Date(), phaseLabel, timeZone: naming.timeZone },
         ext,
       );
 
@@ -1182,7 +1411,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       throw new AppError(
         "VALIDATION",
         "studioflow.response.points-required",
-        "Response revisi butuh minimal satu poin",
+        "A revision response requires at least one point",
       );
     }
 
@@ -1198,7 +1427,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         throw new AppError(
           "CONFLICT",
           "studioflow.iteration.not-sent",
-          "Hanya round terkirim yang bisa menerima response",
+          "Only a sent round can receive a response",
         );
       }
 
@@ -1320,17 +1549,17 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
 
     const originalFilename = input.original_filename.trim();
     if (!originalFilename) {
-      throw new AppError("VALIDATION", "studioflow.file.filename-required", "Nama file wajib diisi");
+      throw new AppError("VALIDATION", "studioflow.file.filename-required", "A file name is required");
     }
     const externalUrl = input.external_url.trim();
     let parsed: URL;
     try {
       parsed = new URL(externalUrl);
     } catch {
-      throw new AppError("VALIDATION", "studioflow.file.url-invalid", "Link tidak valid");
+      throw new AppError("VALIDATION", "studioflow.file.url-invalid", "The link is not valid");
     }
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      throw new AppError("VALIDATION", "studioflow.file.url-invalid", "Link harus http atau https");
+      throw new AppError("VALIDATION", "studioflow.file.url-invalid", "The link must use http or https");
     }
 
     return runTransaction(async () => {
@@ -1340,13 +1569,39 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       });
       if (!project) throw new AppError("NOT_FOUND", "studioflow.project.not-found", "Project not found");
 
-      const settings = await getStudioSettings();
+      const naming = await getNamingContext();
       const { iteration, phaseLabel } = await resolveFolderPlacement(project, input.folder_key);
+      if (iteration && input.folder_key) {
+        const current = await db.sfFile.findFirst({
+          where: {
+            project_id: input.project_id,
+            folder_key: input.folder_key,
+            superseded_at: null,
+            sent_in_iteration_id: null,
+          },
+          orderBy: { dropped_at: "desc" },
+          select: { id: true },
+        });
+        if (current) {
+          await db.sfFile.update({ where: { id: current.id }, data: { superseded_at: new Date() } });
+          await db.sfIteration.update({
+            where: { id: iteration.id },
+            data: { working_revision: { increment: 1 } },
+          });
+          await writeAudit({
+            action: "file.supersede",
+            entityType: "SfFile",
+            entityId: current.id,
+            actor,
+            changes: { reason: "working-file-replaced", iteration_id: iteration.id },
+          });
+        }
+      }
       const ext = originalFilename.includes(".") ? "." + originalFilename.split(".").pop() : "";
       const filename = resolveFilename(
-        settings.naming_template,
+        naming.template,
         { name: project.name, location: project.location, code: project.code },
-        { droppedAt: new Date(), phaseLabel },
+        { droppedAt: new Date(), phaseLabel, timeZone: naming.timeZone },
         ext,
       );
 
@@ -1409,11 +1664,11 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         throw new AppError(
           "CONFLICT",
           "studioflow.file.already-sent",
-          "File yang sudah dikirim tidak bisa dipindah",
+          "A file that has been sent cannot be moved",
         );
       }
       if (file.superseded_at) {
-        throw new AppError("CONFLICT", "studioflow.file.superseded", "File ini sudah diganti");
+        throw new AppError("CONFLICT", "studioflow.file.superseded", "This file has already been superseded");
       }
       if (file.folder_key === folderKey) return file;
 
@@ -1422,15 +1677,15 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         include: { phases: { select: { id: true, folder_key: true, state: true, has_rounds: true } } },
       });
 
-      const settings = await getStudioSettings();
+      const naming = await getNamingContext();
       const { iteration, phaseLabel } = await resolveFolderPlacement(project, folderKey);
       const ext = file.original_filename.includes(".")
         ? "." + file.original_filename.split(".").pop()
         : "";
       const filename = resolveFilename(
-        settings.naming_template,
+        naming.template,
         { name: project.name, location: project.location, code: project.code },
-        { droppedAt: new Date(), phaseLabel },
+        { droppedAt: new Date(), phaseLabel, timeZone: naming.timeZone },
         ext,
       );
 
@@ -1467,13 +1722,13 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       });
       if (!file) throw new AppError("NOT_FOUND", "studioflow.file.not-found", "File not found");
       if (file.superseded_at) {
-        throw new AppError("CONFLICT", "studioflow.file.superseded", "File ini sudah ditandai diganti");
+        throw new AppError("CONFLICT", "studioflow.file.superseded", "This file is already marked superseded");
       }
       if (file.sent_in_iteration_id) {
         throw new AppError(
           "CONFLICT",
           "studioflow.file.already-sent",
-          "File yang sudah dikirim tidak bisa ditandai diganti",
+          "A file that has been sent cannot be marked superseded",
         );
       }
       const updated = await db.sfFile.update({
@@ -1505,6 +1760,199 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
       }),
     ]);
     return { files, folders: phases };
+  }
+
+  // ── MOM (§ project-owned meeting record) ────────────────────────────────
+
+  const momInclude = {
+    items: {
+      orderBy: { sort_order: "asc" as const },
+      include: {
+        points: { orderBy: { sort_order: "asc" as const } },
+        images: { orderBy: { sort_order: "asc" as const } },
+      },
+    },
+  } as const;
+
+  async function listMomDocuments(grants: PermissionGrants, projectId: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    return db.sfMomDocument.findMany({
+      where: { project_id: projectId },
+      orderBy: [{ created_at: "desc" }, { sequence: "desc" }],
+      include: momInclude,
+    });
+  }
+
+  async function getMom(grants: PermissionGrants, projectId: string, momId: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    const mom = await db.sfMomDocument.findFirst({
+      where: { id: momId, project_id: projectId },
+      include: momInclude,
+    });
+    if (!mom) throw new AppError("NOT_FOUND", "studioflow.mom.not-found", "MOM not found");
+    return mom;
+  }
+
+  async function createMomDraft(grants: PermissionGrants, actor: AuditActor, input: CreateMomInput) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.momManage);
+    const actorUserId = actor.userId;
+    if (!actorUserId) throw new AppError("INVARIANT", "studioflow.actor.user-required", "A user actor is required");
+    const topic = input.topic.trim();
+    const preparedBy = input.prepared_by_name.trim();
+    if (!topic || !preparedBy) {
+      throw new AppError("VALIDATION", "studioflow.mom.required", "Topic and preparer are required");
+    }
+    return runTransaction(async () => {
+      const project = await db.sfProject.findUnique({ where: { id: input.project_id }, select: { id: true, deleted_at: true } });
+      if (!project) throw new AppError("NOT_FOUND", "studioflow.project.not-found", "Project not found");
+      if (project.deleted_at) throw new AppError("CONFLICT", "studioflow.project.archived", "Project is archived");
+      const mom = await db.sfMomDocument.create({
+        data: {
+          project_id: input.project_id,
+          topic,
+          meeting_at: input.meeting_at,
+          venue: input.venue?.trim() || null,
+          attendees_text: input.attendees_text?.trim() || null,
+          prepared_by_name: preparedBy,
+          created_by: actorUserId,
+          items: { create: { sort_order: 0, is_text_only: true, list_style: "NONE", points: { create: { sort_order: 0, text: "", style: "TEXT" } } } },
+        },
+        include: momInclude,
+      });
+      await writeAudit({ action: "mom.create", entityType: "SfMomDocument", entityId: mom.id, actor, changes: { project_id: input.project_id, topic } });
+      return mom;
+    });
+  }
+
+  async function updateMomDraft(grants: PermissionGrants, actor: AuditActor, projectId: string, momId: string, input: UpdateMomInput) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.momManage);
+    return runTransaction(async () => {
+      const existing = await db.sfMomDocument.findFirst({ where: { id: momId, project_id: projectId } });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.mom.not-found", "MOM not found");
+      if (existing.state !== "DRAFT") throw new AppError("CONFLICT", "studioflow.mom.immutable", "Only draft MOMs can be edited");
+      const topic = input.topic === undefined ? undefined : input.topic.trim();
+      const preparedBy = input.prepared_by_name === undefined ? undefined : input.prepared_by_name.trim();
+      if (topic === "" || preparedBy === "") throw new AppError("VALIDATION", "studioflow.mom.required", "Topic and preparer are required");
+      const data = { ...(topic !== undefined ? { topic } : {}), ...(input.meeting_at !== undefined ? { meeting_at: input.meeting_at } : {}), ...(input.venue !== undefined ? { venue: input.venue?.trim() || null } : {}), ...(input.attendees_text !== undefined ? { attendees_text: input.attendees_text?.trim() || null } : {}), ...(preparedBy !== undefined ? { prepared_by_name: preparedBy } : {}) };
+      const changed = Object.entries(data).some(([key, value]) => {
+        const current = existing[key as keyof typeof existing];
+        return current instanceof Date && value instanceof Date ? current.getTime() !== value.getTime() : current !== value;
+      });
+      if (!changed) return db.sfMomDocument.findUniqueOrThrow({ where: { id: momId }, include: momInclude });
+      const updated = await db.sfMomDocument.update({ where: { id: momId }, data, include: momInclude });
+      await writeAudit({ action: "mom.edit", entityType: "SfMomDocument", entityId: momId, actor, changes: { project_id: projectId } });
+      return updated;
+    });
+  }
+
+  async function discardMomDraft(grants: PermissionGrants, actor: AuditActor, projectId: string, momId: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.momManage);
+    return runTransaction(async () => {
+      const existing = await db.sfMomDocument.findFirst({ where: { id: momId, project_id: projectId }, include: momInclude });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.mom.not-found", "MOM not found");
+      if (existing.state !== "DRAFT") throw new AppError("CONFLICT", "studioflow.mom.immutable", "Only draft MOMs can be discarded");
+      await db.sfMomDocument.delete({ where: { id: momId } });
+      await writeAudit({ action: "mom.discard", entityType: "SfMomDocument", entityId: momId, actor, changes: { project_id: projectId } });
+      return { id: momId };
+    });
+  }
+
+  async function updateMomContent(grants: PermissionGrants, actor: AuditActor, projectId: string, momId: string, input: MomContentInput) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.momManage);
+    return runTransaction(async () => {
+      const existing = await db.sfMomDocument.findFirst({ where: { id: momId, project_id: projectId }, include: momInclude });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.mom.not-found", "MOM not found");
+      if (existing.state !== "DRAFT") throw new AppError("CONFLICT", "studioflow.mom.immutable", "Only draft MOMs can be edited");
+      if (input.items.length === 0) throw new AppError("VALIDATION", "studioflow.mom.item-required", "A MOM needs at least one content block");
+      if (input.items.some((item) => item.images.length > 2)) throw new AppError("VALIDATION", "studioflow.mom.image-limit", "Each MOM block supports at most two images");
+      const imagePrefix = `studioflow/mom/${projectId}/${momId}/`;
+      if (input.items.some((item) => item.images.some((image) => !image.storage_key.startsWith(imagePrefix)))) {
+        throw new AppError("VALIDATION", "studioflow.mom.image-key", "A MOM image reference is invalid");
+      }
+      if (new Set(input.items.map((item) => item.sort_order)).size !== input.items.length) {
+        throw new AppError("VALIDATION", "studioflow.mom.item-order", "MOM block order must be unique");
+      }
+      for (const item of input.items) {
+        if (new Set(item.points.map((point) => point.sort_order)).size !== item.points.length ||
+            new Set(item.images.map((image) => image.sort_order)).size !== item.images.length) {
+          throw new AppError("VALIDATION", "studioflow.mom.child-order", "MOM point and image order must be unique");
+        }
+        if (item.points.some((point) => !point.text.trim())) {
+          throw new AppError("VALIDATION", "studioflow.mom.point-required", "MOM points cannot be empty");
+        }
+      }
+      const currentContent = existing.items.map((item) => ({ sort_order: item.sort_order, is_text_only: item.is_text_only, list_style: item.list_style, points: item.points.map((point) => ({ sort_order: point.sort_order, text: point.text, style: point.style })), images: item.images.map((image) => ({ sort_order: image.sort_order, storage_key: image.storage_key, alt_text: image.alt_text })) }));
+      const nextContent = input.items.map((item) => ({ sort_order: item.sort_order, is_text_only: item.is_text_only, list_style: item.list_style, points: item.points.map((point) => ({ sort_order: point.sort_order, text: point.text.trim(), style: point.style })), images: item.images.map((image) => ({ sort_order: image.sort_order, storage_key: image.storage_key, alt_text: image.alt_text?.trim() || null })) }));
+      if (JSON.stringify(currentContent) === JSON.stringify(nextContent)) return existing;
+      await db.sfMomItem.deleteMany({ where: { document_id: momId } });
+      await db.sfMomItem.createMany({ data: input.items.map((item) => ({ document_id: momId, sort_order: item.sort_order, is_text_only: item.is_text_only, list_style: item.list_style })) });
+      const items = await db.sfMomItem.findMany({ where: { document_id: momId }, select: { id: true, sort_order: true } });
+      for (const item of input.items) {
+        const target = items.find((row) => row.sort_order === item.sort_order);
+        if (!target) continue;
+        if (item.points.length) await db.sfMomPoint.createMany({ data: item.points.map((point) => ({ item_id: target.id, sort_order: point.sort_order, text: point.text.trim(), style: point.style })) });
+        if (item.images.length) await db.sfMomImage.createMany({ data: item.images.map((image) => ({ item_id: target.id, sort_order: image.sort_order, storage_key: image.storage_key, alt_text: image.alt_text?.trim() || null })) });
+      }
+      const updated = await db.sfMomDocument.findUniqueOrThrow({ where: { id: momId }, include: momInclude });
+      await writeAudit({ action: "mom.content.edit", entityType: "SfMomDocument", entityId: momId, actor, changes: { project_id: projectId, item_count: input.items.length } });
+      return updated;
+    });
+  }
+
+  async function issueMom(grants: PermissionGrants, actor: AuditActor, projectId: string, momId: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.momIssue);
+    const actorUserId = actor.userId;
+    if (!actorUserId) throw new AppError("INVARIANT", "studioflow.actor.user-required", "A user actor is required");
+    return runTransaction(async () => {
+      const existing = await db.sfMomDocument.findFirst({ where: { id: momId, project_id: projectId }, include: momInclude });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.mom.not-found", "MOM not found");
+      if (existing.state !== "DRAFT") throw new AppError("CONFLICT", "studioflow.mom.not-draft", "Only draft MOMs can be issued");
+      if (!existing.items.length || existing.items.every((item) => item.points.every((point) => !point.text.trim()))) {
+        throw new AppError("VALIDATION", "studioflow.mom.content-required", "Add meeting content before issuing this MOM");
+      }
+      const max = await db.sfMomDocument.aggregate({ where: { project_id: projectId }, _max: { sequence: true } });
+      const updated = await db.sfMomDocument.update({ where: { id: momId }, data: { state: "ISSUED", sequence: (max._max.sequence ?? 0) + 1, issued_by: actorUserId, issued_at: new Date() }, include: momInclude });
+      await writeAudit({ action: "mom.issue", entityType: "SfMomDocument", entityId: momId, actor, changes: { project_id: projectId, sequence: updated.sequence } });
+      return updated;
+    });
+  }
+
+  async function assertMomDraftEditable(grants: PermissionGrants, projectId: string, momId: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.momManage);
+    const mom = await db.sfMomDocument.findFirst({ where: { id: momId, project_id: projectId }, select: { state: true } });
+    if (!mom) throw new AppError("NOT_FOUND", "studioflow.mom.not-found", "MOM not found");
+    if (mom.state !== "DRAFT") throw new AppError("CONFLICT", "studioflow.mom.immutable", "Only draft MOMs can be edited");
+  }
+
+  async function supersedeMom(grants: PermissionGrants, actor: AuditActor, projectId: string, momId: string, input: CreateMomInput) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.momIssue);
+    const actorUserId = actor.userId;
+    if (!actorUserId) throw new AppError("INVARIANT", "studioflow.actor.user-required", "A user actor is required");
+    const topic = input.topic.trim();
+    const preparedBy = input.prepared_by_name.trim();
+    if (!topic || !preparedBy) throw new AppError("VALIDATION", "studioflow.mom.required", "Topic and preparer are required");
+    return runTransaction(async () => {
+      const source = await db.sfMomDocument.findFirst({ where: { id: momId, project_id: projectId }, include: momInclude });
+      if (!source) throw new AppError("NOT_FOUND", "studioflow.mom.not-found", "MOM not found");
+      if (source.state !== "ISSUED") throw new AppError("CONFLICT", "studioflow.mom.not-issued", "Only an issued MOM can be corrected");
+      const created = await db.sfMomDocument.create({
+        data: {
+          project_id: projectId, topic, meeting_at: input.meeting_at,
+          venue: input.venue?.trim() || null, attendees_text: input.attendees_text?.trim() || null,
+          prepared_by_name: preparedBy, created_by: actorUserId, supersedes_id: source.id,
+          items: { create: source.items.map((item) => ({
+            sort_order: item.sort_order, is_text_only: item.is_text_only, list_style: item.list_style,
+            points: { create: item.points.map((point) => ({ sort_order: point.sort_order, text: point.text, style: point.style })) },
+            images: { create: item.images.map((image) => ({ sort_order: image.sort_order, storage_key: image.storage_key, alt_text: image.alt_text })) },
+          })) },
+        }, include: momInclude,
+      });
+      const max = await db.sfMomDocument.aggregate({ where: { project_id: projectId }, _max: { sequence: true } });
+      const issued = await db.sfMomDocument.update({ where: { id: created.id }, data: { state: "ISSUED", sequence: (max._max.sequence ?? 0) + 1, issued_by: actorUserId, issued_at: new Date() }, include: momInclude });
+      await db.sfMomDocument.update({ where: { id: source.id }, data: { state: "SUPERSEDED" } });
+      await writeAudit({ action: "mom.supersede", entityType: "SfMomDocument", entityId: issued.id, actor, changes: { project_id: projectId, supersedes_id: source.id, sequence: issued.sequence } });
+      return issued;
+    });
   }
 
   // ── Tasks (§7.3) ───────────────────────────────────────────────────────
@@ -1627,6 +2075,55 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     });
   }
 
+  async function updateTask(
+    grants: PermissionGrants,
+    actor: AuditActor,
+    taskId: string,
+    input: UpdateTaskInput,
+  ) {
+    requireStudioFlowRead(grants);
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.taskManage);
+    const title = input.title === undefined ? undefined : input.title.trim();
+    if (title !== undefined && !title) {
+      throw new AppError("VALIDATION", "studioflow.task.title-required", "Task title is required");
+    }
+    if (input.due_date && Number.isNaN(input.due_date.getTime())) {
+      throw new AppError("VALIDATION", "studioflow.task.due-date-invalid", "Task due date is invalid");
+    }
+    return runTransaction(async () => {
+      const task = await db.sfTask.findUnique({
+        where: { id: taskId },
+        include: { project: { select: { deleted_at: true } } },
+      });
+      if (!task) throw new AppError("NOT_FOUND", "studioflow.task.not-found", "Task not found");
+      if (task.project.deleted_at) {
+        throw new AppError("CONFLICT", "studioflow.project.archived", "Project is archived");
+      }
+      if (input.assignee_id) await requireAssignableUser(input.assignee_id);
+      const dueDate = input.due_date === undefined ? task.due_date : input.due_date;
+      const assigneeId = input.assignee_id === undefined ? task.assignee_id : input.assignee_id;
+      const data = {
+        ...(title !== undefined ? { title } : {}),
+        assignee_id: assigneeId,
+        due_date: dueDate,
+      };
+      if (task.title === (title ?? task.title) && task.assignee_id === assigneeId && task.due_date?.getTime() === dueDate?.getTime()) return task;
+      const updated = await db.sfTask.update({ where: { id: taskId }, data });
+      await writeAudit({
+        action: "task.update",
+        entityType: "SfTask",
+        entityId: taskId,
+        actor,
+        changes: {
+          ...(title !== undefined && task.title !== title ? { title: { from: task.title, to: title } } : {}),
+          ...(task.assignee_id !== assigneeId ? { assignee_id: { from: task.assignee_id, to: assigneeId } } : {}),
+          ...(task.due_date?.getTime() !== dueDate?.getTime() ? { due_date: { from: task.due_date, to: dueDate } } : {}),
+        },
+      });
+      return updated;
+    });
+  }
+
   async function reorderTask(
     grants: PermissionGrants,
     _actor: AuditActor,
@@ -1652,11 +2149,40 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         throw new AppError("CONFLICT", "studioflow.project.archived", "Project is archived");
       }
       await validateTaskPhaseScope(task.project_id, input.phase_scope);
-      if (task.phase_scope === input.phase_scope && task.sort_order === input.sort_order) return task;
-      return db.sfTask.update({
-        where: { id: taskId },
-        data: { phase_scope: input.phase_scope, sort_order: input.sort_order },
+      const sourceSiblings = await db.sfTask.findMany({
+        where: { project_id: task.project_id, phase_scope: task.phase_scope, id: { not: taskId } },
+        orderBy: [{ sort_order: "asc" }, { created_at: "asc" }, { id: "asc" }],
+        select: { id: true },
       });
+      const targetSiblings = task.phase_scope === input.phase_scope
+        ? sourceSiblings
+        : await db.sfTask.findMany({
+            where: { project_id: task.project_id, phase_scope: input.phase_scope },
+            orderBy: [{ sort_order: "asc" }, { created_at: "asc" }, { id: "asc" }],
+            select: { id: true },
+          });
+      const targetIndex = Math.min(input.sort_order, targetSiblings.length);
+      const orderedIds = [...targetSiblings.map((sibling) => sibling.id)];
+      orderedIds.splice(targetIndex, 0, taskId);
+      if (task.phase_scope !== input.phase_scope) {
+        for (const [index, sibling] of sourceSiblings.entries()) {
+          await db.sfTask.update({ where: { id: sibling.id }, data: { sort_order: index } });
+        }
+      }
+      for (const [index, id] of orderedIds.entries()) {
+        await db.sfTask.update({
+          where: { id },
+          data: { phase_scope: input.phase_scope, sort_order: index },
+        });
+      }
+      await writeAudit({
+        action: "task.reorder",
+        entityType: "SfTask",
+        entityId: taskId,
+        actor: _actor,
+        changes: { fromPhase: task.phase_scope, toPhase: input.phase_scope, toIndex: targetIndex },
+      });
+      return db.sfTask.findUniqueOrThrow({ where: { id: taskId } });
     });
   }
 
@@ -1809,6 +2335,162 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     );
   }
 
+  function normalizeCatalogueSpec(input: CatalogueSpecInput) {
+    const product_name = input.product_name.trim();
+    if (!product_name) {
+      throw new AppError("VALIDATION", "studioflow.catalogue.product-required", "Product name is required");
+    }
+    const brand_md_id = input.brand_md_id?.trim() || null;
+    const brand_name = input.brand_name?.trim() || null;
+    if (brand_md_id && !brand_name) {
+      throw new AppError(
+        "VALIDATION",
+        "studioflow.catalogue.brand-name-required",
+        "A selected brand must freeze its name",
+      );
+    }
+    const colour = input.colour?.trim() || null;
+    const finishing = input.finishing?.trim() || null;
+    const dimension_text = input.dimension_text?.trim() || null;
+    const unit = input.unit?.trim() || null;
+    const notes = input.notes?.trim() || null;
+    return {
+      brand_md_id,
+      brand_name,
+      product_name,
+      colour,
+      finishing,
+      dimension_text,
+      unit,
+      notes,
+      search_key: deriveCatalogueSearchKey({ brand_name, product_name, colour, finishing }),
+    };
+  }
+
+  async function listCatalogueProducts(
+    grants: PermissionGrants,
+    opts?: { search?: string; includeArchived?: boolean },
+  ) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    const search = opts?.search?.trim();
+    return db.sfProductCatalogue.findMany({
+      where: {
+        ...(opts?.includeArchived ? {} : { deleted_at: null }),
+        ...(search
+          ? {
+              OR: [
+                { search_key: { contains: search.toLowerCase() } },
+                { product_name: { contains: search, mode: "insensitive" } },
+                { brand_name: { contains: search, mode: "insensitive" } },
+                { colour: { contains: search, mode: "insensitive" } },
+                { finishing: { contains: search, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ sort_order: "asc" }, { product_name: "asc" }, { created_at: "asc" }],
+    });
+  }
+
+  async function getCatalogueProduct(grants: PermissionGrants, id: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    const row = await db.sfProductCatalogue.findUnique({ where: { id } });
+    if (!row) throw new AppError("NOT_FOUND", "studioflow.catalogue.not-found", "Catalogue product not found");
+    return row;
+  }
+
+  async function createCatalogueProduct(
+    grants: PermissionGrants,
+    actor: AuditActor,
+    input: CatalogueSpecInput,
+  ) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.scheduleManage);
+    const data = normalizeCatalogueSpec(input);
+    return runTransaction(async () => {
+      const last = await db.sfProductCatalogue.findFirst({
+        orderBy: { sort_order: "desc" },
+        select: { sort_order: true },
+      });
+      const created = await db.sfProductCatalogue.create({
+        data: { ...data, sort_order: (last?.sort_order ?? 0) + 1 },
+      });
+      await writeAudit({
+        action: "catalogue.create",
+        entityType: "SfProductCatalogue",
+        entityId: created.id,
+        actor,
+        changes: snapshotCatalogueProduct(created),
+      });
+      return created;
+    });
+  }
+
+  async function editCatalogueProduct(
+    grants: PermissionGrants,
+    actor: AuditActor,
+    id: string,
+    input: EditCatalogueSpecInput,
+  ) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.scheduleManage);
+    return runTransaction(async () => {
+      const existing = await db.sfProductCatalogue.findUnique({ where: { id } });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.catalogue.not-found", "Catalogue product not found");
+      if (existing.deleted_at) {
+        throw new AppError("CONFLICT", "studioflow.catalogue.archived", "Catalogue product is archived");
+      }
+      const data = normalizeCatalogueSpec({
+        brand_md_id: input.brand_md_id === undefined ? existing.brand_md_id : input.brand_md_id,
+        brand_name: input.brand_name === undefined ? existing.brand_name : input.brand_name,
+        product_name: input.product_name === undefined ? existing.product_name : input.product_name,
+        colour: input.colour === undefined ? existing.colour : input.colour,
+        finishing: input.finishing === undefined ? existing.finishing : input.finishing,
+        dimension_text: input.dimension_text === undefined ? existing.dimension_text : input.dimension_text,
+        unit: input.unit === undefined ? existing.unit : input.unit,
+        notes: input.notes === undefined ? existing.notes : input.notes,
+      });
+      const before = snapshotCatalogueProduct(existing);
+      const after = snapshotCatalogueProduct(data);
+      if (JSON.stringify(before) === JSON.stringify(after)) return existing;
+      const updated = await db.sfProductCatalogue.update({ where: { id }, data });
+      await writeAudit({
+        action: "catalogue.edit",
+        entityType: "SfProductCatalogue",
+        entityId: id,
+        actor,
+        changes: { before: snapshotCatalogueProduct(existing), after: snapshotCatalogueProduct(updated) },
+      });
+      return updated;
+    });
+  }
+
+  async function archiveCatalogueProduct(grants: PermissionGrants, actor: AuditActor, id: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.scheduleManage);
+    return runTransaction(async () => {
+      const existing = await db.sfProductCatalogue.findUnique({ where: { id } });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.catalogue.not-found", "Catalogue product not found");
+      if (existing.deleted_at) {
+        throw new AppError("CONFLICT", "studioflow.catalogue.already-archived", "Catalogue product is already archived");
+      }
+      const archived = await db.sfProductCatalogue.update({ where: { id }, data: { deleted_at: new Date() } });
+      await writeAudit({ action: "catalogue.archive", entityType: "SfProductCatalogue", entityId: id, actor });
+      return archived;
+    });
+  }
+
+  async function restoreCatalogueProduct(grants: PermissionGrants, actor: AuditActor, id: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.scheduleManage);
+    return runTransaction(async () => {
+      const existing = await db.sfProductCatalogue.findUnique({ where: { id } });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.catalogue.not-found", "Catalogue product not found");
+      if (!existing.deleted_at) {
+        throw new AppError("CONFLICT", "studioflow.catalogue.not-archived", "Catalogue product is not archived");
+      }
+      const restored = await db.sfProductCatalogue.update({ where: { id }, data: { deleted_at: null } });
+      await writeAudit({ action: "catalogue.restore", entityType: "SfProductCatalogue", entityId: id, actor });
+      return restored;
+    });
+  }
+
   // ── Public surface ───────────────────────────────────────────────────────
 
   return {
@@ -1863,9 +2545,29 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     moveFile,
     supersedeFile,
     listProjectFiles,
+    listCatalogueProducts,
+    getCatalogueProduct,
+    createCatalogueProduct,
+    editCatalogueProduct,
+    archiveCatalogueProduct,
+    restoreCatalogueProduct,
+    // MOM
+    listMomDocuments,
+    getMom,
+    createMomDraft,
+    updateMomDraft,
+    discardMomDraft,
+    updateMomContent,
+    assertMomDraftEditable,
+    issueMom,
+    supersedeMom,
+    // People (platform user labels for StudioFlow surfaces)
+    listUserLabels,
     // Tasks (SF-F4)
     listTasks,
+    listAssignableUsers,
     createTask,
+    updateTask,
     assignTask,
     setTaskCompletion,
     reorderTask,

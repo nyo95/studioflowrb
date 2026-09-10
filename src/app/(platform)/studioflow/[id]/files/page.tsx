@@ -1,23 +1,29 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, ExternalLink, FolderOpen, Inbox } from "lucide-react";
+import { ExternalLink, FolderOpen, Inbox } from "lucide-react";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
 import { prisma } from "@/platform/core/db";
 import { readPlatformGeneralSettings } from "@platform/core/settings";
-import { EmptyState, PageHeader, SectionCard } from "@/platform/ui_engine";
+import {
+  Breadcrumb,
+  EmptyState,
+  MetaList,
+  PageHeader,
+  SectionCard,
+} from "@/platform/ui_engine";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
 import { studioFlowService } from "@/apps/studioflow/runtime";
 
-import { FileRowControls, LinkFileForm, RecordFileForm } from "./file-controls";
+import { DeliverableForm, FileRowControls } from "./file-controls";
 import type { FolderOption } from "./file-controls";
 
 export const dynamic = "force-dynamic";
 
 const TREATMENT_LABELS: Record<string, string> = {
-  RECORDED: "Dicatat",
-  STORED: "Tersimpan",
+  RECORDED: "Recorded",
+  STORED: "Stored",
   LINKED: "Link",
 };
 
@@ -51,12 +57,12 @@ export default async function ProjectFilesPage({
 
   if (!canRead) {
     return (
-      <div className="grid gap-4">
-        <PageHeader eyebrow="StudioFlow" title="File" />
+      <>
+        <PageHeader eyebrow="StudioFlow" title="Files" divider />
         <SectionCard>
-          <EmptyState icon={FolderOpen} title="Akses ditolak" description="Kamu tidak punya permission untuk melihat file project ini." />
+          <EmptyState icon={FolderOpen} title="Access denied" description="You do not have permission to view this project's files." />
         </SectionCard>
-      </div>
+      </>
     );
   }
 
@@ -90,7 +96,7 @@ export default async function ProjectFilesPage({
     })),
     {
       key: null,
-      label: "Tray belum disortir",
+      label: "Unsorted tray",
       files: listing.files.filter(
         (file) => !file.folder_key || !folderOptions.some((f) => f.folder_key === file.folder_key),
       ),
@@ -98,36 +104,29 @@ export default async function ProjectFilesPage({
   ];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
-      <div>
-        <Link
-          href={`/studioflow/${projectId}`}
-          className="mb-2 inline-flex items-center gap-1 text-sm text-ink-tertiary hover:text-ink"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Kembali ke project
-        </Link>
-        <PageHeader
-          eyebrow={`StudioFlow · ${project.code}`}
-          title="File project"
-          description={`${listing.files.length} file tercatat`}
-        />
-      </div>
+    <>
+      <Breadcrumb
+        entries={[
+          { label: "Project", href: "/studioflow/projects" },
+          { label: project.name, href: `/studioflow/${projectId}` },
+          { label: "File" },
+        ]}
+      />
+      <PageHeader
+        title="Project files"
+        description={`${listing.files.length} files recorded`}
+        divider
+        meta={<MetaList items={[<span key="code" className="font-ui-mono text-xs">{project.code}</span>, project.name]} />}
+      />
 
       {canManage && (
         <>
-          <SectionCard title="Catat file">
+          <SectionCard title="Add deliverable">
             <p className="mb-3 text-xs text-ink-tertiary">
-              File yang dibuat di luar sistem. Tidak ada upload — hanya metadata.
+              Record deliverable metadata here. The file remains on the PC or in its original storage;
+              StudioFlow stores only the metadata and project filing record.
             </p>
-            <RecordFileForm projectId={projectId} folders={folderOptions} />
-          </SectionCard>
-
-          <SectionCard title="Simpan link">
-            <p className="mb-3 text-xs text-ink-tertiary">
-              File yang bytes-nya ada di tempat lain (Drive, WeTransfer). Kita simpan pointernya.
-            </p>
-            <LinkFileForm projectId={projectId} folders={folderOptions} />
+            <DeliverableForm projectId={projectId} folders={folderOptions} />
           </SectionCard>
         </>
       )}
@@ -137,8 +136,8 @@ export default async function ProjectFilesPage({
           {group.files.length === 0 ? (
             <EmptyState
               icon={group.key === null ? Inbox : FolderOpen}
-              title="Kosong"
-              description={group.key === null ? "Semua file sudah tersortir." : "Belum ada file di folder ini."}
+              title="Empty"
+              description={group.key === null ? "All files are sorted." : "No files in this folder."}
             />
           ) : (
             <div className="grid gap-2">
@@ -153,7 +152,7 @@ export default async function ProjectFilesPage({
                         {file.filename}
                       </p>
                       <p className="text-xs text-ink-tertiary">
-                        Asli: {file.original_filename} · {humanBytes(file.bytes)} · {fmt.format(new Date(file.dropped_at))}
+                        Original: {file.original_filename} · {humanBytes(file.bytes)} · {fmt.format(new Date(file.dropped_at))}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2 text-xs">
@@ -161,10 +160,10 @@ export default async function ProjectFilesPage({
                         {TREATMENT_LABELS[file.treatment] ?? file.treatment}
                       </span>
                       {file.sent_in_iteration_id && (
-                        <span className="rounded-full bg-surface-muted px-2 py-0.5">terkirim</span>
+                        <span className="rounded-full bg-surface-muted px-2 py-0.5">sent</span>
                       )}
                       {file.superseded_at && (
-                        <span className="rounded-full bg-surface-muted px-2 py-0.5">diganti</span>
+                        <span className="rounded-full bg-surface-muted px-2 py-0.5">superseded</span>
                       )}
                       {file.external_url && (
                         <a
@@ -174,7 +173,7 @@ export default async function ProjectFilesPage({
                           className="inline-flex items-center gap-1 text-action hover:underline"
                         >
                           <ExternalLink className="h-3 w-3" />
-                          Buka
+                          Open
                         </a>
                       )}
                     </div>
@@ -193,6 +192,6 @@ export default async function ProjectFilesPage({
           )}
         </SectionCard>
       ))}
-    </div>
+    </>
   );
 }

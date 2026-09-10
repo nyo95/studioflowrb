@@ -35,8 +35,8 @@ export default async function MasterDataPage() {
 
   const summary = await masterDataService.summary({ grants: principalGrants.grants });
 
-  return <div className="grid gap-4">
-    <PageHeader title="Operational Catalog" />
+  return <>
+    <PageHeader title="Operational Catalog" divider />
     <div className="divide-y divide-line-subtle border-y border-line-subtle">
       {SECTIONS.map((section) => {
         const label = section.key === "materialPrices" ? "Pricing" : section.label;
@@ -62,5 +62,5 @@ export default async function MasterDataPage() {
         );
       })}
     </div>
-  </div>;
+  </>;
 }

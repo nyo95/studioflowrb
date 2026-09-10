@@ -6,10 +6,13 @@ import { ArrowRight, CircleAlert, Filter, LayoutGrid, PanelLeftClose, PanelLeftO
 
 import {
   AppShell,
+  Avatar,
   Badge,
+  Breadcrumb,
   Button,
   Combobox,
   ConfirmDialog,
+  CountBadge,
   CreatableSearch,
   DataTable,
   DescriptionItem,
@@ -19,24 +22,29 @@ import {
   EmptyState,
   ErrorState,
   Field,
+  FilterChip,
   FormActions,
   FormSection,
+  GroupHeader,
   Heading,
   IconButton,
   InlineError,
   Input,
   LoadingState,
+  MetaList,
   NavItem,
   Notice,
   PageHeader,
   PageSection,
   PageShell,
   Pagination,
+  PipelineStrip,
+  ProgressBar,
   RadioGroup,
   SearchField,
   SectionCard,
+  SegmentBar,
   Select,
-  type SortDirection,
   Skeleton,
   Spinner,
   StatusBadge,
@@ -48,9 +56,10 @@ import {
   TableHeader,
   TableRow,
   TableToolbar,
+  Tabs,
   Text,
   Textarea,
-  Tabs,
+  type SortDirection,
   useConfirm,
   useDebouncedValue,
   useOptionOverlay,
@@ -201,6 +210,7 @@ export function UiEngineShowcase() {
           title="UI-F1 showcase"
           description="A public route with no domain imports that demonstrates the shared shell, patterns, tables, forms, overlays, and responsive behavior."
           actions={<Button variant="primary" leadingIcon={<ArrowRight aria-hidden="true" />}>Use shared components</Button>}
+          divider
         />
 
         <CurateShowcase />
@@ -284,13 +294,13 @@ export function UiEngineShowcase() {
                       <TableCell>
                         <TableCellContent
                           primary={<span className="font-semibold">{row.name}</span>}
-                          secondary={<span className="font-mono text-xs">{row.code}</span>}
+                          secondary={<span className="font-ui-mono text-xs">{row.code}</span>}
                         />
                       </TableCell>
                       <TableCell>{row.vendor}</TableCell>
                       <TableCell align="end">{row.price}</TableCell>
                       <TableCell>
-                        <span className="font-mono text-xs">{row.unit}</span>
+                        <span className="font-ui-mono text-xs">{row.unit}</span>
                       </TableCell>
                       <TableCell>
                         {row.status === "active" ? (
@@ -432,6 +442,60 @@ export function UiEngineShowcase() {
                   </div>
                 </Surface>
               </div>
+            </div>
+          </SectionCard>
+        </PageSection>
+
+        <PageSection
+          title="Identity, progress, and context"
+          description="Atoms that carry a person, a count, a position, or a place in the hierarchy. Every one of them has a text alternative — none signals by colour alone."
+        >
+          <SectionCard
+            id="context"
+            title="Framed section"
+            count={3}
+            description="A section title lives in its own bar above a hairline."
+            action={<Button variant="ghost" size="sm">Action</Button>}
+          >
+            <div className="grid gap-5">
+              <Breadcrumb
+                entries={[{ label: "Projects", href: "#context" }, { label: "Kopi Kalyana Senopati" }]}
+              />
+
+              <MetaList
+                items={[
+                  <span key="c" className="font-ui-mono text-xs">PRJ-0148</span>,
+                  "Kalyana Group",
+                  "148 m²",
+                  "Dibuka 12 Jun 2026",
+                ]}
+              />
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Avatar name="Admin Rad" size="sm" />
+                <Avatar name="Designer DIC" />
+                <Avatar name="Drafter Rad" size="lg" />
+                <CountBadge>12</CountBadge>
+                <FilterChip selected count={4}>Mine</FilterChip>
+                <FilterChip count={7}>All</FilterChip>
+              </div>
+
+              <div className="grid gap-2 md:max-w-80">
+                <ProgressBar value={8} max={12} label="8 of 12 approved" />
+                <SegmentBar segments={["done", "done", "current", "idle", "idle"]} label="2 of 5 phases done" />
+              </div>
+
+              <GroupHeader title="Overdue" count={2} tone="danger" />
+
+              <PipelineStrip
+                steps={[
+                  { id: "1", label: "Moodboard", note: "Approved 28 Jun", detail: "3 rev", state: "done" },
+                  { id: "2", label: "Layout 2D", note: "Approved 22 Jul", detail: "4 rev", state: "done" },
+                  { id: "3", label: "Design 3D", note: "On client review", detail: "v5.2", state: "current" },
+                  { id: "4", label: "Construction", note: "Not started", detail: "—", state: "upcoming" },
+                ]}
+                label="Phase pipeline"
+              />
             </div>
           </SectionCard>
         </PageSection>

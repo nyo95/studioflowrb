@@ -11,6 +11,7 @@ import {
   EmptyState,
   EntityPrimaryCell,
   PageHeader,
+  Pagination,
   SectionCard,
   TableBody,
   TableCell,
@@ -23,7 +24,14 @@ import { studioFlowService } from "@/apps/studioflow/runtime";
 
 export const dynamic = "force-dynamic";
 
-export default async function StudioFlowClientsPage() {
+/** Rows per page, matching the projects directory. */
+const PAGE_SIZE = 25;
+
+export default async function StudioFlowClientsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { grants } = principalGrants;
@@ -32,58 +40,77 @@ export default async function StudioFlowClientsPage() {
   const canManage = hasPermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
   if (!canRead) {
     return (
-      <div className="grid gap-4">
-        <PageHeader eyebrow="StudioFlow" title="Klien" />
+      <>
+        <PageHeader eyebrow="StudioFlow" title="Clients" divider />
         <SectionCard>
           <EmptyState
             icon={Users}
-            title="Akses ditolak"
-            description="Kamu tidak punya permission untuk melihat klien."
+            title="Access denied"
+            description="You do not have permission to view clients."
           />
         </SectionCard>
-      </div>
+      </>
     );
   }
 
+  const rawPage = (await searchParams).page;
+  const parsed = Number.parseInt(Array.isArray(rawPage) ? (rawPage[0] ?? "") : (rawPage ?? ""), 10);
+  const requestedPage = Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+
   const clients = await studioFlowService.listClients(grants);
+  const pageCount = Math.max(1, Math.ceil(clients.length / PAGE_SIZE));
+  const page = Math.min(requestedPage, pageCount);
+  const pageClients = clients.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
+    <>
       <PageHeader
         eyebrow="StudioFlow"
-        title="Klien"
-        description="Daftar klien studio"
+        title="Clients"
+        description="Studio client directory"
+        divider
         actions={
           <Link href="/studioflow/clients/new" className={buttonClasses("primary", "md")}>
-            <Plus size={16} aria-hidden="true" /> Klien baru
+            <Plus size={16} aria-hidden="true" /> New client
           </Link>
         }
       />
-      {clients.length === 0 ? (
-        <SectionCard>
+      <DirectoryShell
+        surface
+        fill
+        pagination={
+          <Pagination
+            page={page}
+            pageCount={pageCount}
+            total={clients.length}
+            pageSize={PAGE_SIZE}
+            getHref={(nextPage) => (nextPage > 1 ? `/studioflow/clients?page=${nextPage}` : "/studioflow/clients")}
+            label="Client pages"
+          />
+        }
+      >
+        {clients.length === 0 ? (
           <EmptyState
             icon={Users}
-            title="Belum ada klien"
-            description="Tambahkan klien pertama studio."
+            title="No clients yet"
+            description="Add the studio's first client."
           />
-        </SectionCard>
-      ) : (
-        <DirectoryShell surface fill>
+        ) : (
           <DataTable framed={false} density="compact" stickyHeader fill minWidth={560}>
             <TableHeader>
               <TableRow>
-                <TableHead>Klien</TableHead>
-                <TableHead>Kontak</TableHead>
-                <TableHead>Telepon</TableHead>
+                <TableHead>Client</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead>Phone</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clients.map((client) => (
+              {pageClients.map((client) => (
                 <TableRow key={client.id}>
                   <TableCell>
                     <EntityPrimaryCell
-                      tone={client.deleted_at ? "danger" : "neutral"}
-                      statusLabel={client.deleted_at ? "Diarsipkan" : ""}
+                      tone={client.deleted_at ? "danger" : "success"}
+                      statusLabel={client.deleted_at ? "Archived" : "Active"}
                       name={
                         <Link
                           href={`/studioflow/clients/${client.id}`}
@@ -100,8 +127,8 @@ export default async function StudioFlowClientsPage() {
               ))}
             </TableBody>
           </DataTable>
-        </DirectoryShell>
-      )}
-    </div>
+        )}
+      </DirectoryShell>
+    </>
   );
 }

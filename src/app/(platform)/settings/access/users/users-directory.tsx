@@ -60,7 +60,7 @@ export function UsersDirectory({
     startTransition(async () => {
       try {
         const result = await command();
-        if (result && typeof result === "object" && "ok" in result && !result.ok) {
+        if (result && typeof result === "object" && "ok" in result && result.ok === false) {
           const failure = result as { error?: { safeMessage?: string } };
           setRowError(failure.error?.safeMessage ?? "The action could not be completed."); return;
         }
@@ -173,7 +173,7 @@ return (
               ))}
             </Select>
           </Field>
-          {createState && !createState.ok ? (
+          {createState?.ok === false ? (
             <InlineError>{createState.error.safeMessage}</InlineError>
           ) : null}
           <FormActions>
@@ -200,7 +200,7 @@ return (
             <Field id="edit-display-name" label="Display name">
               <Input id="edit-display-name" name="displayName" defaultValue={editTarget.displayName} required />
             </Field>
-            {editState && !editState.ok ? <InlineError>{editState.error.safeMessage}</InlineError> : null}
+            {editState?.ok === false ? <InlineError>{editState.error.safeMessage}</InlineError> : null}
             <FormActions>
               <Button type="button" variant="ghost" onClick={() => setEditTarget(null)}>
                 Close
@@ -227,7 +227,7 @@ return (
             <Field id="set-password" label="New password" description="12–128 characters.">
               <Input id="set-password" name="password" type="password" required autoComplete="new-password" />
             </Field>
-            {passwordState && !passwordState.ok ? <InlineError>{passwordState.error.safeMessage}</InlineError> : null}
+            {passwordState?.ok === false ? <InlineError>{passwordState.error.safeMessage}</InlineError> : null}
             <FormActions>
               <Button type="button" variant="ghost" onClick={() => setPasswordTarget(null)}>
                 Close

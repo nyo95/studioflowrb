@@ -54,9 +54,29 @@ describe("general settings validation", () => {
       currency: "IDR",
       weekStartsOn: 1,
       brandMarkUrl: null,
+      mainAppId: null,
+      landingAppId: null,
     });
     assert.equal(parsed.organizationName, "StudioFlow");
     assert.equal(parsed.brandMarkUrl, null);
+    assert.equal(parsed.mainAppId, null);
+    assert.equal(parsed.landingAppId, null);
+  });
+
+  it("accepts a shape-valid app id for the main/landing route settings", () => {
+    const parsed = parsePlatformGeneralSettingsInput({
+      organizationName: "StudioFlow",
+      appTitle: "StudioFlow",
+      locale: "id-ID",
+      timezone: "Asia/Jakarta",
+      currency: "IDR",
+      weekStartsOn: 1,
+      brandMarkUrl: null,
+      mainAppId: "bq",
+      landingAppId: "studioflow",
+    });
+    assert.equal(parsed.mainAppId, "bq");
+    assert.equal(parsed.landingAppId, "studioflow");
   });
 
   it("rejects invalid locale, timezone, currency, week range, and unsafe URLs", () => {
@@ -68,6 +88,8 @@ describe("general settings validation", () => {
       currency: "IDR",
       weekStartsOn: 1,
       brandMarkUrl: null,
+      mainAppId: null,
+      landingAppId: null,
     };
     const bad = [
       { ...base, locale: "nope-nope-nope" },
@@ -81,6 +103,9 @@ describe("general settings validation", () => {
       { ...base, brandMarkUrl: "//cdn.example.com/mark.png" },
       { ...base, organizationName: "" },
       { ...base, organizationName: "x".repeat(121) },
+      { ...base, mainAppId: "Not-Lowercase" },
+      { ...base, mainAppId: "" },
+      { ...base, landingAppId: "has spaces" },
     ];
     for (const candidate of bad) {
       assert.throws(() => parsePlatformGeneralSettingsInput(candidate));
@@ -97,6 +122,8 @@ describe("general settings validation", () => {
         currency: "IDR",
         weekStartsOn: 1,
         brandMarkUrl: null,
+        mainAppId: null,
+        landingAppId: null,
         arbitrarySetting: "nope",
       }),
     );
@@ -113,6 +140,8 @@ describe("general settings service", () => {
     assert.equal(settings.currency, "IDR");
     assert.equal(settings.weekStartsOn, 1);
     assert.equal(settings.brandMarkUrl, null);
+    assert.equal(settings.mainAppId, null);
+    assert.equal(settings.landingAppId, null);
     const rows = await db.prisma.platformGeneralSettings.findMany();
     assert.equal(rows.length, 1);
   });
@@ -146,6 +175,8 @@ describe("general settings service", () => {
             currency: "IDR",
             weekStartsOn: 1,
             brandMarkUrl: null,
+            mainAppId: null,
+            landingAppId: null,
           }),
         }),
       (error: unknown) => error instanceof AppError && error.kind === "FORBIDDEN",
@@ -166,6 +197,8 @@ describe("general settings service", () => {
         currency: "IDR",
         weekStartsOn: 1,
         brandMarkUrl: null,
+        mainAppId: null,
+        landingAppId: null,
       }),
     });
     assert.equal(noOp.changed, false);
@@ -182,6 +215,8 @@ describe("general settings service", () => {
         currency: "IDR",
         weekStartsOn: 1,
         brandMarkUrl: "https://cdn.example.com/mark.png",
+        mainAppId: "bq",
+        landingAppId: null,
       }),
     });
     assert.equal(changed.changed, true);
@@ -189,7 +224,7 @@ describe("general settings service", () => {
     const event = await db.prisma.auditEvent.findFirst({ where: { action: "settings.general.update" } });
     assert.notEqual(event, null);
     const keys = Object.keys((event?.changes ?? {}) as Record<string, unknown>);
-    assert.deepEqual(keys.sort(), ["appTitle", "brandMarkUrl", "organizationName"]);
+    assert.deepEqual(keys.sort(), ["appTitle", "brandMarkUrl", "mainAppId", "organizationName"]);
     const rows = await db.prisma.platformGeneralSettings.findMany();
     assert.equal(rows.length, 1, "singleton must never grow a second row");
   });

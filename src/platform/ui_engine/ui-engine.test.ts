@@ -8,6 +8,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import * as ui from "./index";
 import { getComboboxNavigationIndex } from "./internal/combobox-navigation";
+import { matchesAccept, selectFiles } from "./internal/file-drop";
 import { getEffectiveRailCollapsed } from "./internal/rail-state";
 
 describe("UI Engine foundation", () => {
@@ -70,12 +71,30 @@ describe("UI Engine foundation", () => {
       "CreatableSearch",
       "CreatableMultiSelect",
       "InlineEdit",
+      // R7.43 — activated by the phase deliverable intake consumer (KB-011).
+      "FileDropZone",
+      // R7.48 — canonical copy-to-clipboard button; no StudioFlow vocabulary.
+      "CopyButton",
       "SimpleTextEditor",
+      // R7.52 — activated by the project MOM image consumer.
+      "ImageWorkspace",
       "useDebouncedValue",
       "useOptionOverlay",
       "useConfirm",
       "useUnsavedChangesGuard",
       "useFormDraftGuard",
+      // R7.22 — chrome and display atoms the three apps now share.
+      "Breadcrumb",
+      "FilterChip",
+      "filterChipClasses",
+      "Avatar",
+      "initialsOf",
+      "CountBadge",
+      "MetaList",
+      "ProgressBar",
+      "SegmentBar",
+      "GroupHeader",
+      "PipelineStrip",
     ]) {
       const exported = ui[name as keyof typeof ui];
       assert.ok(
@@ -83,9 +102,64 @@ describe("UI Engine foundation", () => {
         name,
       );
     }
-    for (const deferred of ["WorkspaceShell", "SplitPane", "ReorderHandle", "FileDropZone", "DocumentSheet"]) {
+    for (const deferred of ["WorkspaceShell", "SplitPane", "ReorderHandle", "DocumentSheet"]) {
       assert.equal(deferred in ui, false, `${deferred} must remain deferred`);
     }
+  });
+
+  it("gives colour-carried display atoms a text alternative", () => {
+    // Each of these signals with colour, so none may ship without a name.
+    assert.match(renderToStaticMarkup(createElement(ui.Avatar, { name: "Admin Rad" })), /aria-label="Admin Rad"/);
+    assert.match(renderToStaticMarkup(createElement(ui.Avatar, { name: "Admin Rad" })), />AR</);
+    assert.match(
+      renderToStaticMarkup(createElement(ui.ProgressBar, { value: 2, max: 4, label: "2 of 4 done" })),
+      /role="progressbar"[^>]*aria-valuenow="2"/,
+    );
+    assert.match(
+      renderToStaticMarkup(createElement(ui.SegmentBar, { segments: ["done", "idle"], label: "1 of 2" })),
+      /role="img"[^>]*aria-label="1 of 2"/,
+    );
+    const strip = renderToStaticMarkup(
+      createElement(ui.PipelineStrip, {
+        steps: [
+          { id: "a", label: "Moodboard", state: "done" },
+          { id: "b", label: "Design 3D", state: "current" },
+        ],
+      }),
+    );
+    // The current stage must be findable without reading its fill.
+    assert.match(strip, /aria-current="step"/);
+  });
+
+  it("paginates by href for server-rendered directories and by callback for client ones", () => {
+    const paginationSource = readFileSync(new URL("./components/pagination.tsx", import.meta.url), "utf8");
+    // URL pagination is rendered by server pages; importing the client Button
+    // here would make getHref cross a server/client boundary and crash Next.
+    assert.doesNotMatch(paginationSource, /from\s*["']\.\.\/primitives["']/);
+    assert.match(paginationSource, /buttonClasses\("secondary",\s*"sm"\)/);
+    const linked = renderToStaticMarkup(
+      createElement(ui.Pagination, { page: 2, pageCount: 4, total: 96, pageSize: 25, getHref: (n: number) => `?page=${n}` }),
+    );
+    // Row range beats page number: the operator is looking for a record.
+    assert.match(linked, /26–50 of 96/);
+    assert.match(linked, /href="\?page=1"/);
+    assert.match(linked, /href="\?page=3"/);
+    // A boundary step stays present but inert, so the row does not reflow.
+    const first = renderToStaticMarkup(
+      createElement(ui.Pagination, { page: 1, pageCount: 3, total: 60, pageSize: 25, getHref: (n: number) => `?page=${n}` }),
+    );
+    assert.match(first, /disabled=""/);
+    assert.doesNotMatch(first, /href="\?page=0"/);
+    // Without a total it still falls back to counting pages.
+    assert.match(
+      renderToStaticMarkup(createElement(ui.Pagination, { page: 1, pageCount: 3, onPageChange: () => {} })),
+      /Page 1 of 3/,
+    );
+  });
+
+  it("marks filter chip selection for assistive technology", () => {
+    const chip = renderToStaticMarkup(createElement(ui.FilterChip, { selected: true }, "Mine"));
+    assert.match(chip, /aria-pressed="true"/);
   });
 
   it("keeps accessibility-critical state and dialog semantics distinct", () => {
@@ -272,6 +346,14 @@ describe("UI Engine foundation", () => {
     assert.match(hooks, /if \(!equals\(initialValue, prevInitial\)\)/);
   });
 
+  it("can guard same-origin link navigation with the shared unsaved dialog", () => {
+    const hooks = readFileSync(new URL("./patterns/hooks.tsx", import.meta.url), "utf8");
+    assert.match(hooks, /guardNavigation/);
+    assert.match(hooks, /document\.addEventListener\("click", handleClick, true\)/);
+    assert.match(hooks, /event\.stopImmediatePropagation\(\)/);
+    assert.match(hooks, /destination\.origin !== window\.location\.origin/);
+  });
+
   it("uses Next client navigation for clickable rail destinations", () => {
     const shells = readFileSync(new URL("./layouts/shells.tsx", import.meta.url), "utf8");
     assert.match(shells, /import Link from "next\/link"/);
@@ -432,6 +514,127 @@ describe("UI Engine foundation", () => {
     assert.match(source, /catch \(failure\) \{[\s\S]*setDraft\(value\)/);
     /* The shell owns no rules about what a value may be. */
     assert.doesNotMatch(source, /parseFloat|Number\(|isNaN|required/);
+  });
+
+  it("names the drop region and keeps a keyboard route to the picker", () => {
+    const zone = renderToStaticMarkup(
+      createElement(
+        ui.FileDropZone,
+        { label: "Deliverable file", onFiles: () => {}, browseLabel: "Choose file", hint: "Bytes stay local." },
+        createElement(ui.Input, { name: "original_filename" }),
+      ),
+    );
+    /* A dashed box is a visual affordance only, so the region needs a name. */
+    assert.match(zone, /role="group"/);
+    assert.match(zone, /aria-label="Deliverable file"/);
+    /* Dragging cannot be performed from a keyboard, so a real control stays. */
+    assert.match(zone, /<button type="button"/);
+    assert.match(zone, />Choose file</);
+    /* The picker is out of the accessibility tree: the button is the affordance. */
+    assert.match(zone, /<input[^>]*type="file"[^>]*aria-hidden="true"/);
+    /* Composed controls and caller-owned copy both survive. */
+    assert.match(zone, /name="original_filename"/);
+    assert.match(zone, /Bytes stay local\./);
+  });
+
+  it("reports file facts without letting bytes ride along with a form", () => {
+    const zone = renderToStaticMarkup(
+      createElement(ui.FileDropZone, { label: "Deliverable file", onFiles: () => {} }),
+    );
+    const picker = /<input[^>]*type="file"[^>]*>/.exec(zone);
+    assert.ok(picker, "the zone must keep a real file picker");
+    /* An unnamed input is not serialized, so a submit can never carry the file. */
+    assert.doesNotMatch(picker[0], /name=/);
+    const source = readFileSync(new URL("./patterns/file-drop-zone.tsx", import.meta.url), "utf8");
+    /* Interaction only: no transport, no reading, no storage policy. */
+    assert.doesNotMatch(source, /fetch\(|FileReader|arrayBuffer|XMLHttpRequest|FormData/);
+    /* Without preventDefault the browser leaves the page and opens the file. */
+    assert.match(source, /event\.preventDefault\(\)/);
+  });
+
+  it("filters a drop by accept and hands single-select zones one file", () => {
+    const files = [
+      { name: "plan.skp", size: 12, type: "" },
+      { name: "render.PNG", size: 34, type: "image/png" },
+      { name: "notes.txt", size: 56, type: "text/plain" },
+    ];
+    const names = (chosen: ReadonlyArray<{ name: string }>) => chosen.map((file) => file.name);
+    /* An empty accept list means "anything", never "nothing". */
+    assert.deepEqual(names(selectFiles(files, { multiple: true })), ["plan.skp", "render.PNG", "notes.txt"]);
+    /* Suffix and media-type-group tokens both apply, case-insensitively. */
+    assert.deepEqual(names(selectFiles(files, { accept: ".skp, image/*", multiple: true })), ["plan.skp", "render.PNG"]);
+    /* A single-select zone never hands back the rest of a multi-file drop. */
+    assert.deepEqual(names(selectFiles(files, { accept: "image/*" })), ["render.PNG"]);
+    /* A drop of only refused files yields nothing rather than a wrong first file. */
+    assert.deepEqual(selectFiles(files, { accept: ".dwg" }), []);
+    /* A group token must not match a media type that merely starts alike. */
+    assert.equal(matchesAccept("image/*", { name: "a", size: 1, type: "imagex/png" }), false);
+    assert.equal(matchesAccept("text/plain", { name: "a", size: 1, type: "text/plain" }), true);
+    assert.equal(matchesAccept("text/plain", { name: "a", size: 1, type: "text/html" }), false);
+  });
+
+  it("keeps a disabled zone inert and marks nothing before a drag", () => {
+    const off = renderToStaticMarkup(
+      createElement(ui.FileDropZone, { label: "Zone", onFiles: () => {}, disabled: true }),
+    );
+    assert.match(off, /aria-disabled="true"/);
+    assert.match(off, /<input[^>]*disabled=""/);
+    assert.match(off, /<button type="button"[^>]*disabled=""/);
+    /* The active-target attribute appears on drag, never at rest. */
+    assert.doesNotMatch(off, /data-drop-active/);
+  });
+
+  it("forwards the control props Field injects onto the region root", () => {
+    const zone = renderToStaticMarkup(
+      createElement(ui.FileDropZone, {
+        label: "Zone",
+        onFiles: () => {},
+        id: "field-1",
+        "aria-describedby": "field-1-error",
+        "aria-invalid": true,
+        "aria-required": true,
+      }),
+    );
+    /* Field clones its single child to wire the label, description, and error. */
+    assert.match(zone, /id="field-1"/);
+    assert.match(zone, /aria-describedby="field-1-error"/);
+    assert.match(zone, /aria-invalid="true"/);
+    assert.match(zone, /aria-required="true"/);
+  });
+
+  it("CopyButton renders with its idle accessible label", () => {
+    const btn = renderToStaticMarkup(
+      createElement(ui.CopyButton, { value: "SF26-TEST D1", label: "Copy filename" }),
+    );
+    assert.match(btn, /aria-label="Copy filename"/);
+  });
+
+  it("CopyButton source awaits clipboard write before changing state", () => {
+    const source = readFileSync(
+      new URL("./patterns/copy-button.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(source, /await navigator\.clipboard\.writeText/);
+  });
+
+  it("CopyButton source handles clipboard failure", () => {
+    const source = readFileSync(
+      new URL("./patterns/copy-button.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(source, /catch/);
+  });
+
+  it("CopyButton failure label is accessible from source", () => {
+    const source = readFileSync(
+      new URL("./patterns/copy-button.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(source, /failureLabel/);
+    assert.match(source, /role="status"/);
+    assert.match(source, /aria-live="polite"/);
+    assert.match(source, /clearTimeout/);
+    assert.match(source, /label=\{label\}/);
   });
 
   it("keeps app internals and domain vocabulary out of shared UI sources", () => {

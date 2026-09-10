@@ -14,7 +14,7 @@ export default async function StudioFlowLayout({ children }: { children: ReactNo
   if (!hasPermission(principalGrants.grants, STUDIOFLOW_PERMISSIONS.access)) redirect("/");
 
   return (
-    <PageShell size="wide" fill>
+    <PageShell fill>
       {children}
     </PageShell>
   );

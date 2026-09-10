@@ -4,11 +4,25 @@
 
 1. `docs/README.md`
 2. `CHANGELOG.md` for the published baseline, current local revision, and next revision
-3. The shared contract relevant to the task: `CORE.md`, `DESIGN.md`, and/or `UI_ENGINE.md`
-4. The active work order, when one exists. There is currently no executable app
-   work order. `docs/apps/masterdata.md` indexes approved logic contracts only.
-5. `prisma/schema.prisma` for the implemented persisted shape
-6. The relevant current code, tests, and migrations
+3. `docs/alignment.md`, `docs/roadmap.md`, and `docs/knownbug.md` when the task
+   plans, audits, changes, or reviews StudioFlow or shared consumers
+4. The shared contract relevant to the task: `CORE.md`, `DESIGN.md`, and/or `UI_ENGINE.md`
+5. The active work order, when one exists. StudioFlow workflow closure in
+   `scripts/work-orders/STUDIOFLOW-R7.56-WORKFLOW-CLOSURE.md` is paused behind
+   the owner's Platform/UI Engine/BQ priorities; its filename is not a revision reservation.
+   Work orders R7.48, R7.49, R7.52 and R7.53 are implemented and are retained
+   as history, not as instructions. `docs/apps/masterdata/masterdata.md` indexes approved
+   logic contracts only.
+6. `prisma/schema.prisma` for the implemented persisted shape
+7. The relevant current code, tests, and migrations
+
+## Communicating with the owner
+
+When explaining plans, findings, status, trade-offs, or problems to the
+owner in conversation, use plain, everyday language and avoid unnecessary
+technical jargon — don't assume familiarity with implementation detail.
+This is about how an agent talks *to the owner*; contracts, code, commit
+messages, and this file itself still need full technical precision.
 
 ## Authority order
 
@@ -113,15 +127,15 @@ Every feature identifies the capabilities it needs before app implementation:
 - keep business policy **APP-OWNED**;
 - **PURGE** unsafe or contradicted behavior.
 
-Core, Utilities, and UI Engine must stay reusable by Master Data, StudioFlow, BQ, and future apps. A missing generic mechanism is added to the shared layer and tested there; an app does not create a private substitute. Core may own platform identity, UserRole assignments, and grant persistence, but shared layers never contain app-entity roles, contextual business authorization, app persistence policy, or business defaults.
+Core, Utilities, and UI Engine must stay reusable by Master Data, StudioFlow, BQ, and future apps. A missing generic mechanism is added to the shared layer and tested there; an app does not create a private substitute. Every shared capability has one canonical implementation, one public export, and an explicit consumer matrix. A capability is not considered shared merely because its contract says so: each consumer must import the canonical export, and boundary checks/tests must prove that no duplicate app-local implementation exists. If the canonical API is insufficient, improve it once at the shared layer and update all affected consumers in the same change set. Core may own platform identity, UserRole assignments, and grant persistence, but shared layers never contain app-entity roles, contextual business authorization, app persistence policy, or business defaults.
 
 A documented deferred capability is not permission to implement it. Activate it only when a locked stage or approved consumer proves the need. Do not create empty modules, speculative dependencies, or broad generic helpers merely to reserve a name.
 
 ## UI quality gate
 
-Component reuse alone is not completion. Verify the running workflow for information hierarchy, search, filters, sorting, pagination, selection, quick entry, detail/edit flow, destructive confirmation, unsaved input, loading/empty/error/disabled/archived/permission states, long content, desktop, collapsed rail, and narrow viewport.
+Component reuse alone is not completion. Verify the running workflow for information hierarchy, search, filters, sorting, pagination, selection, quick entry, detail/edit flow, destructive confirmation, unsaved input, loading/empty/error/disabled/archived/permission states, long content, desktop, collapsed rail, and narrow viewport. For every shared capability used by more than one app, the acceptance evidence must name the canonical export and exercise each listed consumer for both behavior and visual consistency. A passing single-app smoke test is not evidence of shared reuse.
 
-Raw legacy `ui-*` classes may not bypass an available UI Engine component. If the shared component is weak, improve it once at the engine level and then consume it from the app.
+Raw legacy `ui-*` classes may not bypass an available UI Engine component. If the shared component is weak, improve it once at the engine level and then consume it from the app. Private copies or app-local wrappers that reproduce an existing shared capability are prohibited unless the contract explicitly documents a genuinely different domain behavior; such an exception must name the canonical component, explain the difference, and add a regression test preventing accidental convergence drift.
 
 ## Manager-first execution
 
@@ -150,6 +164,27 @@ Any future AI starts as navigator unless the owner explicitly gives it a locked 
 ## Revision, changelog, and local-commit protocol
 
 `CHANGELOG.md` is the revision ledger. A task is not reported as finished until its cohesive changes are documented there, validated, and committed locally.
+
+### Roadmap and known-bug ledgers
+
+`docs/roadmap.md` and `docs/knownbug.md` are operational ledgers and must be read when
+planning or auditing StudioFlow work.
+
+- `docs/roadmap.md` lists features that are planned but not complete. A feature may
+  be removed or struck through only after it is actually implemented and
+  verified; the implementation must still receive a `CHANGELOG.md` entry.
+- `docs/knownbug.md` lists reproducible audit findings that are not fixed in the
+  current change set. Each entry must state the affected area, observed and
+  expected behavior, mitigation, and status.
+- Every audit must either fix a discovered bug in the same scoped change set or
+  add/update it in `docs/knownbug.md`. Do not silently discard an unfixed finding.
+- When a bug is fixed, move or strike through its entry in `docs/knownbug.md` and
+  record the fix, verification, and any limitation in `CHANGELOG.md`.
+- Do not claim a roadmap item or known bug is complete merely because a route,
+  component, or schema exists; verify the end-to-end behavior, permissions,
+  persistence, error states, and relevant UI states.
+- Roadmap entries marked explicitly out of scope are not deferred work and must
+  not be reintroduced without a new owner instruction.
 
 ### Revision format
 

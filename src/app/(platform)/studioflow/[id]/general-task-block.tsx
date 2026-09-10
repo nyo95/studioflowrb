@@ -1,27 +1,33 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { CheckSquare, Plus, Square, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, CheckSquare, Plus, Square, Trash2 } from "lucide-react";
 import type { ActionResult } from "@platform/core/actions";
-import { InlineError } from "@/platform/ui_engine";
+import { Button, IconButton, InlineError, Input, SectionCard, Select, Text } from "@/platform/ui_engine";
 
 import {
   createTaskAction,
   deleteTaskAction,
+  moveTaskAction,
   setTaskCompletionAction,
+  updateTaskAction,
 } from "./task-actions";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type TaskItem = {
+export type TaskItem = {
   id: string;
   title: string;
   status: "OPEN" | "DONE";
+  phase_scope?: string | null;
+  sort_order?: number;
+  assignee_id?: string | null;
+  due_date?: string | null;
 };
 
 // ── Add task form ─────────────────────────────────────────────────────────────
 
-function AddTaskForm({ projectId }: { projectId: string }) {
+function AddTaskForm({ projectId, phaseScope }: { projectId: string; phaseScope: string | null }) {
   const [state, formAction, pending] = useActionState(
     createTaskAction.bind(null, projectId),
     null as ActionResult<void> | null,
@@ -41,13 +47,14 @@ function AddTaskForm({ projectId }: { projectId: string }) {
         action={formAction}
         className="flex items-center gap-2"
       >
+        <input type="hidden" name="phase_scope" value={phaseScope ?? ""} />
         <span className="text-ink-tertiary shrink-0" aria-hidden="true">
           <Plus size={14} />
         </span>
-        <input
+        <Input
           name="title"
           type="text"
-          placeholder="Tambah task…"
+          placeholder="Add a task…"
           required
           minLength={1}
           maxLength={255}
@@ -65,9 +72,17 @@ function AddTaskForm({ projectId }: { projectId: string }) {
 function TaskRow({
   task,
   projectId,
+  phases,
+  position,
+  total,
+  users,
 }: {
   task: TaskItem;
   projectId: string;
+  phases: Array<{ key: string; name: string }>;
+  position: number;
+  total: number;
+  users: Array<{ id: string; display_name: string }>;
 }) {
   const [completing, completingAction] = useActionState(
     setTaskCompletionAction.bind(null, projectId, task.id, task.status === "OPEN"),
@@ -78,9 +93,26 @@ function TaskRow({
     null as ActionResult<void> | null,
   );
   const [hovered, setHovered] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(task.title);
+  const editFormRef = useRef<HTMLFormElement>(null);
+  const [updating, updateAction] = useActionState(
+    updateTaskAction.bind(null, projectId, task.id),
+    null as ActionResult<void> | null,
+  );
+  const [moving, moveAction] = useActionState(
+    moveTaskAction.bind(null, projectId, task.id),
+    null as ActionResult<void> | null,
+  );
 
   const completionError = completing?.ok === false ? completing.error.safeMessage : null;
   const deleteError = deleting?.ok === false ? deleting.error.safeMessage : null;
+
+  useEffect(() => {
+    if (!updating?.ok) return;
+    const frame = requestAnimationFrame(() => setEditing(false));
+    return () => cancelAnimationFrame(frame);
+  }, [updating]);
 
   return (
     <div
@@ -90,45 +122,118 @@ function TaskRow({
     >
       {/* Completion toggle */}
       <form action={completingAction}>
-        <button
+        <IconButton
           type="submit"
-          className="shrink-0 text-ink-tertiary hover:text-action focus:outline-action"
-          title={task.status === "OPEN" ? "Tandai selesai" : "Buka kembali"}
-        >
-          {task.status === "DONE" ? (
-            <CheckSquare size={15} className="text-success" />
-          ) : (
-            <Square size={15} />
-          )}
-        </button>
+          size="sm"
+          variant="ghost"
+          label={task.status === "OPEN" ? "Mark complete" : "Reopen"}
+          className="shrink-0"
+          icon={task.status === "DONE" ? <CheckSquare aria-hidden="true" className="text-success" /> : <Square aria-hidden="true" />}
+        />
       </form>
 
       {/* Title */}
-      <span
-        className={`flex-1 min-w-0 text-sm ${
+      {editing ? (
+        <form ref={editFormRef} action={updateAction} className="flex min-w-0 flex-1 items-center gap-1">
+          <Input
+            name="title"
+            density="compact"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") { event.preventDefault(); editFormRef.current?.requestSubmit(); }
+              if (event.key === "Escape") { event.preventDefault(); setEditing(false); setDraft(task.title); }
+            }}
+            autoFocus
+            className="min-w-0 flex-1"
+          />
+          <Button type="submit" variant="ghost" size="sm" disabled={updating?.ok === false}>Save</Button>
+        </form>
+      ) : <span
+        onDoubleClick={() => setEditing(true)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(event) => { if (event.key === "Enter") setEditing(true); }}
+        className={`flex-1 min-w-0 text-sm cursor-text ${
           task.status === "DONE"
             ? "line-through text-ink-tertiary"
             : "text-ink"
         }`}
       >
         {task.title}
-      </span>
+      </span>}
+
+      {phases.length > 0 && (
+        <form action={moveAction} className="shrink-0">
+          <input type="hidden" name="sort_order" value={String(task.sort_order ?? 0)} />
+          <Select
+            name="phase_scope"
+            density="compact"
+            defaultValue={task.phase_scope ?? ""}
+            aria-label="Move task"
+            onChange={(event) => event.currentTarget.form?.requestSubmit()}
+            className="max-w-28"
+          >
+            <option value="">General</option>
+            {phases.map((phase) => <option key={phase.key} value={phase.key}>{phase.name}</option>)}
+          </Select>
+        </form>
+      )}
+
+      <form action={updateAction} className="flex shrink-0 items-center gap-1">
+        <Select
+          name="assignee_id"
+          density="compact"
+          defaultValue={task.assignee_id ?? ""}
+          aria-label="Task assignee"
+          onChange={(event) => event.currentTarget.form?.requestSubmit()}
+          className="max-w-28"
+        >
+          <option value="">Unassigned</option>
+          {users.map((user) => <option key={user.id} value={user.id}>{user.display_name}</option>)}
+        </Select>
+      </form>
+      <form action={updateAction} className="shrink-0">
+        <Input
+          type="date"
+          name="due_date"
+          density="compact"
+          defaultValue={task.due_date ? task.due_date.slice(0, 10) : ""}
+          aria-label="Task deadline"
+          onChange={(event) => event.currentTarget.form?.requestSubmit()}
+          className="w-28"
+        />
+      </form>
+
+      <div className="flex shrink-0 items-center gap-0.5">
+        <form action={moveAction}>
+          <input type="hidden" name="phase_scope" value={task.phase_scope ?? ""} />
+          <input type="hidden" name="sort_order" value={String(Math.max(0, position - 1))} />
+          <IconButton type="submit" size="sm" variant="ghost" label="Move task up" disabled={position === 0} className="disabled:invisible" icon={<ArrowUp aria-hidden="true" />} />
+        </form>
+        <form action={moveAction}>
+          <input type="hidden" name="phase_scope" value={task.phase_scope ?? ""} />
+          <input type="hidden" name="sort_order" value={String(Math.min(total - 1, position + 1))} />
+          <IconButton type="submit" size="sm" variant="ghost" label="Move task down" disabled={position === total - 1} className="disabled:invisible" icon={<ArrowDown aria-hidden="true" />} />
+        </form>
+      </div>
 
       {/* Delete */}
       {hovered && (
         <form action={deletingAction}>
-          <button
+          <IconButton
             type="submit"
-            className="shrink-0 text-ink-tertiary hover:text-danger focus:outline-action"
-            title="Hapus task"
-          >
-            <Trash2 size={13} />
-          </button>
+            size="sm"
+            variant="ghost"
+            label="Delete task"
+            className="shrink-0 hover:text-danger"
+            icon={<Trash2 aria-hidden="true" />}
+          />
         </form>
       )}
 
-      {completionError || deleteError ? (
-        <InlineError>{completionError ?? deleteError}</InlineError>
+      {completionError || deleteError || moving?.ok === false ? (
+        <InlineError>{completionError ?? deleteError ?? (moving?.ok === false ? moving.error.safeMessage : null)}</InlineError>
       ) : null}
     </div>
   );
@@ -140,56 +245,54 @@ export function GeneralTaskBlock({
   projectId,
   tasks,
   canManage,
+  phases = [],
+  title = "General to-dos",
+  phaseScope = null,
+  users = [],
 }: {
   projectId: string;
   tasks: TaskItem[];
   canManage: boolean;
+  phases?: Array<{ key: string; name: string }>;
+  title?: string;
+  phaseScope?: string | null;
+  users?: Array<{ id: string; display_name: string }>;
 }) {
-  const open = tasks.filter((t) => t.status === "OPEN");
-  const done = tasks.filter((t) => t.status === "DONE");
+  const scopedTasks = tasks.filter((task) => (task.phase_scope ?? null) === phaseScope);
+  const open = scopedTasks.filter((t) => t.status === "OPEN");
+  const done = scopedTasks.filter((t) => t.status === "DONE");
   const [showDone, setShowDone] = useState(false);
 
-  const visible = showDone ? tasks : open;
+  const visible = showDone ? scopedTasks : open;
 
   return (
-    <div className="rounded-card border border-line bg-surface overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-line bg-surface-muted">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
-          TODO umum
-          {open.length > 0 && (
-            <span className="ml-1.5 text-ink-tertiary font-normal normal-case tracking-normal">
-              {open.length} terbuka
-            </span>
-          )}
-        </h2>
-        {done.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setShowDone((v) => !v)}
-            className="text-xs text-action hover:underline"
-          >
-            {showDone ? "Sembunyikan selesai" : `Lihat ${done.length} selesai`}
-          </button>
-        )}
-      </div>
-
-      {/* Rows */}
-      <div className="px-4">
+    <SectionCard
+      title={title}
+      count={open.length > 0 ? `${open.length} open` : undefined}
+      padded={false}
+      action={
+        done.length > 0 ? (
+          <Button variant="ghost" size="sm" onClick={() => setShowDone((v) => !v)}>
+            {showDone ? "Hide completed" : `Show ${done.length} completed`}
+          </Button>
+        ) : null
+      }
+    >
+      <div className="px-(--ui-section-px)">
         {visible.length === 0 && !canManage ? (
-          <p className="py-3 text-sm text-ink-tertiary">Tidak ada task terbuka.</p>
+          <Text as="p" tone="tertiary" className="py-3">No open tasks.</Text>
         ) : null}
 
-        {visible.map((task) => (
-          <TaskRow key={task.id} task={task} projectId={projectId} />
+        {visible.map((task, index) => (
+          <TaskRow key={task.id} task={task} projectId={projectId} phases={phases} position={index} total={visible.length} users={users} />
         ))}
 
         {canManage && (
           <div className="py-2">
-            <AddTaskForm projectId={projectId} />
+            <AddTaskForm projectId={projectId} phaseScope={phaseScope} />
           </div>
         )}
       </div>
-    </div>
+    </SectionCard>
   );
 }

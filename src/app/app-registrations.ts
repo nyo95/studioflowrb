@@ -60,6 +60,9 @@ export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [
       "studioflow.iteration.review",
       "studioflow.phase.override",
       "studioflow.task.manage",
+      "studioflow.schedule.manage",
+      "studioflow.mom.manage",
+      "studioflow.mom.issue",
     ],
   },
 ];

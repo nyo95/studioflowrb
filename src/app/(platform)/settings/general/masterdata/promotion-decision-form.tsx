@@ -10,7 +10,7 @@ export function PromotionDecisionForm({ action, children }: {
 }) {
   const [result, submit, pending] = useActionState(async (_previous: ActionResult<{ id: string }> | null, data: FormData) => action(data), null);
   return <form action={submit} className="grid gap-2">
-    {result && !result.ok ? <InlineError>{result.error.safeMessage}</InlineError> : null}
+    {result?.ok === false ? <InlineError>{result.error.safeMessage}</InlineError> : null}
     <fieldset disabled={pending} className="grid gap-2">{children}</fieldset>
   </form>;
 }

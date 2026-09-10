@@ -19,7 +19,7 @@ import { changePasswordAction, updateDisplayNameAction } from "./actions";
 const INITIAL: ActionResult<{ changed: boolean }> | null = null;
 
 function fieldError(state: ActionResult<unknown> | null, field: string): string | undefined {
-  if (!state || state.ok || state.error.kind !== "VALIDATION") return undefined;
+  if (state === null || state.ok !== false || state.error.kind !== "VALIDATION") return undefined;
   const issues = state.error.details?.issues;
   if (!Array.isArray(issues)) return undefined;
   const issue = issues.find((candidate) => {
@@ -49,7 +49,7 @@ export function AccountForms({ displayName, email }: { displayName: string; emai
                 required
               />
             </Field>
-            {nameState && !nameState.ok ? (
+            {nameState?.ok === false ? (
               <div role="alert" className="mt-2">
                 <InlineError>{nameState.error.safeMessage}</InlineError>
               </div>
@@ -81,7 +81,7 @@ export function AccountForms({ displayName, email }: { displayName: string; emai
             <Field id="account-new-password" label="New password" description="12–128 characters." error={fieldError(passwordState, "newPassword")}>
               <Input id="account-new-password" name="newPassword" type="password" autoComplete="new-password" required />
             </Field>
-            {passwordState && !passwordState.ok ? (
+            {passwordState?.ok === false ? (
               <div role="alert" className="mt-2">
                 <InlineError>{fieldError(passwordState, "currentPassword") ?? fieldError(passwordState, "newPassword") ?? passwordState.error.safeMessage}</InlineError>
               </div>

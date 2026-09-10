@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import type { ActionResult } from "@platform/core/actions";
-import { Button, Field, FormActions, InlineError, Input } from "@/platform/ui_engine";
+import { Button, Field, FormActions, InlineError, Input, Notice } from "@/platform/ui_engine";
 
 import { updateNamingTemplateAction } from "./actions";
 
@@ -10,11 +10,11 @@ const INITIAL: ActionResult<void> | null = null;
 
 /** The vocabulary the service accepts (§8.5). Anything else is rejected. */
 const TOKENS = [
-  { token: "{date}", label: "Tanggal drop, format YYYYMMDD" },
-  { token: "{project}", label: "Nama project" },
-  { token: "{location}", label: "Lokasi singkat project" },
-  { token: "{round}", label: "Label round, misal “D4 2”" },
-  { token: "{code}", label: "Kode project, misal SF26-0001" },
+  { token: "{date}", label: "Drop date, YYYYMMDD format" },
+  { token: "{project}", label: "Project name" },
+  { token: "{location}", label: "Short project location" },
+  { token: "{round}", label: "Round label, for example “D4 2”" },
+  { token: "{code}", label: "Project code, for example SF26-0001" },
 ] as const;
 
 /** Mirrors the service preview so the studio sees the shape before saving. */
@@ -45,10 +45,10 @@ export function NamingTemplateForm({
     <form action={formAction} className="grid gap-4 max-w-xl">
       {failure ? <InlineError>{failure}</InlineError> : null}
       {saved && !failure ? (
-        <p className="text-sm text-green-600 dark:text-green-400">Template tersimpan.</p>
+        <Notice tone="success">Template saved.</Notice>
       ) : null}
 
-      <Field label="Template nama file" required>
+      <Field label="File name template" required>
         <Input
           name="naming_template"
           required
@@ -59,17 +59,17 @@ export function NamingTemplateForm({
         />
       </Field>
 
-      <div className="rounded border border-line bg-surface-muted px-4 py-3">
-        <p className="text-xs text-ink-tertiary">Contoh hasil</p>
-        <p className="mt-1 font-mono text-sm">{preview(draft) || "—"}.pdf</p>
+      <div className="rounded-control border border-line bg-surface-muted px-4 py-3">
+        <p className="text-xs text-ink-tertiary">Example result</p>
+        <p className="mt-1 font-ui-mono text-sm">{preview(draft) || "—"}.pdf</p>
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-medium text-ink-tertiary">Token yang tersedia</p>
+        <p className="mb-2 text-xs font-medium text-ink-tertiary">Available tokens</p>
         <dl className="grid gap-1 text-sm">
           {TOKENS.map((entry) => (
             <div key={entry.token} className="flex gap-3">
-              <dt className="w-24 shrink-0 font-mono text-xs">{entry.token}</dt>
+              <dt className="w-24 shrink-0 font-ui-mono text-xs">{entry.token}</dt>
               <dd className="text-ink-tertiary">{entry.label}</dd>
             </div>
           ))}
@@ -78,7 +78,7 @@ export function NamingTemplateForm({
 
       {canManage && (
         <FormActions>
-          <Button type="submit" variant="primary" pending={pending}>Simpan template</Button>
+          <Button type="submit" variant="primary" pending={pending}>Save template</Button>
         </FormActions>
       )}
     </form>

@@ -26,3 +26,20 @@ export const BUTTON_VARIANT_CLASSES: Record<ButtonVariant, string> = {
 export function buttonClasses(variant: ButtonVariant = "secondary", size: ButtonSize = "md"): string {
   return cx(BUTTON_BASE_CLASSES, BUTTON_SIZE_CLASSES[size], BUTTON_VARIANT_CLASSES[variant]);
 }
+
+export const FILTER_CHIP_BASE_CLASSES =
+  "inline-flex min-h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-pill border px-2.5 text-xs leading-none no-underline cursor-pointer transition-[background-color,border-color,color] duration-[120ms] disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0";
+
+/**
+ * Filter chip chrome. Selection is carried by fill and weight, not colour
+ * alone, and the caller is expected to also set aria-pressed (button) or
+ * aria-current (link) so the state reaches assistive technology.
+ */
+export function filterChipClasses(selected = false): string {
+  return cx(
+    FILTER_CHIP_BASE_CLASSES,
+    selected
+      ? "border-action bg-action font-semibold text-ink-inverse"
+      : "border-line bg-surface font-medium text-ink-secondary hover:bg-surface-muted hover:text-ink",
+  );
+}

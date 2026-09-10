@@ -20,7 +20,7 @@ export default async function RolesPage() {
   if (!hasAllPermissions(grants, ["platform.role.read"])) {
     return (
       <PageShell>
-        <PageHeader eyebrow="Settings · Access" title="Roles & Access" />
+        <PageHeader eyebrow="Settings · Access" title="Roles & Access" divider />
         <SectionCard>
           <ErrorState title="Access denied" description="You do not have permission to view roles." />
         </SectionCard>
@@ -46,6 +46,7 @@ export default async function RolesPage() {
         eyebrow="Settings · Access"
         title="Roles & Access"
         description="Roles compose the registered permissions their members hold."
+        divider
       />
       {failure || !directory || !integrityIssues ? (
         <SectionCard>

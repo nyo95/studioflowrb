@@ -111,7 +111,7 @@ function rejectForbiddenKeysDeep(value: unknown, path: string, seen = new WeakSe
   if (value !== null && typeof value === "object") {
     if (seen.has(value)) throw new Error(`Circular audit value at ${path}.`);
     seen.add(value);
-    for (const [key, entry] of Object.entries(value)) {
+    for (const [key, entry] of Object.entries(value as object)) {
       if (isForbiddenAuditKey(key)) {
         throw new Error(`Forbidden audit key "${key}" at ${path}: secret-style fields cannot be audited.`);
       }
@@ -244,14 +244,14 @@ function serializeAuditValueDeep(value: unknown, seen: WeakSet<object>): unknown
     seen.delete(value);
     return serialized;
   }
-  if (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null) {
-    if (seen.has(value)) throw new Error("Circular values cannot be serialized into audit events.");
-    seen.add(value);
+  if (Object.getPrototypeOf(value as object) === Object.prototype || Object.getPrototypeOf(value as object) === null) {
+    if (seen.has(value as object)) throw new Error("Circular values cannot be serialized into audit events.");
+    seen.add(value as object);
     const out: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
-    for (const [key, entry] of Object.entries(value)) {
+    for (const [key, entry] of Object.entries(value as object)) {
       out[key] = serializeAuditValueDeep(entry, seen);
     }
-    seen.delete(value);
+    seen.delete(value as object);
     return out;
   }
   throw new Error("Unsupported audit value: only primitives, Dates, Decimal-like values, arrays, and plain objects are serializable.");

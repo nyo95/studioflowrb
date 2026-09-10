@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronDown,ChevronLeft,ChevronRight,ChevronUp,ChevronsUpDown,Search,X } from "lucide-react";
+import { ChevronDown,ChevronUp,ChevronsUpDown,Search,X } from "lucide-react";
+import Link from "next/link";
 import {
 forwardRef,
 type CSSProperties,
@@ -15,7 +16,7 @@ type ThHTMLAttributes,
 import { cx } from "../internal/cx";
 import type { SemanticTone } from "../primitives";
 import { StatusMarker } from "./feedback";
-import { Button,IconButton,Input,Text } from "../primitives";
+import { IconButton,Input,Text } from "../primitives";
 
 export type DataTableProps = TableHTMLAttributes<HTMLTableElement> & {
   framed?: boolean;
@@ -393,50 +394,6 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(functi
     </div>
   );
 });
-
-export type PaginationProps = HTMLAttributes<HTMLElement> & {
-  page: number;
-  pageCount: number;
-  onPageChange: (page: number) => void;
-  label?: string;
-};
-
-export function Pagination({
-  page,
-  pageCount,
-  onPageChange,
-  label = "Pagination",
-  className,
-  ...props
-}: PaginationProps) {
-  const safePageCount = Math.max(1, pageCount);
-  const safePage = Math.min(Math.max(1, page), safePageCount);
-  return (
-    <nav className={cx("flex items-center justify-between gap-3 max-[720px]:flex-col max-[720px]:items-stretch", className)} aria-label={label} {...props}>
-      <Text tone="secondary" size="sm">Page {safePage} of {safePageCount}</Text>
-      <div className="flex gap-1.5">
-        <Button
-          size="sm"
-          variant="secondary"
-          leadingIcon={<ChevronLeft aria-hidden="true" />}
-          disabled={safePage <= 1}
-          onClick={() => onPageChange(safePage - 1)}
-        >
-          Previous
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          trailingIcon={<ChevronRight aria-hidden="true" />}
-          disabled={safePage >= safePageCount}
-          onClick={() => onPageChange(safePage + 1)}
-        >
-          Next
-        </Button>
-      </div>
-    </nav>
-  );
-}
 
 export type DescriptionListProps = HTMLAttributes<HTMLDListElement> & {
   /** Pair columns. Use 1 in narrow containers such as a detail aside. */

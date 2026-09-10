@@ -109,7 +109,7 @@ export function SkuDirectory({
     startTransition(async () => {
       try {
         const result = await command();
-        if (result && typeof result === "object" && "ok" in result && !result.ok) {
+        if (result && typeof result === "object" && "ok" in result && result.ok === false) {
           const failure = result as { error?: { safeMessage?: string } };
           setRowError(failure.error?.safeMessage ?? "The action could not be completed."); return;
         }
@@ -239,7 +239,7 @@ export function SkuDirectory({
                 const res = await updateSkuAction(null, fd);
                 if (res && "ok" in res && res.ok) {
                   setEditTarget(null);
-                } else if (res && "ok" in res && !res.ok) {
+                } else if (res && "ok" in res && res.ok === false) {
                   setEditError(res.error.safeMessage);
                 }
               } finally {

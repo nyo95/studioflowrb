@@ -12,7 +12,7 @@ const INITIAL = null;
 export function ProjectForm({ project, templates = [] }: { project?: BqProjectDetail; templates?: BqTemplateRead[] }) {
   const action = project ? updateProjectAction : createProjectAction;
   const [state, formAction, pending] = useActionState(action, INITIAL);
-  const failure = state && !state.ok ? state.error.safeMessage : null;
+  const failure = state?.ok === false ? state.error.safeMessage : null;
 
   return <form action={formAction} className="grid gap-4">
     {failure ? <InlineError>{failure}</InlineError> : null}

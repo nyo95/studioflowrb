@@ -17,7 +17,7 @@ export default async function UsersPage() {
   if (!hasAllPermissions(grants, ["platform.user.read"])) {
     return (
       <PageShell>
-        <PageHeader eyebrow="Settings · Access" title="Users" />
+        <PageHeader eyebrow="Settings · Access" title="Users" divider />
         <SectionCard>
           <ErrorState title="Access denied" description="You do not have permission to view the user directory." />
         </SectionCard>
@@ -41,6 +41,7 @@ export default async function UsersPage() {
         eyebrow="Settings · Access"
         title="Users"
         description="Platform accounts, their roles, and their status."
+        divider
       />
       {failure || !directory || !roles ? (
         <SectionCard>

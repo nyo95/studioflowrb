@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactNode } from "react";
+import { Fragment, type HTMLAttributes, type ReactNode } from "react";
 
 import { cx } from "../internal/cx";
 
@@ -132,5 +132,146 @@ export function Surface({
     <Tag className={cx("bg-surface border border-line rounded-card", elevated && "shadow-elevated", className)} {...props}>
       {children}
     </Tag>
+  );
+}
+
+/* ── Identity, counts, and measure ──────────────────────────────────────────
+   Small display atoms the directory, detail, and worklist templates all reuse:
+   an initials avatar for people columns, a monospace count for section heads
+   and tab labels, a dot-separated meta line for record identity, and a plain
+   measure bar. None of them carry meaning by colour alone. */
+
+export type AvatarSize = "sm" | "md" | "lg";
+
+const AVATAR_SIZE_CLASSES: Record<AvatarSize, string> = {
+  sm: "h-[22px] w-[22px] text-[0.6875rem]",
+  md: "h-6 w-6 text-[0.6875rem]",
+  lg: "h-[26px] w-[26px] text-[0.6875rem]",
+};
+
+/** Initials derived from a display name: at most two leading letters. */
+export function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
+  return (first + last).toUpperCase() || "?";
+}
+
+export function Avatar({
+  name,
+  size = "md",
+  className,
+  ...props
+}: Omit<HTMLAttributes<HTMLSpanElement>, "children"> & { name: string; size?: AvatarSize }) {
+  return (
+    <span
+      className={cx(
+        "grid shrink-0 place-items-center rounded-pill border border-line bg-surface-muted font-semibold text-ink-secondary",
+        AVATAR_SIZE_CLASSES[size],
+        className,
+      )}
+      title={name}
+      aria-label={name}
+      role="img"
+      {...props}
+    >
+      {initialsOf(name)}
+    </span>
+  );
+}
+
+/** Monospace count used beside section titles and tab labels. */
+export function CountBadge({ className, ...props }: HTMLAttributes<HTMLSpanElement>) {
+  return (
+    <span
+      className={cx("font-ui-mono text-[0.6875rem] font-medium text-ink-tertiary tabular-nums", className)}
+      {...props}
+    />
+  );
+}
+
+/** Dot-separated identity line (code · client · area · opened). */
+export function MetaList({
+  items,
+  className,
+  ...props
+}: Omit<HTMLAttributes<HTMLDivElement>, "children"> & { items: ReactNode[] }) {
+  const visible = items.filter((item) => item !== null && item !== undefined && item !== false && item !== "");
+  if (visible.length === 0) return null;
+  return (
+    <div
+      className={cx("flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.8125rem] text-ink-secondary", className)}
+      {...props}
+    >
+      {visible.map((item, index) => (
+        <Fragment key={index}>
+          {index > 0 ? <span aria-hidden="true" className="text-line-strong">·</span> : null}
+          <span className="min-w-0">{item}</span>
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
+/** Plain measure bar. `label` is required so the value is never colour-only. */
+export function ProgressBar({
+  value,
+  max = 100,
+  label,
+  className,
+  ...props
+}: Omit<HTMLAttributes<HTMLDivElement>, "children"> & { value: number; max?: number; label: string }) {
+  const safeMax = max > 0 ? max : 1;
+  const clamped = Math.min(Math.max(value, 0), safeMax);
+  const percent = Math.round((clamped / safeMax) * 100);
+  return (
+    <div
+      className={cx("h-1.5 w-full overflow-hidden rounded-pill bg-line-subtle", className)}
+      role="progressbar"
+      aria-valuenow={clamped}
+      aria-valuemin={0}
+      aria-valuemax={safeMax}
+      aria-label={label}
+      {...props}
+    >
+      <span className="block h-full rounded-pill bg-action" style={{ width: `${percent}%` }} />
+    </div>
+  );
+}
+
+export type SegmentState = "done" | "current" | "idle" | "blocked";
+
+const SEGMENT_STATE_CLASSES: Record<SegmentState, string> = {
+  done: "bg-action",
+  current: "bg-warning",
+  idle: "bg-line",
+  blocked: "bg-danger",
+};
+
+/**
+ * A compact ordered progress bar: one segment per stage, filled by state.
+ * It is decorative on its own, so `label` supplies the full reading for
+ * assistive technology and the native tooltip.
+ */
+export function SegmentBar({
+  segments,
+  label,
+  className,
+  ...props
+}: Omit<HTMLAttributes<HTMLDivElement>, "children"> & { segments: SegmentState[]; label: string }) {
+  if (segments.length === 0) return null;
+  return (
+    <div
+      className={cx("flex min-w-16 items-center gap-[3px]", className)}
+      role="img"
+      aria-label={label}
+      title={label}
+      {...props}
+    >
+      {segments.map((state, index) => (
+        <span key={index} className={cx("h-[5px] flex-1 rounded-pill", SEGMENT_STATE_CLASSES[state])} />
+      ))}
+    </div>
   );
 }

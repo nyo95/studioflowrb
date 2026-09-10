@@ -14,27 +14,27 @@ export function ClientForm() {
   return (
     <form action={formAction} className="grid gap-4 max-w-lg">
       {failure ? <InlineError>{failure}</InlineError> : null}
-      <Field label="Nama klien" required>
+      <Field label="Client name" required>
         <Input name="name" required maxLength={200} autoFocus />
       </Field>
-      <Field label="Nama kontak">
+      <Field label="Contact name">
         <Input name="contact_name" maxLength={200} />
       </Field>
-      <Field label="Telepon">
+      <Field label="Phone">
         <Input name="contact_phone" type="tel" maxLength={50} />
       </Field>
       <Field label="Email">
         <Input name="contact_email" type="email" maxLength={200} />
       </Field>
-      <Field label="Alamat">
+      <Field label="Address">
         <Textarea name="address" maxLength={500} rows={2} />
       </Field>
-      <Field label="Catatan internal">
+      <Field label="Internal notes">
         <Textarea name="notes" maxLength={2000} rows={2} />
       </Field>
       <FormActions>
-        <Link href="/studioflow/clients" className="text-sm text-action hover:underline">Batal</Link>
-        <Button type="submit" variant="primary" pending={pending}>Simpan klien</Button>
+        <Link href="/studioflow/clients" className="text-sm text-action hover:underline">Cancel</Link>
+        <Button type="submit" variant="primary" pending={pending}>Save client</Button>
       </FormActions>
     </form>
   );

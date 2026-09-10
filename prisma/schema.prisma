@@ -155,6 +155,14 @@ model PlatformGeneralSettings {
   week_starts_on    Int
   brand_mark_url    String?
 
+  /// Owner-configured launcher routing (roadmap "configurable main-route
+  /// settings"). Both are advisory: an id that is null, unknown, or no
+  /// longer accessible to the current user is ignored at read time, never
+  /// enforced or validated against the app registry here (Core stays
+  /// domain-neutral and never imports app code).
+  main_app_id    String?
+  landing_app_id String?
+
   updated_at DateTime @updatedAt
 
   @@schema("platform")
@@ -1019,16 +1027,6 @@ model BqLineItem {
 // String? columns — app resolves them via platform service, never via FK.
 // ============================================================================
 
-enum SfProjectType {
-  RESIDENTIAL
-  COMMERCIAL
-  HOSPITALITY
-  OTHER
-
-  @@map("sf_project_type")
-  @@schema("studioflow")
-}
-
 enum SfProjectStatus {
   ACTIVE
   ON_HOLD
@@ -1132,7 +1130,6 @@ model SfProject {
   /// Site address; independent of Client.address.
   address  String?
   area     Decimal?        @db.Decimal(10, 2)
-  type     SfProjectType
   status   SfProjectStatus @default(ACTIVE)
 
   /// Ordering hint for the project list; not a workflow input.
@@ -1147,11 +1144,111 @@ model SfProject {
   phases SfProjectPhase[]
   files  SfFile[]
   tasks  SfTask[]
+  mom_documents SfMomDocument[]
 
   @@index([client_id])
   @@index([status])
   @@index([deleted_at])
   @@map("sf_project")
+  @@schema("studioflow")
+}
+
+// ── MOM — project-owned meeting records ─────────────────────────────────────
+
+enum SfMomState {
+  DRAFT
+  ISSUED
+  SUPERSEDED
+
+  @@map("sf_mom_state")
+  @@schema("studioflow")
+}
+
+enum SfMomListStyle {
+  NONE
+  BULLET
+  NUMBERED
+
+  @@map("sf_mom_list_style")
+  @@schema("studioflow")
+}
+
+enum SfMomPointStyle {
+  TEXT
+  BULLET
+  NUMBERED
+
+  @@map("sf_mom_point_style")
+  @@schema("studioflow")
+}
+
+model SfMomDocument {
+  id String @id @default(uuid())
+  project_id String
+  topic String
+  meeting_at DateTime
+  venue String?
+  attendees_text String?
+  prepared_by_name String
+  state SfMomState @default(DRAFT)
+  sequence Int?
+  supersedes_id String?
+  created_by String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  issued_by String?
+  issued_at DateTime?
+
+  project SfProject @relation(fields: [project_id], references: [id])
+  supersedes SfMomDocument? @relation("MomCorrection", fields: [supersedes_id], references: [id], onDelete: Restrict)
+  corrections SfMomDocument[] @relation("MomCorrection")
+  items SfMomItem[]
+
+  @@unique([project_id, sequence])
+  @@index([project_id, state, created_at])
+  @@index([supersedes_id])
+  @@map("sf_mom_document")
+  @@schema("studioflow")
+}
+
+model SfMomItem {
+  id String @id @default(uuid())
+  document_id String
+  sort_order Int @default(0)
+  is_text_only Boolean @default(false)
+  list_style SfMomListStyle @default(NONE)
+  document SfMomDocument @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  points SfMomPoint[]
+  images SfMomImage[]
+
+  @@index([document_id, sort_order])
+  @@map("sf_mom_item")
+  @@schema("studioflow")
+}
+
+model SfMomPoint {
+  id String @id @default(uuid())
+  item_id String
+  sort_order Int @default(0)
+  text String
+  style SfMomPointStyle @default(TEXT)
+  item SfMomItem @relation(fields: [item_id], references: [id], onDelete: Cascade)
+
+  @@index([item_id, sort_order])
+  @@map("sf_mom_point")
+  @@schema("studioflow")
+}
+
+model SfMomImage {
+  id String @id @default(uuid())
+  item_id String
+  sort_order Int @default(0)
+  storage_key String
+  alt_text String?
+  item SfMomItem @relation(fields: [item_id], references: [id], onDelete: Cascade)
+
+  @@index([item_id, sort_order])
+  @@map("sf_mom_image")
   @@schema("studioflow")
 }
 
@@ -1434,5 +1531,28 @@ model SfResponsePoint {
 
   @@index([response_id])
   @@map("sf_response_point")
+  @@schema("studioflow")
+}
+
+model SfProductCatalogue {
+  id              String    @id @default(uuid())
+  brand_md_id     String?
+  brand_name      String?
+  product_name    String
+  colour          String?
+  finishing       String?
+  dimension_text  String?
+  unit            String?
+  notes           String?
+  search_key      String
+  sort_order      Int       @default(0)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  deleted_at      DateTime?
+
+  @@index([search_key])
+  @@index([brand_md_id])
+  @@index([deleted_at, sort_order])
+  @@map("sf_product_catalogue")
   @@schema("studioflow")
 }

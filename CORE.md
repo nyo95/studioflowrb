@@ -306,6 +306,14 @@ type Money = {
 
 ## 11. Platform General Settings
 
+R7.56 activates nullable `mainAppId` and `landingAppId` preferences under
+`platform.settings.manage`. Core validates and persists opaque app IDs; the
+launcher composition selects among live granted app registrations. An unset main
+means Master Data; otherwise the configured main wins when accessible, then the
+configured landing, then Master Data or the first accessible app. Unknown IDs
+fall back safely. No accessible apps means no redirect. Registered roots must be
+local non-root paths without query strings, fragments, or traversal segments.
+
 General Settings is a small typed platform aggregate shared by every app, not a generic key/value dump and not StudioFlow project configuration.
 
 Initial fields are:
@@ -449,7 +457,7 @@ Foundation is deliberately staged. A capability can be documented before it is i
 
 | Candidate capability | Likely central owner | Activation trigger | Current decision |
 |---|---|---|---|
-| file storage/upload/download, virus/type/size policy | Core port + infrastructure; app policy outside | first approved media/document upload | **DEFER**; UI Engine may own `FileDropZone` interaction only |
+| file storage/upload/download, virus/type/size policy | Core port + infrastructure; app policy outside | first approved media/document upload | **ACTIVATED for MOM image objects in R7.52**; Brand mark migration remains deferred |
 | cache/revalidation helper | framework utility | repeated domain-neutral tag/path mechanism in two apps | **DEFER**; route/tag lists remain app-owned |
 | background jobs/outbox/idempotency | Core infrastructure | first durable async workflow/integration | **DEFER**; no event bus placeholder |
 | notification delivery | Core port + app-owned notification meaning | first approved email/in-app notification workflow | **DEFER** |

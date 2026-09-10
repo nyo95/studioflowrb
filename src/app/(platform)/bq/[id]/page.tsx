@@ -48,6 +48,7 @@ export default async function BqProjectDetailPage({
             </div>
           ) : null
         }
+        divider
       />
 
       {project.sections.length === 0 && !canManage ? (

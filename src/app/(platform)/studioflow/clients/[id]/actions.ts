@@ -11,7 +11,7 @@ import { studioFlowService } from "@/apps/studioflow/runtime";
 
 const EditClientSchema = z.object({
   id: z.string().uuid(),
-  name: z.string().trim().min(1, "Nama klien wajib diisi").max(200),
+  name: z.string().trim().min(1, "Client name is required").max(200),
   contact_name: z.string().trim().max(200).optional(),
   contact_phone: z.string().trim().max(50).optional(),
   contact_email: z
@@ -19,7 +19,7 @@ const EditClientSchema = z.object({
     .trim()
     .max(200)
     .optional()
-    .refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), "Format email tidak valid"),
+    .refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), "The email format is not valid"),
   address: z.string().trim().max(500).optional(),
   notes: z.string().trim().max(2000).optional(),
 });

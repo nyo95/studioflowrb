@@ -10,22 +10,23 @@ import {
   DataTable,
   Dialog,
   EmptyState,
+  Field,
+  FormActions,
+  Heading,
   IconButton,
   InlineEdit,
   InlineError,
   Input,
   SearchField,
   SectionCard,
-  Text,
+  Select,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
+  Text,
   Tooltip,
-  Field,
-  FormActions,
-  Select,
 } from "@/platform/ui_engine";
 import { createMoney, formatMoney } from "@platform/utilities/money";
 import type { ActionResult } from "@platform/core/actions";
@@ -86,7 +87,7 @@ type Mutation = (prev: null, formData: FormData) => Promise<ActionResult<BqProje
 
 /** Amounts arrive as canonical decimal strings; presentation never re-derives them. */
 function money(amount: string | null, currency = "IDR") {
-  if (amount === null) return <span className="text-ink-tertiary">—</span>;
+  if (!amount) return <span className="text-ink-tertiary">—</span>;
   return <>{formatMoney(createMoney(amount, currency))}</>;
 }
 
@@ -132,7 +133,7 @@ export function ProjectEditor({
       }
       startTransition(async () => {
         const result = await action(null, data);
-        if (!result.ok) {
+        if (result.ok === false) {
           setError(result.error.safeMessage);
           reject(new Error(result.error.safeMessage));
           return;
@@ -199,7 +200,7 @@ export function ProjectEditor({
                 onCommit={(name) => run(updateSectionAction, { id: section.id, name })}
               />
             ) : (
-              <h2 className="text-base font-semibold text-ink">{section.name}</h2>
+              <Heading level={4}>{section.name}</Heading>
             )}
           </div>
 
@@ -230,7 +231,7 @@ export function ProjectEditor({
                     onCommit={(name) => run(updateSubsectionAction, { id: subsection.id, name })}
                   />
                 ) : (
-                  <h3 className="text-sm font-semibold text-ink-secondary">{subsection.name}</h3>
+                  <Heading level={5} className="text-ink-secondary">{subsection.name}</Heading>
                 )}
               </div>
               <ItemTable
@@ -552,7 +553,7 @@ function ItemRows({
               inputMode="decimal"
               placeholder="Belum ada harga"
               value={item.hargaSnapshot ?? ""}
-              display={(value) => formatMoney(createMoney(value, "IDR"))}
+              display={(value) => value ? formatMoney(createMoney(value, "IDR")) : <span className="text-ink-tertiary">Belum ada harga</span>}
               disabled={!editable}
               onCommit={commit(updateItemAction, item.id, "hargaSnapshot")}
             />
@@ -816,9 +817,10 @@ function TransientLineItemRow({
       <TableCell />
       <TableCell colSpan={columns - 1}>
         <div className={`flex items-center gap-2 ${indent}`}>
-          <input
+          <Input
             ref={inputRef}
             type="text"
+            density="compact"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => {
@@ -826,7 +828,7 @@ function TransientLineItemRow({
               if (e.key === "Escape") { e.preventDefault(); onDismiss(); }
             }}
             placeholder="Nama baris…"
-            className="min-w-0 flex-1 rounded border border-line bg-surface px-2 py-0.5 text-sm text-ink outline-none focus:border-brand"
+            className="min-w-0 flex-1"
             disabled={pending}
           />
         </div>
@@ -895,7 +897,7 @@ function LineItemRow({
           inputMode="decimal"
           value={line.hargaSnapshot}
           disabled={!editable}
-          display={(value) => <>{formatMoney(createMoney(value, line.currencySnapshot))}</>}
+          display={(value) => value ? formatMoney(createMoney(value, line.currencySnapshot)) : <span className="text-ink-tertiary">Belum ada harga</span>}
           onCommit={commit(updateLineItemAction, line.id, "hargaSnapshot")}
         />
       </TableCell>
@@ -1040,7 +1042,7 @@ function ImportDialog({
     startTransition(async () => {
       const result = await listLineItemSourcesAction(nextQuery);
       if (requestId !== request.current) return;
-      if (!result.ok) {
+      if (result.ok === false) {
         setError(result.error.safeMessage);
         return;
       }
@@ -1056,7 +1058,7 @@ function ImportDialog({
     startTransition(async () => {
       const result = await listLineItemSourcesAction("");
       if (cancelled) return;
-      if (!result.ok) {
+      if (result.ok === false) {
         setError(result.error.safeMessage);
         return;
       }
@@ -1100,7 +1102,7 @@ function ImportDialog({
               className={[
                 "rounded-t px-3 py-1.5 text-sm font-medium transition-colors",
                 tab === t.key
-                  ? "border-b-2 border-brand text-brand"
+                  ? "border-b-2 border-action text-ink"
                   : "text-ink-secondary hover:text-ink",
               ].join(" ")}
               onClick={() => { setTab(t.key); setShowCustom(false); setShowOtherCosts(false); }}
@@ -1118,7 +1120,7 @@ function ImportDialog({
                 <button
                   key={opt.value}
                   type="button"
-                  className="grid gap-0.5 rounded-action border border-line px-3 py-2.5 text-left transition-colors hover:border-brand hover:bg-surface-muted"
+                  className="grid gap-0.5 rounded-action border border-line px-3 py-2.5 text-left transition-colors hover:border-line-strong hover:bg-surface-muted"
                   onClick={() => void onPick({ sourceType: "CUSTOM", kategori: opt.value })}
                 >
                   <span className="font-medium text-ink">{opt.label}</span>
@@ -1127,7 +1129,7 @@ function ImportDialog({
               ))}
               <button
                 type="button"
-                className="grid gap-0.5 rounded-action border border-line px-3 py-2.5 text-left transition-colors hover:border-brand hover:bg-surface-muted"
+                className="grid gap-0.5 rounded-action border border-line px-3 py-2.5 text-left transition-colors hover:border-line-strong hover:bg-surface-muted"
                 aria-expanded={showOtherCosts}
                 onClick={() => setShowOtherCosts((value) => !value)}
               >
@@ -1141,7 +1143,7 @@ function ImportDialog({
                   <button
                     key={opt.value}
                     type="button"
-                    className="grid gap-0.5 rounded-action border border-line px-3 py-2.5 text-left transition-colors hover:border-brand hover:bg-surface-muted"
+                    className="grid gap-0.5 rounded-action border border-line px-3 py-2.5 text-left transition-colors hover:border-line-strong hover:bg-surface-muted"
                     onClick={() => void onPick({ sourceType: "CUSTOM", kategori: opt.value })}
                   >
                     <span className="font-medium text-ink">{opt.label}</span>

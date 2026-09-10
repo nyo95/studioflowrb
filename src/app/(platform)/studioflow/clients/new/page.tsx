@@ -3,7 +3,12 @@ import { Users } from "lucide-react";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
-import { EmptyState, PageHeader, SectionCard } from "@/platform/ui_engine";
+import {
+  Breadcrumb,
+  EmptyState,
+  PageHeader,
+  SectionCard,
+} from "@/platform/ui_engine";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
 import { ClientForm } from "./client-form";
 
@@ -16,21 +21,27 @@ export default async function NewClientPage() {
 
   if (!hasPermission(grants, STUDIOFLOW_PERMISSIONS.projectManage)) {
     return (
-      <div className="grid gap-4">
-        <PageHeader eyebrow="StudioFlow · Klien" title="Klien baru" />
+      <>
+        <Breadcrumb
+        entries={[
+          { label: "Clients", href: "/studioflow/clients" },
+          { label: "New client" },
+        ]}
+      />
+      <PageHeader title="New client" description="Create a client for StudioFlow projects." divider />
         <SectionCard>
-          <EmptyState icon={Users} title="Akses ditolak" description="Kamu tidak punya permission untuk menambahkan klien." />
+          <EmptyState icon={Users} title="Access denied" description="You do not have permission to add clients." />
         </SectionCard>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)">
-      <PageHeader eyebrow="StudioFlow · Klien" title="Klien baru" />
+    <>
+      <PageHeader eyebrow="StudioFlow · Client" title="New client" divider />
       <SectionCard>
         <ClientForm />
       </SectionCard>
-    </div>
+    </>
   );
 }

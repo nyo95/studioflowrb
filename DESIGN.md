@@ -33,9 +33,23 @@ All apps must feel like one product. Do not create a separate visual language pe
 | H5 | sans, 14px, semibold |
 | H6 | sans, 12px, semibold |
 | Body | sans, `text-sm`, normal |
+| Control/chrome | sans, `13px` (`text-[0.8125rem]`), normal/medium |
 | UI Meta | sans, `11px`, bold, uppercase, wide tracking |
 
 H1–H2 provide restrained product identity. H3–H6, tables, controls, labels, menus, and data use sans-serif. Do not invent arbitrary sizes when an existing semantic role fits.
+
+**Body vs Control/chrome.** Body is what the operator came to read — table cell
+values, record names, form values, prose. Chrome is what frames it: navigation
+items, menu items, tabs, badges, notices, the meta line under a page title, and
+mono identifiers. Chrome sits one step down at 13px so it recedes behind the
+content it surrounds; a screen where chrome and content share a size reads as an
+undifferentiated wall. Content never drops to 13px to win space — if a column is
+tight, cut the column, not the type.
+
+This role is not new. It is what `NavItem`, `NavSubmenu`, `RowActionMenu`,
+`StatusBadge`, `Notice`, `MetaList`, and the table identifier face already use,
+and what the approved StudioFlow design specifies for its chrome. It was
+recorded here in R7.22 so the size stops looking like drift.
 
 ## 3. Color Semantics
 
@@ -329,7 +343,7 @@ reachable in both expanded and collapsed desktop presentations.
 - Field help appears only when the input is ambiguous, risky, or constrained in a non-obvious way.
 - Empty, loading, and error states use a short title and at most one actionable sentence; no decorative prose or oversized illustration is required.
 - Buttons use concise verb-first labels. Icon-only actions require an accessible label and tooltip.
-- Dense directories use one shared surface around their toolbar, scrollable compact table, and pagination. Compact headers use 6px vertical padding and cells use 7px; wide tables scroll inside that surface.
+- Dense directories use one shared surface around their toolbar, scrollable compact table, and pagination. Pagination is part of the surface at any row count — it stays visible and inert when there is only one page, so the footer never appears or disappears under the operator. It is not required for card or tab layouts that are not dense tables. Compact headers use 6px vertical padding and cells use 7px; wide tables scroll inside that surface.
 - Secondary row operations live in an intentional action menu whose accessible name identifies the record. Destructive confirmation uses the emphasized danger action only at the final confirmation step.
 - Do not repeat the same instruction in PageHeader, section description, field help, and empty state.
 - Progressive disclosure is preferred for rare metadata and advanced settings.

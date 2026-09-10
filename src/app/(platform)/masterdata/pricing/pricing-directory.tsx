@@ -38,7 +38,7 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
     startTransition(async () => {
       try {
         const result = await command();
-        if (result && typeof result === "object" && "ok" in result && !result.ok) {
+        if (result && typeof result === "object" && "ok" in result && result.ok === false) {
           const failure = result as { error?: { safeMessage?: string } };
           setRowError(failure.error?.safeMessage ?? "The action could not be completed."); return;
         }
@@ -65,7 +65,7 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
   const workTable = (rows: WorkRow[], kind: Kind, canManage: boolean, title: string) => { const filtered = rows.filter((row) => matches(`${row.name} ${row.category.name} ${row.vendor.name}`, Boolean(row.deleted_at))); const paged = paginate(sortRows(filtered, (row) => row.name, (row) => row.vendor.name)); return <DirectoryShell fill surface toolbar={toolbar} pagination={pagination(paged.currentPage, paged.pageCount)}>{filtered.length === 0 ? <EmptyState title={title} description={query ? "No prices match this search." : "No pricing records yet."} /> : <><DataTable density="compact" stickyHeader fill framed={false} minWidth={830}><TableHeader><TableRow>{sortableHead("name", "Name")}<TableHead>Category</TableHead>{sortableHead("vendor", "Supplier")}{sortableHead("amount", "Price", "end")}<TableHead>Unit</TableHead><TableHead>Updated</TableHead>{canManage && <RowActionsHead />}</TableRow></TableHeader><TableBody>{paged.rows.map((row) => <TableRow key={row.id}><TableCell><EntityPrimaryCell tone={row.deleted_at ? "danger" : "success"} statusLabel={row.deleted_at ? "Archived" : "Active"} name={row.name} /></TableCell><TableCell>{row.category.name}</TableCell><TableCell>{row.vendor.name}</TableCell><TableCell align="end">{displayPrice(row.amount, row.currency)}</TableCell><TableCell><span className="font-ui-mono text-xs">{row.unit.code}</span></TableCell><UpdatedCell at={row.updated_at} by={row.updated_by_label} />{actions(row, { kind, id: row.id, name: row.name }, canManage, () => setEditor({ kind, row }))}</TableRow>)}</TableBody></DataTable></>}</DirectoryShell>; };
   return <div className="flex min-h-0 flex-1 flex-col gap-4">
     {rowError ? <InlineError>{rowError}</InlineError> : null}
-    {editor && <PriceEditor pending={savePending} editor={editor} refs={props} error={formError} onCancel={closeEditor} onSubmit={async (event) => { event.preventDefault(); if (savePending) return; setSavePending(true); setFormError(null); const formData = new FormData(event.currentTarget); try { const result = editor.kind === "material" && !editor.row && formData.get("materialEntryMode") === "new" ? await createMaterialSkuAction(formData) : await savePriceAction(editor.kind, formData); if (result.ok) closeEditor(); else setFormError(result.error.safeMessage); } catch { setFormError("The price could not be saved. Please try again."); } finally { setSavePending(false); } }} />}
+    {editor && <PriceEditor pending={savePending} editor={editor} refs={props} error={formError} onCancel={closeEditor} onSubmit={async (event) => { event.preventDefault(); if (savePending) return; setSavePending(true); setFormError(null); const formData = new FormData(event.currentTarget); try { const result = editor.kind === "material" && !editor.row && formData.get("materialEntryMode") === "new" ? await createMaterialSkuAction(formData) : await savePriceAction(editor.kind, formData); if (result.ok) closeEditor(); else if (result.ok === false) setFormError(result.error.safeMessage); } catch { setFormError("The price could not be saved. Please try again."); } finally { setSavePending(false); } }} />}
     <Tabs
       fill
       distribution="equal"
@@ -211,7 +211,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
         setBrandId(result.data.brandId);
         return result.data.brandId;
       }
-      setBrandCreateError(result.error.safeMessage);
+      if (result.ok === false) setBrandCreateError(result.error.safeMessage);
       return "";
     } finally {
       setBrandCreatePending(false);
@@ -230,7 +230,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
         setSelectedProductCategoryId(result.data.categoryId);
         return result.data.categoryId;
       }
-      setProductCategoryCreateError(result.error.safeMessage);
+      if (result.ok === false) setProductCategoryCreateError(result.error.safeMessage);
       return "";
     } finally {
       setProductCategoryCreatePending(false);
@@ -245,7 +245,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
     data.set("vendorTypeId", quickVendorTypeId);
     const result = await createPricingVendorQuickAction(editor.kind, data);
     setQuickPending(false);
-    if (!result.ok) {
+    if (result.ok === false) {
       setQuickError(result.error.safeMessage);
       return;
     }
@@ -264,7 +264,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
     data.set("name", name);
     const result = await createPricingWorkCategoryQuickAction(data);
     setCategoryCreatePending(false);
-    if (!result.ok) {
+    if (result.ok === false) {
       setCategoryCreateError(result.error.safeMessage);
       return "";
     }

@@ -2,7 +2,17 @@
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { UpdatedCell } from "../updated-cell";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
-import { DirectoryShell,DraftDialog,Pagination,RowActionMenu,RowActionsCell,RowActionsHead,Text,usePagination } from "@/platform/ui_engine";
+import {
+  Checkbox,
+  DirectoryShell,
+  DraftDialog,
+  Pagination,
+  RowActionMenu,
+  RowActionsCell,
+  RowActionsHead,
+  Text,
+  usePagination,
+} from "@/platform/ui_engine";
 
 
 import { Plus,UserPlus,X } from "lucide-react";
@@ -165,14 +175,19 @@ function SupplierLinksEditor({ links, snapshot, onLinksChange, onSnapshotChange,
           <div className="grid gap-2">
           <div className="grid gap-1 border border-line rounded p-2 bg-surface-muted/40">
             {snapshot.map((item, idx) => (
-              <label key={idx} className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                <input type="checkbox" checked={acceptedIdxs.has(idx)} onChange={e => {
-                  setAcceptedIdxs(prev => { const next = new Set(prev); e.target.checked ? next.add(idx) : next.delete(idx); return next; });
-                }} className="shrink-0" />
+              <div key={idx} className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  className="shrink-0"
+                  aria-label={`Keep ${item.url}`}
+                  checked={acceptedIdxs.has(idx)}
+                  onCheckedChange={(checked) => {
+                    setAcceptedIdxs(prev => { const next = new Set(prev); if (checked === true) next.add(idx); else next.delete(idx); return next; });
+                  }}
+                />
                 <span className="text-ink-tertiary text-xs uppercase shrink-0">{item.kind}</span>
                 <span className="wrap-anywhere flex-1 min-w-0">{item.label ? `${item.label} — ` : ""}{item.url}</span>
                 {!LINK_KINDS.includes(item.kind as typeof LINK_KINDS[number]) ? <Select aria-label={`Information kind for ${item.url}`} value={reviewKinds[idx] ?? ""} onChange={(event) => setReviewKinds((previous) => ({ ...previous, [idx]: event.target.value }))} className="w-36 shrink-0"><option value="">Reclassify…</option>{LINK_KINDS.map((kind) => <option key={kind} value={kind}>{kind}</option>)}</Select> : null}
-              </label>
+              </div>
             ))}
           </div>
           {canManage ? <Button type="button" size="sm" variant="secondary" onClick={handleResolveReview} className="mt-2">
@@ -292,7 +307,7 @@ export function VendorDirectory({
     startTransition(async () => {
       try {
         const result = await command();
-        if (result && typeof result === "object" && "ok" in result && !result.ok) {
+        if (result && typeof result === "object" && "ok" in result && result.ok === false) {
           const failure = result as { error?: { safeMessage?: string } };
           setRowError(failure.error?.safeMessage ?? "The action could not be completed."); return;
         }
@@ -497,7 +512,7 @@ export function VendorDirectory({
               const res = await createVendorAction(null, fd);
               if (res && "ok" in res && res.ok) {
                 setCreateOpen(false);
-              } else if (res && "ok" in res && !res.ok) {
+              } else if (res && "ok" in res && res.ok === false) {
                 setCreateError(res.error.safeMessage);
               }
             } finally {
@@ -576,10 +591,7 @@ export function VendorDirectory({
                 <Field label="Brand scoping">
                   <Combobox label={`Brand scope for ${contact.personName || "contact"}`} options={[{ id: "", label: "All supplier brands" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={contact.brandId} onValueChange={(brandId) => updateContactDraft(idx, { brandId })} placeholder="All supplier brands" searchPlaceholder="Search brands…" />
                 </Field>
-                <label className="col-span-2 flex items-center gap-2 cursor-pointer select-none">
-                  <input type="checkbox" checked={contact.isPrimary} onChange={(e) => updateContactDraft(idx, { isPrimary: e.target.checked })} className="h-4 w-4 rounded border-line accent-brand" />
-                  <span className="text-sm text-ink-secondary">Primary contact</span>
-                </label>
+                <Checkbox className="col-span-2 text-sm text-ink-secondary" checked={contact.isPrimary} onCheckedChange={(checked) => updateContactDraft(idx, { isPrimary: checked === true })} label="Primary contact" />
               </div>
             ))}
           </div>
@@ -626,7 +638,7 @@ export function VendorDirectory({
                 const res = await updateVendorAction(null, fd);
                 if (res && "ok" in res && res.ok) {
                   setEditTarget(null);
-                } else if (res && "ok" in res && !res.ok) {
+                } else if (res && "ok" in res && res.ok === false) {
                   setEditError(res.error.safeMessage);
                 }
               } finally {
@@ -723,10 +735,7 @@ export function VendorDirectory({
                           <Field label="Brand scoping">
                             <Combobox label={`Brand scope for ${contact.personName || "contact"}`} options={[{ id: "", label: "All supplier brands" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={contact.brandId} onValueChange={(brandId) => updateContactDraft(idx, { brandId })} placeholder="All supplier brands" searchPlaceholder="Search brands…" />
                           </Field>
-                          <label className="col-span-2 flex items-center gap-2 cursor-pointer select-none">
-                            <input type="checkbox" checked={contact.isPrimary} onChange={(e) => updateContactDraft(idx, { isPrimary: e.target.checked })} className="h-4 w-4 rounded border-line accent-brand" />
-                            <span className="text-sm text-ink-secondary">Primary contact</span>
-                          </label>
+                          <Checkbox className="col-span-2 text-sm text-ink-secondary" checked={contact.isPrimary} onCheckedChange={(checked) => updateContactDraft(idx, { isPrimary: checked === true })} label="Primary contact" />
                         </div>
                       ))}
                     </div>

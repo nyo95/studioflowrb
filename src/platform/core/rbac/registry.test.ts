@@ -89,4 +89,10 @@ describe("composePermissionRegistry", () => {
     assert.equal(registry.apps.length, 0);
     assert.equal(registry.permissions.length, PLATFORM_PERMISSIONS.length);
   });
+  it("rejects launcher loops and external or non-canonical app roots", () => {
+    for (const rootPath of ["/", "//example.com", "/../", "/bq?next=/", "/bq#root", "/bq\\other"]) {
+      assert.throws(() => composePermissionRegistry([{ ...MASTERDATA_REGISTRATION, rootPath }]),
+        (error: unknown) => isAppError(error) && error.code === "REGISTRY_INVALID_APP_PATH");
+    }
+  });
 });

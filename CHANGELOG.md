@@ -4,62 +4,1155 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 ## Revision state
 
-- Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.16**
-- Next local revision: **R7.17**
+- Published baseline: **R8** — published to GitHub by the release commit below
+- Current revision after this entry is committed: **R8.01**
+- Next local revision: **R8.02**
 
-## R7.16 | 2026-09-09 | docs(studioflow): record Claude takeover handoff
+## R8.01 | 2026-09-10 | merge(repo): integrate contracts branch into main
 
-### Takeover point
-
-- Claude stopped after building the inline phase/iteration workspace across the
-  StudioFlow project route, server actions, and service, but before the working
-  tree had a coherent review, complete verification, or valid revision commit.
-- The interrupted tree also contained a broad `ActionResult` narrowing sweep in
-  Account, BQ, and Master Data that produced invalid expressions, plus draft
-  changelog claims for `R7.15` through `R7.17` while Git was still at `R7.14`.
-  Those unrelated edits and premature revision claims were not preserved.
-
-### Corrections completed by Codex in R7.15
-
-- Restored unrelated Account, BQ, and Master Data code to the `R7.14` baseline,
-  then kept the accepted work scoped to StudioFlow.
-- Corrected the lifecycle permission split: reviewers send and stop rounds;
-  managers open and edit them; override-only closure remains explicitly gated.
-- Made approval plus optional phase closure atomic, blocked a second pending
-  client send, reused an already-open successor draft for revision responses,
-  appended source-linked client points, and added runtime response validation.
-- Added the distinct Supervision reopen path and corrected UI visibility for
-  internal ACC, exception closure, send, stop, finish, and reopen controls.
-- Replaced the private overlay with UI Engine `DraftDialog`, fixed the phase
-  header's nested-interactive-control accessibility issue, and retained dialog
-  focus, Escape, pending, and unsaved-input behavior.
-- Moved the new project, Client, phase, and round reads behind the StudioFlow
-  service and removed the temporary untyped Prisma `sfTask` fallback.
-- Added three database integration scenarios covering reviewer lifecycle,
-  successor-draft reuse, and atomic response/phase closure. The final R7.15
-  verification was 263 tests passed, typecheck, lint, both boundary checks,
-  production build, and authenticated browser smoke with no console errors.
-
-### Safe continuation point
-
-- The accepted implementation is exactly `R7.15` commit `72daad0` on `main`.
-  Continue from that commit and the current contracts; do not replay the
-  interrupted working-tree sweep or recreate the discarded revision entries.
-- There is no new executable app work order in this handoff. A returning agent
-  starts as navigator and must stop for owner direction before extending product
-  behavior beyond the accepted R7.15 scope.
-- `Tarik pengiriman` remains a disabled placeholder. It was not implemented or
-  approved by this takeover and must not be inferred as the next task.
-- Existing untracked mockups, `.claude/`, uploaded media, `vercel.json`, hidden
-  fuse files, and the line-ending-only Account form status remain owner-local
-  and were deliberately excluded from R7.15 and this documentation revision.
+- Merged the owner-approved `origin/studioflow/contracts` history into local
+  `main`, including the R8 published baseline and its associated application,
+  schema, migration, platform, and documentation changes.
+- Local untracked files were preserved. The previously modified
+  `account-forms.tsx` was replaced with the GitHub version per owner approval.
 
 ### Verification
 
-- Documentation-only revision; the complete implementation verification remains
-  recorded under R7.15.
-- `git diff --cached --check`: passed before the local commit.
+- `npx prisma generate`: passed.
+- `npm run typecheck`: passed after Prisma Client regeneration.
+- `npm run lint`: passed.
+
+## R8 | 2026-09-10 | release: publish routing and documentation corrections
+
+- Published the verified R7.56 routing, settings, registry hardening, migration,
+  documentation reconciliation, and audit ledgers from the `studioflow/contracts`
+  branch to GitHub. This release does not claim deferred StudioFlow KB-012…KB-019
+  work or UI Engine date/time consolidation.
+
+## R7.56 | 2026-09-10 | fix(platform): verify routing and reconcile documentation
+
+- Accepted the pending owner-directed routing implementation: two nullable
+  settings columns (`main_app_id`, `landing_app_id`), audited persistence,
+  Settings controls, and permission-filtered launcher resolution. Locked the
+  activated behavior in `CORE.md`; no new dependency.
+- Corrected unset-main precedence (Master Data before configured landing),
+  preserved unavailable app IDs when saving unrelated settings, and restricted
+  registered app roots to non-root canonical local paths (no launcher loops,
+  external URLs, queries, traversal, or fragments).
+- Browser review reproduced a successful-save form reset to old values.
+  Key the form by refreshed persisted settings so native resets use the saved
+  defaults without discarding the action result. Require settings-management
+  permission before any brand-mark file write.
+- Accepted the pending per-app documentation reorganization and redirect stubs,
+  UI Engine date/time/client-lookup audit, and separate review ledger. Date/time
+  consolidation and header/sidebar redesign are recommendations, not shipped
+  changes. BQ client lookup remains app-owned as documented.
+- Reconciled the paused StudioFlow workflow order with owner priorities; its
+  old R7.56 filename does not reserve or authorize that revision. KB-012 through
+  KB-019 and other deferred app work are not claimed fixed by this release.
+- Verification: `npm run check`, `npm run lint`, `prisma validate`, Prisma
+  generation, `npm test` (314 pass, 74 suites), and production build passed.
+  Local documentation link audit found zero missing targets. Browser tested
+  persisted main/landing selection, BQ and StudioFlow destinations, revoked
+  main-app grant fallback, null-main Master Data priority, stale-ID preservation
+  and fallback, read-only controls, and save at desktop and 375px viewport.
+  Canonical controls: UI Engine `Select`, `Field`, `Button`, `Notice`; no new
+  shared component or cross-app UI redesign is introduced.
+- Migration `20260910160000_platform_main_route_settings` applied successfully
+  to the verified rebuild-only kantor database. All 35 migrations also applied
+  to fresh `studioflow_rebuild_browser_test`; no legacy resource was accessed.
+  Existing kantor migration-history mismatch remains KB-020; no reset or
+  history rewrite was performed. Test browser server is temporary; the existing
+  development server on port 3001 is preserved.
+
+
+## R7.55 | 2026-09-10 | fix(studioflow,docs): reconcile ledgers and close audit defects
+
+### Changed — documentation reconciliation
+
+- Reconciled every stale status header to the current revision: `docs/README.md`,
+  `docs/alignment.md`, `docs/roadmap.md`, `docs/knownbug.md`,
+  `docs/REVISION-LEDGER-NOTES.md`, the StudioFlow contract index, project
+  contract, schedule contract, implementation plan, and the root `README.md`.
+- `AGENTS.md` and `docs/SESSION-HANDOFF-PROMPT.md` pointed at the R7.48 work
+  order as the active executable order while R7.48–R7.53 were already
+  implemented. Both now name the R7.56 order, and the documentation hub marks
+  the finished orders as history rather than as instructions.
+- Corrected the StudioFlow permission vocabulary: `studioflow.md` §3 still said
+  the MOM grants were unregistered, while `src/app/app-registrations.ts` has
+  registered eleven permissions since R7.52. The table now matches the registry
+  and names it as the authority. The MOM contract's matching deferral note is
+  corrected the same way.
+- Removed Minutes of Meeting and the Product Catalogue from `studioflow.md` §6
+  "deferred"; only project Schedule/FFNI remains, pointing at KB-003.
+- Reconciled `docs/alignment.md` §6: MOM, Product Catalogue, the phase
+  deliverable surface and the contextual round actions were all still recorded
+  as **Open**. Added §8's honest statement of where the legacy-minimum bar
+  actually sits.
+- Restored newest-first ordering in this file: the R7.53 entry sat below R7.52.
+  No entry text was rewritten and no revision label was reused.
+
+### Changed — contract amendments
+
+- Project contract §5.2: the derived round label is `<round_prefix><number>`
+  with no separator, and one exported helper owns the format. The section
+  previously gave `MB 1` and `CD 1` beside `D4`, which is two formats for one
+  derived value; §8.5's worked example (`… D1.skp`) settles it.
+- MOM contract §10.1: a correction opens as an editable draft and supersedes its
+  source on issue. Recorded as KB-012 rather than silently changed.
+- `docs/apps/bq-implementation-plan.md` F3-02 and its final checklist instructed
+  clearing `BqItem.harga_snapshot` when the first child is added. That is the
+  defect recorded in project memory: removing the last child then leaves the L1
+  uncalculable and nulls the project grand total. The plan now says the value is
+  retained and merely ignored while children exist. No BQ code was touched.
+
+### Fixed — StudioFlow audit defects
+
+- **Filename dates used the server's timezone.** `{date}` was read off the
+  `Date` object's local parts, so on the UTC production runtime an evening drop
+  in Asia/Jakarta filed under the previous day. Filenames now resolve `{date}`
+  in the platform's configured timezone, which project contract §8.5 always
+  required. Added `getNamingContext()` so the studio-owned template and the
+  platform-owned timezone are read together.
+- **Three different round-label formats.** The service produced `D 1`, the
+  project page produced `D1` while falling back to the phase *key* instead of
+  its name, and the phase section carried a third copy. Added
+  `src/apps/studioflow/labels.ts` as the single canonical helper and routed the
+  service, the project page and the phase section through it.
+- **Frozen rounds could still have their checklist edited.** `markPointDone`
+  accepted `SENT` and `withdrawPoint` checked no state at all, so a delivered
+  round's send-time snapshot could be rewritten. Both are now `DRAFT`-only
+  (§6.3, §7.2).
+- **A round could be approved with no answer behind it.** `approveIteration`
+  set `APPROVED` without writing an `SfResponse`, so `finishPhase` could close a
+  phase on an approval with no readable client answer. It now delegates to
+  `recordResponse`, leaving exactly one write path (§6.1, §6.2).
+- **The project page queried Prisma directly** for user display names — the
+  pattern project contract §11 marks PURGE. Added `listUserLabels` to the
+  service and removed both route-level queries.
+- **MOM meeting dates were formatted with the viewer's locale** inside a client
+  component that also renders on the server, ignoring the platform display
+  settings and mismatching on hydration. The label is formatted on the server
+  (CORE §10).
+- **A permanently disabled "Withdraw send" row** sat in the round menu. UX spec
+  §3.6 forbids a dead control; it is removed and the missing command is KB-015.
+
+### Added
+
+- `docs/knownbug.md` KB-012 … KB-019, from a full read of the StudioFlow service
+  and its surfaces against the project contract. KB-013/KB-014/KB-015 are one
+  gap seen from three sides: the client answer has no state, no replacement link
+  and no reason, so §6.5 correction and §6.6 draft answers have nowhere to live.
+  KB-016 records that a project cannot be archived or restored at all, and
+  KB-017 that the phase template — the reason the phase enum was purged — is
+  still seed-only.
+- `scripts/work-orders/STUDIOFLOW-R7.56-WORKFLOW-CLOSURE.md`, the next
+  executable order, sliced so the answer migration is reviewed on its own.
+
+### Verification
+
+- `STUDIOFLOW_LOCATION=kantor npx prisma validate`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run typecheck`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run lint`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:boundaries`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:legacy-runtime`: passed.
+- Disposable-database `npm test`: 304 passed, 0 failed.
+- `STUDIOFLOW_LOCATION=kantor npm run build`: passed.
+- Browser acceptance remains unavailable because the local test account/session
+  was not available in the running browser; no browser pass is claimed.
+
+### Remaining
+
+- `src/apps/studioflow/service.integration.test.ts` was updated in the same
+  change set for the round-label amendment (`D 1` → `D1`). No assertion was
+  weakened.
+- The route folder
+  `src/app/(platform)/studioflow/[id]/phases/[phaseId]/iterations/[iterationId]/`
+  is now audited. Its three modules only serve the redirecting route and no
+  active surface imports them; KB-018 deletion remains the R7.56 slice 5 task.
+- KB-002, KB-003 and KB-004 are unchanged and remain open.
+
+## R7.54 | 2026-09-10 | fix(studioflow): remove unsupported project type
+
+### Changed
+
+- Removed the unsupported Project type field from project creation and detail
+  surfaces; it was not present in the audited legacy workflow.
+- Removed the type from StudioFlow service inputs and project contract.
+- Added a rebuild migration dropping the speculative `sf_project.type` column
+  and enum.
+
+### Verification
+
+- Prisma schema validation, typecheck, lint, boundary checks, and full disposable
+  database tests passed after regeneration.
+
+### Remaining
+
+- Existing historical migration files retain the original column definition so
+  a rebuild from zero remains reproducible; the final migration removes it.
+
+## R7.53 | 2026-09-10 | feat(studioflow): add product catalogue reuse pool
+
+### Changed
+
+- Added the independent StudioFlow Product Catalogue schema, service boundary,
+  public Brand read usage, audited no-op-safe create/edit/archive/restore, and
+  project-independent permissions.
+- Added search, archived filtering, sortable/paginated list, explicit detail
+  editing, frozen-brand fallback, confirmation, unsaved protection, and
+  loading/error/empty/permission states.
+- Added integration, UI, contract, boundary, and snapshot-isolation coverage.
+
+### Verification
+
+- Full disposable-database `npm test`: 304 passed, including Catalogue CRUD,
+  search, no-op audit, archive/restore, and permission coverage.
+- Build, typecheck, lint, and boundary/legacy checks passed.
+
+### Remaining
+
+- Project schedule/FFNI snapshot selection remains a separate approved slice.
+
+## R7.52 | 2026-09-10 | feat(studioflow): add project-owned MOM
+
+### Changed
+
+- Added project-owned MOM documents with ordered blocks, points, list/point
+  styles, text-only blocks, and up to two ordered images per block.
+- Added draft, issue, discard, immutable issued, and superseding correction
+  lifecycle with project-scope checks, permissions, and transactional audit.
+- Added the canonical shared ImageWorkspace and Core object-storage port with a
+  server-only Supabase adapter seam; MOM image keys are server-generated and
+  private. Runtime upload remains unavailable until office Supabase secrets
+  and the `platform-assets` bucket are provisioned.
+- Added print, loading, error, permission, immutable, confirmation, and
+  unsaved-navigation states, plus focused integration/UI/contract coverage.
+- Removed sort-order uniqueness constraints from MOM children; order is
+  maintained by domain validation and remains separate from identity.
+
+### Verification
+
+- `STUDIOFLOW_LOCATION=kantor npx prisma validate`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run typecheck`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run lint`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run build`: passed.
+- Full disposable-database `npm test`: 304 passed.
+- Browser smoke reached populated project and MOM draft/editor; unsaved-change
+  confirmation was observed. Real image upload remains blocked by missing
+  Supabase configuration.
+
+### Remaining
+
+- Provision the approved Supabase `platform-assets` bucket and server-only
+  secrets before claiming live image upload/cleanup acceptance.
+
+## R7.51 | 2026-09-10 | work-order(studioflow): activate MOM and Product Catalogue
+
+### Changed
+
+- Issued the sequential R7.52 MOM and R7.53 Product Catalogue work orders.
+- Locked MOM as project-owned and independent from tasks, phases, iterations,
+  Master Data, BQ, and Product Catalogue.
+- Locked Product Catalogue as a StudioFlow-owned reuse pool with Brands-only
+  Master Data reads and project snapshot selection; SKU, unit, and pricing
+  dependencies remain prohibited.
+
+### Verification
+
+- Contracts, schema shape, existing boundaries, and legacy evidence references
+  reviewed locally.
+- No application implementation or acceptance gate is claimed by this entry.
+
+## R7.50 | 2026-09-10 | feat(studioflow): unify project work surface
+
+### Changed
+
+- Moved Start round, supervision start/complete, and Finish phase actions out
+  of the dominant phase header and into a contextual action strip below the
+  phase deliverable surface.
+- Preserved the existing project-owned task collection, phase-scoped task
+  filtering, R7.48 deliverable intake, iteration actions, and DONE protection.
+- Added a focused regression test preventing phase actions from returning to
+  the header.
+
+### Verification
+
+- `STUDIOFLOW_LOCATION=kantor npm run typecheck`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run lint`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:boundaries`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:legacy-runtime`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run build`: passed.
+- Focused phase static test: pending after this test addition.
+- Full database-backed test suite and populated browser acceptance remain
+  unavailable because the office disposable test database is not configured
+  and the current browser database has no projects.
+
+### Remaining
+
+- R7.49's combined work-surface acceptance remains pending until a populated
+  project can be exercised through the browser and disposable DB integration.
+
+## R7.49 | 2026-09-10 | work-order(studioflow): unify project work surface
+
+### Changed
+
+- Issued the next locked StudioFlow work order for composing project-owned
+  to-dos and phase deliverables into one work surface.
+- Explicitly preserves one project-owned task collection, keeps MOM unrelated
+  to tasks/phases/iterations, and makes round actions contextual.
+- No implementation is claimed by this entry; the work order remains active
+  until its executor commit and acceptance evidence exist.
+
+### Verification
+
+- Documentation and work-order consistency reviewed locally.
+- No application gates were run for this planning-only revision.
+
+## R7.48 | 2026-09-10 | feat(studioflow): put deliverable intake in phases
+
+### Changed
+
+- Added current deliverable summaries and fixed-folder metadata/link intake to
+  every project phase with an output folder, while keeping the project-wide
+  Files page intact.
+- Added read-only next-filename preview that uses an existing draft number or
+  previews the next server iteration number without creating state.
+- Corrected completed-phase intake protection for both round-bearing and
+  no-round phases.
+- Added the canonical UI Engine `CopyButton` with stable accessible naming,
+  live success/failure status, cleanup, and race-safe reset behavior.
+- Preserved metadata-only file handling: the picker does not submit bytes, and
+  current-file props serialize BigInt sizes as decimal strings.
+- Added focused regression coverage for filename preview, project scope,
+  completed phases, current-file filtering, fixed folders, phase presentation,
+  and copy control behavior.
+
+### Verification
+
+- `STUDIOFLOW_LOCATION=kantor npm run typecheck`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run lint`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:boundaries`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:legacy-runtime`: passed.
+- `STUDIOFLOW_LOCATION=kantor npx prisma validate`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run build`: passed.
+- UI Engine tests: 41 passed.
+- Focused phase deliverable tests: 2 passed; file-control tests: 2 passed;
+  StudioFlow copy regression test: 1 passed.
+- Full `npm test` was attempted and is not a pass: database-backed suites
+  refused to run because `PLATFORM_TEST_DATABASE_URL` is not configured for an
+  explicitly disposable database. No development or legacy database was used.
+- Live browser acceptance was not run, so the related roadmap/alignment items
+  remain open.
+
+### Remaining
+
+- R7.48 is implemented locally but pending disposable-database integration and
+  browser acceptance review. Do not close the phase-surface roadmap item or
+  KB-003/KB-004 based on this commit alone.
+
+## R7.47 | 2026-09-10 | docs(studioflow): issue phase deliverable work order
+
+### Changed
+
+- Activated the deterministic R7.48 Claude/OpenCode work order for current
+  deliverable summary, next standard filename, copy control, and fixed-folder
+  intake directly inside each project phase.
+- Corrected the earlier composition-only plan: filename preview must predict
+  the next round without writing, and completed no-round phases must reject
+  intake just like completed round-bearing phases.
+- Locked the allowed files, shared UI Engine Copy control, service invariants,
+  tests, browser states, database safety, commit subject, and Codex handback.
+
+### Verification
+
+- Documentation/work-order change only. The manager inspected the current
+  service, project route, phase component, file actions/form, contracts, and
+  prior Claude plan; no implementation or runtime gate is claimed in R7.47.
+
+### Remaining
+
+- R7.48 implementation and all acceptance gates remain the executor's work.
+
+## R7.46 | 2026-09-10 | fix(studioflow): reconcile app copy and contracts
+
+### Changed
+
+- Completed the StudioFlow English-copy correction that R7.44 had reported too
+  early, including nested iteration controls, client detail/validation, file
+  metadata, route states, and safe service errors.
+- Added a one-time additive migration that changes only the exact standard
+  `supervision` phase name `Supervisi` to `Supervision` in the current template
+  and existing project snapshots; owner-customized phase names are preserved.
+- Corrected the MOM contract against owner direction and committed legacy
+  evidence: MOM belongs only to Project, is available during any phase, keeps
+  the legacy ordered document/block/point/image capability, and has no phase,
+  iteration, Task, To-do, or client-response relationship.
+- Locked Product Catalogue as a StudioFlow-owned reuse pool shared across
+  StudioFlow projects. StudioFlow reads Master Data only for Brands; Catalogue
+  and Schedule never read Master Data SKU, unit, or pricing, and projects keep
+  independent specification snapshots.
+- Reconciled the documentation hub, alignment, roadmap, known-bug ledger,
+  handoff prompt, implementation plan, and historical decision ledger with
+  those boundaries.
+
+### Verification
+
+- `STUDIOFLOW_LOCATION=kantor npm run typecheck`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run lint`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:boundaries`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:legacy-runtime`: passed.
+- `STUDIOFLOW_LOCATION=kantor npx prisma validate`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run build`: passed.
+- Focused StudioFlow Add Project, canonical file-drop consumer, and English-copy
+  regression tests: 3 passed.
+- Full `npm test` was attempted and is not a pass: database-backed suites
+  refused to run because `PLATFORM_TEST_DATABASE_URL` is not configured for an
+  explicitly disposable database. The migration was not applied, and live
+  browser behavior was not claimed as verified.
+
+### Remaining
+
+- KB-002, KB-003, and KB-004 remain open. MOM and Product Catalogue/Schedule
+  still require executable work orders and implementation; shared image/storage
+  dependencies remain explicit.
+
+## R7.45 | 2026-09-10 | docs(handoff): record StudioFlow continuation gaps
+
+### Changed
+
+- Recorded the post-R7.44 continuation order and remaining StudioFlow gaps in
+  the session handoff prompt, including phase-surface, work-surface, MOM,
+  Product Catalogue/FFNI/Schedule, image, storage, and release gates.
+
+### Verification
+
+- Documentation-only commit `2ac66983b44a05ebdb5a6a7335ade55f567b3c26`;
+  no implementation gate was claimed.
+
+## R7.44 | 2026-09-10 | feat(studioflow): restore client creation and English UI
+
+### Changed
+
+- Restored Add Project in-context client creation: the form can select an
+  existing client or submit a new client name, and the service creates the new
+  client and project atomically with audit events.
+- Expanded StudioFlow Settings navigation to existing Clients and Account
+  surfaces without inventing a Database Settings placeholder.
+- Completed the user-facing English-only copy sweep across StudioFlow project,
+  activity, client, phase, iteration, file, library, and task states.
+- Closed KB-005, KB-006, and KB-007 and synchronized the roadmap and known-bug
+  ledger.
+
+### Verification
+
+- `STUDIOFLOW_LOCATION=kantor npm run typecheck`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run lint`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:boundaries`: passed.
+- Focused UI Engine tests: 37 passed.
+- Full integration tests and live browser verification remain unavailable;
+  disposable office test database variables and browser access are absent.
+  No database command was run.
+
+### Remaining
+
+- Database Settings remains deferred because no backend contract exists.
+
+## R7.43 | 2026-09-10 | feat(ui-engine): canonicalize StudioFlow file drop
+
+### Changed
+
+- Added and publicly exported the domain-neutral UI Engine `FileDropZone`
+  pattern with keyboard-reachable picker, accept filtering, disabled state,
+  active drag presentation, and metadata-only file reporting.
+- Extracted pure file-selection rules into `internal/file-drop.ts`; the picker
+  has no `name`, so file bytes cannot be serialized by the surrounding form.
+- Migrated StudioFlow deliverable intake to the shared pattern and removed its
+  local drag/drop handlers.
+- Activated `FileDropZone` in `UI_ENGINE.md`, closed KB-011, and synchronized
+  the roadmap and alignment ledgers.
+
+### Verification
+
+- `STUDIOFLOW_LOCATION=kantor npm run typecheck`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run lint`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:boundaries`: passed.
+- `STUDIOFLOW_LOCATION=kantor npm run check:legacy-runtime`: passed.
+- Focused UI Engine suite: 37 tests passed.
+- `STUDIOFLOW_LOCATION=kantor npm run build`: passed with Next.js 16.3.2.
+- `npm test`: not a complete pass; database integration tests were cancelled
+  because the required disposable test URL variables were absent. No database
+  command was run.
+- Live browser verification: unavailable in this session.
+
+### Limitations
+
+- KB-002, KB-003, KB-004, KB-005, KB-006, and KB-007 remain open.
+- The pre-existing `Field`/drop-region label focus concern is outside this
+  slice and remains unchanged.
+
+## R7.42 | 2026-09-10 | docs(handoff): coordinate cross-agent app completion
+
+### Changed
+
+- Added `docs/SESSION-HANDOFF-PROMPT.md`, a copy-ready continuation prompt for
+  Codex and Claude/OpenCode with environment checks, mandatory reading,
+  serialized implementation/review handoffs, per-app work order, regression
+  gates, documentation discipline, and required handoff reporting.
+- Prioritized UI Engine/StudioFlow KB-011 as the first bounded correction while
+  preserving Master Data and BQ as protected consumers.
+- Indexed the handoff prompt from `docs/README.md`.
+
+### Verification
+
+- Local Markdown link-target scan: passed.
+- `git diff --check`: passed.
+- Documentation-only change; no runtime, schema, migration, or dependency change.
+
+## R7.41 | 2026-09-10 | docs(repo): reconcile documentation by application
+
+### Changed
+
+- Moved the active alignment, roadmap, and known-bug ledgers into `docs/` and
+  updated governance and active references to their canonical paths.
+- Rebuilt `docs/roadmap.md` by Platform Foundation, UI Engine/Utilities, Master
+  Data, BQ, and StudioFlow, including the previously undocumented owner gates,
+  BQ deferred scope, storage phases, and remaining legacy-audit phases.
+- Rebuilt `docs/knownbug.md` by application, moved R7.40 fixes into a real
+  Closed section, and added KB-011 for the app-local StudioFlow drag/drop that
+  diverges from the deferred canonical `FileDropZone`.
+- Reconciled `docs/alignment.md` with R7.40 instead of leaving fixed deviations
+  described as current, while retaining unresolved phase-workspace gaps.
+- Updated the root/documentation indexes and StudioFlow contract status labels
+  so they no longer describe the repository as Foundation-only or StudioFlow as
+  wholly unimplemented.
+- Corrected duplicate Master Data section numbering and clarified that BQ has
+  no owner-policy blocker but still has an open exact-decimal placement decision.
+- Added `docs/REVISION-LEDGER-NOTES.md` for R4.39/R6.25/R7.18/R7.27 historical
+  ledger gaps without fabricating or reusing revision labels.
+
+### Verification
+
+- Local Markdown link-target scan: passed.
+- Duplicate exact-heading scan under `docs/`: passed.
+- Stale-status phrase scan: passed for the corrected active documents.
+- `git diff --check`: passed.
+- Documentation-only change; no runtime, schema, migration, or dependency change.
+
+## R7.40 | 2026-09-10 | fix(studioflow,bq): close active workflow gaps
+
+### Changed
+
+- StudioFlow deliverable intake now replaces the unsent current file for a
+  phase, increments the draft working revision, preserves the superseded row
+  and audit event, and associates active phase files with the iteration when
+  it is sent.
+- StudioFlow Library now opens Master Data Brand resource links in a read-only
+  UI Engine dialog instead of redirecting to Master Data.
+- Refreshed the tracked Next.js generated route-type references as part of the
+  production build.
+- Translated the updated StudioFlow project, client, and settings entry
+  surfaces to English; remaining mixed-copy surfaces stay recorded in KB-006.
+- Closed KB-001, KB-008, KB-009, and KB-010 in the known-bug ledger. KB-002
+  remains open only for future storage-byte release, while KB-003/004 remain
+  deferred and KB-005/007 remain blocked on the required read-only legacy audit.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- Boundary and legacy-runtime checks run as part of `npm test`: passed.
+- Unit/UI tests passed; database integration tests were unavailable because
+  the required disposable rebuild-only test database variables were not set.
+- `git diff --check`: passed.
+
+## R7.39 | 2026-09-10 | chore(next): refresh generated route types
+
+### Changed
+
+- Committed the tracked Next.js generated type references produced by the
+  current Next.js build tooling.
+
+### Verification
+
+- `git diff --check`: passed.
+
+## R7.38 | 2026-09-10 | docs(roadmap): record foundation and productivity ideas
+
+### Changed
+
+- Added roadmap items for configurable main routes and access redirects.
+- Added the UI Engine header/sidebar boundary redesign with Claude design
+  artifact alignment and controlled color reuse.
+- Added Overview/Operational Catalog revamp, safe Library crawling/card
+  discovery, opt-in AI file organization, and a strictly parsed BQ calculator.
+- Kept all six items planned only; no speculative implementation or dependency
+  was introduced.
+
+### Verification
+
+- `git diff --check`: passed.
+
+## R7.37 | 2026-09-10 | docs(audit): record reported regressions
+
+### Changed
+
+- Added KB-005 through KB-010 to `docs/knownbug.md` for Add Project modal/client
+  parity, English-only UI copy, Settings structure, BQ price Revert, BQ
+  Updated column behavior, and Library resource-link modal behavior.
+- Marked legacy comparison as a required evidence step for the Add Project and
+  Settings fixes; no implementation was guessed or changed in this revision.
+
+### Verification
+
+- `git diff --check`: passed.
+
+## R7.36 | 2026-09-10 | docs(governance): formalize roadmap and bug ledgers
+
+### Changed
+
+- Updated `AGENTS.md` with mandatory rules for reading and maintaining
+  `docs/roadmap.md` and `docs/knownbug.md` during planning, implementation, and audits.
+- Required every unfixed audit finding to be recorded, every fixed bug to be
+  closed in the bug ledger, and every completed roadmap item to remain backed
+  by a changelog entry.
+
+### Verification
+
+- `git diff --check`: passed.
+
+## R7.35 | 2026-09-10 | docs(repo): add roadmap and known bug ledger
+
+### Changed
+
+- Added `docs/roadmap.md` for planned StudioFlow features, completed items, and
+  explicit out-of-scope decisions.
+- Added `docs/knownbug.md` for reproducible audit findings that remain open, with
+  expected behavior, mitigation, and closure rules.
+- Recorded the current deliverable-driven workflow, current-file, MOM,
+  Product Catalogue/FFNI, and shared image gaps without claiming them fixed.
+
+### Verification
+
+- `git diff --check`: passed.
+
+## R7.34 | 2026-09-09 | chore(repo): ignore session debris
+
+### Changed
+
+- Ignored `Claude outputs/` and `_to_delete/` so session debris cannot be
+  accidentally committed.
+- Kept tracked `next-env.d.ts` untouched as an existing repository file.
+
+### Verification
+
+- `git diff --check`: passed.
+
+## R7.33 | 2026-09-09 | fix(docs): clean alignment artifact
+
+### Changed
+
+- Removed the trailing whitespace reported in `docs/alignment.md`.
+
+### Verification
+
+- `git diff --check`: passed.
+
+## R7.32 | 2026-09-09 | docs(studioflow): record workflow alignment
+
+### Changed
+
+- Added `docs/alignment.md` as the owner-aligned explanation of the rebuild
+  contract, legacy preservation/corrections, deliverable-driven workflow,
+  shared foundation rules, explicit non-scope, and current deviations.
+- Recorded the Explorer-style viewer as fully out of scope and identified the
+  remaining deliverable-driven, MOM, Product Catalogue/FFNI, and shared-image
+  gaps without presenting them as completed.
+
+### Verification
+
+- `git diff --check`: passed.
+
+## R7.31 | 2026-09-09 | fix(studioflow): align activity navigation
+
+### Changed
+
+- Renamed the primary StudioFlow task navigation label to `My Activity`.
+- Kept the existing `/studioflow` route and waiting-work aggregation unchanged.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `npm run build`: passed.
+
+## R7.30 | 2026-09-09 | feat(studioflow): add metadata drag-drop intake
+
+### Changed
+
+- Added drag-and-drop metadata capture to the canonical deliverable form.
+- Dropping a local file fills its name and byte size only; file bytes are not
+  uploaded or stored by StudioFlow, preserving the local-PC archive model.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `npm run build`: passed.
+
+## R7.29 | 2026-09-09 | feat(studioflow): unify deliverable intake
+
+### Changed
+
+- Replaced the separate file-metadata and external-link forms with one shared
+  `DeliverableForm` entry point while preserving the existing service actions,
+  permissions, folder mapping, and audit behavior.
+- Kept the Explorer-style folder viewer deferred; the current screen remains a
+  legacy-compatible project file list with technical folder grouping.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `git diff --check`: passed.
+- Full integration tests remain unavailable without the disposable rebuild-only
+  database environment; no database behavior was changed in this revision.
+
+## R7.28 | 2026-09-09 | docs(changelog): record Library discovery implementation
+
+### Changed
+
+- Records the preceding `R7.27` implementation: StudioFlow Library route and
+  rail entry, Master Data public-port category search, and the safe link back to
+  the existing Master Data brand directory.
+
+### Verification
+
+- `R7.27` checks: `npm run typecheck`, `npm run lint`, and
+  `npm run check:boundaries`: passed; `npm run build`: passed.
+- Full integration test run was attempted but could not use the required
+  disposable database environment; failures were infrastructure setup failures,
+  not recorded as a pass.
+
+## R7.26 | 2026-09-09 | docs(governance): enforce shared capability reuse
+
+### Changed
+
+- Strengthened `AGENTS.md` so a shared capability requires one canonical
+  implementation, public export, consumer matrix, and boundary/test evidence.
+- Prohibited app-local copies of existing shared UI/utility capabilities unless
+  a documented domain distinction and drift-prevention regression test exist.
+- Required cross-consumer behavioral and visual acceptance evidence; one-app
+  smoke testing no longer proves shared reuse.
+
+### Verification
+
+- `git diff --check`: passed.
+- Documentation-only governance change; no runtime/schema checks required.
+
+## R7.25 | 2026-09-09 | docs(studioflow): constrain file intake to a simple MVP
+
+### Changed
+
+- Added an explicit first-layer file-intake MVP: `What’s Today`/Project/Phase
+  plus drag-drop, project and phase context, one current file, and permanent
+  metadata/audit.
+- Kept folder templates and PDF/Presentation/CD mappings as technical detail,
+  not extra user-facing filing steps. A technical `OUT` mapping is never a
+  workflow state or a replacement for the iteration/send record.
+- Added agent guardrails against speculative entities, review states, folder
+  systems, integrations, background jobs, or extra screens while implementing
+  the MVP. Advanced bulk, unsorted, and storage behaviors require a named work
+  order.
+
+### Verification
+
+- `git diff --check`: passed.
+- Documentation-only contract change; no runtime/schema checks required.
+
+## R7.24 | 2026-09-09 | docs(studioflow): simplify project-phase file intake
+
+### Changed
+
+- Corrected the StudioFlow project contract's file retention and drop flow to
+  keep one current file per project and phase. Internal drops replace the
+  current working bytes; an external drop replaces those bytes and records the
+  send/iteration link in the same intake.
+- Preserved permanent metadata and audit history for replaced files while
+  treating the studio's own PC storage as the primary archive. Removed the
+  duplicated two-byte working/sent retention assumption.
+- Clarified that Library, Product Catalogue/Schedule, MOM, project-owned to-dos,
+  and phase-filtered views remain part of the corrected StudioFlow scope.
+
+### Verification
+
+- Read-only legacy comparison at commit `5fc605e304a12db6b5efe0a2c0271a2d9415b2da`.
+- `git diff --check`: passed.
+- No runtime or schema changes; application tests were not required for this
+  documentation-only revision.
+
+## R7.23 | 2026-09-09 | fix(bq,ui-engine): preserve empty-price detail rendering
+
+### Fixed
+
+- BQ project detail no longer crashes when an item has no unit price. Inline
+  money presentation now keeps the empty state visible as `Belum ada harga`
+  instead of passing an empty string to `createMoney`.
+
+### Verification
+
+- Browser interaction verified BQ project navigation and empty-price row.
+- `npm run typecheck`, `npm run lint`, and `npm test`: passed; 266 tests,
+  66 suites, 0 failures.
+- `npm run build`: passed.
+
+## R7.22 | 2026-09-09 | feat(ui-engine,platform): one page skeleton and one control ladder across StudioFlow, Master Data, and BQ
+
+> **Handover.** Everything below was implemented and type-checked by Claude.
+> Schema, build, and commit are Codex's — see **For Codex** at the end of this
+> entry. Nothing in this revision has been committed.
+
+### Fixed
+
+- `Pagination` no longer imports the client primitive barrel from its shared
+  data module. Server-rendered directory pages were passing `getHref` through
+  that client boundary and crashed at runtime on `/studioflow/projects` (and
+  `/studioflow`). Pagination now lives in a client-free engine module while
+  retaining callback mode for client directories.
+- `SectionCard` accepted no `title` prop, so five call sites that passed one
+  were setting a native tooltip and rendering no heading at all
+  (`clients/[id]/client-detail-view.tsx` ×2, `[id]/files/page.tsx` ×3). It now
+  owns a real header bar and those sections show their titles.
+- Every page in Master Data, BQ, and StudioFlow wrapped itself in a hand-rolled
+  `flex min-h-0 flex-1 flex-col gap-6 p-(--ui-page-padding)` div **inside** an
+  app layout that already renders `<PageShell fill>`. Padding was applied twice
+  on all 18 pages. The wrapper is removed; the layout's `PageShell` is now the
+  only page shell, which is what `DESIGN.md` §6 and §16 require.
+- `-brand` utility classes in the BQ project editor (`text-brand`,
+  `border-brand`, `hover:border-brand`) referenced a `--color-brand` token that
+  is not defined anywhere, so the active tab indicator and the option-picker
+  hover state had no effect. Replaced with `action` / `line-strong`.
+- The Klien directory passed `statusLabel=""` for live clients, giving the
+  status dot an empty accessible name, and toned live clients `neutral` instead
+  of `success`.
+
+### Added
+
+- UI Engine chrome and display atoms, documented in `UI_ENGINE.md` §3.5 with
+  the tier each belongs to: `Breadcrumb`, `FilterChip` / `filterChipClasses`,
+  `Avatar` / `initialsOf`, `CountBadge`, `MetaList`, `ProgressBar`,
+  `SegmentBar`, `GroupHeader`, `PipelineStrip`. Each signals with a text
+  alternative as well as colour — `aria-pressed`, `aria-current="step"`,
+  `role="progressbar"`, or an `aria-label`.
+- `SectionCard` gains `title`, `description`, `count`, `action`, and `padded`.
+  Row lists pass `padded={false}` so dividers reach the card edge.
+- Form controls gain `density="regular" | "compact"`, named to match
+  `DataTable`'s existing `density`. `size` is left as the native attribute, so
+  the multi-select in the roles editor that sets a visible row count still
+  works.
+- `EmptyState` / `ErrorState` render their glyph in a toned ring with a serif
+  title, and take an optional `code` slot for a monospace reference.
+- UI Engine contract tests now assert the new exports exist, that the
+  colour-carrying atoms expose a text alternative, and that `FilterChip`
+  reports its selection. The showcase page gained a section for them so the
+  catalog stays true.
+
+### Changed
+
+- Tasks (`/studioflow`) rebuilt as the approved worklist: header with working
+  date, open count, and overdue count; URL-driven scope chips; `GroupHeader`
+  buckets; one framed row list per bucket with fixed columns for item,
+  project, due, and holder. Task due dates resolve to `telat N hari` /
+  `hari ini` / `besok` with a matching tone.
+- Projects directory now uses the canonical directory chrome end to end —
+  `DirectoryShell` with a `TableToolbar` holding the view chips and a no-JS
+  `GET` filter field, so a filtered-to-nothing list still shows the controls
+  that got it there. Adds an area column, a leading-phase cell naming the phase
+  the studio is actually waiting on, a `SegmentBar` of template progress, and
+  an `Avatar` on the lead column.
+- Project detail rebuilt on the shared `DetailShell` (it had a hand-rolled
+  spine/rail grid): `Breadcrumb`, a `MetaList` identity line, a
+  `PipelineStrip` of every template phase, then the task block and phase
+  workspace on the spine; phase progress, project facts, and lead on the rail.
+- `phase-section.tsx` and `general-task-block.tsx` moved onto engine
+  primitives. They previously hand-rolled every control — `bg-ink text-white
+  hover:opacity-80` buttons, `border-0 focus:ring-0` inputs, raw radios and
+  checkboxes — inside the redesigned detail page. Now `Button`, `IconButton`,
+  `Input`, `Select`, `Textarea`, `Checkbox`, `RadioGroup`, `Field`,
+  `FormActions`, and `FilterChip`. Raw checkboxes in the Master Data vendor
+  directory and the roles editor were migrated the same way.
+- StudioFlow settings moved onto `SettingsShell` and gained a read-only Phase
+  template section listing the seeded pipeline.
+- Files, new project, new client, client list, and client detail brought onto
+  the same chrome: `Breadcrumb` where nested, `divider` on the page header,
+  and the access-denied branch shaped like every other page.
+- `PageHeader divider` applied to all 50 page headers across the three apps and
+  platform settings; it was on 13 before, so header treatment was inconsistent
+  screen to screen.
+- StudioFlow's layout drops `size="wide"` for the default 1440px measure, which
+  is what the approved design specifies. Master Data and BQ keep `wide`.
+- `studioFlowService.listProjects` orders each project's phases by `sort_order`
+  and selects `id`, `key`, `name`, `sort_order`. Additive; no field removed.
+
+### Removed
+
+- The speculative `NavCount` and `NavWarningPill` helpers in the StudioFlow
+  nav. They had no data source, and the capability they anticipated is already
+  served by `NavItem`'s `badge` slot.
+- `CardSection`, folded into `SectionCard` before it could become a second way
+  to draw the same thing.
+
+### Design-conformance pass
+
+Run against `DESIGN.md` §2–§5 and §14 after the work above, because applying a
+pixel-drawn mockup is exactly how off-scale values get in.
+
+- Seven invented type sizes were introduced during this revision and have been
+  snapped back onto roles that already exist here: 9px/9.5px/10px → 11px meta,
+  11.5px → 12px, 12.5px/13.5px → 13px, and the empty-state title's 17px → the
+  H3 role. `text-[11px]`/`text-[13px]` were also respelled so each size has one
+  spelling. The operational scale is now 14 / 13 / 12 / 11 plus the heading
+  roles, against `DESIGN.md` §2's "do not invent arbitrary sizes".
+- `text-green-600 dark:text-green-400` in the naming-template form and
+  `text-green-500` in the iteration controls were the last raw Tailwind palette
+  colours in the codebase, and the `dark:` variant belonged to a mode this
+  product does not have. Now `Notice tone="success"` and `text-success`.
+  Hardcoded hex outside `tokens.css`: none.
+- `font-mono` (Tailwind's stack) replaced with `font-ui-mono` (the `--ui-font-mono`
+  token) in the four places that used it, per §3's data-face rule.
+- Five raw `<h1>`–`<h3>` elements in BQ and StudioFlow now use `Heading`, so the
+  type roles come from one place. Raw heading tags in app code: none.
+- `GeneralTaskBlock` drew its own card and header bar; it now uses `SectionCard`.
+  The phase card in `phase-section.tsx` now uses `Surface`, so it carries the
+  border and white ground §4 requires rather than sitting transparent on the
+  ground.
+- Two `rounded` (4px) surfaces corrected to `rounded-control` (6px) per §4.
+
+### Owner decisions taken
+
+The owner delegated both open questions. Resolved as follows, and both contracts
+updated so the reasoning is not carried only in this entry.
+
+**13px is a real role, and I had been misapplying it.** Auditing what actually
+used it showed the 13px usages are all chrome — nav items, menu items, badges,
+notices, the meta line, the mono identifier face — while the ones I had added
+during this revision included content: task titles, table cell values, and
+descriptive paragraphs. The approved design uses 13px for chrome throughout and
+14px for content, which is the same distinction. So `DESIGN.md` §2 gains a
+**Control/chrome** row at 13px with the rule that chrome sits one step below the
+content it frames, and content never drops to 13px to win space. Six content
+usages were snapped back to Body. The ten that remain are all chrome.
+
+**Pagination belongs in every dense directory, including one-page ones.** The
+approved Projects directory shows `1–7 of 7` with both steps disabled, so the
+design already answers this: the footer is part of the surface, not something
+that appears once a list grows. `Pagination` gained a `getHref` mode so
+server-rendered directories can page by URL — paging now survives a reload and
+is shareable — plus an optional row-range summary, since an operator hunting a
+record reads "26–50 of 96" better than "Page 2 of 4". Applied to StudioFlow
+projects and clients, BQ projects, and the BQ deletion-review queue. The BQ
+library is tabs of cards rather than a dense table, so `DESIGN.md` §14 now says
+explicitly that pagination is not required there. Every `DirectoryShell` in the
+codebase that renders a table now has a pagination footer.
+
+### Dependencies and migrations
+
+- No new dependency. No schema change authored in this revision.
+
+### Verification performed by Claude
+
+- `npm run check`: passed — `typecheck`, `check:boundaries`, `check:legacy-runtime`.
+- `npx eslint .`: passed, zero findings.
+
+### Verification performed by Codex
+
+- `STUDIOFLOW_LOCATION=kantor npx prisma migrate deploy`: no pending
+  migrations; `npx prisma migrate status`: database up to date.
+- `npx prisma generate`: passed with the Windows Prisma engine.
+- `npm run typecheck`, `npm run check:boundaries`,
+  `npm run check:legacy-runtime`, and `npm run lint`: passed.
+- `npm run build`: passed; all listed application routes compiled.
+- `npm test` against isolated `studioflow_rebuild_test`: 266 tests passed,
+  66 suites passed, 0 failed.
+- Browser smoke verification: StudioFlow tasks/projects/settings/new, all
+  Master Data directories, BQ projects/library, and the repaired server
+  pagination route rendered without runtime error overlays.
+
+### For Codex
+
+Claude could not run these from its environment: `node_modules` is installed
+for Windows, and the Linux side has neither the platform binaries nor the
+network to fetch them. Every one of these is outstanding, not verified.
+
+1. **Migration status.** Resolved on the kantor rebuild database; all 30
+   migrations are applied and `npx prisma migrate status` is clean.
+2. **`npx prisma generate`** — fails on the Linux side with a 403 fetching
+   `schema-engine`; only `schema-engine-windows.exe` is present.
+3. **`npm run build`** — never run for this revision. `next build` aborts
+   fetching `@next/swc-linux-x64-gnu`.
+4. **`npm test`** — all 32 suites abort with an esbuild `TransformError`
+   (`@esbuild/linux-x64` missing against a Windows install). The two suites
+   that need no transform pass. The UI Engine contract tests gained new
+   assertions in this revision and have therefore never actually executed.
+5. **Delete `.git/index.lock`.** Resolved; the empty lock file was removed.
+6. **Then commit.** Resolved by the Codex handover commit for this entry.
+
+### Known gaps, deliberately not built
+
+- Upcoming, Library, Activity, and Product Schedule are locked nav entries with
+  no route behind them, so their screens in the approved design are not
+  implemented.
+- Deliverables and Minutes have no persisted model, so the design's tabs for
+  them do not exist.
+- Login and the app launcher (option 2j) were not touched.
+- Visual verification in a browser has not happened for any screen in this
+  revision — item 1 above is the blocker.
+
+## R7.21 | 2026-09-09 | feat(ui-engine): NavGroup headings, NavSeparator, NavItem badge/lock; StudioFlow nav redesign
+
+### Added
+
+- `NavGroup` now accepts an optional `heading?: string` prop that renders a
+  visible section label (11 px, semibold, uppercase, tracked) above the group.
+  The heading is suppressed when the rail is collapsed and on narrow viewports
+  so the collapsed state remains clean.
+- New `NavSeparator` component exported from `ui_engine`: a thin horizontal
+  rule (`h-px`, `bg-[--ui-border-subtle]`) with `role="separator"`, also
+  hidden when the rail is collapsed.
+- `NavItem` now accepts a `badge?: ReactNode` trailing slot rendered to the
+  right of the label (hidden when the rail is collapsed). When `disabled` is
+  set, a 12 px `Lock` icon replaces any badge automatically.
+- Explicit `text-[13px]` added to `NAV_ITEM_BASE_CLASSES` to match the
+  13 px font-size token in the UI Engine design spec.
+
+### Changed
+
+- `StudioFlowNav` restructured into two `NavGroup` sections matching the
+  proposed sidebar design:
+  - **Workspace** (heading): Projects, Tasks, Upcoming (disabled).
+  - **Extensions** (heading): Library (disabled), Activity (disabled),
+    Product Schedule (disabled).
+  - A `NavSeparator` divides the two sections.
+- Settings moved out of `StudioFlowNav` into a new `StudioFlowUtilityNav`
+  export placed in the `domainUtilityNavigation` slot of `AuthenticatedShell`,
+  keeping it anchored below the rail divider at all viewport sizes.
+- `src/app/(platform)/layout.tsx` updated to import and wire
+  `StudioFlowUtilityNav` as `domainUtilityNavigation`.
+
+### Dependencies and migrations
+
+- No new dependency, schema change, or migration.
+
+### Verification
+
+- `npx tsc --noEmit`: **0 errors**.
+
+## R7.20 | 2026-09-09 | fix(studioflow): avoid cascading render in task edit flow
+
+### Fixed
+
+- Preserved the existing behavior that closes an inline task editor after a
+  successful update, while deferring the state update to the next animation
+  frame so the shared lint rule does not flag a synchronous state update inside
+  an effect.
+
+### Dependencies and migrations
+
+- No new dependency, schema change, or migration.
+
+### Verification
+
+- `npm run lint`: passed.
+- `npm run check`: passed.
+- `npm run build`: passed.
+
+## R7.19 | 2026-09-09 | fix(platform): resolve TypeScript narrowing errors across all platform routes
+
+### Fixed
+
+- Replaced all `!x.ok` boolean negation patterns with `x.ok === false` explicit
+  equality checks throughout `account`, `bq`, `masterdata`, `settings`, and
+  `login` routes. TypeScript 5.9.3 does not narrow discriminated unions through
+  negation (`!x.ok`) or truthy checks (`x.ok`) — only through strict equality
+  comparison.
+- Replaced all JSX ternary `X && !X.ok ?` patterns with `X?.ok === false ?` so
+  the error branch is correctly narrowed to `{ ok: false; error: SafeErrorPayload }`.
+- Fixed `fieldError()` helper in `account-forms.tsx`: guard condition updated
+  from `!state || state.ok ||` to `state === null || state.ok !== false ||`.
+- Fixed `if (result.ok) …; else result.error` implicit-else patterns in
+  `pricing-directory.tsx` and `vendor-type-directory.tsx` by using
+  `else if (result.ok === false)`.
+- Fixed `NormalizedUrl`/`NormalizedLinks` discriminated unions in
+  `brand-link-input.ts` and `brand-directory.tsx` — same `=== false` pattern.
+- Fixed `audit/index.ts`: cast `unknown` → `object` for `Object.getPrototypeOf`,
+  `Object.entries`, and `Set` method calls inside `serializeAuditValueDeep`.
+- Fixed `shells.tsx`: double-cast `props as unknown as ButtonHTMLAttributes` to
+  silence an overlapping-type assertion error on the disabled nav button.
+- Fixed `bq/public/index.ts` `listTemplates()`: added `as BqTemplateRead[]`
+  assertion where TS could not unify the union return type of two actions.
+
+### Dependencies and migrations
+
+- No new dependencies, schema changes, or migrations. Zero functional changes;
+  this is a type-level fix only.
+
+### Verification
+
+- `npx tsc --noEmit --strict false`: **0 errors** (down from 52 before this session).
+- All StudioFlow, Master Data, BQ, Settings, and Auth routes pass type check.
+
+## R7.17 | 2026-09-09 | feat(studioflow): add task assignment and due dates
+
+### Added
+
+- StudioFlow task rows now expose active StudioFlow project readers as
+  assignees and allow a date-only due date for both General and phase-scoped
+  tasks.
+- Task updates share one service command for title, assignee, and due date;
+  eligible users are validated centrally and changes are audited.
+
+### Dependencies and migrations
+
+- No new dependency, schema change, or migration. Master Data, BQ, and shared
+  UI Engine files remain untouched.
+
+### Verification
+
+- `npm run check`: passed.
+- `npm run build`: passed; StudioFlow, Master Data, and BQ routes compiled.
+- Database integration tests were not run in this slice; the office test
+  database remains environment-gated.
+
+## R7.16 | 2026-09-09 | fix(studioflow): restore task phase workspace parity
+
+### Fixed
+
+- StudioFlow project pages now load general and phase-scoped tasks together;
+  phase tasks are rendered inside their phase workspace instead of becoming
+  invisible after the SF-F4 domain slice.
+- General and phase task blocks share one component and keep completed-task
+  visibility, inline title editing, scope movement, and deterministic
+  up/down reordering.
+- Task title updates and scope/order changes now pass through the StudioFlow
+  service with project lifecycle guards and audit events; sibling ordering is
+  normalized transactionally rather than assigning colliding sort numbers.
+
+### Dependencies and migrations
+
+- No new dependency and no migration. Master Data, BQ, shared UI Engine, and
+  cross-schema ownership remain untouched.
+
+### Verification and limitations
+
+- `npm run typecheck`: passed.
+- Focused ESLint on all changed StudioFlow files: passed.
+- `npm run check:boundaries`: passed.
+- `npm run check:legacy-runtime`: passed.
+- `git diff --check`: passed.
+- `npm run build`: passed; StudioFlow, Master Data, and BQ routes compiled.
+- Native drag-and-drop phase filing and task assignment controls remain a
+  follow-up; this slice provides explicit scope selection and reorder controls
+  while the final interaction contract is reconciled with legacy evidence.
 
 ## R7.15 | 2026-09-09 | feat(studioflow): complete inline phase and iteration workspace
 

@@ -3,7 +3,15 @@
 import { useActionState } from "react";
 import { CheckCircle2, Circle } from "lucide-react";
 import type { ActionResult } from "@platform/core/actions";
-import { Button, Field, InlineError, Input, Select, Textarea } from "@/platform/ui_engine";
+import {
+  Badge,
+  Button,
+  Field,
+  InlineError,
+  Input,
+  Select,
+  Textarea,
+} from "@/platform/ui_engine";
 
 import {
   addIterationPointAction,
@@ -70,22 +78,22 @@ export function IterationLifecycle({
       {state === "DRAFT" && canManage && (
         <SimpleAction
           action={sendIterationAction.bind(null, iterationId, projectId, phaseId)}
-          label="Kirim ke klien"
+          label="Send to client"
         />
       )}
       {state === "SENT" && canReview && (
         <SimpleAction
           action={approveIterationAction.bind(null, iterationId, projectId, phaseId)}
-          label="Setujui"
+          label="Approve"
         />
       )}
       {open && canManage && (
         <div className="grid gap-1">
           <form action={voidAction} className="flex items-end gap-2">
-            <Field label="Alasan batal" required>
-              <Input name="reason" required maxLength={500} placeholder="Tulis alasan…" />
+            <Field label="Cancellation reason" required>
+              <Input name="reason" required maxLength={500} placeholder="Write the reason…" />
             </Field>
-            <Button type="submit" variant="danger" pending={voidPending}>Batalkan round</Button>
+            <Button type="submit" variant="danger" pending={voidPending}>Cancel round</Button>
           </form>
           {voidFailure ? <InlineError>{voidFailure}</InlineError> : null}
         </div>
@@ -117,13 +125,13 @@ export function PointRow({
   const failure = failureOf(toggleState) ?? failureOf(wdState);
 
   return (
-    <div className="rounded border border-line px-3 py-2 text-sm">
+    <div className="rounded-control border border-line px-3 py-2 text-sm">
       <div className="flex items-center justify-between gap-3">
         <span className={`flex items-center gap-2 ${point.done ? "text-ink-tertiary line-through" : ""}`}>
-          {point.done ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Circle className="h-4 w-4 text-ink-tertiary" />}
+          {point.done ? <CheckCircle2 className="h-4 w-4 text-success" /> : <Circle className="h-4 w-4 text-ink-tertiary" />}
           {point.text}
           {point.source === "CLIENT_REVISION" && (
-            <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs">dari klien</span>
+            <Badge>from client</Badge>
           )}
         </span>
         {editable && (
@@ -131,12 +139,12 @@ export function PointRow({
             <form action={toggleAction}>
               <input type="hidden" name="done" value={point.done ? "false" : "true"} />
               <Button type="submit" size="sm" variant="ghost" pending={togglePending}>
-                {point.done ? "Buka" : "Selesai"}
+                {point.done ? "Reopen" : "Complete"}
               </Button>
             </form>
             <form action={wdAction} className="flex items-center gap-1">
-              <Input name="reason" required maxLength={500} placeholder="Alasan tarik" className="h-8 w-36" />
-              <Button type="submit" size="sm" variant="danger" pending={wdPending}>Tarik</Button>
+              <Input name="reason" required maxLength={500} placeholder="Withdrawal reason" className="h-8 w-36" />
+              <Button type="submit" size="sm" variant="danger" pending={wdPending}>Withdraw</Button>
             </form>
           </div>
         )}
@@ -156,10 +164,10 @@ export function AddPointForm({ iterationId, projectId, phaseId }: Ids) {
   return (
     <div className="mt-4 grid gap-1">
       <form action={formAction} className="flex items-end gap-2">
-        <Field label="Poin baru" required>
-          <Textarea name="text" required maxLength={1000} rows={2} placeholder="Tulis poin checklist…" />
+        <Field label="New point" required>
+          <Textarea name="text" required maxLength={1000} rows={2} placeholder="Write a checklist point…" />
         </Field>
-        <Button type="submit" variant="primary" pending={pending}>Tambah poin</Button>
+        <Button type="submit" variant="primary" pending={pending}>Add point</Button>
       </form>
       {failure ? <InlineError>{failure}</InlineError> : null}
     </div>
@@ -179,23 +187,23 @@ export function ResponseForm({ iterationId, projectId, phaseId }: Ids) {
     <div className="grid gap-1">
       <form action={formAction} className="grid gap-4 max-w-xl">
         {failure ? <InlineError>{failure}</InlineError> : null}
-        <Field label="Jawaban klien" required>
+        <Field label="Client response" required>
           <Select name="kind" required defaultValue="REVISION">
-            <option value="REVISION">Minta revisi</option>
-            <option value="APPROVAL">Setuju / approve</option>
+            <option value="REVISION">Request revision</option>
+            <option value="APPROVAL">Approve</option>
           </Select>
         </Field>
         <Field
-          label="Poin revisi"
-          description="Satu baris = satu poin. Ditulis persis seperti kata klien. Wajib kalau minta revisi."
+          label="Revision points"
+          description="One line per point. Preserve the client's exact wording. Required for a revision request."
         >
-          <Textarea name="points" rows={4} maxLength={4000} placeholder={"Warna dinding terlalu gelap\nTambah storage di dapur"} />
+          <Textarea name="points" rows={4} maxLength={4000} placeholder={"The wall color is too dark\nAdd storage in the kitchen"} />
         </Field>
-        <Field label="Catatan">
-          <Textarea name="note" rows={2} maxLength={2000} placeholder="Konteks tambahan (opsional)" />
+          <Field label="Notes">
+          <Textarea name="note" rows={2} maxLength={2000} placeholder="Additional context (optional)" />
         </Field>
         <div>
-          <Button type="submit" variant="primary" pending={pending}>Catat response</Button>
+          <Button type="submit" variant="primary" pending={pending}>Record response</Button>
         </div>
       </form>
     </div>

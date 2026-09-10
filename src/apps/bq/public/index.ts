@@ -355,7 +355,7 @@ export function createBqPublicRead(db: PrismaClient) {
             };
           }),
         })),
-      }));
+      })) as BqTemplateRead[];
     },
 
     async listProjectSummaries(): Promise<BqProjectSummary[]> {

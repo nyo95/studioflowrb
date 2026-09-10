@@ -51,7 +51,7 @@ export function SessionsTable({
 
   return (
     <div>
-      {state && !state.ok ? (
+      {state?.ok === false ? (
         <div role="alert" className="mb-2">
           <InlineError>{state.error.safeMessage}</InlineError>
         </div>
