@@ -8,7 +8,7 @@ still current.
 
 ## Prompt
 
-You are continuing the `studioflowrb` rebuild with the owner. Work in the
+You are continuing the `studioflow-rebuild` project with the owner. Work in the
 existing checkout; do not create a second project or copy legacy code.
 
 ### First response and environment
@@ -19,9 +19,10 @@ existing checkout; do not create a second project or copy legacy code.
    `STUDIOFLOW_LOCATION` for repository tooling.
 3. Never access any database until its target is proven to be the isolated
    rebuild-only PostgreSQL environment.
-4. The reference at handoff creation is branch `studioflow/contracts` at
-   revision `R7.55`. Treat it only as a reference: immediately inspect HEAD,
-   branch, upstream, changelog revision state, and the complete dirty-file list.
+4. The reference at handoff creation is branch `main` at revision `R8.02`
+   (published baseline `R8`). Treat it only as a reference: immediately inspect
+   HEAD, branch, upstream, changelog revision state, and the complete dirty-file
+   list.
 
 ### Mandatory reading
 
@@ -33,21 +34,31 @@ Read these files in order before deciding or editing:
 4. `docs/alignment.md`
 5. `docs/knownbug.md`
 6. `docs/roadmap.md`
-7. Relevant shared contract: `CORE.md`, `DESIGN.md`, and/or `UI_ENGINE.md`
-8. Relevant app contract under `docs/apps/`
-9. `prisma/schema.prisma`
-10. Current code, tests, and migrations for the selected slice
+7. `docs/review.md`
+8. Relevant shared contract: `CORE.md`, `DESIGN.md`, and/or `UI_ENGINE.md`
+9. Relevant app contract under `docs/apps/`
+10. `prisma/schema.prisma`
+11. Current code, tests, and migrations for the selected slice
 
 Do not rely on this prompt as a replacement for those sources. Current owner
 instruction wins over every document.
 
-### Active executor order
+### Active execution priority sequence
 
-Claude/OpenCode must execute only
-[`STUDIOFLOW-R7.56-WORKFLOW-CLOSURE.md`](../scripts/work-orders/STUDIOFLOW-R7.56-WORKFLOW-CLOSURE.md),
-then stop and hand its local commit back to Codex for review. The R7.48, R7.49,
-R7.52 and R7.53 orders are implemented history; do not re-execute them. Project
-Schedule/FFNI (KB-003) stays out of this change set and gets its own order.
+Per the owner's active sequence in `docs/README.md`, execution follows this priority:
+
+1. **Platform Foundation — routing first.** Main-route settings delivered in
+   R7.56. Provider-backed asset storage (`docs/apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md`)
+   remains planned.
+2. **UI Engine and Shared Utilities.** Consolidate `Intl.DateTimeFormat` call sites
+   behind one canonical UI Engine component; redesign header/sidebar boundary
+   per approved design artifact.
+3. **BQ.** Simplest remaining app. Add strict calculator expression parser
+   (`=15000*3`), waste tracking, exact decimal extensions, and Quotation PDF output.
+4. **Everything else waits.** StudioFlow workflow closure (`scripts/work-orders/STUDIOFLOW-R7.56-WORKFLOW-CLOSURE.md`)
+   is **paused** behind Platform/UI Engine/BQ priorities. Remaining StudioFlow
+   gaps (KB-012…KB-019, Project Schedule KB-003) hold until 1–3 land.
+5. **AI file organization exploration is parked** (owner instruction).
 
 ### Mission
 
@@ -57,10 +68,10 @@ coverage of legacy while applying the owner’s simplification:
 
 - project-owned to-dos, optionally scoped to phase/revision;
 - My Activity is an aggregate view, not a second task store;
-- deliverable intake drives iteration/review workflow;
+- deliverable intake drives iteration/review workflow (R7.48/R7.50);
 - one current unsent deliverable record per project-phase/iteration;
 - detailed metadata/audit remains, while repeated bookkeeping clicks disappear;
-- MOM and Product Catalogue/FFNI remain project extensions;
+- project-owned MOM (R7.52) and Product Catalogue (R7.53) remain project extensions;
 - the Brands/Library discovery surface remains global and is StudioFlow's only
   Master Data read, through the public port; Product Catalogue is independently
   StudioFlow-owned and reusable across its projects;
@@ -94,9 +105,8 @@ explicitly changes priority.
 
 #### 1. Platform Foundation
 
-- Add configurable main-route settings only after defining the persisted
-  setting, safe fallback, permission-aware redirect order, loop prevention, and
-  tests for users with different grants.
+- Configurable main-route settings delivered in R7.56 (persistence, permission-aware
+  redirects, fallback defaults, read-only controls, desktop & narrow viewports).
 - Continue asset storage only from
   `docs/apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md`; never use runtime local filesystem.
 - Keep identity, RBAC, audit, settings, validation, errors, and DB runtime
@@ -105,14 +115,14 @@ explicitly changes priority.
 
 #### 2. UI Engine and Shared Utilities
 
-- Fix KB-011 first: activate one canonical `FileDropZone`, export it publicly,
-  migrate StudioFlow to consume it, and add behavior/accessibility/boundary
-  tests. Do not leave a local wrapper that duplicates drop semantics.
-- Redesign the header/sidebar boundary only from the approved Claude artifact.
+- `FileDropZone` (KB-011) canonical export delivered in R7.43.
+- Image workspace and rich-text editor delivered in R7.52 for MOM.
+- Date/time audit complete (`apps/ui-engine/date-time-lookup-audit-2026-09-10.md`);
+  next step is consolidating `Intl.DateTimeFormat` call sites behind one canonical
+  UI Engine display component upon owner sign-off.
+- Redesign the header/sidebar boundary using the approved Claude design artifact.
   Use its layout direction and retain approved semantic colors; verify Master
   Data, BQ, StudioFlow, desktop, collapsed rail, and narrow viewport.
-- Add image workspace, rich-text, date/time, or lookup capabilities only when a
-  named approved consumer requires them. One canonical export, no private copy.
 
 #### 3. Master Data
 
@@ -127,39 +137,34 @@ explicitly changes priority.
 #### 4. BQ
 
 - Treat current calculation, snapshots, lifecycle, backend, and UI as protected.
-- Preserve the R7.40 price-override Revert and Updated-date behavior.
-- For calculator/waste work, first decide the smallest exact-decimal capability
-  placement. Generic arithmetic may live in shared Utilities; BQ formulas and
-  rounding remain app-owned.
-- Calculator expressions must be parsed from a strict grammar; never use
-  `eval`, `Function`, or arbitrary code execution.
+- Inline editing at all levels (BQ-F1..F5) and price Revert / Updated-date shipped in R4.56/R7.40.
+- For calculator/waste work, add strict grammar expression parser (`=15000*3`).
+  Calculator expressions must never use `eval`, `Function`, or arbitrary code execution.
+- Decide smallest exact-decimal arithmetic extension while keeping BQ formula and
+  rounding policy app-owned.
 - Deferred BQ features remain listed in `docs/roadmap.md`; do not claim them
   complete before end-to-end verification.
 
 #### 5. StudioFlow
 
-Work through these in order unless the owner reprioritizes:
+Completed items (do not re-implement):
+- Current deliverable intake in phases (R7.48).
+- Unified work surface & contextual actions (R7.50).
+- Project-owned MOM (R7.52).
+- StudioFlow-owned Product Catalogue (R7.53).
+- Removal of speculative project type (R7.54).
+- English-only UI sweep (KB-006, R7.44/R7.46).
+- Add Project in-context client creation (KB-005, R7.44).
+- Settings parity (KB-007, R7.44).
 
-1. KB-011 canonical FileDropZone migration.
-2. KB-006 English-only UI sweep, including actions, validation, empty/error,
-   permission, archived, and responsive states.
-3. KB-005 Add Project parity. Inspect legacy read-only end-to-end first:
-   route/navigation, modal state, action/API, service, persistence, permission,
-   audit, errors, and tests. Restore in-context client creation using the rebuilt
-   UI Engine; do not copy legacy implementation.
-4. KB-007 Settings parity using the same legacy evidence workflow.
-5. Put current deliverable/intake inside the phase work surface and make
-   Start Round/internal approval/send contextual rather than the main path.
-6. Integrate project-owned MOM at every phase. MOM has no Task/To-do, phase, or
-   iteration linkage; “Write today's MOM” is only an ordinary independent
-   To-do. Preserve legacy ordered blocks, points, and images, and reuse
-   canonical rich-text and image tools.
-7. Integrate the StudioFlow-owned Product Catalogue reuse pool shared across
-   StudioFlow projects, then project FFNI/Schedule snapshots. Never read Master
-   Data SKU or pricing; StudioFlow's only Master Data read is Brands through
-   the public boundary.
-8. SketchUp integration is last and must be authenticated, idempotent,
-   observable, retryable, and reconcilable.
+Paused / Deferred items (held behind Platform/UI Engine/BQ priorities):
+1. Client answer correction chain (KB-013, KB-014, KB-015).
+2. Project archive and restore (KB-016).
+3. Studio phase-template administration (KB-017).
+4. MOM correction editable draft (KB-012).
+5. Unreachable redirected phase/iteration route cleanup (KB-018).
+6. Project Schedule/FFNI slice (KB-003).
+7. SketchUp integration ( authenticated, idempotent adapter with retry and observability).
 
 Legacy evidence path varies by computer. Before reading legacy in a new
 computer/session, ask the owner for the exact path. Record its commit, branch,
@@ -195,7 +200,7 @@ For each slice:
    collapsed rail, and narrow viewport.
 5. Shared changes must name every canonical export and test each affected
    consumer for behavior and visual consistency.
-6. Update `docs/knownbug.md`, `docs/roadmap.md`, `docs/alignment.md`, and
+6. Update `docs/knownbug.md`, `docs/roadmap.md`, `docs/alignment.md`, `docs/review.md`, and
    `CHANGELOG.md` as applicable.
 7. Stage only owned files, inspect `git diff --cached` and
    `git diff --cached --check`, then create exactly one local revision commit.
@@ -219,34 +224,17 @@ unless the required backend, test, and browser evidence actually exists.
 
 ---
 
-## Current handoff snapshot (R7.55)
+## Current handoff snapshot (R8.02)
 
-R7.48 put the current-deliverable summary and fixed-folder intake inside every
-phase; R7.50 moved round/supervision actions into a contextual strip; R7.52
-delivered project-owned MOM with the canonical ImageWorkspace and the Core
-storage port; R7.53 delivered the StudioFlow-owned Product Catalogue; R7.54
-removed the unsupported Project type. R7.55 was a documentation-reconciliation
-and audit-correction revision: it aligned every stale status header, corrected
-the round-label and filename-timezone rules, and opened KB-012 … KB-019 for the
-workflow gaps the audit found.
+Published baseline is **R8**, latest local commit is **R8.02**.
+Main-route settings (R7.56), MOM (R7.52), Product Catalogue (R7.53), project type removal (R7.54), and documentation stub cleanup (R8.02) are complete.
 
-The verified remaining gaps, all carried by the active R7.56 order except where
-noted:
-
-- the client answer has no correction chain, no draft state and no withdraw-send
-  (KB-013/KB-014/KB-015) — this is the largest gap against the project contract;
-- a project cannot be archived or restored (KB-016);
-- the studio phase template and per-project phases cannot be administered
-  (KB-017);
-- a MOM correction is issued instantly and therefore cannot correct (KB-012);
-- the redirected phase/iteration routes still carry unreachable controls
-  (KB-018);
-- Project Schedule/FFNI (KB-003) remains a separate later order.
+The active execution priority sequence is:
+1. Platform Foundation (Asset Storage roadmap)
+2. UI Engine (Date/time `Intl.DateTimeFormat` consolidation & Header/Sidebar boundary redesign)
+3. BQ (Calculator parser, waste tracking, Quotation PDF)
+4. StudioFlow closure (paused behind 1–3 above)
 
 ## Recommended first slice
 
-Execute the active R7.56 order in the sequence it locks: the client-answer
-record first, because the correction chain, draft answers and withdraw-send all
-persist against the same `SfResponse` shape and one migration should carry them
-together. Do not begin project archive/restore or phase-template administration
-until the answer slice is reviewed.
+Following the owner's active sequence: proceed with **UI Engine date/time consolidation** (consolidating the 3 `Intl.DateTimeFormat` call sites behind one canonical UI Engine display component per `apps/ui-engine/date-time-lookup-audit-2026-09-10.md` Finding 1), or **BQ strict calculator parser** (`=15000*3`).

@@ -5,8 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.02**
-- Next local revision: **R8.03**
+- Current revision after this entry is committed: **R8.03**
+- Next local revision: **R8.04**
+
+## R8.03 | 2026-09-10 | docs(handoff): reconcile session handoff prompt to R8.03 state
+
+- Reconciled `docs/SESSION-HANDOFF-PROMPT.md` to reflect current `R8.03` / `main`
+  baseline and owner's active execution priorities (Platform routing completed,
+  UI Engine date/time consolidation & BQ priorities active, StudioFlow closure paused).
+- Updated handoff prompt task lists to reflect completed features (Main Route
+  settings, FileDropZone, English UI, Add Project client creation, MOM, Product Catalogue).
+
+### Verification
+
+- Local Markdown link-target audit: passed.
+- `npm run check`: passed.
 
 ## R8.02 | 2026-09-10 | docs(repo): purge obsolete documentation stubs and historical artifacts
 
