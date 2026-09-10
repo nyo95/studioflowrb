@@ -1,6 +1,7 @@
 # StudioFlow Implementation Plan
 
-**Status:** READY FOR EXECUTION — pemecahan work order diserahkan ke navigator
+**Status:** ACTIVE EXECUTION GUARDRAILS — core slices implemented through R7.40;
+remaining work is listed in `../roadmap.md`
 **Versi:** R0.1
 **Tanggal:** 2026-09-09
 **Dibaca bersama:** `studioflow.md`, `studioflow-project-contract.md`,

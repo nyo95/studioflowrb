@@ -1,6 +1,8 @@
 # StudioFlow — Contract Index and Shared Rules
 
-Status: **PRD index revised under owner request, 2026-09-08 — not an executable work order**
+Status: **ACTIVE CONTRACT INDEX — implemented project-workflow and Library
+slices reconciled through R7.40; remaining work is tracked in
+[`../roadmap.md`](../roadmap.md)**
 
 Authority: owner decisions locked in the StudioFlow contract sessions of
 2026-09-07/08, reconciled with
@@ -10,8 +12,9 @@ Legacy code at the recorded audit commit is behavioral evidence only. The
 uncommitted StudioFlow scaffold in this checkout is owner work-in-progress and
 is **superseded by these contracts**; it is not implementation authority.
 
-This index answers Gate 0 of the legacy audit roadmap. It does not authorize
-code.
+This index began as Gate 0 of the legacy audit roadmap. It now governs the
+implemented slices together with current owner instructions and the alignment
+artifact; it does not activate roadmap-only features by itself.
 
 ## 1. Application audience and purpose
 
@@ -125,8 +128,8 @@ StudioFlow follows the platform dependency law: `app -> platform` and
 boundary.
 
 - **Master Data.** StudioFlow reads the brand catalog through the Master Data
-  public read port, read-only. This is used by Library/Schedule only, and is
-  therefore inactive until the Schedule contract exists. Any catalog fact whose
+  public read port, read-only. Library is active; Schedule remains deferred.
+  Any catalog fact whose
   later edit must not rewrite project history is snapshotted as a plain value
   at the moment of selection.
 - **BQ.** No relationship in either direction. BQ reads Master Data pricing on

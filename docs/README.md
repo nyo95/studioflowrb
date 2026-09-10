@@ -1,15 +1,27 @@
-# Active Documentation
+# Documentation Hub
 
-## Current R6.1 convergence — 2026-09-06
+Status: reconciled through **R7.40** on 2026-09-10.
 
-The owner's StudioFlow R6.1 plan is the active instruction for contract,
-domain, UI Engine, Master Data, and BQ convergence. Its audited decision delta
-and implemented-state mapping are recorded in
-[`R6.1-DECISION-DELTA.md`](R6.1-DECISION-DELTA.md). The earlier
-[`UIUX-CURATE`](../scripts/work-orders/UIUX-CURATE.md) and
+This directory contains active contracts, operational trackers, architecture
+roadmaps, and retained historical evidence. Current owner instruction remains
+the highest authority. `CHANGELOG.md` is the revision ledger; code, schema,
+tests, and migrations prove implemented state.
+
+## Operational documents
+
+| Document | Purpose |
+|---|---|
+| [`alignment.md`](alignment.md) | Owner explanation of how the StudioFlow rebuild preserves legacy outcomes while simplifying the workflow |
+| [`roadmap.md`](roadmap.md) | Remaining planned work, grouped by Platform, UI Engine, Master Data, BQ, and StudioFlow |
+| [`knownbug.md`](knownbug.md) | Open and closed defects grouped by application |
+| [`REVISION-LEDGER-NOTES.md`](REVISION-LEDGER-NOTES.md) | Historical missing/skipped revision labels and how to interpret them |
+| [`R6.1-DECISION-DELTA.md`](R6.1-DECISION-DELTA.md) | Historical R6.1 convergence evidence; not the current status page |
+
+Earlier [`UIUX-CURATE`](../scripts/work-orders/UIUX-CURATE.md) and
 [`BQ-MASTERDATA-HARDENING`](../scripts/work-orders/BQ-MASTERDATA-HARDENING.md)
-orders remain implementation history; where they conflict, the current owner
-instruction and patched contracts win.
+orders remain implementation history. Where historical documents conflict with
+current owner instructions, current contracts, or R7.40 implemented evidence,
+the newer authority wins.
 
 This repository keeps only the shared contracts and active app contracts that
 have been reviewed for the current rebuild. A contract is not an executable work
@@ -23,14 +35,14 @@ order unless it says so explicitly.
 | [`DESIGN.md`](../DESIGN.md) | shared visual language and density |
 | [`UI_ENGINE.md`](../UI_ENGINE.md) | reusable UI components, layouts, and interaction patterns |
 | [`PLATFORM-ASSET-STORAGE-ROADMAP.md`](PLATFORM-ASSET-STORAGE-ROADMAP.md) | planned shared image preparation and Supabase Storage activation; no executable work order yet |
-| [`STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md`](STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md) | read-only legacy audit and staged StudioFlow rebuild roadmap; no executable app work order yet |
+| [`STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md`](STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md) | historical read-only audit and staged roadmap; implemented phases and remaining work are reconciled in `roadmap.md` |
 | [`apps/studioflow.md`](apps/studioflow.md) | StudioFlow contract index, permission vocabulary, cross-app boundaries, storage dependency, and deferred decisions |
-| [`apps/studioflow-project-contract.md`](apps/studioflow-project-contract.md) | StudioFlow PRD: Client, Project, assignment, Phase, Iteration, corrected client review exchange, work items, and assets; no implementation authorized |
-| [`apps/studioflow-ux-spec.md`](apps/studioflow-ux-spec.md) | StudioFlow surface specification: the single project page, iteration rows, send/response dialogs, and required states |
-| [`apps/studioflow-implementation-plan.md`](apps/studioflow-implementation-plan.md) | StudioFlow execution rules, phase sequence and gates, theme-evolution limits, and Master Data/BQ non-regression protection; work-order breakdown belongs to the navigator |
-| [`apps/studioflow-schedule-contract.md`](apps/studioflow-schedule-contract.md) | deferred domain brief for Library and Product Schedule; not implementable until its owner decisions are locked |
+| [`apps/studioflow-project-contract.md`](apps/studioflow-project-contract.md) | StudioFlow PRD: Client, Project, assignment, Phase, Iteration, review exchange, work items, and assets; substantial slices are implemented through R7.40 |
+| [`apps/studioflow-ux-spec.md`](apps/studioflow-ux-spec.md) | StudioFlow surface reference; partially implemented and subordinate to current owner alignment |
+| [`apps/studioflow-implementation-plan.md`](apps/studioflow-implementation-plan.md) | Active execution/non-regression guardrails; current remaining work is in `roadmap.md` |
+| [`apps/studioflow-schedule-contract.md`](apps/studioflow-schedule-contract.md) | Library/Schedule logic contract; Library is partially implemented, Product Schedule remains unactivated |
 | [`apps/studioflow-mom-contract.md`](apps/studioflow-mom-contract.md) | deferred domain brief for Minutes of Meeting; not implementable until its owner decisions are locked |
-| [`apps/studioflow-work-orders.md`](apps/studioflow-work-orders.md) | StudioFlow locked decisions, open owner questions, and the staged work order sequence; no work order is activated |
+| [`apps/studioflow-work-orders.md`](apps/studioflow-work-orders.md) | historical decision/work-order ledger; use `roadmap.md` for current remaining work |
 | [`apps/masterdata.md`](apps/masterdata.md) | Master Data contract index, shared lifecycle/deletion rules, capability placement, and remaining deferred decisions |
 | [`apps/brand-contract.md`](apps/brand-contract.md) | owner-approved Brand identity, relations, discovery, lifecycle, deletion, UI, and public boundary |
 | [`apps/vendor-contract.md`](apps/vendor-contract.md) | owner-approved Vendor identity, types/capabilities, contacts/links, Brand relations, lifecycle, deletion, and UI |
@@ -42,10 +54,10 @@ Execution and continuity are governed by [`AGENTS.md`](../AGENTS.md) and
 historical implementation evidence; there is currently no executable app work
 order.
 
-Master Data and BQ are active implemented applications. Their current contracts,
-schema, migrations, services, public boundaries, tests, and browser behavior are
-the implementation authority. Media, Samples, workbook import/export, and other
-explicitly deferred capabilities remain out of scope.
+Master Data, BQ, and the implemented StudioFlow project workflow are active
+applications. Their current contracts, schema, migrations, services, public
+boundaries, tests, and browser behavior are implementation evidence. Remaining
+features and defects are listed only in `roadmap.md` and `knownbug.md`.
 
 ## Authority order
 

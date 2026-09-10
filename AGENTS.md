@@ -4,11 +4,13 @@
 
 1. `docs/README.md`
 2. `CHANGELOG.md` for the published baseline, current local revision, and next revision
-3. The shared contract relevant to the task: `CORE.md`, `DESIGN.md`, and/or `UI_ENGINE.md`
-4. The active work order, when one exists. There is currently no executable app
+3. `docs/alignment.md`, `docs/roadmap.md`, and `docs/knownbug.md` when the task
+   plans, audits, changes, or reviews StudioFlow or shared consumers
+4. The shared contract relevant to the task: `CORE.md`, `DESIGN.md`, and/or `UI_ENGINE.md`
+5. The active work order, when one exists. There is currently no executable app
    work order. `docs/apps/masterdata.md` indexes approved logic contracts only.
-5. `prisma/schema.prisma` for the implemented persisted shape
-6. The relevant current code, tests, and migrations
+6. `prisma/schema.prisma` for the implemented persisted shape
+7. The relevant current code, tests, and migrations
 
 ## Authority order
 
@@ -153,18 +155,18 @@ Any future AI starts as navigator unless the owner explicitly gives it a locked 
 
 ### Roadmap and known-bug ledgers
 
-`roadmap.md` and `knownbug.md` are operational ledgers and must be read when
+`docs/roadmap.md` and `docs/knownbug.md` are operational ledgers and must be read when
 planning or auditing StudioFlow work.
 
-- `roadmap.md` lists features that are planned but not complete. A feature may
+- `docs/roadmap.md` lists features that are planned but not complete. A feature may
   be removed or struck through only after it is actually implemented and
   verified; the implementation must still receive a `CHANGELOG.md` entry.
-- `knownbug.md` lists reproducible audit findings that are not fixed in the
+- `docs/knownbug.md` lists reproducible audit findings that are not fixed in the
   current change set. Each entry must state the affected area, observed and
   expected behavior, mitigation, and status.
 - Every audit must either fix a discovered bug in the same scoped change set or
-  add/update it in `knownbug.md`. Do not silently discard an unfixed finding.
-- When a bug is fixed, remove or strike through its entry in `knownbug.md` and
+  add/update it in `docs/knownbug.md`. Do not silently discard an unfixed finding.
+- When a bug is fixed, move or strike through its entry in `docs/knownbug.md` and
   record the fix, verification, and any limitation in `CHANGELOG.md`.
 - Do not claim a roadmap item or known bug is complete merely because a route,
   component, or schema exists; verify the end-to-end behavior, permissions,

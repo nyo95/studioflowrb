@@ -1,8 +1,12 @@
 # Project Contract — StudioFlow
 
-Status: **PRD revised under owner request, 2026-09-09 — not an executable work order**
+Status: **ACTIVE PROJECT-WORKFLOW CONTRACT — substantial slices implemented
+through R7.40; current deviations are tracked in
+[`../knownbug.md`](../knownbug.md) and [`../roadmap.md`](../roadmap.md)**
 
-R7.07 resolves L1–L9 and their dependent rules. Earlier owner decisions remain
+R7.07 resolved L1–L9 and their dependent rules. Later owner alignment in
+[`../alignment.md`](../alignment.md) governs where this contract's detailed
+mechanics would otherwise obscure the simplified workflow. Earlier owner decisions remain
 unless explicitly revised here. These are navigator product decisions for the
 requested PRD update, not a claim of separately approved implementation.
 Evidence boundary: the recorded legacy audit was read; legacy code was not

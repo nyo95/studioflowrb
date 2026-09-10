@@ -566,13 +566,14 @@ Belum diverifikasi di browser sungguhan; lihat catatan keterbatasan di
 | Revisi antar versi BQ | Snapshot di §7 sudah siap sejak awal. |
 | Integrasi formal ke StudioFlow project | Via `external_ref` nanti. |
 
-## 17. Blocker keputusan sebelum F3
+## 17. Remaining implementation decision
 
-Tidak ada blocker yang tersisa. Semua keputusan sudah dikunci.
+Tidak ada owner-policy blocker yang tersisa. Satu keputusan penempatan capability
+teknis masih harus diselesaikan sebelum arithmetic baru ditambahkan.
 
 ### Catatan pra-implementasi
 
 | Item | Status |
 |---|---|
 | Rounding policy | **LOCKED** — truncate 2 desimal di intermediate dan output final |
-| Exact decimal capability placement | Navigator harus menilai apakah `@platform/utilities/decimal` perlu diextend dengan arithmetic generik (add/multiply/divide/truncate) sebelum F3, atau BQ membuat adapter sendiri. |
+| Exact decimal capability placement | **OPEN TECHNICAL DECISION** — navigator harus menilai apakah `@platform/utilities/decimal` perlu diextend dengan arithmetic generik (add/multiply/divide/truncate) sebelum fitur kalkulator/waste, atau BQ membuat adapter domain yang sempit. |

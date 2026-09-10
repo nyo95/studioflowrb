@@ -5,8 +5,38 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R7** — published to GitHub
-- Current revision after this entry is committed: **R7.40**
-- Next local revision: **R7.41**
+- Current revision after this entry is committed: **R7.41**
+- Next local revision: **R7.42**
+
+## R7.41 | 2026-09-10 | docs(repo): reconcile documentation by application
+
+### Changed
+
+- Moved the active alignment, roadmap, and known-bug ledgers into `docs/` and
+  updated governance and active references to their canonical paths.
+- Rebuilt `docs/roadmap.md` by Platform Foundation, UI Engine/Utilities, Master
+  Data, BQ, and StudioFlow, including the previously undocumented owner gates,
+  BQ deferred scope, storage phases, and remaining legacy-audit phases.
+- Rebuilt `docs/knownbug.md` by application, moved R7.40 fixes into a real
+  Closed section, and added KB-011 for the app-local StudioFlow drag/drop that
+  diverges from the deferred canonical `FileDropZone`.
+- Reconciled `docs/alignment.md` with R7.40 instead of leaving fixed deviations
+  described as current, while retaining unresolved phase-workspace gaps.
+- Updated the root/documentation indexes and StudioFlow contract status labels
+  so they no longer describe the repository as Foundation-only or StudioFlow as
+  wholly unimplemented.
+- Corrected duplicate Master Data section numbering and clarified that BQ has
+  no owner-policy blocker but still has an open exact-decimal placement decision.
+- Added `docs/REVISION-LEDGER-NOTES.md` for R4.39/R6.25/R7.18/R7.27 historical
+  ledger gaps without fabricating or reusing revision labels.
+
+### Verification
+
+- Local Markdown link-target scan: passed.
+- Duplicate exact-heading scan under `docs/`: passed.
+- Stale-status phrase scan: passed for the corrected active documents.
+- `git diff --check`: passed.
+- Documentation-only change; no runtime, schema, migration, or dependency change.
 
 ## R7.40 | 2026-09-10 | fix(studioflow,bq): close active workflow gaps
 
@@ -66,7 +96,7 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 ### Changed
 
-- Added KB-005 through KB-010 to `knownbug.md` for Add Project modal/client
+- Added KB-005 through KB-010 to `docs/knownbug.md` for Add Project modal/client
   parity, English-only UI copy, Settings structure, BQ price Revert, BQ
   Updated column behavior, and Library resource-link modal behavior.
 - Marked legacy comparison as a required evidence step for the Add Project and
@@ -81,7 +111,7 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ### Changed
 
 - Updated `AGENTS.md` with mandatory rules for reading and maintaining
-  `roadmap.md` and `knownbug.md` during planning, implementation, and audits.
+  `docs/roadmap.md` and `docs/knownbug.md` during planning, implementation, and audits.
 - Required every unfixed audit finding to be recorded, every fixed bug to be
   closed in the bug ledger, and every completed roadmap item to remain backed
   by a changelog entry.
@@ -94,9 +124,9 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 ### Changed
 
-- Added `roadmap.md` for planned StudioFlow features, completed items, and
+- Added `docs/roadmap.md` for planned StudioFlow features, completed items, and
   explicit out-of-scope decisions.
-- Added `knownbug.md` for reproducible audit findings that remain open, with
+- Added `docs/knownbug.md` for reproducible audit findings that remain open, with
   expected behavior, mitigation, and closure rules.
 - Recorded the current deliverable-driven workflow, current-file, MOM,
   Product Catalogue/FFNI, and shared image gaps without claiming them fixed.
@@ -121,7 +151,7 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 ### Changed
 
-- Removed the trailing whitespace reported in `alignment.md`.
+- Removed the trailing whitespace reported in `docs/alignment.md`.
 
 ### Verification
 
@@ -131,7 +161,7 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 ### Changed
 
-- Added `alignment.md` as the owner-aligned explanation of the rebuild
+- Added `docs/alignment.md` as the owner-aligned explanation of the rebuild
   contract, legacy preservation/corrections, deliverable-driven workflow,
   shared foundation rules, explicit non-scope, and current deviations.
 - Recorded the Explorer-style viewer as fully out of scope and identified the

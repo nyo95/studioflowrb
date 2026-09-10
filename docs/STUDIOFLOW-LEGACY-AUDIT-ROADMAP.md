@@ -2,10 +2,10 @@
 
 ## Status and scope
 
-**AUDITED FOR DISCOVERY — no StudioFlow rebuild code is authorized by this
-document.** It records what the legacy implementation demonstrates, the risks
-that must not be carried forward, and the decision gates for a later executable
-StudioFlow work order.
+**HISTORICAL AUDIT — discovery evidence retained; implementation status is
+tracked in [`roadmap.md`](roadmap.md) and [`knownbug.md`](knownbug.md).** This
+document records what legacy demonstrated and the risks that must not be carried
+forward. It does not describe the current R7.40 completion state.
 
 Legacy was inspected read-only at:
 
@@ -17,10 +17,10 @@ The legacy working tree was dirty. This audit relies on committed files only;
 it does not treat local legacy edits as evidence and does not modify, run, or
 connect to legacy code or infrastructure.
 
-The committed rebuild baseline currently registers only Master Data and BQ.
-There are uncommitted StudioFlow-related files in this rebuild checkout, but
-they are owner work-in-progress, are not published behavior, and are excluded
-from this audit and roadmap.
+At the time of this historical audit, the committed rebuild registered only
+Master Data and BQ. StudioFlow project-workflow and Library slices were
+implemented later; use the current code, changelog, and operational trackers for
+their status.
 
 ## Executive finding
 

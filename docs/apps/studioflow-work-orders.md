@@ -1,10 +1,10 @@
 # StudioFlow — Decisions, Open Questions, and Work Order Sequence
 
-Status: **PLANNING ARTIFACT — no work order below is activated**
+Status: **HISTORICAL PLANNING/DECISION LEDGER — implemented-state and remaining
+work are tracked in `CHANGELOG.md` and [`../roadmap.md`](../roadmap.md)**
 
-A work order becomes executable only when the owner says so explicitly, and only
-after every blocking question in §2 that it depends on has been answered. Until
-then this file is a plan, not an authorization.
+The sequence below records the original slicing and decisions. It is not the
+current completion tracker and does not reactivate finished or deferred work.
 
 Branch: all StudioFlow work happens on `studioflow/contracts` and its
 successors. `main` is the production source and is not touched.

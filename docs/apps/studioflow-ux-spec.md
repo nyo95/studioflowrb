@@ -1,6 +1,7 @@
 # StudioFlow UX/UI Specification
 
-**Status:** DRAFT — menunggu persetujuan owner
+**Status:** ACTIVE REFERENCE — partially implemented; `../alignment.md` and
+current owner instructions supersede conflicting interaction details
 **Versi:** R0.3 — penegasan konsumsi foundation R7.08
 **Tanggal:** 2026-09-08
 **Dibaca bersama:** `studioflow.md`, `studioflow-project-contract.md`

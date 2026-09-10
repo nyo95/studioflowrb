@@ -129,9 +129,9 @@ The following remain deferred and must not be inferred during implementation:
 - workbook/import/export policy;
 - the final BQ snapshot schema.
 
-## 3. Product and dependency boundaries
+## 4. Product and dependency boundaries
 
-### 3.1 Brand and Supplier ownership
+### 4.1 Brand and Supplier ownership
 
 - Brand owns its identity/profile, categories, catalog resources/links, SKUs,
   and all `BrandSupplier` mutations.

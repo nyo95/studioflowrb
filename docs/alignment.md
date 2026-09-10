@@ -1,6 +1,6 @@
 # StudioFlow Rebuild Alignment
 
-Status: owner alignment artifact, 2026-09-09
+Status: owner alignment artifact, reconciled through R7.40 on 2026-09-10
 Scope: minimum production-daily StudioFlow rebuild, with legacy behavior as the
 minimum baseline and the owner's workflow simplifications as the active correction.
 
@@ -121,29 +121,22 @@ capability applies:
 Business policy remains app-owned: phase meaning, iteration transitions,
 catalogue snapshot rules, MOM semantics, and project authorization.
 
-## 6. Current rebuild deviations from this alignment
+## 6. Current rebuild alignment status
 
-These are current implementation gaps, not new requirements:
+Reconciled through R7.40. Active work and defects are tracked in
+[`roadmap.md`](roadmap.md) and [`knownbug.md`](knownbug.md).
 
-1. The phase UI still presents `Mulai ronde` as a primary action. The aligned
-   primary trigger is phase deliverable intake; opening a round should be an
-   internal consequence or an administrative fallback.
-2. File services currently create new `SfFile` records for each registration.
-   The aligned model needs one current file per project-phase, controlled
-   replacement of working bytes, and retained metadata/audit history.
-3. Internal approval/send/response controls are still more prominent than the
-   deliverable-driven flow requires.
-4. To-dos and deliverables are currently rendered as separate blocks. They may
-   remain separate persistence/read models, but the phase experience should
-   present them as one coherent work surface.
-5. Project files are currently primarily exposed through a separate File page;
-   phase detail still needs the current deliverable summary and intake surface.
-6. The existing drag-drop implementation captures local filename and byte size
-   metadata, but it is not yet connected end-to-end to phase context, current
-   file replacement, and iteration transitions.
-7. MOM and Product Catalogue/FFNI are not yet integrated into project detail.
-8. Shared image picker/crop/zoom/annotation is not yet a canonical rebuild
-   capability consumed by multiple apps.
+| Alignment concern | Current status |
+|---|---|
+| Deliverable intake opens/reuses the draft iteration | **Aligned in R7.40** |
+| One unsent current metadata record per project-phase/iteration | **Aligned in R7.40**; actual storage-byte release remains deferred |
+| File attaches to the iteration when sent | **Aligned in R7.40** |
+| Start Round/internal approval/send are contextual rather than the primary phase UX | **Open** |
+| To-dos and deliverables form one coherent phase work surface | **Open** |
+| Current deliverable and intake appear directly in phase detail | **Open** |
+| Drag/drop uses the canonical UI Engine boundary | **Open (KB-011)** |
+| MOM and Product Catalogue/FFNI are integrated into project detail | **Open** |
+| Shared image picker/crop/zoom/annotation exists for approved consumers | **Open** |
 
 ## 7. Explicit non-scope
 
