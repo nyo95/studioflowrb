@@ -5,8 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.03**
-- Next local revision: **R8.04**
+- Current revision after this entry is committed: **R8.04**
+- Next local revision: **R8.05**
+
+## R8.04 | 2026-09-11 | fix(bq): fix commitNum prop plumbing and dev server rendering
+
+- Resolved undefined identifier `commitNum` error in BQ project editor component
+  (`src/app/(platform)/bq/[id]/project-editor.tsx`) by properly plumbing `commitNum`
+  down to `ItemTable`, `ItemRows`, `SubObjectRows`, and `LineItemRow` parameters.
+- Force-stopped stuck dev server process, cleared `.next` build cache, and verified
+  Next.js production build (`npm run build`) and system checks (`npm run check`) pass 100%.
+
+### Verification
+
+- `npm run build`: passed (all app routes compiled successfully).
+- `npm run check`: passed.
 
 ## R8.03 | 2026-09-10 | docs(handoff): reconcile session handoff prompt to R8.03 state
 

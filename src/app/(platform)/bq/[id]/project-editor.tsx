@@ -39,6 +39,8 @@ import type {
 } from "@/apps/bq/public";
 import type { UnitRead } from "@/apps/masterdata/public";
 
+import { resolveCalcExpression } from "@/apps/bq/lib/calc-expression";
+
 import {
   addItemAction,
   addItemAndApplyAssemblyAction,
@@ -149,6 +151,14 @@ export function ProjectEditor({
   const commit = (action: Mutation, id: string, field: string) => (value: string) =>
     run(action, { id, field, value });
 
+  /** Like `commit` but resolves calculator expressions first (e.g. "=15000*3").
+   *  If the expression cannot be parsed the raw string is forwarded unchanged
+   *  and server-side validation will reject it, restoring the previous value. */
+  const commitNum = (action: Mutation, id: string, field: string) => (raw: string) => {
+    const resolved = resolveCalcExpression(raw.trim()) ?? raw.trim();
+    return run(action, { id, field, value: resolved });
+  };
+
   const totalColumns = 7;
 
   return (
@@ -213,6 +223,7 @@ export function ProjectEditor({
             toggle={toggle}
             run={run}
             commit={commit}
+            commitNum={commitNum}
             onImport={setImportTarget}
             onApplyAssembly={(itemId) => setAssemblyTarget({ via: "item", itemId })}
             transientAdd={transientAdd}
@@ -243,6 +254,7 @@ export function ProjectEditor({
                 toggle={toggle}
                 run={run}
                 commit={commit}
+                commitNum={commitNum}
                 onImport={setImportTarget}
                 onApplyAssembly={(itemId) => setAssemblyTarget({ via: "item", itemId })}
                 transientAdd={transientAdd}
@@ -410,6 +422,7 @@ function ItemTable({
   toggle,
   run,
   commit,
+  commitNum,
   onImport,
   onApplyAssembly,
   transientAdd,
@@ -424,6 +437,7 @@ function ItemTable({
   toggle: (id: string) => void;
   run: (action: Mutation, fields: Record<string, string | undefined>) => Promise<void>;
   commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
+  commitNum: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   onImport: (target: { itemId?: string; subObjectId?: string }) => void;
   onApplyAssembly?: (itemId: string) => void;
   transientAdd: { kind: "item" | "subObject"; id: string } | null;
@@ -465,6 +479,7 @@ function ItemTable({
               toggle={toggle}
               run={run}
               commit={commit}
+              commitNum={commitNum}
               onImport={onImport}
               onApplyAssembly={onApplyAssembly}
               transientAdd={transientAdd}
@@ -489,6 +504,7 @@ function ItemRows({
   toggle,
   run,
   commit,
+  commitNum,
   onImport,
   onApplyAssembly,
   transientAdd,
@@ -505,6 +521,7 @@ function ItemRows({
   toggle: (id: string) => void;
   run: (action: Mutation, fields: Record<string, string | undefined>) => Promise<void>;
   commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
+  commitNum: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   onImport: (target: { itemId?: string; subObjectId?: string }) => void;
   onApplyAssembly?: (itemId: string) => void;
   transientAdd: { kind: "item" | "subObject"; id: string } | null;
@@ -527,7 +544,7 @@ function ItemRows({
           <InlineEdit label="Work Item name" value={item.name} disabled={!editable} onCommit={commit(updateItemAction, item.id, "name")} />
         </TableCell>
         <TableCell align="end">
-          <InlineEdit label="Quantity" align="end" inputMode="decimal" value={item.qty} disabled={!editable} onCommit={commit(updateItemAction, item.id, "qty")} />
+          <InlineEdit label="Quantity" align="end" inputMode="decimal" value={item.qty} disabled={!editable} onCommit={commitNum(updateItemAction, item.id, "qty")} />
         </TableCell>
         <TableCell>{editable ? <Select aria-label="Work Item unit" value={item.unit} disabled={pending} onChange={(event) => void commit(updateItemAction, item.id, "unit")(event.target.value).catch(() => undefined)}>{units.some((unit) => unit.code === item.unit) ? null : <option value={item.unit} disabled>{item.unit} (inactive snapshot)</option>}{units.map((unit) => <option key={unit.id} value={unit.code}>{unit.code}</option>)}</Select> : item.unit}</TableCell>
         <TableCell align="end">
@@ -536,11 +553,11 @@ function ItemRows({
           {hasChildren ? (
             <Tooltip content="Work Item markup (%). Coefficient is used only when this Work Item has no breakdown.">
               <span className="inline-block">
-                <InlineEdit label="Markup percent" align="end" inputMode="decimal" value={item.markupL1Pct} disabled={!editable} onCommit={commit(updateItemAction, item.id, "markupL1Pct")} />
+                <InlineEdit label="Markup percent" align="end" inputMode="decimal" value={item.markupL1Pct} disabled={!editable} onCommit={commitNum(updateItemAction, item.id, "markupL1Pct")} />
               </span>
             </Tooltip>
           ) : (
-            <InlineEdit label="Coefficient" align="end" inputMode="decimal" value={item.koefisien} disabled={!editable} onCommit={commit(updateItemAction, item.id, "koefisien")} />
+            <InlineEdit label="Coefficient" align="end" inputMode="decimal" value={item.koefisien} disabled={!editable} onCommit={commitNum(updateItemAction, item.id, "koefisien")} />
           )}
         </TableCell>
         <TableCell align="end">
@@ -555,7 +572,7 @@ function ItemRows({
               value={item.hargaSnapshot ?? ""}
               display={(value) => value ? formatMoney(createMoney(value, "IDR")) : <span className="text-ink-tertiary">Belum ada harga</span>}
               disabled={!editable}
-              onCommit={commit(updateItemAction, item.id, "hargaSnapshot")}
+              onCommit={commitNum(updateItemAction, item.id, "hargaSnapshot")}
             />
           )}
         </TableCell>
@@ -583,6 +600,7 @@ function ItemRows({
               toggle={toggle}
               run={run}
               commit={commit}
+              commitNum={commitNum}
               onImport={onImport}
               transientAdd={transientAdd}
               onTransientAdd={onTransientAdd}
@@ -599,6 +617,7 @@ function ItemRows({
               pending={pending}
               run={run}
               commit={commit}
+              commitNum={commitNum}
             />
           ))}
           {transientAdd?.kind === "item" && transientAdd.id === item.id ? (
@@ -669,6 +688,7 @@ function SubObjectRows({
   toggle,
   run,
   commit,
+  commitNum,
   onImport,
   transientAdd,
   onTransientAdd,
@@ -681,6 +701,7 @@ function SubObjectRows({
   toggle: (id: string) => void;
   run: (action: Mutation, fields: Record<string, string | undefined>) => Promise<void>;
   commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
+  commitNum: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   onImport: (target: { itemId?: string; subObjectId?: string }) => void;
   transientAdd: { kind: "item" | "subObject"; id: string } | null;
   onTransientAdd: (v: { kind: "item" | "subObject"; id: string } | null) => void;
@@ -704,13 +725,13 @@ function SubObjectRows({
           </div>
         </TableCell>
         <TableCell align="end">
-          <InlineEdit label="Quantity per Work Item" align="end" inputMode="decimal" value={subObject.qtyPerL1} disabled={!editable} onCommit={commit(updateSubObjectAction, subObject.id, "qtyPerL1")} />
+          <InlineEdit label="Quantity per Work Item" align="end" inputMode="decimal" value={subObject.qtyPerL1} disabled={!editable} onCommit={commitNum(updateSubObjectAction, subObject.id, "qtyPerL1")} />
         </TableCell>
         <TableCell><Text tone="tertiary" size="sm">per Work Item</Text></TableCell>
         <TableCell align="end">
           <Tooltip content="Component Group markup (%) — applies only to Cost Components in this group.">
             <span className="inline-block">
-              <InlineEdit label="Markup percent" align="end" inputMode="decimal" value={subObject.markupL2Pct} disabled={!editable} onCommit={commit(updateSubObjectAction, subObject.id, "markupL2Pct")} />
+              <InlineEdit label="Markup percent" align="end" inputMode="decimal" value={subObject.markupL2Pct} disabled={!editable} onCommit={commitNum(updateSubObjectAction, subObject.id, "markupL2Pct")} />
             </span>
           </Tooltip>
         </TableCell>
@@ -730,7 +751,7 @@ function SubObjectRows({
       {open ? (
         <>
           {subObject.lineItems.map((line) => (
-            <LineItemRow key={line.id} line={line} depth={2} editable={editable} pending={pending} run={run} commit={commit} />
+            <LineItemRow key={line.id} line={line} depth={2} editable={editable} pending={pending} run={run} commit={commit} commitNum={commitNum} />
           ))}
           {transientAdd?.kind === "subObject" && transientAdd.id === subObject.id ? (
             <TransientLineItemRow
@@ -845,6 +866,7 @@ function LineItemRow({
   pending,
   run,
   commit,
+  commitNum,
 }: {
   line: BqLineItemDetail;
   depth: 1 | 2;
@@ -852,6 +874,7 @@ function LineItemRow({
   pending: boolean;
   run: (action: Mutation, fields: Record<string, string | undefined>) => Promise<void>;
   commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
+  commitNum: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
 }) {
   return (
     <TableRow>
@@ -882,13 +905,13 @@ function LineItemRow({
         </div>
       </TableCell>
       <TableCell align="end">
-        <InlineEdit label="Quantity" align="end" inputMode="decimal" value={line.qty} disabled={!editable} onCommit={commit(updateLineItemAction, line.id, "qty")} />
+        <InlineEdit label="Quantity" align="end" inputMode="decimal" value={line.qty} disabled={!editable} onCommit={commitNum(updateLineItemAction, line.id, "qty")} />
       </TableCell>
       <TableCell>
         <InlineEdit label="Unit" value={line.purchaseUnitSnapshot} disabled={!editable} onCommit={commit(updateLineItemAction, line.id, "purchaseUnitSnapshot")} />
       </TableCell>
       <TableCell align="end">
-        <InlineEdit label="Coefficient" align="end" inputMode="decimal" value={line.koefisien} disabled={!editable} onCommit={commit(updateLineItemAction, line.id, "koefisien")} />
+        <InlineEdit label="Coefficient" align="end" inputMode="decimal" value={line.koefisien} disabled={!editable} onCommit={commitNum(updateLineItemAction, line.id, "koefisien")} />
       </TableCell>
       <TableCell align="end">
         <InlineEdit
@@ -898,7 +921,7 @@ function LineItemRow({
           value={line.hargaSnapshot}
           disabled={!editable}
           display={(value) => value ? formatMoney(createMoney(value, line.currencySnapshot)) : <span className="text-ink-tertiary">Belum ada harga</span>}
-          onCommit={commit(updateLineItemAction, line.id, "hargaSnapshot")}
+          onCommit={commitNum(updateLineItemAction, line.id, "hargaSnapshot")}
         />
       </TableCell>
       <TableCell align="end">{money(line.biayaLine, line.currencySnapshot)}</TableCell>
