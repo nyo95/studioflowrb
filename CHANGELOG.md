@@ -8,6 +8,25 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Current revision after this entry is committed: **R8.12**
 - Next local revision: **R8.13**
 
+## R8.13 | 2026-09-12 | docs(masterdata): record non-blocking cleanup findings
+
+- Added KB-024 for remaining `any` parameters in promotion mapping.
+- Added KB-025 for the overly broad Master Data services barrel exports.
+- Recorded both as open P2 cleanup items with no current functional blocker.
+- Added the StudioFlow Recovery priority sequence R-SF0 through R-SF3 to the
+  roadmap, including the freeze, full legacy extraction, routing/ownership
+  contract, and shared-foundation curation gates.
+- Added Project Rebuild Foundation priorities PF-0 through PF-8 ahead of
+  StudioFlow Recovery, with the foundation release as the entry gate.
+- Reconciled the PF sequence with the revised foundation reference: app
+  registration cleanup, route ownership cleanup, settings/appearance ownership,
+  UI Engine solidification, shared utility curation, proportional enforcement,
+  and foundation freeze.
+
+### Verification
+
+- `git diff --check`: passed.
+
 ## R8.12 | 2026-09-12 | docs: audit updates to roadmap and knownbug
 
 - Removed parked AI file organization from `roadmap.md` per owner instruction.

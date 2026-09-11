@@ -1,6 +1,6 @@
 # Known Bugs by Application
 
-Status: active defect ledger, reconciled through R8.11 on 2026-09-12.
+Status: active defect ledger, reconciled through R8.13 on 2026-09-12.
 
 Planned features belong in [`roadmap.md`](roadmap.md). When a bug is fixed, move
 it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
@@ -36,8 +36,31 @@ it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
 
 ## Master Data
 
-No open Master Data bug is currently recorded. Deferred media, Samples, and
-import/export capabilities are roadmap items, not defects.
+Deferred media, Samples, and import/export capabilities are roadmap items, not
+defects.
+
+### KB-024 — Promotion mapping still contains avoidable `any` types
+
+- **Observed:** `src/apps/masterdata/service.ts` still uses several `(p: any)`
+  parameters in promotion mapping.
+- **Expected:** Promotion mapping uses the narrow persisted/domain type instead
+  of opting out of type checking.
+- **Mitigation:** No current functional impact or blocker; keep the mapping
+  behavior unchanged until the focused typing cleanup is scheduled.
+- **Priority:** P2 — cleanup, non-blocking.
+- **Status:** Open; deferred cleanup.
+
+### KB-025 — Master Data services barrel exposes internal helpers too broadly
+
+- **Observed:** `src/apps/masterdata/services/index.ts` exports many helpers
+  that are internal implementation details. No external consumer of
+  `@/apps/masterdata/services` was found during the audit.
+- **Expected:** The barrel exposes only the intended public service contract;
+  internal helpers remain private to the Master Data implementation.
+- **Mitigation:** There is no current coupling problem; preserve the existing
+  exports until consumers and the public boundary are reviewed together.
+- **Priority:** P2 — cleanup, non-blocking.
+- **Status:** Open; deferred cleanup.
 
 ## BQ
 

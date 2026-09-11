@@ -1,6 +1,6 @@
 # Product Roadmap by Application
 
-Status: active planning ledger, reconciled through R8.11 on 2026-09-12.
+Status: active planning ledger, reconciled through R8.13 on 2026-09-12.
 
 This file answers **what remains to be built**. It does not activate work by
 itself. Completed items are struck through or removed only after verification
@@ -10,11 +10,48 @@ unverified work belongs in [`review.md`](review.md), not here.
 ## Mandatory Architectural & Enforcement Refactoring (Prerequisite for StudioFlow Continuation)
 
 - [x] ~~**Decompose Master Data God-Service:** Refactor `src/apps/masterdata/service.ts` into focused domain use-case service modules.~~ Done in R8.11; 11 domain service files under `src/apps/masterdata/services/`, facade backward-compatible.
-- [ ] **Decompose BQ & StudioFlow God-Services:** Apply the same use-case modularization pattern to growing service modules in BQ (`src/apps/bq/service.ts`) and StudioFlow (`src/apps/studioflow/service.ts`).
+- [ ] **Decompose BQ services:** Keep BQ decomposition as a separate architecture backlog; do not include it in StudioFlow Recovery.
 - [ ] **Strict Cross-App Surface Isolation:** Enforce `src/apps/<app>/public/index.ts` as the sole public surface for cross-app reads and integrations across Master Data, BQ, and StudioFlow.
 - [ ] **Enforceable UI Engine Boundary Checker:** Upgrade automated boundary checker tooling (`scripts/check-boundaries.mjs`) to detect and fail on ad-hoc app-local visual primitives, unapproved styling patterns, or private wrapper components that bypass canonical UI Engine exports.
-- [ ] **StudioFlow Continuation Gate:** Pause further StudioFlow feature development until service modularization and UI Engine enforcement rules are fully implemented and verified.
+- [ ] **StudioFlow Recovery Freeze:** Pause normal StudioFlow feature development until legacy parity recovery reaches its cutover gate. StudioFlow service decomposition happens through the replacement architecture, not a standalone refactor of the frozen service.
 
+
+## Project Rebuild Foundation — priority before StudioFlow Recovery
+
+The Project Rebuild Foundation Reference dated 2026-09-12 takes priority over
+the StudioFlow Recovery sequence below. StudioFlow Recovery must not begin
+until the foundation is completed and versioned. Master Data and BQ remain
+behaviorally unchanged and are not rebuilt as part of this work.
+
+- [ ] **PF-0 — Pin and freeze:** Pin the RB foundation and legacy evidence
+  baselines; freeze normal StudioFlow feature continuation.
+- [ ] **PF-1 — Core purity:** Move infrastructure adapters out of Core, remove
+  StudioFlow-specific storage policy from Core, and migrate brand-mark storage
+  to the provider-neutral asset path without changing app behavior.
+- [ ] **PF-2 — App registration cleanup:** Establish app-owned canonical
+  permissions and registration metadata; remove duplicated permission lists
+  from central composition without creating a universal plugin framework.
+- [ ] **PF-3 — Route ownership cleanup:** Establish clear app namespaces,
+  canonical route constants/builders, shared active-navigation conventions, and
+  no uncontrolled hardcoded route duplication. Do not redesign StudioFlow URLs
+  yet.
+- [ ] **PF-4 — Settings and appearance ownership:** Finalize Platform General
+  Settings, Platform Appearance, app-owned settings, and SettingsShell
+  responsibility. Do not implement StudioFlow phase settings yet.
+- [ ] **PF-5 — UI Engine solidification:** Audit Master Data, BQ, legacy
+  StudioFlow evidence, and the frozen RB StudioFlow; stabilize tokens,
+  primitives, patterns, shells, generic layouts, interactions, and component
+  APIs.
+- [ ] **PF-6 — Shared utility curation:** Compare legacy and current consumers;
+  add only missing domain-neutral behavior with real consumers, keeping
+  StudioFlow business logic out of shared utilities.
+- [ ] **PF-7 — Boundary enforcement:** Add or strengthen checks for cross-app
+  imports, Core purity, UI Engine ownership, permission single-source-of-truth,
+  app namespace ownership, and duplicate generic UI primitives; then run the
+  applicable repository verification.
+- [ ] **PF-8 — Foundation freeze:** Run typecheck, lint, tests, boundary checks,
+  legacy-runtime checks, production build, and Master Data/BQ browser smoke;
+  then document/version the foundation before beginning StudioFlow Recovery.
 
 ## Platform Foundation
 
@@ -70,6 +107,29 @@ unverified work belongs in [`review.md`](review.md), not here.
 - [ ] Define formal StudioFlow linking through a stable external reference.
 
 ## StudioFlow
+
+### Recovery priority — nearest work
+
+The recovery reference dated 2026-09-12 is the planning basis for this sequence.
+Master Data and BQ remain canonical and are not rebuilt or reverse-engineered
+as part of StudioFlow Recovery.
+
+- [ ] **R-SF0 — Freeze:** Treat the current StudioFlow implementation as a
+  frozen reference. Only security, data-integrity, or repository-breaking fixes
+  may modify it before the recovery cutover.
+- [ ] **R-SF1 — Full legacy extraction:** Audit legacy StudioFlow at pinned
+  commit `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27` and produce capability,
+  route, settings, permission, persistence/ownership, and shared-capability
+  matrices. Classify every meaningful capability as KEEP, MERGE,
+  ALREADY_REPLACED, REDESIGN, PURGE, or DECISION_REQUIRED.
+- [ ] **R-SF2 — Routing and ownership contract:** Ratify global, project, and
+  project-owned module routes; resolve Product Catalogue project ownership;
+  define settings ownership and allowed cross-app reads before new feature
+  implementation.
+- [ ] **R-SF3 — Shared foundation curation:** Extend UI Engine or shared
+  utilities only where the audit proves a genuinely generic need; keep
+  domain-specific behavior inside StudioFlow and preserve Master Data/BQ
+  behavior.
 
 ### Project workflow
 
