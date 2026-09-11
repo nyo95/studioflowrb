@@ -492,6 +492,7 @@ type MasterDataDeletionTarget =
   | "unit"
   | "category"
   | "vendor_type"
+  | "supplier_category"
   | "price_material"
   | "price_material_labor"
   | "price_labor";
@@ -513,6 +514,7 @@ async function hardDeleteMasterDataTarget(
     "unit",
     "category",
     "vendor_type",
+    "supplier_category",
     "price_material",
     "price_material_labor",
     "price_labor",
@@ -562,6 +564,7 @@ async function hardDeleteMasterDataTarget(
     if (priceCount > 0) throw new AppError("CONFLICT", "VENDOR_HAS_PRICES", "Supplier still has price rows. Delete them first.");
     await tx.vendorContact.deleteMany({ where: { vendor_id: targetId } });
     await tx.vendorVendorType.deleteMany({ where: { vendor_id: targetId } });
+    await tx.vendorSupplierCategory.deleteMany({ where: { vendor_id: targetId } });
     await tx.archiveCause.deleteMany({ where: { entity_type: "vendor", entity_id: targetId } });
     await tx.vendor.delete({ where: { id: targetId } });
   } else if (target === "sku") {
@@ -606,6 +609,13 @@ async function hardDeleteMasterDataTarget(
     if (assignmentCount > 0) throw new AppError("CONFLICT", "VENDOR_TYPE_HAS_ASSIGNMENTS", `Supplier Type is assigned to ${assignmentCount} Supplier(s) and cannot be permanently deleted.`);
     await tx.archiveCause.deleteMany({ where: { entity_type: "vendor_type", entity_id: targetId } });
     try { await tx.vendorType.delete({ where: { id: targetId } }); } catch (error) { mapWriteError(error); }
+  } else if (target === "supplier_category") {
+    const supplierCategory = await tx.supplierCategory.findUniqueOrThrow({ where: { id: targetId } });
+    if (supplierCategory.deleted_at === null) throw new AppError("CONFLICT", "SUPPLIER_CATEGORY_NOT_ARCHIVED", "Supplier Category must be archived before permanent deletion.");
+    const assignmentCount = await tx.vendorSupplierCategory.count({ where: { supplier_category_id: targetId } });
+    if (assignmentCount > 0) throw new AppError("CONFLICT", "SUPPLIER_CATEGORY_HAS_ASSIGNMENTS", `Supplier Category is assigned to ${assignmentCount} Supplier(s) and cannot be permanently deleted.`);
+    await tx.archiveCause.deleteMany({ where: { entity_type: "supplier_category", entity_id: targetId } });
+    try { await tx.supplierCategory.delete({ where: { id: targetId } }); } catch (error) { mapWriteError(error); }
   } else if (target === "price_material") {
     const price = await tx.priceMaterial.findUniqueOrThrow({ where: { id: targetId } });
     if (price.deleted_at === null) throw new AppError("CONFLICT", "PRICE_NOT_ARCHIVED", "Price must be archived before permanent deletion.");
@@ -1371,6 +1381,167 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       });
     },
 
+    // ── SupplierCategory Dictionary ─────────────────────────────────────────
+
+    async listSupplierCategories(input: { grants: PermissionGrants; includeArchived?: boolean }) {
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.dictionaryRead, MASTERDATA_PERMISSIONS.dictionaryManage], "You do not have permission to view Supplier Categories.");
+      return db.supplierCategory.findMany({
+        where: input.includeArchived ? {} : { deleted_at: null },
+        orderBy: { sort_order: "asc" },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          sort_order: true,
+          deleted_at: true,
+          _count: { select: { vendor_supplier_categories: true } },
+        },
+      });
+    },
+
+    async listSupplierCategoriesForAssignment(input: { grants: PermissionGrants }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
+      return db.supplierCategory.findMany({
+        where: { deleted_at: null },
+        orderBy: { sort_order: "asc" },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          sort_order: true,
+        },
+      });
+    },
+
+    async getSupplierCategory(input: { grants: PermissionGrants; supplierCategoryId: string }) {
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.dictionaryRead, MASTERDATA_PERMISSIONS.dictionaryManage], "You do not have permission to view Supplier Categories.");
+      return db.supplierCategory.findUniqueOrThrow({
+        where: { id: input.supplierCategoryId },
+        include: { _count: { select: { vendor_supplier_categories: true } } },
+      });
+    },
+
+    async createSupplierCategory(input: {
+      grants: PermissionGrants;
+      actor: AuditActor;
+      code: string;
+      name: string;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
+      actorIsUsable(input.actor);
+      const code = requiredName(input.code, "SUPPLIER_CATEGORY_CODE_REQUIRED").toUpperCase();
+      const name = requiredName(input.name, "SUPPLIER_CATEGORY_NAME_REQUIRED");
+      return runTransaction(async (tx) => {
+        let category;
+        try {
+          category = await tx.supplierCategory.create({
+            data: { id: randomUUID(), code, name },
+          });
+        } catch (error) {
+          mapWriteError(error);
+        }
+        await writeAudit(tx, {
+          action: "supplier-category.created",
+          entityType: "supplier_category",
+          entityId: category!.id,
+          actor: input.actor,
+          metadata: { code },
+        });
+        return { supplierCategoryId: category!.id };
+      });
+    },
+
+    async updateSupplierCategory(input: {
+      grants: PermissionGrants;
+      actor: AuditActor;
+      supplierCategoryId: string;
+      name: string;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
+      actorIsUsable(input.actor);
+      const name = requiredName(input.name, "SUPPLIER_CATEGORY_NAME_REQUIRED");
+      return runTransaction(async (tx) => {
+        const existing = await tx.supplierCategory.findUniqueOrThrow({ where: { id: input.supplierCategoryId } });
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        if (existing.name !== name) changes.name = { from: existing.name, to: name };
+        if (Object.keys(changes).length === 0) return { supplierCategoryId: input.supplierCategoryId };
+        try {
+          await tx.supplierCategory.update({ where: { id: input.supplierCategoryId }, data: { name } });
+        } catch (error) {
+          mapWriteError(error);
+        }
+        await writeAudit(tx, {
+          action: "supplier-category.updated",
+          entityType: "supplier_category",
+          entityId: input.supplierCategoryId,
+          actor: input.actor,
+          changes,
+        });
+        return { supplierCategoryId: input.supplierCategoryId };
+      });
+    },
+
+    async archiveSupplierCategory(input: { grants: PermissionGrants; actor: AuditActor; supplierCategoryId: string }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
+      actorIsUsable(input.actor);
+      return runTransaction(async (tx) => {
+        const category = await tx.supplierCategory.findUniqueOrThrow({ where: { id: input.supplierCategoryId } });
+        if (category.deleted_at !== null) {
+          throw new AppError("CONFLICT", "SUPPLIER_CATEGORY_ALREADY_ARCHIVED", "Supplier Category is already archived.");
+        }
+        await addDirectCause(tx, "supplier_category", input.supplierCategoryId);
+        await tx.supplierCategory.update({ where: { id: input.supplierCategoryId }, data: { deleted_at: new Date() } });
+        await writeAudit(tx, { action: "supplier-category.archived", entityType: "supplier_category", entityId: input.supplierCategoryId, actor: input.actor });
+        return { supplierCategoryId: input.supplierCategoryId };
+      });
+    },
+
+    async restoreSupplierCategory(input: { grants: PermissionGrants; actor: AuditActor; supplierCategoryId: string }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
+      actorIsUsable(input.actor);
+      return runTransaction(async (tx) => {
+        const category = await tx.supplierCategory.findUniqueOrThrow({ where: { id: input.supplierCategoryId } });
+        if (category.deleted_at === null) {
+          throw new AppError("CONFLICT", "SUPPLIER_CATEGORY_NOT_ARCHIVED", "Supplier Category is not archived.");
+        }
+        await removeDirectCause(tx, "supplier_category", input.supplierCategoryId);
+        await tx.supplierCategory.update({ where: { id: input.supplierCategoryId }, data: { deleted_at: null } });
+        await writeAudit(tx, { action: "supplier-category.restored", entityType: "supplier_category", entityId: input.supplierCategoryId, actor: input.actor });
+        return { supplierCategoryId: input.supplierCategoryId };
+      });
+    },
+
+    async requestSupplierCategoryDeletion(input: {
+      grants: PermissionGrants;
+      actor: AuditActor;
+      supplierCategoryId: string;
+      reason?: string;
+      notes?: string;
+    }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
+      actorIsUsable(input.actor);
+      return runTransaction(async (tx) => {
+        const category = await tx.supplierCategory.findUniqueOrThrow({ where: { id: input.supplierCategoryId } });
+        if (category.deleted_at === null) {
+          throw new AppError("VALIDATION", "SUPPLIER_CATEGORY_NOT_ARCHIVED", "Only archived Supplier Categories may be submitted for deletion.");
+        }
+        const requestId = await createDeletionRequest(tx, {
+          targetType: "supplier_category",
+          targetId: input.supplierCategoryId,
+          actor: input.actor,
+          reason: input.reason,
+          notes: input.notes,
+        });
+        await writeAudit(tx, {
+          action: "supplier-category.deletion-requested",
+          entityType: "supplier_category",
+          entityId: input.supplierCategoryId,
+          actor: input.actor,
+        });
+        return { requestId };
+      });
+    },
+
     // ── Brand Management ────────────────────────────────────────────────────
 
     async listBrands(input: {
@@ -1992,6 +2163,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       grants: PermissionGrants;
       search?: string;
       vendorTypeId?: string;
+      supplierCategoryId?: string;
       canSupplyMaterial?: boolean;
       canSupplyLabor?: boolean;
       brandId?: string;
@@ -2005,6 +2177,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           ...(input.includeArchived ? {} : { deleted_at: null }),
           ...(input.brandId ? { brand_suppliers: { some: { brand_id: input.brandId } } } : {}),
           ...(input.vendorTypeId ? { types: { some: { vendor_type_id: input.vendorTypeId } } } : {}),
+          ...(input.supplierCategoryId ? { supplier_categories: { some: { supplier_category_id: input.supplierCategoryId } } } : {}),
           ...(input.canSupplyMaterial !== undefined
             ? { types: { some: { vendor_type: { can_supply_material: input.canSupplyMaterial, deleted_at: null } } } }
             : {}),
@@ -2040,6 +2213,12 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
                 select: { id: true, code: true, name: true, can_supply_material: true, can_supply_labor: true },
               },
             },
+          },
+          supplier_categories: {
+            select: {
+              supplier_category: { select: { id: true, code: true, name: true } },
+            },
+            orderBy: { supplier_category: { name: "asc" } },
           },
           contacts: {
             select: {
@@ -2189,6 +2368,11 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
               vendor_type: true,
             },
           },
+          supplier_categories: {
+            include: {
+              supplier_category: { select: { id: true, code: true, name: true } },
+            },
+          },
           contacts: {
             include: {
               brand: { select: { id: true, name: true, slug: true } },
@@ -2219,6 +2403,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       address?: string;
       notes?: string;
       vendorTypeIds?: string[];
+      supplierCategoryIds?: string[];
       contacts?: Array<{ personName: string; jobTitle?: string; email?: string; phone?: string; isPrimary?: boolean; notes?: string; brandId?: string }>;
     }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
@@ -2258,6 +2443,24 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
               id: randomUUID(),
               vendor_id: vendorId,
               vendor_type_id: vendorTypeId,
+            })),
+          });
+        }
+
+        // SupplierCategories
+        if (input.supplierCategoryIds && input.supplierCategoryIds.length > 0) {
+          const supplierCategories = await tx.supplierCategory.findMany({
+            where: { id: { in: input.supplierCategoryIds }, deleted_at: null },
+            select: { id: true },
+          });
+          if (supplierCategories.length !== new Set(input.supplierCategoryIds).size) {
+            throw new AppError("VALIDATION", "SUPPLIER_CATEGORY_INVALID", "Every selected Supplier Category must be active.");
+          }
+          await tx.vendorSupplierCategory.createMany({
+            data: input.supplierCategoryIds.map((supplierCategoryId) => ({
+              id: randomUUID(),
+              vendor_id: vendorId,
+              supplier_category_id: supplierCategoryId,
             })),
           });
         }
@@ -2365,6 +2568,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       address?: string | null;
       notes?: string | null;
       vendorTypeIds?: string[];
+      supplierCategoryIds?: string[];
       contacts?: Array<{ id?: string; personName: string; jobTitle?: string; email?: string; phone?: string; isPrimary?: boolean; notes?: string; brandId?: string }>;
       /** vendor-contract §5: atomic info_links update; omit = preserve existing */
       infoLinks?: Array<{ kind: string; url: string; label?: string | null }>;
@@ -2382,6 +2586,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
           include: {
             types: true,
             contacts: true,
+            supplier_categories: true,
           },
         });
 
@@ -2452,6 +2657,42 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
             changes.vendor_types = {
               from: [...existingTypeIds].sort(),
               to: [...requestedTypeIds].sort(),
+            };
+          }
+        }
+
+        // Update SupplierCategories — a plain classification assignment with no
+        // capability or dependency guard (removing a category is always safe).
+        if (input.supplierCategoryIds !== undefined) {
+          const requestedCategoryIds = [...new Set(input.supplierCategoryIds)];
+          if (requestedCategoryIds.length > 0) {
+            const liveCategories = await tx.supplierCategory.findMany({
+              where: { id: { in: requestedCategoryIds }, deleted_at: null },
+              select: { id: true },
+            });
+            if (liveCategories.length !== requestedCategoryIds.length) {
+              throw new AppError("VALIDATION", "SUPPLIER_CATEGORY_INVALID", "Every selected Supplier Category must be active.");
+            }
+          }
+          const existingCategoryIds = new Set(existing.supplier_categories.map((c) => c.supplier_category_id));
+          const removedCategories = existing.supplier_categories.filter((c) => !requestedCategoryIds.includes(c.supplier_category_id));
+          if (removedCategories.length > 0) {
+            await tx.vendorSupplierCategory.deleteMany({ where: { id: { in: removedCategories.map((c) => c.id) } } });
+          }
+          const addedCategoryIds = requestedCategoryIds.filter((id) => !existingCategoryIds.has(id));
+          if (addedCategoryIds.length > 0) {
+            await tx.vendorSupplierCategory.createMany({
+              data: addedCategoryIds.map((supplierCategoryId) => ({
+                id: randomUUID(),
+                vendor_id: input.vendorId,
+                supplier_category_id: supplierCategoryId,
+              })),
+            });
+          }
+          if (removedCategories.length > 0 || addedCategoryIds.length > 0) {
+            changes.supplier_categories = {
+              from: [...existingCategoryIds].sort(),
+              to: [...requestedCategoryIds].sort(),
             };
           }
         }

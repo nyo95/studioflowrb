@@ -48,6 +48,13 @@ type VendorRow = {
       can_supply_labor: boolean;
     };
   }>;
+  supplier_categories: Array<{
+    supplier_category: {
+      id: string;
+      code: string;
+      name: string;
+    };
+  }>;
   contacts: Array<{
     id: string;
     person_name: string;
@@ -82,6 +89,7 @@ type VendorTypeOption = {
 };
 
 type BrandOption = { id: string; name: string };
+type VendorCategoryOption = { id: string; code: string; name: string };
 
 const LINK_KINDS = ["WEBSITE", "INSTAGRAM", "FACEBOOK", "TIKTOK", "YOUTUBE", "LINKEDIN", "WHATSAPP"] as const;
 type LinkEntry = { kind: string; url: string; label: string | null };
@@ -214,16 +222,19 @@ type ContactDraft = {
 export function VendorDirectory({
   vendors,
   vendorTypes,
+  supplierCategories,
   brands,
   canManage,
 }: {
   vendors: VendorRow[];
   vendorTypes: VendorTypeOption[];
+  supplierCategories: VendorCategoryOption[];
   brands: BrandOption[];
   canManage: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
+  const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<VendorRow | null>(null);
   const [confirmArchive, setConfirmArchive] = useState<VendorRow | null>(null);
@@ -238,6 +249,8 @@ export function VendorDirectory({
   const [contactsList, setContactsList] = useState<ContactDraft[]>([]);
   const [createVendorTypeIds, setCreateVendorTypeIds] = useState<string[]>([]);
   const [editVendorTypeIds, setEditVendorTypeIds] = useState<string[]>([]);
+  const [createSupplierCategoryIds, setCreateSupplierCategoryIds] = useState<string[]>([]);
+  const [editSupplierCategoryIds, setEditSupplierCategoryIds] = useState<string[]>([]);
   // Staged link state — committed atomically with vendor profile on Save
   const [stagedLinks, setStagedLinks] = useState<LinkEntry[]>([]);
   const [stagedSnapshot, setStagedSnapshot] = useState<LinkEntry[]>([]);
@@ -261,7 +274,7 @@ export function VendorDirectory({
     formRef: createFormRef,
     resetKey: createDraftKey,
     active: createOpen,
-    watchedValue: JSON.stringify([createVendorTypeIds, contactsList]),
+    watchedValue: JSON.stringify([createVendorTypeIds, createSupplierCategoryIds, contactsList]),
     title: "Discard supplier draft?",
     description: "Your changes are only in this browser and have not been saved.",
   });
@@ -269,13 +282,14 @@ export function VendorDirectory({
     formRef: editFormRef,
     resetKey: editTarget?.id ?? "",
     active: Boolean(editTarget),
-    watchedValue: JSON.stringify([editVendorTypeIds, contactsList, stagedLinks, stagedSnapshot]),
+    watchedValue: JSON.stringify([editVendorTypeIds, editSupplierCategoryIds, contactsList, stagedLinks, stagedSnapshot]),
     title: "Discard changes?",
     description: "Your edits are only in this browser and have not been saved.",
   });
 
   const filtered = vendors.filter((v) => {
     if (typeFilter !== "ALL" && !v.types.some((t) => t.vendor_type.id === typeFilter)) return false;
+    if (categoryFilter !== "ALL" && !v.supplier_categories.some((c) => c.supplier_category.id === categoryFilter)) return false;
     if (!query) return true;
     const q = query.toLowerCase();
     return (
@@ -296,7 +310,7 @@ export function VendorDirectory({
     const result = typeof left === "number" && typeof right === "number" ? left - right : collator.compare(String(left), String(right));
     return (sortDirection === "asc" ? result : -result) || a.id.localeCompare(b.id);
   });
-  const paging = usePagination(orderedRows.length, 25, JSON.stringify([query, typeFilter, sortKey, sortDirection]));
+  const paging = usePagination(orderedRows.length, 25, JSON.stringify([query, typeFilter, categoryFilter, sortKey, sortDirection]));
   const visibleRows = orderedRows.slice(paging.offset, paging.offset + 25);
   const pageFooter = <div className="grid gap-2"><Text tone="secondary" size="sm">{orderedRows.length ? paging.offset + 1 : 0}–{Math.min(paging.offset + 25, orderedRows.length)} of {orderedRows.length} records</Text>{paging.pageCount > 1 ? <Pagination page={paging.page} pageCount={paging.pageCount} onPageChange={paging.setPage} /> : null}</div>;
 
@@ -338,6 +352,7 @@ export function VendorDirectory({
   const openCreateDialog = () => {
     setContactsList([]);
     setCreateVendorTypeIds([]);
+    setCreateSupplierCategoryIds([]);
     setCreateNameWarning(null);
     setCreateDraftKey((key) => key + 1);
     setCreateOpen(true);
@@ -357,6 +372,7 @@ export function VendorDirectory({
       })),
     );
     setEditVendorTypeIds(vendor.types.map((type) => type.vendor_type.id));
+    setEditSupplierCategoryIds(vendor.supplier_categories.map((category) => category.supplier_category.id));
     setStagedLinks(parseLinks(vendor.info_links));
     setStagedSnapshot(parseLinks(vendor.link_review_snapshot));
     setEditName(vendor.name);
@@ -399,6 +415,16 @@ export function VendorDirectory({
             ))}
           </Select>
         </div>
+        <div className="w-48">
+          <Select value={categoryFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setCategoryFilter(e.target.value)}>
+            <option value="ALL">All categories</option>
+            {supplierCategories.map((sc) => (
+              <option key={sc.id} value={sc.id}>
+                {sc.name}
+              </option>
+            ))}
+          </Select>
+        </div>
       </TableToolbar>}>
 
 
@@ -409,11 +435,12 @@ export function VendorDirectory({
 
         />
       ) : (
-        <DataTable framed={false} density="compact" stickyHeader fill minWidth={700}>
+        <DataTable framed={false} density="compact" stickyHeader fill minWidth={820}>
           <TableHeader>
             <TableRow>
               <TableHead>Supplier</TableHead>
               <TableHead>Types &amp; Capabilities</TableHead>
+              <TableHead>Categories</TableHead>
               <TableHead>Contacts</TableHead>
               <TableHead align="end">Prices</TableHead>
               <TableHead>Updated</TableHead>
@@ -454,6 +481,15 @@ export function VendorDirectory({
                         <Badge tone="warning" title="Eligible for Material+Labor and Labor-only pricing">
                           Labor
                         </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1 items-center max-w-xs">
+                      {vendor.supplier_categories.length === 0 ? (
+                        <span className="text-ink-tertiary text-xs">No categories</span>
+                      ) : (
+                        vendor.supplier_categories.map((c) => <Badge key={c.supplier_category.id} tone="neutral">{c.supplier_category.name}</Badge>)
                       )}
                     </div>
                   </TableCell>
@@ -522,6 +558,7 @@ export function VendorDirectory({
           className="grid gap-4  pr-1"
         >
           {createVendorTypeIds.map((id) => <input key={id} type="hidden" name="vendorTypeIds" value={id} />)}
+          {createSupplierCategoryIds.map((id) => <input key={id} type="hidden" name="supplierCategoryIds" value={id} />)}
           {createError ? <InlineError>{createError}</InlineError> : null}
 
           <Field label="Supplier name" required>
@@ -535,6 +572,9 @@ export function VendorDirectory({
           </Field>
           <Field label="Supplier types" description="Search the controlled type vocabulary; assign role dimensions to grant pricing capabilities.">
             <CreatableMultiSelect label="Supplier types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={createVendorTypeIds} onValueChange={setCreateVendorTypeIds} placeholder="Search supplier types" searchPlaceholder="Search supplier types…" />
+          </Field>
+          <Field label="Supplier categories" description="Classification labels such as fabric supplier or hardware supplier. A supplier may have more than one.">
+            <CreatableMultiSelect label="Supplier categories" options={supplierCategories.map((category) => ({ id: category.id, label: category.name, description: category.code }))} value={createSupplierCategoryIds} onValueChange={setCreateSupplierCategoryIds} placeholder="Search supplier categories" searchPlaceholder="Search supplier categories…" />
           </Field>
           <Field label="Office / Workshop address">
             <Input name="address" maxLength={256} placeholder="Address, City" />
@@ -649,6 +689,7 @@ export function VendorDirectory({
           >
             <input type="hidden" name="vendorId" value={editTarget.id} />
             {editVendorTypeIds.map((id) => <input key={id} type="hidden" name="vendorTypeIds" value={id} />)}
+            {editSupplierCategoryIds.map((id) => <input key={id} type="hidden" name="supplierCategoryIds" value={id} />)}
             {editError ? <InlineError>{editError}</InlineError> : null}
 
             <Tabs keepMounted
@@ -669,6 +710,9 @@ export function VendorDirectory({
                       </Field>
                       <Field label="Supplier types" description="Search the controlled type vocabulary. Removing capability types is guarded against active dependent prices.">
                         <CreatableMultiSelect label="Supplier types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={editVendorTypeIds} onValueChange={setEditVendorTypeIds} placeholder="Search supplier types" searchPlaceholder="Search supplier types…" />
+                      </Field>
+                      <Field label="Supplier categories" description="Classification labels such as fabric supplier or hardware supplier. A supplier may have more than one.">
+                        <CreatableMultiSelect label="Supplier categories" options={supplierCategories.map((category) => ({ id: category.id, label: category.name, description: category.code }))} value={editSupplierCategoryIds} onValueChange={setEditSupplierCategoryIds} placeholder="Search supplier categories" searchPlaceholder="Search supplier categories…" />
                       </Field>
                       <Field label="Office / Workshop address">
                         <Input name="address" value={editAddress} maxLength={256} onChange={(e) => setEditAddress(e.target.value)} />

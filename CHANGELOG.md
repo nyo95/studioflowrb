@@ -5,8 +5,56 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.07**
-- Next local revision: **R8.08**
+- Current revision after this entry is committed: **R8.08**
+- Next local revision: **R8.09**
+
+## R8.08 | 2026-09-11 | feat(masterdata): add supplier category dictionary and vendor assignment
+
+- Added the **Supplier Category** dictionary, distinct from Supplier Type.
+  Supplier Type stays the capability dimension (Material/Labor eligibility and
+  pricing guard); Supplier Category is a plain classification label (for
+  example fabric supplier or hardware supplier) with no capability or pricing
+  consequence.
+- New `SupplierCategory` model and a many-to-many `VendorSupplierCategory`
+  join (`Vendor` already supports zero-to-many; the owner confirmed a supplier
+  may carry more than one category).
+- Schema change applied to the rebuild-only kantor database through the
+  additive manual migration `20260911150000_add_supplier_category` using
+  `prisma migrate deploy`; `prisma generate` and `prisma validate` passed.
+  Pre-existing office migration-history drift (two migrations edited after
+  apply, one local-only applied migration) was not touched; `migrate dev`
+  would have requested a reset, so deployment went through the hand-written
+  additive SQL instead. `prisma migrate status` reports the database up to
+  date.
+- Service (`src/apps/masterdata/service.ts`): full dictionary CRUD
+  (`createSupplierCategory`, `updateSupplierCategory`, archive/restore,
+  `listSupplierCategories`, `listSupplierCategoriesForAssignment`) with the
+  same duplicate/soft-delete rename, reference, and audit conventions as
+  Supplier Type; deletion flows through the shared deletion request and
+  `masterdata.deletion.approve` direct hard-delete path with
+  `"supplier_category"` added to `MasterDataDeletionTarget`;
+  `createVendor`/`updateVendor` now accept `supplierCategoryIds` and maintain
+  the join atomically (assignment inputs validated as live categories);
+  `getVendor`/`listVendors` include the assignments and `listVendors` gains a
+  `supplierCategoryId` filter.
+- Server actions: vendor create/update actions pass `supplierCategoryIds`
+  through; a new `supplier-categories-actions.ts` exposes save, archive,
+  restore, and deletion-request actions with the same permission-gated
+  behavior as the Supplier Type directory.
+- UI: new **Supplier categories** tab in Settings → Master Data
+  (`supplier-category-directory.tsx`); the Supplier directory gains a
+  categories multi-picker in create/edit, category badges in the table,
+  and a category filter next to the existing supplier type filter.
+
+### Verification
+
+- `npx tsc --noEmit`: passed.
+- `npm run lint`: passed.
+- `prisma validate`, `prisma generate`, `prisma migrate status`, and
+  `prisma migrate deploy` (rebuild-only kantor database): passed.
+- Not yet verified in a real browser; pending entry added to
+  `docs/review.md`. `next-env.d.ts` remains an unrelated owner
+  working-tree change and was not committed.
 
 ## R8.07 | 2026-09-11 | fix(masterdata): save material+labor and labor price edits
 

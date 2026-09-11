@@ -11,6 +11,7 @@ import { UnitDirectory } from "@/app/(platform)/masterdata/units/unit-directory"
 import { CategoryDirectory } from "@/app/(platform)/masterdata/categories/category-directory";
 import { DeletionDirectory } from "@/app/(platform)/masterdata/deletions/deletion-directory";
 import { VendorTypeDirectory } from "./vendor-type-directory";
+import { SupplierCategoryDirectory } from "./supplier-category-directory";
 import { PromotionReview } from "./promotion-review";
 
 export const dynamic = "force-dynamic";
@@ -24,10 +25,11 @@ export default async function MasterDataSettingsPage() {
   if (!canRead && !canManage) {
     return <PageShell><PageHeader eyebrow="Settings" title="Master Data Settings" divider /><SectionCard><ErrorState title="Access denied" description="You do not have permission to view Master Data settings." /></SectionCard></PageShell>;
   }
-  const [units, categories, vendorTypes, deletions] = await Promise.all([
+  const [units, categories, vendorTypes, supplierCategories, deletions] = await Promise.all([
     canRead && hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryRead) ? masterDataService.listUnits({ grants, includeArchived: true }) : [],
     canRead && hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryRead) ? masterDataService.listCategories({ grants, includeDeactivated: true }) : [],
     canRead && hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryRead) ? masterDataService.listVendorTypes({ grants, includeArchived: true }) : [],
+    canRead && hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryRead) ? masterDataService.listSupplierCategories({ grants, includeArchived: true }) : [],
     hasPermission(grants, MASTERDATA_PERMISSIONS.deletionApprove) ? masterDataService.listDeletionRequests({ grants, status: "PENDING" }) : [],
   ]);
   const canApprove = hasPermission(grants, MASTERDATA_PERMISSIONS.deletionApprove);
@@ -39,6 +41,7 @@ export default async function MasterDataSettingsPage() {
       { value: "units", label: "Units", content: <UnitDirectory units={units} canManage={canManage} /> },
       { value: "categories", label: "Categories", content: <CategoryDirectory categories={categories} canManage={canManage} /> },
       { value: "vendor-types", label: "Supplier types", content: <VendorTypeDirectory rows={vendorTypes} canManage={canManage} /> },
+      { value: "supplier-categories", label: "Supplier categories", content: <SupplierCategoryDirectory rows={supplierCategories} canManage={canManage} /> },
       { value: "deletions", label: "Deletion review", disabled: !canApprove, content: <DeletionDirectory pendingRequests={deletions} canApprove={canApprove} /> },
       { value: "promotions", label: "BQ approvals", disabled: !canApprovePromotion, content: <PromotionReview requests={promotionRequests} references={promotionReferences} /> },
     ]} />

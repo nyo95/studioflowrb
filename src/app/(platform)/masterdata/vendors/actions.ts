@@ -24,6 +24,7 @@ const VendorInputSchema = z.object({
   address: z.string().max(256).optional().nullable().or(z.literal("")),
   notes: z.string().max(1000).optional().nullable().or(z.literal("")),
   vendorTypeIds: z.array(z.string().uuid()).optional(),
+  supplierCategoryIds: z.array(z.string().uuid()).optional(),
   contacts: z.array(z.object({
     id: z.string().uuid().optional(),
     personName: z.string().min(1, "Contact name is required"),
@@ -59,6 +60,7 @@ export async function createVendorAction(
     }
 
     const vendorTypeIds = formData.getAll("vendorTypeIds").map(String).filter(Boolean);
+    const supplierCategoryIds = formData.getAll("supplierCategoryIds").map(String).filter(Boolean);
 
     const parsed = VendorInputSchema.safeParse({
       name: String(formData.get("name") ?? ""),
@@ -66,6 +68,7 @@ export async function createVendorAction(
       address: formData.get("address") ? String(formData.get("address")) : null,
       notes: formData.get("notes") ? String(formData.get("notes")) : null,
       vendorTypeIds,
+      supplierCategoryIds,
       contacts,
     });
     if (!parsed.success) throw validationError(parsed.error);
@@ -78,6 +81,7 @@ export async function createVendorAction(
       address: parsed.data.address || undefined,
       notes: parsed.data.notes || undefined,
       vendorTypeIds: parsed.data.vendorTypeIds,
+      supplierCategoryIds: parsed.data.supplierCategoryIds,
       contacts: parsed.data.contacts?.map((c) => ({
         personName: c.personName,
         jobTitle: c.jobTitle || undefined,
@@ -108,6 +112,7 @@ export async function updateVendorAction(
     }
 
     const vendorTypeIds = formData.getAll("vendorTypeIds").map(String).filter(Boolean);
+    const supplierCategoryIds = formData.getAll("supplierCategoryIds").map(String).filter(Boolean);
 
     let infoLinks: Array<{ kind: string; url: string; label?: string | null }> | undefined;
     let linkReviewSnapshot: unknown[] | undefined;
@@ -131,6 +136,7 @@ export async function updateVendorAction(
       address: formData.get("address") ? String(formData.get("address")) : null,
       notes: formData.get("notes") ? String(formData.get("notes")) : null,
       vendorTypeIds,
+      supplierCategoryIds,
       contacts,
     });
     if (!parsed.success) throw validationError(parsed.error);
@@ -144,6 +150,7 @@ export async function updateVendorAction(
       address: parsed.data.address,
       notes: parsed.data.notes,
       vendorTypeIds: parsed.data.vendorTypeIds,
+      supplierCategoryIds: parsed.data.supplierCategoryIds,
       contacts: parsed.data.contacts?.map((c) => ({
         id: c.id,
         personName: c.personName,

@@ -47,7 +47,30 @@ No item currently ready for review.
 
 ## Master Data
 
-No item currently ready for review.
+### Supplier Category dictionary and vendor assignment
+
+- **Observed:** Implemented in R8.08. Adds a **Supplier Category** dictionary
+  distinct from Supplier Type: Supplier Type remains the capability dimension
+  (Material/Labor eligibility and pricing guard), while Supplier Category is a
+  plain classification label (e.g. fabric supplier, hardware supplier) with no
+  capability or pricing consequence. A supplier may carry more than one
+  category (owner-confirmed many-to-many).
+- **Scope:** new `SupplierCategory` + `VendorSupplierCategory` join model and
+  additive migration `20260911150000_add_supplier_category` (deployed to the
+  rebuild-only kantor database via `prisma migrate deploy`); service CRUD with
+  the same duplicate/soft-delete rename, reference, audit, and shared
+  deletion-request/direct-delete behavior as Supplier Type; vendor create/edit
+  `supplierCategoryIds` passthrough with atomic join maintenance; a
+  **Supplier categories** tab in Settings → Master Data; and the Supplier
+  directory gaining a category multi-picker, table badges, and a category
+  filter.
+- **Needs:** A real browser walkthrough of Settings → Master Data →
+  Supplier categories (create, render, edit, archive, restore, request
+  deletion, and `masterdata.deletion.approve` direct delete), plus the
+  Supplier directory flow (assign categories on create and edit, save, badges
+  in the table, category filter, fallback read for non-managers) and the
+  duplicate-code guard on create.
+- **Status:** Ready for review, not yet verified.
 
 ## BQ
 
