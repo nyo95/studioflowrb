@@ -63,22 +63,41 @@ export function formatDateOnly(value: string, options: { locale?: string } = {})
 export type InstantDisplayOptions = {
   locale?: string;
   timeZone?: string;
+  /**
+   * Controls the formatting style.
+   * - "long" (default) — explicit year/month/day/hour/minute tokens, long month name.
+   * - "date" — `dateStyle: "medium"` (e.g. "10 Sep 2026"). No time component.
+   * - "datetime" — `dateStyle: "medium", timeStyle: "short"` (e.g. "10 Sep 2026, 14:30").
+   */
+  style?: "long" | "date" | "datetime";
 };
 
-/** Formats a UTC instant for display in an explicit/default timezone. */
-export function formatInstant(value: string, options: InstantDisplayOptions = {}): string {
-  if (!isIsoInstantString(value)) {
+/** Formats a UTC instant for display in an explicit/default timezone. Accepts a
+ *  UTC ISO-8601 string or a Date object. */
+export function formatInstant(value: string | Date, options: InstantDisplayOptions = {}): string {
+  const iso = typeof value === "string" ? value : value.toISOString();
+  if (!isIsoInstantString(iso)) {
     throw new Error(
-      `Invalid ISO instant string: ${JSON.stringify(value)}. Expected a UTC instant ending in Z.`,
+      `Invalid ISO instant string: ${JSON.stringify(iso)}. Expected a UTC instant ending in Z.`,
     );
   }
-  return new Intl.DateTimeFormat(options.locale ?? DEFAULT_DISPLAY_LOCALE, {
-    timeZone: options.timeZone ?? DEFAULT_DISPLAY_TIME_ZONE,
+  const locale = options.locale ?? DEFAULT_DISPLAY_LOCALE;
+  const timeZone = options.timeZone ?? DEFAULT_DISPLAY_TIME_ZONE;
+  const style = options.style ?? "long";
+  if (style === "date") {
+    return new Intl.DateTimeFormat(locale, { timeZone, dateStyle: "medium" }).format(new Date(iso));
+  }
+  if (style === "datetime") {
+    return new Intl.DateTimeFormat(locale, { timeZone, dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+  }
+  // "long" — existing behaviour preserved for all current callers.
+  return new Intl.DateTimeFormat(locale, {
+    timeZone,
     year: "numeric",
     month: "long",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
-  }).format(new Date(value));
+  }).format(new Date(iso));
 }

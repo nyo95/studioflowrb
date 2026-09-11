@@ -2209,93 +2209,55 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     userId: string,
   ): Promise<WaitingOnMeItem[]> {
     requireStudioFlowRead(grants);
-    const [iterations, tasks] = await Promise.all([
+
+    // Resolve the eligible assignee set once. Existing references to users who
+    // later become unavailable must remain visible as NEEDS_ASSIGNMENT.
+    const assignableUsers = await listAssignableUsers(grants);
+    const assignableUserIds = assignableUsers.map((user) => user.id);
+    const myLabel = assignableUsers.find((user) => user.id === userId)?.display_name ?? null;
+
+    // Two bounded reads per entity type: mine and the needs-assignment set
+    // (null or assigned to a user who is no longer eligible).
+    const [myIterations, needsAssignmentIterations, myTasks, needsAssignmentTasks] = await Promise.all([
       db.sfIteration.findMany({
-        where: {
-          state: { in: ["DRAFT", "SENT"] },
-          phase: { project: { deleted_at: null } },
-        },
+        where: { assignee_id: userId, state: { in: ["DRAFT", "SENT"] }, phase: { project: { deleted_at: null } } },
         select: {
-          id: true,
-          number: true,
-          state: true,
-          assignee_id: true,
-          created_at: true,
-          sent_at: true,
-          phase: {
-            select: {
-              id: true,
-              key: true,
-              name: true,
-              round_prefix: true,
-              project: { select: { id: true, code: true, name: true, status: true } },
-            },
-          },
+          id: true, number: true, state: true, assignee_id: true, created_at: true, sent_at: true,
+          phase: { select: {
+            id: true, key: true, name: true, round_prefix: true,
+            project: { select: { id: true, code: true, name: true, status: true } },
+          } },
+        },
+      }),
+      db.sfIteration.findMany({
+        where: { OR: [{ assignee_id: null }, { assignee_id: { notIn: assignableUserIds } }], state: { in: ["DRAFT", "SENT"] }, phase: { project: { deleted_at: null } } },
+        select: {
+          id: true, number: true, state: true, assignee_id: true, created_at: true, sent_at: true,
+          phase: { select: {
+            id: true, key: true, name: true, round_prefix: true,
+            project: { select: { id: true, code: true, name: true, status: true } },
+          } },
         },
       }),
       db.sfTask.findMany({
-        where: { status: "OPEN", project: { deleted_at: null } },
+        where: { assignee_id: userId, status: "OPEN", project: { deleted_at: null } },
         select: {
-          id: true,
-          phase_scope: true,
-          title: true,
-          assignee_id: true,
-          due_date: true,
-          created_at: true,
+          id: true, phase_scope: true, title: true, assignee_id: true, due_date: true, created_at: true,
+          project: { select: { id: true, code: true, name: true, status: true } },
+        },
+      }),
+      db.sfTask.findMany({
+        where: { OR: [{ assignee_id: null }, { assignee_id: { notIn: assignableUserIds } }], status: "OPEN", project: { deleted_at: null } },
+        select: {
+          id: true, phase_scope: true, title: true, assignee_id: true, due_date: true, created_at: true,
           project: { select: { id: true, code: true, name: true, status: true } },
         },
       }),
     ]);
 
-    const assigneeIds = [
-      ...new Set(
-        [...iterations, ...tasks]
-          .map((item) => item.assignee_id)
-          .filter((id): id is string => id !== null),
-      ),
-    ];
-    const users = assigneeIds.length
-      ? await db.user.findMany({
-          where: { id: { in: assigneeIds } },
-          select: {
-            id: true,
-            display_name: true,
-            status: true,
-            user_roles: {
-              where: { role: { archived_at: null } },
-              select: { role: { select: { role_permissions: { select: { permission_id: true } } } } },
-            },
-          },
-        })
-      : [];
-    const people = new Map(
-      users.map((user) => {
-        const permissionIds = new Set(
-          user.user_roles.flatMap((assignment) =>
-            assignment.role.role_permissions.map((permission) => permission.permission_id),
-          ),
-        );
-        return [
-          user.id,
-          {
-            label: user.display_name,
-            available:
-              user.status === "ACTIVE" &&
-              permissionIds.has(STUDIOFLOW_PERMISSIONS.access) &&
-              permissionIds.has(STUDIOFLOW_PERMISSIONS.projectRead),
-          },
-        ] as const;
-      }),
-    );
-    const assignmentFor = (assigneeId: string | null): "MINE" | "NEEDS_ASSIGNMENT" | null => {
-      if (!assigneeId || !people.get(assigneeId)?.available) return "NEEDS_ASSIGNMENT";
-      return assigneeId === userId ? "MINE" : null;
-    };
-
     const rows: WaitingOnMeItem[] = [];
-    for (const iteration of iterations) {
-      const assignment = assignmentFor(iteration.assignee_id);
-      if (!assignment) continue;
+
+    for (const iteration of myIterations) {
       rows.push({
         kind: "ITERATION",
         id: iteration.id,
@@ -2309,14 +2271,33 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         iteration_number: iteration.number,
         state: iteration.state as "DRAFT" | "SENT",
         assignee_id: iteration.assignee_id,
-        assignee_label: iteration.assignee_id ? people.get(iteration.assignee_id)?.label ?? null : null,
-        assignment,
+        assignee_label: myLabel,
+        assignment: "MINE",
         waiting_since: iteration.state === "SENT" ? iteration.sent_at ?? iteration.created_at : iteration.created_at,
       });
     }
-    for (const task of tasks) {
-      const assignment = assignmentFor(task.assignee_id);
-      if (!assignment) continue;
+
+    for (const iteration of needsAssignmentIterations) {
+      rows.push({
+        kind: "ITERATION",
+        id: iteration.id,
+        project: iteration.phase.project,
+        phase: {
+          id: iteration.phase.id,
+          key: iteration.phase.key,
+          name: iteration.phase.name,
+          round_prefix: iteration.phase.round_prefix,
+        },
+        iteration_number: iteration.number,
+        state: iteration.state as "DRAFT" | "SENT",
+        assignee_id: iteration.assignee_id,
+        assignee_label: null,
+        assignment: "NEEDS_ASSIGNMENT",
+        waiting_since: iteration.state === "SENT" ? iteration.sent_at ?? iteration.created_at : iteration.created_at,
+      });
+    }
+
+    for (const task of myTasks) {
       rows.push({
         kind: "TASK",
         id: task.id,
@@ -2324,12 +2305,28 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         phase_scope: task.phase_scope,
         title: task.title,
         assignee_id: task.assignee_id,
-        assignee_label: task.assignee_id ? people.get(task.assignee_id)?.label ?? null : null,
-        assignment,
+        assignee_label: myLabel,
+        assignment: "MINE",
         due_date: task.due_date,
         waiting_since: task.created_at,
       });
     }
+
+    for (const task of needsAssignmentTasks) {
+      rows.push({
+        kind: "TASK",
+        id: task.id,
+        project: task.project,
+        phase_scope: task.phase_scope,
+        title: task.title,
+        assignee_id: task.assignee_id,
+        assignee_label: null,
+        assignment: "NEEDS_ASSIGNMENT",
+        due_date: task.due_date,
+        waiting_since: task.created_at,
+      });
+    }
+
     return rows.sort((left, right) =>
       left.waiting_since.getTime() - right.waiting_since.getTime() || left.id.localeCompare(right.id),
     );

@@ -28,9 +28,9 @@ export default async function PlatformLayout({ children }: { children: ReactNode
     {apps.some((app) => app.appId === "studioflow") ? <StudioFlowNav /> : null}
   </>;
 
-  const domainUtilityNavigation = <>
-    {apps.some((app) => app.appId === "studioflow") ? <StudioFlowUtilityNav /> : null}
-  </>;
+  const domainUtilityNavigation = apps.some((app) => app.appId === "studioflow")
+    ? <StudioFlowUtilityNav />
+    : null;
 
   return <AuthenticatedShell principal={principal} grants={grants} settings={settings} apps={apps} logoutAction={logoutAction} domainNavigation={domainNavigation} domainUtilityNavigation={domainUtilityNavigation}>
     {children}

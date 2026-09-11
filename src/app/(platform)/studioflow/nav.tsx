@@ -3,7 +3,7 @@
 import { CalendarDays, FolderOpen, Globe, Grid2X2, Layers, ListChecks, Settings, ShoppingBag } from "lucide-react";
 import { usePathname } from "next/navigation";
 
-import { NavGroup, NavItem, NavSeparator } from "@/platform/ui_engine";
+import { NavGroup, NavItem, NavSeparator, UtilitySection } from "@/platform/ui_engine";
 
 function activePath(pathname: string, href: string, exact = false): boolean {
   if (exact) return pathname === href;
@@ -105,13 +105,15 @@ export function StudioFlowUtilityNav() {
   if (!pathname.startsWith("/studioflow")) return null;
 
   return (
-    <NavItem
-      href="/studioflow/settings"
-      icon={<Settings size={16} />}
-      active={activePath(pathname, "/studioflow/settings")}
-      prefetch={false}
-    >
-      General Settings
-    </NavItem>
+    <UtilitySection>
+      <NavItem
+        href="/studioflow/settings"
+        icon={<Settings size={16} />}
+        active={activePath(pathname, "/studioflow/settings")}
+        prefetch={false}
+      >
+        General Settings
+      </NavItem>
+    </UtilitySection>
   );
 }

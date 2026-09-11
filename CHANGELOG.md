@@ -5,8 +5,37 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.04**
-- Next local revision: **R8.05**
+- Current revision after this entry is committed: **R8.06**
+- Next local revision: **R8.07**
+
+## R8.06 | 2026-09-11 | merge(main): integrate remote R8.05 utilities and UI fixes
+
+- Integrated the GitHub `main` R8.05 changes, including the missing BQ
+  calculation-expression utility and its tests.
+- Integrated the canonical instant-display UI Engine component and related
+  StudioFlow/BQ routing and surface corrections.
+- Preserved the local R8.05 Master Data direct hard-delete implementation and
+  its contract/test changes.
+
+### Verification
+
+- Merge simulation and actual merge completed without conflicts.
+- `git diff --cached --check` passed before final commit.
+
+## R8.05 | 2026-09-11 | fix(studioflow,ui-engine): close KB-019 and wire canonical instant display
+
+- Completed KB-019's bounded `listWaitingOnMe` read while preserving open work
+  assigned to unavailable users under `NEEDS_ASSIGNMENT`.
+- Wired the canonical UI Engine `FormattedInstant` component into the three
+  audited Master Data, BQ, and StudioFlow date call sites.
+- Closed KB-019 and marked the audited date-display consolidation complete.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `npm run check`: passed.
+- Full test suite remains environment-blocked by the pre-existing database hook
+  failures; unrelated local changes remain uncommitted.
 
 ## R8.05 | 2026-09-11 | feat(masterdata): allow approved RBAC direct hard delete
 

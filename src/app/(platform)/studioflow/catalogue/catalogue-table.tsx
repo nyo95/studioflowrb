@@ -4,10 +4,13 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { DataTable, EntityPrimaryCell, Pagination, TableBody, TableCell, TableHead, TableHeader, TableRow, usePagination, type SortDirection } from "@/platform/ui_engine";
+import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
+import { formatInstant } from "@platform/utilities/date";
 
 export type CatalogueRow = { id: string; product_name: string; brand_name: string | null; colour: string | null; finishing: string | null; unit: string | null; deleted_at: Date | null; updated_at: Date };
 
 export function CatalogueTable({ products }: { products: CatalogueRow[] }) {
+  const { locale, timezone } = useDisplaySettings();
   const [sort, setSort] = useState<{ key: "product" | "brand" | "updated"; direction: SortDirection }>({ key: "product", direction: "asc" });
   const ordered = useMemo(() => [...products].sort((left, right) => {
     const first = sort.key === "product" ? left.product_name : sort.key === "brand" ? left.brand_name ?? "" : left.updated_at.toISOString();
@@ -27,6 +30,6 @@ export function CatalogueTable({ products }: { products: CatalogueRow[] }) {
       <TableHead>Colour</TableHead><TableHead>Finishing</TableHead><TableHead>Unit</TableHead>
       <TableHead sortable sortDirection={sort.key === "updated" ? sort.direction : null} onSortChange={(direction) => changeSort("updated", direction)} sortLabel={(direction) => `Sort updated date ${direction}`}>Updated</TableHead>
     </TableRow></TableHeader>
-    <TableBody>{pageRows.map((product) => <TableRow key={product.id}><TableCell><EntityPrimaryCell tone={product.deleted_at ? "danger" : "success"} statusLabel={product.deleted_at ? "Archived" : "Active"} name={<Link href={`/studioflow/catalogue/${product.id}`} className="font-medium text-action hover:underline">{product.product_name}</Link>} /></TableCell><TableCell>{product.brand_name ?? "—"}</TableCell><TableCell>{product.colour ?? "—"}</TableCell><TableCell>{product.finishing ?? "—"}</TableCell><TableCell>{product.unit ?? "—"}</TableCell><TableCell>{new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(product.updated_at)}</TableCell></TableRow>)}</TableBody>
+    <TableBody>{pageRows.map((product) => <TableRow key={product.id}><TableCell><EntityPrimaryCell tone={product.deleted_at ? "danger" : "success"} statusLabel={product.deleted_at ? "Archived" : "Active"} name={<Link href={`/studioflow/catalogue/${product.id}`} className="font-medium text-action hover:underline">{product.product_name}</Link>} /></TableCell><TableCell>{product.brand_name ?? "—"}</TableCell><TableCell>{product.colour ?? "—"}</TableCell><TableCell>{product.finishing ?? "—"}</TableCell><TableCell>{product.unit ?? "—"}</TableCell><TableCell>{formatInstant(product.updated_at, { locale, timeZone: timezone, style: "date" })}</TableCell></TableRow>)}</TableBody>
   </DataTable><Pagination page={paging.page} pageCount={paging.pageCount} total={ordered.length} pageSize={pageSize} onPageChange={paging.setPage} label="Catalogue pages" /></>;
 }

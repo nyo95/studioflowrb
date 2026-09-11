@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { FolderOpen, Plus } from "lucide-react";
+import { FolderOpen } from "lucide-react";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
@@ -8,10 +8,10 @@ import { prisma } from "@/platform/core/db";
 import { readPlatformGeneralSettings } from "@platform/core/settings";
 import {
   Avatar,
-  buttonClasses,
   DataTable,
   DirectoryShell,
   EmptyState,
+  FormattedInstant,
   EntityPrimaryCell,
   filterChipClasses,
   PageHeader,
@@ -31,6 +31,7 @@ import {
 } from "@/platform/ui_engine";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
 import { studioFlowService } from "@/apps/studioflow/runtime";
+import { NewProjectButton } from "./new-project-dialog";
 
 export const dynamic = "force-dynamic";
 
@@ -148,10 +149,14 @@ export default async function StudioFlowProjectsPage({
   const query = firstParam(params.q);
   const requestedPage = parsePage(params.page);
 
-  const [projects, settings] = await Promise.all([
+  const [projects, settings, allClients] = await Promise.all([
     studioFlowService.listProjects(grants),
     readPlatformGeneralSettings(prisma),
+    canManage ? studioFlowService.listClients(grants) : Promise.resolve([]),
   ]);
+  const clients = allClients
+    .filter((c) => !c.deleted_at)
+    .map((c) => ({ id: c.id, name: c.name }));
 
   // Cross-schema: resolve lead_user_id → display_name (no Prisma relation allowed).
   const leadUserIds = Array.from(
@@ -203,10 +208,6 @@ export default async function StudioFlowProjectsPage({
   const page = Math.min(requestedPage, pageCount);
   const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const fmt = new Intl.DateTimeFormat(settings.locale, {
-    timeZone: settings.timezone,
-    dateStyle: "medium",
-  });
   const areaFmt = new Intl.NumberFormat(settings.locale, { maximumFractionDigits: 2 });
 
   const chips = [
@@ -232,11 +233,7 @@ export default async function StudioFlowProjectsPage({
         description="Every studio project, with its current active phase."
         divider
         actions={
-          canManage ? (
-            <Link href="/studioflow/new" className={buttonClasses("primary", "md")}>
-              <Plus size={16} aria-hidden="true" /> New project
-            </Link>
-          ) : null
+          canManage ? <NewProjectButton clients={clients} /> : null
         }
       />
 
@@ -375,7 +372,7 @@ export default async function StudioFlowProjectsPage({
                         <Text size="sm" tone="tertiary">—</Text>
                       )}
                     </TableCell>
-                    <TableCell>{fmt.format(new Date(project.updated_at))}</TableCell>
+                    <TableCell><FormattedInstant value={project.updated_at} locale={settings.locale} timeZone={settings.timezone} /></TableCell>
                   </TableRow>
                 );
               })}
