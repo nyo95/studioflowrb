@@ -1,6 +1,6 @@
 # Known Bugs by Application
 
-Status: active defect ledger, reconciled through R7.55 on 2026-09-10.
+Status: active defect ledger, reconciled through R8.11 on 2026-09-12.
 
 Planned features belong in [`roadmap.md`](roadmap.md). When a bug is fixed, move
 it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
@@ -47,7 +47,8 @@ No open BQ bug is currently recorded.
 
 The R7.55 audit read the whole StudioFlow surface against
 [`apps/studioflow/studioflow-project-contract.md`](apps/studioflow/studioflow-project-contract.md) and
-opened KB-012 … KB-019 below. KB-013, KB-014 and KB-015 are one gap seen from
+opened KB-012 … KB-018 below (KB-019 was closed in R8.05; KB-021 … KB-023 were added by the owner audit).
+KB-013, KB-014 and KB-015 are one gap seen from
 three sides: the client answer is persisted as a single immutable `SfResponse`
 with no state, no replacement link and no reason, so the contract's whole §6.5
 / §6.6 correction and draft behaviour has nowhere to live. They are listed apart
@@ -148,20 +149,6 @@ migration and one slice.
   not delete files on the owner's machine. Codex should confirm nothing imports
   these modules and remove the two route folders' non-`page.tsx` files.
 
-### KB-019 — `listWaitingOnMe` reads every open round and task in the database
-
-- **Observed:** The read model loads all `DRAFT`/`SENT` iterations and all `OPEN`
-  tasks across every live project, then filters by assignee in application code.
-- **Expected:** Contract §10.2 is "mine, unfinished, oldest first"; the assignee
-  filter belongs in the query, with the unassigned/unavailable rows fetched as
-  their own bounded read.
-- **Mitigation:** None; correct today at the studio's data volume.
-- **Status:** Open; logic debt, no owner decision required.
-
-### Closed in R8.05
-
-- **KB-019:** `listWaitingOnMe` now bounds the database reads by assignee and
-  retains null or unavailable assignees in the `NEEDS_ASSIGNMENT` bucket.
 
 ### KB-021 — Product Catalogue is a global reuse pool; legacy was per-project
 
@@ -272,6 +259,12 @@ migration and one slice.
   does not exist.
 
 ## Closed
+
+### KB-019 — `listWaitingOnMe` reads every open round and task in the database
+
+- **Closed in R8.05.** `listWaitingOnMe` now bounds the database reads by assignee
+  at the query level and retains null or unavailable assignees in the
+  `NEEDS_ASSIGNMENT` bucket.
 
 ### R7.55 audit corrections closed in the same change set
 

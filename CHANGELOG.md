@@ -5,8 +5,19 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.11**
-- Next local revision: **R8.12**
+- Current revision after this entry is committed: **R8.12**
+- Next local revision: **R8.13**
+
+## R8.12 | 2026-09-12 | docs: audit updates to roadmap and knownbug
+
+- Removed parked AI file organization from `roadmap.md` per owner instruction.
+- Marked the Master Data God-Service decomposition as completed in `roadmap.md` (shipped in R8.11).
+- Updated the status headers for `roadmap.md` and `knownbug.md`.
+- Updated `knownbug.md` to properly document KB-019 (`listWaitingOnMe` query limit) as Closed since it was fixed in R8.05. Fixed the StudioFlow intro paragraph reference to the open KB range.
+
+### Verification
+
+- `git diff --check`: passed.
 
 ## R8.10 | 2026-09-12 | chore(tooling): refresh generated Next.js type references
 

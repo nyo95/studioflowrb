@@ -1,6 +1,6 @@
 # Product Roadmap by Application
 
-Status: active planning ledger, reconciled through R8.10 on 2026-09-12.
+Status: active planning ledger, reconciled through R8.11 on 2026-09-12.
 
 This file answers **what remains to be built**. It does not activate work by
 itself. Completed items are struck through or removed only after verification
@@ -9,7 +9,7 @@ unverified work belongs in [`review.md`](review.md), not here.
 
 ## Mandatory Architectural & Enforcement Refactoring (Prerequisite for StudioFlow Continuation)
 
-- [ ] **Decompose Master Data God-Service:** Refactor `src/apps/masterdata/service.ts` (~214 KB) into focused domain use-case service modules (`services/brand.service.ts`, `services/vendor.service.ts`, `services/pricing.service.ts`, `services/sku.service.ts`, `services/unit.service.ts`, `services/category.service.ts`, `services/supplier-category.service.ts`, `services/deletion.service.ts`).
+- [x] ~~**Decompose Master Data God-Service:** Refactor `src/apps/masterdata/service.ts` into focused domain use-case service modules.~~ Done in R8.11; 11 domain service files under `src/apps/masterdata/services/`, facade backward-compatible.
 - [ ] **Decompose BQ & StudioFlow God-Services:** Apply the same use-case modularization pattern to growing service modules in BQ (`src/apps/bq/service.ts`) and StudioFlow (`src/apps/studioflow/service.ts`).
 - [ ] **Strict Cross-App Surface Isolation:** Enforce `src/apps/<app>/public/index.ts` as the sole public surface for cross-app reads and integrations across Master Data, BQ, and StudioFlow.
 - [ ] **Enforceable UI Engine Boundary Checker:** Upgrade automated boundary checker tooling (`scripts/check-boundaries.mjs`) to detect and fail on ad-hoc app-local visual primitives, unapproved styling patterns, or private wrapper components that bypass canonical UI Engine exports.
@@ -126,10 +126,6 @@ unverified work belongs in [`review.md`](review.md), not here.
 - [ ] Explore a safe Library crawler that uses approved Master Data websites to
   retrieve representative logo/image metadata, with legal/technical checks and
   a deterministic fallback.
-- [ ] **Parked 2026-09-10 (owner instruction) — held until Platform routing,
-  UI Engine, and BQ land; see `README.md`'s Active sequence.** Explore opt-in,
-  auditable, reversible AI file organization that never silently changes
-  filing state.
 
 ### Lifecycle and release decisions
 
