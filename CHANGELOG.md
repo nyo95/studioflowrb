@@ -8,6 +8,17 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Current revision after this entry is committed: **R8.09**
 - Next local revision: **R8.10**
 
+## R8.10 | 2026-09-12 | chore(tooling): refresh generated Next.js type references
+
+- Recorded the generated `next-env.d.ts` update produced by the current Next.js
+  development setup, changing route and root-parameter type references from
+  `.next/types` to `.next/dev/types`.
+- No application logic, schema, migration, or dependency changes.
+
+### Verification
+
+- `git diff --check`: passed.
+
 ## R8.09 | 2026-09-11 | feat(masterdata): inline-creatable supplier category picker
 
 - Owner follow-up to R8.08: the Supplier category picker in the Supplier
