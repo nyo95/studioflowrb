@@ -620,7 +620,7 @@ inferred or created by fallback.
 | Q4 | PriceMaterial vendor | Required (NOT NULL). Manufacturer = register as Vendor |
 | Q5 | Direct archive | Staff can archive any price directly |
 | Q6 | Lifecycle | All 3 tables: archive/restore (deleted_at). Consistent |
-| Q7 | Permanent delete | Staff request → holder of `masterdata.deletion.approve` approves/rejects |
+| Q7 | Permanent delete | Staff request, or direct execution by `masterdata.deletion.approve`; only archived prices may be removed |
 | Q8 | Permissions | 4 permissions: price-material (read+manage) + price-work (read+manage) |
 | Q9 | Audit | Direct CRUD/lifecycle actions plus deletion request/reject/final delete; parent cascades stay in the parent event |
 | Q10 | Work prices vendor | Required (NOT NULL) in both ML and Labor tables |

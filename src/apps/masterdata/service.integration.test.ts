@@ -753,6 +753,23 @@ describe("Master Data service", () => {
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "unit.deleted", entity_id: created.unitId } }), 1);
   });
 
+  it("lets the deletion approver hard-delete without creating a request", async () => {
+    const created = await service.createUnit({ grants: GRANTS, actor: ACTOR, code: "DIRECT_DELETE", name: "Direct Delete" });
+    await service.archiveUnit({ grants: GRANTS, actor: ACTOR, unitId: created.unitId });
+
+    const result = await service.hardDeleteArchived({
+      grants: GRANTS,
+      actor: ACTOR,
+      targetType: "unit",
+      targetId: created.unitId,
+    });
+
+    assert.equal(result?.direct, true);
+    assert.equal(await testDb.prisma.unit.findUnique({ where: { id: created.unitId } }), null);
+    assert.equal(await testDb.prisma.deletionRequest.count({ where: { target_id: created.unitId } }), 0);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "unit.deleted", entity_id: created.unitId } }), 1);
+  });
+
   it("keeps a deletion request pending when its archived target is restored before approval", async () => {
     const created = await service.createUnit({ grants: GRANTS, actor: ACTOR, code: "RESTORE_GUARD", name: "Restore Guard" });
     await service.archiveUnit({ grants: GRANTS, actor: ACTOR, unitId: created.unitId });

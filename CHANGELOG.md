@@ -8,6 +8,25 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Current revision after this entry is committed: **R8.04**
 - Next local revision: **R8.05**
 
+## R8.05 | 2026-09-11 | feat(masterdata): allow approved RBAC direct hard delete
+
+- Added a direct hard-delete path for every Master Data deletion target when the
+  actor has `masterdata.deletion.approve`; no `DeletionRequest` is created.
+- Users without that grant retain the existing archive/deactivate → request →
+  approval workflow.
+- Direct deletion keeps the existing archive and dependency guards. Brand hard
+  deletion now explicitly rejects active branded SKUs; Brand archive continues
+  to archive all branded SKUs and Material Prices with provenance causes.
+- Updated the Master Data, Brand, Vendor, and Pricing contracts to document both
+  deletion paths and direct-deletion audit metadata.
+
+### Verification
+
+- `npm run typecheck`: blocked by the pre-existing missing module
+  `@/apps/bq/lib/calc-expression` in `src/app/(platform)/bq/[id]/project-editor.tsx`;
+  no new type errors were reported for this change.
+- Prisma/database not changed.
+
 ## R8.04 | 2026-09-11 | fix(bq): fix commitNum prop plumbing and dev server rendering
 
 - Resolved undefined identifier `commitNum` error in BQ project editor component

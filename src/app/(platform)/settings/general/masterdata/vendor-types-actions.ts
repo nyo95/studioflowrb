@@ -5,7 +5,9 @@ import { z } from "zod";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { validationError } from "@platform/core/validation";
+import { hasPermission } from "@platform/core/rbac";
 import { masterDataService } from "@/apps/masterdata/runtime";
+import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
 
 function refresh() { revalidatePath("/settings/general/masterdata"); revalidatePath("/masterdata/vendors"); }
 function actor(principal: { userId: string; displayName: string }) { return { kind: "USER" as const, userId: principal.userId, label: principal.displayName }; }
@@ -25,4 +27,4 @@ export async function saveVendorTypeAction(id: string | null, formData: FormData
 }
 export async function archiveVendorTypeAction(id: string): Promise<ActionResult<{ vendorTypeId: string }>> { return runSafeAction(async () => { const { principal, grants } = await requirePrincipalGrants(); const vendorTypeId = parseId(id); const result = await masterDataService.archiveVendorType({ grants, actor: actor(principal), vendorTypeId }); refresh(); return result; }); }
 export async function restoreVendorTypeAction(id: string): Promise<ActionResult<{ vendorTypeId: string }>> { return runSafeAction(async () => { const { principal, grants } = await requirePrincipalGrants(); const vendorTypeId = parseId(id); const result = await masterDataService.restoreVendorType({ grants, actor: actor(principal), vendorTypeId }); refresh(); return result; }); }
-export async function requestVendorTypeDeletionAction(id: string): Promise<ActionResult<{ requestId: string }>> { return runSafeAction(async () => { const { principal, grants } = await requirePrincipalGrants(); const vendorTypeId = parseId(id); const result = await masterDataService.requestVendorTypeDeletion({ grants, actor: actor(principal), vendorTypeId }); refresh(); revalidatePath("/masterdata/deletions"); return result; }); }
+export async function requestVendorTypeDeletionAction(id: string): Promise<ActionResult<unknown>> { return runSafeAction(async () => { const { principal, grants } = await requirePrincipalGrants(); const vendorTypeId = parseId(id); const result = hasPermission(grants, MASTERDATA_PERMISSIONS.deletionApprove) ? await masterDataService.hardDeleteArchived({ grants, actor: actor(principal), targetType: "vendor_type", targetId: vendorTypeId }) : await masterDataService.requestVendorTypeDeletion({ grants, actor: actor(principal), vendorTypeId }); refresh(); revalidatePath("/masterdata/deletions"); return result; }); }

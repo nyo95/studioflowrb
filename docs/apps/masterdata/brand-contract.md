@@ -153,8 +153,7 @@ catalog data; it never archives an owner or supplier Vendor.
 | Read/list | `masterdata.brand.read` | View active/authorized archived states |
 | Create/update | `masterdata.brand.manage` | Mutate profile, discovery, resources, and relationships |
 | Archive/restore | `masterdata.brand.manage` | Reversible operation with persisted causes |
-| Request permanent deletion | `masterdata.brand.manage` | Only an archived Brand; persisted request |
-| Approve/reject and execute | `masterdata.deletion.approve` | Explicit approval permission; never a Role-name bypass |
+| Permanent deletion | `masterdata.brand.manage` requests; `masterdata.deletion.approve` may execute directly | Archived Brand; direct execution creates no request |
 
 ### 6.1 Archive
 
@@ -192,8 +191,10 @@ A directly archived SKU or Price therefore remains archived.
 
 ### 6.3 Permanent deletion
 
-Permanent deletion requires an approved request and an archived Brand. It is
-blocked while BrandSupplier or Brand-scoped VendorContact references remain.
+Permanent deletion requires an archived Brand. A Brand manager may submit a
+request; a holder of `masterdata.deletion.approve` may execute directly without
+a request. It is blocked while any branded SKU is active, or while BrandSupplier
+or Brand-scoped VendorContact references remain.
 Owner linkage is a field on the Brand and is removed with it.
 
 In the same approved transaction the service:
@@ -370,7 +371,7 @@ evidence only; it does not authorize code changes.
 | Resources | Many external URLs directly on Brand; internal storage deferred |
 | Archive | Staff; parent-causes every branded SKU and Material Price |
 | Restore | Staff; removes only Brand-created causes and restores only eligible SKU/Prices |
-| Permanent delete | Staff request, explicit approver permission. Purges the Brand, branded SKUs, and their Material Prices atomically |
+| Permanent delete | Staff request or direct execution by `masterdata.deletion.approve`; purges the archived Brand, branded SKUs, and their Material Prices atomically |
 | Historical BQ | Protected by consumer snapshots |
 | UI | Directory table, trailing action menu, Dialog edit, explicit confirmations |
 | Import/export | Deferred |

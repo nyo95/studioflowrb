@@ -7,6 +7,8 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { masterDataService } from "@/apps/masterdata/runtime";
 import { validationError } from "@platform/core/validation";
+import { hasPermission } from "@platform/core/rbac";
+import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
 
 type PriceKind = "material" | "material-labor" | "labor";
 const mutationInput = z.object({ kind: z.enum(["material", "material-labor", "labor"]), id: z.string().uuid() });
@@ -236,11 +238,18 @@ export async function requestPriceDeletionAction(kind: PriceKind, id: string, re
     const ctx = await context();
     const input = deletionInput.safeParse({ kind, id, reason });
     if (!input.success) throw validationError(input.error);
-    const result = input.data.kind === "material"
-      ? await masterDataService.requestPriceMaterialDeletion({ ...ctx, priceMaterialId: input.data.id, reason: input.data.reason })
-      : input.data.kind === "material-labor"
-        ? await masterDataService.requestPriceMaterialLaborDeletion({ ...ctx, priceMaterialLaborId: input.data.id, reason: input.data.reason })
-        : await masterDataService.requestPriceLaborDeletion({ ...ctx, priceLaborId: input.data.id, reason: input.data.reason });
+    const result = hasPermission(ctx.grants, MASTERDATA_PERMISSIONS.deletionApprove)
+      ? await masterDataService.hardDeleteArchived({
+        grants: ctx.grants,
+        actor: ctx.actor,
+        targetType: input.data.kind === "material" ? "price_material" : input.data.kind === "material-labor" ? "price_material_labor" : "price_labor",
+        targetId: input.data.id,
+      })
+      : input.data.kind === "material"
+        ? await masterDataService.requestPriceMaterialDeletion({ ...ctx, priceMaterialId: input.data.id, reason: input.data.reason })
+        : input.data.kind === "material-labor"
+          ? await masterDataService.requestPriceMaterialLaborDeletion({ ...ctx, priceMaterialLaborId: input.data.id, reason: input.data.reason })
+          : await masterDataService.requestPriceLaborDeletion({ ...ctx, priceLaborId: input.data.id, reason: input.data.reason });
     refreshPricing();
     revalidatePath("/masterdata/deletions");
     return result;

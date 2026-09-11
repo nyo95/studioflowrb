@@ -6,7 +6,9 @@ import { z } from "zod";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { validationError } from "@platform/core/validation";
+import { hasPermission } from "@platform/core/rbac";
 import { masterDataService } from "@/apps/masterdata/runtime";
+import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
 
 const IdSchema = z.string().uuid();
 const DeletionInputSchema = z.object({ id: IdSchema, reason: z.string().max(1000).optional(), notes: z.string().max(1000).optional() });
@@ -116,18 +118,15 @@ export async function requestSkuDeletionAction(
   skuId: string,
   reason?: string,
   notes?: string,
-): Promise<ActionResult<{ requestId: string }>> {
+): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
     const parsed = DeletionInputSchema.safeParse({ id: skuId, reason, notes });
     if (!parsed.success) throw validationError(parsed.error);
-    const result = await masterDataService.requestSkuDeletion({
-      grants,
-      actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      skuId: parsed.data.id,
-      reason: parsed.data.reason,
-      notes: parsed.data.notes,
-    });
+    const actor = { kind: "USER" as const, userId: principal.userId, label: principal.displayName };
+    const result = hasPermission(grants, MASTERDATA_PERMISSIONS.deletionApprove)
+      ? await masterDataService.hardDeleteArchived({ grants, actor, targetType: "sku", targetId: parsed.data.id })
+      : await masterDataService.requestSkuDeletion({ grants, actor, skuId: parsed.data.id, reason: parsed.data.reason, notes: parsed.data.notes });
     revalidateSkus();
     revalidatePath("/masterdata/deletions");
     return result;

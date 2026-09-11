@@ -6,7 +6,9 @@ import { z } from "zod";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { validationError } from "@platform/core/validation";
+import { hasPermission } from "@platform/core/rbac";
 import { masterDataService } from "@/apps/masterdata/runtime";
+import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
 
 function revalidateCategories(): void {
   revalidatePath("/masterdata/categories");
@@ -113,18 +115,15 @@ export async function requestCategoryDeletionAction(
   categoryId: string,
   reason?: string,
   notes?: string,
-): Promise<ActionResult<{ requestId: string }>> {
+): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
     const parsed = DeletionInputSchema.safeParse({ id: categoryId, reason, notes });
     if (!parsed.success) throw validationError(parsed.error);
-    const result = await masterDataService.requestCategoryDeletion({
-      grants,
-      actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      categoryId: parsed.data.id,
-      reason: parsed.data.reason,
-      notes: parsed.data.notes,
-    });
+    const actor = { kind: "USER" as const, userId: principal.userId, label: principal.displayName };
+    const result = hasPermission(grants, MASTERDATA_PERMISSIONS.deletionApprove)
+      ? await masterDataService.hardDeleteArchived({ grants, actor, targetType: "category", targetId: parsed.data.id })
+      : await masterDataService.requestCategoryDeletion({ grants, actor, categoryId: parsed.data.id, reason: parsed.data.reason, notes: parsed.data.notes });
     revalidateCategories();
     revalidatePath("/masterdata/deletions");
     return result;

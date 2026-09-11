@@ -205,19 +205,23 @@ request time, pending/executed/rejected status, approver snapshot, decision time
 and safe reason/notes when supplied. At most one pending request may exist for the
 same target.
 
-Resource `*.manage` permissions may request deletion. Approval and execution
-require the explicit app permission:
+Resource `*.manage` permissions may request deletion. A holder of the explicit
+app permission below may also execute a direct hard delete for an already
+archived/deactivated target, without creating a deletion request:
 
 ```text
 masterdata.deletion.approve
 ```
 
 An initial Admin Role may be seeded with this permission, but code must never use
-the string `Admin` as an authorization bypass. A deletion request produces one
+the string `Admin` as an authorization bypass. The request path remains available
+to resource managers without this grant. A deletion request produces one
 `<entity>.deletion-requested` audit event. Rejection produces
 `<entity>.deletion-rejected`. Successful approval and hard deletion are one atomic
 business operation represented by `<entity>.deleted`, with request and approver
-metadata. This preserves Core's one-operation/one-primary-event rule.
+metadata. Direct deletion emits the same `<entity>.deleted` event with direct
+deletion metadata and no `DeletionRequest` row. Both paths preserve Core's
+one-operation/one-primary-event rule.
 
 ## 5. Shared capability inventory
 

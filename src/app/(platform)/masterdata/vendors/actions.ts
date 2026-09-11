@@ -7,7 +7,9 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { AppError } from "@platform/core/errors";
 import { validationError } from "@platform/core/validation";
+import { hasPermission } from "@platform/core/rbac";
 import { masterDataService } from "@/apps/masterdata/runtime";
+import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
 
 function revalidateVendors(): void {
   revalidatePath("/masterdata/vendors");
@@ -192,18 +194,15 @@ export async function requestVendorDeletionAction(
   vendorId: string,
   reason?: string,
   notes?: string,
-): Promise<ActionResult<{ requestId: string }>> {
+): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
     const parsed = DeletionInputSchema.safeParse({ id: vendorId, reason, notes });
     if (!parsed.success) throw validationError(parsed.error);
-    const result = await masterDataService.requestVendorDeletion({
-      grants,
-      actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      vendorId: parsed.data.id,
-      reason: parsed.data.reason,
-      notes: parsed.data.notes,
-    });
+    const actor = { kind: "USER" as const, userId: principal.userId, label: principal.displayName };
+    const result = hasPermission(grants, MASTERDATA_PERMISSIONS.deletionApprove)
+      ? await masterDataService.hardDeleteArchived({ grants, actor, targetType: "vendor", targetId: parsed.data.id })
+      : await masterDataService.requestVendorDeletion({ grants, actor, vendorId: parsed.data.id, reason: parsed.data.reason, notes: parsed.data.notes });
     revalidateVendors();
     revalidatePath("/masterdata/deletions");
     return result;

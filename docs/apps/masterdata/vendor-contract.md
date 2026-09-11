@@ -561,5 +561,5 @@ them.
 | + | Audit prefix | `vendor.*` |
 | + | Restore validation | Name/slug conflict + VendorType integrity |
 | + | Restore cascade | Only matching Vendor archive causes are removed; independent causes remain |
-| + | Permanent delete flow | Staff request → holder of `masterdata.deletion.approve` approves/rejects |
+| + | Permanent delete flow | Staff request, or direct execution by `masterdata.deletion.approve`; archived target and dependency guards still apply |
 | + | Brand alignment | Brand must follow same lifecycle pattern (§16) |
