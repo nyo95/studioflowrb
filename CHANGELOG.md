@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.09**
-- Next local revision: **R8.10**
+- Current revision after this entry is committed: **R8.11**
+- Next local revision: **R8.12**
 
 ## R8.10 | 2026-09-12 | chore(tooling): refresh generated Next.js type references
 
@@ -18,6 +18,24 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ### Verification
 
 - `git diff --check`: passed.
+
+## R8.11 | 2026-09-12 | refactor(masterdata): decompose monolithic service.ts into modular domain services
+
+- Split the 4788-line monolithic `masterdata/service.ts` into typed domain service factories: `unit`, `category`, `vendor-type`, `supplier-category`, `brand`, `vendor`, `sku`, `pricing`, and `deletion`.
+- Extracted all shared utilities (actor validation, permission checks, audit writing, deletion request creation, normalization helpers) into `services/shared.ts`.
+- Added `services/index.ts` barrel with typed exports (`MASTERDATA_PERMISSIONS`, `MasterDataServicePorts`, `TxClient`, `MasterDataDeletionTarget`, `hasPermission`).
+- `service.ts` remains backward-compatible as a thin facade that composes domain services via object spread and adds `summary`, `listPromotionReferences`, `validatePromotionReference`.
+- All domain service factories now explicitly destructure `runTransaction` from `ports`.
+- Corrected missing imports (`addDirectCause`, `addParentCauses`, `removeDirectCause`, `removeParentCausesAndFindRestored`, `assertPriceMaterialRestorable`, `assertWorkPriceRestorable`) in `vendor.service.ts` and removed the dead stub `runTransaction` function; also ran `prisma generate` to resolve stale generated client for `SupplierCategory` and `VendorSupplierCategory` fields.
+- Updated `docs/roadmap.md` with the owner-directed architectural refactoring and UI Engine enforcement sequence as a prerequisite gate before StudioFlow continuation.
+
+### Verification
+
+- `prisma generate`: passed; `SupplierCategory`, `VendorSupplierCategory`, and `supplier_categories` fields now present in generated client.
+- `npx tsc --noEmit`: passed (zero errors).
+- `npm run lint`: passed.
+- `npm run check:boundaries`: passed.
+- Browser verification of Master Data routes: pending (tracked in `docs/review.md`).
 
 ## R8.09 | 2026-09-11 | feat(masterdata): inline-creatable supplier category picker
 

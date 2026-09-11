@@ -1,11 +1,20 @@
 # Product Roadmap by Application
 
-Status: active planning ledger, reconciled through R7.56 on 2026-09-10.
+Status: active planning ledger, reconciled through R8.10 on 2026-09-12.
 
 This file answers **what remains to be built**. It does not activate work by
 itself. Completed items are struck through or removed only after verification
 and must remain recorded in `CHANGELOG.md`. Bugs belong in [`knownbug.md`](knownbug.md), not here. Implemented-but-
 unverified work belongs in [`review.md`](review.md), not here.
+
+## Mandatory Architectural & Enforcement Refactoring (Prerequisite for StudioFlow Continuation)
+
+- [ ] **Decompose Master Data God-Service:** Refactor `src/apps/masterdata/service.ts` (~214 KB) into focused domain use-case service modules (`services/brand.service.ts`, `services/vendor.service.ts`, `services/pricing.service.ts`, `services/sku.service.ts`, `services/unit.service.ts`, `services/category.service.ts`, `services/supplier-category.service.ts`, `services/deletion.service.ts`).
+- [ ] **Decompose BQ & StudioFlow God-Services:** Apply the same use-case modularization pattern to growing service modules in BQ (`src/apps/bq/service.ts`) and StudioFlow (`src/apps/studioflow/service.ts`).
+- [ ] **Strict Cross-App Surface Isolation:** Enforce `src/apps/<app>/public/index.ts` as the sole public surface for cross-app reads and integrations across Master Data, BQ, and StudioFlow.
+- [ ] **Enforceable UI Engine Boundary Checker:** Upgrade automated boundary checker tooling (`scripts/check-boundaries.mjs`) to detect and fail on ad-hoc app-local visual primitives, unapproved styling patterns, or private wrapper components that bypass canonical UI Engine exports.
+- [ ] **StudioFlow Continuation Gate:** Pause further StudioFlow feature development until service modularization and UI Engine enforcement rules are fully implemented and verified.
+
 
 ## Platform Foundation
 
