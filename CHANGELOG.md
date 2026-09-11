@@ -5,8 +5,34 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.08**
-- Next local revision: **R8.09**
+- Current revision after this entry is committed: **R8.09**
+- Next local revision: **R8.10**
+
+## R8.09 | 2026-09-11 | feat(masterdata): inline-creatable supplier category picker
+
+- Owner follow-up to R8.08: the Supplier category picker in the Supplier
+  create/edit dialogs is now a creatable search like the Brand Product
+  Category picker, so staff can type a new category name, have it created
+  immediately, and keep adding more than one category per Supplier.
+- The picker passes an `onCreate` handler when the actor holds
+  `masterdata.dictionary.manage`; the new
+  `createSupplierCategoryQuick` service derives a unique upper-case code from
+  the typed name (suffix `-2`, `-3`, … on collision) and reuses an existing
+  live category with the same name instead of duplicating it. The client adds
+  the returned id to the selection right away (shared `useOptionOverlay`),
+  matching the Brand category flow.
+- New `createSupplierCategoryQuickAction` in
+  `settings/general/masterdata/supplier-categories-actions.ts`; the Supplier
+  page now passes `canManageCategories` down to the directory.
+- No schema or migration change for this revision.
+
+### Verification
+
+- `npx tsc --noEmit`: passed.
+- `npm run lint`: passed.
+- `npm run check:boundaries`: passed.
+- Pending real-browser verification continues to be tracked in
+  `docs/review.md`.
 
 ## R8.08 | 2026-09-11 | feat(masterdata): add supplier category dictionary and vendor assignment
 

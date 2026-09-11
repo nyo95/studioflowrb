@@ -62,14 +62,16 @@ No item currently ready for review.
   deletion-request/direct-delete behavior as Supplier Type; vendor create/edit
   `supplierCategoryIds` passthrough with atomic join maintenance; a
   **Supplier categories** tab in Settings → Master Data; and the Supplier
-  directory gaining a category multi-picker, table badges, and a category
-  filter.
+  directory gaining a creatable category multi-picker (type a name and it is
+  created inline when the actor holds `masterdata.dictionary.manage`), table
+  badges, and a category filter.
 - **Needs:** A real browser walkthrough of Settings → Master Data →
   Supplier categories (create, render, edit, archive, restore, request
   deletion, and `masterdata.deletion.approve` direct delete), plus the
-  Supplier directory flow (assign categories on create and edit, save, badges
-  in the table, category filter, fallback read for non-managers) and the
-  duplicate-code guard on create.
+  Supplier directory flow (assign categories on create and edit — including
+  typing a new name and confirming it is created inline and added — save,
+  badges in the table, category filter, fallback read for non-managers) and
+  the duplicate-code guard on create.
 - **Status:** Ready for review, not yet verified.
 
 ## BQ

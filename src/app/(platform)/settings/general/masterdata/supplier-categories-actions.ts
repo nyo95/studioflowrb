@@ -20,6 +20,21 @@ const formSchema = z.object({
   code: z.string().min(1).max(32),
   name: z.string().min(1).max(64),
 });
+
+export async function createSupplierCategoryQuickAction(formData: FormData): Promise<ActionResult<{ supplierCategoryId: string; code: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = z.object({ name: z.string().trim().min(1).max(64) }).safeParse({ name: String(formData.get("name") ?? "") });
+    if (!parsed.success) throw validationError(parsed.error);
+    const result = await masterDataService.createSupplierCategoryQuick({
+      grants,
+      actor: actor(principal),
+      name: parsed.data.name,
+    });
+    refresh();
+    return result;
+  });
+}
 const idSchema = z.string().uuid();
 function parseId(value: string): string {
   const parsed = idSchema.safeParse(value);

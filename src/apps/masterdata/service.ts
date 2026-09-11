@@ -1451,6 +1451,44 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
       });
     },
 
+    async createSupplierCategoryQuick(input: { grants: PermissionGrants; actor: AuditActor; name: string }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
+      actorIsUsable(input.actor);
+      const name = requiredName(input.name, "SUPPLIER_CATEGORY_NAME_REQUIRED");
+      const baseCode = toSlug(name).toUpperCase();
+      if (!baseCode) throw new AppError("VALIDATION", "SUPPLIER_CATEGORY_CODE_INVALID", "The name must produce a usable code.");
+      return runTransaction(async (tx) => {
+        const exactLive = await tx.supplierCategory.findFirst({
+          where: { name: { equals: name, mode: "insensitive" }, deleted_at: null },
+          select: { id: true, code: true },
+        });
+        if (exactLive) return { supplierCategoryId: exactLive.id, code: exactLive.code };
+        const existingCodes = new Set(
+          (await tx.supplierCategory.findMany({ where: { code: { startsWith: baseCode } }, select: { code: true } })).map((entry) => entry.code),
+        );
+        let code = baseCode;
+        let suffix = 2;
+        while (existingCodes.has(code)) {
+          code = `${baseCode}-${suffix}`;
+          suffix += 1;
+        }
+        let category;
+        try {
+          category = await tx.supplierCategory.create({ data: { id: randomUUID(), code, name } });
+        } catch (error) {
+          mapWriteError(error);
+        }
+        await writeAudit(tx, {
+          action: "supplier-category.created",
+          entityType: "supplier_category",
+          entityId: category!.id,
+          actor: input.actor,
+          metadata: { code },
+        });
+        return { supplierCategoryId: category!.id, code };
+      });
+    },
+
     async updateSupplierCategory(input: {
       grants: PermissionGrants;
       actor: AuditActor;

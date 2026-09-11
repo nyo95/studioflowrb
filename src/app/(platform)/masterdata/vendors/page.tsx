@@ -27,6 +27,7 @@ export default async function VendorsPage() {
   const { grants } = principalGrants;
   const canRead = hasPermission(grants, MASTERDATA_PERMISSIONS.vendorRead);
   const canManage = hasPermission(grants, MASTERDATA_PERMISSIONS.vendorManage);
+  const canManageCategories = hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryManage);
 
   if (!canRead && !canManage) {
     return (
@@ -66,6 +67,7 @@ export default async function VendorsPage() {
         supplierCategories={supplierCategories.map((b) => ({ id: b.id, name: b.name, code: b.code }))}
         brands={brands.map((b) => ({ id: b.id, name: b.name }))}
         canManage={canManage}
+        canManageCategories={canManageCategories}
       />
     </>
   );

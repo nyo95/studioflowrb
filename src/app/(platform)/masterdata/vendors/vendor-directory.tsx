@@ -18,7 +18,7 @@ import {
 import { Plus,UserPlus,X } from "lucide-react";
 import { useRef,useState,useTransition } from "react";
 
-import { Badge,Button,Combobox,ConfirmDialog,CreatableMultiSelect,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,HelpHint,IconButton,InlineError,Input,Notice,SearchField,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,useFormDraftGuard } from "@/platform/ui_engine";
+import { Badge,Button,Combobox,ConfirmDialog,CreatableMultiSelect,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,HelpHint,IconButton,InlineError,Input,Notice,SearchField,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,useFormDraftGuard,useOptionOverlay } from "@/platform/ui_engine";
 import {
 archiveVendorAction,
 createVendorAction,
@@ -26,6 +26,7 @@ requestVendorDeletionAction,
 restoreVendorAction,
 updateVendorAction,
 } from "./actions";
+import { createSupplierCategoryQuickAction } from "../../settings/general/masterdata/supplier-categories-actions";
 
 type VendorRow = {
   id: string;
@@ -225,13 +226,16 @@ export function VendorDirectory({
   supplierCategories,
   brands,
   canManage,
+  canManageCategories,
 }: {
   vendors: VendorRow[];
   vendorTypes: VendorTypeOption[];
   supplierCategories: VendorCategoryOption[];
   brands: BrandOption[];
   canManage: boolean;
+  canManageCategories: boolean;
 }) {
+  const { options: categoryOptions, upsertOverlayOption: upsertCategoryOption } = useOptionOverlay(supplierCategories);
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
@@ -347,6 +351,20 @@ export function VendorDirectory({
         return false;
       });
     return similar ? `Potential duplicate: a similar supplier "${similar.name}" already exists.` : null;
+  };
+
+  const createSupplierCategory = async (name: string, setError: (error: string | null) => void) => {
+    setError(null);
+    const formData = new FormData();
+    formData.set("name", name);
+    const result = await createSupplierCategoryQuickAction(formData);
+    if (result.ok === false) {
+      setError(result.error.safeMessage);
+      return;
+    }
+    const option = { id: result.data.supplierCategoryId, name: name.trim(), code: result.data.code };
+    upsertCategoryOption(option);
+    return option.id;
   };
 
   const openCreateDialog = () => {
@@ -573,8 +591,8 @@ export function VendorDirectory({
           <Field label="Supplier types" description="Search the controlled type vocabulary; assign role dimensions to grant pricing capabilities.">
             <CreatableMultiSelect label="Supplier types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={createVendorTypeIds} onValueChange={setCreateVendorTypeIds} placeholder="Search supplier types" searchPlaceholder="Search supplier types…" />
           </Field>
-          <Field label="Supplier categories" description="Classification labels such as fabric supplier or hardware supplier. A supplier may have more than one.">
-            <CreatableMultiSelect label="Supplier categories" options={supplierCategories.map((category) => ({ id: category.id, label: category.name, description: category.code }))} value={createSupplierCategoryIds} onValueChange={setCreateSupplierCategoryIds} placeholder="Search supplier categories" searchPlaceholder="Search supplier categories…" />
+          <Field label="Supplier categories" description="Classification labels such as fabric supplier or hardware supplier. A supplier may have more than one; a missing category is created and added for you.">
+            <CreatableMultiSelect label="Supplier categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name, description: category.code }))} value={createSupplierCategoryIds} onValueChange={setCreateSupplierCategoryIds} onCreate={canManageCategories ? (name) => createSupplierCategory(name, setCreateError) : undefined} createLabel={(name) => `Create supplier category "${name}"`} placeholder="Search supplier categories" searchPlaceholder="Search supplier categories…" />
           </Field>
           <Field label="Office / Workshop address">
             <Input name="address" maxLength={256} placeholder="Address, City" />
@@ -711,8 +729,8 @@ export function VendorDirectory({
                       <Field label="Supplier types" description="Search the controlled type vocabulary. Removing capability types is guarded against active dependent prices.">
                         <CreatableMultiSelect label="Supplier types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={editVendorTypeIds} onValueChange={setEditVendorTypeIds} placeholder="Search supplier types" searchPlaceholder="Search supplier types…" />
                       </Field>
-                      <Field label="Supplier categories" description="Classification labels such as fabric supplier or hardware supplier. A supplier may have more than one.">
-                        <CreatableMultiSelect label="Supplier categories" options={supplierCategories.map((category) => ({ id: category.id, label: category.name, description: category.code }))} value={editSupplierCategoryIds} onValueChange={setEditSupplierCategoryIds} placeholder="Search supplier categories" searchPlaceholder="Search supplier categories…" />
+                      <Field label="Supplier categories" description="Classification labels such as fabric supplier or hardware supplier. A supplier may have more than one; a missing category is created and added for you.">
+                        <CreatableMultiSelect label="Supplier categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name, description: category.code }))} value={editSupplierCategoryIds} onValueChange={setEditSupplierCategoryIds} onCreate={canManageCategories ? (name) => createSupplierCategory(name, setEditError) : undefined} createLabel={(name) => `Create supplier category "${name}"`} placeholder="Search supplier categories" searchPlaceholder="Search supplier categories…" />
                       </Field>
                       <Field label="Office / Workshop address">
                         <Input name="address" value={editAddress} maxLength={256} onChange={(e) => setEditAddress(e.target.value)} />
