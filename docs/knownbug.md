@@ -158,6 +158,70 @@ migration and one slice.
 - **Mitigation:** None; correct today at the studio's data volume.
 - **Status:** Open; logic debt, no owner decision required.
 
+### Closed in R8.05
+
+- **KB-019:** `listWaitingOnMe` now bounds the database reads by assignee and
+  retains null or unavailable assignees in the `NEEDS_ASSIGNMENT` bucket.
+
+### KB-021 — Product Catalogue is a global reuse pool; legacy was per-project
+
+- **Observed (owner audit, 2026-09-10):** `/studioflow/catalogue` is a single
+  studio-wide pool. `studioflow-project-contract.md §11` and the roadmap both
+  describe it as "a StudioFlow-wide reuse pool shared across StudioFlow
+  projects." The implemented route has no `project_id` binding; products are
+  studio-global.
+- **Expected (owner):** The legacy Catalogue was scoped per project. That
+  behavior was correct and should have been preserved. The "reuse pool" framing
+  in the contract was a mis-specification; the owner had not signed off on
+  making the catalogue global. The rebuild should have carried the per-project
+  scoping onto the new foundation, with the UIUX redesigned but the ownership
+  model kept.
+- **Impact:** Every existing catalogue record is unowned by a project, and the
+  Schedule slice (`KB-003`) was designed on top of the wrong ownership model.
+  No catalogue work should continue until the per-project scoping is restored.
+- **Mitigation:** Use the current global list as a reference only.
+- **Status:** Open; owner-directed. Requires a migration, a schema change
+  (`project_id` FK on `SfProductCatalogue`), a contract correction, and route
+  restructuring to `/studioflow/[id]/catalogue`. Block all further catalogue
+  and Schedule development until resolved.
+
+### KB-022 — MOM implementation does not match owner's required behavior
+
+- **Observed (owner audit, 2026-09-10):** MOM was rebuilt with a formal
+  `DRAFT → ISSUED → SUPERSEDED` document lifecycle, a rich-text block editor,
+  and image blocks. This matches `studioflow-mom-contract.md` but the owner
+  states the result does not match their actual operational need. The existing
+  contract was written without confirming the required meeting-notes behavior
+  with the owner first.
+- **Expected (owner):** MOM should match the legacy behavior the owner used
+  day-to-day. What that behavior is must be re-confirmed by the owner before
+  any further MOM implementation — including KB-012 (correction draft fix) —
+  resumes. Legacy MOM artifacts should be audited as the reference, not the
+  current contract.
+- **Mitigation:** Avoid issuing or superseding MOM documents in the current
+  implementation until the correct shape is confirmed. KB-012 is blocked by
+  this.
+- **Status:** Open; awaiting owner re-specification of MOM. Do not extend the
+  current implementation or fix KB-012 until the requirements are re-anchored.
+
+### KB-023 — General project todos not surfaced on StudioFlow home page
+
+- **Observed (owner audit, 2026-09-10):** `/studioflow` (My Activity) shows
+  open rounds and tasks only through the "waiting on me" lens: items filtered
+  by assignee or flagged as needing assignment. In the legacy, general
+  project-level todos were prominently visible on the home page regardless of
+  the waiting-queue framing. The owner confirms todos are absent from where
+  they expect them ("halaman muka").
+- **Expected:** General to-dos (project-owned tasks, including those surfaced
+  via `GeneralTaskBlock` on the project page) should be visible from the main
+  StudioFlow page in a form matching legacy behavior. The exact surface — a
+  standalone todo list, a combined view, or a project-grouped list — needs
+  owner confirmation.
+- **Mitigation:** Navigate to the individual project to see its `GeneralTaskBlock`.
+- **Status:** Open; requires owner clarification of which page is "halaman
+  muka" (application home `/studioflow` vs. project home `/studioflow/[id]`)
+  and what the legacy presentation looked like before implementing.
+
 ### KB-002 — Storage-byte retention policy is not finalized
 
 - **Observed:** MOM removes unreferenced draft image objects best-effort, while

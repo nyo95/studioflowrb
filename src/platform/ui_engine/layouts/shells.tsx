@@ -163,16 +163,7 @@ export function AppShell({
             >
               {navigation}
             </nav>
-            {utility ? (
-              <div
-                className={cx(
-                  "grid gap-1 border-t border-line px-3 pt-2.5 pb-3.5 max-[840px]:hidden",
-                  isCollapsed && "px-1.5",
-                )}
-              >
-                {utility}
-              </div>
-            ) : null}
+            {utility ?? null}
           </aside> : null}
           <main className="flex h-[calc(100vh-4rem)] min-h-0 min-w-0 flex-col overflow-auto max-[840px]:h-auto max-[840px]:overflow-visible">{children}</main>
         </div>
@@ -434,6 +425,20 @@ export function PageHeader({
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 max-[560px]:justify-start">{actions}</div> : null}
     </header>
+  );
+}
+
+/**
+ * Styled wrapper for the AppShell's bottom-of-rail utility slot.
+ * Render this as the outermost element of any utility navigation component.
+ * Using this wrapper (rather than passing a bare ReactNode to the `utility` prop)
+ * ensures the border and padding only appear when the component actually has content.
+ */
+export function UtilitySection({ children }: { children: ReactNode }) {
+  return (
+    <div className="grid gap-1 border-t border-line px-3 pt-2.5 pb-3.5 max-[840px]:hidden group-data-[collapsed]:px-1.5">
+      {children}
+    </div>
   );
 }
 

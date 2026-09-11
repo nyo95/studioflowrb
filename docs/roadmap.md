@@ -35,10 +35,9 @@ unverified work belongs in [`review.md`](review.md), not here.
 - [x] Audit canonical date/time and project/client lookup controls across
   activated consumers. See
   [`apps/ui-engine/date-time-lookup-audit-2026-09-10.md`](apps/ui-engine/date-time-lookup-audit-2026-09-10.md).
-- [ ] Consolidate the three separate hand-rolled `Intl.DateTimeFormat` call
-  sites found in Master Data, BQ, and StudioFlow behind one canonical UI
-  Engine display component, per the audit's Finding 1. Needs owner sign-off
-  before this is executed.
+- [x] Consolidate the three separate hand-rolled `Intl.DateTimeFormat` call
+  sites found in Master Data, BQ, and StudioFlow behind the canonical
+  `FormattedInstant` UI Engine component, per the audit's Finding 1. R8.05.
 
 ## Master Data
 
@@ -55,7 +54,6 @@ unverified work belongs in [`review.md`](review.md), not here.
   `0.5*80000`, with exact decimal parsing and no arbitrary code execution.
 - [ ] Decide the smallest reusable exact-decimal arithmetic extension while
   keeping BQ formula and rounding policy app-owned.
-- [ ] Add waste tracking (`waste = 1 - coefficient`).
 - [ ] Add Quotation PDF output and Terms & Conditions.
 - [ ] Add price modes such as TBC and By Owner.
 - [ ] Add Rate Library after sufficient project-line evidence exists.
@@ -92,8 +90,18 @@ unverified work belongs in [`review.md`](review.md), not here.
 - [x] Integrate project-owned MOM at every phase with no Task/To-do, phase, or
   iteration linkage. Preserve the legacy ordered document/block/point/image
   capability and reuse the canonical rich-text and image tools. R7.52.
-- [x] Integrate the StudioFlow-owned Product Catalogue reuse pool shared across
-  StudioFlow projects. Never read Master Data SKU, unit, or pricing. R7.53.
+- [x] ~~Integrate the StudioFlow-owned Product Catalogue reuse pool shared across
+  StudioFlow projects. Never read Master Data SKU, unit, or pricing. R7.53.~~
+  **⚠ KB-021: implemented as global pool; owner requires per-project scoping.
+  This item is re-opened — see correction item below.**
+- [ ] **Correct Product Catalogue to per-project scoping (KB-021):** migration
+  adding `project_id` FK to `SfProductCatalogue`, contract revision, route
+  restructure to `/studioflow/[id]/catalogue`, and a data migration plan for
+  existing global records. All Schedule work is blocked on this.
+- [ ] **Re-anchor MOM requirements against legacy behavior** before resuming any
+  MOM work or KB-012 (KB-022). Owner confirmation required first.
+- [ ] **Restore general project todos to the StudioFlow home page** in a form
+  matching legacy presentation (KB-023). Confirm exact page with owner.
 - [ ] Add the project Schedule/FFNI slice on top of that reuse pool: entries,
   competing options, one entry lifecycle, templates that carry filled
   specifications, and project snapshots that later catalogue edits never

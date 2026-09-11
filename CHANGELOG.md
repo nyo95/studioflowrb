@@ -5,8 +5,23 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.04**
-- Next local revision: **R8.05**
+- Current revision after this entry is committed: **R8.05**
+- Next local revision: **R8.06**
+
+## R8.05 | 2026-09-11 | fix(studioflow,ui-engine): close KB-019 and wire canonical instant display
+
+- Completed KB-019's bounded `listWaitingOnMe` read while preserving open work
+  assigned to unavailable users under `NEEDS_ASSIGNMENT`.
+- Wired the canonical UI Engine `FormattedInstant` component into the three
+  audited Master Data, BQ, and StudioFlow date call sites.
+- Closed KB-019 and marked the audited date-display consolidation complete.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `npm run check`: passed.
+- Full test suite remains environment-blocked by the pre-existing database hook
+  failures; unrelated local changes remain uncommitted.
 
 ## R8.04 | 2026-09-11 | fix(bq): fix commitNum prop plumbing and dev server rendering
 
