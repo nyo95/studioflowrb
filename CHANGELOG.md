@@ -5,8 +5,24 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.06**
-- Next local revision: **R8.07**
+- Current revision after this entry is committed: **R8.07**
+- Next local revision: **R8.08**
+
+## R8.07 | 2026-09-11 | fix(masterdata): save material+labor and labor price edits
+
+- Fixed Material + Labor and Labor price edits failing with a missing-field
+  validation error. `vendorField` is defined as `!edit && (...)` so it rendered
+  nothing during edit, which also dropped the required hidden `vendorId` input
+  from the form; the server action then rejected the submit because
+  `vendorId` is mandatory for non-material prices.
+- Edit mode now emits the hidden `vendorId` input directly from the existing
+  row so the service update path receives the supplier reference.
+- Material price edit is unaffected: SKU, Supplier, and Unit stay read-only by
+  contract and no hidden inputs were missing.
+
+### Verification
+
+- `npx tsc --noEmit`: passed.
 
 ## R8.06 | 2026-09-11 | merge(main): integrate remote R8.05 utilities and UI fixes
 
