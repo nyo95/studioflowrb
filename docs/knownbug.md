@@ -29,7 +29,7 @@ it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
   StudioFlow RB as the frozen reference; it remains distinct from the R8.16
   documentation-only overlay and preserves the PF-8-only release condition.
 - **Priority:** P1 — Foundation/Recovery gate ambiguity.
-- **Status:** Open; correction required before PF-0 can be accepted.
+- **Status:** Corrected in R8.20; awaiting independent review before closure.
 
 ### KB-020 — Office rebuild migration history contains an untracked migration
 

@@ -15,6 +15,19 @@ R8.16 is a documentation-only planning overlay on the approved R8.12
 behavior/reference baseline. It is not an independently verified behavioral
 baseline and must not be used to make a parity claim.
 
+## Frozen StudioFlow RB reference
+
+The frozen StudioFlow RB reference is `nyo95/studioflowrb` R8.12 —
+`45d74884c1ec268b30b1d5e6dc86a80da32cffe7`. This exact snapshot is both the
+approved rebuild behavior/reference baseline and the current StudioFlow RB
+implementation to preserve throughout Foundation work.
+
+R8.16 (`edcd1b287de396440db1a36004b873e7c0410eee`) is a later,
+documentation-only planning overlay on that R8.12 snapshot. It neither
+supersedes nor moves the frozen StudioFlow RB reference. Foundation
+compatibility and the PF-8/Recovery boundary must use the pinned R8.12
+snapshot; R8.16 provides planning context only.
+
 ## Legacy evidence metadata
 
 The pinned legacy evidence identity is `nyo95/studioflow` at
@@ -29,11 +42,11 @@ database access.
 Foundation work must preserve the behavioral state of Master Data and BQ.
 
 Normal StudioFlow continuation is frozen before PF-8: no StudioFlow feature,
-route, schema, service, UI, or behavior work is allowed. The sole exception is
-an explicitly planned and approved security, data-integrity, or
-repository-breaking correction. An approved Foundation slice may make only the
-deterministic StudioFlow consumer compatibility change it requires, without
-changing StudioFlow business behavior.
+route, schema, service, UI, or behavior work may diverge from the pinned R8.12
+reference. The sole exception is an explicitly planned and approved security,
+data-integrity, or repository-breaking correction. An approved Foundation slice
+may make only the deterministic StudioFlow consumer compatibility change it
+requires, without changing StudioFlow business behavior.
 
 ## Release condition
 

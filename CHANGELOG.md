@@ -5,8 +5,26 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.19**
-- Next local revision: **R8.20**
+- Current revision after this entry is committed: **R8.20**
+- Next local revision: **R8.21**
+
+## R8.20 | 2026-09-13 | docs(foundation): pin frozen StudioFlow RB reference
+
+- Corrected KB-026 by naming `nyo95/studioflowrb` R8.12
+  (`45d74884c1ec268b30b1d5e6dc86a80da32cffe7`) as the exact frozen StudioFlow
+  RB reference.
+- Recorded that R8.12 remains the approved rebuild behavior/reference baseline
+  and that the later R8.16 commit is a documentation-only planning overlay that
+  cannot supersede or move the frozen StudioFlow reference.
+- Preserved the narrow freeze exception and PF-8 as the sole Foundation and
+  StudioFlow Recovery gate release; returned the correction to the review
+  ledger while KB-026 awaits closure on PASS.
+
+### Verification
+
+- Verified R8.12 is an ancestor of R8.16 and the R8.12-to-R8.16 changes are
+  limited to documentation and ledger files.
+- `git diff --cached --check`: passed.
 
 ## R8.19 | 2026-09-13 | docs(foundation): record PF-0 review correction
 
