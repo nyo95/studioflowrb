@@ -5,8 +5,24 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.20**
-- Next local revision: **R8.21**
+- Current revision after this entry is committed: **R8.21**
+- Next local revision: **R8.22**
+
+## R8.21 | 2026-09-13 | docs(foundation): accept PF-0 reference correction
+
+- Independently verified the KB-026 correction in R8.20 and closed KB-026.
+- Confirmed the canonical PF-0 record names R8.12 as the exact frozen
+  StudioFlow RB reference; R8.16 remains a documentation-only overlay that
+  cannot supersede or move it.
+- Confirmed the narrow exception and PF-8-only Foundation/StudioFlow Recovery
+  gate release remain unchanged. Removed the satisfied correction from the
+  review ledger.
+
+### Verification
+
+- Both pinned commits resolve locally; R8.12 is an ancestor of R8.16.
+- The R8.12-to-R8.16 range changes documentation and ledger files only.
+- `git show --check R8.20`: passed.
 
 ## R8.20 | 2026-09-13 | docs(foundation): pin frozen StudioFlow RB reference
 

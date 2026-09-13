@@ -19,23 +19,6 @@ a real defect — move it to `knownbug.md` with what was actually observed.
 
 ## Platform Foundation
 
-### PF-0 / KB-026 — frozen StudioFlow RB reference correction
-
-- **Observed:** R8.20 corrects the PF-0 canonical freeze record to identify
-  `nyo95/studioflowrb` R8.12
-  (`45d74884c1ec268b30b1d5e6dc86a80da32cffe7`) as the exact frozen StudioFlow
-  RB snapshot. It establishes that the same commit is the approved rebuild
-  behavior/reference baseline, while R8.16
-  (`edcd1b287de396440db1a36004b873e7c0410eee`) is its later
-  documentation-only planning overlay and cannot move or supersede that
-  frozen reference.
-- **Needs:** Independently verify R8.12 is an ancestor of R8.16; verify the
-  intervening R8.12-to-R8.16 changes are documentation/ledger-only; verify the
-  record preserves the narrow freeze exception and PF-8 as the sole
-  Foundation/StudioFlow Recovery gate release. On PASS, close KB-026 with this
-  revision and remove this review entry.
-- **Status:** Ready for review, not yet verified.
-
 ### Configurable main-route settings
 
 - **Observed:** Implemented 2026-09-10 per `roadmap.md`'s "Add configurable
