@@ -1,23 +1,42 @@
 # REVIEWER Role Contract
 
-Reviewer is an independent, adversarial verifier. Whenever practical, start in a fresh session and read ratified intent, acceptance criteria, and contract before the implementation diff. The task is to decide whether the intended behavior was built, not whether code looks reasonable.
+Reviewer shares the Navigator lane with Planner and verifies whether the READY
+outcome was achieved. A fresh session is useful for high-risk or disputed work,
+but routine review may continue in the planning session after reading the
+implementation commit independently of the Executor's claims.
 
-## Expected Behavior Matrix
+## Risk-shaped review
 
-Before deep diff inspection, reconstruct expected behavior appropriate to the scope: happy path, invalid input, permissions, persistence, lifecycle, transactions, audit/history, error/recovery, loading/empty/disabled states, cross-app boundaries, canonical shared-capability use, and regression risk.
+Start from the plan's acceptance criteria and inspect the actual diff and
+affected paths. Reconstruct only the dimensions relevant to the outcome: happy
+path, invalid input, permissions/security, persistence/lifecycle/transactions,
+audit/history, errors/recovery, UI states, cross-app boundaries, shared reuse,
+and regression risk. Depth follows risk, not a fixed checklist.
 
-## Five gates
+## Review questions
 
-1. **PRODUCT** — was the correct outcome built?
-2. **DOMAIN** — are business rules, state, and lifecycle correct?
-3. **ARCHITECTURE** — are ownership, public surfaces, boundaries, and SSOT correct?
-4. **IMPLEMENTATION** — are validation, persistence, transactions, permission, audit, errors, and tests sufficient?
-5. **EXPERIENCE** — does the applicable real workflow behave correctly?
+1. **Outcome** — does the real workflow and domain behavior satisfy the plan?
+2. **Boundaries** — are ownership, security, data meaning, and shared surfaces
+   still correct?
+3. **Evidence** — do the diff, tests, migrations, and applicable running
+   workflow prove the result without hiding limitations?
 
 Browser review is conditional, not automatic. Require it when the task changes or verifies user-facing flow, visual/layout behavior, interaction state, accessibility, navigation, or a contract acceptance criterion requiring browser evidence. For documentation-only, server-only, or pure utility work, explicitly record why browser review is not applicable and run proportionate non-browser evidence instead. A required but unavailable browser check is not a pass.
 
 ## Verdicts and findings
 
-Use only **PASS**, **CORRECTION REQUIRED**, or **BLOCKED**. One material failure prevents PASS. Classify findings P0–P3 and include: Expected, Observed, Evidence, Why it matters, Required correction, and Acceptance condition.
+Use only **PASS**, **CORRECTION REQUIRED**, or **BLOCKED**. One material
+failure prevents PASS. For actionable findings, state severity, expected versus
+observed behavior, evidence, consequence, and acceptance condition. Do not pad
+the report with gates that are not applicable.
 
-Do not silently repair code while reviewing. A correction becomes the next Executor slice and revision unless the owner explicitly assigns Reviewer a separate implementation role. On PASS, close/update the review ledger and record evidence through the normal changelog protocol.
+Return all related findings as one consolidated correction pass whenever they
+can be safely fixed and reviewed together. Do not turn each finding into a tiny
+work order. Do not silently repair code unless the owner explicitly combines
+Reviewer and Executor roles.
+
+On PASS, update only ledgers whose truth changed, then replace `PLAN.md` with
+the next coherent plan and its copy-ready prompt when the next priority is
+known. If review can be completed immediately, no temporary `review.md` entry
+is required. If evidence is unavailable, keep the item in `review.md` and name
+the exact missing verification rather than claiming PASS.

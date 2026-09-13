@@ -1,6 +1,6 @@
 # Documentation Hub
 
-Status: reconciled through **R8.14** on 2026-09-13. Contracts under `docs/apps/`
+Status: reconciled through **R8.23** on 2026-09-13. Contracts under `docs/apps/`
 were reorganized into one subfolder per application on 2026-09-10 at owner
 request; content is unchanged except for corrected cross-links.
 
@@ -18,11 +18,11 @@ tests, and migrations prove implemented state.
 | [`knownbug.md`](knownbug.md) | Open and closed defects grouped by application |
 | [`review.md`](review.md) | Implemented-but-unverified work, grouped by application — distinct from `roadmap.md` (not built) and `knownbug.md` (confirmed defect) |
 | [`REVISION-LEDGER-NOTES.md`](REVISION-LEDGER-NOTES.md) | Historical missing/skipped revision labels and how to interpret them |
-| [`SESSION-HANDOFF-PROMPT.md`](SESSION-HANDOFF-PROMPT.md) | Copy-ready prompt for coordinated Codex and Claude/OpenCode continuation |
-| [`agent/README.md`](agent/README.md) | Role-based AI harness: context routing, ledger transitions, priority, and bypass rules |
-| [`agent/PLANNER.md`](agent/PLANNER.md) | Discovery and ratified-plan role contract |
-| [`agent/EXECUTOR.md`](agent/EXECUTOR.md) | Deterministic implementation role contract |
-| [`agent/REVIEWER.md`](agent/REVIEWER.md) | Independent verification role contract |
+| [`SESSION-HANDOFF-PROMPT.md`](SESSION-HANDOFF-PROMPT.md) | Compact continuation prompts for Planner/Reviewer and Executor sessions |
+| [`agent/README.md`](agent/README.md) | Two-lane AI harness: coherent work sizing, handoff loop, context, and revision rules |
+| [`agent/PLANNER.md`](agent/PLANNER.md) | Planning half of the Planner/Reviewer Navigator lane |
+| [`agent/EXECUTOR.md`](agent/EXECUTOR.md) | Autonomous implementation within a READY plan's locked boundaries |
+| [`agent/REVIEWER.md`](agent/REVIEWER.md) | Risk-shaped verification and next-plan preparation |
 | [`StudioFlow workflow closure draft`](../scripts/work-orders/STUDIOFLOW-R7.56-WORKFLOW-CLOSURE.md) | **paused** by the owner priority below; assign the next unused revision when reactivated, not the historical filename's R7.56 |
 | [`StudioFlow R7.48 work order`](../scripts/work-orders/STUDIOFLOW-R7.48-PHASE-DELIVERABLE.md) | implemented in R7.48; retained as history |
 | [`StudioFlow R7.49 work order`](../scripts/work-orders/STUDIOFLOW-R7.49-COHERENT-WORK-SURFACE.md) | implemented in R7.50; retained as history |
@@ -30,8 +30,8 @@ tests, and migrations prove implemented state.
 
 
 A work order marked *implemented* above is evidence of what was built, never an
-instruction to rebuild it. Only the order labelled **active executable order** may
-be executed.
+instruction to rebuild it. New execution authority lives in the root READY
+`PLAN.md`; historical work orders are not automatically active.
 
 Earlier [`UIUX-CURATE`](../scripts/work-orders/UIUX-CURATE.md) and
 [`BQ-MASTERDATA-HARDENING`](../scripts/work-orders/BQ-MASTERDATA-HARDENING.md)

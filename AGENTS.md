@@ -2,32 +2,49 @@
 
 This is the bootstrap and invariant contract for every AI session in this checkout. Identify role and scope first, then load only the authority needed for that work.
 
-## Session handshake and role router
+## Session handshake and operating lane
 
 At the start of a new computer/session, ask one compact setup question, omitting facts already known from the active session/environment:
 
-> Agent apa yang sedang bekerja (Codex / Claude / OpenCode / other), role-nya Planner / Executor / Reviewer, dan ini kerja di rumah atau kantor?
+> Lane-nya Planner/Reviewer atau Executor, dan ini kerja di rumah atau kantor?
 
-Roles are explicit session assignments, not model/tool identities. When no role is assigned, work as **PLANNER** until the owner assigns another role.
+The model or tool does not determine authority. When no lane is assigned, work
+as **PLANNER/REVIEWER** until the owner assigns another lane. The owner may
+explicitly combine lanes for one session; state the transition before changing
+from planning/review into implementation.
 
-- **PLANNER** — read `docs/agent/PLANNER.md`; turns incomplete owner intent into a ratified, executable plan.
-- **EXECUTOR** — read `docs/agent/EXECUTOR.md`; implements only a READY plan slice or active deterministic work order.
-- **REVIEWER** — read `docs/agent/REVIEWER.md`; independently verifies intended behavior before judging the implementation.
+- **PLANNER/REVIEWER** — read `docs/agent/PLANNER.md` and
+  `docs/agent/REVIEWER.md`; clarify intent, prepare one coherent implementation
+  plan and copy-ready executor prompt, then verify the resulting commit and
+  prepare the next plan.
+- **EXECUTOR** — read `docs/agent/EXECUTOR.md`; own the implementation details
+  needed to complete the whole READY plan within its locked boundaries.
 
 Read `docs/agent/README.md` to select scoped context. Never load every app contract, roadmap section, or legacy artifact merely because it exists.
 
-## Manager-first execution
+## Planner-led execution
 
-The role model refines manager-first execution: **Planner** is the PM/TL
-product-and-architecture navigator, **Executor** is the deterministic
-implementation worker, and **Reviewer** is the independent verification
-navigator. Tool or model name never grants a role. Planner locks material
-architecture, domain, ownership, schema, calculation, security, and dependency
-decisions before execution; Executor must stop for an unresolved decision;
-Reviewer records PASS, required correction, or a precise blocker. Corrections
-are always the next local revision, never a silent rewrite of an accepted commit.
+Planner/Reviewer is the PM/TL and product-and-architecture navigator. It locks
+material product, domain, ownership, schema meaning, calculation, security, and
+dependency decisions, then delegates a coherent outcome rather than a list of
+tiny file edits. Executor is a capable implementation agent: it may inspect the
+repository, choose ordinary code structure, refactor locally, add the necessary
+tests, and complete mechanical follow-through without asking the Planner to
+decide every implementation detail.
+
+Executor stops only when completing the outcome would require changing a locked
+decision, inventing product behavior, crossing an ownership/security boundary,
+adding an unapproved dependency, performing an unauthorized destructive or
+remote action, or overwriting unrelated owner work. Reviewer records PASS, one
+consolidated correction pass, or a precise blocker. Corrections use the next
+local revision, never a silent rewrite of an accepted commit.
+
 Codex, Claude, and OpenCode may hand off or take over work, but they work
-serially on the same branch and must not overlap uncommitted files.
+serially on the same branch and must not overlap uncommitted files. Use the
+strongest reasoning model available for genuinely ambiguous planning or risky
+review. A faster capable coding model is normal for READY execution; escalate
+because of demonstrated risk or context pressure, not because the Executor
+label implies weak judgment.
 
 ## Global authority and communication
 
@@ -67,7 +84,12 @@ No raw legacy `ui-*` class may bypass an available UI Engine component. A real e
 
 ## Evidence, ledgers, revision, and remote safety
 
-`PLAN.md` is temporary planning workspace; `docs/roadmap.md` is approved work not yet built; `docs/review.md` is built work awaiting sufficient verification; `docs/knownbug.md` is a reproducible verified defect; `CHANGELOG.md` is the accepted revision ledger. Detailed transition rules are in `docs/agent/README.md`.
+`PLAN.md` is the temporary active implementation contract and ends with a
+copy-ready Executor prompt. `docs/roadmap.md` is approved work not yet built;
+`docs/review.md` is only a queue for work whose review must be deferred;
+`docs/knownbug.md` is a reproducible verified defect; `CHANGELOG.md` is the
+revision ledger. Do not churn every ledger at every handoff. Detailed rules are
+in `docs/agent/README.md`.
 
 Before editing, record HEAD, branch, remote/published baseline, existing revision entries, and the complete dirty-file list. Determine the next unused revision from `CHANGELOG.md`; never infer it from memory. Preserve unrelated owner changes, stage only owned files, inspect staged diff and whitespace, and make exactly one local revision commit for each cohesive completed change set. Run proportionate checks; a skipped, unavailable, or cancelled mandatory check is not a pass and must be reported. Do not call work complete without the required changelog, validation, and local commit.
 

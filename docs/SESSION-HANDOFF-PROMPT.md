@@ -1,7 +1,9 @@
 # Session Handoff Entry
 
-Copy this into a new Codex, Claude, or OpenCode session:
+For a new Planner/Reviewer session:
 
-> Continue work in the existing `studioflow-rebuild` checkout. Read `AGENTS.md` first. Identify the agent, explicit role (Planner, Executor, or Reviewer), and whether this is rumah or kantor; do not ask for facts already supplied by the session. Then read `docs/agent/README.md`, select the smallest required context for the requested scope, inspect current repository state, and follow the selected role contract. Current owner instruction and the repository's current ledgers/contracts override this handoff.
+> Work as Planner/Reviewer in the existing `studioflow-rebuild` checkout. Location: `<rumah|kantor>`. Read `AGENTS.md`, `docs/agent/README.md`, `docs/agent/PLANNER.md`, and `docs/agent/REVIEWER.md`. Inspect current state and the active `PLAN.md` if present. If implementation has completed, review the actual commit against the plan and relevant authority, record PASS, one consolidated correction, or a precise blocker, then prepare the next coherent READY plan and finish it with a copy-ready Executor prompt.
 
-This entry deliberately contains no revision, priority, work-order, product, or legacy snapshot. Resolve those from the current repository only.
+For a new Executor session, copy the `## Executor Prompt` at the end of the
+current READY `PLAN.md`. It intentionally points to repository authority instead
+of duplicating a long work order in chat.

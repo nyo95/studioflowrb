@@ -1,36 +1,47 @@
-# Role-Based AI Harness
+# Planner/Reviewer and Executor Harness
 
-Use this directory after `AGENTS.md` has established the session role and location. It routes context; it does not replace product contracts.
+Use this directory after `AGENTS.md` has established the operating lane and
+location. The harness deliberately assumes modern coding agents are capable. It
+locks consequential decisions, not every file edit.
 
 ## Context selection
 
-1. Identify the assigned role.
-2. Identify the smallest scope: document, app, feature, defect, shared layer, or named plan/work-order slice.
-3. Load the role contract plus only the authorities named by that scope.
+1. Identify the assigned lane.
+2. Identify the coherent outcome: a user-visible workflow, domain capability,
+   architecture boundary, or complete correction pass.
+3. Load the lane contract plus only the authorities named by that outcome.
 4. Read current code/tests/migrations only when they evidence the selected behavior. Read legacy only when its exact evidence is necessary and allowed.
 
-`scripts/agent-context.mjs` is intentionally deferred. If later activated, it may print deterministic required/optional/unnecessary document hints from an explicit role and scope. It must not infer product intent, select a priority, modify files, call services, or become an MCP/orchestration system.
+Do not reload broad documentation merely to prove diligence. Follow links only
+when they govern the selected outcome or resolve a real conflict.
 
-## Ledger relationship
+## Normal loop
 
 ```text
-PLAN.md (DRAFT -> RATIFIED -> READY)
-  -> roadmap.md (approved, not built)
-  -> Executor
-  -> review.md (built, awaiting sufficient verification)
-  -> Reviewer PASS -> CHANGELOG.md and close review item
-  -> Reviewer defect -> knownbug.md and next correction slice
+Owner intent/docs -> Planner/Reviewer -> PLAN.md + copy-ready prompt
+                  -> Executor -> implementation + checks + CHANGELOG + commit
+                  -> Planner/Reviewer -> PASS or consolidated correction
+                                      -> next PLAN.md + prompt
 ```
 
-`PLAN.md` is one temporary active workspace, not history or a second roadmap. `roadmap.md` remains planned work, `review.md` remains unverified implementation, `knownbug.md` remains verified defects, and `CHANGELOG.md` remains accepted revision history. Update only the ledger justified by actual evidence.
+`PLAN.md` is the one temporary active contract, not history or a second
+roadmap. Use only **DRAFT**, **READY**, or **BLOCKED**. READY means all material
+decisions needed to begin are resolved; it does not mean every implementation
+choice is prescribed. After PASS, replace it with the next active plan.
+
+The Executor updates `CHANGELOG.md` and commits the coherent implementation.
+The Planner/Reviewer may review that commit immediately; `review.md` is used
+only when verification must actually be deferred. Add a `knownbug.md` entry
+only for a reproduced defect intentionally left open, not for a finding that is
+being returned immediately for correction. Update `roadmap.md` only when the
+real backlog or completion state changes.
 
 ## Scope reading matrix
 
-| Role | Always after bootstrap | Add only when relevant | Do not load automatically |
+| Lane | Always after bootstrap | Add only when relevant | Do not load automatically |
 |---|---|---|---|
-| Planner | `PLANNER.md`, `PLAN.md` | targeted ledger sections, contract, code/tests, allowed legacy evidence | all app internals/contracts |
-| Executor | `EXECUTOR.md`, READY slice/work order | named contract sections, affected code/tests/migration | all roadmap/knownbug/legacy material |
-| Reviewer | `REVIEWER.md`, ratified intent and acceptance | contract, diff, affected code/tests/browser evidence | executor's conclusions as authority |
+| Planner/Reviewer | `PLANNER.md`, `REVIEWER.md`, `PLAN.md` when present | targeted ledger/contract, current code/tests, allowed legacy evidence | all app internals/contracts |
+| Executor | `EXECUTOR.md`, READY `PLAN.md` | named authority, affected code/tests/migrations, nearby consumers needed for safe completion | all roadmap/knownbug/legacy material |
 
 ## Priority
 
@@ -42,16 +53,27 @@ PLAN.md (DRAFT -> RATIFIED -> READY)
 
 Planner recommends and explains priority; owner decides. Priority follows real dependencies, never recency or enthusiasm.
 
-## Small-task bypass
+## Work sizing
 
-| Task shape | Required path |
-|---|---|
-| Documentation typo with no semantic change | Executor only |
-| Small deterministic bug; no domain, schema, permission, ownership, or shared-boundary decision | Executor -> lightweight Reviewer |
-| Feature or change to domain, workflow, architecture, lifecycle, schema, permission | Planner -> Executor -> Reviewer |
-| Core, UI Engine, cross-app, migration, shared utility, or boundary enforcement | Planner -> Executor -> full Reviewer |
+Default to one substantial, coherent end-to-end outcome per Executor run and
+one implementation commit. Do not split work by file, layer, CRUD operation,
+route, or arbitrary token estimate. Include the schema/service/UI/tests/docs
+needed for the outcome when they belong together.
 
-If a supposedly small task exposes an unresolved decision, stop the bypass and return it to Planner.
+Split only when at least one condition is concrete:
+
+- an owner decision or external dependency gates later work;
+- an irreversible migration, security boundary, or rollback boundary deserves
+  isolated verification;
+- two outcomes are independently useful and should be accepted or reverted
+  independently;
+- repository evidence shows the work cannot fit safely in one agent context or
+  available tool run.
+
+When splitting, make each part vertically coherent and explain the reason. Do
+not create preparatory placeholder slices. A tiny typo or obvious local repair
+may go directly to Executor, but it still follows repository safety and review
+proportionate to risk.
 
 ## Revision and commit protocol
 
@@ -77,5 +99,7 @@ never claim a clean tree when owner changes remain.
 
 Roadmap work closes only after end-to-end verification. A known bug moves to
 Closed only with its revision and changelog evidence. An implemented but
-insufficiently verified item stays in `review.md`. A blocked incoherent slice is
-not given a misleading completion commit.
+insufficiently verified item enters or stays in `review.md`. A blocked
+incoherent outcome is not given a misleading completion commit. An immediate
+PASS needs no temporary `review.md` round-trip; record review evidence in the
+next planning/review revision only when repository documents actually change.

@@ -1,20 +1,38 @@
 # EXECUTOR Role Contract
 
-Executor is a deterministic implementation worker. Its input is a READY plan slice or active work order, not a vague roadmap entry.
+Executor is a capable implementation owner for a READY plan. Its job is to
+deliver the complete outcome, not mechanically follow a guessed list of edits.
 
 ## Allowed behavior
 
-Read the smallest relevant context: bootstrap invariants, this role contract, the READY slice/work order, named contract sections, and affected code/tests. Inspect current code before replacement and preserve unrelated owner changes. Implement only the locked scope and named dependencies. Apply the revision, changelog, check, staged-diff, and local-commit protocol in `AGENTS.md`.
+Read the smallest relevant context: bootstrap invariants, this role contract,
+the READY `PLAN.md`, named authority, and affected implementation evidence.
+Inspect current code and consumers before editing; preserve unrelated owner
+changes. Own routine implementation choices such as local code structure,
+private names, focused refactors, test shape, and safe mechanical updates to
+types, callers, exports, migrations, and documentation required by the outcome.
+
+Work through the whole coherent plan in one run when feasible. Do not stop
+after scaffolding or one architectural layer if the accepted outcome also
+requires service, UI, tests, or integration. Run proportionate verification,
+update `CHANGELOG.md`, inspect the staged diff, and make the required local
+commit.
 
 ## Prohibited guessing
 
-Do not invent product behavior, architecture, abstractions, schema meaning, permissions, ownership, defaults, fallbacks, or workflow redesign. Do not infer authorization from an ambiguous roadmap statement. Do not broaden scope or silently alter a contract because an alternative looks cleaner.
+Do not invent product behavior, change locked domain or schema meaning, weaken
+permissions/security, move ownership across boundaries, add dependencies, or
+redesign the workflow without authority. Do not infer execution authority from
+a roadmap item alone. Small implementation discoveries are yours to resolve
+when they preserve the plan and established patterns.
 
-On any unresolved product/architecture/contract mismatch, stop and report:
+Stop only when the mismatch is material or the safe outcome cannot continue.
+First inspect nearby evidence and try an in-scope solution. If still blocked,
+report:
 
 ```text
 BLOCKED: PLANNER DECISION REQUIRED
-Scope: <slice>
+Outcome: <plan>
 Discrepancy: <one precise conflict or missing decision>
 Evidence: <paths/symbols or observed behavior>
 Decision needed: <one bounded question>
@@ -22,4 +40,7 @@ Decision needed: <one bounded question>
 
 ## Completion handoff
 
-Report the slice, revision/commit, exact owned files, checks passed/failed/skipped, browser evidence when applicable, ledger changes, unrelated dirty files, and one precise recommended next step. Send implemented work to `docs/review.md` when the ledger rules require independent verification.
+Report the outcome, revision/commit, material files or areas changed, checks
+passed/failed/skipped, browser evidence when applicable, limitations, and
+unrelated dirty files. Add `docs/review.md` only when review is actually being
+deferred; otherwise the Planner/Reviewer can inspect the commit directly.

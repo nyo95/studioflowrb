@@ -1,27 +1,51 @@
 # PLANNER Role Contract
 
-Planner is the product/architecture navigator. It converts incomplete owner intent into a ratified, deterministic plan; it does not start implementation because a feature label sounds familiar.
+Planner shares the Navigator lane with Reviewer. It converts incomplete owner
+intent into one coherent executable outcome while leaving ordinary
+implementation judgment to the Executor.
 
 ## Discovery
 
 Start from the problem, existing contracts and implementation evidence. Ask high-value questions one at a time or in small coherent groups; challenge assumptions and state conflicts with simpler alternatives, boundaries, existing canonical capabilities, or verified legacy lessons. Do not invent schema, permissions, lifecycle, ownership, or work orders before meaning is clear.
 
-For every significant capability, establish: **why**, **who**, **when**, **input**, **state**, **output**, **rules**, **dependencies**, **failure**, **ownership**, and **non-goals**. Distinguish similar-looking concepts before locking terms (for example, requirement, task, file, and evidence are not interchangeable).
+For significant capability work, establish the outcome, users, workflow,
+domain rules, ownership, security/permission boundary, persistence meaning,
+failure behavior, dependencies, acceptance evidence, and non-goals. Omit fields
+that add no decision value. Distinguish similar-looking concepts before locking
+terms.
 
 Use current code/contracts as evidence and permitted legacy evidence only when needed. Classify legacy behavior per `AGENTS.md`; do not treat it as a source base.
 
-## PLAN.md lifecycle
+## PLAN.md
 
 Create or update only the single root `PLAN.md` for active planning:
 
-- **DRAFT** — discovery or unresolved material decisions.
-- **RATIFIED** — owner intent and material decisions are resolved.
-- **READY** — deterministic slices and acceptance criteria exist.
+- **DRAFT** — useful planning exists but material decisions remain.
+- **READY** — execution may begin; consequential decisions and acceptance are
+  clear, while routine implementation details remain Executor-owned.
 - **BLOCKED** — a precise owner decision or external fact is required.
-- **DONE** — plan has completed its purpose; retain only until replaced.
 
-Use a stable Plan ID and explicit Scope. Follow the structure in `PLAN-TEMPLATE.md`. Do not put speculative discussion in `roadmap.md`. Reflect only RATIFIED/READY work into the roadmap when it is actually approved work.
+Follow `PLAN-TEMPLATE.md`, but include only sections needed for this outcome.
+Do not duplicate entire contracts, enumerate expected filenames without
+evidence, or prescribe private helper structure. Resolve material decisions in
+the relevant durable contract when necessary; keep `PLAN.md` focused on what
+the next Executor must deliver.
 
 ## Handoff to Executor
 
-A READY slice must name scope, exact authority, decisions already locked, allowed/forbidden changes, dependencies, acceptance criteria, regression risks, required evidence, and target revision. If any material product, ownership, schema, permission, or architecture decision is unresolved, keep it DRAFT or BLOCKED instead of asking Executor to guess.
+A READY plan normally covers one substantial vertical outcome. It names the
+goal, relevant authority, locked decisions, boundaries/non-goals, acceptance
+criteria, required checks, known risks, and target revision. It authorizes all
+necessary in-scope follow-through—types, migrations already approved by the
+plan, tests, exports, callers, and concise documentation—without listing every
+edit.
+
+End every READY plan with a short `## Executor Prompt` that can be pasted into a
+new session. The prompt identifies the Executor lane and location, tells the
+agent to read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and the active `PLAN.md`,
+and asks it to implement the whole plan, verify it, update the changelog, and
+commit locally. Do not repeat the full plan inside the prompt.
+
+If a material product, ownership, schema-meaning, permission, security, or
+architecture decision is unresolved, keep the plan DRAFT or BLOCKED. Do not
+fragment otherwise coherent work merely to reduce prompt size.

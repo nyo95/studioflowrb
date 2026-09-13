@@ -5,8 +5,41 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.22**
-- Next local revision: **R8.23**
+- Current revision after this entry is committed: **R8.23**
+- Next local revision: **R8.24**
+
+## R8.23 | 2026-09-13 | docs(harness): simplify planner executor workflow
+
+- Replaced the three-role ceremony with two practical operating lanes:
+  Planner/Reviewer owns intent, architecture, review, and the next plan;
+  Executor owns implementation details within the READY boundary.
+- Made one substantial end-to-end outcome the default unit of work. Plans split
+  only for a real decision gate, risk/rollback boundary, independent outcome,
+  or demonstrated context/tool limit—not by file, layer, CRUD step, or an
+  arbitrary token estimate.
+- Reduced active plan states to DRAFT, READY, and BLOCKED; made the copy-ready
+  Executor prompt a required final section; and updated the active PF-1 plan to
+  use the next revision, R8.24.
+- Removed mandatory ledger churn from every handoff. Executor still updates the
+  changelog and commits; `review.md` is now only for genuinely deferred review,
+  while immediate findings return as one consolidated correction pass.
+- Preserved database and legacy isolation, shared ownership boundaries, dirty
+  worktree protection, verification, local revision commits, and remote safety.
+
+### Dependencies and migrations
+
+- No dependency, schema, migration, runtime, or application behavior change.
+
+### Verification
+
+- Local Markdown link scan passed across the nine changed harness/plan
+  documents.
+- Active-harness terminology scan found no stale RATIFIED state, deterministic
+  worker wording, mandatory READY-slice wording, or mandatory review-ledger
+  transition.
+- The active PF-1 plan was reduced from 1,541 to 759 words while retaining its
+  material decisions, acceptance criteria, safety boundaries, and target.
+- `git diff --cached --check`: passed.
 
 ## R8.22 | 2026-09-13 | docs(foundation): reconcile PF-0 and prepare PF-1
 
