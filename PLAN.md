@@ -88,7 +88,7 @@ The baseline/freeze record is project-level governance documentation, not a plat
 
 **Exact authority:** `AGENTS.md`; `docs/agent/README.md#revision-and-commit-protocol`; `docs/PROJECT-REBUILD-FOUNDATION-REFERENCE.md` §§29–31, §34; and the Project Rebuild Foundation / StudioFlow Recovery sections of `docs/roadmap.md`.
 
-**Allowed changes:** add one new durable documentation record under `docs/`; edit only the PF-0 row/link in `docs/roadmap.md`; add the R8.18 entry in `CHANGELOG.md`; replace `PLAN.md` only if the Executor's role protocol requires recording completion. Preserve all pre-existing dirty files and do not touch either untracked reference document.
+**Allowed changes:** add one new durable documentation record under `docs/`; edit only the PF-0 row/link in `docs/roadmap.md`; add one scoped PF-0 review entry in `docs/review.md`; add the R8.18 entry in `CHANGELOG.md`; replace `PLAN.md` only if the Executor's role protocol requires recording completion. Preserve all pre-existing dirty files and do not touch either untracked reference document.
 
 **Forbidden changes:** all production code, schema/migrations, dependencies, tests, app contracts, other roadmap items, `scripts/work-orders/FOUNDATION.md`, legacy files/databases, remotes, tags, and releases.
 

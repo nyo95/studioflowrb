@@ -23,8 +23,12 @@ the StudioFlow Recovery sequence below. StudioFlow Recovery must not begin
 until the foundation is completed and versioned. Master Data and BQ remain
 behaviorally unchanged and are not rebuilt as part of this work.
 
-- [ ] **PF-0 — Pin and freeze:** Pin the RB foundation and legacy evidence
-  baselines; freeze normal StudioFlow feature continuation.
+- [x] ~~**PF-0 — Pin and freeze:** Pin the RB foundation and legacy evidence
+  baselines; freeze normal StudioFlow feature continuation.~~ Implemented in
+  R8.18; awaiting independent review in
+  [`review.md`](review.md). See
+  [`FOUNDATION-BASELINE-FREEZE.md`](FOUNDATION-BASELINE-FREEZE.md) for the
+  canonical record.
 - [ ] **PF-1 — Core purity:** Move infrastructure adapters out of Core, remove
   StudioFlow-specific storage policy from Core, and migrate brand-mark storage
   to the provider-neutral asset path without changing app behavior.

@@ -5,8 +5,27 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.17**
-- Next local revision: **R8.18**
+- Current revision after this entry is committed: **R8.18**
+- Next local revision: **R8.19**
+
+## R8.18 | 2026-09-13 | docs(foundation): pin rebuild baseline and continuation freeze
+
+- Added the canonical PF-0 Foundation baseline/freeze record, preserving R8.12
+  as the approved behavior/reference baseline and distinguishing R8.16 as its
+  documentation-only planning overlay.
+- Pinned the legacy evidence identity as metadata only; PF-0 neither accesses
+  a legacy checkout nor permits legacy database access.
+- Recorded Master Data and BQ behavioral preservation, the narrow StudioFlow
+  continuation freeze exception, and PF-8 as the sole Foundation/StudioFlow
+  Recovery gate-release condition.
+- Linked the completed PF-0 implementation from `roadmap.md` and added its
+  scoped independent-verification handoff to `review.md`.
+
+### Verification
+
+- Verified the R8.12 baseline and R8.16 overlay commits locally with
+  `git show -s`.
+- `git diff --cached --check`: passed.
 
 ## R8.17 | 2026-09-13 | docs(foundation): prepare PF-0 baseline freeze plan
 
