@@ -5,8 +5,15 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.35**
-- Next local revision: **R8.36**
+- Current revision after this entry is committed: **R8.36**
+- Next local revision: **R8.37**
+
+## R8.36 | 2026-09-14 | feat(app): decentralize permission ownership to individual apps and keep central registration metadata-only
+
+- Decentralized permission vocabulary definitions: Master Data, BQ, and StudioFlow now own and export their canonical permission arrays from their public boundaries (`MASTERDATA_PERMISSIONS`, `BQ_PERMISSIONS`, `STUDIOFLOW_PERMISSIONS`).
+- Updated `src/app/app-registrations.ts` to compose permission registrations exclusively via public imports from each app, ensuring the central composition root contains metadata only and no duplicated permission literals (completing F-B / PF-2 + PF-3).
+- Verified full test suite (346 tests passed), typecheck, architecture boundaries, legacy runtime check, and production build.
+- Advanced revision ledger state to current R8.36 and next R8.37.
 
 ## R8.35 | 2026-09-14 | docs(roadmap): activate F-B application ownership plan
 

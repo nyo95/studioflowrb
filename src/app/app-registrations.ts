@@ -1,4 +1,7 @@
 import type { AppPermissionRegistrationInput } from "@platform/core/rbac/registry";
+import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
+import { BQ_PERMISSIONS } from "@/apps/bq/public";
+import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/public";
 
 /**
  * App registrations for the platform permission registry and app launcher
@@ -15,54 +18,18 @@ export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [
     appId: "masterdata",
     name: "Master Data",
     rootPath: "/masterdata",
-    permissions: [
-      "masterdata.access",
-      "masterdata.brand.read",
-      "masterdata.brand.manage",
-      "masterdata.vendor.read",
-      "masterdata.vendor.manage",
-      "masterdata.dictionary.read",
-      "masterdata.dictionary.manage",
-      "masterdata.sku.read",
-      "masterdata.sku.manage",
-      "masterdata.price-material.read",
-      "masterdata.price-material.manage",
-      "masterdata.price-work.read",
-      "masterdata.price-work.manage",
-      "masterdata.promotion.approve",
-      "masterdata.deletion.approve",
-    ],
+    permissions: Object.values(MASTERDATA_PERMISSIONS),
   },
   {
     appId: "bq",
     name: "Bill of Quantity",
     rootPath: "/bq",
-    permissions: [
-      "bq.access",
-      "bq.project.read",
-      "bq.project.manage",
-      "bq.project-deletion.approve",
-      "bq.library.read",
-      "bq.library.manage",
-      "bq.library.promote",
-    ],
+    permissions: Object.values(BQ_PERMISSIONS),
   },
   {
     appId: "studioflow",
     name: "StudioFlow",
     rootPath: "/studioflow",
-    permissions: [
-      "studioflow.access",
-      "studioflow.project.read",
-      "studioflow.project.manage",
-      "studioflow.project-deletion.approve",
-      "studioflow.iteration.manage",
-      "studioflow.iteration.review",
-      "studioflow.phase.override",
-      "studioflow.task.manage",
-      "studioflow.schedule.manage",
-      "studioflow.mom.manage",
-      "studioflow.mom.issue",
-    ],
+    permissions: Object.values(STUDIOFLOW_PERMISSIONS),
   },
 ];
