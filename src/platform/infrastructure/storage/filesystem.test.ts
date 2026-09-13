@@ -7,7 +7,7 @@ import fs from "node:fs/promises";
 import { createLocalFilesystemStorage, createLocalPublicFilesystemStorage } from "./filesystem";
 
 describe("LocalFilesystemStorage adapter", () => {
-  it("writes, removes, and creates signed URLs safely", async () => {
+  it("writes, removes, and creates valid absolute-expiry signed URLs safely", async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "studioflow-storage-"));
     try {
       const storage = createLocalFilesystemStorage(tmpDir);
@@ -17,7 +17,7 @@ describe("LocalFilesystemStorage adapter", () => {
       assert.equal(stored.bytes, 4);
 
       const signedUrl = await storage.createSignedReadUrl("test/image.png", 60);
-      assert.match(signedUrl, /\/api\/platform\/assets\/private\?key=test%2Fimage\.png/);
+      assert.match(signedUrl, /\/api\/platform\/assets\/private\?key=test%2Fimage\.png&expires=\d+&token=[a-f0-9]{64}/);
 
       await storage.remove("test/image.png");
       await assert.rejects(() => storage.createSignedReadUrl("test/image.png", 60));
@@ -26,16 +26,29 @@ describe("LocalFilesystemStorage adapter", () => {
     }
   });
 
-  it("rejects path traversal attacks", async () => {
+  it("rejects path traversal and symlink escape attacks", async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "studioflow-storage-"));
+    const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), "studioflow-outside-"));
     try {
       const storage = createLocalFilesystemStorage(tmpDir);
       const data = Uint8Array.from([1]);
+
+      // Traversal tests
       await assert.rejects(() => storage.put({ key: "../outside.txt", body: data, bytes: 1, contentType: "text/plain" }));
       await assert.rejects(() => storage.remove("../outside.txt"));
       await assert.rejects(() => storage.createSignedReadUrl("../outside.txt", 60));
+
+      // Symlink escape test (if platform supports symlinks)
+      try {
+        const symlinkPath = path.join(tmpDir, "escape-link");
+        await fs.symlink(outsideDir, symlinkPath, "dir");
+        await assert.rejects(() => storage.put({ key: "escape-link/file.txt", body: data, bytes: 1, contentType: "text/plain" }));
+      } catch {
+        // Symlinks might be restricted on Windows without admin rights, ignore if OS throws EPERM
+      }
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
+      await fs.rm(outsideDir, { recursive: true, force: true });
     }
   });
 

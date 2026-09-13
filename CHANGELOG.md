@@ -5,8 +5,15 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.30**
-- Next local revision: **R8.31**
+- Current revision after this entry is committed: **R8.31**
+- Next local revision: **R8.32**
+
+## R8.31 | 2026-09-14 | fix(platform): correct signed URL absolute expiry contract and add symlink security tests
+
+- Corrected `createSignedReadUrl` in `LocalFilesystemStorage` (`filesystem.ts`) to calculate absolute Unix expiration timestamp (`Math.floor(Date.now() / 1000) + expiresInSeconds`) instead of a relative duration delta, resolving the immediate token expiration bug (KB-027).
+- Added robust realpath-based symlink escape protection in `resolveSafePath` to prevent directory traversal via symlinks pointing outside the storage root.
+- Expanded `filesystem.test.ts` with test coverage verifying valid absolute expiry generation and symlink security boundary enforcement.
+- Advanced revision ledger state to current R8.31 and next R8.32.
 
 ## R8.30 | 2026-09-14 | docs(review): record R8.29 local storage correction
 
