@@ -1,12 +1,20 @@
 # Active Plan
 
-Plan ID: PF-1-LOCAL-STORAGE-R8
+Plan ID: PF-1-LOCAL-STORAGE-R8-CORRECTION
 Scope: Local filesystem asset provider and public/private application asset surfaces
-Status: READY
+Status: CORRECTION REQUIRED
 Priority: P1
 Owner: Repository owner
-Target revision: R8.29
+Target revision: R8.31
 Last updated: 2026-09-14
+
+## Review finding
+
+R8.29 implemented the local provider, but review found a P1 correctness defect
+before acceptance: the signed URL expiry value has different meanings in the
+adapter and private route, so MOM image URLs expire immediately. The committed
+tests also do not prove symlink escape protection. This correction pass must
+fix those two gaps without changing the locked local/public/private decision.
 
 ## Outcome
 
@@ -99,7 +107,7 @@ metadata and storage keys; it never stores file/blob contents.
    checks for public Brand mark/private MOM behavior pass. Any unavailable
    local-browser check remains explicitly recorded rather than claimed.
 8. The Executor updates `CHANGELOG.md`, stages only owned files, verifies the
-   staged diff/whitespace, and creates local revision R8.29.
+   staged diff/whitespace, and creates local revision R8.31.
 
 ## Risks and Recovery
 
@@ -112,9 +120,12 @@ working directory. Recovery of old files is a separate migration decision.
 ## Executor Prompt
 
 You are the Executor. Location: rumah. Read `AGENTS.md`,
-`docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire
-PF-1 local-storage outcome. Preserve the locked local/public/private boundary,
-run all required checks including local browser evidence, update the changelog,
-and create local revision R8.29. Do not provision or require Supabase. Stop
+`docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the PF-1
+correction pass for R8.29. Align signed URL expiry semantics between the local
+adapter and private route, add valid/expired URL integration coverage, and
+prove symlink escape protection for public and private reads. Preserve the
+locked local/public/private boundary, run all required checks including local
+browser evidence, update the changelog, and create local revision R8.31. Do
+not provision or require Supabase. Stop
 only for a material locked-decision conflict or unsafe boundary, then report
 the commit, checks, limitations, and unrelated dirty files.

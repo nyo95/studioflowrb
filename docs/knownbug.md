@@ -7,6 +7,21 @@ it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
 
 ## Platform Foundation
 
+### KB-027 — Local private asset signed URL expires immediately
+
+- **Observed (R8.29 review):** `LocalFilesystemStorage.createSignedReadUrl`
+  writes the `expires` query parameter as the requested duration (for example
+  `600`), while the private asset route interprets it as an absolute Unix
+  timestamp. A generated MOM URL is therefore rejected as expired immediately.
+- **Expected:** The provider and private route agree on one expiry meaning;
+  normal MOM reads remain valid for the requested duration and expire only
+  afterward.
+- **Required correction:** Make the signed URL expiry contract explicit and
+  apply it consistently in the local adapter and route. Add an integration
+  test covering a valid URL and an expired URL.
+- **Priority:** P1 — private asset availability.
+- **Status:** Open; blocks PF-1 acceptance until corrected and reverified.
+
 ### KB-026 — PF-0 does not identify the frozen StudioFlow RB reference
 
 - **Observed (R8.18 review):**

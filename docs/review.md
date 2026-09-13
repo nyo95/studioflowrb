@@ -30,9 +30,13 @@ a real defect — move it to `knownbug.md` with what was actually observed.
   boundary, legacy-runtime, production build, and commit whitespace checks
   passed. The previous Supabase URL tests remain evidence for the parked
   adapter, not a deployment requirement.
-- **Status:** Superseded by the active READY local-provider plan in `PLAN.md`.
-  Review of PF-1 resumes after LocalFilesystemStorage and local browser
-  evidence are complete.
+- **R8.29 review finding:** The local adapter and routes were implemented and
+  the reported automated checks passed, but the private signed URL contract
+  has a material mismatch: the adapter emits a duration while the route reads
+  it as an epoch timestamp. MOM URLs therefore expire immediately. Symlink
+  escape behavior is also not covered by the committed tests.
+- **Status:** Correction required. See KB-027 and the active correction plan
+  in `PLAN.md`; PF-1 is not accepted yet.
 
 ### Configurable main-route settings
 

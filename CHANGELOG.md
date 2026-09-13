@@ -5,8 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.29**
-- Next local revision: **R8.30**
+- Current revision after this entry is committed: **R8.30**
+- Next local revision: **R8.31**
+
+## R8.30 | 2026-09-14 | docs(review): record R8.29 local storage correction
+
+- Reviewer found that the local private signed URL adapter emits an expiry
+  duration while the route interprets it as an epoch timestamp, causing MOM
+  URLs to expire immediately.
+- Recorded KB-027, changed PF-1 to correction-required, and opened a focused
+  correction plan requiring expiry-contract and symlink-escape coverage.
+- No application code changed in this review revision. The implementation
+  correction is the next outcome, targeting R8.31.
+
+### Verification
+
+- Read-only review of commit `3393f4a` and `git diff --check`: passed.
 
 ## R8.29 | 2026-09-14 | feat(platform): implement canonical LocalFilesystemStorage adapter for self-hosted Foundation target
 
