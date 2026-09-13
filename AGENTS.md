@@ -1,216 +1,77 @@
 # Agent Entry Point
 
-## Mandatory reading order
+This is the bootstrap and invariant contract for every AI session in this checkout. Identify role and scope first, then load only the authority needed for that work.
 
-1. `docs/README.md`
-2. `CHANGELOG.md` for the published baseline, current local revision, and next revision
-3. `docs/alignment.md`, `docs/roadmap.md`, and `docs/knownbug.md` when the task
-   plans, audits, changes, or reviews StudioFlow or shared consumers
-4. The shared contract relevant to the task: `CORE.md`, `DESIGN.md`, and/or `UI_ENGINE.md`
-5. The active work order, when one exists. StudioFlow workflow closure in
-   `scripts/work-orders/STUDIOFLOW-R7.56-WORKFLOW-CLOSURE.md` is paused behind
-   the owner's Platform/UI Engine/BQ priorities; its filename is not a revision reservation.
-   Work orders R7.48, R7.49, R7.52 and R7.53 are implemented and are retained
-   as history, not as instructions. `docs/apps/masterdata/masterdata.md` indexes approved
-   logic contracts only.
-6. `prisma/schema.prisma` for the implemented persisted shape
-7. The relevant current code, tests, and migrations
+## Session handshake and role router
 
-## Communicating with the owner
+At the start of a new computer/session, ask one compact setup question, omitting facts already known from the active session/environment:
 
-When explaining plans, findings, status, trade-offs, or problems to the
-owner in conversation, use plain, everyday language and avoid unnecessary
-technical jargon — don't assume familiarity with implementation detail.
-This is about how an agent talks *to the owner*; contracts, code, commit
-messages, and this file itself still need full technical precision.
+> Agent apa yang sedang bekerja (Codex / Claude / OpenCode / other), role-nya Planner / Executor / Reviewer, dan ini kerja di rumah atau kantor?
 
-## Authority order
+Roles are explicit session assignments, not model/tool identities. When no role is assigned, work as **PLANNER** until the owner assigns another role.
 
-1. Explicit current owner instruction
-2. `CORE.md`, `DESIGN.md`, or `UI_ENGINE.md` within its shared concern
-3. An active app contract when one has been approved
-4. Schema/migrations as implemented-state evidence
-5. Current code/tests as behavior evidence
-6. Legacy code at an exact commit as evidence only
+- **PLANNER** — read `docs/agent/PLANNER.md`; turns incomplete owner intent into a ratified, executable plan.
+- **EXECUTOR** — read `docs/agent/EXECUTOR.md`; implements only a READY plan slice or active deterministic work order.
+- **REVIEWER** — read `docs/agent/REVIEWER.md`; independently verifies intended behavior before judging the implementation.
 
-## Legacy isolation and location rule
+Read `docs/agent/README.md` to select scoped context. Never load every app contract, roadmap section, or legacy artifact merely because it exists.
 
-StudioFlow legacy has different checkout locations and may have different local
-states on the owner's home and office computers. Never assume `../studioflow`, a
-drive letter, a saved path, or that a previously observed checkout is the one the
-owner intends to use.
+## Manager-first execution
 
-### Required owner verification before continuation
+The role model refines manager-first execution: **Planner** is the PM/TL
+product-and-architecture navigator, **Executor** is the deterministic
+implementation worker, and **Reviewer** is the independent verification
+navigator. Tool or model name never grants a role. Planner locks material
+architecture, domain, ownership, schema, calculation, security, and dependency
+decisions before execution; Executor must stop for an unresolved decision;
+Reviewer records PASS, required correction, or a precise blocker. Corrections
+are always the next local revision, never a silent rewrite of an accepted commit.
 
-This project is worked on from both the owner's home and office computers. At
-the start of a new computer/session, or whenever the environment has changed,
-ask one short question: **"Ini kerja di mana: rumah atau kantor?"**
+## Global authority and communication
 
-Use the current checkout location as the identity of the rebuild repository. Do
-not ask the owner to restate its path when the agent is already running in this
-checkout. The home/office answer selects the matching local environment file:
+1. Explicit current owner instruction.
+2. `CORE.md`, `DESIGN.md`, or `UI_ENGINE.md` within its shared concern.
+3. An approved active app contract.
+4. Schema/migrations as implemented-state evidence.
+5. Current code/tests as behavior evidence.
+6. Legacy code at an exact recorded commit as evidence only.
+
+Explain plans, findings, status, trade-offs, and problems to the owner in plain everyday language. Contracts, code, and commit messages retain technical precision.
+
+## Location, rebuild database, and legacy isolation
+
+The current checkout identifies the rebuild repository. Do not ask for its path. The home/office answer selects local-only configuration:
 
 - `rumah`: load `.env.rumah`;
 - `kantor`: load `.env.kantor`.
 
-These files are local-only configuration and must not be committed or copied
-between computers. If the selected file is missing or its target is ambiguous,
-stop and ask only for the missing local setup detail.
+Never commit or copy either file. Set `STUDIOFLOW_LOCATION` to the selected value before Prisma or other repository tooling. Both locations use isolated rebuild-only PostgreSQL; verify the explicit target is `studioflow-rebuild` before *any* database command, and stop if the target is absent or ambiguous.
 
-For Prisma and other repository tooling, set `STUDIOFLOW_LOCATION` to `rumah` or
-`kantor` before running the command so it selects the corresponding file.
+Legacy is separate, read-only evidence. When needed, ask the owner for its exact path on this computer, then record path, commit, branch, and dirty state before reading it. Do not scan drives or assume a path. Never edit, format, generate into, install in, run, test, migrate, seed, reset, stash, clean, switch, merge, rebase, pull, push, or otherwise alter legacy. Inspect committed evidence with read-only Git commands and name any working-tree-only evidence separately. Never copy legacy code, schema, migrations, database, or configuration as an implementation base.
 
-Both locations use a new rebuild-only PostgreSQL instance through Docker. The
-database name, schema, and application contract are intentionally identical at
-home and office; only connection details such as host, port, or Docker service
-may differ. Select the target through the location-specific environment file,
-and verify that it is rebuild-only before any database command. Do not require
-the owner to provide the database name or full Docker target on every session.
+StudioFlow legacy PostgreSQL is completely forbidden. Never connect to, query, inspect, dump, restore, migrate, seed, reset, truncate, or otherwise touch any legacy database, server, schema, role, connection string, container, volume, backup, or service. Never run a database command whose target could be legacy.
 
-Legacy evidence remains a separate exception: when it is actually required,
-stop and ask the owner for the exact StudioFlow legacy repository path on the
-current computer. Do not discover it by broadly scanning drives or sibling
-folders.
+For activated legacy work, inspect end-to-end route/navigation, UI state, server boundary, domain rules, persistence/transaction, permissions/audit, downstream reads, tests/migrations/errors. Classify behavior as **KEEP**, **FIX**, **MERGE**, or **PURGE**, with exact paths/symbols and rebuild destination. Prose, screenshots, and schema alone are not sufficient evidence.
 
-After the owner supplies the path, resolve and record that exact path, commit,
-branch, and dirty state before reading evidence. A path supplied for one
-computer/session is not a portable default for another computer.
+## Foundation and ownership invariants
 
-The legacy repository is strictly read-only evidence:
+Every feature must classify its needed capability: **REUSE** an existing shared contract, **EXTEND** one whose purpose fits, **ADD** a proven missing domain-neutral capability, keep policy **APP-OWNED**, or **PURGE** contradicted behavior. Deferred documentation is not permission to create placeholders, dependencies, helpers, or modules.
 
-- never edit, format, generate into, stage, commit, stash, reset, clean, switch,
-  merge, rebase, pull, push, install dependencies in, or otherwise alter it;
-- never run its application, scripts, seeds, migrations, tests, or commands that
-  may write files, caches, dependencies, generated output, or external state;
-- inspect committed evidence with read-only Git operations such as `git show`;
-  name working-tree-only evidence separately and never modify it;
-- never copy its code, schema, migrations, database, or configuration into the
-  rebuild as an implementation starting point; legacy informs behavior only;
-- never make the rebuild depend on the presence, path, branch, or availability
-  of the legacy repository.
+Core, Utilities, and UI Engine are reusable by every app. A generic capability has one canonical implementation, public export, consumer matrix, and boundary evidence; an app may not create a private substitute. Improve an insufficient canonical API once in the shared layer and update affected consumers together. Shared layers never own app roles, contextual business authorization, persistence policy, or business defaults.
 
-StudioFlow legacy PostgreSQL is completely out of scope. Never connect to,
-query, inspect, dump, restore, migrate, seed, reset, truncate, or otherwise touch
-any database, server, schema, role, connection string, container, volume, backup,
-or service used by or capable of affecting StudioFlow legacy. Do not run a
-command when its database target is absent, ambiguous, inherited from the legacy
-environment, or not proven to be rebuild-only.
+Allowed dependencies are `app -> platform` and `app -> other-app/public`. Forbidden dependencies are `platform -> app`, cross-app internal imports, implicit cross-app writes, and cross-app database foreign keys. Consumers must snapshot facts when later upstream changes must not rewrite historical meaning.
 
-The rebuild starts from zero and owns isolated code, migrations, configuration,
-and PostgreSQL resources. Before any database command that can write or apply a
-migration, verify that its explicit target belongs only to
-`studioflow-rebuild`; otherwise stop and ask the owner. No legacy data migration
-or compatibility dependency is implied unless the owner later approves a
-separate, explicit, safely isolated work order.
+No raw legacy `ui-*` class may bypass an available UI Engine component. A real exception must name the canonical component, explain its domain difference, and have a regression test against accidental convergence drift.
 
-## Legacy evidence workflow
+## Evidence, ledgers, revision, and remote safety
 
-For every legacy feature, inspect the end-to-end implementation where it exists:
+`PLAN.md` is temporary planning workspace; `docs/roadmap.md` is approved work not yet built; `docs/review.md` is built work awaiting sufficient verification; `docs/knownbug.md` is a reproducible verified defect; `CHANGELOG.md` is the accepted revision ledger. Detailed transition rules are in `docs/agent/README.md`.
 
-1. route and navigation;
-2. component state and interaction;
-3. server action/API;
-4. service/domain rules;
-5. query, transaction, and persisted relations;
-6. permission, audit, import/export, and downstream reads;
-7. tests, migrations, error handling, and comments that explain defects.
+Before editing, record HEAD, branch, remote/published baseline, existing revision entries, and the complete dirty-file list. Determine the next unused revision from `CHANGELOG.md`; never infer it from memory. Preserve unrelated owner changes, stage only owned files, inspect staged diff and whitespace, and make exactly one local revision commit for each cohesive completed change set. Run proportionate checks; a skipped, unavailable, or cancelled mandatory check is not a pass and must be reported. Do not call work complete without the required changelog, validation, and local commit.
 
-Classify each observed behavior as **KEEP**, **FIX**, **MERGE**, or **PURGE** and record exact paths/symbols plus the rebuild destination. Prose, screenshots, and schema alone never replace reading the implementation.
+When an audit proves a defect not fixed in its scoped change, record it in `docs/knownbug.md`; do not discard it. Remove/strike roadmap work only after actual end-to-end verification. Review corrections always use the next local revision; never silently amend an accepted commit.
 
-## Foundation-first rule
-
-Every feature identifies the capabilities it needs before app implementation:
-
-- **REUSE** an existing shared contract;
-- **EXTEND** a shared contract whose purpose already fits;
-- **ADD** a missing domain-neutral capability;
-- keep business policy **APP-OWNED**;
-- **PURGE** unsafe or contradicted behavior.
-
-Core, Utilities, and UI Engine must stay reusable by Master Data, StudioFlow, BQ, and future apps. A missing generic mechanism is added to the shared layer and tested there; an app does not create a private substitute. Every shared capability has one canonical implementation, one public export, and an explicit consumer matrix. A capability is not considered shared merely because its contract says so: each consumer must import the canonical export, and boundary checks/tests must prove that no duplicate app-local implementation exists. If the canonical API is insufficient, improve it once at the shared layer and update all affected consumers in the same change set. Core may own platform identity, UserRole assignments, and grant persistence, but shared layers never contain app-entity roles, contextual business authorization, app persistence policy, or business defaults.
-
-A documented deferred capability is not permission to implement it. Activate it only when a locked stage or approved consumer proves the need. Do not create empty modules, speculative dependencies, or broad generic helpers merely to reserve a name.
-
-## UI quality gate
-
-Component reuse alone is not completion. Verify the running workflow for information hierarchy, search, filters, sorting, pagination, selection, quick entry, detail/edit flow, destructive confirmation, unsaved input, loading/empty/error/disabled/archived/permission states, long content, desktop, collapsed rail, and narrow viewport. For every shared capability used by more than one app, the acceptance evidence must name the canonical export and exercise each listed consumer for both behavior and visual consistency. A passing single-app smoke test is not evidence of shared reuse.
-
-Raw legacy `ui-*` classes may not bypass an available UI Engine component. If the shared component is weak, improve it once at the engine level and then consume it from the app. Private copies or app-local wrappers that reproduce an existing shared capability are prohibited unless the contract explicitly documents a genuinely different domain behavior; such an exception must name the canonical component, explain the difference, and add a regression test preventing accidental convergence drift.
-
-## Manager-first execution
-
-The active manager/navigator is PM/TL for architecture, domain, ownership, schema/calculation decisions, legacy classification, contracts, work orders, and review. Until the owner changes the assignment, Codex is the navigator and the owner-operated OpenCode session is the coding executor. Deterministic CRUD, tests, mechanical refactors, and UI implementation against a locked contract are executed through an explicit work order. An executor makes no product or architecture decisions; on ambiguity or code/contract mismatch it stops and reports the discrepancy.
-
-Direct PM/TL code changes are limited to genuinely ambiguous architecture/domain work, risky migration, cross-app boundaries, or critical bugs that cannot yet be reduced to deterministic instructions.
-
-The navigator must:
-
-- lock every material architecture, security, ownership, schema, and dependency choice before execution;
-- issue a deterministic work order and target revision;
-- review the executor commit, code paths, migration, tests, and real browser behavior;
-- record acceptance, required correction, or a precise blocker;
-- issue any correction as the next local revision rather than silently rewriting the executor commit.
-
-The executor must:
-
-- implement only the locked work order and named dependency versions;
-- inspect current code before replacing it and preserve unrelated owner changes;
-- stop instead of inventing product policy, a schema meaning, a permission, a fallback, or an unapproved dependency;
-- update the changelog and make the required local commit after its implementation and checks complete;
-- never push, publish, open a PR, or alter remote state.
-
-Any future AI starts as navigator unless the owner explicitly gives it a locked executor work order. Model or tool choice never changes these authority boundaries.
-
-## Revision, changelog, and local-commit protocol
-
-`CHANGELOG.md` is the revision ledger. A task is not reported as finished until its cohesive changes are documented there, validated, and committed locally.
-
-### Roadmap and known-bug ledgers
-
-`docs/roadmap.md` and `docs/knownbug.md` are operational ledgers and must be read when
-planning or auditing StudioFlow work.
-
-- `docs/roadmap.md` lists features that are planned but not complete. A feature may
-  be removed or struck through only after it is actually implemented and
-  verified; the implementation must still receive a `CHANGELOG.md` entry.
-- `docs/knownbug.md` lists reproducible audit findings that are not fixed in the
-  current change set. Each entry must state the affected area, observed and
-  expected behavior, mitigation, and status.
-- Every audit must either fix a discovered bug in the same scoped change set or
-  add/update it in `docs/knownbug.md`. Do not silently discard an unfixed finding.
-- When a bug is fixed, move or strike through its entry in `docs/knownbug.md` and
-  record the fix, verification, and any limitation in `CHANGELOG.md`.
-- Do not claim a roadmap item or known bug is complete merely because a route,
-  component, or schema exists; verify the end-to-end behavior, permissions,
-  persistence, error states, and relevant UI states.
-- Roadmap entries marked explicitly out of scope are not deferred work and must
-  not be reintroduced without a new owner instruction.
-
-### Revision format
-
-- `R<N>` is the most recent owner-authorized GitHub/published baseline. The initial recorded baseline is `R1` at commit `c8e473702801510aa314bbed45242a71b600f733`.
-- Local-only work increments a two-or-more digit ordinal under that baseline: `R1.01`, `R1.02`, `R1.03`, …, `R1.99`, `R1.100`.
-- A local commit subject is exactly `R<N>.<NN> | <type>(<scope>): <imperative summary>`.
-- Example: `R1.02 | feat(foundation): implement identity access and settings`.
-- A local revision is an ordinal label, not a decimal number. Never reuse, renumber, or skip to a lower suffix.
-- Only an explicit owner instruction to publish/push promotes the next whole revision (`R2`, then `R3`, and so on). Promotion uses a dedicated `R<N> | release: <summary>` commit and changelog entry; existing local commit subjects are not rewritten.
-- After a whole revision is actually published, the next local change starts at that baseline's `.01`.
-
-### Required sequence for every completed change set
-
-1. Record `git rev-parse HEAD`, branch, remote/published baseline, existing revision entries, and the complete dirty-file list before editing.
-2. Determine the next unused revision from `CHANGELOG.md`; never guess from memory.
-3. Edit only the files owned by the approved request/work order. Do not reset, stash, clean, overwrite, or stage unrelated dirty files.
-4. Run the proportionate required checks. A cancelled, skipped, or unavailable mandatory check is not a pass and must be named in the changelog/report.
-5. Add one changelog entry containing scope, important behavior/contract changes, migrations/dependencies, checks run, and remaining limitations.
-6. Stage only owned files, inspect `git diff --cached` and `git diff --cached --check`, then create exactly one local commit with the required revision subject.
-7. Report the revision, commit hash, checks, and any still-uncommitted unrelated files. Never claim a clean tree when reserved owner changes remain.
-
-Review corrections use the next revision and a new commit; do not amend or squash unless the owner explicitly orders it. If work is genuinely blocked before it is coherent and verifiable, do not create a misleading completion commit: preserve the diff, report the blocker and exact uncommitted files, and wait for a manager decision.
-
-### Remote safety
-
-A request to change, build, commit, or finish authorizes local commits only. It never authorizes `git push`, remote tag creation, pull-request creation/merge, deployment, or release publication. Those actions require a separate explicit owner instruction. Fetching/read-only remote inspection is allowed only when required by the task; it does not change the revision baseline.
+A request to change, build, commit, or finish authorizes local commits only. It never authorizes push, remote tag, pull request, merge, deployment, publication, or release. Those require separate explicit owner instruction.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
@@ -221,7 +82,3 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
-
-## Imported Claude Cowork project instructions
-
-disini kamu kerja bareng dengan codex,  kamu akan banyak handoff dan takeover kerjaan bersama dengan codex nantinya

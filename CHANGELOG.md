@@ -5,8 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.12**
-- Next local revision: **R8.13**
+- Current revision after this entry is committed: **R8.14**
+- Next local revision: **R8.15**
+
+## R8.14 | 2026-09-13 | docs(harness): introduce role-based AI workflow
+
+- Refactored `AGENTS.md` into a bootstrap, invariant, and explicit role-router contract while preserving owner authority, location/database safeguards, read-only legacy evidence, legacy-database prohibition, ownership boundaries, revision protocol, remote safety, and the current Next.js rule block.
+- Added scoped PLANNER, EXECUTOR, and REVIEWER contracts under `docs/agent/`, including discovery, deterministic stop rules, independent five-gate review, priority, ledger transitions, and a proportionate small-task bypass.
+- Formalized temporary root `PLAN.md` with a stable Plan ID and Scope; recorded this documentation migration as completed without changing roadmap priorities or product/business contracts.
+- Reduced `docs/SESSION-HANDOFF-PROMPT.md` to a snapshot-free role-router entry.
+- Made browser verification conditional on task type and explicit acceptance criteria; a user-facing or interaction change still requires it.
+- Documented, but did not implement, the optional deterministic context-resolver script. No production code, schema, migration, or app behavior changed.
+
+### Verification
+
+- Documentation cross-links and role routing: reviewed.
+- `git diff --check`: passed.
 
 ## R8.13 | 2026-09-12 | docs(masterdata): record non-blocking cleanup findings
 
