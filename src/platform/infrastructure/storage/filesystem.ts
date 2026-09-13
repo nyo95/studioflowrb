@@ -15,36 +15,51 @@ function encodedKey(key: string): string {
   return key.split("/").map(encodeURIComponent).join("/");
 }
 
-async function resolveSafePath(rootDir: string, key: string): Promise<string> {
+export async function resolveSafePath(rootDir: string, key: string): Promise<string> {
   if (!key || key.includes("..") || key.startsWith("/") || key.endsWith("/")) {
     throw new AppError("VALIDATION", "storage.invalid-key", "The storage object reference is invalid.");
   }
   const resolvedRoot = path.resolve(rootDir);
   const targetPath = path.resolve(resolvedRoot, key);
-  if (!targetPath.startsWith(resolvedRoot + path.sep) && targetPath !== resolvedRoot) {
+
+  const normRoot = path.resolve(resolvedRoot).toLowerCase();
+  const normTarget = path.resolve(targetPath).toLowerCase();
+  if (!normTarget.startsWith(normRoot + path.sep.toLowerCase()) && normTarget !== normRoot) {
     throw new AppError("VALIDATION", "storage.invalid-key", "The storage object reference is invalid.");
   }
 
-  // Symlink escape protection via realpath verification
+  // Check every segment from root down to targetPath using realpath (covers Windows junctions & symlinks)
+  let currentPath = resolvedRoot;
+  const relative = path.relative(resolvedRoot, targetPath);
+  const segments = relative ? relative.split(path.sep) : [];
+
+  for (const segment of segments) {
+    currentPath = path.join(currentPath, segment);
+    try {
+      const realSegment = await fs.realpath(currentPath);
+      const normReal = path.resolve(realSegment).toLowerCase();
+      if (!normReal.startsWith(normRoot + path.sep.toLowerCase()) && normReal !== normRoot) {
+        throw new AppError("VALIDATION", "storage.invalid-key", "The storage object reference is invalid.");
+      }
+    } catch (err: unknown) {
+      if (typeof err === "object" && err !== null && "code" in err && (err as { code?: string }).code === "ENOENT") {
+        break;
+      }
+      if (err instanceof AppError) throw err;
+    }
+  }
+
+  // Final realpath verification if target exists
   try {
     const realRoot = await fs.realpath(resolvedRoot);
     const realPath = await fs.realpath(targetPath);
-    if (!realPath.startsWith(realRoot + path.sep) && realPath !== realRoot) {
+    const normRealRoot = path.resolve(realRoot).toLowerCase();
+    const normRealPath = path.resolve(realPath).toLowerCase();
+    if (!normRealPath.startsWith(normRealRoot + path.sep.toLowerCase()) && normRealPath !== normRealRoot) {
       throw new AppError("VALIDATION", "storage.invalid-key", "The storage object reference is invalid.");
     }
   } catch (err: unknown) {
-    if (typeof err === "object" && err !== null && "code" in err && (err as { code?: string }).code === "ENOENT") {
-      const parentDir = path.dirname(targetPath);
-      try {
-        const realRoot = await fs.realpath(resolvedRoot);
-        const realParent = await fs.realpath(parentDir);
-        if (!realParent.startsWith(realRoot + path.sep) && realParent !== realRoot) {
-          throw new AppError("VALIDATION", "storage.invalid-key", "The storage object reference is invalid.");
-        }
-      } catch {
-        // Parent directory doesn't exist yet; safe root boundaries enforced lexically
-      }
-    }
+    if (err instanceof AppError) throw err;
   }
 
   return targetPath;

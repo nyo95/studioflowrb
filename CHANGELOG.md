@@ -5,8 +5,14 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.32**
-- Next local revision: **R8.33**
+- Current revision after this entry is committed: **R8.33**
+- Next local revision: **R8.34**
+
+## R8.33 | 2026-09-14 | fix(platform): centralize realpath-based symlink and path traversal security across routes and storage
+
+- Centralized storage path resolution and security validation into `resolveSafePath` in `@platform/infrastructure/storage/filesystem`, ensuring lexical prefix checks and realpath-based symlink escape protection are uniformly shared between storage adapters and public/private asset route handlers.
+- Corrected symlink test suite in `filesystem.test.ts` to strictly classify OS-level privilege restrictions (EPERM/EACCES) while ensuring traversal and symlink escape rejections are fully asserted without false passes (addressing KB-028).
+- Advanced revision ledger state to current R8.33 and next R8.34.
 
 ## R8.32 | 2026-09-14 | docs(review): record R8.31 symlink correction
 

@@ -38,13 +38,22 @@ describe("LocalFilesystemStorage adapter", () => {
       await assert.rejects(() => storage.remove("../outside.txt"));
       await assert.rejects(() => storage.createSignedReadUrl("../outside.txt", 60));
 
-      // Symlink escape test (if platform supports symlinks)
+      // Symlink escape test with strict error classification
+      const symlinkPath = path.join(tmpDir, "escape-link");
+      let symlinkCreated = false;
       try {
-        const symlinkPath = path.join(tmpDir, "escape-link");
         await fs.symlink(outsideDir, symlinkPath, "dir");
+        symlinkCreated = true;
+      } catch (err: unknown) {
+        if (typeof err === "object" && err !== null && "code" in err && ((err as { code?: string }).code === "EPERM" || (err as { code?: string }).code === "EACCES")) {
+          // Platform lacks symlink permission (Windows unprivileged user), skip symlink execution safely
+        } else {
+          throw err;
+        }
+      }
+
+      if (symlinkCreated) {
         await assert.rejects(() => storage.put({ key: "escape-link/file.txt", body: data, bytes: 1, contentType: "text/plain" }));
-      } catch {
-        // Symlinks might be restricted on Windows without admin rights, ignore if OS throws EPERM
       }
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
