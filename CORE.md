@@ -336,8 +336,9 @@ Rules:
 - values are validated by a typed application service; there is no arbitrary JSON setting API;
 - locale, IANA timezone, ISO currency, and brand mark are explicit and validated;
   a brand mark may be an existing safe HTTP(S)/site-relative URL or an
-  owner-uploaded PNG (maximum 2 MB, verified PNG signature, random local filename
-  under the application public upload directory);
+  owner-uploaded PNG (maximum 2 MB, verified PNG signature, server-generated permanent
+  storage key under the public platform asset bucket, with durable database storage
+  recording the key rather than a raw URL);
 - settings supply defaults to formatters and shells, but callers can override display locale/timezone/currency explicitly;
 - changing a display default never rewrites persisted business values or snapshots;
 - read/manage use `platform.settings.read/manage`; updates are transactional and audited with safe field deltas;

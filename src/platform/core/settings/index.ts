@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { prepareAuditEvent, type AuditActor, type AuditWriter } from "@platform/core/audit";
-import { AppError } from "@platform/core/errors";
+import { AppError, reportOperationalError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 import type { ObjectStorage } from "@platform/core/storage";
 import { validationError } from "@platform/core/validation";
@@ -336,10 +336,18 @@ export function createPlatformSettingsService(ports: PlatformSettingsPorts) {
           ? current.brandMarkStorageKey : null;
         return { changed: true, settings: await toPresentationSettings(after, resolveBrandMarkUrl) };
       });
-        if (cleanupKey) await objectStorage?.remove(cleanupKey).catch(() => undefined);
+        if (cleanupKey) {
+          await objectStorage?.remove(cleanupKey).catch((cleanupError) => {
+            reportOperationalError({ context: "platform.settings.brand_mark.cleanup", error: cleanupError });
+          });
+        }
         return result;
       } catch (error) {
-        if (brandMarkChange.kind === "managed") await objectStorage?.remove(brandMarkChange.storageKey).catch(() => undefined);
+        if (brandMarkChange.kind === "managed") {
+          await objectStorage?.remove(brandMarkChange.storageKey).catch((cleanupError) => {
+            reportOperationalError({ context: "platform.settings.brand_mark.rollback_cleanup", error: cleanupError });
+          });
+        }
         throw error;
       }
     },

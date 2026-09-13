@@ -5,8 +5,15 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.24**
-- Next local revision: **R8.25**
+- Current revision after this entry is committed: **R8.26**
+- Next local revision: **R8.27**
+
+## R8.26 | 2026-09-13 | fix(platform): increase request body limit for managed uploads, update storage contract and operational cleanup logging
+
+- Increased Next.js Server Action request body size limit to 4 MB in `next.config.ts` while keeping file validation strict at 2 MB, preventing framework-level rejection of valid 2 MB PNG uploads due to multipart metadata/boundary overhead.
+- Updated `CORE.md` storage contract to explicitly document the two-bucket architecture (`platform-public-assets` for managed Brand marks, `platform-assets` for private MOM objects) and durable storage keys in the database instead of local filesystem paths.
+- Replaced silent `catch(() => undefined)` cleanup and rollback removals in settings and MOM storage actions with centralized `reportOperationalError` logging for stray object tracking.
+- Advanced revision ledger state to current R8.26 and next R8.27.
 
 ## R8.25 | 2026-09-13 | feat(platform): separate managed Brand mark storage
 

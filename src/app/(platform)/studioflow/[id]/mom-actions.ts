@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { requirePrincipalGrants } from "@platform/core/auth";
-import { AppError } from "@platform/core/errors";
+import { AppError, reportOperationalError } from "@platform/core/errors";
 import { createPrivateObjectKey } from "@platform/core/storage";
 import { objectStorage } from "@platform/runtime";
 import { studioFlowService } from "@/apps/studioflow/runtime";
@@ -100,7 +100,12 @@ export async function uploadMomImageAction(projectId: string, momId: string, fil
     const key = createPrivateObjectKey(`studioflow/mom/${projectId}/${momId}`, extension);
     await objectStorage.put({ key, body: bytes, bytes: bytes.length, contentType: file.type });
     try { return { storageKey: key, readUrl: await objectStorage.createSignedReadUrl(key, 600) }; }
-    catch (error) { await objectStorage.remove(key).catch(() => undefined); throw error; }
+    catch (error) {
+      await objectStorage.remove(key).catch((cleanupError) => {
+        reportOperationalError({ context: "studioflow.mom.image.rollback_cleanup", error: cleanupError });
+      });
+      throw error;
+    }
   }, { context: "studioflow.mom.image.upload" });
 }
 
