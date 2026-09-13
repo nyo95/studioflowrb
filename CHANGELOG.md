@@ -5,8 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.14**
-- Next local revision: **R8.15**
+- Current revision after this entry is committed: **R8.15**
+- Next local revision: **R8.16**
+
+## R8.15 | 2026-09-13 | docs(harness): restore revision and target safeguards
+
+- Restored the exact local revision subject, ordinal, ledger, staging, and
+  reporting protocol in the role-harness reference used by all editing and
+  reviewing roles.
+- Corrected rebuild database validation to require a target belonging only to
+  `studioflow-rebuild`, without assuming a database name from local connection
+  configuration.
+- Restored explicit serial Codex/Claude/OpenCode handoff guidance.
+
+### Verification
+
+- `git diff --check`: pending before commit.
 
 ## R8.14 | 2026-09-13 | docs(harness): introduce role-based AI workflow
 

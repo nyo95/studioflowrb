@@ -26,6 +26,8 @@ architecture, domain, ownership, schema, calculation, security, and dependency
 decisions before execution; Executor must stop for an unresolved decision;
 Reviewer records PASS, required correction, or a precise blocker. Corrections
 are always the next local revision, never a silent rewrite of an accepted commit.
+Codex, Claude, and OpenCode may hand off or take over work, but they work
+serially on the same branch and must not overlap uncommitted files.
 
 ## Global authority and communication
 
@@ -45,7 +47,7 @@ The current checkout identifies the rebuild repository. Do not ask for its path.
 - `rumah`: load `.env.rumah`;
 - `kantor`: load `.env.kantor`.
 
-Never commit or copy either file. Set `STUDIOFLOW_LOCATION` to the selected value before Prisma or other repository tooling. Both locations use isolated rebuild-only PostgreSQL; verify the explicit target is `studioflow-rebuild` before *any* database command, and stop if the target is absent or ambiguous.
+Never commit or copy either file. Set `STUDIOFLOW_LOCATION` to the selected value before Prisma or other repository tooling. Both locations use isolated rebuild-only PostgreSQL; verify the explicit target belongs only to `studioflow-rebuild` before *any* database command, and stop if the target is absent or ambiguous.
 
 Legacy is separate, read-only evidence. When needed, ask the owner for its exact path on this computer, then record path, commit, branch, and dirty state before reading it. Do not scan drives or assume a path. Never edit, format, generate into, install in, run, test, migrate, seed, reset, stash, clean, switch, merge, rebase, pull, push, or otherwise alter legacy. Inspect committed evidence with read-only Git commands and name any working-tree-only evidence separately. Never copy legacy code, schema, migrations, database, or configuration as an implementation base.
 
@@ -68,6 +70,8 @@ No raw legacy `ui-*` class may bypass an available UI Engine component. A real e
 `PLAN.md` is temporary planning workspace; `docs/roadmap.md` is approved work not yet built; `docs/review.md` is built work awaiting sufficient verification; `docs/knownbug.md` is a reproducible verified defect; `CHANGELOG.md` is the accepted revision ledger. Detailed transition rules are in `docs/agent/README.md`.
 
 Before editing, record HEAD, branch, remote/published baseline, existing revision entries, and the complete dirty-file list. Determine the next unused revision from `CHANGELOG.md`; never infer it from memory. Preserve unrelated owner changes, stage only owned files, inspect staged diff and whitespace, and make exactly one local revision commit for each cohesive completed change set. Run proportionate checks; a skipped, unavailable, or cancelled mandatory check is not a pass and must be reported. Do not call work complete without the required changelog, validation, and local commit.
+
+The exact revision format and required ledger fields are mandatory in `docs/agent/README.md#revision-and-commit-protocol` for every role that edits, approves, or reviews a change.
 
 When an audit proves a defect not fixed in its scoped change, record it in `docs/knownbug.md`; do not discard it. Remove/strike roadmap work only after actual end-to-end verification. Review corrections always use the next local revision; never silently amend an accepted commit.
 

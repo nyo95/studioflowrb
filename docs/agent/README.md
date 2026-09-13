@@ -52,3 +52,30 @@ Planner recommends and explains priority; owner decides. Priority follows real d
 | Core, UI Engine, cross-app, migration, shared utility, or boundary enforcement | Planner -> Executor -> full Reviewer |
 
 If a supposedly small task exposes an unresolved decision, stop the bypass and return it to Planner.
+
+## Revision and commit protocol
+
+The published baseline is `R<N>`. Each local change increments its ordinal as
+`R<N>.<NN>` (for example `R8.15`); this is an ordinal, not a decimal. Never
+reuse, renumber, or skip back to a lower suffix. Only an explicit owner request
+to publish/push promotes a whole revision through a dedicated
+`R<N> | release: <summary>` commit; the next local work then starts at `.01`.
+
+Every local commit subject is exactly:
+
+```text
+R<N>.<NN> | <type>(<scope>): <imperative summary>
+```
+
+Before editing, record HEAD, branch, remote/published baseline, existing
+revision entries, and every dirty file. After proportionate checks, add one
+changelog entry naming scope, material behavior/contract changes,
+migrations/dependencies, checks, and remaining limitations. Stage only owned
+files, inspect `git diff --cached` and `git diff --cached --check`, then make
+one local commit. Report revision, commit, checks, and unrelated dirty files;
+never claim a clean tree when owner changes remain.
+
+Roadmap work closes only after end-to-end verification. A known bug moves to
+Closed only with its revision and changelog evidence. An implemented but
+insufficiently verified item stays in `review.md`. A blocked incoherent slice is
+not given a misleading completion commit.
