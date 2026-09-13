@@ -19,6 +19,19 @@ a real defect — move it to `knownbug.md` with what was actually observed.
 
 ## Platform Foundation
 
+### F-B / PF-2+PF-3 — Application ownership and navigation
+
+- **Observed (R8.36):** Permission vocabularies were moved behind the public
+  boundaries of Master Data, BQ, and StudioFlow, and central registration no
+  longer duplicates permission literals.
+- **Missing:** The READY plan also requires app-owned route helpers and
+  navigation definitions, plus regression evidence that launcher/sidebar
+  visibility and route behavior remain unchanged. R8.36 does not implement or
+  verify those parts.
+- **Status:** Correction required. Continue the same coherent F-B outcome;
+  do not mark it accepted until route/navigation ownership and browser evidence
+  are complete.
+
 ### PF-1 — Core purity and managed Brand mark storage
 
 - **Observed:** R8.25 (`c4061f3`) moved storage behind the provider-neutral

@@ -2,10 +2,10 @@
 
 Plan ID: F-B-APP-OWNERSHIP-NAVIGATION-R8
 Scope: Application permission ownership, registration metadata, route helpers, and navigation definitions
-Status: READY
+Status: CORRECTION REQUIRED
 Priority: P1
 Owner: Repository owner
-Target revision: R8.36
+Target revision: R8.38
 Last updated: 2026-09-14
 
 ## Outcome
@@ -15,6 +15,10 @@ registration metadata; the central composition root only combines public app
 metadata and must not define app permission policy. Route helpers and
 navigation definitions must have one clear owner per app, while existing route
 URLs and behavior remain unchanged.
+
+R8.36 completed only the permission-vocabulary and metadata portion. Route
+helpers, navigation ownership, and their browser/regression evidence remain
+open and are required for acceptance.
 
 ## Context
 
@@ -65,7 +69,7 @@ URLs and behavior remain unchanged.
    production build pass. Browser smoke covers launcher/navigation and one
    authorized plus unauthorized route per app.
 8. Executor updates `CHANGELOG.md`, stages only owned files, verifies the
-   staged diff/whitespace, and creates local revision R8.36.
+   staged diff/whitespace, and creates local revision R8.38.
 
 ## Risks and recovery
 
@@ -79,7 +83,8 @@ Revert only the local correction commit; do not touch unrelated owner files.
 You are the Executor. Location: rumah. Read `AGENTS.md`,
 `docs/agent/EXECUTOR.md`, and this `PLAN.md`. Implement the complete F-B / PF-2
 + PF-3 outcome within the locked ownership, route, security, and boundary
-decisions. Preserve current URLs and behavior, run all required checks and
-browser smoke, update the changelog, and create local revision R8.36. Stop for
+decisions. Complete the remaining route-helper and navigation ownership work,
+preserve current URLs and behavior, run all required checks and browser smoke,
+update the changelog, and create local revision R8.38. Stop for
 any material ambiguity about permission meaning, route ownership, or security;
 do not redesign StudioFlow or add a plugin framework.

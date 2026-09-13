@@ -5,8 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.36**
-- Next local revision: **R8.37**
+- Current revision after this entry is committed: **R8.37**
+- Next local revision: **R8.38**
+
+## R8.37 | 2026-09-14 | docs(review): keep F-B open for route and navigation ownership
+
+- Reviewed R8.36 and confirmed the permission-vocabulary decentralization.
+- Recorded that route helpers, app-owned navigation definitions, and their
+  browser/regression evidence were not included, so F-B / PF-2+PF-3 remains
+  open under the correction plan.
+- No application code changed in this review revision; implementation target
+  is R8.38.
+
+### Verification
+
+- Read-only review of commit `06890dc` and `git diff --check`: passed.
 
 ## R8.36 | 2026-09-14 | feat(app): decentralize permission ownership to individual apps and keep central registration metadata-only
 
