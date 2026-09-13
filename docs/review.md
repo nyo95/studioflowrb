@@ -43,6 +43,13 @@ a real defect — move it to `knownbug.md` with what was actually observed.
   check.
 - **Status:** Correction required. See KB-028 and the active correction plan
   in `PLAN.md`; PF-1 remains unaccepted.
+- **R8.33 verification:** `resolveSafePath` is now shared by the filesystem
+  adapter and both application asset routes. The symlink test only skips
+  explicit OS permission errors and no longer catches failed assertions.
+  Reported 346 tests, typecheck, boundaries, legacy-runtime check, and build
+  all passed.
+- **Status:** PASS — PF-1 local storage and public/private asset boundaries
+  are accepted. Supabase remains deferred and is not a release dependency.
 
 ### Configurable main-route settings
 

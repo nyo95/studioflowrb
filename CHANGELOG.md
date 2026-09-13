@@ -5,8 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.33**
-- Next local revision: **R8.34**
+- Current revision after this entry is committed: **R8.34**
+- Next local revision: **R8.35**
+
+## R8.34 | 2026-09-14 | docs(review): accept PF-1 local storage boundary
+
+- Reviewed R8.33 and confirmed the shared realpath-aware resolver is used by
+  the local adapter and public/private application asset routes.
+- Confirmed symlink tests no longer swallow assertion failures; closed KB-028
+  and accepted PF-1. KB-027 was corrected in R8.31.
+- Recorded the reported 346 passing tests, typecheck, architecture boundary,
+  legacy-runtime, and production build checks. Supabase remains deferred.
+
+### Verification
+
+- Read-only review of commit `3b102b8` and `git diff --check`: passed.
 
 ## R8.33 | 2026-09-14 | fix(platform): centralize realpath-based symlink and path traversal security across routes and storage
 

@@ -19,7 +19,9 @@ it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
   boundary check for every filesystem surface, and make the test skip only
   symlink creation permission errors—not failed security assertions.
 - **Priority:** P1 — storage isolation.
-- **Status:** Open; blocks PF-1 acceptance until corrected and reverified.
+- **Status:** Closed — corrected and reverified in R8.33. The resolver is now
+  used by both asset routes and the adapter; symlink permission skips are
+  narrowly classified and assertion failures are no longer swallowed.
 
 ### KB-027 — Local private asset signed URL expires immediately
 
@@ -34,7 +36,8 @@ it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
   apply it consistently in the local adapter and route. Add an integration
   test covering a valid URL and an expired URL.
 - **Priority:** P1 — private asset availability.
-- **Status:** Open; blocks PF-1 acceptance until corrected and reverified.
+- **Status:** Closed — corrected and reverified in R8.31. The adapter and
+  private route now use the same absolute Unix expiry timestamp contract.
 
 ### KB-026 — PF-0 does not identify the frozen StudioFlow RB reference
 

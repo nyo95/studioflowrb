@@ -2,11 +2,14 @@
 
 Plan ID: PF-1-LOCAL-STORAGE-R8-SYMLINK-CORRECTION
 Scope: Local filesystem asset provider and public/private application asset surfaces
-Status: CORRECTION REQUIRED
+Status: ACCEPTED
 Priority: P1
 Owner: Repository owner
 Target revision: R8.33
 Last updated: 2026-09-14
+
+PF-1 was accepted in review after R8.33 corrected KB-028. No further Executor
+action is required from this plan.
 
 ## Review finding
 
