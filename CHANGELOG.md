@@ -5,8 +5,27 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.21**
-- Next local revision: **R8.22**
+- Current revision after this entry is committed: **R8.22**
+- Next local revision: **R8.23**
+
+## R8.22 | 2026-09-13 | docs(foundation): reconcile PF-0 and prepare PF-1
+
+- Reconciled the active plan and Foundation ledgers to the accepted PF-0 state:
+  R8.21 independently passed the R8.20 correction, KB-026 is closed, and no
+  PF-0 review entry remains.
+- Removed stale "awaiting review" status from the roadmap and canonical
+  baseline/freeze record without reopening or re-executing PF-0.
+- Replaced the completed PF-0 work order with the sole READY PF-1 slice for
+  Core storage purity and Platform Brand mark migration. The plan locks
+  provider-neutral ownership, stored-reference behavior, additive migration,
+  compensating cleanup, and verification limits without changing production
+  code.
+
+### Verification
+
+- Reconciled `CHANGELOG.md` R8.18–R8.21, `docs/review.md`, and KB-026 in
+  `docs/knownbug.md`.
+- `git diff --cached --check`: passed.
 
 ## R8.21 | 2026-09-13 | docs(foundation): accept PF-0 reference correction
 

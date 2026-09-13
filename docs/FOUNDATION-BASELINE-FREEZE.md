@@ -1,6 +1,7 @@
 # Foundation Baseline and Continuation Freeze
 
-**Status:** PF-0 implemented in R8.18; awaiting independent review.
+**Status:** PF-0 accepted in R8.21 after the R8.20 reference correction passed
+independent review.
 **Scope:** Project Rebuild Foundation governance record only. This record does
 not change application, platform, schema, or runtime behavior.
 
