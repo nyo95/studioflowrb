@@ -5,8 +5,17 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.15**
-- Next local revision: **R8.16**
+- Current revision after this entry is committed: **R8.16**
+- Next local revision: **R8.17**
+
+## R8.16 | 2026-09-13 | docs(harness): correct verification record
+
+- Corrected R8.15's verification record: its staged documentation diff passed
+  `git diff --check` before the local commit.
+
+### Verification
+
+- `git diff --check`: passed.
 
 ## R8.15 | 2026-09-13 | docs(harness): restore revision and target safeguards
 
@@ -20,7 +29,7 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 ### Verification
 
-- `git diff --check`: pending before commit.
+- `git diff --check`: passed.
 
 ## R8.14 | 2026-09-13 | docs(harness): introduce role-based AI workflow
 
