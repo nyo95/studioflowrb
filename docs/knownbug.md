@@ -7,6 +7,22 @@ it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
 
 ## Platform Foundation
 
+### KB-029 — F-B app registry fails at dev boot on duplicate cross-app permission
+
+- **Observed (R8.38 runtime check):** `BQ_PERMISSIONS` includes
+  `masterdata.promotion.approve`, while Master Data owns and exports the same
+  permission. `composePermissionRegistry` correctly rejects the duplicate, so
+  `npm run dev` fails during instrumentation with `REGISTRY_DUPLICATE_PERMISSION`.
+- **Expected:** Each permission ID has one owning app. Cross-app capability use
+  must consume the owning app's public permission contract without registering
+  the same ID twice.
+- **Required correction:** Remove the duplicate from BQ's registered vocabulary
+  while preserving any legitimate cross-app authorization check through the
+  public Master Data permission contract, then add a boot/registry regression
+  test.
+- **Priority:** P1 — development/runtime boot failure.
+- **Status:** Open; blocks F-B acceptance.
+
 ### KB-028 — Symlink escape protection is incomplete and unproven
 
 - **Observed (R8.31 review):** The adapter's symlink test catches assertion

@@ -5,8 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.38**
-- Next local revision: **R8.39**
+- Current revision after this entry is committed: **R8.39**
+- Next local revision: **R8.40**
+
+## R8.39 | 2026-09-14 | docs(review): record F-B duplicate permission boot blocker
+
+- Runtime review of R8.38 found that BQ registers
+  `masterdata.promotion.approve`, already owned by Master Data; the permission
+  registry therefore rejects the app set and `npm run dev` fails at boot.
+- Recorded KB-029 and extended the F-B correction plan with ownership cleanup
+  and a boot/registry regression test. F-B remains unaccepted.
+- No application code changed in this review revision; implementation target
+  is R8.40.
+
+### Verification
+
+- Read-only review of commit `ad552ad` and the supplied runtime error evidence.
 
 ## R8.38 | 2026-09-14 | fix(app): give each app owned route/navigation constants without leaking server code into client bundles
 

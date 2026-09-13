@@ -1,11 +1,11 @@
 # Active Plan
 
-Plan ID: F-B-APP-OWNERSHIP-NAVIGATION-R8
+Plan ID: F-B-APP-OWNERSHIP-NAVIGATION-R8-CORRECTION
 Scope: Application permission ownership, registration metadata, route helpers, and navigation definitions
 Status: CORRECTION REQUIRED
 Priority: P1
 Owner: Repository owner
-Target revision: R8.38
+Target revision: R8.40
 Last updated: 2026-09-14
 
 ## Outcome
@@ -19,6 +19,10 @@ URLs and behavior remain unchanged.
 R8.36 completed only the permission-vocabulary and metadata portion. Route
 helpers, navigation ownership, and their browser/regression evidence remain
 open and are required for acceptance.
+
+R8.38 also exposed KB-029: BQ registers a permission owned by Master Data,
+causing the registry to reject the app set at dev boot. Correct ownership and
+add a boot regression test before accepting F-B.
 
 ## Context
 
@@ -69,7 +73,7 @@ open and are required for acceptance.
    production build pass. Browser smoke covers launcher/navigation and one
    authorized plus unauthorized route per app.
 8. Executor updates `CHANGELOG.md`, stages only owned files, verifies the
-   staged diff/whitespace, and creates local revision R8.38.
+   staged diff/whitespace, and creates local revision R8.40.
 
 ## Risks and recovery
 
@@ -85,6 +89,6 @@ You are the Executor. Location: rumah. Read `AGENTS.md`,
 + PF-3 outcome within the locked ownership, route, security, and boundary
 decisions. Complete the remaining route-helper and navigation ownership work,
 preserve current URLs and behavior, run all required checks and browser smoke,
-update the changelog, and create local revision R8.38. Stop for
+update the changelog, and create local revision R8.40. Stop for
 any material ambiguity about permission meaning, route ownership, or security;
 do not redesign StudioFlow or add a plugin framework.

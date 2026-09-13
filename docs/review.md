@@ -31,6 +31,11 @@ a real defect — move it to `knownbug.md` with what was actually observed.
 - **Status:** Correction required. Continue the same coherent F-B outcome;
   do not mark it accepted until route/navigation ownership and browser evidence
   are complete.
+- **R8.38 runtime finding:** `npm run dev` fails during permission registry
+  initialization because BQ registers `masterdata.promotion.approve`, which is
+  already owned by Master Data. The passing suite did not exercise this boot
+  path.
+- **Status:** Correction required. See KB-029; F-B remains unaccepted.
 
 ### PF-1 — Core purity and managed Brand mark storage
 
