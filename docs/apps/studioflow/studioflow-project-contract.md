@@ -1045,7 +1045,7 @@ It records usable mechanisms, not a claim that every future workflow is tested.
 | Dates, numbers and list mechanics | **REUSE** existing `src/platform/utilities/{date,decimal,normalization,pagination}` and Core settings | Business date/area meaning, filter/query scope and sort order; no local formatter or alternative locale/timezone settings |
 | Authenticated navigation and page frame | **REUSE** [authenticated shell](../../../src/platform/authenticated-shell/index.tsx) and [UI Engine public exports](../../../src/platform/ui_engine/index.ts) | App navigation entries and project content; no StudioFlow shell, account menu or separate design tokens |
 | Forms, lists and user feedback | **REUSE** UI Engine `DirectoryShell`, `PageShell`, `PageHeader`, `DataTable`, `Field`, `Combobox`, `InlineEdit`, `DraftDialog`, `ConfirmDialog`, `RowActionMenu`, and standard states | Field meaning, columns, phase/round compositions, dialog copy and command callbacks |
-| Stored file bytes | **DEFER**, then **EXTEND/ADD** the activated shared storage capability (§13.2). `RECORDED` files need none of it | Folder and treatment rules, send links, naming, supersession; no local filesystem upload substitute |
+| Stored file bytes | **DEFER**, then **REUSE** the activated shared `ObjectStorage` capability (§13.2), whose canonical self-hosted adapter is local filesystem storage | Folder and treatment rules, send links, naming, supersession; no direct-path or private-static-file access |
 
 App-owned code is expected: phase/round transitions, client-answer replacement,
 point provenance, project read models and UI compositions are domain logic. They

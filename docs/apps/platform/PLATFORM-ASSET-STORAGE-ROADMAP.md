@@ -2,20 +2,22 @@
 
 ## Status
 
-**PARTIALLY ACTIVATED in R7.52.** The shared Core port, fake seam, UI Engine
-ImageWorkspace, MOM consumer, and server-only Supabase adapter are implemented.
-The provider bucket and local/production credentials are not provisioned.
+**PARTIALLY ACTIVATED in R7.52.** The provider-neutral Core port, fake seam,
+UI Engine ImageWorkspace, and StudioFlow MOM consumer exist. The final target
+is now self-hosted/local; PF-1 activates the LocalFilesystemStorage adapter.
+The Supabase adapter is optional parked infrastructure and is not a Foundation
+release blocker.
 
 ## Objective
 
-Make production-safe image upload available through a reusable platform
-capability. The first activated consumer is StudioFlow MOM in R7.52; the
-platform Brand mark remains deferred until its own work order. The StudioFlow
-decision gates and exclusions are recorded in [`STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md`](../studioflow/STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md).
+Provide durable asset storage for the self-hosted/local StudioFlow deployment
+without putting file/blob contents in SQLite or PostgreSQL. The database stores
+metadata and opaque storage keys; the configured local filesystem stores bytes.
 
-The production runtime is Vercel and the application database is Supabase
-PostgreSQL. Runtime filesystem storage is not durable on Vercel and must never
-be used as an upload destination.
+Brand marks are public presentation assets served through an application-owned
+public asset surface. MOM and future private project assets are served only
+through authenticated/authorized application endpoints. The private storage
+directory is never exposed as a static/public directory.
 
 ## Evidence and classification
 
@@ -25,100 +27,93 @@ Legacy evidence was inspected read-only at:
 - committed reference: `5fc605e304a12db6b5efe0a2c0271a2d9415b2da`
 - relevant implementation: `src/components/ui/optimized-uploader.tsx`
 
-| Observed legacy behavior | Classification | Rebuild destination |
+| Observed behavior | Classification | Rebuild destination |
 | --- | --- | --- |
-| Client-side crop plus `browser-image-compression`, using a 1200 px maximum dimension and 0.5 MB target | **MERGE** | Shared UI/image-preparation capability, with each consumer declaring its own policy |
-| Server validates, persists, and reports image operations | **KEEP** | Platform Core storage port and infrastructure adapter |
-| Writing public files under `public/uploads` | **PURGE** | Replace with Supabase Storage objects |
-| A generic upload API which accepts caller-controlled folders and paths | **PURGE** | Fixed, server-owned object-key constructors; no client-selected storage path |
+| Client-side crop/compression | **MERGE** | Shared UI/image-preparation capability; each consumer declares policy |
+| Server validation and persistence | **KEEP** | Core ObjectStorage port plus deployment adapter |
+| Public writes under `public/uploads` | **PURGE** | Local provider with configured root and application-owned public read |
+| Caller-selected folders/paths | **PURGE** | Fixed server-owned keys; no client-selected root/path |
+| Cloud-specific Supabase provider | **DEFER** | Parked optional adapter; not required by the local Foundation target |
 
 The legacy working tree was dirty when inspected. Only the committed reference
 above is evidence; no working-tree legacy file is a source of behavior.
 
 ## Locked design decisions
 
-1. **Storage provider.** Use two fixed Supabase Storage buckets:
-   `platform-assets` is private for MOM and other private assets, while
-   `platform-public-assets` holds Brand marks. Supabase PostgreSQL stores
-   metadata/URLs only; it does not store image bytes.
-2. **Visibility.** Brand marks are public presentation assets because they are
-   displayed before sign-in. Only `platform-public-assets` permits anonymous
-   read for approved public asset paths. `platform-assets` remains private and
-   uses signed reads. Write, update, list, and delete remain server-only for
-   both buckets.
-3. **Credentials.** Vercel holds Supabase URL and service-role credentials as
-   Production secrets. Those credentials never reach the browser, source tree,
-   client bundles, action responses, audit metadata, or logs.
-4. **Shared boundary.** Platform Core owns a domain-neutral storage port and
-   opaque object references; the Supabase adapter remains infrastructure code.
-   UI Engine owns file selection, preview, crop, and compression interaction.
-   General Settings owns the Brand mark policy and authorization.
-5. **Keys.** The server generates non-guessable fixed-prefix keys such as
-   `brand-marks/<UUID>.png`. The client supplies neither a bucket nor an
-   object path.
-6. **Brand-mark policy.** Retain the current consumer rule: PNG only, valid
-   PNG structure, non-empty, at most 2 MB after preparation. The first UI
-   implementation may crop and optimize in the browser but server validation
-   remains authoritative.
-7. **Replacement and cleanup.** Upload the new object first, persist the new
-   reference, then best-effort delete the previous object. If persistence
-   fails, delete the newly uploaded object before returning a safe error.
-8. **No speculative StudioFlow media.** This roadmap creates no StudioFlow
-   routes, schemas, tables, permissions, or media policies. Future consumers
-   must declare their allowed formats, dimensions, retention, access model,
-   and lifecycle separately.
+1. **Canonical provider.** Use `LocalFilesystemStorage` in the self-hosted/local
+   runtime. Its physical root is supplied by server-only configuration or an
+   environment variable and must not default silently to the process working
+   directory.
+2. **Database meaning.** SQLite/PostgreSQL stores metadata and opaque keys only;
+   it never stores image/file/blob contents or absolute filesystem paths.
+3. **Public Brand marks.** Brand marks use fixed server-generated
+   `brand-marks/<UUID>.png` keys. An application/public asset endpoint may serve
+   those bytes without authentication. The backing directory is not exposed as
+   a static folder.
+4. **Private assets.** MOM and future private project assets use private keys
+   below the configured root and are read only through authenticated,
+   authorized application endpoints. Direct static/public access is forbidden.
+5. **Key safety.** Reject absolute paths, traversal, separator escapes,
+   unknown prefixes, and symlink escapes. Domain code never sees or constructs
+   physical paths; it passes storage keys through ObjectStorage.
+6. **Shared boundary.** Core owns the provider-neutral ObjectStorage contract,
+   opaque references, and fake seam. LocalFilesystemStorage and the parked
+   Supabase adapter remain infrastructure. UI Engine owns preparation
+   interaction; each application owns format, size, retention, and authorization
+   policy.
+7. **Compensation.** Upload first, persist the key, then best-effort delete a
+   replaced object. On persistence failure, remove the new object. On removal,
+   clear the reference first. Cleanup failures are operationally reported and
+   never leak raw provider/path details.
+8. **Supabase is deferred.** No Supabase bucket, credential, Vercel setting, or
+   cloud browser proof is required for Foundation completion. The adapter may be
+   selected later by a separate deployment profile without changing domain
+   storage keys.
 
 ## Delivery sequence
 
 ### Phase 1 — platform contract and test seam (complete in R7.52)
 
-- Add the storage port, object-reference model, and a fake adapter for unit
-  tests.
-- Add UI Engine image-preparation interaction based on the legacy pattern,
-  without copying its legacy styles or upload routing.
-- Keep policy out of the shared layer: format, byte size, aspect ratio, and
-  ownership are supplied by the consumer.
-- Add tests for size/type/signature checks, key construction, cleanup, and
-  failures that never expose provider errors.
+- Keep the provider-neutral port, object-reference model, fake seam, and UI
+  Engine image-preparation interaction.
+- Keep image policy out of the shared layer; consumers declare it.
 
-### Phase 2 — Supabase Storage infrastructure (adapter complete; provisioning open)
+### Phase 2 — LocalFilesystemStorage adapter (PF-1; next)
 
-- Create private `platform-assets` and public-read-only
-  `platform-public-assets`; neither permits anonymous write/list/delete.
-- Add the server-only Supabase adapter and Production Vercel secrets.
-- Verify no service-role secret is included in browser JavaScript or surfaced
-  through an error response.
+- Resolve a configured storage root and create controlled public/private
+  subdirectories without placing private bytes under `public/`.
+- Implement safe key-to-file mapping, atomic enough writes, reads, removal,
+  missing-root behavior, traversal/symlink protection, and sanitized errors.
+- Compose this adapter as the canonical runtime provider. Keep Supabase parked.
 
 ### Phase 3 — General Settings Brand mark
 
-- Replace filesystem writes in `saveBrandMarkPng` with the shared storage
-  port.
-- Use the shared preparation UI in General Settings while retaining the
-  General Settings permission check and PNG policy.
-- Show preview, replacement, validation, pending, safe-error, and removal
-  states; preserve the existing safe HTTP(S)/site-relative URL validation for
-  stored references.
-- Verify upload, replacement, removal, sign-in branding, app-shell branding,
-  and a Vercel production deployment.
+- Store managed Brand marks in the local provider and persist only their keys.
+- Serve Brand marks through the application/public asset surface.
+- Preserve external safe URLs, replacement/removal behavior, authorization,
+  audit, and the existing PNG policy.
 
-### Phase 4 — operate and enable future consumers
+### Phase 4 — private application assets
 
-- Document object ownership, cleanup/reconciliation, quota monitoring, and
-  incident handling.
-- Activate StudioFlow media only through an owner-approved StudioFlow work
-  order that consumes this port and provides its own policy. No legacy upload
-  endpoint or local directory is reused.
+- Keep MOM reads authenticated/authorized through application endpoints.
+- Activate future StudioFlow file consumers only through their own approved
+  work orders with explicit policy, retention, and lifecycle decisions.
 
-## Acceptance criteria for the first executable work order
+### Phase 5 — optional cloud deployment profile
 
-- A Platform Owner can upload, replace, and remove a valid PNG Brand mark in
-  production.
-- The object survives redeployments and appears on the login page and app
-  shell.
-- Invalid, oversized, malformed, unauthorized, unavailable-storage, and
-  cleanup-failure cases produce safe, actionable UI states without leaking
-  provider secrets or raw errors.
-- Vercel runtime performs no filesystem writes for uploaded assets.
-- Browser, unit/integration, typecheck, lint, boundary, build, and production
-  verification are recorded. Any unavailable mandatory check is reported as a
-  limitation, not a pass.
+- Revisit the parked Supabase adapter only if a future online deployment is
+  explicitly approved. It must remain behind the same ObjectStorage boundary.
+
+## Acceptance criteria for PF-1
+
+- A local deployment can upload, replace, remove, and publicly render a Brand
+  mark without authentication at read time.
+- A local authenticated deployment can read MOM through its authorized endpoint;
+  anonymous requests and direct static requests to private bytes fail.
+- Moving the configured storage root to another PC/disk does not change stored
+  keys or require a domain-data rewrite.
+- Invalid, oversized, malformed, unauthorized, unavailable-root, traversal, and
+  cleanup-failure cases produce safe behavior and operational evidence.
+- Unit/integration tests, typecheck, lint, boundary, legacy-runtime, build, and
+  local browser workflow evidence are recorded. Supabase provisioning is not a
+  required check.

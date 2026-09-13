@@ -5,8 +5,31 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.26**
-- Next local revision: **R8.27**
+- Current revision after this entry is committed: **R8.27**
+- Next local revision: **R8.28**
+
+## R8.28 | 2026-09-14 | docs(architecture): make local storage the Foundation target
+
+- Recorded the owner's final deployment decision: self-hosted/local is the
+  target, with a configuration-driven `LocalFilesystemStorage` adapter as the
+  canonical provider behind the provider-neutral `ObjectStorage` boundary.
+- Reframed Brand mark as publicly readable only through the application's
+  public asset surface, while MOM and future private assets remain behind
+  authenticated/authorized application endpoints; private storage is never a
+  static/public directory.
+- Clarified that databases store metadata and opaque storage keys only, never
+  file/blob contents or absolute machine paths.
+- Parked the Supabase adapter as optional follow-up and removed Supabase
+  provisioning/browser evidence as a PF-1 release blocker. Replaced the active
+  plan, platform storage roadmap, Core contract, environment example,
+  StudioFlow contracts, review queue, and KB-004 wording accordingly.
+- No application code or schema changed. The next implementation outcome is
+  the READY PF-1 local-storage plan targeting R8.29.
+
+### Verification
+
+- `git diff --check`: passed.
+- Documentation-only planning change; no application test suite was rerun.
 
 ## R8.26 | 2026-09-13 | fix(platform): increase request body limit for managed uploads, update storage contract and operational cleanup logging
 

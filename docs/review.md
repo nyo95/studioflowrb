@@ -21,22 +21,18 @@ a real defect — move it to `knownbug.md` with what was actually observed.
 
 ### PF-1 — Core purity and managed Brand mark storage
 
-- **Observed:** R8.25 (`c4061f3`) moved the Supabase adapter to Platform
-  infrastructure, returned MOM image policy to StudioFlow, stored managed Brand
-  mark keys in the additive settings column, and separated public Brand marks
-  (`platform-public-assets`) from private MOM objects (`platform-assets`). R8.26
-  (`358c61c`) corrected request-size headroom, aligned the CORE storage contract,
-  added operational cleanup reporting, and fixed the revision ledger.
+- **Observed:** R8.25 (`c4061f3`) moved storage behind the provider-neutral
+  boundary and R8.26 (`358c61c`) corrected request-size headroom, the storage
+  contract, cleanup reporting, and the revision ledger. The owner then changed
+  the final deployment target to self-hosted/local on 2026-09-14; Supabase is
+  now deferred and the local filesystem provider is the next PF-1 outcome.
 - **Verified:** Full test suite 343/343 passed. Typecheck, lint, architecture
   boundary, legacy-runtime, production build, and commit whitespace checks
-  passed. Focused tests cover key generation, PNG policy, bucket URL routing,
-  private signed MOM reads, replacement/removal compensation, and safe failure.
-- **Missing:** Provider-backed/browser evidence that anonymous Brand mark read
-  succeeds, anonymous MOM public read fails, and bucket mutation/listing remains
-  server-only. Supabase credentials/buckets are not provisioned in this
-  environment.
-- **Status:** Blocked pending external storage provisioning and the exact
-  browser/HTTP evidence listed in the active `PLAN.md`. `KB-004` remains open.
+  passed. The previous Supabase URL tests remain evidence for the parked
+  adapter, not a deployment requirement.
+- **Status:** Superseded by the active READY local-provider plan in `PLAN.md`.
+  Review of PF-1 resumes after LocalFilesystemStorage and local browser
+  evidence are complete.
 
 ### Configurable main-route settings
 

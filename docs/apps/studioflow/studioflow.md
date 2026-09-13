@@ -181,8 +181,11 @@ This is the declaration the storage roadmap asks every future consumer to make:
 *"Future consumers must declare their allowed formats, dimensions, retention,
 access model, and lifecycle separately."*
 
-Local filesystem upload stays **PURGE** and is never reintroduced — the
-production runtime is Vercel and its filesystem is not durable.
+Local filesystem storage is now the approved self-hosted deployment provider,
+but StudioFlow must use the shared `ObjectStorage` boundary and opaque storage
+keys. Domain code must never construct absolute paths, and private project
+assets must never be exposed as static/public files. A future Vercel/cloud
+profile remains optional and does not change this domain contract.
 
 ### 5.1 Google Drive — contracted, deferred
 

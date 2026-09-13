@@ -336,9 +336,16 @@ Rules:
 - values are validated by a typed application service; there is no arbitrary JSON setting API;
 - locale, IANA timezone, ISO currency, and brand mark are explicit and validated;
   a brand mark may be an existing safe HTTP(S)/site-relative URL or an
-  owner-uploaded PNG (maximum 2 MB, verified PNG signature, server-generated permanent
-  storage key under the public platform asset bucket, with durable database storage
-  recording the key rather than a raw URL);
+  owner-uploaded PNG (maximum 2 MB, verified PNG signature, server-generated
+  permanent storage key under the configured local public-asset root, with
+  durable database storage recording the key rather than a raw URL);
+- the self-hosted/local deployment uses a provider-neutral ObjectStorage port
+  bound to a configuration-driven LocalFilesystemStorage adapter; the database
+  never stores file/blob contents or absolute filesystem paths;
+- Brand marks are readable without authentication only through the application's
+  public asset surface. MOM and other private assets are readable only through
+  authenticated/authorized application endpoints, and the private storage root
+  is never served as a static/public directory;
 - settings supply defaults to formatters and shells, but callers can override display locale/timezone/currency explicitly;
 - changing a display default never rewrites persisted business values or snapshots;
 - read/manage use `platform.settings.read/manage`; updates are transactional and audited with safe field deltas;

@@ -135,7 +135,7 @@ Reconciled through R7.55. Active work and defects are tracked in
 | Current deliverable and intake appear directly in phase detail | **Aligned in R7.48** |
 | Start Round/internal approval/send are contextual rather than the primary phase UX | **Aligned in R7.50** |
 | To-dos and deliverables form one coherent phase work surface | **Aligned in R7.50** |
-| Shared image picker/crop/zoom/annotation exists for approved consumers | **Aligned in R7.52**; provider provisioning remains open (KB-004) |
+| Shared image picker/crop/zoom/annotation exists for approved consumers | **Aligned in R7.52**; local storage provider activation is tracked in PF-1 |
 | MOM is integrated into project detail | **Aligned in R7.52**; correcting an issued MOM is defective (KB-012) |
 | Product Catalogue is a StudioFlow-wide reuse pool | **Aligned in R7.53** |
 | Project Schedule/FFNI is integrated into project detail | **Open** (KB-003) |

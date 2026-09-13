@@ -49,17 +49,21 @@ it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
 
 ## UI Engine and Shared Utilities
 
-### KB-004 — Shared image provider is not provisioned in kantor
+### KB-004 — Supabase image provider is not provisioned in kantor
 
 - **Observed:** R7.52 provides the canonical UI Engine ImageWorkspace, Core
   storage port, fake seam, and server-only Supabase adapter, but `.env.kantor`
   has no Supabase provider credentials and no production bucket has been
   provisioned.
-- **Expected:** One public UI Engine capability with consumer-owned policy and
-  cross-consumer regression evidence.
-- **Mitigation:** MOM image persistence fails safely until the provider is
-  configured; tests use the fake adapter and no local filesystem fallback.
-- **Status:** Open; implementation complete, environment provisioning remains.
+- **Expected (superseded 2026-09-14):** The final deployment target is now
+  self-hosted/local, so Supabase provisioning is no longer an acceptance
+  requirement. The shared UI Engine capability and consumer-owned policy remain
+  valid.
+- **Replacement:** The active PF-1 plan implements and verifies
+  `LocalFilesystemStorage` with a configuration-driven root, public Brand mark
+  surface, and authenticated/private MOM endpoint.
+- **Status:** Superseded by owner decision; do not provision Supabase for
+  Foundation. The replacement local-provider work remains open in `PLAN.md`.
 
 ## Master Data
 

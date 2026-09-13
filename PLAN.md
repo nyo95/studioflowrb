@@ -1,69 +1,120 @@
 # Active Plan
 
-Plan ID: PF-1-VERIFICATION-CLOSURE-R8
-Scope: Provider-backed verification of Platform Brand mark storage
-Status: BLOCKED
+Plan ID: PF-1-LOCAL-STORAGE-R8
+Scope: Local filesystem asset provider and public/private application asset surfaces
+Status: READY
 Priority: P1
-Owner: Repository owner / deployment operator
-Target revision: R8.27 (planning ledger)
-Last updated: 2026-09-13
+Owner: Repository owner
+Target revision: R8.29
+Last updated: 2026-09-14
 
 ## Outcome
 
-Close PF-1 only after the deployed Supabase storage configuration proves the
-two-bucket security boundary end to end: an unauthenticated user can read a
-Brand mark from `platform-public-assets`, while a MOM object in private
-`platform-assets` cannot be read through a public URL. Preserve the accepted
-R8.25/R8.26 implementation and do not change Master Data, BQ, or StudioFlow
-behavior.
+Complete PF-1 for the final self-hosted/local deployment target. Keep the
+provider-neutral `ObjectStorage` boundary, implement and compose a canonical
+LocalFilesystemStorage adapter, and make Platform Brand marks public through an
+application asset surface while keeping MOM and future private project assets
+behind authenticated/authorized application reads. The database stores only
+metadata and storage keys; it never stores file/blob contents.
 
 ## Context and Evidence
 
-- R8.25 (`c4061f3`) implemented the storage split and additive
-  `brand_mark_storage_key` migration.
-- R8.26 (`358c61c`) corrected the request-size headroom, CORE storage contract,
-  cleanup reporting, and revision ledger.
-- Independent verification now passes: full suite 343/343, typecheck, lint,
-  boundary check, legacy-runtime check, production build, and staged-diff
-  whitespace check.
-- The provider credentials and buckets are not provisioned in the current
-  environment. Browser/provider evidence is therefore unavailable, and
-  `KB-004` remains open.
+- Owner decision on 2026-09-14 makes self-hosted/local the final deployment
+  target; Vercel + Supabase is deferred and must not block Foundation.
+- R8.25 (`c4061f3`) implemented the first storage migration and the
+  provider-neutral Core port. R8.26 (`358c61c`) corrected request headroom,
+  storage contract wording, cleanup reporting, and the revision ledger.
+- R8.27 (`a5bb5b7`) correctly blocked only on Supabase/provider evidence; that
+  gate is now superseded by this owner decision.
+- Existing Supabase infrastructure may remain parked as an optional adapter,
+  but runtime composition and acceptance tests must use the local adapter.
+- Existing runtime writes under `public/uploads` are not the target. The local
+  storage root must be configuration/environment-driven and outside static
+  public directories.
 
 ## Locked Decisions
 
-- Keep `platform-public-assets` public for anonymous Brand mark reads only.
-- Keep `platform-assets` private for MOM and other private objects; MOM uses
-  signed reads only and must never receive a public URL.
-- Upload, replacement, deletion, and listing remain server-only for both
-  buckets. No service-role credential may reach browser code or responses.
-- Durable settings keep a managed storage key, never a signed URL; existing
-  safe external/site-relative URLs remain supported.
-- This plan authorizes verification and evidence capture only. It does not
-  authorize a new schema, storage abstraction, dependency, provider migration,
-  or application feature.
+- **REUSE/EXTEND:** Preserve the provider-neutral `ObjectStorage` port, fake
+  seam, opaque server-generated keys, and domain-owned image policy. Add only
+  the smallest read capability needed to distinguish public Brand mark reads
+  from private authenticated reads.
+- **ADD infrastructure:** `LocalFilesystemStorage` is the canonical deployment
+  adapter. Its physical root comes from server-only configuration/environment;
+  domain and app code use storage keys only, never absolute Windows paths.
+- **Public Brand marks:** Brand mark objects use a fixed server-generated
+  `brand-marks/<UUID>.png` key and are readable without authentication through
+  an application/public asset endpoint. The filesystem directory itself is not
+  exposed as a static directory.
+- **Private assets:** MOM and future private project assets live below the
+  configured private root and are readable only through an authenticated and
+  authorized application endpoint. No private storage directory is served by
+  Next static/public hosting.
+- **Persistence meaning:** PostgreSQL/SQLite stores metadata and opaque keys
+  only. File bytes remain on the configured filesystem root. Moving the
+  installation to another PC or disk changes configuration, not domain data or
+  key meaning.
+- **Security:** reject absolute keys, traversal, separator escapes, unknown
+  prefixes, and symlink/path escapes. Client input never chooses the physical
+  root or arbitrary storage path. Provider errors are sanitized.
+- **Supabase:** no bucket provisioning, credentials, browser proof, or runtime
+  dependency is required for PF-1. The Supabase adapter may remain parked for a
+  future deployment profile, but it is not the canonical composition root.
 
-## Blocker and Required Evidence
+## Boundaries and Non-goals
 
-The owner/deployment operator must provision the two approved buckets and
-server-only credentials in the intended verification environment, then provide
-evidence for all of the following:
+- Preserve General Settings authorization, PNG validation, replacement/removal
+  compensation, audit/no-op behavior, login branding, and authenticated-shell
+  branding.
+- Preserve StudioFlow MOM policy and its signed/private application read flow;
+  do not broaden the MOM feature or alter Master Data/BQ behavior.
+- Do not store blobs in Prisma/PostgreSQL, create a generic upload endpoint,
+  expose absolute paths, expose the private directory, or add a cloud provider.
+- Do not migrate/delete existing local uploaded files automatically. Existing
+  files require a separate owner-approved migration/retention decision.
+- Do not implement Vercel/Supabase provisioning or remove the parked adapter in
+  this slice.
 
-1. Login renders a managed Brand mark without authentication.
-2. A direct anonymous request to the Brand mark public URL succeeds.
-3. A direct anonymous request to a MOM object public URL fails.
-4. MOM still renders through its signed URL path for an authorized workflow.
-5. Anonymous upload, list, replace, and delete attempts are rejected for both
-   buckets; server-side operations continue to work.
-6. No service-role secret, signed token, or raw provider error appears in
-   browser output, action responses, audit data, or logs.
+## Acceptance Criteria
 
-Until this evidence exists, the reviewer must not mark PF-1 PASS or close
-KB-004. No Executor run should begin; this is an external provisioning gate.
+1. Core remains provider-neutral; LocalFilesystemStorage is the only canonical
+   runtime adapter and has focused tests for configured-root resolution,
+   traversal/symlink protection, missing root, read/write/remove, and safe
+   failures.
+2. A managed Brand mark is stored under the configured root, its key is the
+   only durable reference, and an unauthenticated request through the
+   application/public asset surface returns the bytes.
+3. An authenticated/authorized MOM request returns a private asset through the
+   application endpoint; unauthenticated access and direct static access to the
+   private directory fail.
+4. No Prisma/SQLite model or audit payload contains image/blob bytes or an
+   absolute filesystem path. Existing external Brand mark URLs remain valid.
+5. Replacement, persistence failure, removal, cleanup failure, malformed PNG,
+   oversized PNG, missing configuration, unauthorized private read, and safe
+   error behavior have focused tests.
+6. Login, authenticated shell, and Settings continue to render a usable Brand
+   mark URL/path; moving the configured storage root requires no domain-data
+   rewrite.
+7. `prisma validate/generate`, typecheck, lint, boundary check,
+   legacy-runtime check, full test suite, production build, and local browser
+   checks for public Brand mark/private MOM behavior pass. Any unavailable
+   local-browser check remains explicitly recorded rather than claimed.
+8. The Executor updates `CHANGELOG.md`, stages only owned files, verifies the
+   staged diff/whitespace, and creates local revision R8.29.
 
-## Next After Unblock
+## Risks and Recovery
 
-Once this plan passes, replace it with a READY plan for **F-B / PF-2+PF-3**:
-canonical per-app permission vocabulary and registration metadata, public route
-helpers/navigation definitions, central composition using public metadata only,
-and preserved existing route behavior without StudioFlow route redesign.
+Local disk permissions, backups, disk loss, and root relocation become
+deployment responsibilities. The adapter must fail safely when the root is
+missing or inaccessible. A root change must be an explicit operator action;
+the system must not silently reinterpret keys or fall back to the runtime
+working directory. Recovery of old files is a separate migration decision.
+
+## Executor Prompt
+
+You are the Executor. Location: rumah. Read `AGENTS.md`,
+`docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire
+PF-1 local-storage outcome. Preserve the locked local/public/private boundary,
+run all required checks including local browser evidence, update the changelog,
+and create local revision R8.29. Do not provision or require Supabase. Stop
+only for a material locked-decision conflict or unsafe boundary, then report
+the commit, checks, limitations, and unrelated dirty files.
