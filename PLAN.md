@@ -1,138 +1,85 @@
 # Active Plan
 
-Plan ID: PF-1-LOCAL-STORAGE-R8-SYMLINK-CORRECTION
-Scope: Local filesystem asset provider and public/private application asset surfaces
-Status: ACCEPTED
+Plan ID: F-B-APP-OWNERSHIP-NAVIGATION-R8
+Scope: Application permission ownership, registration metadata, route helpers, and navigation definitions
+Status: READY
 Priority: P1
 Owner: Repository owner
-Target revision: R8.33
+Target revision: R8.36
 Last updated: 2026-09-14
-
-PF-1 was accepted in review after R8.33 corrected KB-028. No further Executor
-action is required from this plan.
-
-## Review finding
-
-R8.29 implemented the local provider, but review found a P1 correctness defect
-before acceptance: the signed URL expiry value has different meanings in the
-adapter and private route, so MOM image URLs expire immediately. The committed
-tests also do not prove symlink escape protection. This correction pass must
-fix those two gaps without changing the locked local/public/private decision.
-
-R8.31 aligned expiry semantics, but its symlink test can swallow a failed
-assertion and the application routes do not reuse the realpath boundary check.
-This pass must close KB-028.
 
 ## Outcome
 
-Complete PF-1 for the final self-hosted/local deployment target. Keep the
-provider-neutral `ObjectStorage` boundary, implement and compose a canonical
-LocalFilesystemStorage adapter, and make Platform Brand marks public through an
-application asset surface while keeping MOM and future private project assets
-behind authenticated/authorized application reads. The database stores only
-metadata and storage keys; it never stores file/blob contents.
+Complete F-B / PF-2 + PF-3. Each app owns its permission vocabulary and public
+registration metadata; the central composition root only combines public app
+metadata and must not define app permission policy. Route helpers and
+navigation definitions must have one clear owner per app, while existing route
+URLs and behavior remain unchanged.
 
-## Context and Evidence
+## Context
 
-- Owner decision on 2026-09-14 makes self-hosted/local the final deployment
-  target; Vercel + Supabase is deferred and must not block Foundation.
-- R8.25 (`c4061f3`) implemented the first storage migration and the
-  provider-neutral Core port. R8.26 (`358c61c`) corrected request headroom,
-  storage contract wording, cleanup reporting, and the revision ledger.
-- R8.27 (`a5bb5b7`) correctly blocked only on Supabase/provider evidence; that
-  gate is now superseded by this owner decision.
-- Existing Supabase infrastructure may remain parked as an optional adapter,
-  but runtime composition and acceptance tests must use the local adapter.
-- Existing runtime writes under `public/uploads` are not the target. The local
-  storage root must be configuration/environment-driven and outside static
-  public directories.
+- PF-1 local storage was accepted in R8.34.
+- `src/app/app-registrations.ts` currently contains the permission arrays for
+  Master Data, BQ, and StudioFlow, so permission ownership is still centralized.
+- The roadmap sequences F-B before StudioFlow recovery discovery and before UI
+  Engine/utility curation.
+- This is Foundation work only; it does not redesign StudioFlow routes, add
+  features, create a plugin framework, or change persisted RBAC behavior.
 
-## Locked Decisions
+## Locked decisions
 
-- **REUSE/EXTEND:** Preserve the provider-neutral `ObjectStorage` port, fake
-  seam, opaque server-generated keys, and domain-owned image policy. Add only
-  the smallest read capability needed to distinguish public Brand mark reads
-  from private authenticated reads.
-- **ADD infrastructure:** `LocalFilesystemStorage` is the canonical deployment
-  adapter. Its physical root comes from server-only configuration/environment;
-  domain and app code use storage keys only, never absolute Windows paths.
-- **Public Brand marks:** Brand mark objects use a fixed server-generated
-  `brand-marks/<UUID>.png` key and are readable without authentication through
-  an application/public asset endpoint. The filesystem directory itself is not
-  exposed as a static directory.
-- **Private assets:** MOM and future private project assets live below the
-  configured private root and are readable only through an authenticated and
-  authorized application endpoint. No private storage directory is served by
-  Next static/public hosting.
-- **Persistence meaning:** PostgreSQL/SQLite stores metadata and opaque keys
-  only. File bytes remain on the configured filesystem root. Moving the
-  installation to another PC or disk changes configuration, not domain data or
-  key meaning.
-- **Security:** reject absolute keys, traversal, separator escapes, unknown
-  prefixes, and symlink/path escapes. Client input never chooses the physical
-  root or arbitrary storage path. Provider errors are sanitized.
-- **Supabase:** no bucket provisioning, credentials, browser proof, or runtime
-  dependency is required for PF-1. The Supabase adapter may remain parked for a
-  future deployment profile, but it is not the canonical composition root.
+- **Ownership:** Master Data, BQ, and StudioFlow each own and export their
+  canonical permission vocabulary. Core owns only domain-neutral registration,
+  authorization interfaces, and evaluation helpers.
+- **Composition:** The central registration file imports public app metadata,
+  route roots, and permission lists; it does not duplicate, edit, or invent
+  app permissions.
+- **Routes:** Preserve every existing URL and access result. Add or reuse
+  app-owned route helpers only where current code has duplicated route strings.
+  No route redesign or redirect policy change is allowed.
+- **Navigation:** Each app owns its navigation definition. The shell consumes
+  public metadata and filters by existing grants; it must not contain hidden
+  app-specific navigation policy.
+- **Security:** Existing permission names, grant checks, and unauthorized
+  behavior remain intact. Rename or semantic change requires owner approval.
+- **Boundaries:** `app -> platform` remains allowed; platform must not import
+  app internals; cross-app internal imports remain forbidden.
+- **Scope:** No database migration, role redesign, new dependency, plugin
+  framework, or StudioFlow feature implementation.
 
-## Boundaries and Non-goals
+## Acceptance criteria
 
-- Preserve General Settings authorization, PNG validation, replacement/removal
-  compensation, audit/no-op behavior, login branding, and authenticated-shell
-  branding.
-- Preserve StudioFlow MOM policy and its signed/private application read flow;
-  do not broaden the MOM feature or alter Master Data/BQ behavior.
-- Do not store blobs in Prisma/PostgreSQL, create a generic upload endpoint,
-  expose absolute paths, expose the private directory, or add a cloud provider.
-- Do not migrate/delete existing local uploaded files automatically. Existing
-  files require a separate owner-approved migration/retention decision.
-- Do not implement Vercel/Supabase provisioning or remove the parked adapter in
-  this slice.
+1. Master Data, BQ, and StudioFlow each have one canonical public permission
+   vocabulary consumed by their own policy and by central registration.
+2. `src/app/app-registrations.ts` contains composition metadata only; no
+   duplicated app-owned permission literals remain there.
+3. Each app has one public route/navigation definition where needed, with no
+   duplicate conflicting route ownership.
+4. Existing launcher, sidebar, login redirect, route access, and unauthorized
+   behavior remain unchanged for all three apps.
+5. Tests prove registration completeness, permission consistency, navigation
+   visibility by grant, route helper output, and boundary rules.
+6. No new cross-app internal import, Core-to-app dependency, database change,
+   or permission semantic change is introduced.
+7. Typecheck, lint, full tests, boundary check, legacy-runtime check, and
+   production build pass. Browser smoke covers launcher/navigation and one
+   authorized plus unauthorized route per app.
+8. Executor updates `CHANGELOG.md`, stages only owned files, verifies the
+   staged diff/whitespace, and creates local revision R8.36.
 
-## Acceptance Criteria
+## Risks and recovery
 
-1. Core remains provider-neutral; LocalFilesystemStorage is the only canonical
-   runtime adapter and has focused tests for configured-root resolution,
-   traversal/symlink protection, missing root, read/write/remove, and safe
-   failures.
-2. A managed Brand mark is stored under the configured root, its key is the
-   only durable reference, and an unauthenticated request through the
-   application/public asset surface returns the bytes.
-3. An authenticated/authorized MOM request returns a private asset through the
-   application endpoint; unauthenticated access and direct static access to the
-   private directory fail.
-4. No Prisma/SQLite model or audit payload contains image/blob bytes or an
-   absolute filesystem path. Existing external Brand mark URLs remain valid.
-5. Replacement, persistence failure, removal, cleanup failure, malformed PNG,
-   oversized PNG, missing configuration, unauthorized private read, and safe
-   error behavior have focused tests.
-6. Login, authenticated shell, and Settings continue to render a usable Brand
-   mark URL/path; moving the configured storage root requires no domain-data
-   rewrite.
-7. `prisma validate/generate`, typecheck, lint, boundary check,
-   legacy-runtime check, full test suite, production build, and local browser
-   checks for public Brand mark/private MOM behavior pass. Any unavailable
-   local-browser check remains explicitly recorded rather than claimed.
-8. The Executor updates `CHANGELOG.md`, stages only owned files, verifies the
-   staged diff/whitespace, and creates local revision R8.33.
-
-## Risks and Recovery
-
-Local disk permissions, backups, disk loss, and root relocation become
-deployment responsibilities. The adapter must fail safely when the root is
-missing or inaccessible. A root change must be an explicit operator action;
-the system must not silently reinterpret keys or fall back to the runtime
-working directory. Recovery of old files is a separate migration decision.
+The main risk is silently changing permission meaning or navigation visibility.
+If an app's current vocabulary or route ownership is ambiguous, stop and
+report the exact conflict instead of inventing a name or changing behavior.
+Revert only the local correction commit; do not touch unrelated owner files.
 
 ## Executor Prompt
 
 You are the Executor. Location: rumah. Read `AGENTS.md`,
-`docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the PF-1
-correction pass for R8.29. Align signed URL expiry semantics between the local
-adapter and private route, add valid/expired URL integration coverage, and
-prove symlink escape protection for public and private reads. Preserve the
-locked local/public/private boundary, run all required checks including local
-browser evidence, update the changelog, and create local revision R8.33. Do
-not provision or require Supabase. Stop
-only for a material locked-decision conflict or unsafe boundary, then report
-the commit, checks, limitations, and unrelated dirty files.
+`docs/agent/EXECUTOR.md`, and this `PLAN.md`. Implement the complete F-B / PF-2
++ PF-3 outcome within the locked ownership, route, security, and boundary
+decisions. Preserve current URLs and behavior, run all required checks and
+browser smoke, update the changelog, and create local revision R8.36. Stop for
+any material ambiguity about permission meaning, route ownership, or security;
+do not redesign StudioFlow or add a plugin framework.

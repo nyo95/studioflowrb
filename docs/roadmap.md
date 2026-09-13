@@ -43,9 +43,10 @@ independently useful outcome, or demonstrated context/tool limit.
   and freeze normal StudioFlow continuation.~~ Implemented in R8.18 and
   accepted after correction review in R8.21. See
   [`FOUNDATION-BASELINE-FREEZE.md`](FOUNDATION-BASELINE-FREEZE.md).
-- [ ] **F-A / PF-1 — Core and storage purity:** Move the provider adapter out
+- [x] ~~**F-A / PF-1 — Core and storage purity:** Move the provider adapter out
   of Core, return MOM policy to StudioFlow, and migrate Platform Brand mark
-  bytes to object storage. The READY plan is `../PLAN.md`.
+  bytes to object storage.~~ Accepted in R8.34 with local filesystem storage;
+  Supabase remains deferred.
 - [ ] **F-B / PF-2+PF-3 — Application ownership and navigation:** Give each app
   one canonical permission vocabulary, registration, route helpers, and
   navigation definition; central composition only imports public metadata.

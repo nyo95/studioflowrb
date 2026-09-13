@@ -78,7 +78,7 @@ above is evidence; no working-tree legacy file is a source of behavior.
   Engine image-preparation interaction.
 - Keep image policy out of the shared layer; consumers declare it.
 
-### Phase 2 — LocalFilesystemStorage adapter (PF-1; next)
+### Phase 2 — LocalFilesystemStorage adapter (PF-1; accepted in R8.34)
 
 - Resolve a configured storage root and create controlled public/private
   subdirectories without placing private bytes under `public/`.

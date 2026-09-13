@@ -5,8 +5,20 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.34**
-- Next local revision: **R8.35**
+- Current revision after this entry is committed: **R8.35**
+- Next local revision: **R8.36**
+
+## R8.35 | 2026-09-14 | docs(roadmap): activate F-B application ownership plan
+
+- Marked F-A / PF-1 accepted after the R8.33 correction and R8.34 review.
+- Activated the READY F-B / PF-2+PF-3 plan for app-owned permission
+  vocabularies, registration metadata, route helpers, and navigation definitions.
+- Kept existing URLs, authorization behavior, and StudioFlow feature freeze
+  locked; no application code or schema changed.
+
+### Verification
+
+- `git diff --check`: passed.
 
 ## R8.34 | 2026-09-14 | docs(review): accept PF-1 local storage boundary
 
