@@ -5,7 +5,8 @@ import { prisma, runSerializableTransaction } from "@platform/core/db";
 import { createPlatformAccessService } from "@platform/core/rbac/services";
 import { createPlatformSettingsService } from "@platform/core/settings";
 import { createPlatformAccountService } from "@platform/core/auth/account";
-import { createConfiguredObjectStorage, createConfiguredPublicObjectStorage } from "@platform/infrastructure/storage/supabase";
+import path from "node:path";
+import { createLocalFilesystemStorage, createLocalPublicFilesystemStorage } from "@platform/infrastructure/storage/filesystem";
 import type { Prisma } from "@/generated/prisma/client";
 
 /**
@@ -28,10 +29,14 @@ const commonPorts = {
 };
 
 export const auditWriter = commonPorts.auditWriter;
+const storageRoot = process.env.STUDIOFLOW_STORAGE_ROOT || path.join(process.cwd(), ".storage");
+const privateRootDir = path.join(storageRoot, "private-assets");
+const publicRootDir = path.join(storageRoot, "public-assets");
+
 /** Private objects (including MOM) always use signed read URLs. */
-export const objectStorage = createConfiguredObjectStorage();
-/** Public Brand marks use a separate bucket; mutation remains server-only. */
-export const brandMarkStorage = createConfiguredPublicObjectStorage();
+export const objectStorage = createLocalFilesystemStorage(privateRootDir);
+/** Public Brand marks use a separate storage root; mutation remains server-only. */
+export const brandMarkStorage = createLocalPublicFilesystemStorage(publicRootDir);
 
 export const platformAccess = createPlatformAccessService({
   db: prisma,

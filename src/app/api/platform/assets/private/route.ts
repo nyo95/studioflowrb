@@ -1,0 +1,61 @@
+import { NextResponse } from "next/server";
+import fs from "node:fs/promises";
+import path from "node:path";
+import crypto from "node:crypto";
+import { requirePrincipalGrants } from "@platform/core/auth";
+
+export async function GET(request: Request) {
+  try {
+    await requirePrincipalGrants();
+    const url = new URL(request.url);
+    const key = url.searchParams.get("key");
+    const token = url.searchParams.get("token");
+    const expires = url.searchParams.get("expires");
+
+    if (!key || !token || !expires || key.includes("..") || key.startsWith("/")) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+
+    const expiresTime = Number(expires);
+    if (!Number.isFinite(expiresTime) || Date.now() > expiresTime * 1000) {
+      return new NextResponse("Forbidden", { status: 403 });
+    }
+
+    const expectedToken = crypto
+      .createHmac("sha256", process.env.SESSION_SECRET || "local-storage-secret")
+      .update(`${key}:${expires}`)
+      .digest("hex");
+
+    if (token !== expectedToken) {
+      return new NextResponse("Forbidden", { status: 403 });
+    }
+
+    const storageRoot = process.env.STUDIOFLOW_STORAGE_ROOT || path.join(process.cwd(), ".storage");
+    const rootDir = path.resolve(storageRoot, "private-assets");
+    const filePath = path.resolve(rootDir, key);
+    const resolvedRoot = path.resolve(rootDir);
+
+    if (!filePath.startsWith(resolvedRoot + path.sep) && filePath !== resolvedRoot) {
+      return new NextResponse("Not Found", { status: 404 });
+    }
+
+    const data = await fs.readFile(filePath);
+    const ext = path.extname(key).toLowerCase();
+    const contentType =
+      ext === ".png"
+        ? "image/png"
+        : ext === ".jpg" || ext === ".jpeg"
+          ? "image/jpeg"
+          : "application/octet-stream";
+
+    return new NextResponse(data, {
+      status: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Cache-Control": "private, no-cache",
+      },
+    });
+  } catch {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
+}

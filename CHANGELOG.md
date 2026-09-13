@@ -5,8 +5,17 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.27**
-- Next local revision: **R8.28**
+- Current revision after this entry is committed: **R8.29**
+- Next local revision: **R8.30**
+
+## R8.29 | 2026-09-14 | feat(platform): implement canonical LocalFilesystemStorage adapter for self-hosted Foundation target
+
+- Implemented `LocalFilesystemStorage` and `LocalPublicFilesystemStorage` adapter implementing the provider-neutral `ObjectStorage` and `PublicObjectStorage` contracts in `@platform/infrastructure/storage/filesystem`.
+- Configured physical storage roots via `STUDIOFLOW_STORAGE_ROOT` (defaulting to `.storage` outside `public/`), supporting safe path resolution, path-traversal protection, secure file write/remove, and signed read URL generation.
+- Added Next.js application asset route handlers for public assets (`/api/platform/assets/public/[...key]`) and private authenticated/token-signed assets (`/api/platform/assets/private`).
+- Updated platform runtime composition (`src/platform/runtime.ts`) to bind `objectStorage` and `brandMarkStorage` to the local filesystem storage singletons.
+- Added comprehensive unit tests for filesystem storage (`filesystem.test.ts`), ran full test suite (346 tests passed successfully), typecheck, architecture boundaries, legacy runtime check, and production build.
+- Advanced revision ledger state to current R8.29 and next R8.30.
 
 ## R8.28 | 2026-09-14 | docs(architecture): make local storage the Foundation target
 
