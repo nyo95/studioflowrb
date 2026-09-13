@@ -6,7 +6,7 @@ Status: READY
 Priority: P1
 Owner: Repository owner
 Target revision: R8.25
-Last updated: 2026-09-13
+Last updated: 2026-09-13 (owner decision: separate public Brand mark bucket)
 
 ## Outcome
 
@@ -42,15 +42,18 @@ behavior.
 - Preserve `brand_mark_url` for existing safe HTTP(S) and site-relative URLs.
   Add a nullable `brand_mark_storage_key` for Platform-managed objects. Resolve
   managed keys to presentation URLs at read time; never persist an expiring
-  signed URL as durable settings data.
+  signed URL as durable settings data. Brand marks use the separate public
+  `platform-public-assets` bucket; `platform-assets` remains private for MOM.
 - Brand mark uploads remain PNG-only and at most 2 MB. Use server-generated
   `brand-marks/<UUID>.png` keys. Upload first, persist and audit the managed
   reference, then best-effort delete the replaced managed object. On persistence
   failure, clean up the new upload. On removal, clear the reference before
   best-effort deletion. Never delete externally supplied URLs.
-- The provider remains Supabase bucket `platform-assets`, with server-only
-  credentials and writes. Missing configuration fails safely; there is no
-  filesystem fallback and no provider-secret leakage.
+- Supabase has two fixed buckets: public-read-only `platform-public-assets`
+  for Brand marks and private `platform-assets` for MOM. Both retain
+  server-only credentials for writes, replacement, listing, and deletion.
+  Missing configuration fails safely; there is no filesystem fallback or
+  provider-secret leakage.
 
 ## Boundaries and Non-goals
 
@@ -78,8 +81,9 @@ behavior.
    behavior remain correct.
 5. Upload, replacement, persistence failure, removal, malformed/oversized PNG,
    missing provider, and cleanup behavior have focused safe-error tests.
-6. Login and the authenticated shell receive a usable presentation URL while
-   the durable settings record contains no raw secret or expiring signed URL.
+6. Login and the authenticated shell receive a public presentation URL from
+   `platform-public-assets`, while MOM stays private/signed and the durable
+   settings record contains no raw secret or expiring signed URL.
 7. Focused checks, Prisma validation/generation, typecheck, lint, boundary and
    legacy-runtime checks, the full test suite on a verified disposable rebuild
    database, and production build pass. Browser-check Brand mark states when

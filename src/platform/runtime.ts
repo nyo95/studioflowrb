@@ -5,7 +5,7 @@ import { prisma, runSerializableTransaction } from "@platform/core/db";
 import { createPlatformAccessService } from "@platform/core/rbac/services";
 import { createPlatformSettingsService } from "@platform/core/settings";
 import { createPlatformAccountService } from "@platform/core/auth/account";
-import { createConfiguredObjectStorage } from "@platform/core/storage/supabase";
+import { createConfiguredObjectStorage, createConfiguredPublicObjectStorage } from "@platform/infrastructure/storage/supabase";
 import type { Prisma } from "@/generated/prisma/client";
 
 /**
@@ -28,7 +28,10 @@ const commonPorts = {
 };
 
 export const auditWriter = commonPorts.auditWriter;
+/** Private objects (including MOM) always use signed read URLs. */
 export const objectStorage = createConfiguredObjectStorage();
+/** Public Brand marks use a separate bucket; mutation remains server-only. */
+export const brandMarkStorage = createConfiguredPublicObjectStorage();
 
 export const platformAccess = createPlatformAccessService({
   db: prisma,
@@ -37,6 +40,8 @@ export const platformAccess = createPlatformAccessService({
 
 export const platformSettings = createPlatformSettingsService({
   db: prisma,
+  objectStorage: brandMarkStorage,
+  resolveBrandMarkUrl: (key) => brandMarkStorage.createPublicReadUrl(key),
   ...commonPorts,
 });
 

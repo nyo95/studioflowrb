@@ -6,6 +6,7 @@ const schema = readFileSync(new URL("../../../prisma/schema.prisma", import.meta
 const service = readFileSync(new URL("./service.ts", import.meta.url), "utf8");
 const actions = readFileSync(new URL("../../app/(platform)/studioflow/[id]/mom-actions.ts", import.meta.url), "utf8");
 const editor = readFileSync(new URL("../../app/(platform)/studioflow/[id]/mom-editor.tsx", import.meta.url), "utf8");
+const imagePolicy = readFileSync(new URL("./mom-images.ts", import.meta.url), "utf8");
 
 describe("StudioFlow MOM contract", () => {
   it("keeps MOM project-owned with the ordered legacy hierarchy", () => {
@@ -39,8 +40,10 @@ describe("StudioFlow MOM contract", () => {
     assert.match(editor, /useUnsavedChangesGuard/);
     assert.match(editor, /useFormDraftGuard/);
     assert.match(actions, /@platform\/core\/storage/);
+    assert.match(actions, /@\/apps\/studioflow\/mom-images/);
     assert.match(actions, /assertMomDraftEditable/);
     assert.match(actions, /validateMomImage/);
+    assert.match(imagePolicy, /MOM images must be non-empty and no larger than 10 MB/);
     assert.doesNotMatch(editor + actions, /window\.confirm/);
   });
 });

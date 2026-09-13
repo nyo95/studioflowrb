@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { PageShell } from "@/platform/ui_engine";
 import { getPrincipalGrants } from "@platform/core/auth";
 import { prisma } from "@platform/core/db";
+import { brandMarkStorage } from "@platform/runtime";
 import { getPermissionRegistry } from "@platform/core/rbac/registry";
 import { readPlatformGeneralSettings } from "@platform/core/settings";
 import { LoginForm } from "./login-form";
@@ -11,14 +12,14 @@ import { LoginForm } from "./login-form";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await readPlatformGeneralSettings(prisma);
+  const settings = await readPlatformGeneralSettings(prisma, (key) => brandMarkStorage.createPublicReadUrl(key));
   return { title: `Sign in — ${settings.appTitle}` };
 }
 
 export default async function LoginPage() {
   const [principalGrants, settings] = await Promise.all([
     getPrincipalGrants(),
-    readPlatformGeneralSettings(prisma),
+    readPlatformGeneralSettings(prisma, (key) => brandMarkStorage.createPublicReadUrl(key)),
   ]);
   if (principalGrants) {
     const accessible = getPermissionRegistry().apps.filter((app) =>

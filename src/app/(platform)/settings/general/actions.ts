@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePrincipalGrants } from "@platform/core/auth";
-import { platformSettings } from "@platform/runtime";
+import { brandMarkStorage, platformSettings } from "@platform/runtime";
 import { parsePlatformGeneralSettingsInput } from "@platform/core/settings";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
-import { saveBrandMarkPng } from "@platform/core/settings/brand-mark";
+import { uploadBrandMarkPng } from "@platform/core/settings/brand-mark";
 import { requirePermission } from "@platform/core/rbac";
+import { AppError } from "@platform/core/errors";
 
 export async function updateGeneralSettingsAction(
   _prev: ActionResult<{ changed: boolean }> | null,
@@ -16,7 +17,10 @@ export async function updateGeneralSettingsAction(
     const { principal, grants } = await requirePrincipalGrants();
     requirePermission(grants, "platform.settings.manage");
     const uploaded = formData.get("brandMarkFile");
-    const brandMarkUrl = uploaded instanceof File && uploaded.size > 0 ? await saveBrandMarkPng(uploaded) : String(formData.get("brandMarkUrl") ?? "").trim() || null;
+    const removeBrandMark = formData.get("removeBrandMark") === "on";
+    if (removeBrandMark && uploaded instanceof File && uploaded.size > 0) {
+      throw new AppError("VALIDATION", "platform.brand-mark.conflicting-change", "Choose either a new Brand mark or remove the current one.");
+    }
     const mainAppId = String(formData.get("mainAppId") ?? "").trim() || null;
     const landingAppId = String(formData.get("landingAppId") ?? "").trim() || null;
     const values = parsePlatformGeneralSettingsInput({
@@ -26,7 +30,8 @@ export async function updateGeneralSettingsAction(
       timezone: String(formData.get("timezone") ?? ""),
       currency: String(formData.get("currency") ?? ""),
       weekStartsOn: Number(formData.get("weekStartsOn") ?? "1"),
-      brandMarkUrl,
+      // The browser never supplies a durable storage key or a signed URL.
+      brandMarkUrl: null,
       mainAppId,
       landingAppId,
     });
@@ -34,6 +39,9 @@ export async function updateGeneralSettingsAction(
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
       values,
+      brandMarkChange: uploaded instanceof File && uploaded.size > 0
+        ? { kind: "managed", storageKey: await uploadBrandMarkPng(uploaded, brandMarkStorage) }
+        : removeBrandMark ? { kind: "remove" } : { kind: "preserve" },
     });
     revalidatePath("/settings/general");
     revalidatePath("/login");

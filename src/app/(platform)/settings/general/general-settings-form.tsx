@@ -46,7 +46,7 @@ export function GeneralSettingsForm({
 
   return (
     <SectionCard>
-      <form key={JSON.stringify(settings)} action={action}>
+      <form action={action}>
         <div className="grid gap-4 md:grid-cols-2">
           <Field id="settings-organization" label="Organization name">
             <Input id="settings-organization" name="organizationName" defaultValue={settings.organizationName} required maxLength={120} disabled={disabled} />
@@ -76,9 +76,11 @@ export function GeneralSettingsForm({
               <option value="1">Monday</option>
             </Select>
           </Field>
-          <input type="hidden" name="brandMarkUrl" value={settings.brandMarkUrl ?? ""} />
           <Field id="settings-brand-mark" label="Brand mark" description="Optional PNG, maximum 2 MB. It is fitted into the header mark without changing its height.">
-            <Input id="settings-brand-mark" name="brandMarkFile" type="file" accept="image/png,.png" disabled={disabled} />
+            <div>
+              <Input id="settings-brand-mark" name="brandMarkFile" type="file" accept="image/png,.png" disabled={disabled} />
+              {settings.brandMarkUrl ? <label className="mt-2 flex items-center gap-2 text-sm"><input name="removeBrandMark" type="checkbox" disabled={disabled} /> Remove the current Brand mark</label> : null}
+            </div>
           </Field>
           <Field id="settings-main-app" label="Main application" description="Where an eligible user lands instead of the launcher. Leave as Master Data to keep the previous behavior.">
             <Select id="settings-main-app" name="mainAppId" defaultValue={settings.mainAppId ?? ""} disabled={disabled}>

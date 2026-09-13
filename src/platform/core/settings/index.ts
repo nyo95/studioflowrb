@@ -4,6 +4,7 @@ import { Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { prepareAuditEvent, type AuditActor, type AuditWriter } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
+import type { ObjectStorage } from "@platform/core/storage";
 import { validationError } from "@platform/core/validation";
 import { normalizeText } from "@platform/utilities/normalization";
 
@@ -146,11 +147,14 @@ type SettingsRow = {
   currency: string;
   week_starts_on: number;
   brand_mark_url: string | null;
+  brand_mark_storage_key: string | null;
   main_app_id: string | null;
   landing_app_id: string | null;
 };
 
-function rowToSettings(row: SettingsRow): PlatformGeneralSettings {
+type StoredPlatformGeneralSettings = PlatformGeneralSettings & { brandMarkStorageKey: string | null };
+
+function rowToStoredSettings(row: SettingsRow): StoredPlatformGeneralSettings {
   return {
     organizationName: row.organization_name,
     appTitle: row.app_title,
@@ -159,9 +163,27 @@ function rowToSettings(row: SettingsRow): PlatformGeneralSettings {
     currency: row.currency,
     weekStartsOn: row.week_starts_on as PlatformGeneralSettings["weekStartsOn"],
     brandMarkUrl: row.brand_mark_url,
+    brandMarkStorageKey: row.brand_mark_storage_key,
     mainAppId: row.main_app_id,
     landingAppId: row.landing_app_id,
   };
+}
+
+async function toPresentationSettings(settings: StoredPlatformGeneralSettings, resolveBrandMarkUrl?: (key: string) => string | Promise<string>): Promise<PlatformGeneralSettings> {
+  if (!settings.brandMarkStorageKey) {
+    const { brandMarkStorageKey: _unused, ...presentation } = settings;
+    return presentation;
+  }
+  try {
+    const brandMarkUrl = await resolveBrandMarkUrl?.(settings.brandMarkStorageKey);
+    const { brandMarkStorageKey: _unused, ...presentation } = settings;
+    return { ...presentation, brandMarkUrl: brandMarkUrl ?? null };
+  } catch {
+    // A missing provider or object must never make login/the app shell expose
+    // an infrastructure error. The text fallback remains usable.
+    const { brandMarkStorageKey: _unused, ...presentation } = settings;
+    return { ...presentation, brandMarkUrl: null };
+  }
 }
 
 /**
@@ -169,12 +191,12 @@ function rowToSettings(row: SettingsRow): PlatformGeneralSettings {
  * defaults only when absent. A concurrent first read may lose the create race;
  * it re-reads the row after that expected unique conflict.
  */
-export async function readPlatformGeneralSettings(db: DbClient): Promise<PlatformGeneralSettings> {
+async function readStoredPlatformGeneralSettings(db: DbClient): Promise<StoredPlatformGeneralSettings> {
   const defaults = DEFAULT_PLATFORM_GENERAL_SETTINGS;
   const existing = await db.platformGeneralSettings.findUnique({
     where: { id: PLATFORM_GENERAL_SETTINGS_ID },
   });
-  if (existing) return rowToSettings(existing);
+  if (existing) return rowToStoredSettings(existing);
 
   try {
     const created = await db.platformGeneralSettings.create({
@@ -187,18 +209,24 @@ export async function readPlatformGeneralSettings(db: DbClient): Promise<Platfor
         currency: defaults.currency,
         week_starts_on: defaults.weekStartsOn,
         brand_mark_url: defaults.brandMarkUrl,
+        brand_mark_storage_key: null,
         main_app_id: defaults.mainAppId,
         landing_app_id: defaults.landingAppId,
       },
     });
-    return rowToSettings(created);
+    return rowToStoredSettings(created);
   } catch (error) {
     // Another request may seed the singleton between our read and create.
     if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
     const raced = await db.platformGeneralSettings.findUnique({ where: { id: PLATFORM_GENERAL_SETTINGS_ID } });
     if (!raced) throw error;
-    return rowToSettings(raced);
+    return rowToStoredSettings(raced);
   }
+}
+
+/** Resolves a managed Brand mark only for presentation; its durable key stays private. */
+export async function readPlatformGeneralSettings(db: DbClient, resolveBrandMarkUrl?: (key: string) => string | Promise<string>): Promise<PlatformGeneralSettings> {
+  return toPresentationSettings(await readStoredPlatformGeneralSettings(db), resolveBrandMarkUrl);
 }
 
 export type SettingsUpdateResult = { changed: boolean; settings: PlatformGeneralSettings };
@@ -209,17 +237,25 @@ export type PlatformSettingsPorts = {
   auditWriter: AuditWriter;
   now: () => Date;
   generateId: () => string;
+  objectStorage?: ObjectStorage;
+  resolveBrandMarkUrl?: (key: string) => string | Promise<string>;
 };
 
+export type BrandMarkChange =
+  | { kind: "preserve" }
+  | { kind: "managed"; storageKey: string }
+  | { kind: "remove" }
+  | { kind: "external"; url: string | null };
+
 export function createPlatformSettingsService(ports: PlatformSettingsPorts) {
-  const { db, runTransaction, auditWriter, now, generateId } = ports;
+  const { db, runTransaction, auditWriter, now, generateId, objectStorage, resolveBrandMarkUrl } = ports;
 
   return {
     /** Reads settings. Requires `platform.settings.read`. */
     async read(input: { grants: PermissionGrants }): Promise<PlatformGeneralSettings> {
       requirePermission(input.grants, "platform.settings.read");
       // Simple independent read: no transaction (CORE.md §2).
-      return readPlatformGeneralSettings(db);
+      return readPlatformGeneralSettings(db, resolveBrandMarkUrl);
     },
 
     /**
@@ -230,11 +266,20 @@ export function createPlatformSettingsService(ports: PlatformSettingsPorts) {
       grants: PermissionGrants;
       actor: AuditActor;
       values: PlatformGeneralSettings;
+      brandMarkChange?: BrandMarkChange;
     }): Promise<SettingsUpdateResult> {
       requirePermission(input.grants, "platform.settings.manage");
       const values = input.values;
-      return runTransaction(async (tx) => {
-        const current = await readPlatformGeneralSettings(tx);
+      const brandMarkChange = input.brandMarkChange ?? { kind: "external" as const, url: values.brandMarkUrl };
+      let cleanupKey: string | null = null;
+      try {
+        const result = await runTransaction(async (tx) => {
+        const current = await readStoredPlatformGeneralSettings(tx);
+        const nextBrandMarkUrl = brandMarkChange.kind === "external" ? brandMarkChange.url
+          : brandMarkChange.kind === "remove" || brandMarkChange.kind === "managed" ? null : current.brandMarkUrl;
+        const nextBrandMarkStorageKey = brandMarkChange.kind === "managed"
+          ? brandMarkChange.storageKey
+          : brandMarkChange.kind === "remove" || brandMarkChange.kind === "external" ? null : current.brandMarkStorageKey;
         const before = {
           organizationName: current.organizationName,
           appTitle: current.appTitle,
@@ -243,14 +288,15 @@ export function createPlatformSettingsService(ports: PlatformSettingsPorts) {
           currency: current.currency,
           weekStartsOn: current.weekStartsOn,
           brandMarkUrl: current.brandMarkUrl,
+          brandMarkStorageKey: current.brandMarkStorageKey,
           mainAppId: current.mainAppId,
           landingAppId: current.landingAppId,
         };
-        const after = values;
+        const after = { ...values, brandMarkUrl: nextBrandMarkUrl, brandMarkStorageKey: nextBrandMarkStorageKey };
         const changedKeys = Object.keys(after).filter((key) =>
           JSON.stringify(before[key as keyof typeof before]) !== JSON.stringify(after[key as keyof typeof after]));
         if (changedKeys.length === 0) {
-          return { changed: false, settings: current };
+          return { changed: false, settings: await toPresentationSettings(current, resolveBrandMarkUrl) };
         }
         await tx.platformGeneralSettings.update({
           where: { id: PLATFORM_GENERAL_SETTINGS_ID },
@@ -262,6 +308,7 @@ export function createPlatformSettingsService(ports: PlatformSettingsPorts) {
             currency: after.currency,
             week_starts_on: after.weekStartsOn,
             brand_mark_url: after.brandMarkUrl,
+            brand_mark_storage_key: after.brandMarkStorageKey,
             main_app_id: after.mainAppId,
             landing_app_id: after.landingAppId,
           },
@@ -285,8 +332,16 @@ export function createPlatformSettingsService(ports: PlatformSettingsPorts) {
           }, { now }),
           tx,
         );
-        return { changed: true, settings: after };
+        cleanupKey = current.brandMarkStorageKey && current.brandMarkStorageKey !== nextBrandMarkStorageKey
+          ? current.brandMarkStorageKey : null;
+        return { changed: true, settings: await toPresentationSettings(after, resolveBrandMarkUrl) };
       });
+        if (cleanupKey) await objectStorage?.remove(cleanupKey).catch(() => undefined);
+        return result;
+      } catch (error) {
+        if (brandMarkChange.kind === "managed") await objectStorage?.remove(brandMarkChange.storageKey).catch(() => undefined);
+        throw error;
+      }
     },
   };
 }

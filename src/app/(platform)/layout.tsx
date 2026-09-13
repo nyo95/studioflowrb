@@ -6,6 +6,7 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 import { prisma } from "@platform/core/db";
 import { getPermissionRegistry } from "@platform/core/rbac/registry";
 import { readPlatformGeneralSettings } from "@platform/core/settings";
+import { brandMarkStorage } from "@platform/runtime";
 import { logoutAction } from "./logout-action";
 import { BqNav } from "./bq/nav";
 import { StudioFlowNav,StudioFlowUtilityNav } from "./studioflow/nav";
@@ -17,7 +18,7 @@ export default async function PlatformLayout({ children }: { children: ReactNode
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { principal, grants } = principalGrants;
-  const settings = await readPlatformGeneralSettings(prisma);
+  const settings = await readPlatformGeneralSettings(prisma, (key) => brandMarkStorage.createPublicReadUrl(key));
   const apps = getPermissionRegistry().apps
     .filter((app) => grants.includes(app.accessPermission))
     .map(({ appId, name, rootPath }) => ({ appId, name, rootPath }));

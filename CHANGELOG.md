@@ -8,6 +8,41 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Current revision after this entry is committed: **R8.24**
 - Next local revision: **R8.25**
 
+## R8.25 | 2026-09-13 | feat(platform): separate managed Brand mark storage
+
+- Reduced Core storage to the provider-neutral object port, fake seam, and
+  server-generated opaque keys; moved Supabase mechanics to Platform
+  infrastructure and StudioFlow MOM image policy to StudioFlow.
+- Replaced runtime filesystem Brand mark writes with validated PNG objects in
+  `platform-public-assets`. Durable General Settings now stores only a nullable
+  managed storage key, while existing safe external/site-relative URLs remain
+  valid and untouched.
+- Kept `platform-assets` private for MOM: MOM still obtains signed read URLs;
+  Brand marks resolve public presentation URLs from the separate public bucket.
+  All upload, replacement, and deletion operations remain server-only.
+- Added replacement, persistence rollback, removal, malformed/oversized PNG,
+  Core-boundary, and two-bucket regression coverage. General Settings now
+  supports removal and accepts its locked 2 MB file limit at the Server Action
+  boundary.
+
+### Dependencies and migrations
+
+- No dependency added. Added additive migration
+  `20260913100000_platform_brand_mark_storage_key` for nullable
+  `brand_mark_storage_key`; existing `brand_mark_url` data is not rewritten.
+
+### Verification
+
+- `prisma generate`, `npm run typecheck`, `npm run lint`,
+  `npm run check:boundaries`, and `npm run check:legacy-runtime`: passed.
+- Focused storage, Brand mark, MOM-policy, and form tests: 14 passed.
+- Full suite and disposable database migration could not run to completion:
+  Prisma schema engine failed before executing SQL against the verified
+  `studioflow_rebuild_test` target, whose schema is behind the repository.
+  The ambiguous home development target was not touched. Provider credentials
+  are not provisioned, so browser verification remains unavailable; KB-004
+  remains open.
+
 ## R8.24 | 2026-09-13 | docs(roadmap): consolidate foundation and recovery plan
 
 - Consolidated PF-1 through PF-8 into five substantive Foundation outcomes:

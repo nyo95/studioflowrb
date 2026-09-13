@@ -6,9 +6,10 @@ import { z } from "zod";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { AppError } from "@platform/core/errors";
-import { createPrivateObjectKey, validateMomImage } from "@platform/core/storage";
+import { createPrivateObjectKey } from "@platform/core/storage";
 import { objectStorage } from "@platform/runtime";
 import { studioFlowService } from "@/apps/studioflow/runtime";
+import { validateMomImage } from "@/apps/studioflow/mom-images";
 
 const actorFrom = (principal: { userId: string; displayName: string }) => ({ kind: "USER" as const, userId: principal.userId, label: principal.displayName });
 

@@ -154,6 +154,9 @@ model PlatformGeneralSettings {
   /// Weekday number the week starts on (0 = Sunday, 1 = Monday).
   week_starts_on    Int
   brand_mark_url    String?
+  /// Server-owned Platform asset reference. This is deliberately distinct
+  /// from a safe external/site-relative URL and is resolved only at read time.
+  brand_mark_storage_key String?
 
   /// Owner-configured launcher routing (roadmap "configurable main-route
   /// settings"). Both are advisory: an id that is null, unknown, or no

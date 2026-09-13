@@ -3,6 +3,7 @@ import { after, before, beforeEach, describe, it } from "node:test";
 
 import { AppError } from "@platform/core/errors";
 import { createAuditEventWriter } from "@platform/core/audit/persistence";
+import { FakeObjectStorage } from "@platform/core/storage";
 
 import {
   closeTestDb,
@@ -20,6 +21,7 @@ import {
 
 let db: TestDb;
 let service: PlatformSettingsService;
+let storage: FakeObjectStorage;
 const ACTOR = { kind: "USER" as const, userId: "admin-1", label: "Admin One" };
 const READ_GRANTS = ["platform.settings.read"];
 const MANAGE_GRANTS = ["platform.settings.manage"];
@@ -27,12 +29,15 @@ const MANAGE_GRANTS = ["platform.settings.manage"];
 before(async () => {
   requireDisposableTestDatabaseUrl();
   db = await createTestDb(await requireDisposableTestDatabaseUrl());
+  storage = new FakeObjectStorage();
   service = createPlatformSettingsService({
     db: db.prisma,
     runTransaction: (work) => db.prisma.$transaction(work),
     auditWriter: createAuditEventWriter(),
     now: () => new Date(),
     generateId: () => crypto.randomUUID(),
+    objectStorage: storage,
+    resolveBrandMarkUrl: (key) => `https://public.invalid/${encodeURIComponent(key)}`,
   });
 });
 
@@ -227,5 +232,53 @@ describe("general settings service", () => {
     assert.deepEqual(keys.sort(), ["appTitle", "brandMarkUrl", "mainAppId", "organizationName"]);
     const rows = await db.prisma.platformGeneralSettings.findMany();
     assert.equal(rows.length, 1, "singleton must never grow a second row");
+  });
+
+  it("stores a managed key, resolves a temporary presentation URL, and cleans up the replaced object", async () => {
+    const firstKey = "brand-marks/first.png";
+    const secondKey = "brand-marks/second.png";
+    const body = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    await storage.put({ key: firstKey, body, bytes: body.length, contentType: "image/png" });
+    await storage.put({ key: secondKey, body, bytes: body.length, contentType: "image/png" });
+    const values = parsePlatformGeneralSettingsInput({ organizationName: "StudioFlow", appTitle: "StudioFlow", locale: "id-ID", timezone: "Asia/Jakarta", currency: "IDR", weekStartsOn: 1, brandMarkUrl: null, mainAppId: null, landingAppId: null });
+
+    await service.update({ grants: MANAGE_GRANTS, actor: ACTOR, values, brandMarkChange: { kind: "managed", storageKey: firstKey } });
+    const first = await service.read({ grants: READ_GRANTS });
+    assert.equal(first.brandMarkUrl, "https://public.invalid/brand-marks%2Ffirst.png");
+    assert.equal((await db.prisma.platformGeneralSettings.findUniqueOrThrow({ where: { id: "platform_general_settings" } })).brand_mark_storage_key, firstKey);
+    assert.equal((await db.prisma.platformGeneralSettings.findUniqueOrThrow({ where: { id: "platform_general_settings" } })).brand_mark_url, null);
+
+    await service.update({ grants: MANAGE_GRANTS, actor: ACTOR, values, brandMarkChange: { kind: "managed", storageKey: secondKey } });
+    assert.equal(storage.objects.has(firstKey), false);
+    assert.equal(storage.objects.has(secondKey), true);
+  });
+
+  it("clears the durable reference before best-effort removal", async () => {
+    const key = "brand-marks/remove.png";
+    const body = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    await storage.put({ key, body, bytes: body.length, contentType: "image/png" });
+    const values = parsePlatformGeneralSettingsInput({ organizationName: "StudioFlow", appTitle: "StudioFlow", locale: "id-ID", timezone: "Asia/Jakarta", currency: "IDR", weekStartsOn: 1, brandMarkUrl: null, mainAppId: null, landingAppId: null });
+    await service.update({ grants: MANAGE_GRANTS, actor: ACTOR, values, brandMarkChange: { kind: "managed", storageKey: key } });
+    await service.update({ grants: MANAGE_GRANTS, actor: ACTOR, values, brandMarkChange: { kind: "remove" } });
+    const row = await db.prisma.platformGeneralSettings.findUniqueOrThrow({ where: { id: "platform_general_settings" } });
+    assert.equal(row.brand_mark_storage_key, null);
+    assert.equal(storage.objects.has(key), false);
+  });
+
+  it("cleans up a newly uploaded object when persistence fails", async () => {
+    const key = "brand-marks/rollback.png";
+    const body = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    await storage.put({ key, body, bytes: body.length, contentType: "image/png" });
+    const failing = createPlatformSettingsService({
+      db: db.prisma,
+      runTransaction: (work) => db.prisma.$transaction(work),
+      auditWriter: { write: async () => { throw new Error("persistence failure"); } },
+      now: () => new Date(), generateId: () => crypto.randomUUID(), objectStorage: storage,
+      resolveBrandMarkUrl: (key) => `https://public.invalid/${encodeURIComponent(key)}`,
+    });
+    const values = parsePlatformGeneralSettingsInput({ organizationName: "StudioFlow", appTitle: "StudioFlow", locale: "id-ID", timezone: "Asia/Jakarta", currency: "IDR", weekStartsOn: 1, brandMarkUrl: null, mainAppId: null, landingAppId: null });
+    await assert.rejects(() => failing.update({ grants: MANAGE_GRANTS, actor: ACTOR, values, brandMarkChange: { kind: "managed", storageKey: key } }));
+    assert.equal(storage.objects.has(key), false);
+    assert.equal(await db.prisma.platformGeneralSettings.count(), 0);
   });
 });

@@ -37,13 +37,15 @@ above is evidence; no working-tree legacy file is a source of behavior.
 
 ## Locked design decisions
 
-1. **Storage provider.** Use a Supabase Storage bucket named
-   `platform-assets`. Supabase PostgreSQL stores metadata/URLs only; it does
-   not store image bytes.
+1. **Storage provider.** Use two fixed Supabase Storage buckets:
+   `platform-assets` is private for MOM and other private assets, while
+   `platform-public-assets` holds Brand marks. Supabase PostgreSQL stores
+   metadata/URLs only; it does not store image bytes.
 2. **Visibility.** Brand marks are public presentation assets because they are
-   displayed before sign-in. The bucket/object policy must permit anonymous
-   read only for approved public asset paths. Write, update, list, and delete
-   remain server-only.
+   displayed before sign-in. Only `platform-public-assets` permits anonymous
+   read for approved public asset paths. `platform-assets` remains private and
+   uses signed reads. Write, update, list, and delete remain server-only for
+   both buckets.
 3. **Credentials.** Vercel holds Supabase URL and service-role credentials as
    Production secrets. Those credentials never reach the browser, source tree,
    client bundles, action responses, audit metadata, or logs.
@@ -81,8 +83,8 @@ above is evidence; no working-tree legacy file is a source of behavior.
 
 ### Phase 2 — Supabase Storage infrastructure (adapter complete; provisioning open)
 
-- Create `platform-assets` with public-read access limited to its public asset
-  paths and no anonymous write/list/delete access.
+- Create private `platform-assets` and public-read-only
+  `platform-public-assets`; neither permits anonymous write/list/delete.
 - Add the server-only Supabase adapter and Production Vercel secrets.
 - Verify no service-role secret is included in browser JavaScript or surfaced
   through an error response.
