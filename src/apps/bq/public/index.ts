@@ -2,6 +2,8 @@ import { BQ_PERMISSIONS } from "../service";
 import { calculateItem, calculateProject, type ItemInput } from "../lib/calculation-engine";
 import { toDecimalString } from "@platform/utilities/decimal";
 
+export * from "./nav";
+
 export { BQ_PERMISSIONS };
 
 export type BqLibItemRead = {

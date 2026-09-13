@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
+import { STUDIOFLOW_NAV_LINKS } from "@/apps/studioflow/public/nav";
+
 const nav = readFileSync(new URL("../nav.tsx", import.meta.url), "utf8");
 const list = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
 const table = readFileSync(new URL("./catalogue-table.tsx", import.meta.url), "utf8");
@@ -12,12 +14,14 @@ const actions = readFileSync(new URL("./actions.ts", import.meta.url), "utf8");
 
 describe("Product Catalogue UI", () => {
   it("adds a global catalogue nav item and leaves project schedule disabled", () => {
-    assert.match(nav, /href="\/studioflow\/catalogue"/);
-    assert.match(nav, /Product Catalogue/);
-    assert.match(nav, /Product Schedule/);
-    assert.match(nav, /href="\/studioflow\/schedule"/);
-    const scheduleBlock = nav.slice(nav.indexOf('href="/studioflow/schedule"'), nav.indexOf("Product Schedule") + 40);
-    assert.match(scheduleBlock, /disabled/);
+    const catalogueLink = STUDIOFLOW_NAV_LINKS.extensions.find((link) => link.href === "/studioflow/catalogue");
+    const scheduleLink = STUDIOFLOW_NAV_LINKS.extensions.find((link) => link.href === "/studioflow/schedule");
+    assert.ok(catalogueLink, "expected a /studioflow/catalogue nav link");
+    assert.equal(catalogueLink?.label, "Product Catalogue");
+    assert.ok(scheduleLink, "expected a /studioflow/schedule nav link");
+    assert.equal(scheduleLink?.label, "Product Schedule");
+    assert.equal(scheduleLink?.disabled, true);
+    assert.match(nav, /STUDIOFLOW_NAV_LINKS/);
   });
 
   it("covers list search, archived filter, empty, and permission states", () => {

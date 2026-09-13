@@ -1,26 +1,17 @@
 "use client";
 
-import { Banknote,LayoutGrid,Tags,Truck } from "lucide-react";
-
+import { Banknote, LayoutGrid, Tags, Truck } from "lucide-react";
 import { usePathname } from "next/navigation";
 
+import { NavGroup, NavItem } from "@/platform/ui_engine";
+import { MASTERDATA_NAV_LINKS } from "@/apps/masterdata/public/nav";
 
-import { NavGroup,NavItem } from "@/platform/ui_engine";
-
-
-type MasterDataNavLink = {
-  href: string;
-  label: string;
-  icon: typeof LayoutGrid;
-  exact?: boolean;
+const iconMap: Record<string, typeof LayoutGrid> = {
+  "/masterdata": LayoutGrid,
+  "/masterdata/brands": Tags,
+  "/masterdata/vendors": Truck,
+  "/masterdata/pricing": Banknote,
 };
-
-const links: readonly MasterDataNavLink[] = [
-  { href: "/masterdata", label: "Overview", icon: LayoutGrid, exact: true },
-  { href: "/masterdata/brands", label: "Brands", icon: Tags },
-  { href: "/masterdata/vendors", label: "Suppliers", icon: Truck },
-  { href: "/masterdata/pricing", label: "Pricing", icon: Banknote },
-];
 
 /**
  * App-owned navigation data rendered by the shared UI Engine rail.
@@ -34,7 +25,8 @@ export function MasterDataNav() {
 
   return (
     <NavGroup label="Master Data navigation">
-      {links.map(({ href, label, icon: Icon, exact }) => {
+      {MASTERDATA_NAV_LINKS.map(({ href, label, exact }) => {
+        const Icon = iconMap[href] ?? LayoutGrid;
         const isActive = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
         return (
           <NavItem

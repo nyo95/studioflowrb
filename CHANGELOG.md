@@ -5,8 +5,38 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.37**
-- Next local revision: **R8.38**
+- Current revision after this entry is committed: **R8.38**
+- Next local revision: **R8.39**
+
+## R8.38 | 2026-09-14 | fix(app): give each app owned route/navigation constants without leaking server code into client bundles
+
+- Completed F-B / PF-2 + PF-3: Master Data, BQ, and StudioFlow each own their
+  route helpers (`MASTERDATA_ROUTES`, `BQ_ROUTES`, `STUDIOFLOW_ROUTES`) and
+  navigation link definitions (`MASTERDATA_NAV_LINKS`, `BQ_NAV_LINKS`,
+  `STUDIOFLOW_NAV_LINKS`), exported from each app's public boundary.
+- Found and fixed a client/server boundary leak: the `"use client"` nav
+  components imported nav data from each app's `public/index.ts` barrel,
+  which also re-exports `*_PERMISSIONS` from `../service` — a server-only
+  module importing `node:async_hooks`/`node:crypto`, Prisma, and audit/rbac
+  code. This pulled server-only code into the browser bundle and broke the
+  production build.
+- Extracted the route/nav constants into a new side-effect-free
+  `public/nav.ts` per app (no service or Node built-in imports); each
+  `public/index.ts` now re-exports from `./nav` for server-side consumers,
+  while the client nav components (`src/app/(platform)/{masterdata,bq,studioflow}/nav.tsx`)
+  import directly from `@/apps/<app>/public/nav`, bypassing the
+  service-dependent barrel entirely.
+- Updated `catalogue.ui.test.ts` to assert against `STUDIOFLOW_NAV_LINKS`
+  from the same client-safe module instead of regex-matching source text.
+- Verified full test suite (346 tests passed), typecheck, architecture
+  boundaries, legacy runtime check, and production build (Turbopack) with no
+  client-bundle Node built-in errors.
+
+### Verification
+
+- `npm run test`: 346/346 passed.
+- `npm run check` (typecheck, boundaries, legacy-runtime): all OK.
+- `npm run build`: succeeded, all routes compiled.
 
 ## R8.37 | 2026-09-14 | docs(review): keep F-B open for route and navigation ownership
 

@@ -1,6 +1,8 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { MASTERDATA_PERMISSIONS } from "../service";
 
+export * from "./nav";
+
 export { MASTERDATA_PERMISSIONS };
 
 export type BrandLibraryRead = {

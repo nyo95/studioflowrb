@@ -4,19 +4,32 @@ import { CalendarDays, FolderOpen, Globe, Grid2X2, Layers, ListChecks, Settings,
 import { usePathname } from "next/navigation";
 
 import { NavGroup, NavItem, NavSeparator, UtilitySection } from "@/platform/ui_engine";
+import { STUDIOFLOW_NAV_LINKS } from "@/apps/studioflow/public/nav";
 
 function activePath(pathname: string, href: string, exact = false): boolean {
   if (exact) return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+const workspaceIconMap: Record<string, typeof Grid2X2> = {
+  "/studioflow/projects": Grid2X2,
+  "/studioflow": ListChecks,
+  "/studioflow/upcoming": CalendarDays,
+};
+
+const extensionsIconMap: Record<string, typeof FolderOpen> = {
+  "/studioflow/library": FolderOpen,
+  "/studioflow/catalogue": Layers,
+  "/studioflow/activity": Globe,
+  "/studioflow/schedule": ShoppingBag,
+};
+
+const utilityIconMap: Record<string, typeof Settings> = {
+  "/studioflow/settings": Settings,
+};
+
 /**
  * StudioFlow navigation rail.
- *
- * Structure (mirrors the proposed design):
- *   Workspace  — primary workspace views
- *   ──────────
- *   Extensions — additional or gated modules
  */
 export function StudioFlowNav() {
   const pathname = usePathname();
@@ -26,70 +39,41 @@ export function StudioFlowNav() {
   return (
     <>
       <NavGroup label="Workspace" heading="Workspace">
-        <NavItem
-          href="/studioflow/projects"
-          icon={<Grid2X2 size={16} />}
-          active={activePath(pathname, "/studioflow/projects")}
-          prefetch={false}
-        >
-          Projects
-        </NavItem>
-        <NavItem
-          href="/studioflow"
-          icon={<ListChecks size={16} />}
-          active={activePath(pathname, "/studioflow", true)}
-          prefetch={false}
-        >
-          My Activity
-        </NavItem>
-        <NavItem
-          href="/studioflow/upcoming"
-          icon={<CalendarDays size={16} />}
-          active={activePath(pathname, "/studioflow/upcoming")}
-          prefetch={false}
-          disabled
-        >
-          Upcoming
-        </NavItem>
+        {STUDIOFLOW_NAV_LINKS.workspace.map(({ href, label, exact, disabled }) => {
+          const Icon = workspaceIconMap[href] ?? Grid2X2;
+          return (
+            <NavItem
+              key={href}
+              href={href}
+              icon={<Icon size={16} />}
+              active={activePath(pathname, href, exact)}
+              prefetch={false}
+              disabled={disabled}
+            >
+              {label}
+            </NavItem>
+          );
+        })}
       </NavGroup>
 
       <NavSeparator />
 
       <NavGroup label="Extensions" heading="Extensions">
-        <NavItem
-          href="/studioflow/library"
-          icon={<FolderOpen size={16} />}
-          active={activePath(pathname, "/studioflow/library")}
-          prefetch={false}
-        >
-          Library
-        </NavItem>
-        <NavItem
-          href="/studioflow/catalogue"
-          icon={<Layers size={16} />}
-          active={activePath(pathname, "/studioflow/catalogue")}
-          prefetch={false}
-        >
-          Product Catalogue
-        </NavItem>
-        <NavItem
-          href="/studioflow/activity"
-          icon={<Globe size={16} />}
-          active={activePath(pathname, "/studioflow/activity")}
-          prefetch={false}
-          disabled
-        >
-          Activity
-        </NavItem>
-        <NavItem
-          href="/studioflow/schedule"
-          icon={<ShoppingBag size={16} />}
-          active={false}
-          prefetch={false}
-          disabled
-        >
-          Product Schedule
-        </NavItem>
+        {STUDIOFLOW_NAV_LINKS.extensions.map(({ href, label, exact, disabled }) => {
+          const Icon = extensionsIconMap[href] ?? FolderOpen;
+          return (
+            <NavItem
+              key={href}
+              href={href}
+              icon={<Icon size={16} />}
+              active={activePath(pathname, href, exact)}
+              prefetch={false}
+              disabled={disabled}
+            >
+              {label}
+            </NavItem>
+          );
+        })}
       </NavGroup>
     </>
   );
@@ -97,7 +81,6 @@ export function StudioFlowNav() {
 
 /**
  * Utility navigation rendered in the rail's bottom slot (below the divider).
- * Contains workspace-wide settings that don't belong in the main nav hierarchy.
  */
 export function StudioFlowUtilityNav() {
   const pathname = usePathname();
@@ -106,14 +89,20 @@ export function StudioFlowUtilityNav() {
 
   return (
     <UtilitySection>
-      <NavItem
-        href="/studioflow/settings"
-        icon={<Settings size={16} />}
-        active={activePath(pathname, "/studioflow/settings")}
-        prefetch={false}
-      >
-        General Settings
-      </NavItem>
+      {STUDIOFLOW_NAV_LINKS.utility.map(({ href, label, exact }) => {
+        const Icon = utilityIconMap[href] ?? Settings;
+        return (
+          <NavItem
+            key={href}
+            href={href}
+            icon={<Icon size={16} />}
+            active={activePath(pathname, href, exact)}
+            prefetch={false}
+          >
+            {label}
+          </NavItem>
+        );
+      })}
     </UtilitySection>
   );
 }

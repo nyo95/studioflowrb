@@ -5,7 +5,11 @@
  * (service.ts, runtime.ts, components) are private.
  */
 
-export { STUDIOFLOW_PERMISSIONS } from "../service";
+import { STUDIOFLOW_PERMISSIONS } from "../service";
+
+export * from "./nav";
+
+export { STUDIOFLOW_PERMISSIONS };
 export type {
   CreateClientInput,
   EditClientInput,

@@ -1,24 +1,15 @@
 "use client";
 
-import { FileText,Library } from "lucide-react";
-
+import { FileText, Library } from "lucide-react";
 import { usePathname } from "next/navigation";
 
+import { NavGroup, NavItem } from "@/platform/ui_engine";
+import { BQ_NAV_LINKS } from "@/apps/bq/public/nav";
 
-import { NavGroup,NavItem } from "@/platform/ui_engine";
-
-
-type BqNavLink = {
-  href: string;
-  label: string;
-  icon: typeof FileText;
-  exact?: boolean;
+const iconMap: Record<string, typeof FileText> = {
+  "/bq": FileText,
+  "/bq/library": Library,
 };
-
-const links: readonly BqNavLink[] = [
-  { href: "/bq", label: "Projects", icon: FileText, exact: true },
-  { href: "/bq/library", label: "BQ Library", icon: Library },
-];
 
 export function BqNav() {
   const pathname = usePathname();
@@ -27,7 +18,8 @@ export function BqNav() {
 
   return (
     <NavGroup label="BQ navigation">
-      {links.map(({ href, label, icon: Icon, exact }) => {
+      {BQ_NAV_LINKS.map(({ href, label, exact }) => {
+        const Icon = iconMap[href] ?? FileText;
         const isActive = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
         return (
           <NavItem
