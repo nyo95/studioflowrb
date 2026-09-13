@@ -15,6 +15,26 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Replaced silent `catch(() => undefined)` cleanup and rollback removals in settings and MOM storage actions with centralized `reportOperationalError` logging for stray object tracking.
 - Advanced revision ledger state to current R8.26 and next R8.27.
 
+## R8.27 | 2026-09-13 | docs(review): record PF-1 verification gate and next plan
+
+- Reviewed R8.25 and R8.26 independently; full suite passed 343/343, with
+  typecheck, lint, architecture boundaries, legacy-runtime checks, production
+  build, and whitespace validation also passing.
+- Kept PF-1 blocked because provider-backed/browser evidence is unavailable
+  until `platform-public-assets` and private `platform-assets` are provisioned.
+- Recorded the exact missing public-read/private-read/server-only mutation
+  evidence in `docs/review.md` and replaced the active plan with the blocked
+  verification-closure plan.
+- Named F-B / PF-2+PF-3 as the next implementation outcome after PF-1 passes;
+  no application code or schema changed in this revision.
+
+### Verification
+
+- `npm test`: 343 passed, 0 failed, 0 cancelled.
+- `npm run typecheck`, `npm run lint`, `npm run check:boundaries`,
+  `npm run check:legacy-runtime`, and `npm run build`: passed.
+- `git show --check` for R8.25 and R8.26: passed.
+
 ## R8.25 | 2026-09-13 | feat(platform): separate managed Brand mark storage
 
 - Reduced Core storage to the provider-neutral object port, fake seam, and
