@@ -7,6 +7,20 @@ it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
 
 ## Platform Foundation
 
+### KB-028 — Symlink escape protection is incomplete and unproven
+
+- **Observed (R8.31 review):** The adapter's symlink test catches assertion
+  failures together with platform symlink-creation errors, so it can pass even
+  when a write escapes the root. The route handlers also resolve filesystem
+  paths independently and do not apply the adapter's realpath boundary check.
+- **Expected:** Public and private application reads, writes, and removals all
+  reject symlink paths that resolve outside their configured root.
+- **Required correction:** Centralize or duplicate a correct realpath-aware
+  boundary check for every filesystem surface, and make the test skip only
+  symlink creation permission errors—not failed security assertions.
+- **Priority:** P1 — storage isolation.
+- **Status:** Open; blocks PF-1 acceptance until corrected and reverified.
+
 ### KB-027 — Local private asset signed URL expires immediately
 
 - **Observed (R8.29 review):** `LocalFilesystemStorage.createSignedReadUrl`

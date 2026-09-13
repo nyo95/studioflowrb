@@ -1,11 +1,11 @@
 # Active Plan
 
-Plan ID: PF-1-LOCAL-STORAGE-R8-CORRECTION
+Plan ID: PF-1-LOCAL-STORAGE-R8-SYMLINK-CORRECTION
 Scope: Local filesystem asset provider and public/private application asset surfaces
 Status: CORRECTION REQUIRED
 Priority: P1
 Owner: Repository owner
-Target revision: R8.31
+Target revision: R8.33
 Last updated: 2026-09-14
 
 ## Review finding
@@ -15,6 +15,10 @@ before acceptance: the signed URL expiry value has different meanings in the
 adapter and private route, so MOM image URLs expire immediately. The committed
 tests also do not prove symlink escape protection. This correction pass must
 fix those two gaps without changing the locked local/public/private decision.
+
+R8.31 aligned expiry semantics, but its symlink test can swallow a failed
+assertion and the application routes do not reuse the realpath boundary check.
+This pass must close KB-028.
 
 ## Outcome
 
@@ -107,7 +111,7 @@ metadata and storage keys; it never stores file/blob contents.
    checks for public Brand mark/private MOM behavior pass. Any unavailable
    local-browser check remains explicitly recorded rather than claimed.
 8. The Executor updates `CHANGELOG.md`, stages only owned files, verifies the
-   staged diff/whitespace, and creates local revision R8.31.
+   staged diff/whitespace, and creates local revision R8.33.
 
 ## Risks and Recovery
 
@@ -125,7 +129,7 @@ correction pass for R8.29. Align signed URL expiry semantics between the local
 adapter and private route, add valid/expired URL integration coverage, and
 prove symlink escape protection for public and private reads. Preserve the
 locked local/public/private boundary, run all required checks including local
-browser evidence, update the changelog, and create local revision R8.31. Do
+browser evidence, update the changelog, and create local revision R8.33. Do
 not provision or require Supabase. Stop
 only for a material locked-decision conflict or unsafe boundary, then report
 the commit, checks, limitations, and unrelated dirty files.

@@ -5,8 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.31**
-- Next local revision: **R8.32**
+- Current revision after this entry is committed: **R8.32**
+- Next local revision: **R8.33**
+
+## R8.32 | 2026-09-14 | docs(review): record R8.31 symlink correction
+
+- Reviewer confirmed the signed URL expiry correction, but found that the
+  symlink security test swallows assertion failures and that public/private
+  routes bypass the adapter's realpath boundary check.
+- Recorded KB-028 and opened a focused correction plan for route isolation and
+  non-masked symlink tests. PF-1 remains unaccepted.
+- No application code changed in this review revision; implementation target
+  is R8.33.
+
+### Verification
+
+- Read-only review of commit `a9a59d6` and `git diff --check`: passed.
 
 ## R8.31 | 2026-09-14 | fix(platform): correct signed URL absolute expiry contract and add symlink security tests
 

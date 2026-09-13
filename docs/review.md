@@ -37,6 +37,12 @@ a real defect — move it to `knownbug.md` with what was actually observed.
   escape behavior is also not covered by the committed tests.
 - **Status:** Correction required. See KB-027 and the active correction plan
   in `PLAN.md`; PF-1 is not accepted yet.
+- **R8.31 review finding:** Expiry semantics are now aligned, but symlink
+  protection is still not proven. The symlink assertion is swallowed by a broad
+  catch, and the public/private route handlers bypass the adapter boundary
+  check.
+- **Status:** Correction required. See KB-028 and the active correction plan
+  in `PLAN.md`; PF-1 remains unaccepted.
 
 ### Configurable main-route settings
 
