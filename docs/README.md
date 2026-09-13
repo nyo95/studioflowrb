@@ -1,6 +1,6 @@
 # Documentation Hub
 
-Status: reconciled through **R8.23** on 2026-09-13. Contracts under `docs/apps/`
+Status: reconciled through **R8.24** on 2026-09-13. Contracts under `docs/apps/`
 were reorganized into one subfolder per application on 2026-09-10 at owner
 request; content is unchanged except for corrected cross-links.
 
@@ -43,10 +43,11 @@ This repository keeps only the shared contracts and active app contracts that
 have been reviewed for the current rebuild. A contract is not an executable work
 order unless it says so explicitly.
 
-## Active contracts
+## Contracts and active evidence
 
-Contracts are grouped by the application they belong to. Shared contracts sit
-outside any app folder because every app depends on them.
+Documents are grouped by the application they belong to. Each row identifies
+whether it is current authority or historical implementation evidence. Shared
+contracts sit outside any app folder because every app depends on them.
 
 ### Shared platform (governs every app)
 
@@ -60,7 +61,7 @@ outside any app folder because every app depends on them.
 
 | Contract | Owns |
 |---|---|
-| [`apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md`](apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md) | planned shared image preparation and Supabase Storage activation; no executable work order yet |
+| [`apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md`](apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md) | locked storage/Brand mark decisions activated by the current PF-1 `PLAN.md` |
 
 ### UI Engine
 
@@ -89,12 +90,12 @@ outside any app folder because every app depends on them.
 
 | Contract | Owns |
 |---|---|
-| [`apps/studioflow/studioflow.md`](apps/studioflow/studioflow.md) | StudioFlow contract index, permission vocabulary, cross-app boundaries, storage dependency, and deferred decisions |
-| [`apps/studioflow/studioflow-project-contract.md`](apps/studioflow/studioflow-project-contract.md) | StudioFlow PRD: Client, Project, assignment, Phase, Iteration, review exchange, work items, and assets; substantial slices are implemented through R7.55 |
+| [`apps/studioflow/studioflow.md`](apps/studioflow/studioflow.md) | frozen RB contract index and implemented ownership evidence; recovery authority comes from the Recovery Reference and active roadmap |
+| [`apps/studioflow/studioflow-project-contract.md`](apps/studioflow/studioflow-project-contract.md) | frozen RB Client/Project/workflow contract and implementation evidence; parity differences require D-SF classification |
 | [`apps/studioflow/studioflow-ux-spec.md`](apps/studioflow/studioflow-ux-spec.md) | StudioFlow surface reference; partially implemented and subordinate to current owner alignment |
-| [`apps/studioflow/studioflow-implementation-plan.md`](apps/studioflow/studioflow-implementation-plan.md) | Active execution/non-regression guardrails; current remaining work is in `roadmap.md` |
-| [`apps/studioflow/studioflow-schedule-contract.md`](apps/studioflow/studioflow-schedule-contract.md) | StudioFlow Brands, independent reusable Product Catalogue, and project Schedule logic contract; Product Catalogue is implemented in R7.53 and Schedule remains unactivated |
-| [`apps/studioflow/studioflow-mom-contract.md`](apps/studioflow/studioflow-mom-contract.md) | implemented project-owned MOM logic contract; no task/phase/iteration linkage; delivered in R7.52 |
+| [`apps/studioflow/studioflow-implementation-plan.md`](apps/studioflow/studioflow-implementation-plan.md) | historical R7 execution plan; superseded for recovery scope and sequencing |
+| [`apps/studioflow/studioflow-schedule-contract.md`](apps/studioflow/studioflow-schedule-contract.md) | historical R7 catalogue/Schedule contract; its global catalogue premise is superseded and Schedule remains unactivated |
+| [`apps/studioflow/studioflow-mom-contract.md`](apps/studioflow/studioflow-mom-contract.md) | historical implemented MOM contract; actual owner workflow must be re-audited before recovery |
 | [`apps/studioflow/studioflow-work-orders.md`](apps/studioflow/studioflow-work-orders.md) | historical decision/work-order ledger; use `roadmap.md` for current remaining work |
 | [`apps/studioflow/STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md`](apps/studioflow/STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md) | historical read-only audit and staged roadmap; implemented phases and remaining work are reconciled in `roadmap.md` |
 

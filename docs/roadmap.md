@@ -1,60 +1,70 @@
 # Product Roadmap by Application
 
-Status: active planning ledger, reconciled through R8.13 on 2026-09-12.
+Status: active planning ledger, reconciled through R8.24 on 2026-09-13.
 
 This file answers **what remains to be built**. It does not activate work by
 itself. Completed items are struck through or removed only after verification
 and must remain recorded in `CHANGELOG.md`. Bugs belong in [`knownbug.md`](knownbug.md), not here. Implemented-but-
 unverified work belongs in [`review.md`](review.md), not here.
 
-## Mandatory Architectural & Enforcement Refactoring (Prerequisite for StudioFlow Continuation)
+## Active rebuild program
 
-- [x] ~~**Decompose Master Data God-Service:** Refactor `src/apps/masterdata/service.ts` into focused domain use-case service modules.~~ Done in R8.11; 11 domain service files under `src/apps/masterdata/services/`, facade backward-compatible.
-- [ ] **Decompose BQ services:** Keep BQ decomposition as a separate architecture backlog; do not include it in StudioFlow Recovery.
-- [ ] **Strict Cross-App Surface Isolation:** Enforce `src/apps/<app>/public/index.ts` as the sole public surface for cross-app reads and integrations across Master Data, BQ, and StudioFlow.
-- [ ] **Enforceable UI Engine Boundary Checker:** Upgrade automated boundary checker tooling (`scripts/check-boundaries.mjs`) to detect and fail on ad-hoc app-local visual primitives, unapproved styling patterns, or private wrapper components that bypass canonical UI Engine exports.
-- [ ] **StudioFlow Recovery Freeze:** Pause normal StudioFlow feature development until legacy parity recovery reaches its cutover gate. StudioFlow service decomposition happens through the replacement architecture, not a standalone refactor of the frozen service.
+The Project Rebuild Foundation Reference dated 2026-09-12 governs shared
+ownership. Master Data and BQ remain canonical and behaviorally unchanged. The
+current StudioFlow implementation stays frozen except for security/data-
+integrity fixes and narrow Foundation compatibility.
 
+One exception resolves a sequencing deadlock in the two references: read-only
+StudioFlow recovery discovery occurs before the final UI Engine and utility
+Foundation passes because those passes require mature StudioFlow evidence.
+Discovery changes no application code and does not open StudioFlow feature
+development. Recovery implementation still begins only after Foundation freeze.
 
-## Project Rebuild Foundation — priority before StudioFlow Recovery
+Normal sequence:
 
-The Project Rebuild Foundation Reference dated 2026-09-12 takes priority over
-the StudioFlow Recovery sequence below. StudioFlow Recovery must not begin
-until the foundation is completed and versioned. Master Data and BQ remain
-behaviorally unchanged and are not rebuilt as part of this work.
+1. **F-A — Core and storage purity** (PF-1).
+2. **F-B — Application ownership and navigation** (PF-2 + PF-3).
+3. **D-SF — StudioFlow recovery discovery and contract** (R-SF1 + R-SF2;
+   read-only evidence and owner decisions only).
+4. **F-C — Settings, Appearance, and UI Engine** (PF-4 + PF-5), informed by
+   D-SF rather than an incomplete StudioFlow abstraction.
+5. **F-D — Shared utility curation and executable boundaries** (PF-6 + PF-7).
+6. **F-E — Foundation acceptance and freeze** (PF-8).
+7. **SF-A through SF-F — StudioFlow recovery implementation and cutover.**
+8. **SF-G — Workflow Optimization vNext**, only after parity is accepted.
 
-- [x] ~~**PF-0 — Pin and freeze:** Pin the RB foundation and legacy evidence
-  baselines; freeze normal StudioFlow feature continuation.~~ Implemented in
-  R8.18 and accepted after correction review in R8.21. See
-  [`FOUNDATION-BASELINE-FREEZE.md`](FOUNDATION-BASELINE-FREEZE.md) for the
-  canonical record.
-- [ ] **PF-1 — Core purity:** Move infrastructure adapters out of Core, remove
-  StudioFlow-specific storage policy from Core, and migrate brand-mark storage
-  to the provider-neutral asset path without changing app behavior.
-- [ ] **PF-2 — App registration cleanup:** Establish app-owned canonical
-  permissions and registration metadata; remove duplicated permission lists
-  from central composition without creating a universal plugin framework.
-- [ ] **PF-3 — Route ownership cleanup:** Establish clear app namespaces,
-  canonical route constants/builders, shared active-navigation conventions, and
-  no uncontrolled hardcoded route duplication. Do not redesign StudioFlow URLs
-  yet.
-- [ ] **PF-4 — Settings and appearance ownership:** Finalize Platform General
-  Settings, Platform Appearance, app-owned settings, and SettingsShell
-  responsibility. Do not implement StudioFlow phase settings yet.
-- [ ] **PF-5 — UI Engine solidification:** Audit Master Data, BQ, legacy
-  StudioFlow evidence, and the frozen RB StudioFlow; stabilize tokens,
-  primitives, patterns, shells, generic layouts, interactions, and component
-  APIs.
-- [ ] **PF-6 — Shared utility curation:** Compare legacy and current consumers;
-  add only missing domain-neutral behavior with real consumers, keeping
-  StudioFlow business logic out of shared utilities.
-- [ ] **PF-7 — Boundary enforcement:** Add or strengthen checks for cross-app
-  imports, Core purity, UI Engine ownership, permission single-source-of-truth,
-  app namespace ownership, and duplicate generic UI primitives; then run the
-  applicable repository verification.
-- [ ] **PF-8 — Foundation freeze:** Run typecheck, lint, tests, boundary checks,
-  legacy-runtime checks, production build, and Master Data/BQ browser smoke;
-  then document/version the foundation before beginning StudioFlow Recovery.
+Each item above is one coherent Executor outcome by default. Split only for a
+real owner decision, external dependency, migration/security/rollback boundary,
+independently useful outcome, or demonstrated context/tool limit.
+
+## Foundation execution
+
+- [x] ~~**PF-0 / Freeze:** Pin the RB foundation and legacy evidence baselines
+  and freeze normal StudioFlow continuation.~~ Implemented in R8.18 and
+  accepted after correction review in R8.21. See
+  [`FOUNDATION-BASELINE-FREEZE.md`](FOUNDATION-BASELINE-FREEZE.md).
+- [ ] **F-A / PF-1 — Core and storage purity:** Move the provider adapter out
+  of Core, return MOM policy to StudioFlow, and migrate Platform Brand mark
+  bytes to object storage. The READY plan is `../PLAN.md`.
+- [ ] **F-B / PF-2+PF-3 — Application ownership and navigation:** Give each app
+  one canonical permission vocabulary, registration, route helpers, and
+  navigation definition; central composition only imports public metadata.
+  Preserve route behavior and do not perform the StudioFlow route redesign yet.
+  Do not create a plugin or route framework.
+- [ ] **F-C / PF-4+PF-5 — Settings, Appearance, and UI Engine:** Keep Platform
+  General Settings narrow; add only typed global appearance settings; clarify
+  app-owned settings; and stabilize the shell, layouts, primitives,
+  interactions, and token API against Master Data, BQ, frozen RB StudioFlow,
+  and D-SF evidence. Add only generic layouts with proven consumers.
+- [ ] **F-D / PF-6+PF-7 — Utility curation and boundaries:** Consolidate only
+  domain-neutral utilities with real consumers, then enforce Core purity,
+  public cross-app reads, permission SSOT, app route ownership, UI Engine
+  ownership, and prohibited duplicate primitives. Record stable Master Data/BQ
+  convergence opportunities rather than changing their behavior silently.
+- [ ] **F-E / PF-8 — Foundation acceptance and freeze:** Run the complete
+  repository gates plus Master Data/BQ browser smoke, resolve findings as one
+  correction pass, document the accepted Foundation baseline, and only then
+  release StudioFlow implementation.
 
 ## Platform Foundation
 
@@ -99,6 +109,8 @@ behaviorally unchanged and are not rebuilt as part of this work.
 
 ## BQ
 
+- [ ] Decompose the BQ service as a separate architecture backlog. This is not
+  a prerequisite or work item inside StudioFlow Recovery.
 - [ ] Add a safe calculator expression input such as `=15000*3` or
   `0.5*80000`, with exact decimal parsing and no arbitrary code execution.
 - [ ] Decide the smallest reusable exact-decimal arithmetic extension while
@@ -109,97 +121,89 @@ behaviorally unchanged and are not rebuilt as part of this work.
 - [ ] Add revision/version comparison between BQ snapshots.
 - [ ] Define formal StudioFlow linking through a stable external reference.
 
-## StudioFlow
+## StudioFlow Recovery
 
-### Recovery priority — nearest work
+The recovery reference dated 2026-09-12 is the product baseline. Existing RB
+StudioFlow is evidence and a temporary runtime, not the destination. Its 111 KB
+service is not refactored as a standalone task; replacement modules acquire
+clean ownership while each capability is recovered.
 
-The recovery reference dated 2026-09-12 is the planning basis for this sequence.
-Master Data and BQ remain canonical and are not rebuilt or reverse-engineered
-as part of StudioFlow Recovery.
+### Discovery gate before Foundation freeze
 
-- [ ] **R-SF0 — Freeze:** Treat the current StudioFlow implementation as a
-  frozen reference. Only security, data-integrity, or repository-breaking fixes
-  may modify it before the recovery cutover.
-- [ ] **R-SF1 — Full legacy extraction:** Audit legacy StudioFlow at pinned
-  commit `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27` and produce capability,
-  route, settings, permission, persistence/ownership, and shared-capability
-  matrices. Classify every meaningful capability as KEEP, MERGE,
+- [ ] **D-SF — Full extraction and recovery contract:** After the owner supplies
+  the exact legacy checkout path for this home session, inspect only pinned
+  commit `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`. Produce and ratify the
+  capability, route, settings, permission, persistence/ownership, and shared-
+  capability matrices. Classify every meaningful behavior as KEEP, MERGE,
   ALREADY_REPLACED, REDESIGN, PURGE, or DECISION_REQUIRED.
-- [ ] **R-SF2 — Routing and ownership contract:** Ratify global, project, and
-  project-owned module routes; resolve Product Catalogue project ownership;
-  define settings ownership and allowed cross-app reads before new feature
-  implementation.
-- [ ] **R-SF3 — Shared foundation curation:** Extend UI Engine or shared
-  utilities only where the audit proves a genuinely generic need; keep
-  domain-specific behavior inside StudioFlow and preserve Master Data/BQ
-  behavior.
 
-### Project workflow
+  D-SF also locks the canonical `/studioflow/projects/...` hierarchy,
+  compatibility redirects, project-owned Product Catalogue, settings
+  ownership, cross-app reads, and the specific generic UI/utility pressure that
+  F-C/F-D must satisfy. Resolve Upcoming, Database Settings, project live/chat,
+  MOM behavior, and existing global catalogue data treatment with the owner.
+  D-SF is read-only discovery and documentation; it creates no production code,
+  schema, placeholder route, or dependency.
 
-- [x] Put current-deliverable summary and intake directly inside each phase;
-  retain the File page only as a project-wide filing view. R7.48.
-- [x] Present project-owned to-dos and phase deliverables as one coherent work
-  surface without adding a second task entity. R7.50.
-- [x] Demote Start Round/internal approval/send controls to contextual or
-  administrative actions after deliverable intake is proven end-to-end. R7.50.
-- [ ] Complete the client answer against project contract §6: replacement chain
-  with reasons, draft answers, and withdraw send (KB-013, KB-014, KB-015). One
-  migration and one slice; these are the largest remaining contract gap.
-- [ ] Add project archive and restore, and let a client become archivable once
-  its projects are (KB-016).
-- [ ] Add studio phase-template administration and per-project add/remove of a
-  phase, so a new phase stops requiring a seed change (KB-017).
-- [ ] Open a MOM correction as an editable draft instead of issuing a copy
-  (KB-012).
-- [x] Finish English-only UI copy across every route and state (KB-006).
-- [x] Restore Add Project parity after read-only legacy audit, including
-  in-context client creation (KB-005).
-- [x] Rebuild the useful legacy Settings structure after audit (KB-007),
-  excluding Database Settings until its backend contract exists.
+### Implementation after F-E Foundation acceptance
 
-### Project extensions
+- [ ] **SF-A — Daily work and project operations:** Build the modular
+  StudioFlow backbone and canonical routes for home/general todos, activity,
+  projects, clients, project lifecycle/archive, project detail, phase
+  navigation, phase administration, project todos, and StudioFlow-owned phase/
+  project-engine settings. Preserve accepted behavior, implement ratified
+  parity gaps such as KB-016/KB-017/KB-018/KB-023, use controlled redirects,
+  and cut over these routes together.
+- [ ] **SF-B — Delivery and client collaboration:** Recover deliverables/files,
+  iterations and revision provenance, send/withdraw, draft client answers,
+  corrected-answer chains, phase consequences, activity/history, permissions,
+  audit, error recovery, and relevant retention behavior as one end-to-end
+  production workflow. This absorbs KB-013 through KB-015 and any ratified
+  replacement for the frozen simplified workflow.
+- [ ] **SF-C — Project records and discovery:** Re-anchor MOM to the audited
+  owner workflow; correct Product Catalogue to project ownership including an
+  explicit disposition for existing global rows; preserve useful Library/
+  discovery behavior; and cut over their project/global routes. Resolve KB-012,
+  KB-021, and KB-022 together only where the ratified model says they interact;
+  do not retain the incorrect global reuse-pool premise.
+- [ ] **SF-D — Product Schedule / FF&E:** Restore the complete project-owned
+  Schedule capability, its catalogue snapshots/options/lifecycle/templates,
+  Schedule-owned settings, permissions, history, and browser workflow. Keep it
+  separate because its domain and migration can be accepted or rolled back
+  independently from the other project-record modules.
+- [ ] **SF-E — SketchUp and external integration:** Implement only the ratified
+  SketchUp capability through an authenticated, idempotent adapter with retry,
+  observability, reconciliation, safe failure, and no legacy runtime/database
+  dependency. Keep this separate because external integration and operational
+  recovery form their own security and rollback boundary.
+- [ ] **SF-F — Parity cutover and frozen-code purge:** Prove every classified
+  route/capability, Master Data/BQ non-regression, migrations, permissions,
+  persistence, audit/history, error states, and real browser workflows. Remove
+  the frozen StudioFlow service/routes/contracts only after no live consumer
+  remains. Record every remaining deviation as an explicit owner decision and
+  freeze the recovered StudioFlow baseline.
+- [ ] **SF-G — Workflow Optimization vNext:** After SF-F PASS, compare recovered
+  parity, the frozen RB todo/phase/deliverable ideas, and the owner's current
+  daily workflow. Only then simplify clicks, transitions, and information
+  architecture deliberately. Reassess the Overview/Operational Catalog and any
+  Library crawler here; a crawler requires separate legal, security, source-
+  permission, failure, and deterministic-fallback decisions.
 
-- [x] Integrate project-owned MOM at every phase with no Task/To-do, phase, or
-  iteration linkage. Preserve the legacy ordered document/block/point/image
-  capability and reuse the canonical rich-text and image tools. R7.52.
-- [x] ~~Integrate the StudioFlow-owned Product Catalogue reuse pool shared across
-  StudioFlow projects. Never read Master Data SKU, unit, or pricing. R7.53.~~
-  **⚠ KB-021: implemented as global pool; owner requires per-project scoping.
-  This item is re-opened — see correction item below.**
-- [ ] **Correct Product Catalogue to per-project scoping (KB-021):** migration
-  adding `project_id` FK to `SfProductCatalogue`, contract revision, route
-  restructure to `/studioflow/[id]/catalogue`, and a data migration plan for
-  existing global records. All Schedule work is blocked on this.
-- [ ] **Re-anchor MOM requirements against legacy behavior** before resuming any
-  MOM work or KB-012 (KB-022). Owner confirmation required first.
-- [ ] **Restore general project todos to the StudioFlow home page** in a form
-  matching legacy presentation (KB-023). Confirm exact page with owner.
-- [ ] Add the project Schedule/FFNI slice on top of that reuse pool: entries,
-  competing options, one entry lifecycle, templates that carry filled
-  specifications, and project snapshots that later catalogue edits never
-  rewrite (KB-003, schedule contract §4–§5).
-- [ ] Complete legacy-audit phases for artifacts/MOM, schedule, SketchUp, and
-  operational hardening before each related slice.
-- [ ] Rebuild SketchUp only as an authenticated, idempotent adapter with retry,
-  observability, and reconciliation.
+Each milestone normally targets one implementation commit. When review finds
+material defects, bundle all related findings into one correction prompt and
+commit per review pass. Progressive compatibility redirects and route cutovers
+occur inside the owning milestone; SF-F is verification and dead-code removal,
+not a giant last-minute replacement.
 
-### Discovery and automation
+## Historical implemented or removed evidence
 
-- [ ] Revamp Overview / Operational Catalog after its daily hierarchy is locked.
-- [ ] Explore a safe Library crawler that uses approved Master Data websites to
-  retrieve representative logo/image metadata, with legal/technical checks and
-  a deterministic fallback.
+These entries describe what the frozen RB implementation delivered. They do
+not count as Recovery parity and may be replaced by SF-A through SF-F.
 
-### Lifecycle and release decisions
-
-- [ ] Decide project archival and retention beyond metadata-only files.
-- [ ] Decide whether contracts merge to `main` or stay on the StudioFlow branch
-  until the application release gate.
-
-## Completed or explicitly removed
-
-- ~~Project-owned MOM with draft/issue/supersede lifecycle and images.~~ R7.52.
-- ~~StudioFlow-owned Product Catalogue reuse pool.~~ R7.53.
+- ~~Project-owned MOM with draft/issue/supersede lifecycle and images.~~ R7.52;
+  behavior must be re-anchored in D-SF/SF-C.
+- ~~StudioFlow-owned global Product Catalogue reuse pool.~~ R7.53; ownership is
+  known wrong and must become project-scoped in SF-C.
 - ~~Unsupported Project `type` field.~~ Removed in R7.54; it was never in the
   audited legacy workflow.
 - ~~Global Library MVP with hashtag, brand, category, and resource links.~~ R7.40.

@@ -5,8 +5,44 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.23**
-- Next local revision: **R8.24**
+- Current revision after this entry is committed: **R8.24**
+- Next local revision: **R8.25**
+
+## R8.24 | 2026-09-13 | docs(roadmap): consolidate foundation and recovery plan
+
+- Consolidated PF-1 through PF-8 into five substantive Foundation outcomes:
+  Core/storage purity; application ownership/navigation; Settings/Appearance/
+  UI Engine; utility curation/boundary enforcement; and final acceptance/freeze.
+- Resolved the circular dependency between Foundation UI/utility curation and
+  post-Foundation legacy extraction. A read-only StudioFlow discovery/contract
+  gate now happens before the last Foundation passes, while all StudioFlow
+  production implementation remains frozen until Foundation acceptance.
+- Replaced the fragmented StudioFlow backlog with six coherent recovery
+  outcomes covering daily project operations, delivery/client collaboration,
+  project records/discovery, Schedule/FF&E, SketchUp/external integration, and
+  final parity cutover/purge; Workflow Optimization vNext remains post-parity.
+- Recorded that the 111 KB frozen StudioFlow service is not decomposed as a
+  standalone task. Modular ownership is created as accepted capabilities are
+  recovered and cut over.
+- Marked the old R7 StudioFlow implementation plan historical because its
+  global Product Catalogue premise, old phase sequence, and deferred scope
+  conflict with the recovery direction. Advanced the active PF-1 target to
+  R8.25 without changing its implementation scope.
+
+### Dependencies and migrations
+
+- No dependency, schema, migration, runtime, or application behavior change.
+- The two owner-supplied proposed reference documents remain untracked and were
+  used as planning evidence only.
+
+### Verification
+
+- Local Markdown link scan passed across the four changed planning documents.
+- Program consistency check confirmed F-A through F-E, D-SF, and SF-A through
+  SF-G are all present and ordered in the active roadmap.
+- Git comparison confirmed no `src`, Prisma, or package file changed from the
+  frozen R8.12 runtime baseline through the pre-plan HEAD.
+- `git diff --cached --check`: passed.
 
 ## R8.23 | 2026-09-13 | docs(harness): simplify planner executor workflow
 

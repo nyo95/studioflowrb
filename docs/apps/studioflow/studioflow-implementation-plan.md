@@ -1,17 +1,20 @@
 # StudioFlow Implementation Plan
 
-**Status:** ACTIVE EXECUTION GUARDRAILS — core slices implemented through R7.55;
-remaining work is listed in `../../roadmap.md`
+**Status:** HISTORICAL R7 EXECUTION PLAN — implemented-state evidence only.
+Future StudioFlow work is governed by `../../STUDIOFLOW-RECOVERY-REFERENCE.md`
+and the consolidated milestones in `../../roadmap.md`.
 **Versi:** R0.1
 **Tanggal:** 2026-09-09
 **Dibaca bersama:** `studioflow.md`, `studioflow-project-contract.md`,
 `studioflow-ux-spec.md`, `studioflow-schedule-contract.md`,
 `studioflow-mom-contract.md`, `studioflow-work-orders.md`
 
-Dokumen ini menetapkan **aturan, urutan fase, dan gerbang mutu**. Ia sengaja
-tidak memecah pekerjaan menjadi work order — itu tugas navigator. Yang dikunci di
-sini adalah *apa yang tidak boleh berubah*; bagaimana pekerjaannya dipotong
-adalah keputusan navigator.
+Dokumen ini mempertahankan alasan dan guardrail fase rebuild R7. Ia tidak lagi
+memberi otorisasi eksekusi atau menentukan minimum parity StudioFlow. Secara
+khusus, asumsi Product Catalogue global, urutan SF-F0–SF-F10, dan daftar domain
+yang dahulu ditunda sudah disupersede untuk recovery. Gunakan dokumen ini hanya
+untuk memahami implemented state dan keputusan historis; konflik diselesaikan
+oleh Recovery Reference, roadmap aktif, dan instruksi terbaru owner.
 
 ---
 

@@ -5,7 +5,7 @@ Scope: Core storage purity and Platform Brand mark persistence
 Status: READY
 Priority: P1
 Owner: Repository owner
-Target revision: R8.24
+Target revision: R8.25
 Last updated: 2026-09-13
 
 ## Outcome
@@ -85,7 +85,7 @@ behavior.
    database, and production build pass. Browser-check Brand mark states when
    the provider is provisioned; otherwise record the unavailable-provider state
    and keep KB-004 open.
-8. The Executor records R8.24 in `CHANGELOG.md`, stages only owned files,
+8. The Executor records R8.25 in `CHANGELOG.md`, stages only owned files,
    inspects the staged diff and whitespace, and creates one local commit.
 
 ## Risks and Recovery
@@ -103,6 +103,6 @@ You are the Executor. Location: rumah. Read `AGENTS.md`,
 PF-1 READY outcome as one coherent change. Inspect current repository evidence,
 preserve unrelated owner work, make sound in-scope implementation decisions,
 run the required checks, update `CHANGELOG.md`, and create local revision
-R8.24. Stop only for a material locked-decision conflict or unsafe boundary;
+R8.25. Stop only for a material locked-decision conflict or unsafe boundary;
 otherwise finish the outcome and report the commit, checks, limitations, and
 remaining unrelated dirty files.
