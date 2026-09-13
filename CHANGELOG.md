@@ -5,8 +5,24 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.16**
-- Next local revision: **R8.17**
+- Current revision after this entry is committed: **R8.17**
+- Next local revision: **R8.18**
+
+## R8.17 | 2026-09-13 | docs(foundation): prepare PF-0 baseline freeze plan
+
+- Replaced the completed harness plan with the active Project Rebuild Foundation
+  plan, based on the approved Foundation Reference and current roadmap.
+- Marked only PF-0 (baseline pin and StudioFlow continuation freeze) READY;
+  PF-1 remains the next planned implementation slice after PF-0 acceptance.
+- Recorded the exact rebuild and legacy evidence baselines, the documentation
+  overlay distinction, freeze boundary, acceptance criteria, and R8.18 executor
+  handoff without modifying production behavior, contracts, schema, or tooling.
+
+### Verification
+
+- Verified the R8.12 behavior/reference baseline and current R8.16 planning
+  overlay commits locally.
+- `git diff --cached --check`: passed.
 
 ## R8.16 | 2026-09-13 | docs(harness): correct verification record
 
