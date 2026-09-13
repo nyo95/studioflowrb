@@ -19,24 +19,6 @@ a real defect — move it to `knownbug.md` with what was actually observed.
 
 ## Platform Foundation
 
-### PF-0 — Foundation baseline pin and continuation freeze
-
-- **Observed:** R8.18 adds the canonical
-  [`FOUNDATION-BASELINE-FREEZE.md`](FOUNDATION-BASELINE-FREEZE.md) governance
-  record. It pins R8.12 (`45d74884c1ec268b30b1d5e6dc86a80da32cffe7`) as the
-  approved rebuild behavior/reference baseline and R8.16
-  (`edcd1b287de396440db1a36004b873e7c0410eee`) as its documentation-only
-  planning overlay; it also records legacy evidence metadata
-  `nyo95/studioflow` at `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27` without
-  authorizing legacy checkout or database access.
-- **Needs:** Independently verify both rebuild commits resolve locally; verify
-  the record keeps Master Data and BQ behaviorally frozen, applies the
-  StudioFlow continuation freeze only until PF-8 with the narrow approved
-  exception, and does not misrepresent R8.16 as a behavior baseline. Verify
-  the R8.18 diff is limited to the PF-0 governance and ledger files, with no
-  owner-supplied untracked reference staged.
-- **Status:** Ready for review, not yet verified.
-
 ### Configurable main-route settings
 
 - **Observed:** Implemented 2026-09-10 per `roadmap.md`'s "Add configurable

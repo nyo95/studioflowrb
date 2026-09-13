@@ -5,8 +5,27 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.18**
-- Next local revision: **R8.19**
+- Current revision after this entry is committed: **R8.19**
+- Next local revision: **R8.20**
+
+## R8.19 | 2026-09-13 | docs(foundation): record PF-0 review correction
+
+- Independently reviewed R8.18 against the ratified PF-0 slice, the Foundation
+  Reference, and repository boundaries.
+- Recorded KB-026: the canonical freeze record does not explicitly identify the
+  current StudioFlow RB as the frozen reference required by Foundation Reference
+  §30. PF-0 remains unaccepted pending a focused documentation correction.
+- Removed PF-0 from the ready-for-review ledger because the verified governance
+  defect now belongs in `knownbug.md`.
+
+### Verification
+
+- Verified both pinned rebuild commits resolve locally and R8.12 is an ancestor
+  of the R8.16 documentation-only overlay.
+- Reviewed the R8.18 commit scope: governance and ledger files only; no
+  production source, schema, migration, dependency, test, or app-contract file
+  changed, and owner-supplied reference files remain untracked.
+- `git show --check R8.18`: passed.
 
 ## R8.18 | 2026-09-13 | docs(foundation): pin rebuild baseline and continuation freeze
 

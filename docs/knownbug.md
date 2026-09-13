@@ -7,6 +7,30 @@ it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
 
 ## Platform Foundation
 
+### KB-026 — PF-0 does not identify the frozen StudioFlow RB reference
+
+- **Observed (R8.18 review):**
+  `docs/FOUNDATION-BASELINE-FREEZE.md` pins the general R8.12 rebuild baseline
+  and freezes future StudioFlow continuation, but it never states that the
+  current StudioFlow RB implementation is the frozen reference to preserve
+  through Foundation work and use at the PF-8/Recovery boundary.
+- **Expected:** Foundation Reference §30 PF-0 explicitly pins the current
+  StudioFlow RB as a frozen reference, alongside the rebuild and legacy
+  evidence baselines, Master Data behavior, and BQ behavior.
+- **Why it matters:** A prohibition on new StudioFlow work does not identify
+  the reference state against which Foundation compatibility and later recovery
+  work must be judged. The gap permits later work to treat the generic R8.12
+  baseline, an R8.16 documentation overlay, or a moving checkout as the
+  StudioFlow reference.
+- **Required correction:** Amend the canonical PF-0 record to name the exact
+  frozen StudioFlow RB reference and its relationship to R8.12/R8.16, without
+  changing StudioFlow behavior or widening the approved exception.
+- **Acceptance condition:** The record expressly identifies the current
+  StudioFlow RB as the frozen reference; it remains distinct from the R8.16
+  documentation-only overlay and preserves the PF-8-only release condition.
+- **Priority:** P1 — Foundation/Recovery gate ambiguity.
+- **Status:** Open; correction required before PF-0 can be accepted.
+
 ### KB-020 — Office rebuild migration history contains an untracked migration
 
 - **Observed (R7.56):** `prisma migrate status` reports database-only migration
