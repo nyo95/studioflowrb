@@ -1,8 +1,7 @@
 # StudioFlow — Contract Index and Shared Rules
 
-Status: **ACTIVE CONTRACT INDEX — implemented project-workflow, Library, MOM
-and Product Catalogue slices reconciled through R7.55; pinned recovery discovery
-is complete in R8.48; remaining work is tracked in
+Status: **ACTIVE CONTRACT INDEX — D-SF recovery ratified in R8.51; StudioFlow
+implementation remains sequenced after Foundation F-E; remaining work is tracked in
 [`../../roadmap.md`](../../roadmap.md)**
 
 Authority: owner decisions locked in the StudioFlow contract sessions of
@@ -54,15 +53,14 @@ activates neither app execution nor a new foundation build.
 
 | Contract | Owns |
 |---|---|
-| [`studioflow-project-contract.md`](studioflow-project-contract.md) | Client, Project, Phase, Iteration, client review exchange, tasks, assets, and how people reach a project — one workflow contract |
-| [`studioflow-schedule-contract.md`](studioflow-schedule-contract.md) | Owner-approved Brands, StudioFlow-owned Product Catalogue, and project Schedule contract; Product Catalogue is implemented in R7.53 and Schedule remains unactivated |
-| [`studioflow-mom-contract.md`](studioflow-mom-contract.md) | Owner-approved project-owned Minutes of Meeting contract; executable work order remains deferred |
+| [`studioflow-project-contract.md`](studioflow-project-contract.md) | Client, Project, first-class Requirements, Phase, Iteration, client review exchange, tasks, assets, and how people reach a project |
+| [`studioflow-schedule-contract.md`](studioflow-schedule-contract.md) | Ratified project-owned Product Catalogue and project Schedule direction; global R7 catalogue is historical implementation evidence only |
+| [`studioflow-mom-contract.md`](studioflow-mom-contract.md) | Canonical project-owned Minutes of Meeting lifecycle and content floor; later recovery module |
 
-The R7.53 global Product Catalogue implementation is retained as historical
-implementation evidence, not recovery authority: D-SF found project-scoped
-legacy product/schedule records. Its existing-data treatment needs Planner
-decision D-SF-04 before SF-C. Project Schedule/FFNI remains unactivated;
-project-owned MOM is implemented in R7.52.
+The R7.53 global Product Catalogue is historical implementation evidence, not
+recovery authority. The ratified future model is `Project → Product Catalogue`;
+the old global rows are discarded only through a later, explicitly scoped safe
+cutover. Project Schedule/FFNI and MOM remain later recovery modules.
 
 ## 3. Permission vocabulary
 
@@ -142,12 +140,9 @@ StudioFlow follows the platform dependency law: `app -> platform` and
 boundary.
 
 - **Master Data.** StudioFlow reads only Brands through the Master Data public
-  read port, read-only. The R7.53 global Product Catalogue premise is
-  superseded for recovery planning by the project-scoped evidence recorded in
-  `D-SF-RECOVERY-DISCOVERY.md`; the data disposition remains D-SF-04. Neither
-  form reads Master Data SKU, unit, or pricing. A future schedule must copy its
-  chosen specification into a project snapshot so later changes cannot rewrite
-  project history.
+  read port, read-only. Product Catalogue is project-owned; it does not read
+  Master Data SKU, unit, or pricing. A future schedule copies chosen
+  specifications into project snapshots so later changes cannot rewrite history.
 - **BQ.** No relationship in either direction. BQ reads Master Data pricing on
   its own. A StudioFlow project and a BQ project are unrelated records and are
   not linked, joined, or synchronized.
@@ -218,10 +213,11 @@ or placeholder export is created for anything below.
 
 | Deferred | Reason |
 |---|---|
-| Project Schedule / FFNI | Historical R7 schedule contract §4–§5 and the R7.53 global reuse-pool implementation are superseded for recovery scope by D-SF's project-scoped evidence. No data or schema change is authorized until D-SF-04; then a project-scoped entry/option/template work order may be written (KB-003). |
-| SketchUp plugin exchange | An authenticated, idempotent integration with retry and reconciliation. No plugin endpoint enters the first release |
-| Checklist templates and template-seeded requirements | Legacy root checklists were template requirements users could not create. Reintroduce only if a confirmed workflow needs them |
-| Legacy's Today's View feature set — saved filters, auto-hide, event feed | The one list that replaces it ships in the first release (project contract §10.2). What stays deferred is the accumulation that made legacy's version unreadable |
+| Project Schedule / FFNI | Project-owned entry/option/template work is deferred. The incorrect R7 global rows are discarded only in a separately approved safe cutover; no migration is authorized yet. |
+| SketchUp plugin exchange | Deferred later capability; future integration must be authenticated, idempotent, observable, retry-safe, reconcilable, and independent from legacy DB/runtime. |
+| Requirement templates and template-seeded project/phase requirements | First-class StudioFlow requirements, distinct from tasks and files. Recover their template snapshot behavior in later SF-A planning; do not hide them under generic checklist wording. |
+| Upcoming planning surface | Deferred toward a planning Gantt/timeline view. Activity Center is the canonical Today workspace; do not restore duplicate legacy activity/today surfaces or old-list behavior. |
+| Global/general collaboration | Deferred temporary StudioFlow collaboration (messages, presence, discussion), not project-scoped permanent chat. |
 | Google Drive archive (`LINKED` files) | Contracted in §5.1 so nothing must be redesigned later. Needs an egress answer and a studio account first |
 | Legacy data migration | The rebuild starts from zero. No connection to legacy PostgreSQL, ever |
 

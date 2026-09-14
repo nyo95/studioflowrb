@@ -498,6 +498,22 @@ This is also why legacy's tasks felt hard to file under a phase: what the owner
 was typing genuinely was general work. The phase-bound work already existed as
 revisions and simply had no queue of its own.
 
+### 7.1.1 Requirements are first-class StudioFlow domain behavior
+
+Requirements state what a Project or one of its Phases must satisfy; they are
+not work items hidden behind checklist wording. A **General Requirement** is
+project-scoped. A **Phase Requirement** belongs to exactly one Phase. Both may
+have a File as evidence, but a File never becomes the requirement itself; a
+Task or subtask may decompose work needed to satisfy a requirement without
+creating another requirement.
+
+The legacy template-seeded project and phase requirements are retained as
+recovery evidence for a later SF-A planning outcome. That outcome must define
+template snapshotting for new projects, explicit satisfaction/evidence rules,
+and how running projects remain unaffected by later template edits. This
+contract records the domain boundary only: it authorizes no requirement schema,
+template, route, or implementation now.
+
 ### 7.2 IterationPoint — checklist inside a round
 
 | Field | Type | Rule |
@@ -962,7 +978,7 @@ the separate question of recording sign-off).
 | `Revision` entity | **MERGE** | `Iteration` (§5) |
 | Rejection creates revision and converts feedback to TODOs | **FIX** | Contracted record plus consequence (§6) |
 | `Activity` as task carrier, phase-tagged deferred activities | **MERGE** | `Task` (§7.3) |
-| `ProjectChecklist` + `ChecklistTemplate` | **MERGE** for the in-round case (§7.2); templates **DEFER** ([`studioflow.md`](studioflow.md) §6) |
+| `ProjectChecklist` + `ChecklistTemplate` | **MERGE** for in-round points (§7.2); project/phase template-seeded Requirements are a separate first-class recovery domain (§7.1.1), deferred to later SF-A planning |
 | `assertNoPendingTasks` hard blocking | **PURGE** | Warn-only (§7.4) |
 | Flat `File` under `Revision`; local disk writes; caller-selected folders | **PURGE** | §8 |
 | B1 virtual folder structure from metadata | **KEEP** | §8.2 — the one legacy design conclusion adopted intact |
@@ -1122,15 +1138,16 @@ Recorded so a reviewer can test them rather than inherit them.
 
 ## 15. First-release scope correction
 
-Brands, Product Catalogue/Schedule, and MOM are in the rebuild scope, not
-optional future placeholders. Brands is the only Master Data read. Product
-Catalogue is a StudioFlow-wide reuse pool; Schedule copies its specifications
-into a project. MOM and Schedule are exposed from Project detail. Their detailed lifecycle remains in
-[`studioflow-schedule-contract.md`](studioflow-schedule-contract.md) and
-[`studioflow-mom-contract.md`](studioflow-mom-contract.md). SketchUp exchange,
-client-facing links, the `LINKED` treatment and its Google Drive archive,
-project archival with retention manifest, and legacy data migration remain
-deferred. `What’s Today` is the aggregate view for project-owned tasks, not a
+The rebuild scope includes first-class Requirements, project-owned Product
+Catalogue/Schedule, and MOM, but their later recovery modules are not activated
+by this contract. Brands is the only Master Data read. Product Catalogue belongs
+to its Project; the historical R7 global reuse pool is discarded only in a
+separately approved safe cutover. MOM and Schedule are reached from Project
+detail under their own contracts. SketchUp exchange, global/general temporary
+collaboration, client-facing links, the `LINKED` treatment and its Google Drive
+archive, project archival with retention manifest, and legacy data migration
+remain deferred. Activity Center is the one `Today` aggregate over
+project-owned work; Upcoming is a separately deferred planning surface, not a
 second task system.
 
 ## 16. PRD acceptance scenarios and simplification ledger

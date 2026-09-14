@@ -1,70 +1,97 @@
 # Active Plan
 
-Plan ID: D-SF-PLANNER-RATIFICATION
-Scope: Owner ratification of StudioFlow recovery decisions
-Status: BLOCKED
+Plan ID: F-C-PF-4-PF-5-SETTINGS-APPEARANCE-UI-ENGINE
+Scope: Foundation settings ownership, typed appearance, and UI Engine solidification
+Status: READY
 Priority: P1
 Owner: Repository owner
 Last updated: 2026-09-14
 
 ## Outcome
 
-Ratify the seven bounded product and rollout decisions found by completed D-SF
-recovery discovery, then lock them in the affected StudioFlow contracts and
-activate one coherent next implementation outcome. No legacy source access,
-application change, schema/data operation, or partial SF-A work is authorized
-until the owner decisions are recorded.
+Complete the F-C Foundation outcome: keep Platform General Settings narrowly
+typed, add only approved global appearance behavior, make app-owned settings
+boundaries explicit, and solidify the shared shell, layouts, primitives,
+interactions, and token API against current Master Data, BQ, frozen StudioFlow,
+and ratified D-SF evidence. The result must improve shared foundations without
+activating StudioFlow recovery features.
 
 ## Context and Evidence
 
-- R8.48 recovered and documented source evidence at the exact legacy pin;
-  R8.49 independently corrected the roadmap to keep D-SF open for ratification.
-- The authoritative evidence and decision register is
-  `docs/apps/studioflow/D-SF-RECOVERY-DISCOVERY.md` §5. It establishes the
-  questions and their affected scopes; it deliberately does not choose policy.
-- `docs/roadmap.md` now correctly shows D-SF evidence complete but the gate
-  open. SF-A through SF-F remain unactivated.
+- R8.51 ratified D-SF-01 through D-SF-07. D-SF now informs F-C/F-D; F-E
+  Foundation acceptance still gates all StudioFlow implementation.
+- `CORE.md` §11 keeps Platform General Settings a narrow typed aggregate;
+  `DESIGN.md` and `UI_ENGINE.md` govern shared appearance and reusable UI.
+- The ratified settings boundary is Platform: profile/account, organization and
+  general application settings, appearance/theme, and platform access/settings;
+  StudioFlow: naming, phase/general/phase-requirement templates, project-engine
+  defaults, Schedule configuration, and other workflow defaults. Database
+  administration is not a StudioFlow feature.
+- Current Master Data, BQ, frozen StudioFlow, and D-SF are evidence consumers;
+  their business behavior must not be changed incidentally by Foundation work.
 
 ## Locked Decisions
 
-- Keep canonical rebuild hierarchy `/studioflow/projects/...`; never restore a
-  parallel `/projects/...` tree.
-- Preserve platform-owned profile, no legacy role enum, no cross-app internal
-  import/write/database foreign key, and Master Data public read-only / BQ
-  independence boundaries.
-- The next executor receives only owner-ratified decisions; it may not choose
-  D-SF-01 through D-SF-07 from legacy evidence.
+- General Settings remains a small typed platform aggregate, never a generic
+  key/value store and never a home for app workflow defaults.
+- Appearance/theme is global and typed; UI Engine consumes canonical tokens and
+  components. App-local visual substitutes are prohibited where a canonical
+  surface exists.
+- App settings remain app-owned. F-C may clarify their boundary and navigation,
+  but may not implement StudioFlow project requirements, templates, Schedule,
+  Product Catalogue cutover, Today, collaboration, SketchUp, or route aliases.
+- Add or extend a shared UI surface only when evidence proves it is generic and
+  has named consumers. Preserve Core purity and current cross-app boundaries.
 
 ## Boundaries and Non-goals
 
-Do not start any implementation, migration, data disposition, route rollout,
-or external integration during ratification. A later READY plan must have a
-single coherent outcome and may only cover the decisions needed for that
-outcome.
+- Do not implement any StudioFlow workflow/domain capability or destructive
+  migration/data disposition.
+- Do not alter Master Data/BQ business semantics, create a parallel shell,
+  duplicate UI primitive, or add an unapproved dependency.
+- Do not turn appearance into per-app branding policy or route/local storage
+  preferences outside the approved platform contract.
 
 ## Acceptance Criteria
 
-Not applicable until the owner supplies ratifications. The output required now
-is an explicit owner decision for each D-SF entry in the prompt below.
+- Platform settings, typed appearance, and UI Engine public surfaces have one
+  clear ownership boundary and no app-workflow leakage.
+- Existing three applications consume the stabilized shared shell/tokens and
+  retain their established route, permission, and business behavior.
+- Any necessary settings migration/persistence, validation, permissions, tests,
+  documentation, and consumer follow-through is cohesive and locally committed
+  as R8.52.
 
 ## Verification
 
-After owner ratification, Planner/Reviewer must reconcile the selected policy
-with affected contracts and create the next READY plan. No browser/database
-check is applicable to this decision gate.
+- Run targeted tests plus typecheck, lint, boundary check, legacy-runtime check,
+  and production build. Use an approved disposable rebuild database for any
+  required migration/integration validation.
+- Inspect changed consumer surfaces and run `git diff --check`. Record skipped
+  checks honestly; no browser acceptance belongs in Executor verification unless
+  needed to diagnose the implementation.
+
+## Reviewer Acceptance
+
+After the Executor commit, Reviewer runs browser acceptance using the approved
+local fixture: authorized settings access, save/reload of typed global
+appearance, narrow/desktop shell behavior, and smoke of Master Data, BQ, and
+StudioFlow entry/navigation without visual or permission regressions.
 
 ## Risks and Recovery
 
-- Treating an unanswered decision as implied approval would authorize incorrect
-  routes, data changes, operational access, or a privacy-sensitive feature.
-- If one choice changes schema/data ownership, keep that work isolated in its
-  own subsequent plan with explicit rollback/recovery evidence.
+- Shared changes can silently regress one of three app consumers. Keep consumer
+  coverage and browser review proportionate to each altered public surface.
+- A purported generic UI enhancement may encode an app workflow. Keep such
+  policy app-owned and report a genuine contract conflict instead of guessing.
 
-## Owner Decision Prompt
+## Executor Prompt
 
-Ratify D-SF-01 through D-SF-07 in
-`docs/apps/studioflow/D-SF-RECOVERY-DISCOVERY.md` §5: (1) global work-list
-surfaces, (2) StudioFlow settings ownership, (3) MOM parity, (4) existing global
-Product Catalogue data, (5) live/chat first-release scope, (6) SketchUp
-activation, and (7) legacy-route compatibility. State the intended outcome for
-each item; I will turn only the necessary decisions into the next READY plan.
+You are the Executor. Location: kantor. Read `AGENTS.md`,
+`docs/agent/EXECUTOR.md`, and this READY `PLAN.md`, then implement the entire
+F-C/PF-4+PF-5 Foundation outcome. Preserve ratified D-SF ownership boundaries,
+protect Master Data/BQ/StudioFlow behavior, run the required checks, update
+`CHANGELOG.md`, and create local revision R8.52. Do not start any StudioFlow
+recovery feature, destructive migration, or remote action. Stop only for a
+material locked-decision conflict or unsafe boundary; otherwise complete the
+coherent outcome and report the commit, checks, limitations, and dirty files.

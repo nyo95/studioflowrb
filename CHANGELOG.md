@@ -5,8 +5,35 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.50**
-- Next local revision: **R8.51**
+- Current revision after this entry is committed: **R8.51**
+- Next local revision: **R8.52**
+
+## R8.51 | 2026-09-14 | docs(studioflow): ratify D-SF recovery decisions
+
+### Changed
+
+- Ratified D-SF-01 through D-SF-07 in the durable recovery report and aligned
+  StudioFlow route, settings, MOM, Product Catalogue, collaboration, SketchUp,
+  and requirement-domain documentation.
+- Locked Activity Center as the sole Today surface; deferred Upcoming toward a
+  planning timeline/Gantt; retained MOM as its canonical later module; and kept
+  temporary legacy route redirects only for later recovery cutover.
+- Made `Project → Product Catalogue` canonical and authorized later discard of
+  incorrect global rows only through a separately approved safe cutover.
+- Marked D-SF complete and activated F-C/PF-4+PF-5 planning. F-E remains the
+  gate before any StudioFlow implementation.
+
+### Verification
+
+- Reconciled every D-SF decision-register entry with the StudioFlow index,
+  project, MOM, Schedule, and roadmap contracts; no decision remains open.
+- Documentation links and whitespace checks: passed.
+
+### Limitations
+
+- This is planning/documentation only: no production code, schema, migration,
+  data disposition, route alias, realtime system, SketchUp integration, or
+  StudioFlow feature was activated.
 
 ## R8.50 | 2026-09-14 | review(studioflow): accept D-SF evidence and hold ratification gate
 

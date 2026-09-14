@@ -1,9 +1,10 @@
 # Minutes of Meeting Contract — StudioFlow
 
-Status: **OWNER-APPROVED LOGIC CONTRACT — implemented in R7.52**
+Status: **OWNER-RATIFIED CANONICAL CONTRACT — legacy content floor; later
+StudioFlow recovery module**
 
-Authority: owner clarification of 2026-09-10, reconciled with committed legacy
-evidence at `5fc605e304a12db6b5efe0a2c0271a2d9415b2da`. MOM belongs only to a
+Authority: owner clarification of 2026-09-10 and D-SF ratification of
+2026-09-14, reconciled with committed legacy evidence. MOM belongs only to a
 StudioFlow project. It has no phase, iteration, Task, or To-do relationship.
 
 ## 1. Business purpose and boundary
@@ -183,9 +184,11 @@ BQ, Product Catalogue, Schedule, phase, iteration, or task dependency.
 4. Image support is required and reuses the shared image workspace.
 5. Issue is direct with confirmation; no separate approval stage is added.
 
-The MOM executable work order is complete in R7.52. Production storage activation
-for `STORED` images and KB-004 environment provisioning remain technical
-dependencies and must not be reported as passed before verification.
+The R7.52 implementation is historical evidence, not recovery closure. The
+current lifecycle is canonical; the remaining MOM recovery/module work stays
+later in the StudioFlow roadmap. Production storage activation for `STORED`
+images and KB-004 environment provisioning remain technical dependencies and
+must not be reported as passed before verification.
 
 ### 10.1 Correction is a draft, not an instant re-issue
 
@@ -195,4 +198,5 @@ editable draft that copies the source content; the source becomes `SUPERSEDED`
 only when that correction is issued. Creating and issuing the correction in one
 step cannot correct anything, because the copied content is immutable from the
 moment it exists. This is recorded as KB-012 and is fixed by the active work
-order, not by this contract.
+order only when the later MOM recovery module is activated; this contract itself
+does not claim implementation closure.

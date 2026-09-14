@@ -253,10 +253,11 @@ migration and one slice.
   Schedule slice (`KB-003`) was designed on top of the wrong ownership model.
   No catalogue work should continue until the per-project scoping is restored.
 - **Mitigation:** Use the current global list as a reference only.
-- **Status:** Open; owner-directed. Requires a migration, a schema change
-  (`project_id` FK on `SfProductCatalogue`), a contract correction, and route
-  restructuring to `/studioflow/[id]/catalogue`. Block all further catalogue
-  and Schedule development until resolved.
+- **Status:** Open; owner-ratified in D-SF-04 (R8.51). The recovery model is
+  `Project → Product Catalogue`; existing global rows are discarded, not
+  migrated, re-scoped, or preserved. Its destructive schema/data cutover and
+  canonical project route belong to a separately approved future recovery plan;
+  no catalogue or Schedule implementation may proceed before that plan.
 
 ### KB-022 — MOM implementation does not match owner's required behavior
 

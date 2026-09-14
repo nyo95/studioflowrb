@@ -91,12 +91,12 @@ contracts sit outside any app folder because every app depends on them.
 | Contract | Owns |
 |---|---|
 | [`apps/studioflow/studioflow.md`](apps/studioflow/studioflow.md) | frozen RB contract index and implemented ownership evidence; recovery authority comes from the Recovery Reference and active roadmap |
-| [`apps/studioflow/D-SF-RECOVERY-DISCOVERY.md`](apps/studioflow/D-SF-RECOVERY-DISCOVERY.md) | R8.48 pinned legacy recovery evidence, classification matrices, and Planner decision register before SF-A implementation |
+| [`apps/studioflow/D-SF-RECOVERY-DISCOVERY.md`](apps/studioflow/D-SF-RECOVERY-DISCOVERY.md) | R8.48 pinned legacy evidence and R8.51 owner-ratified classification/decision register; informs F-C/F-D before later StudioFlow implementation |
 | [`apps/studioflow/studioflow-project-contract.md`](apps/studioflow/studioflow-project-contract.md) | frozen RB Client/Project/workflow contract and implementation evidence; parity differences require D-SF classification |
 | [`apps/studioflow/studioflow-ux-spec.md`](apps/studioflow/studioflow-ux-spec.md) | StudioFlow surface reference; partially implemented and subordinate to current owner alignment |
 | [`apps/studioflow/studioflow-implementation-plan.md`](apps/studioflow/studioflow-implementation-plan.md) | historical R7 execution plan; superseded for recovery scope and sequencing |
-| [`apps/studioflow/studioflow-schedule-contract.md`](apps/studioflow/studioflow-schedule-contract.md) | historical R7 catalogue/Schedule contract; its global catalogue premise is superseded and Schedule remains unactivated |
-| [`apps/studioflow/studioflow-mom-contract.md`](apps/studioflow/studioflow-mom-contract.md) | historical implemented MOM contract; actual owner workflow must be re-audited before recovery |
+| [`apps/studioflow/studioflow-schedule-contract.md`](apps/studioflow/studioflow-schedule-contract.md) | ratified project-owned catalogue/Schedule direction; global R7 premise is historical and Schedule remains unactivated |
+| [`apps/studioflow/studioflow-mom-contract.md`](apps/studioflow/studioflow-mom-contract.md) | ratified canonical MOM lifecycle/content floor; remaining module recovery is later roadmap work |
 | [`apps/studioflow/studioflow-work-orders.md`](apps/studioflow/studioflow-work-orders.md) | historical decision/work-order ledger; use `roadmap.md` for current remaining work |
 | [`apps/studioflow/STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md`](apps/studioflow/STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md) | historical read-only audit and staged roadmap; implemented phases and remaining work are reconciled in `roadmap.md` |
 

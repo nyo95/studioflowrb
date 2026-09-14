@@ -1,6 +1,6 @@
 # Product Roadmap by Application
 
-Status: active planning ledger, reconciled through R8.46 on 2026-09-14.
+Status: active planning ledger, reconciled through R8.51 on 2026-09-14.
 
 This file answers **what remains to be built**. It does not activate work by
 itself. Completed items are struck through or removed only after verification
@@ -55,9 +55,10 @@ independently useful outcome, or demonstrated context/tool limit.
   three app roots. The unrelated Windows storage failure remains KB-030.
 - [ ] **F-C / PF-4+PF-5 — Settings, Appearance, and UI Engine:** Keep Platform
   General Settings narrow; add only typed global appearance settings; clarify
-  app-owned settings; and stabilize the shell, layouts, primitives,
-  interactions, and token API against Master Data, BQ, frozen RB StudioFlow,
-  and D-SF evidence. Add only generic layouts with proven consumers.
+  app-owned settings (including ratified StudioFlow workflow settings); and
+  stabilize the shell, layouts, primitives, interactions, and token API against
+  Master Data, BQ, frozen RB StudioFlow, and D-SF evidence. Add only generic
+  layouts with proven consumers.
 - [ ] **F-D / PF-6+PF-7 — Utility curation and boundaries:** Consolidate only
   domain-neutral utilities with real consumers, then enforce Core purity,
   public cross-app reads, permission SSOT, app route ownership, UI Engine
@@ -132,8 +133,8 @@ clean ownership while each capability is recovered.
 
 ### Discovery gate before Foundation freeze
 
-- [ ] **D-SF — Recovery evidence complete; gate pending Planner/owner
-  ratification:** At the owner-supplied kantor checkout, inspect only pinned
+- [x] ~~**D-SF — Full extraction and recovery contract:** At the owner-supplied
+  kantor checkout, inspect only pinned
   commit `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`. Produce and ratify the
   capability, route, settings, permission, persistence/ownership, and shared-
   capability matrices. Classify every meaningful behavior as KEEP, MERGE,
@@ -142,21 +143,24 @@ clean ownership while each capability is recovered.
   D-SF also locks the canonical `/studioflow/projects/...` hierarchy,
   compatibility redirects, project-owned Product Catalogue, settings
   ownership, cross-app reads, and the specific generic UI/utility pressure that
-  F-C/F-D must satisfy. Resolve Upcoming, Database Settings, project live/chat,
-  MOM behavior, and existing global catalogue data treatment with the owner.
+  F-C/F-D must satisfy. The owner ratified Upcoming, Database Settings, project
+  live/chat, MOM behavior, and existing global catalogue data treatment in the
+  decision register.
   D-SF is read-only discovery and documentation; it creates no production code,
   schema, placeholder route, or dependency. Discovery evidence is recorded in
   [`apps/studioflow/D-SF-RECOVERY-DISCOVERY.md`](apps/studioflow/D-SF-RECOVERY-DISCOVERY.md)
-  (R8.48); the evidence is complete, but this gate remains open until the
-  Planner/owner ratifies its decision register before SF-A starts.
+  (R8.48), with D-SF-01 through D-SF-07 ratified in R8.51. It informs F-C/F-D;
+  Foundation F-E must still pass before any StudioFlow implementation begins.
 
 ### Implementation after F-E Foundation acceptance
 
 - [ ] **SF-A — Daily work and project operations:** Build the modular
   StudioFlow backbone and canonical routes for home/general todos, activity,
   projects, clients, project lifecycle/archive, project detail, phase
-  navigation, phase administration, project todos, and StudioFlow-owned phase/
-  project-engine settings. Preserve accepted behavior, implement ratified
+  navigation, phase administration, project todos, first-class General and
+  Phase Requirements, and StudioFlow-owned phase/project-engine settings.
+  Activity Center is the sole Today surface; Upcoming remains deferred toward
+  planning/Gantt. Preserve accepted behavior, implement ratified
   parity gaps such as KB-016/KB-017/KB-018/KB-023, use controlled redirects,
   and cut over these routes together.
 - [ ] **SF-B — Delivery and client collaboration:** Recover deliverables/files,
@@ -165,12 +169,12 @@ clean ownership while each capability is recovered.
   audit, error recovery, and relevant retention behavior as one end-to-end
   production workflow. This absorbs KB-013 through KB-015 and any ratified
   replacement for the frozen simplified workflow.
-- [ ] **SF-C — Project records and discovery:** Re-anchor MOM to the audited
-  owner workflow; correct Product Catalogue to project ownership including an
-  explicit disposition for existing global rows; preserve useful Library/
-  discovery behavior; and cut over their project/global routes. Resolve KB-012,
-  KB-021, and KB-022 together only where the ratified model says they interact;
-  do not retain the incorrect global reuse-pool premise.
+- [ ] **SF-C — Project records and discovery:** Recover the canonical MOM module
+  and project-owned Product Catalogue; preserve useful project discovery
+  behavior; and cut over their project/global routes. The incorrect global rows
+  are discarded—not migrated, re-scoped, or retained—only through a separately
+  approved safe destructive cutover plan. Resolve KB-012, KB-021, and KB-022
+  only where the ratified model says they interact.
 - [ ] **SF-D — Product Schedule / FF&E:** Restore the complete project-owned
   Schedule capability, its catalogue snapshots/options/lifecycle/templates,
   Schedule-owned settings, permissions, history, and browser workflow. Keep it
@@ -181,6 +185,10 @@ clean ownership while each capability is recovered.
   observability, reconciliation, safe failure, and no legacy runtime/database
   dependency. Keep this separate because external integration and operational
   recovery form their own security and rollback boundary.
+- [ ] **SF-H — General collaboration:** Activate only the ratified temporary
+  StudioFlow-global discussion, presence, and realtime capability after a
+  separate retention, privacy, delivery, and persistence design. It is not a
+  project record and does not recover legacy project chat.
 - [ ] **SF-F — Parity cutover and frozen-code purge:** Prove every classified
   route/capability, Master Data/BQ non-regression, migrations, permissions,
   persistence, audit/history, error states, and real browser workflows. Remove

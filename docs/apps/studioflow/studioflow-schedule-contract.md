@@ -1,10 +1,8 @@
 # Library and Schedule Contract — StudioFlow
 
-Status: **HISTORICAL R7 LOGIC CONTRACT — Library discovery is partially
-implemented through R7.40; its R7.53 global Product Catalogue reuse-pool
-premise is superseded for recovery planning by
-[`D-SF-RECOVERY-DISCOVERY.md`](D-SF-RECOVERY-DISCOVERY.md); Product
-Schedule/FFNI remains unactivated and is tracked as KB-003**
+Status: **RATIFIED RECOVERY DIRECTION — Product Catalogue is project-owned;
+the R7.53 global reuse pool is historical only; Schedule/FFNI remains deferred
+and is tracked as KB-003**
 
 Authority: owner decisions of 2026-09-08 — the Library reads the Master Data
 **brand catalogue** only, and FF&E is composed from **snapshots exactly as legacy
@@ -66,23 +64,16 @@ pricing methods on the port (`listMaterialPriceOptions`, `getSkuPricingOptions`,
 `listWorkPricesRead`) are BQ's and are never called from StudioFlow — mixing them
 in would turn a specification screen into a costing screen.
 
-### 3.2 Historical R7 Product Catalogue ownership
+### 3.2 Project-owned Product Catalogue
 
-This section records the prior R7 decision only. It is not implementation
-authority for recovery: the pinned legacy evidence establishes project-scoped
-product/schedule behavior, while disposition of existing global rebuild data is
-Planner decision D-SF-04. Do not use this section to authorize a migration,
-deletion, or re-scope operation.
+Product Catalogue belongs to its Project. It is not Master Data and never reads
+Master Data SKU or pricing. A project catalogue entry may use a Brand selected
+from the public Brand surface, but retains only an opaque id and frozen name so
+the project remains readable after Brand changes or removal.
 
-Product Catalogue is an independent StudioFlow reuse pool shared across
-StudioFlow projects. It is not Master Data, is not project-owned, and never
-reads Master Data SKU or pricing. A catalogue product may use a brand selected
-from the Brands surface, but persists only the opaque brand id and frozen brand
-name; it remains usable if that Master Data brand later changes or disappears.
-
-Projects never own or live-link the reusable catalogue row. Selecting a product
-copies its current specification into the project option as a historical
-snapshot. Later catalogue edits do not rewrite any project.
+The R7 global reuse-pool rows are not migrated, re-scoped, or retained as
+historical application data. They are discarded only by a separately approved,
+safe future cutover. This contract does not authorize that destructive action.
 
 ### 3.3 The specification itself is written, not picked from SKU
 
@@ -96,17 +87,11 @@ frozen name**. The rest is typed by the designer, because interior specification
 is finer-grained than any SKU list: the same tile appears in six colours and
 three finishes, and the studio specifies the combination.
 
-### 3.4 The reuse pool
+### 3.4 Project-local search
 
-Legacy keeps `spec_search_key` — a normalised concatenation of brand, product,
-colour and finishing — indexed so that specifications can be found across
-projects without scanning JSON. In the rebuild, this search belongs to the
-StudioFlow-owned Product Catalogue rather than treating project history as the
-catalogue itself.
-
-This is the reusable Product Catalogue: **the studio's own accumulated
-specifications**, not a vendor or Master Data SKU catalogue. It is **KEEP**,
-and it is what makes the second project faster than the first.
+`spec_search_key` remains a normalised, project-local search aid for a
+specification's brand, product, colour, and finishing. It must not become a
+global cross-project reuse pool or encode a Master Data SKU dependency.
 
 ### 3.5 Product requests
 
@@ -234,7 +219,7 @@ those values into the project. There is no propagation: editing a template never
 touches a running project, exactly as legacy states.
 
 Legacy `ScheduleTemplateItem.sku_id` is **PURGE**. Rebuild template items copy
-from the StudioFlow Product Catalogue or accept a manual StudioFlow
+from a project-owned Product Catalogue entry or accept a manual StudioFlow
 specification; neither path reads or stores a Master Data SKU.
 
 A whole-project standard and a single-room package need no different machinery: a
@@ -275,7 +260,7 @@ catalogue requires no Master Data permission: the public port is the boundary.
 | Master Data FKs severed; dangling id plus snapshot | **KEEP** | §1, §4.3 — already correct |
 | Entry + option structure, category, location, qty, unit, section | **KEEP** | §4.1 |
 | `ScheduleTemplateItem` with filled specification, copied at apply | **KEEP** | §5 |
-| `spec_search_key` reuse across projects | **KEEP** | StudioFlow-owned Product Catalogue (§3.4) |
+| `spec_search_key` reuse across projects | **PURGE** | Project-local search only (§3.4) |
 | `PrefixDictionary` mapping category to display prefix | **KEEP** | §4.2 |
 | `data_snapshot` JSON mirrored into spec columns | **FIX** | Explicit columns only; one copy (§4.3) |
 | `schedule_prefix` + `schedule_increment` as the unique key; negative temporaries; two-step renumbering | **PURGE** | Internal id plus `sort_order`; code derived at read (§4.2) |
@@ -291,7 +276,6 @@ catalogue requires no Master Data permission: the public port is the boundary.
 |---|---|---|---|
 | S1 | Six specification columns are assumed sufficient | A seventh attribute arrives and the temptation is a JSON escape hatch | Add a column. The JSON blob is how legacy acquired the sync risk it documented against itself |
 | S2 | Locations are free text | "Living Room" and "Living room" become two groups | Normalise case for grouping. A controlled room dictionary is a second maintenance burden |
-| S3 | The reuse pool is assumed to be used | If nobody reuses, every project is typed from scratch and the Library is decoration | Measure how many options are created from reuse versus typed fresh |
 | S4 | Templates are assumed to be refreshed | §5.3 exists for this; unused, templates specify last year's products | Measure updates to templates over a year |
 | S5 | Clients are assumed to choose among options | If the studio always presents one, multiple options are ceremony | Measure how many entries ever hold more than one option |
 
@@ -304,7 +288,7 @@ catalogue requires no Master Data permission: the public port is the boundary.
 | Apply a template | Entries appear with specifications already filled; no propagation link back to the template |
 | Edit a template afterwards | No running project changes |
 | Insert a position in the middle | Only `sort_order` changes. No renumbering pass, no negative temporaries, no unique-key collision |
-| Reuse a catalogue specification | Found in the StudioFlow-wide Product Catalogue and copied into the project as an independent snapshot |
+| Search a catalogue specification | Search stays inside its Project catalogue; no other project's record is exposed or copied |
 | Specification with no catalogued brand | Typed freely with `brand_md_id` null; specified and locked normally |
 | Any Product Catalogue or schedule screen | No price, supplier, Master Data SKU, unit read, or cross-app write appears anywhere |
 | Lock one entry, neighbours open | Permitted; locking is per entry |
