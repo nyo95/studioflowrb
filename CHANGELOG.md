@@ -5,8 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.45**
-- Next local revision: **R8.46**
+- Current revision after this entry is committed: **R8.46**
+- Next local revision: **R8.47**
+
+## R8.46 | 2026-09-14 | review(storage): accept KB-030 and activate D-SF gate
+
+- Independently reviewed R8.45. The resolver now compares canonical paths
+  derived from the deepest existing realpath ancestor, preserving lexical and
+  canonical containment checks. Focused Windows filesystem tests passed again;
+  the reported full-suite, typecheck, lint, boundary, legacy-runtime, and build
+  evidence is consistent with the scoped change.
+- Accepted KB-030 as closed. Browser acceptance is not applicable to this
+  infrastructure-only correction because no user-facing behavior or route
+  changed.
+- Replaced the completed KB-030 plan with the next roadmap outcome, D-SF
+  read-only legacy recovery discovery. It is correctly BLOCKED pending the
+  owner's exact kantor legacy-checkout path; no legacy source or database has
+  been accessed.
+
+### Verification
+
+- Fresh focused `filesystem.test.ts`: 3/3 passed on kantor Windows.
+- Commit diff and whitespace review: passed.
 
 ## R8.45 | 2026-09-14 | fix(storage): canonicalize local path containment
 
