@@ -1,17 +1,17 @@
 import { redirect, notFound } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Circle, FileText, Link2 } from "lucide-react";
+import { ArrowLeft, FileText } from "lucide-react";
 import Link from "next/link";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
 import {
-  Badge,
   EmptyState,
   PageHeader,
   SectionCard,
 } from "@/platform/ui_engine";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
 import { studioFlowService } from "@/apps/studioflow/runtime";
+import { RequirementCreateForm, RequirementWorkflowRow } from "../../../requirements/requirement-workflow";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +26,7 @@ export default async function PhaseRequirementsPage({
   const { grants } = principalGrants;
 
   const canRead = hasPermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+  const canManage = hasPermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
   if (!canRead) redirect(`/studioflow/${id}`);
 
   let project;
@@ -44,7 +45,10 @@ export default async function PhaseRequirementsPage({
     notFound();
   }
 
-  const requirements = await studioFlowService.listPhaseRequirements(grants, id, phaseId);
+  const [requirements, files] = await Promise.all([
+    studioFlowService.listProjectRequirements(grants, id, { phaseId, includeArchived: true }),
+    studioFlowService.listFiles(grants, id),
+  ]);
 
   return (
     <>
@@ -69,6 +73,7 @@ export default async function PhaseRequirementsPage({
           count={requirements.length}
           padded={false}
         >
+          {canManage ? <RequirementCreateForm projectId={id} phaseId={phaseId} phaseName={phase.name} /> : null}
           {requirements.length === 0 ? (
             <EmptyState
               icon={FileText}
@@ -76,46 +81,7 @@ export default async function PhaseRequirementsPage({
               description="Phase requirements will appear here once seeded from templates or created manually."
             />
           ) : (
-            <ol className="m-0 list-none p-0">
-              {requirements.map((req) => (
-                <li
-                  key={req.id}
-                  className="flex items-start gap-3 border-b border-line-subtle px-3.5 py-3 last:border-0"
-                >
-                  <div className="mt-0.5">
-                    {req.satisfaction_state === "SATISFIED" ? (
-                      <CheckCircle2 className="size-4 text-green-600" />
-                    ) : (
-                      <Circle className="size-4 text-ink-tertiary" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold">{req.title}</span>
-                      <Badge>{req.satisfaction_state}</Badge>
-                    </div>
-                    {req.description ? (
-                      <p className="mt-0.5 text-sm text-ink-secondary">{req.description}</p>
-                    ) : null}
-                    {req.satisfaction_state === "SATISFIED" && req.satisfaction_note ? (
-                      <p className="mt-1 text-xs text-ink-tertiary">
-                        Note: {req.satisfaction_note}
-                      </p>
-                    ) : null}
-                    {req.evidence.length > 0 ? (
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {req.evidence.map((ev) => (
-                          <Badge key={ev.id} className="gap-1">
-                            <Link2 className="size-3" />
-                            {ev.file.filename}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
-            </ol>
+            <ol className="m-0 list-none p-0">{requirements.map((req) => <RequirementWorkflowRow key={req.id} projectId={id} canManage={canManage} files={files.map((file) => ({ id: file.id, filename: file.filename }))} requirement={{ ...req, archived_at: req.archived_at?.toISOString() ?? null, evidence: req.evidence.map((ev) => ({ id: ev.id, file: { id: ev.file.id, filename: ev.file.filename } })) }} />)}</ol>
           )}
         </SectionCard>
       </div>

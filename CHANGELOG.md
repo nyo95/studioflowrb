@@ -5,8 +5,29 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.68**
-- Next local revision: **R8.69**
+- Current revision after this entry is committed: **R8.69**
+- Next local revision: **R8.70**
+
+## R8.69 | 2026-09-14 | fix(studioflow): complete project requirement workflow UI
+
+### Corrected
+
+- Added guarded General and Phase Requirement controls on their existing
+  canonical project routes: create, edit, satisfy, reopen, archive, restore,
+  and lifecycle feedback.
+- Added existing same-project file selection for evidence link and explicit
+  reason forms for evidence unlink. Server actions continue to enforce
+  project/phase/file scope, archive, audit, and permission rules.
+- Added browser-oriented route/UI regression coverage and revalidation for
+  nested project requirement routes after each mutation.
+
+### Verification
+
+- `npm test`: 380 passed, 0 failed, including the workflow route regression.
+- Typecheck, lint, boundary check, legacy-runtime check, production build,
+  and whitespace checks passed.
+- Browser acceptance is handed back to Reviewer for desktop and 375 px:
+  Requirement lifecycle, evidence, permission denial, and signed-out redirects.
 
 ## R8.68 | 2026-09-14 | fix(studioflow): expose requirement template management UI
 
