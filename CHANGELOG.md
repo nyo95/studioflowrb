@@ -5,8 +5,67 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.56**
-- Next local revision: **R8.57**
+- Current revision after this entry is committed: **R8.57**
+- Next local revision: **R8.58**
+
+## R8.57 | 2026-09-14 | feat(boundaries,foundation): F-D utility curation and executable boundaries
+
+### Changed
+
+- Extended `scripts/check-boundaries.mjs` with seven executable rules and a
+  combined `collectAllViolations` entry point, all wired into
+  `npm run check:boundaries`:
+  - app route files under `src/app/(platform)/<app>` are classified as the
+    app's lane, so cross-app internal imports there are rejected;
+  - Core purity: `src/platform/core` may not import the UI Engine or
+    infrastructure;
+  - UI Engine ownership: apps may import only the canonical
+    `@/platform/ui_engine` surface (deep imports rejected) and raw legacy
+    `ui-*` class tokens in app `.tsx` are denied;
+  - permission vocabulary SSOT: `*_PERMISSIONS` maps must be disjoint,
+    appId-prefix-owned, and the composition root must register them via
+    `Object.values(...)` imported from the app public boundary; permission
+    literals at known consumption call sites must exist in the vocabulary
+    (audit actions and `AppError` codes share the id shape but are excluded);
+  - app route ownership: every app registers `rootPath "/<app>"`, owns its
+    client-safe import-free `public/nav.ts` declaring `/<app>`-rooted routes,
+    and has a matching route directory.
+- Duplicate-primitive enforcement: app-owned raw `new Intl.DateTimeFormat(`
+  now fails `check:boundaries` unless the file is in the explicit documented
+  allow list.
+- Consolidated the four behavior-identical date formatters onto the canonical
+  `formatInstant` (style `"datetime"` or `"date"`):
+  `masterdata/brands/brand-directory.tsx`, `masterdata/vendors/vendor-directory.tsx`,
+  `masterdata/deletions/deletion-directory.tsx`, and `bq/library/page.tsx`.
+- Added deterministic `date.test.ts` coverage locking the `"date"`/`"datetime"`
+  styles and Date-object input used by the directory consumers.
+- Created `docs/UTILITY-INVENTORY.md` (REUSE/EXTEND/ADD/APP-OWNED/PURGE ledger,
+  consumer matrix, convergence and deferral ledger, enforcement mapping) and
+  linked it from the `docs/README.md` operational table.
+- Recorded the six StudioFlow/BQ deferral candidates (service date-extraction
+  key, browser-local audit stamps, and custom component formatters) in the
+  inventory and allow-listed them so they remain unchanged; client-side
+  pagination duplicates were examined and recorded as semantically different
+  (merge PURGEd to preserve behavior; canonical `usePagination`/`buildPageMeta`
+  remains the surface).
+
+### Verification
+
+- `scripts/test-boundaries-checker.mjs` extended with regression fixtures for
+  every new rule (14 boundary rejections plus a foundation fixture tree covering
+  import/layer, permission SSOT, route ownership, and duplicate primitives);
+  both fixture scenarios pass.
+- `npm run check:boundaries`, `npm run typecheck`, `npm run lint`,
+  `npm run check:legacy-runtime`, `npm test`, and `npm run build` all pass.
+- `git diff --check` clean; only the pre-existing unrelated `next-env.d.ts`
+  working-tree churn remains uncommitted.
+
+### Limitations
+
+- Browser acceptance of the consolidated Master Data/BQ date cells is the
+  Reviewer's; it was not performed in this Executor session (per AGENTS.md the
+  implementation commit is not blocked by that). F-D roadmap closure and the
+  F-E plan replacement follow Reviewer PASS of this revision.
 
 ## R8.56 | 2026-09-14 | review(foundation): accept F-C browser walkthrough
 

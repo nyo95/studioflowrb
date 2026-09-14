@@ -14,6 +14,7 @@ tests, and migrations prove implemented state.
 | Document | Purpose |
 |---|---|
 | [`alignment.md`](alignment.md) | Owner explanation of how the StudioFlow rebuild preserves legacy outcomes while simplifying the workflow |
+| [`UTILITY-INVENTORY.md`](UTILITY-INVENTORY.md) | Evidence-backed disposition ledger (REUSE/EXTEND/ADD/APP-OWNED/PURGE) for shared utilities and their duplicates; enforced by `scripts/check-boundaries.mjs` |
 | [`roadmap.md`](roadmap.md) | Remaining planned work, grouped by Platform, UI Engine, Master Data, BQ, and StudioFlow |
 | [`knownbug.md`](knownbug.md) | Open and closed defects grouped by application |
 | [`review.md`](review.md) | Implemented-but-unverified work, grouped by application — distinct from `roadmap.md` (not built) and `knownbug.md` (confirmed defect) |

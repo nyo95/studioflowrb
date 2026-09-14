@@ -108,3 +108,27 @@ describe("instant formatting", () => {
     assert.throws(() => formatInstant("2026-08-23T10:00:00+07:00"));
   });
 });
+
+describe("formatInstant display styles (shared by app directories)", () => {
+  const instant = "2026-08-23T18:30:00Z";
+
+  it("'date' renders dateStyle medium with no time component", () => {
+    assert.equal(formatInstant(instant, { locale: "en-US", timeZone: "UTC", style: "date" }), "Aug 23, 2026");
+  });
+
+  it("'datetime' renders dateStyle medium plus short time", () => {
+    assert.equal(
+      formatInstant(instant, { locale: "en-US", timeZone: "UTC", style: "datetime" }),
+      "Aug 23, 2026, 6:30 PM",
+    );
+  });
+
+  it("keeps timezone conversion identical to the pre-consolidation raw formatter", () => {
+    assert.equal(formatInstant(instant, { locale: "en-US", timeZone: "UTC", style: "datetime" }),
+      new Intl.DateTimeFormat("en-US", { timeZone: "UTC", dateStyle: "medium", timeStyle: "short" }).format(new Date(instant)));
+  });
+
+  it("accepts Date objects the way the directory consumers pass Prisma Date fields", () => {
+    assert.equal(formatInstant(new Date(instant), { locale: "en-US", timeZone: "UTC", style: "date" }), "Aug 23, 2026");
+  });
+});

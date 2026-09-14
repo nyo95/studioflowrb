@@ -1,5 +1,6 @@
 import { prisma } from "@/platform/core/db";
 import { readPlatformGeneralSettings } from "@platform/core/settings";
+import { formatInstant } from "@platform/utilities/date";
 
 import { redirect } from "next/navigation";
 
@@ -118,7 +119,7 @@ export default async function BqLibraryPage() {
                     <TableBody>
                       {items.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell><div className="grid gap-0.5"><span className="font-medium">{item.name}</span><span className="text-xs text-ink-tertiary">Updated {new Intl.DateTimeFormat(settings.locale, { timeZone: settings.timezone, dateStyle: "medium" }).format(new Date(item.updatedAt))}</span></div></TableCell>
+                          <TableCell><div className="grid gap-0.5"><span className="font-medium">{item.name}</span><span className="text-xs text-ink-tertiary">Updated {formatInstant(item.updatedAt, { locale: settings.locale, timeZone: settings.timezone, style: "date" })}</span></div></TableCell>
                           <TableCell>{item.purchaseUnit}</TableCell>
                           <TableCell align="end">
                             {formatMoney(createMoney(item.harga, item.currency), { locale: settings.locale })}

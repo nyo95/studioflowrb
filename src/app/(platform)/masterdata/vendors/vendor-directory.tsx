@@ -2,6 +2,7 @@
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { UpdatedCell } from "../updated-cell";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
+import { formatInstant } from "@platform/utilities/date";
 import {
   Checkbox,
   DirectoryShell,
@@ -837,7 +838,7 @@ export function VendorDirectory({
 
             {editTarget.updated_by_label ? (
               <p className="text-xs text-ink-tertiary px-0.5">
-                Updated by <span className="font-medium text-ink-secondary">{editTarget.updated_by_label}</span> · {new Intl.DateTimeFormat(locale, { timeZone: timezone, dateStyle: "medium", timeStyle: "short" }).format(editTarget.updated_at)}
+                Updated by <span className="font-medium text-ink-secondary">{editTarget.updated_by_label}</span> · {formatInstant(editTarget.updated_at, { locale, timeZone: timezone, style: "datetime" })}
               </p>
             ) : null}
             <FormActions>
