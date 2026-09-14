@@ -5,8 +5,30 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.67**
-- Next local revision: **R8.68**
+- Current revision after this entry is committed: **R8.68**
+- Next local revision: **R8.69**
+
+## R8.68 | 2026-09-14 | fix(studioflow): expose requirement template management UI
+
+### Corrected
+
+- Implemented the canonical `/studioflow/settings/requirements/new` create
+  route and connected General/Phase template creation to the existing guarded
+  service actions.
+- Added edit, archive, restore, and delete controls for templates on the
+  canonical settings surfaces, including the parent-scoped Phase template
+  requirements route. No parallel CRUD route or permission was introduced.
+- Added route/UI regression coverage for canonical paths, lifecycle action
+  wiring, and fixed Phase scope/parent selection.
+
+### Verification
+
+- `npm test`: 378 passed, 0 failed; focused route/UI regression: 2 passed.
+- Typecheck, lint, boundary check, legacy-runtime check, production build,
+  and staged whitespace checks passed.
+- Browser acceptance is intentionally handed back to Reviewer for desktop and
+  375 px coverage, including template lifecycle, requirements/evidence,
+  permissions, and signed-out redirects.
 
 ## R8.67 | 2026-09-14 | fix(platform): restore rebuild login limiter table
 

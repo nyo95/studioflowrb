@@ -51,6 +51,9 @@ export async function createRequirementTemplateAction(
       phase_template_id: parsed.data.phase_template_id || null,
     });
     revalidatePath("/studioflow/settings/requirements");
+    if (parsed.data.phase_template_id) {
+      revalidatePath(`/studioflow/settings/phases/${parsed.data.phase_template_id}/requirements`);
+    }
   });
 }
 
@@ -72,6 +75,7 @@ export async function editRequirementTemplateAction(
       description: parsed.data.description || null,
     });
     revalidatePath("/studioflow/settings/requirements");
+    revalidatePath("/studioflow/settings/phases", "layout");
   });
 }
 
@@ -80,6 +84,7 @@ export async function archiveRequirementTemplateAction(templateId: string): Prom
     const { principal, grants } = await requirePrincipalGrants();
     await studioFlowService.archiveRequirementTemplate(grants, actorFrom(principal), templateId);
     revalidatePath("/studioflow/settings/requirements");
+    revalidatePath("/studioflow/settings/phases", "layout");
   });
 }
 
@@ -88,6 +93,7 @@ export async function restoreRequirementTemplateAction(templateId: string): Prom
     const { principal, grants } = await requirePrincipalGrants();
     await studioFlowService.restoreRequirementTemplate(grants, actorFrom(principal), templateId);
     revalidatePath("/studioflow/settings/requirements");
+    revalidatePath("/studioflow/settings/phases", "layout");
   });
 }
 
@@ -96,5 +102,6 @@ export async function deleteRequirementTemplateAction(templateId: string): Promi
     const { principal, grants } = await requirePrincipalGrants();
     await studioFlowService.deleteRequirementTemplate(grants, actorFrom(principal), templateId);
     revalidatePath("/studioflow/settings/requirements");
+    revalidatePath("/studioflow/settings/phases", "layout");
   });
 }

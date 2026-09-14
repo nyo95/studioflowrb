@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Settings } from "lucide-react";
+import { ArrowLeft, Plus, Settings } from "lucide-react";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
 import { Badge, EmptyState, PageHeader, SectionCard } from "@/platform/ui_engine";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
 import { studioFlowService } from "@/apps/studioflow/runtime";
+import { RequirementTemplateActions } from "../../../requirements/template-actions";
+import { EditRequirementTemplateForm } from "../../../requirements/template-form";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,7 @@ export default async function PhaseTemplateRequirementsPage({
   if (!principalGrants) redirect("/login");
   const { grants } = principalGrants;
   const canRead = hasPermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+  const canManage = hasPermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
 
   if (!canRead) {
     return (
@@ -43,9 +46,12 @@ export default async function PhaseTemplateRequirementsPage({
         description={`Requirements seeded when the ${result.phaseTemplate.name} phase is added to a project.`}
         divider
         actions={
-          <Link href="/studioflow/settings/requirements" className="inline-flex items-center gap-1.5 text-sm text-ink-secondary hover:text-ink">
-            <ArrowLeft className="size-4" /> All requirement templates
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link href="/studioflow/settings/requirements" className="inline-flex items-center gap-1.5 text-sm text-ink-secondary hover:text-ink">
+              <ArrowLeft className="size-4" /> All requirement templates
+            </Link>
+            {canManage ? <Link href={`/studioflow/settings/requirements/new?phase_template_id=${result.phaseTemplate.id}`} className="inline-flex items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-on-ink hover:bg-ink/90"><Plus className="size-4" /> New Phase Requirement</Link> : null}
+          </div>
         }
       />
       <div className="px-6 py-4">
@@ -61,8 +67,10 @@ export default async function PhaseTemplateRequirementsPage({
                     <span className="truncate text-sm font-semibold">{template.title}</span>
                     <span className="font-ui-mono text-[0.6875rem] text-ink-tertiary">{template.key}</span>
                   </div>
+                  {canManage && !template.deleted_at ? <EditRequirementTemplateForm template={template} /> : null}
                   {template.deleted_at ? <Badge tone="warning">Archived</Badge> : null}
                   {template.key_immutable ? <Badge>In use</Badge> : null}
+                  {canManage ? <RequirementTemplateActions templateId={template.id} archived={Boolean(template.deleted_at)} canDelete={!template.key_immutable} /> : null}
                 </li>
               ))}
             </ol>

@@ -13,6 +13,8 @@ import {
 } from "@/platform/ui_engine";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
 import { studioFlowService } from "@/apps/studioflow/runtime";
+import { EditRequirementTemplateForm } from "./template-form";
+import { RequirementTemplateActions } from "./template-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -95,8 +97,10 @@ export default async function RequirementTemplatesPage() {
                     <span className="truncate text-sm font-semibold">{template.title}</span>
                     <span className="font-ui-mono text-[0.6875rem] text-ink-tertiary">{template.key}</span>
                   </div>
+                  {canManage && !template.deleted_at ? <EditRequirementTemplateForm template={template} /> : null}
                   {template.deleted_at ? <Badge tone="warning">Archived</Badge> : null}
                   {template.key_immutable ? <Badge>In use</Badge> : null}
+                  {canManage ? <RequirementTemplateActions templateId={template.id} archived={Boolean(template.deleted_at)} canDelete={!template.key_immutable} /> : null}
                 </li>
               ))}
             </ol>
@@ -143,8 +147,10 @@ export default async function RequirementTemplatesPage() {
                         Open phase requirements
                       </Link>
                     ) : null}
+                    {canManage && !template.deleted_at ? <EditRequirementTemplateForm template={template} /> : null}
                     {template.deleted_at ? <Badge tone="warning">Archived</Badge> : null}
                     {template.key_immutable ? <Badge>In use</Badge> : null}
+                    {canManage ? <RequirementTemplateActions templateId={template.id} archived={Boolean(template.deleted_at)} canDelete={!template.key_immutable} /> : null}
                   </li>
                 );
               })}
