@@ -7,22 +7,6 @@ it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
 
 ## Platform Foundation
 
-### KB-030 — Valid local private storage keys fail signed-read verification on Windows
-
-- **Observed (R8.40 executor verification):**
-  `LocalFilesystemStorage.createSignedReadUrl("test/image.png", 60)` rejects a
-  freshly written key with `storage.invalid-key` in the kantor Windows
-  environment. The focused filesystem test reproduces it consistently, so the
-  local private-read path cannot be accepted as working on the target OS.
-- **Expected:** A normal key beneath the configured local storage root remains
-  valid after it is written and receives a signed private-read URL. Traversal
-  and symlink escape attempts must still be rejected.
-- **Mitigation:** Do not rely on managed private MOM image reads in kantor until
-  the filesystem path normalization is corrected and the focused test passes.
-- **Priority:** P1 — private asset availability on the selected deployment
-  target.
-- **Status:** Open; discovered outside the F-B ownership/navigation scope.
-
 ### KB-028 — Symlink escape protection is incomplete and unproven
 
 - **Observed (R8.31 review):** The adapter's symlink test catches assertion
@@ -361,6 +345,15 @@ migration and one slice.
   does not exist.
 
 ## Closed
+
+### KB-030 — Valid local private storage keys fail signed-read verification on Windows
+
+- **Closed in R8.45:** `resolveSafePath` now derives canonical paths from the
+  deepest existing realpath ancestor for both the configured root and target.
+  This compares Windows short/long path representations consistently while
+  retaining lexical traversal rejection and canonical symlink/junction escape
+  rejection. The focused kantor test and the full disposable-database suite
+  pass.
 
 ### KB-029 — F-B app registry duplicate cross-app permission
 

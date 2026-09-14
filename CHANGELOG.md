@@ -5,8 +5,31 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.44**
-- Next local revision: **R8.45**
+- Current revision after this entry is committed: **R8.45**
+- Next local revision: **R8.46**
+
+## R8.45 | 2026-09-14 | fix(storage): canonicalize local path containment
+
+- Fixed Windows private local-storage reads rejecting a valid, freshly written
+  key when the lexical storage root and `realpath` use different short/long
+  representations.
+- `resolveSafePath` now canonicalizes both root and target from their deepest
+  existing realpath ancestor before testing containment. Lexical traversal is
+  still rejected first, and canonical paths that escape through a symlink or
+  junction still fail closed. The same resolver remains used by the public and
+  private asset routes.
+- Closed KB-030. No schema, migration, dependency, permission, signed-URL, or
+  user-facing route behavior changed.
+
+### Verification
+
+- Focused local filesystem tests: 3/3 passed on kantor Windows.
+- `npm run test` against the owner-approved disposable
+  `studioflow_rebuild_test` container: 347/347 passed.
+- `npm run typecheck`, `npm run lint`, `npm run check:boundaries`,
+  `npm run check:legacy-runtime`, and `npm run build`: passed.
+- Browser acceptance: not required by this infrastructure-only plan; no route
+  or user-facing behavior changed.
 
 ## R8.44 | 2026-09-14 | docs(agent): move browser acceptance to reviewer
 
