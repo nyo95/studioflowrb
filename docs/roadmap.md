@@ -1,6 +1,6 @@
 # Product Roadmap by Application
 
-Status: active planning ledger, reconciled through R8.24 on 2026-09-13.
+Status: active planning ledger, reconciled through R8.43 on 2026-09-14.
 
 This file answers **what remains to be built**. It does not activate work by
 itself. Completed items are struck through or removed only after verification
@@ -47,11 +47,12 @@ independently useful outcome, or demonstrated context/tool limit.
   of Core, return MOM policy to StudioFlow, and migrate Platform Brand mark
   bytes to object storage.~~ Accepted in R8.34 with local filesystem storage;
   Supabase remains deferred.
-- [ ] **F-B / PF-2+PF-3 — Application ownership and navigation:** Give each app
-  one canonical permission vocabulary, registration, route helpers, and
-  navigation definition; central composition only imports public metadata.
-  Preserve route behavior and do not perform the StudioFlow route redesign yet.
-  Do not create a plugin or route framework.
+- [x] ~~**F-B / PF-2+PF-3 — Application ownership and navigation:** Give each
+  app one canonical permission vocabulary, registration, route helpers, and
+  navigation definition; central composition only imports public metadata.~~
+  Accepted in R8.43 after registry/boot correction, full disposable-database
+  integration evidence, and authenticated grant-filtered browser smoke for all
+  three app roots. The unrelated Windows storage failure remains KB-030.
 - [ ] **F-C / PF-4+PF-5 — Settings, Appearance, and UI Engine:** Keep Platform
   General Settings narrow; add only typed global appearance settings; clarify
   app-owned settings; and stabilize the shell, layouts, primitives,

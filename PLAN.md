@@ -1,98 +1,78 @@
 # Active Plan
 
-Plan ID: F-B-APP-OWNERSHIP-NAVIGATION-ACCEPTANCE
-Scope: F-B/PF-2+PF-3 acceptance verification in the kantor environment
-Status: BLOCKED
+Plan ID: KB-030-WINDOWS-LOCAL-STORAGE-PATH
+Scope: Windows-safe local filesystem storage path validation
+Status: READY
 Priority: P1
 Owner: Repository owner
+Target revision: R8.44
 Last updated: 2026-09-14
 
 ## Outcome
 
-Accept F-B/PF-2+PF-3 only after the existing implementation is verified with a
-disposable rebuild-only integration database and an authenticated browser
-smoke. Permission ownership, route helpers, navigation definitions, and the
-application boot correction are implemented in R8.36, R8.38, and R8.40.
+Close KB-030. A valid key written beneath local private storage must receive a
+signed read URL on Windows, while traversal, symlink, and junction escapes
+remain rejected on every supported platform.
 
 ## Context and Evidence
 
-- R8.38 created app-owned public route and navigation definitions while
-  preserving existing routes and client/server boundaries.
-- R8.40 removed BQ's duplicate registration of
-  `masterdata.promotion.approve`, added a complete-app registry regression
-  test, and proved dev boot plus unauthenticated redirects for all three app
-  roots.
-- Existing checks passed: focused registry tests, Prisma generation, typecheck,
-  lint, boundary, legacy-runtime, and production build.
-- `docs/review.md` records the remaining evidence gap. KB-030 is a separate
-  Windows private-storage defect and is outside this plan.
+- The full kantor suite against the owner-designated
+  `studioflow_rebuild_test` database passes 346/347 tests.
+- The only failure is
+  `src/platform/infrastructure/storage/filesystem.test.ts`: a freshly written
+  `test/image.png` is rejected by `resolveSafePath` during signed-read URL
+  creation.
+- On Windows, `os.tmpdir()` may expose a short path while `fs.realpath()`
+  returns the long canonical path. Comparing a real child path against the
+  unresolved root representation can therefore reject a valid descendant.
+- KB-028 remains closed only if real symlink/junction escape protection is
+  preserved.
 
 ## Locked Decisions
 
-- No permission, role, route, navigation, schema, dependency, or security
-  behavior may change merely to obtain acceptance evidence.
-- Tests may use only a disposable database explicitly identified as
-  `studioflow-rebuild`; production and legacy databases are forbidden.
-- Browser smoke uses only an owner-supplied test account. Its credentials must
-  not be printed, committed, or substituted with a production account.
+- Local filesystem storage remains the selected self-hosted provider.
+- Use one canonical containment rule for existing and not-yet-existing paths;
+  do not weaken traversal or realpath escape protection.
+- Preserve signed URL format, expiry semantics, object-key ownership, and
+  public/private route behavior.
+- No schema, migration, dependency, permission, or application workflow change.
 
 ## Boundaries and Non-goals
 
-- This is verification, not a new Foundation implementation slice.
-- Do not start D-SF, UI Engine curation, a storage repair, or StudioFlow feature
-  work while F-B remains blocked.
+- Do not redesign the storage provider interface or activate Supabase.
+- Do not alter MOM or Brand mark product policy.
+- Do not special-case the current Windows username, temp directory, or drive.
 
 ## Acceptance Criteria
 
-1. `npm run test` passes with `PLATFORM_TEST_DATABASE_URL` configured for a
-   disposable `studioflow-rebuild` database.
-2. The application starts without registry or initialization errors.
-3. A supplied test account can sign in and sees launcher/sidebar entries only
-   for its granted applications.
-4. For Master Data, BQ, and StudioFlow, browser smoke proves one authorized
-   route succeeds and one unauthorized route is denied or redirected according
-   to the existing behavior.
-5. The browser workflow records the route, grants used, expected result, and
-   observed result without exposing credentials.
-6. Reviewer independently verifies the evidence and records PASS before F-B is
-   removed from `docs/review.md`.
+1. The focused filesystem tests pass on kantor Windows, including valid signed
+   reads, removal, traversal rejection, and symlink/junction escape rejection
+   when the OS permits creating the link.
+2. Root containment compares canonical representations consistently and still
+   handles a target whose final segments do not yet exist.
+3. Public and private asset routes continue using the same safe resolver.
+4. Full tests have no KB-030 failure; typecheck, lint, boundary,
+   legacy-runtime, and production build pass.
 
 ## Verification
 
-### Required preflight — currently blocked
+Run the focused filesystem test first, then the full repository suite against
+the owner-designated disposable kantor test database, followed by typecheck,
+lint, boundary, legacy-runtime, and production build. Browser smoke is not
+required unless implementation evidence shows route behavior changed; this is
+an infrastructure path-normalization correction.
 
-1. Set `STUDIOFLOW_LOCATION=kantor`.
-2. Supply `PLATFORM_TEST_DATABASE_URL` for a disposable database whose explicit
-   target is only `studioflow-rebuild`.
-3. Supply an approved non-production browser test account and its allowed
-   grants through local-only configuration.
-4. Confirm the configured browser/test runner can access the local app.
+## Risks and Recovery
 
-### Recipe after preflight passes
-
-1. Run `npm run test`.
-2. Start the production-equivalent application and confirm it has no
-   instrumentation or initialization error.
-3. Sign in with the configured test account; verify launcher and sidebar
-   visibility against its grants.
-4. Exercise and record one authorized and one unauthorized route for each of
-   `/masterdata`, `/bq`, and `/studioflow`.
-5. Add the evidence to `docs/review.md` and submit it for independent reviewer
-   acceptance.
-
-## Risks and recovery
-
-The main risk is treating unavailable environment prerequisites as a product
-failure, or using a non-disposable database to overcome them. Stop rather than
-substituting credentials, changing permissions, or using an ambiguous database.
+The main risk is fixing short/long Windows path equivalence by weakening the
+escape boundary. Keep fail-closed behavior for real paths outside the canonical
+root and add focused regression evidence before accepting the change.
 
 ## Executor Prompt
 
 You are the Executor. Location: kantor. Read `AGENTS.md`,
-`docs/agent/EXECUTOR.md`, and this `PLAN.md`. First perform the mandatory
-acceptance preflight. If every prerequisite exists, run the entire acceptance
-recipe without changing F-B behavior, record the evidence, and submit it for
-review. If a prerequisite is missing, run every safe available check, update
-`docs/review.md` with the exact blocker, and report `BLOCKED: ACCEPTANCE
-ENVIRONMENT REQUIRED`. Do not use production or legacy databases/accounts, and
-do not start unrelated work.
+`docs/agent/EXECUTOR.md`, and the active `PLAN.md`. Implement the whole KB-030
+Windows local-storage correction within its locked security boundary, run the
+specified focused and full verification using the approved local acceptance
+fixture, update the ledgers, and create local revision R8.44. Finish with only
+a copy-ready Planner/Reviewer prompt containing the commit and exact evidence.

@@ -44,3 +44,10 @@ Report the outcome, revision/commit, material files or areas changed, checks
 passed/failed/skipped, browser evidence when applicable, limitations, and
 unrelated dirty files. Add `docs/review.md` only when review is actually being
 deferred; otherwise the Planner/Reviewer can inspect the commit directly.
+
+For a separate-session handoff, the final response contains only one
+copy-ready `Planner/Reviewer Prompt`. It names the active plan, revision and
+commit, material outcome, exact verification results and limitations, dirty
+files, and asks for an independent PASS/CORRECTION REQUIRED/BLOCKED verdict and
+the next READY plan. It points to repository evidence instead of duplicating
+the plan and never includes credentials.

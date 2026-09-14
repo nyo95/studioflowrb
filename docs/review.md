@@ -1,6 +1,6 @@
 # Ready for Review
 
-Status: active verification ledger, reconciled through R7.56 on 2026-09-10.
+Status: active verification ledger, reconciled through R8.43 on 2026-09-14.
 New file, split out of `roadmap.md`/`knownbug.md` on 2026-09-10 at owner
 request, so status is visible at a glance:
 
@@ -18,50 +18,6 @@ delete the entry and note the evidence in `CHANGELOG.md`; or verification finds
 a real defect — move it to `knownbug.md` with what was actually observed.
 
 ## Platform Foundation
-
-### F-B / PF-2+PF-3 — Application ownership and navigation
-
-- **Observed (R8.36):** Permission vocabularies were moved behind the public
-  boundaries of Master Data, BQ, and StudioFlow, and central registration no
-  longer duplicates permission literals.
-- **Missing:** The READY plan also requires app-owned route helpers and
-  navigation definitions, plus regression evidence that launcher/sidebar
-  visibility and route behavior remain unchanged. R8.36 does not implement or
-  verify those parts.
-- **Status:** Correction required. Continue the same coherent F-B outcome;
-  do not mark it accepted until route/navigation ownership and browser evidence
-  are complete.
-- **R8.40 correction:** BQ no longer registers Master Data's
-  `masterdata.promotion.approve`; its retained promotion approval checks import
-  the public Master Data permission contract instead. A registration test now
-  composes the full app set and asserts that this permission has one owner.
-  `npm run dev` boots successfully and unauthenticated Master Data, BQ, and
-  StudioFlow route checks all redirect to `/login`.
-- **Remaining review:** Typecheck, lint, boundary, legacy-runtime, production
-  build, and focused registry tests pass. Full integration coverage is blocked
-  because kantor has no disposable test-database configuration, and authorized
-  browser navigation/launcher checks still need a supplied test account. The
-  unrelated local-filesystem signed-read failure is tracked as KB-030.
-- **Status:** BLOCKED: ACCEPTANCE ENVIRONMENT REQUIRED. F-B remains
-  unaccepted until a disposable rebuild-only test database and an approved
-  non-production browser test account are supplied; then run the active
-  `PLAN.md` acceptance recipe.
-- **R8.42 kantor preflight:** `STUDIOFLOW_LOCATION=kantor` is set, but local
-  configuration contains neither `PLATFORM_TEST_DATABASE_URL` nor a browser
-  test-account/grant fixture. The required environment is therefore not proven
-  safe to run integration tests against and cannot sign in for authenticated
-  launcher/sidebar or route checks.
-- **Checks completed:** focused app-registration/registry tests (9/9),
-  typecheck, lint, architecture boundary, legacy-runtime, and production build
-  all passed. `next start` booted with no instrumentation/registry failure;
-  `/`, `/masterdata`, `/bq`, and `/studioflow` each redirected unauthenticated
-  requests to `/login`.
-- **Checks not run:** `npm run test`; authenticated launcher/sidebar visibility;
-  and the authorized/unauthorized route matrix for Master Data, BQ, and
-  StudioFlow.
-- **Required to continue:** one complete kantor acceptance fixture: a
-  disposable `studioflow-rebuild` `PLATFORM_TEST_DATABASE_URL` plus a
-  local-only non-production browser account with its grant fixture.
 
 ### PF-1 — Core purity and managed Brand mark storage
 

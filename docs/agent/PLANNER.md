@@ -46,6 +46,10 @@ agent to read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and the active `PLAN.md`,
 and asks it to implement the whole plan, verify it, update the changelog, and
 commit locally. Do not repeat the full plan inside the prompt.
 
+When handing off, the final response contains only that copy-ready Executor
+prompt. Keep explanations and decisions in `PLAN.md`, where both sessions can
+verify them; never put credentials in the prompt.
+
 If a material product, ownership, schema-meaning, permission, security, or
 architecture decision is unresolved, keep the plan DRAFT or BLOCKED. Do not
 fragment otherwise coherent work merely to reduce prompt size.

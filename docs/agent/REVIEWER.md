@@ -40,3 +40,8 @@ the next coherent plan and its copy-ready prompt when the next priority is
 known. If review can be completed immediately, no temporary `review.md` entry
 is required. If evidence is unavailable, keep the item in `review.md` and name
 the exact missing verification rather than claiming PASS.
+
+After recording the verdict and next plan, a separate-session final response
+contains only the copy-ready Executor prompt for the consolidated correction or
+next slice. When genuinely BLOCKED, return one copy-ready owner-decision prompt
+instead. Do not make the owner reconstruct a handoff from narrative status.

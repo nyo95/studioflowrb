@@ -5,8 +5,40 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.42**
-- Next local revision: **R8.43**
+- Current revision after this entry is committed: **R8.43**
+- Next local revision: **R8.44**
+
+## R8.43 | 2026-09-14 | docs(agent): streamline prompt handoff and accept F-B
+
+- Simplified the acceptance rule: the Executor owns safe environment discovery
+  and fixture preparation, while the Planner defines outcome-specific evidence
+  and the Reviewer decides PASS. Owner-designated disposable local resources
+  and explicit current-session inputs are valid without duplicating secrets in
+  committed configuration.
+- Added the serial copy-ready prompt loop: Planner/Reviewer hands a READY plan
+  to Executor; Executor returns a commit/evidence prompt to Planner/Reviewer;
+  Reviewer returns one correction or next-slice Executor prompt. Role documents
+  now enforce that output shape without duplicating the full plan.
+- Accepted F-B/PF-2+PF-3. The owner-designated kantor container already held
+  `studioflow_rebuild_test`; migrations applied and the full suite ran against
+  it. Authenticated browser evidence verified grant-filtered launcher/sidebar
+  visibility, authorized app roots, and redirects away from ungranted app roots
+  for Master Data, BQ, and StudioFlow.
+- The full suite passed 346/347. Its sole failure is the pre-existing,
+  reproducible KB-030 Windows local-storage path defect; it does not overlap
+  permission registration, app navigation, or route authorization, so it does
+  not conceal an F-B regression. The next READY plan corrects KB-030.
+- Added the approved kantor acceptance resource and account references only to
+  ignored local configuration; no credential or connection secret is committed.
+- No schema, migration, dependency, or application behavior changed.
+
+### Verification
+
+- Disposable database migration deploy: passed.
+- Full test suite: 346/347 passed; only tracked KB-030 failed.
+- Production boot and authenticated browser smoke: passed for Master Data, BQ,
+  and StudioFlow full-access and per-app grant-filtered states.
+- Repository diff and whitespace checks: passed.
 
 ## R8.42 | 2026-09-14 | docs(review): record F-B kantor acceptance preflight blocker
 

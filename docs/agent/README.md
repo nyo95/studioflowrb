@@ -18,10 +18,11 @@ when they govern the selected outcome or resolve a real conflict.
 ## Normal loop
 
 ```text
-Owner intent/docs -> Planner/Reviewer -> PLAN.md + copy-ready prompt
-                  -> Executor -> implementation + checks + CHANGELOG + commit
-                  -> Planner/Reviewer -> PASS or consolidated correction
-                                      -> next PLAN.md + prompt
+Owner intent/docs -> Planner/Reviewer -> PLAN.md -> Executor prompt
+                  -> Executor -> implementation + checks + commit
+                              -> Planner/Reviewer prompt
+                  -> Planner/Reviewer -> PASS/correction + next PLAN.md
+                                      -> Executor prompt
 ```
 
 `PLAN.md` is the one temporary active contract, not history or a second
@@ -35,6 +36,12 @@ only when verification must actually be deferred. Add a `knownbug.md` entry
 only for a reproduced defect intentionally left open, not for a finding that is
 being returned immediately for correction. Update `roadmap.md` only when the
 real backlog or completion state changes.
+
+The prompt loop is the session interface. Each sending role includes enough
+revision and evidence context for the receiving role to start, but points to
+the repository contracts instead of pasting them. Credentials remain in the
+selected ignored local configuration or current owner session and never travel
+inside a handoff prompt.
 
 ## Scope reading matrix
 

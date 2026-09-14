@@ -99,40 +99,30 @@ When an audit proves a defect not fixed in its scoped change, record it in `docs
 
 A request to change, build, commit, or finish authorizes local commits only. It never authorizes push, remote tag, pull request, merge, deployment, publication, or release. Those require separate explicit owner instruction.
 
-## Mandatory acceptance execution
+## Acceptance and session handoff
 
-For every READY plan, the Executor must run every acceptance check available in
-the assigned location before reporting completion or making its local revision
-commit. A passing typecheck, test suite, or build alone does not substitute for
-an acceptance check named by the plan.
+The Planner names outcome-specific acceptance evidence in `PLAN.md`; the
+Executor runs it before claiming the slice complete, and the Reviewer decides
+PASS. Browser evidence is required only for affected user-facing behavior.
+Checks should be proportionate: a known, recorded failure outside the slice is
+reported but does not automatically reject an otherwise isolated outcome; the
+Reviewer must explain why it cannot hide an in-scope regression.
 
-The Planner/Reviewer must put an exact acceptance recipe in each READY
-`PLAN.md`: commands, browser routes or workflows, expected results, test
-fixtures, and any environment prerequisites. A vague requirement such as
-"smoke test" is not an executable acceptance recipe.
+Environment discovery is Executor work, not an automatic owner blocker. A safe
+resource may come from the selected local env file, an owner-designated local
+test container/service, or explicit current-session input. The Executor may
+derive ephemeral connection settings and prepare fixtures inside an explicitly
+disposable rebuild-only target. Never print or commit secrets. Stop only when
+the target remains ambiguous or a truly external prerequisite is absent after
+safe discovery.
 
-Before implementation, the Executor performs an acceptance preflight:
-
-- confirm `STUDIOFLOW_LOCATION` matches the assigned location;
-- confirm any disposable test-database configuration is present and explicitly
-  belongs only to `studioflow-rebuild` before a database test runs;
-- confirm the test account and browser/test runner required by the plan are
-  available, without printing credentials or other secrets; and
-- confirm the plan's required commands and routes can be exercised safely.
-
-If the preflight passes, the Executor must run the complete recipe. This
-includes authenticated browser smoke whenever the plan changes or verifies
-user-facing flow, navigation, authorization, accessibility, or visual
-interaction. The completion handoff records each check, its observed result,
-and the evidence location.
-
-If a required prerequisite is absent, the Executor still runs every safe,
-available check and records the exact missing prerequisite, completed checks,
-unrun steps, and one bounded requirement in `docs/review.md`. The handoff must
-state `BLOCKED: ACCEPTANCE ENVIRONMENT REQUIRED`; the work cannot be reported
-as accepted or PASS. The Executor must never use production credentials, create
-an unapproved account, or run a database command against an ambiguous or
-non-rebuild target.
+Separate sessions use a copy-ready prompt loop. Planner/Reviewer ends a READY
+planning turn with only the Executor prompt. Executor ends with only a
+Planner/Reviewer prompt containing the outcome, commit, checks, limitations,
+dirty files, and a request for verdict/next plan. Reviewer returns one
+copy-ready Executor correction/next-slice prompt after PASS or CORRECTION
+REQUIRED; a BLOCKED verdict instead returns one bounded owner-decision prompt.
+Prompts never contain credentials or repeat the full plan.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
