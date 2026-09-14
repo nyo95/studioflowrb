@@ -5,8 +5,34 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.70**
-- Next local revision: **R8.71**
+- Current revision after this entry is committed: **R8.71**
+- Next local revision: **R8.72**
+
+## R8.71 | 2026-09-14 | fix(dev): generate Prisma client before Next startup
+
+### Corrected
+
+- Changed the normal `npm run dev` startup path to run `prisma generate`
+  before Next loads server routes. The ignored generated client therefore
+  remains aligned with the committed Prisma schema during local development.
+- Added a regression test that locks this startup order. No schema, migration,
+  database data, Requirement workflow, authorization, audit behavior, or
+  canonical Requirement route changed.
+
+### Verification
+
+- From an absent generated-client directory, `npm run dev` regenerated the
+  client and confirmed `SfProjectRequirement` is exported before Next startup.
+  A pre-existing local dev server owned port 3001, so the new process stopped
+  only at bind time after generation; it was not interrupted.
+- Focused development-runtime test, typecheck, lint, boundary check,
+  legacy-runtime check, and production build: passed.
+- `npm test` reached 343 passing tests but 38 database-backed failures because
+  the disposable `studioflow_rebuild_test` schema lacks committed Requirements
+  and settings objects. Prisma migration deployment against that verified
+  disposable target failed in the schema engine before SQL execution; no
+  database or production data was changed. Browser acceptance remains
+  Reviewer-owned.
 
 ## R8.70 | 2026-09-14 | docs(review): record Requirements Prisma dev-runtime correction
 
