@@ -1,94 +1,98 @@
 # Active Plan
 
-Plan ID: F-B-APP-OWNERSHIP-NAVIGATION-R8-CORRECTION
-Scope: Application permission ownership, registration metadata, route helpers, and navigation definitions
-Status: CORRECTION REQUIRED
+Plan ID: F-B-APP-OWNERSHIP-NAVIGATION-ACCEPTANCE
+Scope: F-B/PF-2+PF-3 acceptance verification in the kantor environment
+Status: BLOCKED
 Priority: P1
 Owner: Repository owner
-Target revision: R8.40
 Last updated: 2026-09-14
 
 ## Outcome
 
-Complete F-B / PF-2 + PF-3. Each app owns its permission vocabulary and public
-registration metadata; the central composition root only combines public app
-metadata and must not define app permission policy. Route helpers and
-navigation definitions must have one clear owner per app, while existing route
-URLs and behavior remain unchanged.
+Accept F-B/PF-2+PF-3 only after the existing implementation is verified with a
+disposable rebuild-only integration database and an authenticated browser
+smoke. Permission ownership, route helpers, navigation definitions, and the
+application boot correction are implemented in R8.36, R8.38, and R8.40.
 
-R8.36 completed only the permission-vocabulary and metadata portion. Route
-helpers, navigation ownership, and their browser/regression evidence remain
-open and are required for acceptance.
+## Context and Evidence
 
-R8.38 also exposed KB-029: BQ registers a permission owned by Master Data,
-causing the registry to reject the app set at dev boot. Correct ownership and
-add a boot regression test before accepting F-B.
+- R8.38 created app-owned public route and navigation definitions while
+  preserving existing routes and client/server boundaries.
+- R8.40 removed BQ's duplicate registration of
+  `masterdata.promotion.approve`, added a complete-app registry regression
+  test, and proved dev boot plus unauthenticated redirects for all three app
+  roots.
+- Existing checks passed: focused registry tests, Prisma generation, typecheck,
+  lint, boundary, legacy-runtime, and production build.
+- `docs/review.md` records the remaining evidence gap. KB-030 is a separate
+  Windows private-storage defect and is outside this plan.
 
-## Context
+## Locked Decisions
 
-- PF-1 local storage was accepted in R8.34.
-- `src/app/app-registrations.ts` currently contains the permission arrays for
-  Master Data, BQ, and StudioFlow, so permission ownership is still centralized.
-- The roadmap sequences F-B before StudioFlow recovery discovery and before UI
-  Engine/utility curation.
-- This is Foundation work only; it does not redesign StudioFlow routes, add
-  features, create a plugin framework, or change persisted RBAC behavior.
+- No permission, role, route, navigation, schema, dependency, or security
+  behavior may change merely to obtain acceptance evidence.
+- Tests may use only a disposable database explicitly identified as
+  `studioflow-rebuild`; production and legacy databases are forbidden.
+- Browser smoke uses only an owner-supplied test account. Its credentials must
+  not be printed, committed, or substituted with a production account.
 
-## Locked decisions
+## Boundaries and Non-goals
 
-- **Ownership:** Master Data, BQ, and StudioFlow each own and export their
-  canonical permission vocabulary. Core owns only domain-neutral registration,
-  authorization interfaces, and evaluation helpers.
-- **Composition:** The central registration file imports public app metadata,
-  route roots, and permission lists; it does not duplicate, edit, or invent
-  app permissions.
-- **Routes:** Preserve every existing URL and access result. Add or reuse
-  app-owned route helpers only where current code has duplicated route strings.
-  No route redesign or redirect policy change is allowed.
-- **Navigation:** Each app owns its navigation definition. The shell consumes
-  public metadata and filters by existing grants; it must not contain hidden
-  app-specific navigation policy.
-- **Security:** Existing permission names, grant checks, and unauthorized
-  behavior remain intact. Rename or semantic change requires owner approval.
-- **Boundaries:** `app -> platform` remains allowed; platform must not import
-  app internals; cross-app internal imports remain forbidden.
-- **Scope:** No database migration, role redesign, new dependency, plugin
-  framework, or StudioFlow feature implementation.
+- This is verification, not a new Foundation implementation slice.
+- Do not start D-SF, UI Engine curation, a storage repair, or StudioFlow feature
+  work while F-B remains blocked.
 
-## Acceptance criteria
+## Acceptance Criteria
 
-1. Master Data, BQ, and StudioFlow each have one canonical public permission
-   vocabulary consumed by their own policy and by central registration.
-2. `src/app/app-registrations.ts` contains composition metadata only; no
-   duplicated app-owned permission literals remain there.
-3. Each app has one public route/navigation definition where needed, with no
-   duplicate conflicting route ownership.
-4. Existing launcher, sidebar, login redirect, route access, and unauthorized
-   behavior remain unchanged for all three apps.
-5. Tests prove registration completeness, permission consistency, navigation
-   visibility by grant, route helper output, and boundary rules.
-6. No new cross-app internal import, Core-to-app dependency, database change,
-   or permission semantic change is introduced.
-7. Typecheck, lint, full tests, boundary check, legacy-runtime check, and
-   production build pass. Browser smoke covers launcher/navigation and one
-   authorized plus unauthorized route per app.
-8. Executor updates `CHANGELOG.md`, stages only owned files, verifies the
-   staged diff/whitespace, and creates local revision R8.40.
+1. `npm run test` passes with `PLATFORM_TEST_DATABASE_URL` configured for a
+   disposable `studioflow-rebuild` database.
+2. The application starts without registry or initialization errors.
+3. A supplied test account can sign in and sees launcher/sidebar entries only
+   for its granted applications.
+4. For Master Data, BQ, and StudioFlow, browser smoke proves one authorized
+   route succeeds and one unauthorized route is denied or redirected according
+   to the existing behavior.
+5. The browser workflow records the route, grants used, expected result, and
+   observed result without exposing credentials.
+6. Reviewer independently verifies the evidence and records PASS before F-B is
+   removed from `docs/review.md`.
+
+## Verification
+
+### Required preflight — currently blocked
+
+1. Set `STUDIOFLOW_LOCATION=kantor`.
+2. Supply `PLATFORM_TEST_DATABASE_URL` for a disposable database whose explicit
+   target is only `studioflow-rebuild`.
+3. Supply an approved non-production browser test account and its allowed
+   grants through local-only configuration.
+4. Confirm the configured browser/test runner can access the local app.
+
+### Recipe after preflight passes
+
+1. Run `npm run test`.
+2. Start the production-equivalent application and confirm it has no
+   instrumentation or initialization error.
+3. Sign in with the configured test account; verify launcher and sidebar
+   visibility against its grants.
+4. Exercise and record one authorized and one unauthorized route for each of
+   `/masterdata`, `/bq`, and `/studioflow`.
+5. Add the evidence to `docs/review.md` and submit it for independent reviewer
+   acceptance.
 
 ## Risks and recovery
 
-The main risk is silently changing permission meaning or navigation visibility.
-If an app's current vocabulary or route ownership is ambiguous, stop and
-report the exact conflict instead of inventing a name or changing behavior.
-Revert only the local correction commit; do not touch unrelated owner files.
+The main risk is treating unavailable environment prerequisites as a product
+failure, or using a non-disposable database to overcome them. Stop rather than
+substituting credentials, changing permissions, or using an ambiguous database.
 
 ## Executor Prompt
 
-You are the Executor. Location: rumah. Read `AGENTS.md`,
-`docs/agent/EXECUTOR.md`, and this `PLAN.md`. Implement the complete F-B / PF-2
-+ PF-3 outcome within the locked ownership, route, security, and boundary
-decisions. Complete the remaining route-helper and navigation ownership work,
-preserve current URLs and behavior, run all required checks and browser smoke,
-update the changelog, and create local revision R8.40. Stop for
-any material ambiguity about permission meaning, route ownership, or security;
-do not redesign StudioFlow or add a plugin framework.
+You are the Executor. Location: kantor. Read `AGENTS.md`,
+`docs/agent/EXECUTOR.md`, and this `PLAN.md`. First perform the mandatory
+acceptance preflight. If every prerequisite exists, run the entire acceptance
+recipe without changing F-B behavior, record the evidence, and submit it for
+review. If a prerequisite is missing, run every safe available check, update
+`docs/review.md` with the exact blocker, and report `BLOCKED: ACCEPTANCE
+ENVIRONMENT REQUIRED`. Do not use production or legacy databases/accounts, and
+do not start unrelated work.

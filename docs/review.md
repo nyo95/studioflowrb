@@ -42,8 +42,10 @@ a real defect — move it to `knownbug.md` with what was actually observed.
   because kantor has no disposable test-database configuration, and authorized
   browser navigation/launcher checks still need a supplied test account. The
   unrelated local-filesystem signed-read failure is tracked as KB-030.
-- **Status:** Ready for reviewer acceptance; F-B remains unaccepted until the
-  required authenticated browser and disposable-database evidence exists.
+- **Status:** BLOCKED: ACCEPTANCE ENVIRONMENT REQUIRED. F-B remains
+  unaccepted until a disposable rebuild-only test database and an approved
+  non-production browser test account are supplied; then run the active
+  `PLAN.md` acceptance recipe.
 
 ### PF-1 — Core purity and managed Brand mark storage
 

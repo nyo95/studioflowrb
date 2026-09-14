@@ -99,6 +99,41 @@ When an audit proves a defect not fixed in its scoped change, record it in `docs
 
 A request to change, build, commit, or finish authorizes local commits only. It never authorizes push, remote tag, pull request, merge, deployment, publication, or release. Those require separate explicit owner instruction.
 
+## Mandatory acceptance execution
+
+For every READY plan, the Executor must run every acceptance check available in
+the assigned location before reporting completion or making its local revision
+commit. A passing typecheck, test suite, or build alone does not substitute for
+an acceptance check named by the plan.
+
+The Planner/Reviewer must put an exact acceptance recipe in each READY
+`PLAN.md`: commands, browser routes or workflows, expected results, test
+fixtures, and any environment prerequisites. A vague requirement such as
+"smoke test" is not an executable acceptance recipe.
+
+Before implementation, the Executor performs an acceptance preflight:
+
+- confirm `STUDIOFLOW_LOCATION` matches the assigned location;
+- confirm any disposable test-database configuration is present and explicitly
+  belongs only to `studioflow-rebuild` before a database test runs;
+- confirm the test account and browser/test runner required by the plan are
+  available, without printing credentials or other secrets; and
+- confirm the plan's required commands and routes can be exercised safely.
+
+If the preflight passes, the Executor must run the complete recipe. This
+includes authenticated browser smoke whenever the plan changes or verifies
+user-facing flow, navigation, authorization, accessibility, or visual
+interaction. The completion handoff records each check, its observed result,
+and the evidence location.
+
+If a required prerequisite is absent, the Executor still runs every safe,
+available check and records the exact missing prerequisite, completed checks,
+unrun steps, and one bounded requirement in `docs/review.md`. The handoff must
+state `BLOCKED: ACCEPTANCE ENVIRONMENT REQUIRED`; the work cannot be reported
+as accepted or PASS. The Executor must never use production credentials, create
+an unapproved account, or run a database command against an ambiguous or
+non-rebuild target.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

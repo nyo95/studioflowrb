@@ -5,8 +5,31 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.39**
-- Next local revision: **R8.40**
+- Current revision after this entry is committed: **R8.41**
+- Next local revision: **R8.42**
+
+## R8.41 | 2026-09-14 | docs(agent): require executor acceptance preflight
+
+- Added a mandatory acceptance-execution protocol to `AGENTS.md`. Every READY
+  plan now needs an executable recipe, and Executors must preflight and run all
+  available acceptance checks before their local completion commit.
+- Specified the safe failure path for missing test databases, test accounts, or
+  browser runners: record the exact prerequisite and evidence, report
+  `BLOCKED: ACCEPTANCE ENVIRONMENT REQUIRED`, and never claim acceptance.
+- Replaced the stale F-B correction plan state with the valid `BLOCKED` state
+  and an explicit kantor acceptance recipe. F-B now names its two external
+  prerequisites: a disposable rebuild-only test database and a non-production
+  browser test account.
+- Aligned the deferred-review receipt with the same acceptance-environment
+  blocker so it cannot be mistaken for reviewer-ready evidence.
+- No application behavior, schema, migration, dependency, environment file, or
+  external service changed.
+
+### Verification
+
+- Documentation review against `AGENTS.md`, `docs/agent/PLAN-TEMPLATE.md`, and
+  the R8.40 deferred-review evidence: passed.
+- Staged diff and whitespace checks: passed.
 
 ## R8.40 | 2026-09-14 | fix(foundation): restore unique app permission registration
 
