@@ -5,8 +5,35 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.57**
-- Next local revision: **R8.58**
+- Current revision after this entry is committed: **R8.58**
+- Next local revision: **R8.59**
+
+## R8.58 | 2026-09-14 | review(foundation): defer F-D browser acceptance
+
+### Changed
+
+- Independently reviewed R8.57 F-D/PF-6+PF-7: the executable boundary rules,
+  focused negative fixtures, canonical date formatter use, utility inventory,
+  and allowed deferrals match the locked Foundation scope. No correction was
+  found.
+- Recorded the remaining browser scenarios in `docs/review.md`, kept F-D open
+  in `docs/roadmap.md`, and changed `PLAN.md` to BLOCKED. F-E cannot be planned
+  before this user-facing acceptance evidence exists.
+
+### Verification
+
+- Re-ran `npm run test:boundaries`, `npm run check:boundaries`,
+  `npm run typecheck`, `npm run lint`, `npm run check:legacy-runtime`, and the
+  complete `npm test` suite: 353/353 passed against the approved disposable
+  kantor test database.
+- Inspected the R8.57 diff and formatter option equivalence; working tree and
+  whitespace check were clean before this documentation-only review revision.
+
+### Limitations
+
+- Browser acceptance is required because four user-facing date cells changed.
+  Browser automation is unavailable in this Reviewer session, so F-D is
+  BLOCKED rather than PASS; this is not a defect finding.
 
 ## R8.57 | 2026-09-14 | feat(boundaries,foundation): F-D utility curation and executable boundaries
 

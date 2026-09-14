@@ -68,6 +68,8 @@ independently useful outcome, or demonstrated context/tool limit.
   public cross-app reads, permission SSOT, app route ownership, UI Engine
   ownership, and prohibited duplicate primitives. Record stable Master Data/BQ
   convergence opportunities rather than changing their behavior silently.
+  Implemented in R8.57; browser acceptance of the changed Master Data/BQ date
+  cells remains pending in [`review.md`](review.md).
 - [ ] **F-E / PF-8 — Foundation acceptance and freeze:** Run the complete
   repository gates plus Master Data/BQ browser smoke, resolve findings as one
   correction pass, document the accepted Foundation baseline, and only then

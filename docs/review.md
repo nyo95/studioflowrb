@@ -99,7 +99,26 @@ a real defect — move it to `knownbug.md` with what was actually observed.
 
 ## UI Engine and Shared Utilities
 
-No item currently ready for review.
+### F-D / PF-6+PF-7 — Utility curation and executable boundaries (R8.57)
+
+- **Observed:** R8.57 (`e1580f9`) made the Foundation utility and ownership
+  rules executable, recorded the REUSE/EXTEND/ADD/APP-OWNED/PURGE inventory,
+  and consolidated four behavior-identical date displays onto the existing
+  canonical `formatInstant` helper. It changes no schema, data, route,
+  permission, dependency, or StudioFlow behavior.
+- **Verified automatically:** Boundary fixtures, boundary check, typecheck,
+  lint, legacy-runtime check, production build, and the complete 353-test
+  disposable-database suite passed. Independent review reproduced the focused
+  fixtures/checks and full suite; the date tests lock medium-date-only and
+  medium-date/short-time behavior with locale/timezone input.
+- **Needs:** Reviewer browser smoke at desktop and 375 px: authorized Master
+  Data Brand and Vendor edit metadata plus pending Deletion Requests must show
+  the expected medium date/short time; authorized BQ Library must show the
+  expected medium date only. Confirm app navigation/permissions remain intact,
+  then sign out and confirm both app roots redirect to `/login`.
+- **Status:** BLOCKED — browser automation is unavailable in this Reviewer
+  session. This is an acceptance-evidence blocker, not a code defect. F-E
+  must not start until the walkthrough passes.
 
 ## Master Data
 
