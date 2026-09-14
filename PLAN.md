@@ -1,116 +1,116 @@
 # Active Plan
 
-Plan ID: F-C-PF-4-PF-5-SETTINGS-APPEARANCE-UI-ENGINE
-Scope: Foundation settings ownership, typed appearance, and UI Engine solidification
-Status: BLOCKED
+Plan ID: F-D-PF-6-PF-7-UTILITY-CURATION-EXECUTABLE-BOUNDARIES
+Scope: Shared utility curation and executable architectural boundaries
+Status: READY
 Priority: P1
 Owner: Repository owner
 Last updated: 2026-09-14
 
-## Implementation gate
-
-Executor committed the complete F-C implementation as **R8.53** (2026-09-14).
-All automated checks passed: typecheck, lint, boundaries, legacy-runtime, 349
-tests, additive migration, and production build. Reviewer browser acceptance is
-the remaining gate before this plan is formally accepted and replaced by the
-F-D plan. The exact scenarios are documented in `docs/review.md` under
-**F-C / PF-4+PF-5**. This plan is BLOCKED until that acceptance is recorded.
-
 ## Outcome
 
-Complete the F-C Foundation outcome: keep Platform General Settings narrowly
-typed, add only approved global appearance behavior, make app-owned settings
-boundaries explicit, and solidify the shared shell, layouts, primitives,
-interactions, and token API against current Master Data, BQ, frozen StudioFlow,
-and ratified D-SF evidence. The result must improve shared foundations without
-activating StudioFlow recovery features.
+Complete the F-D Foundation outcome: establish the small, evidence-backed set
+of domain-neutral shared utilities that genuinely serve multiple consumers,
+then make the repository's ownership rules executable. Core purity, public
+cross-app reads, permission single sources of truth, app route ownership, UI
+Engine ownership, and the prohibition on duplicate primitives must be checked
+reliably without changing Master Data, BQ, or frozen StudioFlow business
+behavior.
 
 ## Context and Evidence
 
-- R8.51 ratified D-SF-01 through D-SF-07. D-SF now informs F-C/F-D; F-E
-  Foundation acceptance still gates all StudioFlow implementation.
-- `CORE.md` §11 keeps Platform General Settings a narrow typed aggregate;
-  `DESIGN.md` and `UI_ENGINE.md` govern shared appearance and reusable UI.
-- The ratified settings boundary is Platform: profile/account, organization and
-  general application settings, appearance/theme, and platform access/settings;
-  StudioFlow: naming, phase/general/phase-requirement templates, project-engine
-  defaults, Schedule configuration, and other workflow defaults. Database
-  administration is not a StudioFlow feature.
-- Current Master Data, BQ, frozen StudioFlow, and D-SF are evidence consumers;
-  their business behavior must not be changed incidentally by Foundation work.
+- F-C is accepted in R8.56. `CORE.md` defines Core as domain-neutral
+  mechanics, forbids direct cross-app data access, and keeps app policy and
+  permission vocabularies app-owned.
+- `UI_ENGINE.md` and `DESIGN.md` require canonical tokens/components rather
+  than app-local substitutes when a generic surface exists.
+- `docs/roadmap.md` defines F-D/PF-6+PF-7 as the next Foundation outcome. The
+  ratified D-SF recovery matrix permits a shared task-feed utility only if this
+  slice proves a real second consumer; otherwise it remains app-owned.
+- `docs/FOUNDATION-BASELINE-FREEZE.md` keeps Master Data and BQ behavior
+  stable and prevents StudioFlow recovery work before F-E.
 
 ## Locked Decisions
 
-- General Settings remains a small typed platform aggregate, never a generic
-  key/value store and never a home for app workflow defaults.
-- Appearance/theme is global and typed; UI Engine consumes canonical tokens and
-  components. App-local visual substitutes are prohibited where a canonical
-  surface exists.
-- App settings remain app-owned. F-C may clarify their boundary and navigation,
-  but may not implement StudioFlow project requirements, templates, Schedule,
-  Product Catalogue cutover, Today, collaboration, SketchUp, or route aliases.
-- Add or extend a shared UI surface only when evidence proves it is generic and
-  has named consumers. Preserve Core purity and current cross-app boundaries.
+- Consolidate a utility only when the repository proves identical,
+  domain-neutral meaning and at least two named consumers. Give each accepted
+  utility one canonical implementation, public export, consumer matrix, and
+  boundary evidence.
+- Preserve app ownership of workflow rules, calculations, settings policy,
+  role/grant vocabulary, route content, persistence policy, and historical
+  data meaning. Do not make an app capability generic by renaming it.
+- Cross-app reads use only the owning app's public contract; no cross-app
+  internal imports, implicit writes, database foreign keys, or direct model
+  access are introduced.
+- The registered permission vocabulary remains the single source of truth;
+  UI visibility is never authorization. UI Engine owns a generic primitive or
+  token only when its named consumers prove it generic.
+- Do not add dependencies, StudioFlow features/routes/schema, destructive
+  migrations, or legacy-runtime/database access.
 
 ## Boundaries and Non-goals
 
-- Do not implement any StudioFlow workflow/domain capability or destructive
-  migration/data disposition.
-- Do not alter Master Data/BQ business semantics, create a parallel shell,
-  duplicate UI primitive, or add an unapproved dependency.
-- Do not turn appearance into per-app branding policy or route/local storage
-  preferences outside the approved platform contract.
+- This is not a refactor-for-uniformity exercise. Record stable Master
+  Data/BQ convergence candidates when their semantics differ or consumer
+  evidence is insufficient; do not silently alter their behavior.
+- Retain the frozen StudioFlow compatibility surface. In particular, do not
+  promote the StudioFlow task feed or a project/catalogue/Schedule mechanism
+  without the proof and later plan required by D-SF.
+- Improve an existing canonical shared API once when that is warranted; do not
+  create private app substitutes or broad generic repositories/frameworks.
 
 ## Acceptance Criteria
 
-- Platform settings, typed appearance, and UI Engine public surfaces have one
-  clear ownership boundary and no app-workflow leakage.
-- Existing three applications consume the stabilized shared shell/tokens and
-  retain their established route, permission, and business behavior.
-- Any necessary settings migration/persistence, validation, permissions, tests,
-  documentation, and consumer follow-through is cohesive and locally committed
-  as R8.53.
+- An evidence-backed utility/duplicate inventory distinguishes REUSE, EXTEND,
+  ADD, APP-OWNED, and PURGE outcomes, names current consumers, and records
+  deferred convergence candidates in the appropriate durable document.
+- Every accepted shared utility has a canonical public surface and its actual
+  consumers use it; no app-local duplicate remains where equivalent generic
+  meaning and consumers are proven.
+- Executable checks cover Core purity, public cross-app boundaries, permission
+  SSOT, route ownership, UI Engine ownership, and prohibited duplicate
+  primitives sufficiently to prevent the demonstrated regressions.
+- Master Data, BQ, and frozen StudioFlow preserve their established route,
+  permission, persistence, and business behavior. No unapproved dependency or
+  data/schema change is introduced.
 
 ## Verification
 
-- Run targeted tests plus typecheck, lint, boundary check, legacy-runtime check,
-  and production build. Use an approved disposable rebuild database for any
-  required migration/integration validation.
-- Inspect changed consumer surfaces and run `git diff --check`. Record skipped
-  checks honestly; no browser acceptance belongs in Executor verification unless
-  needed to diagnose the implementation.
+- Inspect the current implementation, public exports, app consumers, existing
+  boundary checks, and relevant contract evidence before choosing a utility
+  outcome. Test both accepted consolidations and newly enforced violations.
+- Run targeted tests plus `npm run typecheck`, `npm run lint`,
+  `npm run check:boundaries`, `npm run check:legacy-runtime`, the full test
+  suite, production build, and `git diff --check`.
+- Use an approved disposable rebuild-only database only if an affected test or
+  integration check requires one. Never access legacy databases.
 
 ## Reviewer Acceptance
 
-After the Executor commit, Reviewer runs browser acceptance using the approved
-local fixture: authorized settings access, save/reload of typed global
-appearance, narrow/desktop shell behavior, and smoke of Master Data, BQ, and
-StudioFlow entry/navigation without visual or permission regressions.
+If any accepted consolidation changes a user-facing shared UI consumer, run
+desktop and 375 px browser smoke for every affected app entry plus the changed
+surface, checking navigation, permissions, interaction, and visual regression.
+If the committed outcome is purely non-user-facing, record why browser review
+is not applicable and review the public-boundary evidence instead.
 
 ## Risks and Recovery
 
-- Shared changes can silently regress one of three app consumers. Keep consumer
-  coverage and browser review proportionate to each altered public surface.
-- A purported generic UI enhancement may encode an app workflow. Keep such
-  policy app-owned and report a genuine contract conflict instead of guessing.
+- Apparent duplication may encode a different app rule. Preserve it as
+  app-owned and record the candidate rather than merging it.
+- A boundary rule can be too broad and reject valid public composition. Keep a
+  focused regression fixture for every rule and correct the canonical public
+  surface instead of allowing an exception by hidden import.
+- Shared refactors can regress an otherwise unchanged app. Keep consumer
+  coverage proportionate and revert the single F-D revision if a boundary or
+  consumer outcome cannot be preserved.
 
-## Reviewer Acceptance Scenarios (pending)
+## Executor Prompt
 
-Run these against the approved local kantor fixture at the committed R8.53
-revision before recording PASS and replacing this plan with the F-D plan:
-
-1. **Settings access** — open `/settings/general` and the Appearance section
-   under a role that holds settings access; confirm an unauthorized user is
-   refused.
-2. **Appearance save/reload** — submit the form's Save action and reload;
-   confirm the canonical light theme (read-only in the Appearance section)
-   persists and stays visible after reload.
-3. **Narrow/desktop shell** — verify SettingsShell navigation renders correctly
-   at desktop width and at ≤ 375 px narrow.
-4. **Three-app smoke** — open Master Data, BQ, and StudioFlow entry points;
-   confirm no visual, permission, or navigation regression from the
-   SettingsShell and platform shell changes.
-
-On PASS: update `docs/roadmap.md` to mark F-C complete (with R8.53 evidence),
-update `docs/review.md` to close the F-C entry, commit as R8.56, and replace
-this PLAN.md with the F-D plan.
+You are the Executor. Location: kantor. Read `AGENTS.md`,
+`docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY
+F-D/PF-6+PF-7 outcome. Inspect current repository evidence, preserve unrelated
+owner work, make sound in-scope implementation decisions, run the required
+checks, update `CHANGELOG.md`, and create the target local revision commit.
+Stop only for a material locked-decision conflict or unsafe boundary; otherwise
+finish the coherent outcome and report the commit, checks, limitations, and
+remaining unrelated dirty files.

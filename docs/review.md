@@ -51,7 +51,7 @@ a real defect — move it to `knownbug.md` with what was actually observed.
 - **Status:** PASS — PF-1 local storage and public/private asset boundaries
   are accepted. Supabase remains deferred and is not a release dependency.
 
-### F-C / PF-4+PF-5 — Settings, Appearance, and UI Engine
+### F-C / PF-4+PF-5 — Settings, Appearance, and UI Engine (closed R8.56)
 
 - **Observed:** R8.53 implemented the F-C Foundation outcome on 2026-09-14:
   typed global `PlatformTheme` on the `PlatformGeneralSettings` singleton (sole
@@ -65,21 +65,15 @@ a real defect — move it to `knownbug.md` with what was actually observed.
   tests (settings integration suite and SQL CHECK constraint test), additive
   migration deployed to all rebuild-only databases, and production build all
   passed.
-- **Needs:** Reviewer browser walkthrough against the approved local kantor
-  fixture:
-  1. **Settings access** — open General Settings and the Appearance section
-     under an authorized role; confirm an unauthorized user is refused.
-  2. **Appearance save/reload** — save the theme field and reload the page;
-     confirm the persisted canonical value is displayed.
-  3. **Narrow/desktop shell** — verify `SettingsShell` navigation renders and
-     collapses correctly at desktop width and at ≤ 375 px narrow width.
-  4. **Three-app smoke** — open Master Data, BQ, and StudioFlow entry points;
-     confirm no visual, permission, or navigation regression from the platform
-     shell and `SettingsShell` changes.
-- **Status:** Ready for review, not yet verified. Browser acceptance was
-  deferred in R8.54 because `device_bash` was unavailable (Windows update
-  issue). Acceptance scenarios are also documented in `PLAN.md` §Reviewer
-  Acceptance Scenarios.
+- **Reviewer acceptance (R8.56):** Passed in the approved local kantor fixture.
+  The authorized account reached `/settings/general` and its Appearance
+  section; after sign-out, the same protected route redirected to `/login`.
+  Save reported no pending changes and a reload retained the sole canonical,
+  disabled `Light` Theme value. `SettingsShell` rendered correctly at desktop
+  width and 375 px. Master Data, BQ, and StudioFlow each opened their normal
+  entry page with their expected navigation and no visual or permission
+  regression observed.
+- **Status:** Closed. F-C is accepted; F-D is now the active Foundation slice.
 
 ### Configurable main-route settings
 

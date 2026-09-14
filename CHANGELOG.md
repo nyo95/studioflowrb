@@ -5,8 +5,30 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.55**
-- Next local revision: **R8.56**
+- Current revision after this entry is committed: **R8.56**
+- Next local revision: **R8.57**
+
+## R8.56 | 2026-09-14 | review(foundation): accept F-C browser walkthrough
+
+### Changed
+
+- Recorded Reviewer PASS for F-C/PF-4+PF-5 after the four required browser
+  scenarios passed against the approved kantor fixture; marked F-C complete in
+  `docs/roadmap.md` and closed its deferred-review entry.
+- Replaced the completed F-C plan with the next active F-D/PF-6+PF-7 plan.
+
+### Verification
+
+- Browser acceptance passed: authorized `/settings/general` access and
+  unauthenticated refusal after sign-out; canonical read-only Light appearance
+  remained visible after Save/reload; SettingsShell rendered at desktop and
+  375 px; Master Data, BQ, and StudioFlow entry/navigation smoke passed.
+- Documentation link and whitespace checks: passed.
+
+### Limitations
+
+- F-D has not been implemented. StudioFlow recovery remains frozen until F-E
+  Foundation acceptance.
 
 ## R8.55 | 2026-09-14 | docs(plan): correct F-C reviewer scenario route and wording
 
