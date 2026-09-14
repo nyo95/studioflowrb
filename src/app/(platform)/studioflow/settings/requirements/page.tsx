@@ -138,6 +138,11 @@ export default async function RequirementTemplatesPage() {
                         {pt ? ` \u2014 ${pt.name}` : ""}
                       </span>
                     </div>
+                    {pt ? (
+                      <Link href={`/studioflow/settings/phases/${pt.id}/requirements`} className="text-xs font-medium text-ink-secondary hover:text-ink">
+                        Open phase requirements
+                      </Link>
+                    ) : null}
                     {template.deleted_at ? <Badge tone="warning">Archived</Badge> : null}
                     {template.key_immutable ? <Badge>In use</Badge> : null}
                   </li>

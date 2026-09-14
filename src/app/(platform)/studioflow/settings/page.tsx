@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { Settings } from "lucide-react";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
@@ -107,6 +108,9 @@ export default async function StudioFlowSettingsPage() {
                     <span className="font-ui-mono text-[0.6875rem] text-ink-tertiary">{template.key}</span>
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                    <Link href={`/studioflow/settings/phases/${template.id}/requirements`} className="text-xs font-medium text-ink-secondary hover:text-ink">
+                      Requirements
+                    </Link>
                     {template.has_rounds ? (
                       <Badge>
                         Rounds{template.round_prefix ? ` · ${template.round_prefix}` : ""}

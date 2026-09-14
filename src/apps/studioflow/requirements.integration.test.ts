@@ -105,6 +105,14 @@ describe("§7.1.1 Requirement templates", () => {
     assert.equal(created.scope, "PHASE");
     assert.equal(created.phase_template_id, phaseTemplate.id);
 
+    const scoped = await service.listPhaseRequirementTemplates([STUDIOFLOW_PERMISSIONS.projectRead], phaseTemplate.id);
+    assert.equal(scoped.phaseTemplate.id, phaseTemplate.id);
+    assert.equal(scoped.templates.length, 1);
+    await assert.rejects(
+      () => service.listPhaseRequirementTemplates([STUDIOFLOW_PERMISSIONS.projectRead], "00000000-0000-0000-0000-000000000000"),
+      (err: unknown) => err instanceof AppError && err.code === "studioflow.phase-template.not-found",
+    );
+
     // Phase scope without phase_template_id should fail
     await assert.rejects(
       () => service.createRequirementTemplate(
@@ -296,6 +304,27 @@ describe("§7.1.1 Project requirement CRUD and lifecycle", () => {
       { title: "Fire Safety v2" },
     );
     assert.equal(edited.title, "Fire Safety v2");
+  });
+
+  it("refuses phase removal while an archived phase requirement exists", async () => {
+    const { phase } = await setupProject();
+    const req = await service.createProjectRequirement(
+      [STUDIOFLOW_PERMISSIONS.projectManage],
+      ACTOR,
+      { project_id: phase.project_id, phase_id: phase.id, title: "Retained scope" },
+    );
+    await service.archiveRequirement([STUDIOFLOW_PERMISSIONS.projectManage], ACTOR, req.id, { reason: "Retained for audit" });
+
+    await assert.rejects(
+      () => service.removeProjectPhase([STUDIOFLOW_PERMISSIONS.projectManage], ACTOR, phase.id),
+      (err: unknown) => err instanceof AppError && err.code === "studioflow.phase.requirements-exist",
+    );
+    await assert.rejects(
+      () => testDb.prisma.sfProjectPhase.delete({ where: { id: phase.id } }),
+      (err: unknown) => typeof err === "object" && err !== null && "code" in err && (err as { code?: string }).code === "P2003",
+    );
+    const stillThere = await testDb.prisma.sfProjectRequirement.findUnique({ where: { id: req.id }, select: { phase_id: true } });
+    assert.equal(stillThere?.phase_id, phase.id);
   });
 
   it("satisfies and reopens a requirement", async () => {
@@ -609,5 +638,9 @@ describe("§7.1.1 Audit events", () => {
     });
     assert.ok(auditAfter.length >= 2);
     assert.equal(auditAfter[1].action, "requirement.satisfy");
+    const metadata = auditAfter[1].metadata;
+    assert.equal(typeof metadata, "object");
+    assert.equal((metadata as Record<string, unknown> | null)?.satisfaction_note, undefined);
+    assert.equal((metadata as Record<string, unknown> | null)?.satisfaction_state, "SATISFIED");
   });
 });

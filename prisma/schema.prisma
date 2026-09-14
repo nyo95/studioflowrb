@@ -1686,7 +1686,7 @@ model SfProjectRequirement {
   updated_at DateTime @updatedAt
 
   project  SfProject       @relation(fields: [project_id], references: [id])
-  phase    SfProjectPhase? @relation(fields: [phase_id], references: [id])
+  phase    SfProjectPhase? @relation(fields: [phase_id], references: [id], onDelete: Restrict)
   source_template SfRequirementTemplate? @relation(fields: [source_template_id], references: [id])
   evidence SfRequirementEvidence[]
 

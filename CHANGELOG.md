@@ -5,8 +5,34 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.65**
-- Next local revision: **R8.66**
+- Current revision after this entry is committed: **R8.66**
+- Next local revision: **R8.67**
+
+## R8.66 | 2026-09-14 | fix(studioflow): preserve phase requirement scope
+
+### Corrected
+
+- Added the StudioFlow-only scope-guard migration that changes the project
+  phase requirement foreign key to `ON DELETE RESTRICT`; phase removal is also
+  service-guarded against any Phase Requirement, including archived records.
+  No requirement can silently become General.
+- Added the canonical server-validated route
+  `/studioflow/settings/phases/[phaseTemplateId]/requirements` and links from
+  the existing settings surfaces. The route validates the phase-template
+  parent and returns only `PHASE`-scoped templates for that parent.
+- Removed unrestricted `satisfaction_note` text from satisfaction audit
+  metadata while retaining project/phase identifiers and the satisfied state.
+  Added regression coverage for the audit envelope.
+
+### Verification
+
+- Disposable kantor rebuild database applied 40 migrations successfully and
+  reported up to date.
+- Focused Requirements integration suite: 23 passed, 0 failed.
+- `npm test`: 376 passed, 0 failed; typecheck, lint, boundary check,
+  legacy-runtime check, production build, and whitespace checks passed.
+- Browser acceptance was not run; it remains Reviewer-owned and requires the
+  approved fixture sign-in. No legacy source or database was accessed.
 
 ## R8.65 | 2026-09-14 | fix(studioflow): make SF-A requirements migration additive
 

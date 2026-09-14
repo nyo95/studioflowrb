@@ -806,8 +806,41 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
   // ── Phase template (read-only in WO-2; settings UI deferred) ────────────
 
   async function listPhaseTemplates(grants: PermissionGrants) {
-    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
     return db.sfPhaseTemplate.findMany({ orderBy: { sort_order: "asc" } });
+  }
+
+  async function listPhaseRequirementTemplates(grants: PermissionGrants, phaseTemplateId: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    const phaseTemplate = await db.sfPhaseTemplate.findUnique({ where: { id: phaseTemplateId } });
+    if (!phaseTemplate) {
+      throw new AppError("NOT_FOUND", "studioflow.phase-template.not-found", "Phase template not found");
+    }
+    const templates = await db.sfRequirementTemplate.findMany({
+      where: { scope: "PHASE", phase_template_id: phaseTemplateId },
+      orderBy: [{ sort_order: "asc" }, { created_at: "asc" }],
+    });
+    return { phaseTemplate, templates };
+  }
+
+  async function removeProjectPhase(grants: PermissionGrants, actor: AuditActor, phaseId: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
+    return runTransaction(async () => {
+      const phase = await db.sfProjectPhase.findUnique({ where: { id: phaseId }, select: { id: true, project_id: true } });
+      if (!phase) throw new AppError("NOT_FOUND", "studioflow.phase.not-found", "Phase not found");
+      const [roundCount, requirementCount] = await Promise.all([
+        db.sfIteration.count({ where: { phase_id: phaseId } }),
+        db.sfProjectRequirement.count({ where: { phase_id: phaseId } }),
+      ]);
+      if (roundCount > 0) {
+        throw new AppError("CONFLICT", "studioflow.phase.rounds-exist", "Cannot remove a phase that has rounds");
+      }
+      if (requirementCount > 0) {
+        throw new AppError("CONFLICT", "studioflow.phase.requirements-exist", "Cannot remove a phase that has requirements");
+      }
+      await db.sfProjectPhase.delete({ where: { id: phaseId } });
+      await writeAudit({ action: "phase.remove", entityType: "SfProjectPhase", entityId: phaseId, actor, changes: { project_id: phase.project_id } });
+    });
   }
 
 
@@ -2835,7 +2868,7 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         entityType: "SfProjectRequirement",
         entityId: id,
         actor,
-        changes: { project_id: existing.project_id, phase_id: existing.phase_id, satisfaction_note: input.satisfaction_note.trim() },
+        changes: { project_id: existing.project_id, phase_id: existing.phase_id, satisfaction_state: "SATISFIED" },
       });
       return updated;
     });
@@ -3092,12 +3125,14 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     editProject,
     // Template (read)
     listPhaseTemplates,
+    listPhaseRequirementTemplates,
     // Studio settings (WO-3)
     getStudioSettings,
     updateNamingTemplate,
     // Phase (WO-3)
     listProjectPhases,
     getPhase,
+    removeProjectPhase,
     finishPhase,
     reopenPhase,
     closePhaseByException,
