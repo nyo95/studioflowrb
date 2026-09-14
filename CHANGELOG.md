@@ -8,6 +8,29 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Current revision after this entry is committed: **R8.72**
 - Next local revision: **R8.73**
 
+## R8.73 | 2026-09-14 | docs(agent): record harness, browser backlog, and SF-0 design lock
+
+### Changed
+
+- Updated `docs/agent/EXECUTOR.md` with the mandatory code-check gate, the rule
+  that browser acceptance never blocks an Executor commit, and the batch-commit
+  procedure used when `device_bash` is unavailable.
+- Added `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md` with 8 pending browser items
+  and 3 Executor-run PASS items awaiting Reviewer confirmation at the phase gate.
+- Added `docs/apps/studioflow/SF-0-DESIGN-LOCK.md` as the active authority for
+  SF-B through SF-G, covering surface tiers, workspace interaction vocabulary,
+  Requirements decisions, and the 375px narrow-screen contract.
+
+### Verification
+
+- `git diff --cached --check`: passed before commit.
+- `npm test`: skipped; documentation-only change.
+- Typecheck: skipped; no TypeScript files changed.
+- Lint: skipped; no TypeScript or JavaScript files changed.
+- Boundary check: skipped; no imports changed.
+- Legacy-runtime check: skipped; no code changed.
+- Production build: skipped; no code changed.
+
 ## R8.72 | 2026-09-14 | fix(env): align rebuild test database target for rumah environment
 
 ### Corrected
