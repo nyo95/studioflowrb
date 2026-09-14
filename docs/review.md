@@ -1,6 +1,6 @@
 # Ready for Review
 
-Status: active verification ledger, reconciled through R8.46 on 2026-09-14.
+Status: active verification ledger, reconciled through R8.54 on 2026-09-14.
 New file, split out of `roadmap.md`/`knownbug.md` on 2026-09-10 at owner
 request, so status is visible at a glance:
 
@@ -50,6 +50,36 @@ a real defect — move it to `knownbug.md` with what was actually observed.
   all passed.
 - **Status:** PASS — PF-1 local storage and public/private asset boundaries
   are accepted. Supabase remains deferred and is not a release dependency.
+
+### F-C / PF-4+PF-5 — Settings, Appearance, and UI Engine
+
+- **Observed:** R8.53 implemented the F-C Foundation outcome on 2026-09-14:
+  typed global `PlatformTheme` on the `PlatformGeneralSettings` singleton (sole
+  approved value `"light"`), additive migration
+  `20260914090000_platform_appearance_theme` (SQL CHECK constraint), General
+  Settings page split into General and Appearance sections, and `SettingsShell`
+  applied with a boundary-explicit navigation enforcing the D-SF-02 settings
+  ownership split. No app-workflow behavior, StudioFlow feature, or destructive
+  migration was activated.
+- **Automated checks:** typecheck, lint, boundaries, legacy-runtime, 349/349
+  tests (settings integration suite and SQL CHECK constraint test), additive
+  migration deployed to all rebuild-only databases, and production build all
+  passed.
+- **Needs:** Reviewer browser walkthrough against the approved local kantor
+  fixture:
+  1. **Settings access** — open General Settings and the Appearance section
+     under an authorized role; confirm an unauthorized user is refused.
+  2. **Appearance save/reload** — save the theme field and reload the page;
+     confirm the persisted canonical value is displayed.
+  3. **Narrow/desktop shell** — verify `SettingsShell` navigation renders and
+     collapses correctly at desktop width and at ≤ 375 px narrow width.
+  4. **Three-app smoke** — open Master Data, BQ, and StudioFlow entry points;
+     confirm no visual, permission, or navigation regression from the platform
+     shell and `SettingsShell` changes.
+- **Status:** Ready for review, not yet verified. Browser acceptance was
+  deferred in R8.54 because `device_bash` was unavailable (Windows update
+  issue). Acceptance scenarios are also documented in `PLAN.md` §Reviewer
+  Acceptance Scenarios.
 
 ### Configurable main-route settings
 

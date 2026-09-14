@@ -2,10 +2,19 @@
 
 Plan ID: F-C-PF-4-PF-5-SETTINGS-APPEARANCE-UI-ENGINE
 Scope: Foundation settings ownership, typed appearance, and UI Engine solidification
-Status: READY
+Status: BLOCKED
 Priority: P1
 Owner: Repository owner
 Last updated: 2026-09-14
+
+## Implementation gate
+
+Executor committed the complete F-C implementation as **R8.53** (2026-09-14).
+All automated checks passed: typecheck, lint, boundaries, legacy-runtime, 349
+tests, additive migration, and production build. Reviewer browser acceptance is
+the remaining gate before this plan is formally accepted and replaced by the
+F-D plan. The exact scenarios are documented in `docs/review.md` under
+**F-C / PF-4+PF-5**. This plan is BLOCKED until that acceptance is recorded.
 
 ## Outcome
 
@@ -85,13 +94,22 @@ StudioFlow entry/navigation without visual or permission regressions.
 - A purported generic UI enhancement may encode an app workflow. Keep such
   policy app-owned and report a genuine contract conflict instead of guessing.
 
-## Executor Prompt
+## Reviewer Acceptance Scenarios (pending)
 
-You are the Executor. Location: kantor. Read `AGENTS.md`,
-`docs/agent/EXECUTOR.md`, and this READY `PLAN.md`, then implement the entire
-F-C/PF-4+PF-5 Foundation outcome. Preserve ratified D-SF ownership boundaries,
-protect Master Data/BQ/StudioFlow behavior, run the required checks, update
-`CHANGELOG.md`, and create local revision R8.53. Do not start any StudioFlow
-recovery feature, destructive migration, or remote action. Stop only for a
-material locked-decision conflict or unsafe boundary; otherwise complete the
-coherent outcome and report the commit, checks, limitations, and dirty files.
+Run these against the approved local kantor fixture at the committed R8.53
+revision before recording PASS and replacing this plan with the F-D plan:
+
+1. **Settings access** — open `/platform/settings/general` and the Appearance
+   tab under a role that holds settings access; confirm an unauthorized user is
+   refused.
+2. **Appearance save/reload** — save the theme field and reload; confirm the
+   persisted canonical value is shown.
+3. **Narrow/desktop shell** — verify SettingsShell navigation renders correctly
+   at desktop width and at ≤ 375 px narrow.
+4. **Three-app smoke** — open Master Data, BQ, and StudioFlow entry points;
+   confirm no visual, permission, or navigation regression from the
+   SettingsShell and platform shell changes.
+
+On PASS: update `docs/roadmap.md` to mark F-C complete (with R8.53 evidence),
+update `docs/review.md` to close the F-C entry, commit as R8.55, and replace
+this PLAN.md with the F-D plan.

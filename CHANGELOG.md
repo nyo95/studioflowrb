@@ -5,8 +5,47 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.53**
-- Next local revision: **R8.54**
+- Current revision after this entry is committed: **R8.54**
+- Next local revision: **R8.55**
+
+## R8.54 | 2026-09-14 | review(studioflow,foundation): verify D-SF ratification; defer F-C browser acceptance
+
+### Changed
+
+- Verified D-SF-01 through D-SF-07 against the current owner ratification
+  instructions. All seven decisions are correctly captured in
+  `docs/apps/studioflow/D-SF-RECOVERY-DISCOVERY.md` §5 (ratified in R8.51),
+  `docs/apps/studioflow/studioflow.md`, `studioflow-project-contract.md`
+  §7.1.1, `studioflow-mom-contract.md` (§2 "at most two images per block" and
+  §10.1 two-step correction), and `studioflow-schedule-contract.md`. No
+  documentation conflict found; no change required.
+- Confirmed actual git HEAD is R8.53 — D-SF ratification (R8.51), roadmap
+  markup correction (R8.52), and F-C Settings/Appearance implementation (R8.53)
+  were all previously committed. The session prompt's "R8.50" tip was stale.
+- Added F-C / PF-4+PF-5 browser acceptance entry to `docs/review.md` with the
+  four exact Reviewer scenarios (settings access, appearance save/reload,
+  narrow/desktop shell, three-app smoke).
+- Updated `docs/roadmap.md` F-C entry to note R8.53 implementation committed
+  pending browser acceptance.
+- Updated `PLAN.md` to BLOCKED: noted that R8.53 implementation is complete,
+  documented the four Reviewer acceptance scenarios, and described what PASS
+  triggers (roadmap update, review.md closure, F-D plan at R8.55).
+
+### Verification
+
+- Cross-referenced each of the seven owner decisions with the D-SF decision
+  register, the StudioFlow index, the project contract, and the MOM and
+  Schedule contracts. No open decision remained and no conflict was found.
+- `device_bash` unavailable (Windows update since 2026-09-08); browser
+  acceptance for R8.53 cannot be completed in this session.
+
+### Limitations
+
+- F-C browser acceptance is deferred; `docs/review.md` names the exact
+  missing verification. F-C remains open in `docs/roadmap.md`.
+- F-D plan will be produced after F-C Reviewer PASS (target R8.55).
+- No production code, schema, migration, route, data disposition, or
+  StudioFlow feature was activated.
 
 ## R8.53 | 2026-09-14 | feat(platform,settings): typed global appearance theme
 

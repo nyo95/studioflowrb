@@ -1,6 +1,6 @@
 # Product Roadmap by Application
 
-Status: active planning ledger, reconciled through R8.51 on 2026-09-14.
+Status: active planning ledger, reconciled through R8.54 on 2026-09-14.
 
 This file answers **what remains to be built**. It does not activate work by
 itself. Completed items are struck through or removed only after verification
@@ -59,6 +59,8 @@ independently useful outcome, or demonstrated context/tool limit.
   stabilize the shell, layouts, primitives, interactions, and token API against
   Master Data, BQ, frozen RB StudioFlow, and D-SF evidence. Add only generic
   layouts with proven consumers.
+  *R8.53 implementation committed 2026-09-14 (all automated checks passed);
+  Reviewer browser acceptance deferred — tracked in `review.md`.*
 - [ ] **F-D / PF-6+PF-7 — Utility curation and boundaries:** Consolidate only
   domain-neutral utilities with real consumers, then enforce Core purity,
   public cross-app reads, permission SSOT, app route ownership, UI Engine
