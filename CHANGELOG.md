@@ -5,8 +5,23 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.61**
-- Next local revision: **R8.62**
+- Current revision after this entry is committed: **R8.63**
+- Next local revision: **R8.64**
+
+## R8.63 | 2026-09-14 | docs(agent): advance revision ledger after SF-A contract
+
+### Fixed
+
+- Advanced the authoritative revision state after the completed R8.62 planning
+  decision, so the next Executor change starts at R8.64.
+
+### Verification
+
+- Revision ledger, local history, staged diff, and whitespace review: passed.
+
+### Limitations
+
+- Documentation ledger correction only; no application or legacy system changed.
 
 ## R8.62 | 2026-09-14 | docs(studioflow): ratify SF-A Requirements contract
 
