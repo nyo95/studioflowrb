@@ -5,8 +5,27 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.66**
-- Next local revision: **R8.67**
+- Current revision after this entry is committed: **R8.67**
+- Next local revision: **R8.68**
+
+## R8.67 | 2026-09-14 | fix(platform): restore rebuild login limiter table
+
+### Corrected
+
+- Added an additive recovery migration that recreates the Foundation
+  `platform.LoginRateLimit` table with the canonical `key VARCHAR(255)` primary
+  key, `points INTEGER NOT NULL DEFAULT 0`, and nullable `expire BIGINT` shape.
+- The migration is limited to the approved StudioFlow rebuild Platform schema;
+  it does not rewrite migration history, reset data, or touch legacy.
+
+### Verification
+
+- Deployed to the explicitly validated kantor `studioflow_rebuild` database
+  without reset; migration status is up to date.
+- Confirmed the table schema and limiter insert/read contract against the
+  rebuild database. Focused/full automated checks and the production-equivalent
+  dev server restart were run after deployment.
+- Browser acceptance was not run; the sign-in fixture remains Reviewer-owned.
 
 ## R8.66 | 2026-09-14 | fix(studioflow): preserve phase requirement scope
 
