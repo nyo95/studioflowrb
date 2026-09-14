@@ -132,8 +132,8 @@ clean ownership while each capability is recovered.
 
 ### Discovery gate before Foundation freeze
 
-- [x] **D-SF — Full extraction and recovery contract:** At the owner-supplied
-  kantor checkout, inspect only pinned
+- [ ] **D-SF — Recovery evidence complete; gate pending Planner/owner
+  ratification:** At the owner-supplied kantor checkout, inspect only pinned
   commit `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`. Produce and ratify the
   capability, route, settings, permission, persistence/ownership, and shared-
   capability matrices. Classify every meaningful behavior as KEEP, MERGE,
@@ -147,7 +147,8 @@ clean ownership while each capability is recovered.
   D-SF is read-only discovery and documentation; it creates no production code,
   schema, placeholder route, or dependency. Discovery evidence is recorded in
   [`apps/studioflow/D-SF-RECOVERY-DISCOVERY.md`](apps/studioflow/D-SF-RECOVERY-DISCOVERY.md)
-  (R8.48); its decision register must be ratified before SF-A starts.
+  (R8.48); the evidence is complete, but this gate remains open until the
+  Planner/owner ratifies its decision register before SF-A starts.
 
 ### Implementation after F-E Foundation acceptance
 

@@ -5,8 +5,26 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.48**
-- Next local revision: **R8.49**
+- Current revision after this entry is committed: **R8.49**
+- Next local revision: **R8.50**
+
+## R8.49 | 2026-09-14 | docs(roadmap): retain D-SF ratification gate
+
+### Changed
+
+- Corrected the R8.48 roadmap ledger: its recovery evidence is complete, but
+  D-SF remains an open gate until the Planner/owner ratifies D-SF-01 through
+  D-SF-07. SF-A is not activated by the evidence record alone.
+
+### Verification
+
+- Documentation links, staged whitespace, and staged-diff review: passed.
+
+### Limitations
+
+- This correction changes only the roadmap and revision ledger. It does not
+  alter the discovery report, StudioFlow contracts, code, schema, data, or
+  legacy evidence.
 
 ## R8.48 | 2026-09-14 | docs(studioflow): recover pinned legacy discovery evidence
 
