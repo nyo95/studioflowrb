@@ -42,16 +42,29 @@ Today surface for project-owned work.
 - Pages call StudioFlow services; no page-local Prisma or authorization policy.
   Every mutation uses its app service transaction and platform audit envelope.
 - Requirements are first-class records, distinct from todos/tasks and files.
-  Phase template changes never rewrite an existing project snapshot; template
-  keys stay immutable after use; a project phase may be removed only while
-  empty. Compatibility redirects are temporary and no parallel route tree is
-  allowed.
+  `RequirementTemplate` seeds a project snapshot transactionally; a
+  `ProjectRequirement` is then independent, scope-immutable, and is General
+  only when `phase_id` is null. Existing `SfFile` records may be linked as
+  same-project evidence; SF-A adds no upload path. Satisfaction requires a
+  note and records actor/time; evidence is optional. Reopen, archive/restore,
+  and evidence unlink require reasons. §7.1.1 of the Project Contract is the
+  exhaustive Requirements decision.
+- Phase and Requirement-template changes never rewrite an existing project
+  snapshot; template keys stay immutable after use; a project phase may be
+  removed only while it holds no rounds and no Phase Requirements. Canonical
+  CRUD routes are `/studioflow/projects/[projectId]/requirements`,
+  `/studioflow/projects/[projectId]/phases/[phaseId]/requirements`, and the
+  corresponding StudioFlow settings routes. Compatibility redirects are
+  temporary and no parallel route tree is allowed.
 
 ## Acceptance Criteria
 
 - Authorized users can create/read/update/archive/restore Clients and Projects,
   administer template and project phases under the contract guards, and manage
-  general project todos and General/Phase Requirements through canonical routes.
+  General/Phase Requirement templates and project snapshots through canonical
+  routes. Requirement tests prove snapshot independence, immutable used keys,
+  project/phase/file scope guards, satisfaction/reopen metadata, and
+  archive/evidence lifecycle rules.
 - Activity Center shows open project-owned work, including general todos, in one
   project-grouped Today surface. Upcoming remains absent.
 - Permissions, audit, validation/error states, phase/project scope integrity,
@@ -92,9 +105,14 @@ access fail safely. Do not claim acceptance without this browser evidence.
 You are the Executor. Location: kantor. Read `AGENTS.md`,
 `docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY
 SF-A daily-work and project-operations outcome. Preserve unrelated owner work,
-respect the ratified StudioFlow contracts and recovery boundaries, run the
-required checks only against the approved disposable rebuild database, update
-the changelog/ledgers, and create one local revision commit. Stop only for a
-material locked-decision conflict, unsafe boundary, or failed mandatory
+respect the ratified StudioFlow contracts and recovery boundaries. In
+particular, implement §7.1.1 exactly: snapshot active General and per-phase
+RequirementTemplates transactionally; make ProjectRequirements immutable in
+scope; use existing same-project `SfFile` records as optional evidence only;
+enforce the stated satisfaction, archive, evidence, and route guards; and do
+not add a new permission, upload flow, checklist, or parallel CRUD surface.
+Run the required checks only against the approved disposable rebuild database,
+update the changelog/ledgers, and create one local revision commit. Stop only
+for a material locked-decision conflict, unsafe boundary, or failed mandatory
 evidence; otherwise report the commit, checks, limitations, and remaining
 unrelated dirty files.

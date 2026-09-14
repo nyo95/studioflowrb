@@ -502,17 +502,98 @@ revisions and simply had no queue of its own.
 
 Requirements state what a Project or one of its Phases must satisfy; they are
 not work items hidden behind checklist wording. A **General Requirement** is
-project-scoped. A **Phase Requirement** belongs to exactly one Phase. Both may
-have a File as evidence, but a File never becomes the requirement itself; a
-Task or subtask may decompose work needed to satisfy a requirement without
-creating another requirement.
+project-scoped. A **Phase Requirement** belongs to exactly one Phase. A Task
+or subtask may decompose work needed to satisfy a requirement without creating
+another requirement. SF-A authorizes the following bounded Requirements
+capability; it does not authorize a second task/checklist system or a new file
+upload flow.
 
-The legacy template-seeded project and phase requirements are retained as
-recovery evidence for a later SF-A planning outcome. That outcome must define
-template snapshotting for new projects, explicit satisfaction/evidence rules,
-and how running projects remain unaffected by later template edits. This
-contract records the domain boundary only: it authorizes no requirement schema,
-template, route, or implementation now.
+#### Identity and persisted shapes
+
+`RequirementTemplate` is a studio setting used only to seed future projects.
+`ProjectRequirement` is the authoritative project record. Both use UUID
+primary keys. A template has an immutable `key`, `scope` (`GENERAL` or
+`PHASE`), `title`, optional `description`, `sort_order`, and reversible archive
+metadata. A `PHASE` template additionally names exactly one
+`SfPhaseTemplate`; a `GENERAL` template names none. The tuple
+`(scope, phase_template_id, key)` is unique, with the null phase treated as the
+General scope. A key is a stable lowercase machine identifier, not a mutable
+display label, and becomes immutable after the first project snapshot uses it.
+
+`ProjectRequirement` has UUID `id`, required `project_id`, nullable `phase_id`,
+nullable `source_template_id`, immutable nullable `template_key_snapshot`,
+required `title`, optional `description`, `sort_order`, a satisfaction state,
+and lifecycle/audit metadata. `phase_id = null` is a General Requirement;
+otherwise it must identify a phase of that exact `project_id`. `source_template_id`
+is provenance only: the snapshot title, description, scope, and template key
+remain readable if its template is edited or archived. A manually created
+requirement has no source template or template-key snapshot. Scope, project,
+and phase never move after creation; create a replacement and archive the old
+record instead.
+
+The sole evidence relation is `ProjectRequirementEvidence`: UUID `id`,
+`requirement_id`, and `file_id` referencing an existing `SfFile`. It has a
+unique `(requirement_id, file_id)` pair and may contain zero or more files.
+Every evidence file must belong to the same project as its requirement. This
+links existing StudioFlow file records only; upload, storage, and file
+classification remain governed by §8 and are not expanded by SF-A.
+
+#### Snapshotting and template lifecycle
+
+In the same transaction that creates a Project, the service copies every active
+General template and every active template for each phase copied from the
+studio phase template. It writes a separate `ProjectRequirement` snapshot for
+each, preserving the template key, title, description, and order at that time.
+Adding a project phase from a studio template snapshots that template's active
+Phase Requirements in the same transaction. Editing, reordering, archiving,
+or restoring a studio RequirementTemplate affects only later snapshots; it
+never rewrites a running project. A used template is archived/restored rather
+than deleted. An unused template may be deleted only if it has no snapshots.
+
+#### Satisfaction, evidence, and lifecycle
+
+An active requirement is `OPEN` or `SATISFIED`. Marking it satisfied records
+`satisfied_at`, `satisfied_by_id`, and a required non-empty
+`satisfaction_note`; one or more linked evidence files are optional. Reopening
+sets it back to `OPEN`, clears the satisfaction fields, retains its evidence,
+and requires a non-empty reopen reason. This is not an approval gate: open
+requirements warn on Project completion and Phase closure but do not block
+those transitions.
+
+Requirements and templates are never silently or permanently deleted from the
+normal UI. A manager may archive or restore a ProjectRequirement; archive and
+restore each require a reason, archived records are read-only and excluded from
+open-work counts, and restoration returns the retained `OPEN` or `SATISFIED`
+state. Evidence may be linked or unlinked while the requirement is active;
+unlinking requires a reason. Archived Projects remain wholly read-only under
+§12, including requirements and their evidence.
+
+#### Permission, routes, and audit
+
+No new permission identifier is introduced. `studioflow.project.read` reads
+templates, project requirements, and evidence metadata. `studioflow.project.manage`
+creates, edits, archives, restores, reorders, satisfies/reopens requirements;
+links/unlinks evidence; and manages RequirementTemplates. Every action still
+requires `studioflow.access`; services enforce the permission and all scope
+guards server-side.
+
+The canonical project routes are
+`/studioflow/projects/[projectId]/requirements` for General Requirements and
+`/studioflow/projects/[projectId]/phases/[phaseId]/requirements` for Phase
+Requirements. Studio settings exposes the template editor at
+`/studioflow/settings/requirements`, with a phase-template requirement section
+under `/studioflow/settings/phases/[phaseTemplateId]/requirements`. Each route
+must reject a phase/template whose parent does not match the route context;
+there is no cross-project or cross-template lookup by guessed ID. The project
+detail and phase workspace may show read summaries and link to these canonical
+routes, but they are not parallel CRUD surfaces.
+
+Audit RequirementTemplate create/edit/archive/restore/delete; ProjectRequirement
+create/edit/archive/restore/satisfy/reopen; and evidence link/unlink. Audit
+metadata includes the requirement/template ID, project ID, optional phase ID,
+and reason where required; it never includes file bytes or unrestricted note
+contents. These mutations use the app service transaction and Platform audit
+envelope together.
 
 ### 7.2 IterationPoint — checklist inside a round
 
@@ -997,11 +1078,12 @@ invariant, not authorization.
 
 | Action | Permission | Additional rule |
 |---|---|---|
-| Read any project, phase, iteration, task, asset | `project.read` | — |
+| Read any project, phase, iteration, task, asset, Requirement, or evidence metadata | `project.read` | Evidence files remain governed by §8 |
 | Create / edit Client | `project.manage` | A Client with live Projects cannot be archived |
 | Create Project | `project.manage` | Snapshots the phase template in the same transaction |
 | Edit the studio phase, folder and naming templates | `project.manage` | Never rewrites a running project (§4.1, §8.2) |
 | Add / remove a phase on one project | `project.manage` | Remove only while it holds no rounds |
+| Manage RequirementTemplates and Project Requirements | `project.manage` | §7.1.1 snapshots, scope guards, archive rules, and evidence ownership apply |
 | Edit Project fields, set `lead_user_id` | `project.manage` | `code` is immutable |
 | Archive Project (`deleted_at`) | `project.manage` | Reversible |
 | Permanently delete Project | `project-deletion.approve` | Deferred: no destructive action until retention and deletion policy is approved |

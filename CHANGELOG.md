@@ -8,6 +8,30 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Current revision after this entry is committed: **R8.61**
 - Next local revision: **R8.62**
 
+## R8.62 | 2026-09-14 | docs(studioflow): ratify SF-A Requirements contract
+
+### Changed
+
+- Replaced the deferred Requirements boundary with the complete SF-A contract:
+  template and project identities, General/Phase ownership, snapshot timing,
+  immutable used keys, satisfaction/evidence semantics, reversible lifecycle,
+  existing permission mapping, canonical routes, audit events, and server-side
+  scope guards.
+- Tightened the active SF-A plan to make that contract executable without
+  creating a duplicate checklist/task system or a new file-upload capability.
+
+### Verification
+
+- Cross-checked the decision against the existing Project/Phase/File schema,
+  StudioFlow permission registry, active SF-A plan, and contract access/audit
+  sections.
+- `git diff --check`: passed.
+
+### Limitations
+
+- This is a planning decision only: no application schema, migration, service,
+  route, fixture, dependency, or legacy system was changed or accessed.
+
 ## R8.61 | 2026-09-14 | review(foundation): accept PF-8 and release SF-A planning
 
 ### Changed
