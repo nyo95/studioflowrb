@@ -5,8 +5,44 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.71**
-- Next local revision: **R8.72**
+- Current revision after this entry is committed: **R8.72**
+- Next local revision: **R8.73**
+
+## R8.72 | 2026-09-14 | fix(env): align rebuild test database target for rumah environment
+
+### Corrected
+
+- Fixed `PLATFORM_TEST_DATABASE_URL` in `.env.rumah` from a non-existent
+  `localhost:5437/studioflow_rebuild_test` to the correct
+  `localhost:5433/masterdata_test`. The test runner (`run-tests.mjs`) loads
+  `.env.test.local` which already pointed to `masterdata_test`; `.env.rumah`
+  was a separate copy that had never been updated after the container setup
+  changed. No tracked file contains the wrong port.
+- Applied the four pending Prisma migrations to `masterdata_test` (the
+  disposable rebuild test database for the rumah environment):
+  `platform_appearance_theme`, `sf_a_requirements`,
+  `sf_a_requirements_scope_guards`, `r8_67_restore_login_rate_limit`. The
+  first three supply `sf_requirement_template`, `sf_project_requirement`, and
+  `sf_requirement_evidence` — the tables whose absence blocked 38 integration
+  tests in R8.71. No migration targeted production or legacy databases.
+
+### Verification
+
+- `npm test`: 381 passed, 0 failed (up from 343/381 in R8.71).
+- Typecheck, lint, boundary check, legacy-runtime check, and production build:
+  all passed.
+- Browser lifecycle on fixture project 2026-483-Sociolla SPZ PI (General
+  Requirements route, authenticated as Berkah):
+  - Create: requirement "R8.72 Gate Verification Req" appeared OPEN and
+    persisted after page reload.
+  - Satisfy → Reopen → Archive → Restore: each state transition rendered
+    correctly with the appropriate controls after server revalidation.
+  - Evidence link: selected an existing project file from the dropdown and
+    confirmed it appeared as linked evidence on the requirement.
+  - Archived + evidence guard: when archived with a linked file, the evidence
+    name displayed read-only and no unlink control was shown.
+- Phase Requirements route verified separately during SF-A-TEST-ENV-REPAIR:
+  rendered application content for the Moodboard phase fixture.
 
 ## R8.71 | 2026-09-14 | fix(dev): generate Prisma client before Next startup
 
