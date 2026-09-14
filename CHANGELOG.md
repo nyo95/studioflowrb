@@ -5,8 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.46**
-- Next local revision: **R8.47**
+- Current revision after this entry is committed: **R8.47**
+- Next local revision: **R8.48**
+
+## R8.47 | 2026-09-14 | docs(plan): activate pinned StudioFlow recovery discovery
+
+### Changed
+- Recorded the owner-supplied legacy source baseline for D-SF at pinned commit
+  `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`, including its branch and the
+  working-tree-only artifacts excluded from evidence.
+- Replaced the path blocker with a READY, documentation-only discovery contract
+  covering the route, capability, settings, permission, persistence/ownership,
+  shared-capability, and downstream-read matrices.
+- Locked legacy working-tree artifacts and every legacy database-related target
+  out of scope, including untracked recovery dumps.
+
+### Verification
+- Read-only Git baseline verification confirms the supplied path's `main` HEAD
+  is the roadmap pin; no legacy working-tree file or database target was used.
+
+### Limitations
+- This only activates discovery. It does not implement a StudioFlow feature or
+  resolve product decisions that the pinned evidence cannot determine.
 
 ## R8.46 | 2026-09-14 | review(storage): accept KB-030 and activate D-SF gate
 
