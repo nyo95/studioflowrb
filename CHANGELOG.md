@@ -5,8 +5,32 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.69**
-- Next local revision: **R8.70**
+- Current revision after this entry is committed: **R8.70**
+- Next local revision: **R8.71**
+
+## R8.70 | 2026-09-14 | docs(review): record Requirements Prisma dev-runtime correction
+
+### Review finding
+
+- Browser review of R8.69 reproduced a P1 local runtime failure on the
+  authenticated General Requirements route: `db.sfProjectRequirement` was
+  undefined because `npm run dev` used an ignored generated Prisma client that
+  predated the committed schema model.
+- The route therefore rendered the application error boundary before any
+  Requirement workflow could be accepted. This is an immediate correction,
+  not a deferred known bug.
+
+### Next outcome
+
+- Activated R8.71 to make normal development startup generate a schema-aligned
+  Prisma client before Next evaluates routes. Browser acceptance for the full
+  General/Phase lifecycle remains Reviewer work after that correction.
+
+### Verification
+
+- Reviewer browser evidence: authenticated General Requirements route and
+  console error observed locally; no mutation was performed.
+- `git diff --check`: passed.
 
 ## R8.69 | 2026-09-14 | fix(studioflow): complete project requirement workflow UI
 
