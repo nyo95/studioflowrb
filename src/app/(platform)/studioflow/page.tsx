@@ -94,7 +94,7 @@ function WaitingRow({
       </div>
 
       <Link
-        href={`/studioflow/${item.project.id}`}
+        href={`/studioflow/projects/${item.project.id}`}
         className="flex min-w-0 items-center gap-1.5 text-xs text-ink-secondary no-underline hover:text-ink max-[840px]:col-span-2 max-[840px]:col-start-1"
       >
         <StatusMarker

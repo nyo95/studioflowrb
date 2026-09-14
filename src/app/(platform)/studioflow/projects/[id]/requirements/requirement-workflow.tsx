@@ -43,7 +43,7 @@ export function RequirementCreateForm({ projectId, phaseId, phaseName }: { proje
 }
 
 function ReasonAction({ label, action, pending, tone = "secondary" }: { label: string; action: (formData: FormData) => void; pending: boolean; tone?: "secondary" | "danger" }) {
-  return <form action={action} className="flex items-center gap-1"><Input name="reason" required maxLength={500} placeholder="Reason" aria-label={`${label} reason`} /><Button type="submit" variant={tone} pending={pending}>{label}</Button></form>;
+  return <form action={action} className="flex flex-wrap items-center gap-1"><Input name="reason" required maxLength={500} placeholder="Reason" aria-label={`${label} reason`} /><Button type="submit" variant={tone} pending={pending}>{label}</Button></form>;
 }
 
 export function RequirementWorkflowRow({ projectId, requirement, files, canManage }: { projectId: string; requirement: RequirementWorkflowRow; files: RequirementWorkflowFile[]; canManage: boolean }) {
@@ -88,12 +88,12 @@ export function RequirementWorkflowRow({ projectId, requirement, files, canManag
       ) : canManage ? (
         <div className="mt-3"><ReasonAction label="Restore" action={restoreAction} pending={restorePending} /></div>
       ) : null}
-      {canManage && requirement.evidence.length > 0 ? <div className="mt-2 grid gap-1">{requirement.evidence.map((entry) => <EvidenceUnlinkForm key={entry.id} projectId={projectId} requirementId={requirement.id} evidenceId={entry.id} />)}</div> : null}
+      {canManage && !requirement.archived_at && requirement.evidence.length > 0 ? <div className="mt-2 grid gap-1">{requirement.evidence.map((entry) => <EvidenceUnlinkForm key={entry.id} projectId={projectId} requirementId={requirement.id} evidenceId={entry.id} />)}</div> : null}
     </li>
   );
 }
 
 function EvidenceUnlinkForm({ projectId, requirementId, evidenceId }: { projectId: string; requirementId: string; evidenceId: string }) {
   const [state, action, pending] = useActionState(unlinkEvidenceAction.bind(null, projectId, requirementId, evidenceId), INITIAL);
-  return <form action={action} className="flex flex-wrap items-center gap-2"><Input name="reason" required maxLength={500} placeholder="Reason to unlink evidence" aria-label="Unlink evidence reason" /><Button type="submit" variant="secondary" pending={pending}>Unlink evidence</Button>{state?.ok === false ? <InlineError>{state.error.safeMessage}</InlineError> : null}</form>;
+  return <form action={action} className="flex min-w-0 flex-wrap items-center gap-2"><Input name="reason" required maxLength={500} placeholder="Reason to unlink evidence" aria-label="Unlink evidence reason" /><Button type="submit" variant="secondary" pending={pending}>Unlink evidence</Button>{state?.ok === false ? <InlineError>{state.error.safeMessage}</InlineError> : null}</form>;
 }

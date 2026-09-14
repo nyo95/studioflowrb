@@ -14,7 +14,7 @@ const actorFrom = (principal: { userId: string; displayName: string }) => ({
 });
 
 const refresh = (projectId: string) => {
-  revalidatePath(`/studioflow/${projectId}`);
+  revalidatePath(`/studioflow/projects/${projectId}`);
 };
 
 // ── Task actions (SF-F4) ─────────────────────────────────────────────────────

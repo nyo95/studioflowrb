@@ -295,7 +295,7 @@ export default async function ProjectDetailPage({
             <StatusBadge tone={PROJECT_STATUS_TONE[project.status as keyof typeof PROJECT_STATUS_TONE] ?? "neutral"}>
               {STATUS_LABELS[project.status] ?? project.status}
             </StatusBadge>
-            <Link href={`/studioflow/${id}/files`} className={buttonClasses("secondary", "sm")}>
+            <Link href={`/studioflow/projects/${id}/files`} className={buttonClasses("secondary", "sm")}>
               <FolderOpen aria-hidden="true" /> Project files
             </Link>
           </>

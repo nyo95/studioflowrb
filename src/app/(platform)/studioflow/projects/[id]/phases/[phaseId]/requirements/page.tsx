@@ -11,23 +11,23 @@ import {
 } from "@/platform/ui_engine";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/service";
 import { studioFlowService } from "@/apps/studioflow/runtime";
-import { RequirementCreateForm, RequirementWorkflowRow } from "./requirement-workflow";
+import { RequirementCreateForm, RequirementWorkflowRow } from "../../../requirements/requirement-workflow";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProjectRequirementsPage({
+export default async function PhaseRequirementsPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string; phaseId: string }>;
 }) {
-  const { id } = await params;
+  const { id, phaseId } = await params;
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { grants } = principalGrants;
 
   const canRead = hasPermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
   const canManage = hasPermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
-  if (!canRead) redirect(`/studioflow/${id}`);
+  if (!canRead) redirect(`/studioflow/projects/${id}`);
 
   let project;
   try {
@@ -36,23 +36,30 @@ export default async function ProjectRequirementsPage({
     notFound();
   }
 
-  if (project.deleted_at) redirect(`/studioflow/${id}`);
+  if (project.deleted_at) redirect(`/studioflow/projects/${id}`);
+
+  let phase;
+  try {
+    phase = await studioFlowService.getPhase(grants, id, phaseId);
+  } catch {
+    notFound();
+  }
 
   const [requirements, files] = await Promise.all([
-    studioFlowService.listProjectRequirements(grants, id, { phaseId: null, includeArchived: true }),
+    studioFlowService.listProjectRequirements(grants, id, { phaseId, includeArchived: true }),
     studioFlowService.listFiles(grants, id),
   ]);
 
   return (
     <>
       <PageHeader
-        eyebrow={project.name}
-        title="General Requirements"
-        description="Project-scoped requirements applied to the whole project."
+        eyebrow={`${project.name} \u2014 ${phase.name}`}
+        title="Phase Requirements"
+        description={`Requirements specific to the ${phase.name} phase.`}
         divider
         actions={
           <Link
-            href={`/studioflow/${id}`}
+            href={`/studioflow/projects/${id}`}
             className="inline-flex items-center gap-1.5 rounded-md border border-line-subtle px-3 py-1.5 text-sm font-medium text-ink-secondary hover:bg-surface-muted"
           >
             <ArrowLeft className="size-4" /> Back to project
@@ -60,18 +67,18 @@ export default async function ProjectRequirementsPage({
         }
       />
 
-      <div className="px-6 py-4">
+      <div className="min-w-0 px-4 py-4 sm:px-6">
         <SectionCard
-          title="General Requirements"
+          title={`${phase.name} Requirements`}
           count={requirements.length}
           padded={false}
         >
-          {canManage ? <RequirementCreateForm projectId={id} /> : null}
+          {canManage ? <RequirementCreateForm projectId={id} phaseId={phaseId} phaseName={phase.name} /> : null}
           {requirements.length === 0 ? (
             <EmptyState
               icon={FileText}
-              title="No general requirements"
-              description="General requirements will appear here once seeded from templates or created manually."
+              title="No phase requirements"
+              description="Phase requirements will appear here once seeded from templates or created manually."
             />
           ) : (
             <ol className="m-0 list-none p-0">{requirements.map((req) => <RequirementWorkflowRow key={req.id} projectId={id} canManage={canManage} files={files.map((file) => ({ id: file.id, filename: file.filename }))} requirement={{ ...req, archived_at: req.archived_at?.toISOString() ?? null, evidence: req.evidence.map((ev) => ({ id: ev.id, file: { id: ev.file.id, filename: ev.file.filename } })) }} />)}</ol>

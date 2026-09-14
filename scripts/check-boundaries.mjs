@@ -24,9 +24,9 @@ export const APP_DUPLICATE_PRIMITIVE_ALLOW_LIST = [
   "src/apps/studioflow/service.ts",
   "src/app/(platform)/bq/project-deletion-review.tsx",
   "src/app/(platform)/studioflow/page.tsx",
-  "src/app/(platform)/studioflow/[id]/page.tsx",
-  "src/app/(platform)/studioflow/[id]/files/page.tsx",
-  "src/app/(platform)/studioflow/[id]/mom/[momId]/page.tsx",
+  "src/app/(platform)/studioflow/projects/[id]/page.tsx",
+  "src/app/(platform)/studioflow/projects/[id]/files/page.tsx",
+  "src/app/(platform)/studioflow/projects/[id]/mom/[momId]/page.tsx",
 ];
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);

@@ -14,7 +14,7 @@ const actorFrom = (p: { userId: string; displayName: string }) => ({
   label: p.displayName,
 });
 
-const refresh = (projectId: string) => revalidatePath(`/studioflow/${projectId}`);
+const refresh = (projectId: string) => revalidatePath(`/studioflow/projects/${projectId}`);
 
 function responseKindOf(formData: FormData): "APPROVAL" | "REVISION" {
   const kind = formData.get("kind");

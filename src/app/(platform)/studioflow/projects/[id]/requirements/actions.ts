@@ -60,9 +60,9 @@ export async function createProjectRequirementAction(
       description: parsed.data.description || null,
       phase_id: parsed.data.phase_id || null,
     });
-    revalidatePath(`/studioflow/${projectId}`);
-    revalidatePath(`/studioflow/${projectId}/requirements`);
-    revalidatePath(`/studioflow/${projectId}/phases`, "layout");
+    revalidatePath(`/studioflow/projects/${projectId}`);
+    revalidatePath(`/studioflow/projects/${projectId}/requirements`);
+    revalidatePath(`/studioflow/projects/${projectId}/phases`, "layout");
   });
 }
 
@@ -84,9 +84,9 @@ export async function editProjectRequirementAction(
       ...parsed.data,
       description: parsed.data.description || null,
     });
-    revalidatePath(`/studioflow/${projectId}`);
-    revalidatePath(`/studioflow/${projectId}/requirements`);
-    revalidatePath(`/studioflow/${projectId}/phases`, "layout");
+    revalidatePath(`/studioflow/projects/${projectId}`);
+    revalidatePath(`/studioflow/projects/${projectId}/requirements`);
+    revalidatePath(`/studioflow/projects/${projectId}/phases`, "layout");
   });
 }
 
@@ -101,9 +101,9 @@ export async function satisfyRequirementAction(
     const parsed = SatisfySchema.safeParse({ satisfaction_note: formData.get("satisfaction_note") });
     if (!parsed.success) throw validationError(parsed.error);
     await studioFlowService.satisfyRequirement(grants, actorFrom(principal), requirementId, parsed.data);
-    revalidatePath(`/studioflow/${projectId}`);
-    revalidatePath(`/studioflow/${projectId}/requirements`);
-    revalidatePath(`/studioflow/${projectId}/phases`, "layout");
+    revalidatePath(`/studioflow/projects/${projectId}`);
+    revalidatePath(`/studioflow/projects/${projectId}/requirements`);
+    revalidatePath(`/studioflow/projects/${projectId}/phases`, "layout");
   });
 }
 
@@ -118,9 +118,9 @@ export async function reopenRequirementAction(
     const parsed = ReasonSchema.safeParse({ reason: formData.get("reason") });
     if (!parsed.success) throw validationError(parsed.error);
     await studioFlowService.reopenRequirement(grants, actorFrom(principal), requirementId, { reopen_reason: parsed.data.reason });
-    revalidatePath(`/studioflow/${projectId}`);
-    revalidatePath(`/studioflow/${projectId}/requirements`);
-    revalidatePath(`/studioflow/${projectId}/phases`, "layout");
+    revalidatePath(`/studioflow/projects/${projectId}`);
+    revalidatePath(`/studioflow/projects/${projectId}/requirements`);
+    revalidatePath(`/studioflow/projects/${projectId}/phases`, "layout");
   });
 }
 
@@ -135,9 +135,9 @@ export async function archiveRequirementAction(
     const parsed = ReasonSchema.safeParse({ reason: formData.get("reason") });
     if (!parsed.success) throw validationError(parsed.error);
     await studioFlowService.archiveRequirement(grants, actorFrom(principal), requirementId, parsed.data);
-    revalidatePath(`/studioflow/${projectId}`);
-    revalidatePath(`/studioflow/${projectId}/requirements`);
-    revalidatePath(`/studioflow/${projectId}/phases`, "layout");
+    revalidatePath(`/studioflow/projects/${projectId}`);
+    revalidatePath(`/studioflow/projects/${projectId}/requirements`);
+    revalidatePath(`/studioflow/projects/${projectId}/phases`, "layout");
   });
 }
 
@@ -152,9 +152,9 @@ export async function restoreRequirementAction(
     const parsed = ReasonSchema.safeParse({ reason: formData.get("reason") });
     if (!parsed.success) throw validationError(parsed.error);
     await studioFlowService.restoreRequirement(grants, actorFrom(principal), requirementId, parsed.data);
-    revalidatePath(`/studioflow/${projectId}`);
-    revalidatePath(`/studioflow/${projectId}/requirements`);
-    revalidatePath(`/studioflow/${projectId}/phases`, "layout");
+    revalidatePath(`/studioflow/projects/${projectId}`);
+    revalidatePath(`/studioflow/projects/${projectId}/requirements`);
+    revalidatePath(`/studioflow/projects/${projectId}/phases`, "layout");
   });
 }
 
@@ -169,9 +169,9 @@ export async function linkEvidenceAction(
     const parsed = EvidenceSchema.safeParse({ file_id: formData.get("file_id") });
     if (!parsed.success) throw validationError(parsed.error);
     await studioFlowService.linkEvidence(grants, actorFrom(principal), requirementId, parsed.data);
-    revalidatePath(`/studioflow/${projectId}`);
-    revalidatePath(`/studioflow/${projectId}/requirements`);
-    revalidatePath(`/studioflow/${projectId}/phases`, "layout");
+    revalidatePath(`/studioflow/projects/${projectId}`);
+    revalidatePath(`/studioflow/projects/${projectId}/requirements`);
+    revalidatePath(`/studioflow/projects/${projectId}/phases`, "layout");
   });
 }
 
@@ -187,8 +187,8 @@ export async function unlinkEvidenceAction(
     const parsed = ReasonSchema.safeParse({ reason: formData.get("reason") });
     if (!parsed.success) throw validationError(parsed.error);
     await studioFlowService.unlinkEvidence(grants, actorFrom(principal), requirementId, evidenceId, parsed.data);
-    revalidatePath(`/studioflow/${projectId}`);
-    revalidatePath(`/studioflow/${projectId}/requirements`);
-    revalidatePath(`/studioflow/${projectId}/phases`, "layout");
+    revalidatePath(`/studioflow/projects/${projectId}`);
+    revalidatePath(`/studioflow/projects/${projectId}/requirements`);
+    revalidatePath(`/studioflow/projects/${projectId}/phases`, "layout");
   });
 }

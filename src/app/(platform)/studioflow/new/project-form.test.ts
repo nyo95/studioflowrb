@@ -10,6 +10,7 @@ describe("StudioFlow project creation", () => {
     assert.match(form, /name="client_id"/);
     assert.match(form, /name="client_name"/);
     assert.match(action, /client_name/);
+    assert.match(action, /client_name: String\(formData\.get\("client_name"\) \?\? ""\)/);
     assert.match(action, /client_id: client_id \|\| undefined/);
   });
 });

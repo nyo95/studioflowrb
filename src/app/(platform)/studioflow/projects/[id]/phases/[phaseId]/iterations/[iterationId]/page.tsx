@@ -10,5 +10,5 @@ export default async function IterationDetailPage({
   params: Promise<{ id: string; phaseId: string; iterationId: string }>;
 }) {
   const { id } = await params;
-  redirect(`/studioflow/${id}`);
+  redirect(`/studioflow/projects/${id}`);
 }

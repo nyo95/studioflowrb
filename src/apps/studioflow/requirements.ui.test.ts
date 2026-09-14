@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-const projectPage = readFileSync("src/app/(platform)/studioflow/[id]/requirements/page.tsx", "utf8");
-const phasePage = readFileSync("src/app/(platform)/studioflow/[id]/phases/[phaseId]/requirements/page.tsx", "utf8");
-const workflow = readFileSync("src/app/(platform)/studioflow/[id]/requirements/requirement-workflow.tsx", "utf8");
-const actions = readFileSync("src/app/(platform)/studioflow/[id]/requirements/actions.ts", "utf8");
+const projectPage = readFileSync("src/app/(platform)/studioflow/projects/[id]/requirements/page.tsx", "utf8");
+const phasePage = readFileSync("src/app/(platform)/studioflow/projects/[id]/phases/[phaseId]/requirements/page.tsx", "utf8");
+const workflow = readFileSync("src/app/(platform)/studioflow/projects/[id]/requirements/requirement-workflow.tsx", "utf8");
+const actions = readFileSync("src/app/(platform)/studioflow/projects/[id]/requirements/actions.ts", "utf8");
 
 describe("StudioFlow project requirement workflow routes", () => {
   it("exposes guarded General requirement lifecycle controls", () => {
@@ -16,9 +16,11 @@ describe("StudioFlow project requirement workflow routes", () => {
     }
     assert.match(workflow, /Link evidence/);
     assert.match(workflow, /Unlink evidence/);
+    assert.match(workflow, /canManage && !requirement\.archived_at/);
   });
 
   it("keeps Phase requirements on the project/phase canonical route", () => {
+    assert.match(phasePage, /\/studioflow\/projects\/\$\{id\}/);
     assert.match(phasePage, /RequirementCreateForm/);
     assert.match(phasePage, /phaseId/);
     assert.match(phasePage, /listProjectRequirements/);

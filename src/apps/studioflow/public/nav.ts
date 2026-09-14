@@ -17,11 +17,11 @@ export const STUDIOFLOW_ROUTES = {
   catalogue: "/studioflow/catalogue",
   newCatalogueItem: "/studioflow/catalogue/new",
   catalogueItem: (id: string) => `/studioflow/catalogue/${id}`,
-  projectDetail: (id: string) => `/studioflow/${id}`,
-  projectFiles: (id: string) => `/studioflow/${id}/files`,
-  projectPhase: (projectId: string, phaseId: string) => `/studioflow/${projectId}/phases/${phaseId}`,
-  projectIteration: (projectId: string, phaseId: string, iterationId: string) => `/studioflow/${projectId}/phases/${phaseId}/iterations/${iterationId}`,
-  projectMom: (projectId: string, momId: string) => `/studioflow/${projectId}/mom/${momId}`,
+  projectDetail: (id: string) => `/studioflow/projects/${id}`,
+  projectFiles: (id: string) => `/studioflow/projects/${id}/files`,
+  projectPhase: (projectId: string, phaseId: string) => `/studioflow/projects/${projectId}/phases/${phaseId}`,
+  projectIteration: (projectId: string, phaseId: string, iterationId: string) => `/studioflow/projects/${projectId}/phases/${phaseId}/iterations/${iterationId}`,
+  projectMom: (projectId: string, momId: string) => `/studioflow/projects/${projectId}/mom/${momId}`,
   settings: "/studioflow/settings",
 } as const;
 

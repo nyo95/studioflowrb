@@ -108,7 +108,7 @@ export default async function ProjectFilesPage({
       <Breadcrumb
         entries={[
           { label: "Project", href: "/studioflow/projects" },
-          { label: project.name, href: `/studioflow/${projectId}` },
+          { label: project.name, href: `/studioflow/projects/${projectId}` },
           { label: "File" },
         ]}
       />

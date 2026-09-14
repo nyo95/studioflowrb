@@ -241,6 +241,8 @@ export default async function StudioFlowProjectsPage({
           without client JS and every view is a shareable URL. */}
       {/* Canonical directory chrome: the toolbar owns filters and search, so a
           filtered-to-nothing list still shows the controls that got it there. */}
+      {/* TODO(SF-0): Project List — replace DirectoryShell/DataTable/EntityPrimaryCell with workspace-appropriate pattern.
+          DirectoryShell/DataTable paradigm does not fit workspace execution context. */}
       <DirectoryShell
         surface
         fill
@@ -328,7 +330,7 @@ export default async function StudioFlowProjectsPage({
                         statusLabel={STATUS_LABELS[project.status] ?? project.status}
                         name={
                           <Link
-                            href={`/studioflow/${project.id}`}
+                            href={`/studioflow/projects/${project.id}`}
                             className="font-medium text-action hover:underline"
                           >
                             {project.name}

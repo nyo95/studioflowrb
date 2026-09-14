@@ -4,8 +4,8 @@ import { describe, it } from "node:test";
 
 const schema = readFileSync(new URL("../../../prisma/schema.prisma", import.meta.url), "utf8");
 const service = readFileSync(new URL("./service.ts", import.meta.url), "utf8");
-const actions = readFileSync(new URL("../../app/(platform)/studioflow/[id]/mom-actions.ts", import.meta.url), "utf8");
-const editor = readFileSync(new URL("../../app/(platform)/studioflow/[id]/mom-editor.tsx", import.meta.url), "utf8");
+const actions = readFileSync(new URL("../../app/(platform)/studioflow/projects/[id]/mom-actions.ts", import.meta.url), "utf8");
+const editor = readFileSync(new URL("../../app/(platform)/studioflow/projects/[id]/mom-editor.tsx", import.meta.url), "utf8");
 const imagePolicy = readFileSync(new URL("./mom-images.ts", import.meta.url), "utf8");
 
 describe("StudioFlow MOM contract", () => {

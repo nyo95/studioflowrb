@@ -44,7 +44,7 @@ export async function createMomAction(projectId: string, _prev: ActionResult<voi
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
     await studioFlowService.createMomDraft(grants, actorFrom(principal), { project_id: projectId, ...metadataFrom(formData) });
-    revalidatePath(`/studioflow/${projectId}`);
+    revalidatePath(`/studioflow/projects/${projectId}`);
   }, { context: "studioflow.mom.create" });
 }
 
@@ -52,7 +52,7 @@ export async function updateMomAction(projectId: string, momId: string, _prev: A
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
     await studioFlowService.updateMomDraft(grants, actorFrom(principal), projectId, momId, metadataFrom(formData));
-    revalidatePath(`/studioflow/${projectId}`); revalidatePath(`/studioflow/${projectId}/mom/${momId}`);
+    revalidatePath(`/studioflow/projects/${projectId}`); revalidatePath(`/studioflow/projects/${projectId}/mom/${momId}`);
   }, { context: "studioflow.mom.update" });
 }
 
@@ -60,7 +60,7 @@ export async function issueMomAction(projectId: string, momId: string, _prev: Ac
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
     await studioFlowService.issueMom(grants, actorFrom(principal), projectId, momId);
-    revalidatePath(`/studioflow/${projectId}`); revalidatePath(`/studioflow/${projectId}/mom/${momId}`);
+    revalidatePath(`/studioflow/projects/${projectId}`); revalidatePath(`/studioflow/projects/${projectId}/mom/${momId}`);
   }, { context: "studioflow.mom.issue" });
 }
 
@@ -70,7 +70,7 @@ export async function discardMomAction(projectId: string, momId: string, _prev: 
     const mom = await studioFlowService.getMom(grants, projectId, momId);
     await studioFlowService.discardMomDraft(grants, actorFrom(principal), projectId, momId);
     await Promise.allSettled(mom.items.flatMap((item) => item.images.map((image) => objectStorage.remove(image.storage_key))));
-    revalidatePath(`/studioflow/${projectId}`);
+    revalidatePath(`/studioflow/projects/${projectId}`);
   }, { context: "studioflow.mom.discard" });
 }
 
@@ -86,7 +86,7 @@ export async function updateMomContentAction(projectId: string, momId: string, _
     const retained = new Set(content.items.flatMap((item) => item.images.map((image) => image.storage_key)));
     const removed = previous.items.flatMap((item) => item.images.map((image) => image.storage_key)).filter((key) => !retained.has(key));
     await Promise.allSettled(removed.map((key) => objectStorage.remove(key)));
-    revalidatePath(`/studioflow/${projectId}`); revalidatePath(`/studioflow/${projectId}/mom/${momId}`);
+    revalidatePath(`/studioflow/projects/${projectId}`); revalidatePath(`/studioflow/projects/${projectId}/mom/${momId}`);
   }, { context: "studioflow.mom.content.update" });
 }
 
@@ -113,6 +113,6 @@ export async function supersedeMomAction(projectId: string, momId: string, _prev
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
     await studioFlowService.supersedeMom(grants, actorFrom(principal), projectId, momId, { project_id: projectId, ...metadataFrom(formData) });
-    revalidatePath(`/studioflow/${projectId}`); revalidatePath(`/studioflow/${projectId}/mom/${momId}`);
+    revalidatePath(`/studioflow/projects/${projectId}`); revalidatePath(`/studioflow/projects/${projectId}/mom/${momId}`);
   }, { context: "studioflow.mom.supersede" });
 }

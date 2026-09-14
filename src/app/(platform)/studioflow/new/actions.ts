@@ -30,6 +30,7 @@ export async function createProjectAction(
     const parsed = ProjectSchema.safeParse({
       name: String(formData.get("name") ?? ""),
       client_id: String(formData.get("client_id") ?? ""),
+      client_name: String(formData.get("client_name") ?? ""),
       lead_user_id: String(formData.get("lead_user_id") ?? "") || undefined,
       location: String(formData.get("location") ?? "") || undefined,
       address: String(formData.get("address") ?? "") || undefined,
@@ -51,6 +52,6 @@ export async function createProjectAction(
       },
     );
     revalidatePath("/studioflow");
-    redirect(`/studioflow/${project.id}`);
+    redirect(`/studioflow/projects/${project.id}`);
   });
 }

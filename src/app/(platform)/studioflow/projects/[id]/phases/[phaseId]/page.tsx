@@ -11,5 +11,5 @@ export default async function PhaseDetailPage({
   params: Promise<{ id: string; phaseId: string }>;
 }) {
   const { id } = await params;
-  redirect(`/studioflow/${id}`);
+  redirect(`/studioflow/projects/${id}`);
 }
