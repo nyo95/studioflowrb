@@ -5,8 +5,35 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.59**
-- Next local revision: **R8.60**
+- Current revision after this entry is committed: **R8.60**
+- Next local revision: **R8.61**
+
+## R8.60 | 2026-09-14 | docs(foundation): record PF-8 acceptance candidate
+
+### Changed
+
+- Added the PF-8 candidate receipt with the frozen R8.12 StudioFlow reference,
+  accepted F-A through F-D revisions, automated gate results, and the verified
+  kantor disposable database scope.
+- Recorded F-E/PF-8 in `docs/review.md` as candidate-only. Reviewer browser
+  smoke remains required before closing the roadmap gate or releasing
+  StudioFlow implementation.
+
+### Verification
+
+- `npm test`: 353/353 passed across 82 suites against disposable
+  `studioflow_rebuild_test` in the approved `studioflowrb-gateb-test-db`
+  container.
+- `npm run typecheck`, `npm run lint`, `npm run check:boundaries`,
+  `npm run check:legacy-runtime`, `npm run build`, documentation link scan,
+  `git diff --check`, and staged whitespace review: passed.
+
+### Limitations
+
+- Reviewer browser acceptance is not run by this Executor receipt. F-E/PF-8
+  remains open; no StudioFlow recovery implementation is released.
+- No code, schema, migration, dependency, permission, route, data, or legacy
+  checkout/database was changed or accessed.
 
 ## R8.59 | 2026-09-14 | review(foundation): accept F-D browser walkthrough
 

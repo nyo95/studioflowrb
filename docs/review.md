@@ -19,6 +19,21 @@ a real defect — move it to `knownbug.md` with what was actually observed.
 
 ## Platform Foundation
 
+### F-E / PF-8 — Foundation acceptance and freeze (candidate R8.60)
+
+- **Executor evidence:** The candidate receipt in
+  [`FOUNDATION-ACCEPTANCE-PF8.md`](FOUNDATION-ACCEPTANCE-PF8.md) records the
+  frozen R8.12 StudioFlow reference, accepted Foundation slices, and the
+  kantor disposable database scope. `npm test` passed 353/353 across 82
+  suites; typecheck, lint, architecture boundary, legacy-runtime, production
+  build, and whitespace checks passed.
+- **Still needed:** Reviewer desktop and 375 px browser smoke for `/masterdata`
+  and `/bq`, primary navigation, one existing read-only surface per app, and
+  unauthenticated redirects to `/login` after sign-out. No fixture data should
+  be created or edited.
+- **Status:** Candidate only. F-E/PF-8 remains open until Reviewer records
+  PASS; StudioFlow recovery implementation remains frozen.
+
 ### PF-1 — Core purity and managed Brand mark storage
 
 - **Observed:** R8.25 (`c4061f3`) moved storage behind the provider-neutral
