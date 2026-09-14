@@ -46,6 +46,22 @@ a real defect — move it to `knownbug.md` with what was actually observed.
   unaccepted until a disposable rebuild-only test database and an approved
   non-production browser test account are supplied; then run the active
   `PLAN.md` acceptance recipe.
+- **R8.42 kantor preflight:** `STUDIOFLOW_LOCATION=kantor` is set, but local
+  configuration contains neither `PLATFORM_TEST_DATABASE_URL` nor a browser
+  test-account/grant fixture. The required environment is therefore not proven
+  safe to run integration tests against and cannot sign in for authenticated
+  launcher/sidebar or route checks.
+- **Checks completed:** focused app-registration/registry tests (9/9),
+  typecheck, lint, architecture boundary, legacy-runtime, and production build
+  all passed. `next start` booted with no instrumentation/registry failure;
+  `/`, `/masterdata`, `/bq`, and `/studioflow` each redirected unauthenticated
+  requests to `/login`.
+- **Checks not run:** `npm run test`; authenticated launcher/sidebar visibility;
+  and the authorized/unauthorized route matrix for Master Data, BQ, and
+  StudioFlow.
+- **Required to continue:** one complete kantor acceptance fixture: a
+  disposable `studioflow-rebuild` `PLATFORM_TEST_DATABASE_URL` plus a
+  local-only non-production browser account with its grant fixture.
 
 ### PF-1 — Core purity and managed Brand mark storage
 

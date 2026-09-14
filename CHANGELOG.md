@@ -5,8 +5,31 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.41**
-- Next local revision: **R8.42**
+- Current revision after this entry is committed: **R8.42**
+- Next local revision: **R8.43**
+
+## R8.42 | 2026-09-14 | docs(review): record F-B kantor acceptance preflight blocker
+
+- Ran the F-B acceptance preflight with `STUDIOFLOW_LOCATION=kantor`.
+  The local configuration has neither a `PLATFORM_TEST_DATABASE_URL` for a
+  disposable `studioflow-rebuild` database nor a configured non-production
+  browser test account/grant fixture.
+- Re-ran every safe available check: focused registration tests, typecheck,
+  lint, architecture boundary, legacy-runtime, and production build all pass.
+  A production server started without instrumentation or registry errors; the
+  unauthenticated root and each app root redirected to `/login`.
+- `npm run test`, authenticated launcher/sidebar verification, and the
+  authorized/unauthorized route matrix were intentionally not run: doing so
+  would require the missing disposable database and supplied test account.
+  F-B remains blocked and unaccepted; no application behavior changed.
+
+### Verification
+
+- Focused registration/registry tests: 9/9 passed.
+- `npm run typecheck`, `npm run lint`, `npm run check:boundaries`,
+  `npm run check:legacy-runtime`, and `npm run build`: passed.
+- Production server (`next start`) boot plus `/`, `/masterdata`, `/bq`, and
+  `/studioflow` unauthenticated redirects: passed.
 
 ## R8.41 | 2026-09-14 | docs(agent): require executor acceptance preflight
 
