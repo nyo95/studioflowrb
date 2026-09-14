@@ -249,6 +249,62 @@ export type UpdateNamingTemplateInput = {
   naming_template: string;
 };
 
+// ── §7.1.1 Requirements input types ─────────────────────────────────────────
+
+export type CreateRequirementTemplateInput = {
+  key: string;
+  scope: "GENERAL" | "PHASE";
+  title: string;
+  description?: string | null;
+  sort_order?: number;
+  /** Required when scope is PHASE; must match an existing SfPhaseTemplate id. */
+  phase_template_id?: string | null;
+};
+
+export type EditRequirementTemplateInput = {
+  title?: string;
+  description?: string | null;
+  sort_order?: number;
+};
+
+export type CreateProjectRequirementInput = {
+  project_id: string;
+  phase_id?: string | null;
+  title: string;
+  description?: string | null;
+  sort_order?: number;
+};
+
+export type EditProjectRequirementInput = {
+  title?: string;
+  description?: string | null;
+  sort_order?: number;
+};
+
+export type SatisfyRequirementInput = {
+  satisfaction_note: string;
+};
+
+export type ReopenRequirementInput = {
+  reopen_reason: string;
+};
+
+export type ArchiveRequirementInput = {
+  reason: string;
+};
+
+export type RestoreRequirementInput = {
+  reason: string;
+};
+
+export type LinkEvidenceInput = {
+  file_id: string;
+};
+
+export type UnlinkEvidenceInput = {
+  reason: string;
+};
+
 // ── Code generation ───────────────────────────────────────────────────────
 
 /** Generates the next project code in format SF<YY>-<NNNN>. Runs inside tx. */
@@ -687,6 +743,11 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
           phases: { orderBy: { sort_order: "asc" } },
         },
       });
+
+      // §7.1.1: Snapshot requirement templates into project requirements
+      for (const phase of project.phases) {
+        await snapshotRequirementsForProject(db, project.id, phase.id, phase.template_id);
+      }
 
       await writeAudit({
         action: "project.create",
@@ -2488,6 +2549,526 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     });
   }
 
+  // ── §7.1.1 Requirement templates (studio settings) ──────────────────────
+
+  async function listRequirementTemplates(
+    grants: PermissionGrants,
+    opts?: { includeArchived?: boolean },
+  ) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    return db.sfRequirementTemplate.findMany({
+      where: opts?.includeArchived ? {} : { deleted_at: null },
+      orderBy: [{ sort_order: "asc" }, { created_at: "asc" }],
+      include: { phase_template: { select: { id: true, key: true, name: true } } },
+    });
+  }
+
+  async function getRequirementTemplate(grants: PermissionGrants, id: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    const row = await db.sfRequirementTemplate.findUnique({
+      where: { id },
+      include: { phase_template: { select: { id: true, key: true, name: true } } },
+    });
+    if (!row) throw new AppError("NOT_FOUND", "studioflow.requirement-template.not-found", "Requirement template not found");
+    return row;
+  }
+
+  async function createRequirementTemplate(
+    grants: PermissionGrants,
+    actor: AuditActor,
+    input: CreateRequirementTemplateInput,
+  ) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
+    const key = input.key.trim().toLowerCase();
+    if (!key) throw new AppError("VALIDATION", "studioflow.requirement-template.key-required", "Template key is required");
+    if (!/^[a-z0-9_-]+$/.test(key)) {
+      throw new AppError("VALIDATION", "studioflow.requirement-template.key-invalid", "Template key must be lowercase alphanumeric with hyphens or underscores");
+    }
+    if (!input.title.trim()) throw new AppError("VALIDATION", "studioflow.requirement-template.title-required", "Template title is required");
+    if (input.scope === "PHASE" && !input.phase_template_id) {
+      throw new AppError("VALIDATION", "studioflow.requirement-template.phase-template-required", "Phase scope requires a phase template reference");
+    }
+    if (input.scope === "GENERAL" && input.phase_template_id) {
+      throw new AppError("VALIDATION", "studioflow.requirement-template.general-no-phase", "General scope must not reference a phase template");
+    }
+    if (input.phase_template_id) {
+      const pt = await db.sfPhaseTemplate.findUnique({ where: { id: input.phase_template_id } });
+      if (!pt) throw new AppError("NOT_FOUND", "studioflow.phase-template.not-found", "Phase template not found");
+    }
+    return runTransaction(async () => {
+      const existing = await db.sfRequirementTemplate.findFirst({
+        where: { scope: input.scope, phase_template_id: input.phase_template_id ?? null, key },
+      });
+      if (existing) throw new AppError("CONFLICT", "studioflow.requirement-template.duplicate-key", "A template with this key already exists for this scope");
+      const last = await db.sfRequirementTemplate.findFirst({
+        where: { scope: input.scope, phase_template_id: input.phase_template_id ?? null },
+        orderBy: { sort_order: "desc" },
+        select: { sort_order: true },
+      });
+      const created = await db.sfRequirementTemplate.create({
+        data: {
+          key,
+          scope: input.scope,
+          title: input.title.trim(),
+          description: input.description?.trim() || null,
+          sort_order: input.sort_order ?? ((last?.sort_order ?? 0) + 1),
+          phase_template_id: input.phase_template_id ?? null,
+        },
+      });
+      await writeAudit({
+        action: "requirement_template.create",
+        entityType: "SfRequirementTemplate",
+        entityId: created.id,
+        actor,
+        changes: { key: created.key, scope: created.scope, title: created.title },
+      });
+      return created;
+    });
+  }
+
+  async function editRequirementTemplate(
+    grants: PermissionGrants,
+    actor: AuditActor,
+    id: string,
+    input: EditRequirementTemplateInput,
+  ) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
+    return runTransaction(async () => {
+      const existing = await db.sfRequirementTemplate.findUnique({ where: { id } });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.requirement-template.not-found", "Requirement template not found");
+      if (existing.deleted_at) throw new AppError("CONFLICT", "studioflow.requirement-template.archived", "Cannot edit an archived template");
+      const data: Record<string, unknown> = {};
+      if (input.title !== undefined) data.title = input.title.trim();
+      if (input.description !== undefined) data.description = input.description?.trim() || null;
+      if (input.sort_order !== undefined) data.sort_order = input.sort_order;
+      if (Object.keys(data).length === 0) return existing;
+      const updated = await db.sfRequirementTemplate.update({ where: { id }, data });
+      await writeAudit({
+        action: "requirement_template.edit",
+        entityType: "SfRequirementTemplate",
+        entityId: id,
+        actor,
+        changes: { before: { title: existing.title, description: existing.description, sort_order: existing.sort_order }, after: data },
+      });
+      return updated;
+    });
+  }
+
+  async function archiveRequirementTemplate(grants: PermissionGrants, actor: AuditActor, id: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
+    return runTransaction(async () => {
+      const existing = await db.sfRequirementTemplate.findUnique({ where: { id } });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.requirement-template.not-found", "Requirement template not found");
+      if (existing.deleted_at) throw new AppError("CONFLICT", "studioflow.requirement-template.already-archived", "Template is already archived");
+      const updated = await db.sfRequirementTemplate.update({ where: { id }, data: { deleted_at: new Date() } });
+      await writeAudit({ action: "requirement_template.archive", entityType: "SfRequirementTemplate", entityId: id, actor });
+      return updated;
+    });
+  }
+
+  async function restoreRequirementTemplate(grants: PermissionGrants, actor: AuditActor, id: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
+    return runTransaction(async () => {
+      const existing = await db.sfRequirementTemplate.findUnique({ where: { id } });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.requirement-template.not-found", "Requirement template not found");
+      if (!existing.deleted_at) throw new AppError("CONFLICT", "studioflow.requirement-template.not-archived", "Template is not archived");
+      const updated = await db.sfRequirementTemplate.update({ where: { id }, data: { deleted_at: null } });
+      await writeAudit({ action: "requirement_template.restore", entityType: "SfRequirementTemplate", entityId: id, actor });
+      return updated;
+    });
+  }
+
+  async function deleteRequirementTemplate(grants: PermissionGrants, actor: AuditActor, id: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
+    return runTransaction(async () => {
+      const existing = await db.sfRequirementTemplate.findUnique({ where: { id } });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.requirement-template.not-found", "Requirement template not found");
+      if (existing.key_immutable) {
+        throw new AppError("CONFLICT", "studioflow.requirement-template.key-in-use", "Cannot delete a template whose key has been used in a project snapshot");
+      }
+      if (!existing.deleted_at) {
+        throw new AppError("CONFLICT", "studioflow.requirement-template.not-archived", "Archive the template before deleting");
+      }
+      await db.sfRequirementTemplate.delete({ where: { id } });
+      await writeAudit({ action: "requirement_template.delete", entityType: "SfRequirementTemplate", entityId: id, actor });
+    });
+  }
+
+  // ── §7.1.1 Project requirements ─────────────────────────────────────────
+
+  async function listProjectRequirements(
+    grants: PermissionGrants,
+    projectId: string,
+    opts?: { phaseId?: string | null; includeArchived?: boolean },
+  ) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    const project = await db.sfProject.findUnique({ where: { id: projectId } });
+    if (!project) throw new AppError("NOT_FOUND", "studioflow.project.not-found", "Project not found");
+    const where: Record<string, unknown> = { project_id: projectId };
+    if (opts?.phaseId !== undefined) where.phase_id = opts.phaseId;
+    if (!opts?.includeArchived) where.archived_at = null;
+    return db.sfProjectRequirement.findMany({
+      where,
+      orderBy: [{ sort_order: "asc" }, { created_at: "asc" }],
+      include: {
+        evidence: {
+          where: { unlinked_at: null },
+          include: { file: { select: { id: true, filename: true, original_filename: true, treatment: true, folder_key: true } } },
+        },
+      },
+    });
+  }
+
+  async function getProjectRequirement(grants: PermissionGrants, id: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    const row = await db.sfProjectRequirement.findUnique({
+      where: { id },
+      include: {
+        evidence: {
+          where: { unlinked_at: null },
+          include: { file: { select: { id: true, filename: true, original_filename: true, treatment: true, folder_key: true } } },
+        },
+      },
+    });
+    if (!row) throw new AppError("NOT_FOUND", "studioflow.requirement.not-found", "Requirement not found");
+    return row;
+  }
+
+  async function createProjectRequirement(
+    grants: PermissionGrants,
+    actor: AuditActor,
+    input: CreateProjectRequirementInput,
+  ) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
+    if (!input.title.trim()) throw new AppError("VALIDATION", "studioflow.requirement.title-required", "Requirement title is required");
+    return runTransaction(async () => {
+      const project = await db.sfProject.findUnique({ where: { id: input.project_id } });
+      if (!project) throw new AppError("NOT_FOUND", "studioflow.project.not-found", "Project not found");
+      if (project.deleted_at) throw new AppError("CONFLICT", "studioflow.project.archived", "Cannot add requirements to an archived project");
+      if (input.phase_id) {
+        const phase = await db.sfProjectPhase.findFirst({ where: { id: input.phase_id, project_id: input.project_id } });
+        if (!phase) throw new AppError("NOT_FOUND", "studioflow.phase.not-found", "Phase not found in this project");
+      }
+      const last = await db.sfProjectRequirement.findFirst({
+        where: { project_id: input.project_id, phase_id: input.phase_id ?? null },
+        orderBy: { sort_order: "desc" },
+        select: { sort_order: true },
+      });
+      const created = await db.sfProjectRequirement.create({
+        data: {
+          project_id: input.project_id,
+          phase_id: input.phase_id ?? null,
+          title: input.title.trim(),
+          description: input.description?.trim() || null,
+          sort_order: input.sort_order ?? ((last?.sort_order ?? 0) + 1),
+        },
+      });
+      await writeAudit({
+        action: "requirement.create",
+        entityType: "SfProjectRequirement",
+        entityId: created.id,
+        actor,
+        changes: { project_id: input.project_id, phase_id: input.phase_id, title: created.title },
+      });
+      return created;
+    });
+  }
+
+  async function editProjectRequirement(
+    grants: PermissionGrants,
+    actor: AuditActor,
+    id: string,
+    input: EditProjectRequirementInput,
+  ) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
+    return runTransaction(async () => {
+      const existing = await db.sfProjectRequirement.findUnique({ where: { id } });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.requirement.not-found", "Requirement not found");
+      if (existing.archived_at) throw new AppError("CONFLICT", "studioflow.requirement.archived", "Cannot edit an archived requirement");
+      const data: Record<string, unknown> = {};
+      if (input.title !== undefined) data.title = input.title.trim();
+      if (input.description !== undefined) data.description = input.description?.trim() || null;
+      if (input.sort_order !== undefined) data.sort_order = input.sort_order;
+      if (Object.keys(data).length === 0) return existing;
+      const updated = await db.sfProjectRequirement.update({ where: { id }, data });
+      await writeAudit({
+        action: "requirement.edit",
+        entityType: "SfProjectRequirement",
+        entityId: id,
+        actor,
+        changes: { before: { title: existing.title, description: existing.description }, after: data },
+      });
+      return updated;
+    });
+  }
+
+  async function satisfyRequirement(
+    grants: PermissionGrants,
+    actor: AuditActor,
+    id: string,
+    input: SatisfyRequirementInput,
+  ) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
+    if (!input.satisfaction_note.trim()) {
+      throw new AppError("VALIDATION", "studioflow.requirement.satisfaction-note-required", "Satisfaction note is required");
+    }
+    return runTransaction(async () => {
+      const existing = await db.sfProjectRequirement.findUnique({ where: { id } });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.requirement.not-found", "Requirement not found");
+      if (existing.archived_at) throw new AppError("CONFLICT", "studioflow.requirement.archived", "Cannot satisfy an archived requirement");
+      if (existing.satisfaction_state === "SATISFIED") {
+        throw new AppError("CONFLICT", "studioflow.requirement.already-satisfied", "Requirement is already satisfied");
+      }
+      const updated = await db.sfProjectRequirement.update({
+        where: { id },
+        data: {
+          satisfaction_state: "SATISFIED",
+          satisfied_at: new Date(),
+          satisfied_by_id: actor.userId,
+          satisfaction_note: input.satisfaction_note.trim(),
+        },
+      });
+      await writeAudit({
+        action: "requirement.satisfy",
+        entityType: "SfProjectRequirement",
+        entityId: id,
+        actor,
+        changes: { project_id: existing.project_id, phase_id: existing.phase_id, satisfaction_note: input.satisfaction_note.trim() },
+      });
+      return updated;
+    });
+  }
+
+  async function reopenRequirement(
+    grants: PermissionGrants,
+    actor: AuditActor,
+    id: string,
+    input: ReopenRequirementInput,
+  ) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
+    if (!input.reopen_reason.trim()) {
+      throw new AppError("VALIDATION", "studioflow.requirement.reopen-reason-required", "Reopen reason is required");
+    }
+    return runTransaction(async () => {
+      const existing = await db.sfProjectRequirement.findUnique({ where: { id } });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.requirement.not-found", "Requirement not found");
+      if (existing.archived_at) throw new AppError("CONFLICT", "studioflow.requirement.archived", "Cannot reopen an archived requirement");
+      if (existing.satisfaction_state === "OPEN") {
+        throw new AppError("CONFLICT", "studioflow.requirement.already-open", "Requirement is already open");
+      }
+      const updated = await db.sfProjectRequirement.update({
+        where: { id },
+        data: {
+          satisfaction_state: "OPEN",
+          satisfied_at: null,
+          satisfied_by_id: null,
+          satisfaction_note: null,
+        },
+      });
+      await writeAudit({
+        action: "requirement.reopen",
+        entityType: "SfProjectRequirement",
+        entityId: id,
+        actor,
+        changes: { project_id: existing.project_id, phase_id: existing.phase_id, reopen_reason: input.reopen_reason.trim() },
+      });
+      return updated;
+    });
+  }
+
+  async function archiveRequirement(grants: PermissionGrants, actor: AuditActor, id: string, input: ArchiveRequirementInput) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
+    if (!input.reason.trim()) throw new AppError("VALIDATION", "studioflow.requirement.archive-reason-required", "Archive reason is required");
+    return runTransaction(async () => {
+      const existing = await db.sfProjectRequirement.findUnique({ where: { id } });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.requirement.not-found", "Requirement not found");
+      if (existing.archived_at) throw new AppError("CONFLICT", "studioflow.requirement.already-archived", "Requirement is already archived");
+      const now = new Date();
+      const updated = await db.sfProjectRequirement.update({
+        where: { id },
+        data: { archived_at: now, archived_by_id: actor.userId, archive_reason: input.reason.trim(), deleted_at: now },
+      });
+      await writeAudit({
+        action: "requirement.archive",
+        entityType: "SfProjectRequirement",
+        entityId: id,
+        actor,
+        changes: { project_id: existing.project_id, phase_id: existing.phase_id, reason: input.reason.trim() },
+      });
+      return updated;
+    });
+  }
+
+  async function restoreRequirement(grants: PermissionGrants, actor: AuditActor, id: string, input: RestoreRequirementInput) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
+    if (!input.reason.trim()) throw new AppError("VALIDATION", "studioflow.requirement.restore-reason-required", "Restore reason is required");
+    return runTransaction(async () => {
+      const existing = await db.sfProjectRequirement.findUnique({ where: { id } });
+      if (!existing) throw new AppError("NOT_FOUND", "studioflow.requirement.not-found", "Requirement not found");
+      if (!existing.archived_at) throw new AppError("CONFLICT", "studioflow.requirement.not-archived", "Requirement is not archived");
+      const updated = await db.sfProjectRequirement.update({
+        where: { id },
+        data: {
+          archived_at: null,
+          archived_by_id: null,
+          archive_reason: null,
+          deleted_at: null,
+          restored_at: new Date(),
+          restored_by_id: actor.userId,
+          restore_reason: input.reason.trim(),
+        },
+      });
+      await writeAudit({
+        action: "requirement.restore",
+        entityType: "SfProjectRequirement",
+        entityId: id,
+        actor,
+        changes: { project_id: existing.project_id, phase_id: existing.phase_id, reason: input.reason.trim() },
+      });
+      return updated;
+    });
+  }
+
+  async function linkEvidence(grants: PermissionGrants, actor: AuditActor, requirementId: string, input: LinkEvidenceInput) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
+    return runTransaction(async () => {
+      const req = await db.sfProjectRequirement.findUnique({ where: { id: requirementId } });
+      if (!req) throw new AppError("NOT_FOUND", "studioflow.requirement.not-found", "Requirement not found");
+      if (req.archived_at) throw new AppError("CONFLICT", "studioflow.requirement.archived", "Cannot link evidence to an archived requirement");
+      const file = await db.sfFile.findUnique({ where: { id: input.file_id } });
+      if (!file) throw new AppError("NOT_FOUND", "studioflow.file.not-found", "File not found");
+      if (file.project_id !== req.project_id) {
+        throw new AppError("VALIDATION", "studioflow.requirement.evidence-wrong-project", "Evidence file must belong to the same project as the requirement");
+      }
+      const existing = await db.sfRequirementEvidence.findUnique({
+        where: { requirement_id_file_id: { requirement_id: requirementId, file_id: input.file_id } },
+      });
+      if (existing && !existing.unlinked_at) {
+        throw new AppError("CONFLICT", "studioflow.requirement.evidence-already-linked", "File is already linked as evidence");
+      }
+      if (existing && existing.unlinked_at) {
+        const restored = await db.sfRequirementEvidence.update({
+          where: { id: existing.id },
+          data: { unlinked_at: null, unlinked_by_id: null, unlink_reason: null, linked_at: new Date(), linked_by_id: actor.userId },
+        });
+        await writeAudit({ action: "requirement.evidence.link", entityType: "SfRequirementEvidence", entityId: restored.id, actor, changes: { requirement_id: requirementId, file_id: input.file_id } });
+        return restored;
+      }
+      const created = await db.sfRequirementEvidence.create({
+        data: { requirement_id: requirementId, file_id: input.file_id, linked_by_id: actor.userId },
+      });
+      await writeAudit({ action: "requirement.evidence.link", entityType: "SfRequirementEvidence", entityId: created.id, actor, changes: { requirement_id: requirementId, file_id: input.file_id } });
+      return created;
+    });
+  }
+
+  async function unlinkEvidence(grants: PermissionGrants, actor: AuditActor, requirementId: string, evidenceId: string, input: UnlinkEvidenceInput) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectManage);
+    if (!input.reason.trim()) throw new AppError("VALIDATION", "studioflow.requirement.unlink-reason-required", "Unlink reason is required");
+    return runTransaction(async () => {
+      const req = await db.sfProjectRequirement.findUnique({ where: { id: requirementId } });
+      if (!req) throw new AppError("NOT_FOUND", "studioflow.requirement.not-found", "Requirement not found");
+      const evidence = await db.sfRequirementEvidence.findFirst({ where: { id: evidenceId, requirement_id: requirementId } });
+      if (!evidence) throw new AppError("NOT_FOUND", "studioflow.requirement.evidence-not-found", "Evidence not found");
+      if (evidence.unlinked_at) throw new AppError("CONFLICT", "studioflow.requirement.evidence-already-unlinked", "Evidence is already unlinked");
+      const updated = await db.sfRequirementEvidence.update({
+        where: { id: evidenceId },
+        data: { unlinked_at: new Date(), unlinked_by_id: actor.userId, unlink_reason: input.reason.trim() },
+      });
+      await writeAudit({ action: "requirement.evidence.unlink", entityType: "SfRequirementEvidence", entityId: evidenceId, actor, changes: { requirement_id: requirementId, file_id: evidence.file_id, reason: input.reason.trim() } });
+      return updated;
+    });
+  }
+
+  // ── §7.1.1 Requirement snapshot helpers ─────────────────────────────────
+
+  /**
+   * Snapshots active RequirementTemplates for a project.
+   * Called inside the project creation transaction AND when adding a project phase.
+   */
+  async function snapshotRequirementsForProject(
+    db: PrismaClient,
+    projectId: string,
+    projectPhaseId: string,
+    phaseTemplateId: string,
+  ) {
+    // 1. Snapshot active General templates (scope=GENERAL, no phase_template_id)
+    const generalTemplates = await db.sfRequirementTemplate.findMany({
+      where: { scope: "GENERAL", deleted_at: null },
+      orderBy: { sort_order: "asc" },
+    });
+    for (const tmpl of generalTemplates) {
+      await db.sfProjectRequirement.create({
+        data: {
+          project_id: projectId,
+          phase_id: null,
+          source_template_id: tmpl.id,
+          template_key_snapshot: tmpl.key,
+          title: tmpl.title,
+          description: tmpl.description,
+          sort_order: tmpl.sort_order,
+        },
+      });
+      // Mark key as immutable after first use
+      if (!tmpl.key_immutable) {
+        await db.sfRequirementTemplate.update({ where: { id: tmpl.id }, data: { key_immutable: true } });
+      }
+    }
+    // 2. Snapshot active Phase templates for this specific phase
+    const phaseTemplates = await db.sfRequirementTemplate.findMany({
+      where: { scope: "PHASE", phase_template_id: phaseTemplateId, deleted_at: null },
+      orderBy: { sort_order: "asc" },
+    });
+    for (const tmpl of phaseTemplates) {
+      await db.sfProjectRequirement.create({
+        data: {
+          project_id: projectId,
+          phase_id: projectPhaseId,
+          source_template_id: tmpl.id,
+          template_key_snapshot: tmpl.key,
+          title: tmpl.title,
+          description: tmpl.description,
+          sort_order: tmpl.sort_order,
+        },
+      });
+      if (!tmpl.key_immutable) {
+        await db.sfRequirementTemplate.update({ where: { id: tmpl.id }, data: { key_immutable: true } });
+      }
+    }
+  }
+
+  // ── §7.1.1 Project requirement queries ─────────────────────────────────
+
+  async function listGeneralRequirements(grants: PermissionGrants, projectId: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    return db.sfProjectRequirement.findMany({
+      where: { project_id: projectId, phase_id: null, archived_at: null },
+      orderBy: [{ sort_order: "asc" }, { created_at: "asc" }],
+      include: {
+        evidence: {
+          where: { unlinked_at: null },
+          include: { file: { select: { id: true, filename: true, treatment: true } } },
+        },
+      },
+    });
+  }
+
+  async function listPhaseRequirements(grants: PermissionGrants, projectId: string, phaseId: string) {
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.projectRead);
+    const phase = await db.sfProjectPhase.findFirst({ where: { id: phaseId, project_id: projectId } });
+    if (!phase) throw new AppError("NOT_FOUND", "studioflow.phase.not-found", "Phase not found in this project");
+    return db.sfProjectRequirement.findMany({
+      where: { project_id: projectId, phase_id: phaseId, archived_at: null },
+      orderBy: [{ sort_order: "asc" }, { created_at: "asc" }],
+      include: {
+        evidence: {
+          where: { unlinked_at: null },
+          include: { file: { select: { id: true, filename: true, treatment: true } } },
+        },
+      },
+    });
+  }
+
   // ── Public surface ───────────────────────────────────────────────────────
 
   return {
@@ -2571,5 +3152,28 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
     deleteTask,
     // Workload (SF-F5 read model)
     listWaitingOnMe,
+    // §7.1.1 Requirement templates
+    listRequirementTemplates,
+    getRequirementTemplate,
+    createRequirementTemplate,
+    editRequirementTemplate,
+    archiveRequirementTemplate,
+    restoreRequirementTemplate,
+    deleteRequirementTemplate,
+    // §7.1.1 Project requirements
+    listProjectRequirements,
+    getProjectRequirement,
+    createProjectRequirement,
+    editProjectRequirement,
+    satisfyRequirement,
+    reopenRequirement,
+    archiveRequirement,
+    restoreRequirement,
+    // §7.1.1 Evidence
+    linkEvidence,
+    unlinkEvidence,
+    // §7.1.1 Queries
+    listGeneralRequirements,
+    listPhaseRequirements,
   };
 }

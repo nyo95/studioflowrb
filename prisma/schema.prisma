@@ -1120,7 +1120,8 @@ model SfPhaseTemplate {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  phases SfProjectPhase[]
+  phases                SfProjectPhase[]
+  requirement_templates SfRequirementTemplate[]
 
   @@map("sf_phase_template")
   @@schema("studioflow")
@@ -1182,6 +1183,7 @@ model SfProject {
   files  SfFile[]
   tasks  SfTask[]
   mom_documents SfMomDocument[]
+  requirements SfProjectRequirement[]
 
   @@index([client_id])
   @@index([status])
@@ -1320,6 +1322,7 @@ model SfProjectPhase {
   project  SfProject       @relation(fields: [project_id], references: [id])
   template SfPhaseTemplate @relation(fields: [template_id], references: [id])
   iterations SfIteration[]
+  requirements SfProjectRequirement[]
 
   /// One phase-key per project; the snapshot is the authority.
   @@unique([project_id, key])
@@ -1485,6 +1488,7 @@ model SfFile {
   project           SfProject    @relation(fields: [project_id], references: [id])
   sent_in_iteration SfIteration? @relation(fields: [sent_in_iteration_id], references: [id])
   task_attachments  SfTask[]
+  requirement_evidence SfRequirementEvidence[]
 
   @@index([project_id, folder_key])
   @@index([sent_in_iteration_id])
@@ -1591,5 +1595,130 @@ model SfProductCatalogue {
   @@index([brand_md_id])
   @@index([deleted_at, sort_order])
   @@map("sf_product_catalogue")
+  @@schema("studioflow")
+}
+
+// ── §7.1.1 Requirements — first-class domain behavior ────────────────────────
+
+enum SfRequirementScope {
+  GENERAL
+  PHASE
+
+  @@map("sf_requirement_scope")
+  @@schema("studioflow")
+}
+
+enum SfRequirementSatisfactionState {
+  OPEN
+  SATISFIED
+
+  @@map("sf_requirement_satisfaction_state")
+  @@schema("studioflow")
+}
+
+/// Studio setting: a requirement template used to seed future projects.
+/// key is stable, lowercase, machine-readable; immutable after first snapshot use.
+model SfRequirementTemplate {
+  id      String @id @default(uuid())
+  key     String
+  scope   SfRequirementScope
+
+  title       String
+  description String?
+  sort_order  Int @default(0)
+
+  /// For PHASE scope: exactly which SfPhaseTemplate this belongs to.
+  /// Null for GENERAL scope.
+  phase_template_id String?
+
+  /// Immutable after the first project snapshot uses this key.
+  key_immutable Boolean @default(false)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  /// Archive state (reversible, not permanent delete).
+  deleted_at DateTime?
+
+  phase_template SfPhaseTemplate? @relation(fields: [phase_template_id], references: [id])
+  project_requirements SfProjectRequirement[]
+
+  /// (scope, phase_template_id, key) is the logical unique; Prisma enforces
+  /// with a partial index below.
+  @@unique([scope, phase_template_id, key])
+  @@index([scope, phase_template_id, deleted_at])
+  @@map("sf_requirement_template")
+  @@schema("studioflow")
+}
+
+/// Authoritative project record for a requirement.
+/// scope + project + phase never move after creation; create a replacement
+/// and archive the old record instead.
+model SfProjectRequirement {
+  id         String @id @default(uuid())
+  project_id String
+  phase_id   String?
+
+  source_template_id     String?
+  template_key_snapshot  String?
+
+  title       String
+  description String?
+  sort_order  Int @default(0)
+
+  satisfaction_state SfRequirementSatisfactionState @default(OPEN)
+  satisfied_at       DateTime?
+  satisfied_by_id    String?
+  satisfaction_note  String?
+
+  /// Archive state (reversible, not permanent delete).
+  /// Archived records are read-only and excluded from open-work counts.
+  deleted_at     DateTime?
+  archived_at    DateTime?
+  archived_by_id String?
+  archive_reason String?
+
+  restored_at    DateTime?
+  restored_by_id String?
+  restore_reason String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  project  SfProject       @relation(fields: [project_id], references: [id])
+  phase    SfProjectPhase? @relation(fields: [phase_id], references: [id])
+  source_template SfRequirementTemplate? @relation(fields: [source_template_id], references: [id])
+  evidence SfRequirementEvidence[]
+
+  /// phase_id = null is General; otherwise must identify a phase of this project.
+  @@index([project_id, satisfaction_state, archived_at])
+  @@index([project_id, phase_id])
+  @@index([source_template_id])
+  @@map("sf_project_requirement")
+  @@schema("studioflow")
+}
+
+/// Links existing SfFile records as evidence for a requirement.
+/// Upload, storage, and file classification remain governed by §8.
+model SfRequirementEvidence {
+  id            String @id @default(uuid())
+  requirement_id String
+  file_id       String
+
+  linked_at    DateTime @default(now())
+  linked_by_id String?
+
+  /// Unlink requires a reason (stored in audit only).
+  unlinked_at    DateTime?
+  unlinked_by_id String?
+  unlink_reason  String?
+
+  requirement SfProjectRequirement @relation(fields: [requirement_id], references: [id])
+  file        SfFile               @relation(fields: [file_id], references: [id])
+
+  @@unique([requirement_id, file_id])
+  @@index([requirement_id])
+  @@index([file_id])
+  @@map("sf_requirement_evidence")
   @@schema("studioflow")
 }

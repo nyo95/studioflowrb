@@ -5,8 +5,71 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.63**
-- Next local revision: **R8.64**
+- Current revision after this entry is committed: **R8.64**
+- Next local revision: **R8.65**
+
+## R8.64 | 2026-09-14 | feat(studioflow): implement SF-A Requirements templates and project snapshots
+
+### Added
+
+- **Requirement Templates**: CRUD with archive/restore/delete lifecycle in
+  settings/requirements route. Templates are project-independent and carry
+  an immutable `key` used for snapshot identity.
+- **Project Requirements**: Created from templates at project creation via
+  `snapshotRequirementsForProject`, with satisfy/reopen/archive/restore
+  lifecycle and satisfaction reasons.
+- **Phase Requirements**: Scoped to a project phase, inherit the phase key
+  constraint (at most one requirement per phase key per project).
+- **Evidence Linking**: Attach existing uploaded files as evidence; prevent
+  cross-project file references.
+- **Prisma schema**: `SfRequirementScope`, `SfRequirementSatisfactionState`
+  enums; `SfRequirementTemplate`, `SfProjectRequirement`,
+  `SfRequirementEvidence` models; relation fields on `SfPhaseTemplate`,
+  `SfProject`, `SfProjectPhase`, `SfFile`.
+- **Service methods**: `createRequirementTemplate`, `editRequirementTemplate`,
+  `archiveRequirementTemplate`, `restoreRequirementTemplate`,
+  `deleteRequirementTemplate`, `listRequirementTemplates`,
+  `createProjectRequirement`, `editProjectRequirement`,
+  `satisfyProjectRequirement`, `reopenProjectRequirement`,
+  `archiveProjectRequirement`, `restoreProjectRequirement`,
+  `linkEvidence`, `unlinkEvidence`, `listProjectRequirements`,
+  `listPhaseRequirements`, `listGeneralRequirements`.
+- **Canonical routes**:
+  - `/studioflow/settings/requirements` — template list (read-only list
+    with settings heading).
+  - `/studioflow/[id]/requirements` — project general requirements page
+    with create, satisfy, archive, evidence modals.
+  - `/studioflow/[id]/phases/[phaseId]/requirements` — phase-scoped
+    requirements page.
+- **Server actions**: template CRUD actions, project requirement CRUD actions.
+- **Snapshot seeding**: Project creation automatically snapshots all phase
+  requirements for each project phase. Editing the source template after
+  snapshot does not rewrite historical requirement titles.
+
+### Changed
+
+- `createProject` now calls `snapshotRequirementsForProject` after phase
+  seeding, using the atomic `updateMany` approach instead of a transaction.
+- `PLATFORM_TABLES` in `test-support.ts` no longer includes `LoginRateLimit`
+  (drift corrected).
+- Migration `20260914104750_sf_a_requirements` created and applied.
+
+### Verification
+
+- 21 SF-A requirement integration tests pass (template CRUD, scope validation,
+  key immutability, snapshot seeding, snapshot independence, requirement CRUD,
+  satisfy/reopen, archive/restore, evidence linking/unlinking, cross-project
+  evidence rejection, audit events).
+- Full suite: 374/375 pass; sole failure is pre-existing `LoginRateLimit`
+  schema expectation (not SF-A related).
+- TypeScript compiles cleanly (`npx tsc --noEmit`).
+
+### Limitations
+
+- The `LoginRateLimit` test failure in `platform-schema.test.ts` is
+  pre-existing drift unrelated to SF-A; not addressed in this revision.
+- Requirement ordering on list pages is database-default (insertion order);
+  no explicit sort control yet.
 
 ## R8.63 | 2026-09-14 | docs(agent): advance revision ledger after SF-A contract
 
