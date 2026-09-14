@@ -18,6 +18,11 @@ requires service, UI, tests, or integration. Run proportionate verification,
 update `CHANGELOG.md`, inspect the staged diff, and make the required local
 commit.
 
+Do not delay that implementation commit solely for browser acceptance assigned
+to Reviewer. Run browser checks only when the active plan places them under
+Executor verification or they are needed to diagnose the implementation, then
+report the evidence without deciding acceptance yourself.
+
 ## Prohibited guessing
 
 Do not invent product behavior, change locked domain or schema meaning, weaken
@@ -41,7 +46,7 @@ Decision needed: <one bounded question>
 ## Completion handoff
 
 Report the outcome, revision/commit, material files or areas changed, checks
-passed/failed/skipped, browser evidence when applicable, limitations, and
+passed/failed/skipped, browser evidence when Executor-owned, limitations, and
 unrelated dirty files. Add `docs/review.md` only when review is actually being
 deferred; otherwise the Planner/Reviewer can inspect the commit directly.
 

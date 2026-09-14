@@ -21,7 +21,8 @@ when they govern the selected outcome or resolve a real conflict.
 Owner intent/docs -> Planner/Reviewer -> PLAN.md -> Executor prompt
                   -> Executor -> implementation + checks + commit
                               -> Planner/Reviewer prompt
-                  -> Planner/Reviewer -> PASS/correction + next PLAN.md
+                  -> Planner/Reviewer -> diff + browser acceptance when needed
+                                      -> PASS/correction + next PLAN.md
                                       -> Executor prompt
 ```
 
@@ -42,6 +43,11 @@ revision and evidence context for the receiving role to start, but points to
 the repository contracts instead of pasting them. Credentials remain in the
 selected ignored local configuration or current owner session and never travel
 inside a handoff prompt.
+
+Browser acceptance belongs at the end of this loop, after the Executor commit,
+unless the active plan explicitly needs browser work to finish or diagnose the
+implementation. This keeps execution moving while preserving an independent
+user-facing gate before PASS.
 
 ## Scope reading matrix
 

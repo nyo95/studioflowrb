@@ -36,6 +36,11 @@ must preserve.>
 
 <Focused checks plus full checks proportionate to risk.>
 
+## Reviewer Acceptance
+
+<Post-commit browser scenarios when user-facing behavior needs them; omit for
+server-only, documentation-only, or pure utility outcomes.>
+
 ## Risks and Recovery
 
 ## Executor Prompt

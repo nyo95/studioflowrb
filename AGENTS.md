@@ -101,12 +101,19 @@ A request to change, build, commit, or finish authorizes local commits only. It 
 
 ## Acceptance and session handoff
 
-The Planner names outcome-specific acceptance evidence in `PLAN.md`; the
-Executor runs it before claiming the slice complete, and the Reviewer decides
-PASS. Browser evidence is required only for affected user-facing behavior.
-Checks should be proportionate: a known, recorded failure outside the slice is
+The Planner separates Executor verification from Reviewer acceptance in
+`PLAN.md`. Executor finishes implementation, automated/integration checks, and
+the local revision commit before handoff. Browser acceptance is normally owned
+by the Reviewer after that commit, using the applicable browser-use skill, and
+is required only for affected user-facing behavior. A plan assigns browser work
+to Executor only when it is needed to diagnose or complete the implementation;
+missing browser evidence alone does not block an otherwise valid Executor
+commit.
+
+Checks remain proportionate: a known, recorded failure outside the slice is
 reported but does not automatically reject an otherwise isolated outcome; the
-Reviewer must explain why it cannot hide an in-scope regression.
+Reviewer must explain why it cannot hide an in-scope regression. Only the
+Reviewer records acceptance PASS.
 
 Environment discovery is Executor work, not an automatic owner blocker. A safe
 resource may come from the selected local env file, an owner-designated local

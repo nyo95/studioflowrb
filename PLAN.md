@@ -5,7 +5,7 @@ Scope: Windows-safe local filesystem storage path validation
 Status: READY
 Priority: P1
 Owner: Repository owner
-Target revision: R8.44
+Target revision: R8.45
 Last updated: 2026-09-14
 
 ## Outcome
@@ -73,6 +73,6 @@ root and add focused regression evidence before accepting the change.
 You are the Executor. Location: kantor. Read `AGENTS.md`,
 `docs/agent/EXECUTOR.md`, and the active `PLAN.md`. Implement the whole KB-030
 Windows local-storage correction within its locked security boundary, run the
-specified focused and full verification using the approved local acceptance
-fixture, update the ledgers, and create local revision R8.44. Finish with only
+  specified focused and full verification using the approved local acceptance
+  fixture, update the ledgers, and create local revision R8.45. Finish with only
 a copy-ready Planner/Reviewer prompt containing the commit and exact evidence.

@@ -21,7 +21,15 @@ and regression risk. Depth follows risk, not a fixed checklist.
 3. **Evidence** — do the diff, tests, migrations, and applicable running
    workflow prove the result without hiding limitations?
 
-Browser review is conditional, not automatic. Require it when the task changes or verifies user-facing flow, visual/layout behavior, interaction state, accessibility, navigation, or a contract acceptance criterion requiring browser evidence. For documentation-only, server-only, or pure utility work, explicitly record why browser review is not applicable and run proportionate non-browser evidence instead. A required but unavailable browser check is not a pass.
+Browser review is conditional, not universal, but Reviewer owns it after the
+Executor commit. Require it when the task changes or verifies user-facing flow,
+visual/layout behavior, interaction state, accessibility, navigation, or a
+contract acceptance criterion requiring browser evidence. Use the applicable
+browser-use skill and the approved local fixture; do not send ordinary browser
+acceptance back to Executor. For documentation-only, server-only, or pure
+utility work, explicitly record why browser review is not applicable and run
+proportionate non-browser evidence instead. A required but unavailable browser
+check is not a pass.
 
 ## Verdicts and findings
 

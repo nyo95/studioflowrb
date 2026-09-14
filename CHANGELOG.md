@@ -5,8 +5,29 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.43**
-- Next local revision: **R8.44**
+- Current revision after this entry is committed: **R8.44**
+- Next local revision: **R8.45**
+
+## R8.44 | 2026-09-14 | docs(agent): move browser acceptance to reviewer
+
+- Split plan evidence into Executor verification and Reviewer acceptance.
+  Executor now completes implementation, automated/integration checks, and its
+  local revision commit before handing off; ordinary browser acceptance runs
+  afterward in the Reviewer session.
+- Kept browser work with Executor only when a READY plan explicitly needs it to
+  diagnose or complete implementation. Missing post-commit browser evidence no
+  longer stalls an otherwise valid implementation commit.
+- Updated the prompt loop so Reviewer inspects the commit and performs required
+  browser-use acceptance before deciding PASS or returning one consolidated
+  correction prompt.
+- Shifted the still-READY KB-030 implementation target to R8.45. No application
+  behavior, schema, migration, dependency, or local credential changed.
+
+### Verification
+
+- Harness cross-check across `AGENTS.md`, all three role contracts, harness
+  README, active plan, and plan template: passed.
+- Staged diff and whitespace checks: passed.
 
 ## R8.43 | 2026-09-14 | docs(agent): streamline prompt handoff and accept F-B
 

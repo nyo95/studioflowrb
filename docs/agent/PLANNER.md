@@ -40,6 +40,11 @@ necessary in-scope follow-through—types, migrations already approved by the
 plan, tests, exports, callers, and concise documentation—without listing every
 edit.
 
+Separate `## Verification` for checks the Executor must finish before commit
+from `## Reviewer Acceptance` for post-commit browser scenarios. Put browser
+work in Executor verification only when it is necessary to diagnose or complete
+the code; ordinary user-facing acceptance stays with Reviewer.
+
 End every READY plan with a short `## Executor Prompt` that can be pasted into a
 new session. The prompt identifies the Executor lane and location, tells the
 agent to read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and the active `PLAN.md`,
