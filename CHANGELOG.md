@@ -5,8 +5,60 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.52**
-- Next local revision: **R8.53**
+- Current revision after this entry is committed: **R8.53**
+- Next local revision: **R8.54**
+
+## R8.53 | 2026-09-14 | feat(platform,settings): typed global appearance theme
+
+### Changed
+
+- Added the typed global Platform Appearance contract (`PlatformTheme`
+  union, sole approved value `"light"` per DESIGN.md) in
+  `src/platform/core/settings/appearance.ts` and wired it through the
+  `PlatformGeneralSettings` singleton: type, frozen defaults, strict Zod
+  input, seed/read/update persistence, and audited safe deltas.
+- Persisted the theme on the settings singleton via additive migration
+  `20260914090000_platform_appearance_theme` — `theme TEXT NOT NULL DEFAULT
+  'light'` plus a SQL CHECK (`theme IN ('light')`) so an unapproved value
+  can never be stored.
+- Split the General Settings page into General and Appearance sections. The
+  Appearance section hosts the application title, the Brand mark control,
+  and a read-only typed Theme field; the server action rejects a tampered
+  or missing theme value.
+- Applied SettingsShell to the platform General Settings page with a
+  boundary-explicit Settings navigation: Platform-owned settings (General
+  Settings, Users, Roles) plus gated links to the app-owned Master Data and
+  StudioFlow workflow settings, reinforcing the ratified D-SF-02 ownership
+  boundary.
+- Kept General Settings a narrow typed aggregate: no generic key/value
+  store, no per-app branding, no per-user or dark/density theme options, and
+  no raw legacy `ui-*` classes or duplicate UI Engine primitives were
+  introduced (PF-5 conformance audited).
+
+### Verification
+
+- `npm run typecheck`, `npm run lint`, `npm run check:boundaries`, and
+  `npm run check:legacy-runtime`: all passed.
+- `npm test`: 349/349 passing, including the settings integration suite and
+  the new SQL CHECK constraint test against the disposable
+  `studioflow_rebuild_test` database in the kantor container.
+- Additive migration `20260914090000_platform_appearance_theme` applied to
+  every rebuild-only database in the target container (test, dev, browser
+  test, regression test); no destructive migration.
+- `npm run build` (Prisma generate + Next.js production build): passed.
+- Whitespace and diff checks: passed.
+
+### Limitations
+
+- The appearance theme currently has exactly one approved variant
+  (`"light"`); a future variant extends the union, SQL CHECK, and Zod schema
+  in one changelog-scoped change, and the read-only Theme control always
+  shows the canonical value.
+- Application title and Brand mark stay on the same CORE.md §11 singleton
+  row; they were regrouped into the Appearance section in the UI only, so
+  schema and audit behavior for them are unchanged.
+- Browser acceptance of the reorganized settings layout is a Reviewer step
+  after this commit; this revision required automated checks only.
 
 ## R8.52 | 2026-09-14 | docs(roadmap): close D-SF completion markup
 

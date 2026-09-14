@@ -8,6 +8,15 @@ import type { ObjectStorage } from "@platform/core/storage";
 import { validationError } from "@platform/core/validation";
 import { normalizeText } from "@platform/utilities/normalization";
 
+import {
+  PLATFORM_APPEARANCE_THEME_DEFAULT,
+  PLATFORM_APPEARANCE_THEMES,
+  type PlatformTheme,
+} from "./appearance";
+
+export { PLATFORM_APPEARANCE_THEME_DEFAULT, PLATFORM_APPEARANCE_THEMES };
+export type { PlatformTheme };
+
 /**
  * Typed Platform General Settings singleton (CORE.md §11, Foundation F0 §7).
  *
@@ -16,6 +25,9 @@ import { normalizeText } from "@platform/utilities/normalization";
  * `platform.settings.manage`, are transactional, audited with safe field
  * deltas, and emit no audit event on a no-op. There is no arbitrary key/value
  * API, no file upload, and no per-user preference surface here.
+ *
+ * Platform Appearance (`theme`) is global and typed — it belongs to the same
+ * singleton row, never to per-app or per-user storage.
  */
 
 export const PLATFORM_GENERAL_SETTINGS_ID = "platform_general_settings";
@@ -28,6 +40,8 @@ export type PlatformGeneralSettings = {
   currency: string;
   weekStartsOn: 0 | 1;
   brandMarkUrl: string | null;
+  /** Typed global appearance theme (D-SF-02: Platform owns appearance/theme). */
+  theme: PlatformTheme;
   /**
    * Owner-chosen launcher routing (roadmap: configurable main-route
    * settings). Advisory only — resolved defensively against the current
@@ -46,6 +60,7 @@ export const DEFAULT_PLATFORM_GENERAL_SETTINGS: PlatformGeneralSettings = Object
   currency: "IDR",
   weekStartsOn: 1,
   brandMarkUrl: null,
+  theme: PLATFORM_APPEARANCE_THEME_DEFAULT,
   mainAppId: null,
   landingAppId: null,
 });
@@ -117,6 +132,7 @@ export const PlatformGeneralSettingsSchema = z.strictObject({
   currency: z.string().refine(isSupportedCurrency, "Unsupported ISO-4217 currency code"),
   weekStartsOn: z.union([z.literal(0), z.literal(1)]),
   brandMarkUrl: z.string().refine(isSafeBrandMarkUrl, "Unsafe brand mark URL").nullable(),
+  theme: z.enum([...PLATFORM_APPEARANCE_THEMES]),
   mainAppId: z.string().refine(isAppIdShape, "Invalid app id").nullable(),
   landingAppId: z.string().refine(isAppIdShape, "Invalid app id").nullable(),
 });
@@ -132,6 +148,7 @@ export function parsePlatformGeneralSettingsInput(input: unknown): PlatformGener
     currency: result.data.currency,
     weekStartsOn: result.data.weekStartsOn as PlatformGeneralSettings["weekStartsOn"],
     brandMarkUrl: result.data.brandMarkUrl,
+    theme: result.data.theme,
     mainAppId: result.data.mainAppId,
     landingAppId: result.data.landingAppId,
   };
@@ -148,6 +165,7 @@ type SettingsRow = {
   week_starts_on: number;
   brand_mark_url: string | null;
   brand_mark_storage_key: string | null;
+  theme: string;
   main_app_id: string | null;
   landing_app_id: string | null;
 };
@@ -164,6 +182,7 @@ function rowToStoredSettings(row: SettingsRow): StoredPlatformGeneralSettings {
     weekStartsOn: row.week_starts_on as PlatformGeneralSettings["weekStartsOn"],
     brandMarkUrl: row.brand_mark_url,
     brandMarkStorageKey: row.brand_mark_storage_key,
+    theme: row.theme as PlatformTheme,
     mainAppId: row.main_app_id,
     landingAppId: row.landing_app_id,
   };
@@ -210,6 +229,7 @@ async function readStoredPlatformGeneralSettings(db: DbClient): Promise<StoredPl
         week_starts_on: defaults.weekStartsOn,
         brand_mark_url: defaults.brandMarkUrl,
         brand_mark_storage_key: null,
+        theme: defaults.theme,
         main_app_id: defaults.mainAppId,
         landing_app_id: defaults.landingAppId,
       },
@@ -289,6 +309,7 @@ export function createPlatformSettingsService(ports: PlatformSettingsPorts) {
           weekStartsOn: current.weekStartsOn,
           brandMarkUrl: current.brandMarkUrl,
           brandMarkStorageKey: current.brandMarkStorageKey,
+          theme: current.theme,
           mainAppId: current.mainAppId,
           landingAppId: current.landingAppId,
         };
@@ -309,6 +330,7 @@ export function createPlatformSettingsService(ports: PlatformSettingsPorts) {
             week_starts_on: after.weekStartsOn,
             brand_mark_url: after.brandMarkUrl,
             brand_mark_storage_key: after.brandMarkStorageKey,
+            theme: after.theme,
             main_app_id: after.mainAppId,
             landing_app_id: after.landingAppId,
           },

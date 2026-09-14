@@ -158,6 +158,11 @@ model PlatformGeneralSettings {
   /// from a safe external/site-relative URL and is resolved only at read time.
   brand_mark_storage_key String?
 
+  /// Typed global appearance theme (D-SF-02: Platform owns appearance/theme,
+  /// F-C / PF-4). DESIGN.md locks the canonical "light" theme; the SQL CHECK
+  /// constraint mirrors the typed union so no other value can be persisted.
+  theme String @default("light")
+
   /// Owner-configured launcher routing (roadmap "configurable main-route
   /// settings"). Both are advisory: an id that is null, unknown, or no
   /// longer accessible to the current user is ignored at read time, never
