@@ -9,8 +9,8 @@ their app-owned duplicates. Owned by the Platform Foundation; created in
 - A generic capability has **one canonical implementation** with a public
   export and an explicit consumer matrix.
 - Every capability is classified **REUSE**, **EXTEND**, **ADD**, **APP-OWNED**,
-  or **PURGE**. `docs/roadmap.md` F-D remains open until the Reviewer accepts
-  the change set that makes these rules executable.
+  or **PURGE**. `docs/roadmap.md` F-D was accepted in R8.59 after Reviewer
+  browser evidence confirmed the changed date consumers.
 - Apps may not create private substitutes for a canonical capability. A
   convergence candidate that is proven **identical** is merged into the
   canonical surface; a candidate with **different semantics** is recorded here

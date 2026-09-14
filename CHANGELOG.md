@@ -5,8 +5,31 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.58**
-- Next local revision: **R8.59**
+- Current revision after this entry is committed: **R8.59**
+- Next local revision: **R8.60**
+
+## R8.59 | 2026-09-14 | review(foundation): accept F-D browser walkthrough
+
+### Changed
+
+- Accepted F-D/PF-6+PF-7 after the previously blocked Reviewer browser
+  walkthrough passed. Closed F-D in `docs/roadmap.md`, removed its deferred
+  review entry, and replaced the blocked plan with the next READY F-E/PF-8
+  Foundation acceptance-and-freeze plan.
+
+### Verification
+
+- Authorized desktop and 375 px smoke passed: Master Data Brand and Supplier
+  edit dialogs retained `Updated by … ·` medium-date/short-time metadata;
+  pending Deletion Requests retained `14 Sep 2026, 15.25`; BQ Library retained
+  the fixture item's medium-date-only `Updated 14 Sep 2026` cell. Navigation
+  and layouts remained usable at both widths.
+- After sign-out, both `/masterdata` and `/bq` redirected to `/login`.
+
+### Limitations
+
+- F-E/PF-8 is the remaining Foundation gate. StudioFlow recovery stays frozen
+  until its full repository, Master Data, and BQ evidence is accepted.
 
 ## R8.58 | 2026-09-14 | review(foundation): defer F-D browser acceptance
 

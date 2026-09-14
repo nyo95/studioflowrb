@@ -63,13 +63,14 @@ independently useful outcome, or demonstrated context/tool limit.
   the kantor fixture for authorized/unauthenticated settings access, persisted
   canonical Light appearance, desktop/375 px SettingsShell, and all three app
   entries.
-- [ ] **F-D / PF-6+PF-7 — Utility curation and boundaries:** Consolidate only
+- [x] ~~**F-D / PF-6+PF-7 — Utility curation and boundaries:** Consolidate only
   domain-neutral utilities with real consumers, then enforce Core purity,
   public cross-app reads, permission SSOT, app route ownership, UI Engine
   ownership, and prohibited duplicate primitives. Record stable Master Data/BQ
   convergence opportunities rather than changing their behavior silently.
-  Implemented in R8.57; browser acceptance of the changed Master Data/BQ date
-  cells remains pending in [`review.md`](review.md).
+  Implemented in R8.57 and accepted in R8.59 after automated boundary/full
+  suite evidence and authenticated desktop/375 px Master Data and BQ browser
+  smoke.~~
 - [ ] **F-E / PF-8 — Foundation acceptance and freeze:** Run the complete
   repository gates plus Master Data/BQ browser smoke, resolve findings as one
   correction pass, document the accepted Foundation baseline, and only then
