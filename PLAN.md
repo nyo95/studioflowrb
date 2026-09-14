@@ -1,7 +1,7 @@
 # Active Plan
 
-Plan ID: F-E-PF-8-FOUNDATION-ACCEPTANCE-AND-FREEZE
-Scope: Final Foundation verification, release receipt, and StudioFlow recovery gate
+Plan ID: SF-A-DAILY-WORK-AND-PROJECT-OPERATIONS
+Scope: StudioFlow recovery backbone, canonical project operations, and Today work
 Status: READY
 Priority: P1
 Owner: Repository owner
@@ -9,82 +9,92 @@ Last updated: 2026-09-14
 
 ## Outcome
 
-Produce an evidence-backed Foundation acceptance receipt for PF-8. Re-run the
-complete repository gates against the approved kantor fixture, verify the
-frozen Master Data and BQ application entries remain intact, and document the
-candidate accepted Foundation baseline. No StudioFlow Recovery implementation
-may begin until the post-commit Reviewer acceptance is recorded.
+Replace the frozen StudioFlow compatibility surface with the first modular,
+project-owned recovery slice: canonical `/studioflow/projects/...` navigation;
+StudioFlow Clients and Projects; reversible project archive/restore; phase
+template and per-project phase administration; project general todos; first-
+class General and Phase Requirements; and one Activity Center as the canonical
+Today surface for project-owned work.
 
 ## Context and Evidence
 
-- F-A through F-D are accepted. F-D was accepted in R8.59 after executable
-  boundary checks, full-suite evidence, and browser confirmation of its
-  user-facing date consumers.
-- `docs/FOUNDATION-BASELINE-FREEZE.md` keeps R8.12 as the frozen StudioFlow RB
-  reference and permits the Recovery gate to open only after PF-8 is documented
-  and versioned.
-- `docs/roadmap.md` defines PF-8 as complete repository gates plus Master Data
-  and BQ browser smoke, followed by a documented Foundation baseline.
+- PF-8 is accepted in R8.61. D-SF-01 through D-SF-07 are ratified in
+  `docs/apps/studioflow/D-SF-RECOVERY-DISCOVERY.md`; `/studioflow/projects/...`
+  is canonical and legacy `/projects/...` may have only controlled temporary
+  redirects.
+- `studioflow-project-contract.md` owns Client, Project, Phase, task, lifecycle,
+  audit, and requirements semantics. `studioflow.md` owns permission vocabulary
+  and cross-app boundaries.
+- SF-A absorbs KB-016, KB-017, KB-018, and KB-023. Activity Center is the
+  single Today surface: general project todos appear there grouped by project;
+  no duplicate Today or Upcoming route is created.
 
 ## Locked Decisions
 
-- This is a verification and release-receipt slice, not a feature or cleanup
-  opportunity. Do not change Master Data, BQ, StudioFlow, schema, migrations,
-  dependencies, or permission behavior merely because a check exposes a
-  pre-existing concern.
-- Preserve the pinned R8.12 StudioFlow RB reference, all D-SF ratifications,
-  and the recovery freeze. The Executor prepares a candidate acceptance record;
-  only Reviewer PASS releases PF-8 and activates SF-A planning.
-- Use only the approved disposable rebuild test database. Do not access any
-  legacy checkout or database. Do not push, deploy, publish, or alter remote
-  state.
+- StudioFlow owns Clients, Projects, workflow settings, phases, requirements,
+  and task projections. Platform owns authentication/RBAC/audit/storage
+  mechanics; Master Data is a public read-only Brand port only; BQ remains
+  unrelated.
+- Archive/restore is reversible and audited. No destructive deletion, retention
+  policy, legacy data migration, project membership authorization, role enum,
+  Schedule/Product Catalogue, MOM, delivery/client-answer exchange, SketchUp,
+  Google Drive, or collaboration work is authorized.
+- Pages call StudioFlow services; no page-local Prisma or authorization policy.
+  Every mutation uses its app service transaction and platform audit envelope.
+- Requirements are first-class records, distinct from todos/tasks and files.
+  Phase template changes never rewrite an existing project snapshot; template
+  keys stay immutable after use; a project phase may be removed only while
+  empty. Compatibility redirects are temporary and no parallel route tree is
+  allowed.
 
 ## Acceptance Criteria
 
-- A durable PF-8 candidate receipt names the exact Foundation baseline,
-  accepted Foundation slices, check results, database scope, frozen StudioFlow
-  reference, and the remaining Reviewer browser evidence without claiming an
-  unrun result.
-- `npm test`, typecheck, lint, boundary check, legacy-runtime check, production
-  build, and whitespace review pass from a clean owned change set.
-- No production behavior changes; any real verification failure is reported as
-  a consolidated finding rather than hidden in acceptance documentation.
+- Authorized users can create/read/update/archive/restore Clients and Projects,
+  administer template and project phases under the contract guards, and manage
+  general project todos and General/Phase Requirements through canonical routes.
+- Activity Center shows open project-owned work, including general todos, in one
+  project-grouped Today surface. Upcoming remains absent.
+- Permissions, audit, validation/error states, phase/project scope integrity,
+  archive read-only behavior, and browser navigation are covered. KB-016/017/
+  018/023 are closed only when their observable contract behavior is proven.
+- Master Data/BQ behavior and Foundation boundaries remain unchanged.
 
 ## Verification
 
-- Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, this plan, the current Foundation
-  baseline record, roadmap, and relevant test/build scripts before acting.
-- Confirm the test target explicitly identifies the approved disposable
-  `studioflow_rebuild` database before database-backed checks.
-- Run `npm test`, `npm run typecheck`, `npm run lint`, `npm run
-  check:boundaries`, `npm run check:legacy-runtime`, `npm run build`, and
-  `git diff --check`. Stage only the candidate acceptance receipt, required
-  ledger changes, and other files directly needed to state the evidence.
+- Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, this plan, the two StudioFlow
+  contracts, D-SF discovery, and affected current implementation before edits.
+- Use only the disposable rebuild test database after explicit target validation.
+  Add migrations only where the contract requires persistence; make them
+  additive and verify fresh deployment.
+- Run focused tests plus `npm test`, typecheck, lint, boundary and legacy-runtime
+  checks, production build, migration validation where applicable, and whitespace
+  review. Record each unfixed observed defect in `docs/knownbug.md`.
 
 ## Reviewer Acceptance
 
-After the Executor commit, use the authorized kantor browser fixture at desktop
-and 375 px. Smoke `/masterdata` and `/bq`, their primary navigation, and one
-representative existing read-only surface per app. Confirm the correct app
-navigation and normal rendering; sign out and confirm both roots redirect to
-`/login`. If that passes and the candidate receipt agrees with the committed
-evidence, record PF-8 PASS, close F-E, and release SF-A planning. Do not turn
-this browser smoke into feature testing or create/edit fixture data.
+Using authorized and limited-grant kantor fixtures at desktop and 375 px, walk
+Client/Project create-edit-archive-restore, phase template/project phase guards,
+general todo and Requirement creation/read states, Activity Center grouping, and
+canonical plus compatibility redirects. Verify denied grants and signed-out
+access fail safely. Do not claim acceptance without this browser evidence.
 
 ## Risks and Recovery
 
-- A passing automated suite does not release Foundation alone; missing browser
-  evidence keeps PF-8 in `docs/review.md` and the plan BLOCKED.
-- Any finding that requires product, ownership, schema, or security decisions
-  remains a blocker rather than being folded into a release receipt.
+- SF-A is one coherent backbone cutover. If a contract gap needs a new product,
+  authorization, retention, or destructive-data decision, stop and return it as
+  a blocker rather than guessing.
+- Retain the frozen compatibility behavior until the canonical route/workflow
+  replacement passes; remove dead redirected controls only once no supported
+  surface relies on them.
 
 ## Executor Prompt
 
 You are the Executor. Location: kantor. Read `AGENTS.md`,
-`docs/agent/EXECUTOR.md`, and this `PLAN.md`, then complete the entire READY
-F-E/PF-8 Foundation acceptance-and-freeze outcome. Preserve unrelated owner
-work, run the required checks against only the approved disposable rebuild
-database, prepare the candidate receipt and required ledgers, and create the
-next local revision commit. Stop only for a material locked-decision conflict,
-unsafe boundary, or failed mandatory evidence; otherwise report the commit,
-checks, limitations, and remaining unrelated dirty files.
+`docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY
+SF-A daily-work and project-operations outcome. Preserve unrelated owner work,
+respect the ratified StudioFlow contracts and recovery boundaries, run the
+required checks only against the approved disposable rebuild database, update
+the changelog/ledgers, and create one local revision commit. Stop only for a
+material locked-decision conflict, unsafe boundary, or failed mandatory
+evidence; otherwise report the commit, checks, limitations, and remaining
+unrelated dirty files.

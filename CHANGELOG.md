@@ -5,8 +5,33 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.60**
-- Next local revision: **R8.61**
+- Current revision after this entry is committed: **R8.61**
+- Next local revision: **R8.62**
+
+## R8.61 | 2026-09-14 | review(foundation): accept PF-8 and release SF-A planning
+
+### Changed
+
+- Accepted PF-8 after independently reviewing the R8.60 candidate receipt and
+  completing the required Master Data/BQ browser smoke. Closed F-E in the
+  roadmap and review ledger; the Foundation gate is released.
+- Replaced the PF-8 plan with the first StudioFlow Recovery plan, SF-A. The
+  frozen R8.12 reference remains evidence, not an implementation base.
+
+### Verification
+
+- Authorized browser smoke at desktop and 375 px passed for `/masterdata` →
+  Brands and `/bq` → BQ Library: app navigation and representative read-only
+  surfaces rendered normally. After sign-out, both app roots redirected to
+  `/login`.
+- R8.60 receipt/diff, workspace cleanliness, and PF-8 automated evidence were
+  independently checked; no correction was found.
+
+### Limitations
+
+- PF-8 releases SF-A planning only. StudioFlow implementation starts only with
+  the following READY SF-A plan; later MOM, Product Catalogue/Schedule,
+  delivery/client exchange, SketchUp, and collaboration remain out of scope.
 
 ## R8.60 | 2026-09-14 | docs(foundation): record PF-8 acceptance candidate
 

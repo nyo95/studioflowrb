@@ -1,15 +1,14 @@
 # PF-8 Foundation Acceptance Candidate
 
-Status: **CANDIDATE — automated gates passed; Reviewer browser acceptance
-required**
+Status: **ACCEPTED — R8.61 Reviewer PASS**
 
 Date: 2026-09-14
 Candidate revision: R8.60
 Active plan: `F-E-PF-8-FOUNDATION-ACCEPTANCE-AND-FREEZE`
 
-This is an Executor receipt, not PF-8 acceptance. Reviewer PASS is required
-before F-E is closed, the Foundation is released, or StudioFlow implementation
-planning is activated.
+R8.60 was the Executor candidate receipt. R8.61 records the independent
+Reviewer PASS that closes F-E, releases the Foundation, and activates SF-A
+planning only.
 
 ## Foundation reference and accepted slices
 
@@ -58,9 +57,9 @@ permission registration, launcher access, route ownership, and the Master Data
 and BQ service suites. This is automated evidence only; it is not a substitute
 for the required browser smoke.
 
-## Reviewer acceptance still required
+## Reviewer acceptance (R8.61 PASS)
 
-Using the authorized kantor browser fixture, Reviewer must perform the plan's
+Using the authorized kantor browser fixture, Reviewer completed the plan's
 desktop and 375 px smoke without creating or editing fixture data:
 
 1. Open `/masterdata` and `/bq`, their primary navigation, and one existing
@@ -69,6 +68,7 @@ desktop and 375 px smoke without creating or editing fixture data:
    hydration, or layout failure.
 3. Sign out and confirm both app roots redirect to `/login`.
 
-Until that evidence is recorded, PF-8 remains open in `docs/review.md`, F-E
-remains open in `docs/roadmap.md`, and StudioFlow recovery implementation must
-not begin.
+Master Data Brands and BQ Library rendered with their expected app navigation
+and representative read-only content at both widths. After sign-out,
+`/masterdata` and `/bq` both redirected to `/login`. No browser finding was
+observed. F-E is closed; SF-A planning is now permitted.

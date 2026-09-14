@@ -71,10 +71,11 @@ independently useful outcome, or demonstrated context/tool limit.
   Implemented in R8.57 and accepted in R8.59 after automated boundary/full
   suite evidence and authenticated desktop/375 px Master Data and BQ browser
   smoke.~~
-- [ ] **F-E / PF-8 — Foundation acceptance and freeze:** Run the complete
+- [x] ~~**F-E / PF-8 — Foundation acceptance and freeze:** Run the complete
   repository gates plus Master Data/BQ browser smoke, resolve findings as one
   correction pass, document the accepted Foundation baseline, and only then
-  release StudioFlow implementation.
+  release StudioFlow implementation. Accepted in R8.61 after R8.60 candidate
+  automated evidence and authenticated desktop/375 px Master Data/BQ smoke.~~
 
 ## Platform Foundation
 
