@@ -5,8 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.49**
-- Next local revision: **R8.50**
+- Current revision after this entry is committed: **R8.50**
+- Next local revision: **R8.51**
+
+## R8.50 | 2026-09-14 | review(studioflow): accept D-SF evidence and hold ratification gate
+
+### Changed
+
+- Independently accepted R8.49: the roadmap now correctly distinguishes
+  completed D-SF evidence from the still-open Planner/owner ratification gate.
+- Replaced the completed discovery execution plan with the bounded owner
+  ratification gate for D-SF-01 through D-SF-07; no SF implementation slice is
+  active.
+
+### Verification
+
+- Reviewed the R8.49 diff, final whitespace, and decision-register references;
+  its open roadmap gate is consistent with the R8.48 discovery report.
+
+### Limitations
+
+- A READY implementation plan cannot be issued until the owner explicitly
+  ratifies the affected product, route, data, integration, and settings policy.
 
 ## R8.49 | 2026-09-14 | docs(roadmap): retain D-SF ratification gate
 
