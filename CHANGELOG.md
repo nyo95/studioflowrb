@@ -5,8 +5,31 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.54**
-- Next local revision: **R8.55**
+- Current revision after this entry is committed: **R8.55**
+- Next local revision: **R8.56**
+
+## R8.55 | 2026-09-14 | docs(plan): correct F-C reviewer scenario route and wording
+
+### Changed
+
+- Corrected the F-C Reviewer acceptance scenarios in `PLAN.md`: the settings
+  route is `/settings/general` (the `(platform)` route group is never part of
+  a URL), the Appearance surface is a section of that page rather than a tab,
+  and the save/reload scenario now matches the read-only Theme behavior — the
+  form's Save persists the unchanged canonical light theme across reloads.
+- Advanced the PASS commit reference in `PLAN.md` from R8.55 to R8.56, since
+  R8.55 is used by this revision.
+
+### Verification
+
+- Documentation link and whitespace checks: passed.
+- No product, application, schema, data, migration, or route behavior changed.
+
+### Limitations
+
+- Browser acceptance remains deferred to a Reviewer/session with browser
+  access, so the F-C walkthrough is still pending; F-D is not planned before
+  that acceptance completes.
 
 ## R8.54 | 2026-09-14 | review(studioflow,foundation): verify D-SF ratification; defer F-C browser acceptance
 

@@ -99,11 +99,12 @@ StudioFlow entry/navigation without visual or permission regressions.
 Run these against the approved local kantor fixture at the committed R8.53
 revision before recording PASS and replacing this plan with the F-D plan:
 
-1. **Settings access** — open `/platform/settings/general` and the Appearance
-   tab under a role that holds settings access; confirm an unauthorized user is
+1. **Settings access** — open `/settings/general` and the Appearance section
+   under a role that holds settings access; confirm an unauthorized user is
    refused.
-2. **Appearance save/reload** — save the theme field and reload; confirm the
-   persisted canonical value is shown.
+2. **Appearance save/reload** — submit the form's Save action and reload;
+   confirm the canonical light theme (read-only in the Appearance section)
+   persists and stays visible after reload.
 3. **Narrow/desktop shell** — verify SettingsShell navigation renders correctly
    at desktop width and at ≤ 375 px narrow.
 4. **Three-app smoke** — open Master Data, BQ, and StudioFlow entry points;
@@ -111,5 +112,5 @@ revision before recording PASS and replacing this plan with the F-D plan:
    SettingsShell and platform shell changes.
 
 On PASS: update `docs/roadmap.md` to mark F-C complete (with R8.53 evidence),
-update `docs/review.md` to close the F-C entry, commit as R8.55, and replace
+update `docs/review.md` to close the F-C entry, commit as R8.56, and replace
 this PLAN.md with the F-D plan.
