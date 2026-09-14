@@ -160,9 +160,14 @@ describe("§7.1.1 Requirement templates", () => {
 
 describe("§7.1.1 Project requirement snapshot", () => {
   it("snapshots general and phase templates when creating a project", async () => {
-    const pt = await testDb.prisma.sfPhaseTemplate.create({
-      data: { key: "design", name: "Design", sort_order: 1, has_rounds: true, round_prefix: "D" },
-    });
+    const phaseTemplates = await Promise.all([
+      testDb.prisma.sfPhaseTemplate.create({
+        data: { key: "design", name: "Design", sort_order: 1, has_rounds: true, round_prefix: "D" },
+      }),
+      testDb.prisma.sfPhaseTemplate.create({
+        data: { key: "build", name: "Build", sort_order: 2, has_rounds: true, round_prefix: "B" },
+      }),
+    ]);
 
     // Create general template
     await service.createRequirementTemplate(
@@ -174,7 +179,7 @@ describe("§7.1.1 Project requirement snapshot", () => {
     await service.createRequirementTemplate(
       [STUDIOFLOW_PERMISSIONS.projectManage],
       ACTOR,
-      { key: "phase-1", scope: "PHASE", title: "Phase Req 1", phase_template_id: pt.id },
+      { key: "phase-1", scope: "PHASE", title: "Phase Req 1", phase_template_id: phaseTemplates[0].id },
     );
 
     const client = await testDb.prisma.sfClient.create({ data: { name: "Test Client" } });
@@ -185,7 +190,7 @@ describe("§7.1.1 Project requirement snapshot", () => {
     );
 
     const reqs = await service.listProjectRequirements([STUDIOFLOW_PERMISSIONS.projectRead], project.id);
-    assert.equal(reqs.length, 2); // 1 general + 1 phase
+    assert.equal(reqs.length, 2); // 1 general + 1 phase across 2 project phases
 
     const generalReqs = reqs.filter((r) => r.phase_id === null);
     assert.equal(generalReqs.length, 1);

@@ -744,9 +744,11 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         },
       });
 
-      // §7.1.1: Snapshot requirement templates into project requirements
+      // §7.1.1: General requirements are project-wide and must be copied once.
+      await snapshotGeneralRequirementsForProject(db, project.id);
+      // Phase requirements are copied once for their corresponding snapshot.
       for (const phase of project.phases) {
-        await snapshotRequirementsForProject(db, project.id, phase.id, phase.template_id);
+        await snapshotPhaseRequirementsForProject(db, project.id, phase.id, phase.template_id);
       }
 
       await writeAudit({
@@ -2986,13 +2988,10 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
    * Snapshots active RequirementTemplates for a project.
    * Called inside the project creation transaction AND when adding a project phase.
    */
-  async function snapshotRequirementsForProject(
+  async function snapshotGeneralRequirementsForProject(
     db: PrismaClient,
     projectId: string,
-    projectPhaseId: string,
-    phaseTemplateId: string,
   ) {
-    // 1. Snapshot active General templates (scope=GENERAL, no phase_template_id)
     const generalTemplates = await db.sfRequirementTemplate.findMany({
       where: { scope: "GENERAL", deleted_at: null },
       orderBy: { sort_order: "asc" },
@@ -3014,7 +3013,14 @@ export function createStudioFlowService(rootDb: PrismaClient, deps: StudioFlowSe
         await db.sfRequirementTemplate.update({ where: { id: tmpl.id }, data: { key_immutable: true } });
       }
     }
-    // 2. Snapshot active Phase templates for this specific phase
+  }
+
+  async function snapshotPhaseRequirementsForProject(
+    db: PrismaClient,
+    projectId: string,
+    projectPhaseId: string,
+    phaseTemplateId: string,
+  ) {
     const phaseTemplates = await db.sfRequirementTemplate.findMany({
       where: { scope: "PHASE", phase_template_id: phaseTemplateId, deleted_at: null },
       orderBy: { sort_order: "asc" },

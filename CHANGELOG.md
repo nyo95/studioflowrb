@@ -5,8 +5,39 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.64**
-- Next local revision: **R8.65**
+- Current revision after this entry is committed: **R8.65**
+- Next local revision: **R8.66**
+
+## R8.65 | 2026-09-14 | fix(studioflow): make SF-A requirements migration additive
+
+### Corrected
+
+- Replaced the unsafe SF-A migration path with an additive StudioFlow-only
+  migration. It creates only the Requirements enums, tables, indexes, and
+  foreign keys; it does not drop `platform.LoginRateLimit`, alter Platform
+  identities/keys, or change BQ or unrelated StudioFlow constraints/indexes.
+- Restored `LoginRateLimit` to the platform test-table fixture so the platform
+  schema contract remains covered.
+- Split project requirement snapshotting so active General templates are copied
+  exactly once per project and Phase templates are copied once for their
+  corresponding project phase. The multi-phase integration regression covers
+  the no-duplicate-General invariant.
+
+### Verification
+
+- Recreated the approved disposable kantor rebuild database after creating a
+  local custom-format `master_data` backup; Prisma migration reset and status
+  completed successfully across all 39 migrations.
+- `npm test`: 375 passed, 0 failed; `npm run typecheck`, `npm run lint`,
+  `npm run check:boundaries`, `npm run check:legacy-runtime`, and `npm run
+  build` all passed.
+- Browser acceptance was not run; it remains Reviewer-owned. No legacy source
+  or database was accessed.
+
+### Limitations
+
+- The backup is retained outside the repository for the approved disposable
+  database and is not committed. No production or legacy data was used.
 
 ## R8.64 | 2026-09-14 | feat(studioflow): implement SF-A Requirements templates and project snapshots
 

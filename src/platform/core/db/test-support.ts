@@ -73,6 +73,7 @@ const PLATFORM_TABLES = [
   "RolePermission",
   "Session",
   "PlatformGeneralSettings",
+  "LoginRateLimit",
 ].map((table) => `"platform"."${table}"`);
 
 const AUDIT_TABLES = [`"platform"."AuditEvent"`];
