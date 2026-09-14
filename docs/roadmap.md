@@ -32,6 +32,10 @@ Normal sequence:
 6. **F-E — Foundation acceptance and freeze** (PF-8).
 7. **SF-A through SF-F — StudioFlow recovery implementation and cutover.**
 8. **SF-G — Workflow Optimization vNext**, only after parity is accepted.
+9. **SF-H — General collaboration**, after SF-G owner decision.
+
+SF-E (SketchUp external integration) is deferred — not part of the active
+recovery sequence. See "Deferred features" below.
 
 Each item above is one coherent Executor outcome by default. Split only for a
 real owner decision, external dependency, migration/security/rollback boundary,
@@ -172,50 +176,88 @@ clean ownership while each capability is recovered.
   planning/Gantt. Preserve accepted behavior, implement ratified
   parity gaps such as KB-016/KB-017/KB-018/KB-023, use controlled redirects,
   and cut over these routes together.
+
+  **SF-A is in progress.** Design authority: `docs/apps/studioflow/SF-0-DESIGN-LOCK.md`.
+  Each slice below is one coherent Executor outcome. Code tests are the
+  mandatory gate; browser acceptance items go to `BROWSER-ACCEPTANCE-BACKLOG.md`
+  and are run by the Reviewer at each phase gate.
+
+  Completed slices:
+  - [x] ~~SF-A-REQUIREMENTS: Requirements infrastructure — schema, service,
+    dedicated routes (General + Phase), seeding, evidence, full lifecycle.
+    R8.62–R8.74.~~
+
+  Remaining slices (order is execution order):
+  - [ ] **SF-A-REQUIREMENTS-SIMPLIFY:** Schema cleanup — drop archive/restore
+    columns (`archived_at`, `archive_reason`, `archived_by`, `restored_at`,
+    `restore_reason`, `restored_by`) from `sf_project_requirement`; add `WAIVED`
+    state to enum and service; update all consumers. Must run before SF-A-PROJECT-DETAIL
+    because the embedded requirement UI is built on the simplified schema.
+  - [ ] **SF-A-ACTIVITY-CENTER:** Activity Center / Menunggu Saya — Tier C
+    surface (workflow-state grouping: Menunggu Saya / Menunggu Klien / Belum ada
+    penanggung jawab), sorted by age descending, no DataTable, no stored filters.
+    Route: `/studioflow` or `/studioflow/activity`.
+  - [ ] **SF-A-PROJECT-DETAIL:** Project Detail as workspace — Tier B surface.
+    `PageShell` + `PhaseRow` (expandable, active phases open by default) +
+    `IterationRow` + `GeneralTaskBlock` + embedded General Requirements (pinned
+    section) + embedded Phase Requirements (inside `PhaseRow`). No `DirectoryShell`
+    as page frame.
+  - [ ] **SF-A-PROJECT-LIST-FIX:** Project List DataTable column corrections —
+    phase summary column uses human language per UX spec §4, not raw enum values.
+    Resolve TODO(SF-0) markers from R8.72.
+  - [ ] **SF-A-CLIENTS:** Client list and project-linked client detail — Tier A
+    directory surface. Routes: `/studioflow/clients`, `/studioflow/clients/[id]`.
+  - [ ] **SF-A-LIFECYCLE:** Project lifecycle and archive — create, rename, archive,
+    restore project; phase administration (add/remove/reorder phases).
+  - [ ] **SF-A-SETTINGS:** StudioFlow-owned phase/project-engine settings — Tier A
+    admin surfaces. Phase template settings already partially exists; verify and
+    complete ownership.
 - [ ] **SF-B — Delivery and client collaboration:** Recover deliverables/files,
   iterations and revision provenance, send/withdraw, draft client answers,
   corrected-answer chains, phase consequences, activity/history, permissions,
   audit, error recovery, and relevant retention behavior as one end-to-end
   production workflow. This absorbs KB-013 through KB-015 and any ratified
   replacement for the frozen simplified workflow.
-- [ ] **SF-C — Project records and discovery:** Recover the canonical MOM module
-  and project-owned Product Catalogue; preserve useful project discovery
-  behavior; and cut over their project/global routes. The incorrect global rows
-  are discarded—not migrated, re-scoped, or retained—only through a separately
-  approved safe destructive cutover plan. Resolve KB-012, KB-021, and KB-022
-  only where the ratified model says they interact.
+- [ ] **SF-C — Project records:** Recover the canonical MOM module and verify
+  project-scoped Library ownership (Library = Product Catalogue; the rebuild
+  Library already exists but its global-vs-project ownership must be confirmed
+  correct and any incorrectly global rows discarded through a separately approved
+  safe destructive cutover plan). Cut over project/global routes. Resolve KB-012,
+  KB-021, and KB-022 only where the ratified model says they interact.
 - [ ] **SF-D — Product Schedule / FF&E:** Restore the complete project-owned
   Schedule capability, its catalogue snapshots/options/lifecycle/templates,
   Schedule-owned settings, permissions, history, and browser workflow. Keep it
   separate because its domain and migration can be accepted or rolled back
   independently from the other project-record modules.
-- [ ] **SF-E — SketchUp and external integration:** Implement only the ratified
-  SketchUp capability through an authenticated, idempotent adapter with retry,
-  observability, reconciliation, safe failure, and no legacy runtime/database
-  dependency. Keep this separate because external integration and operational
-  recovery form their own security and rollback boundary.
-- [ ] **SF-H — General collaboration:** Activate only the ratified temporary
-  StudioFlow-global discussion, presence, and realtime capability after a
-  separate retention, privacy, delivery, and persistence design. It is not a
-  project record and does not recover legacy project chat.
-- [ ] **SF-F — Parity cutover and frozen-code purge:** Prove every classified
-  route/capability, Master Data/BQ non-regression, migrations, permissions,
-  persistence, audit/history, error states, and real browser workflows. Remove
-  the frozen StudioFlow service/routes/contracts only after no live consumer
-  remains. Record every remaining deviation as an explicit owner decision and
-  freeze the recovered StudioFlow baseline.
-- [ ] **SF-G — Workflow Optimization vNext:** After SF-F PASS, compare recovered
-  parity, the frozen RB todo/phase/deliverable ideas, and the owner's current
-  daily workflow. Only then simplify clicks, transitions, and information
-  architecture deliberately. Reassess the Overview/Operational Catalog and any
-  Library crawler here; a crawler requires separate legal, security, source-
-  permission, failure, and deterministic-fallback decisions.
+- [ ] **SF-F — Cabut kabel lama (parity cutover + purge):** Buktikan semua
+  route dan fitur rebuild berjalan benar end-to-end (browser, data nyata,
+  permissions, audit). Setelah terbukti, hapus kode legacy StudioFlow yang sudah
+  tidak dipakai siapapun — service, routes, contracts. Catat setiap deviasi dari
+  legacy yang disengaja sebagai owner decision, lalu freeze rebuild baseline.
+  Intinya: verifikasi final + matikan legacy.
+- [ ] **SF-G — Workflow Optimization vNext:** Setelah SF-F PASS, bandingkan
+  parity yang sudah diterima dengan ide-ide di RB dan workflow harian owner yang
+  sekarang. Baru di sini sederhanakan klik, transisi, dan information architecture
+  secara deliberate. Evaluasi Library crawler di sini; crawler butuh keputusan
+  legal, security, source-permission, failure, dan deterministic-fallback tersendiri.
+- [ ] **SF-H — General collaboration:** Aktifkan discussion, presence, dan
+  realtime hanya setelah ada desain retention, privacy, delivery, dan persistence
+  yang terpisah. Bukan project record; tidak me-recover legacy project chat.
 
 Each milestone normally targets one implementation commit. When review finds
 material defects, bundle all related findings into one correction prompt and
 commit per review pass. Progressive compatibility redirects and route cutovers
 occur inside the owning milestone; SF-F is verification and dead-code removal,
 not a giant last-minute replacement.
+
+### Deferred features (not in active sequence)
+
+- [ ] **SF-E — SketchUp integration:** Implement only the ratified SketchUp
+  capability through an authenticated, idempotent adapter with retry,
+  observability, reconciliation, safe failure, and no legacy runtime/database
+  dependency. Deferred by owner decision 2026-09-14. Revisit after SF-F.
+
+---
 
 ## Historical implemented or removed evidence
 
