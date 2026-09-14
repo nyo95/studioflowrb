@@ -5,8 +5,25 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.51**
-- Next local revision: **R8.52**
+- Current revision after this entry is committed: **R8.52**
+- Next local revision: **R8.53**
+
+## R8.52 | 2026-09-14 | docs(roadmap): close D-SF completion markup
+
+### Changed
+
+- Closed the D-SF roadmap strikethrough marker so the completed item does not
+  accidentally mark subsequent roadmap sections as historical.
+- Advanced the F-C Executor target to R8.53 for the next local implementation
+  revision.
+
+### Verification
+
+- Documentation link and whitespace checks: passed.
+
+### Limitations
+
+- No product, application, schema, data, or route behavior changed.
 
 ## R8.51 | 2026-09-14 | docs(studioflow): ratify D-SF recovery decisions
 

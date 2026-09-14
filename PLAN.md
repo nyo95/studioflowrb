@@ -60,7 +60,7 @@ activating StudioFlow recovery features.
   retain their established route, permission, and business behavior.
 - Any necessary settings migration/persistence, validation, permissions, tests,
   documentation, and consumer follow-through is cohesive and locally committed
-  as R8.52.
+  as R8.53.
 
 ## Verification
 
@@ -91,7 +91,7 @@ You are the Executor. Location: kantor. Read `AGENTS.md`,
 `docs/agent/EXECUTOR.md`, and this READY `PLAN.md`, then implement the entire
 F-C/PF-4+PF-5 Foundation outcome. Preserve ratified D-SF ownership boundaries,
 protect Master Data/BQ/StudioFlow behavior, run the required checks, update
-`CHANGELOG.md`, and create local revision R8.52. Do not start any StudioFlow
+`CHANGELOG.md`, and create local revision R8.53. Do not start any StudioFlow
 recovery feature, destructive migration, or remote action. Stop only for a
 material locked-decision conflict or unsafe boundary; otherwise complete the
 coherent outcome and report the commit, checks, limitations, and dirty files.

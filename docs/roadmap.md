@@ -151,6 +151,7 @@ clean ownership while each capability is recovered.
   [`apps/studioflow/D-SF-RECOVERY-DISCOVERY.md`](apps/studioflow/D-SF-RECOVERY-DISCOVERY.md)
   (R8.48), with D-SF-01 through D-SF-07 ratified in R8.51. It informs F-C/F-D;
   Foundation F-E must still pass before any StudioFlow implementation begins.
+  ~~
 
 ### Implementation after F-E Foundation acceptance
 
