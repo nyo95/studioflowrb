@@ -31,11 +31,19 @@ a real defect — move it to `knownbug.md` with what was actually observed.
 - **Status:** Correction required. Continue the same coherent F-B outcome;
   do not mark it accepted until route/navigation ownership and browser evidence
   are complete.
-- **R8.38 runtime finding:** `npm run dev` fails during permission registry
-  initialization because BQ registers `masterdata.promotion.approve`, which is
-  already owned by Master Data. The passing suite did not exercise this boot
-  path.
-- **Status:** Correction required. See KB-029; F-B remains unaccepted.
+- **R8.40 correction:** BQ no longer registers Master Data's
+  `masterdata.promotion.approve`; its retained promotion approval checks import
+  the public Master Data permission contract instead. A registration test now
+  composes the full app set and asserts that this permission has one owner.
+  `npm run dev` boots successfully and unauthenticated Master Data, BQ, and
+  StudioFlow route checks all redirect to `/login`.
+- **Remaining review:** Typecheck, lint, boundary, legacy-runtime, production
+  build, and focused registry tests pass. Full integration coverage is blocked
+  because kantor has no disposable test-database configuration, and authorized
+  browser navigation/launcher checks still need a supplied test account. The
+  unrelated local-filesystem signed-read failure is tracked as KB-030.
+- **Status:** Ready for reviewer acceptance; F-B remains unaccepted until the
+  required authenticated browser and disposable-database evidence exists.
 
 ### PF-1 — Core purity and managed Brand mark storage
 

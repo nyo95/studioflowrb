@@ -7,21 +7,21 @@ it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
 
 ## Platform Foundation
 
-### KB-029 — F-B app registry fails at dev boot on duplicate cross-app permission
+### KB-030 — Valid local private storage keys fail signed-read verification on Windows
 
-- **Observed (R8.38 runtime check):** `BQ_PERMISSIONS` includes
-  `masterdata.promotion.approve`, while Master Data owns and exports the same
-  permission. `composePermissionRegistry` correctly rejects the duplicate, so
-  `npm run dev` fails during instrumentation with `REGISTRY_DUPLICATE_PERMISSION`.
-- **Expected:** Each permission ID has one owning app. Cross-app capability use
-  must consume the owning app's public permission contract without registering
-  the same ID twice.
-- **Required correction:** Remove the duplicate from BQ's registered vocabulary
-  while preserving any legitimate cross-app authorization check through the
-  public Master Data permission contract, then add a boot/registry regression
-  test.
-- **Priority:** P1 — development/runtime boot failure.
-- **Status:** Open; blocks F-B acceptance.
+- **Observed (R8.40 executor verification):**
+  `LocalFilesystemStorage.createSignedReadUrl("test/image.png", 60)` rejects a
+  freshly written key with `storage.invalid-key` in the kantor Windows
+  environment. The focused filesystem test reproduces it consistently, so the
+  local private-read path cannot be accepted as working on the target OS.
+- **Expected:** A normal key beneath the configured local storage root remains
+  valid after it is written and receives a signed private-read URL. Traversal
+  and symlink escape attempts must still be rejected.
+- **Mitigation:** Do not rely on managed private MOM image reads in kantor until
+  the filesystem path normalization is corrected and the focused test passes.
+- **Priority:** P1 — private asset availability on the selected deployment
+  target.
+- **Status:** Open; discovered outside the F-B ownership/navigation scope.
 
 ### KB-028 — Symlink escape protection is incomplete and unproven
 
@@ -361,6 +361,13 @@ migration and one slice.
   does not exist.
 
 ## Closed
+
+### KB-029 — F-B app registry duplicate cross-app permission
+
+- **Closed in R8.40:** BQ no longer registers Master Data's
+  `masterdata.promotion.approve`; BQ's retained authorization checks consume
+  the public Master Data permission export. The full registration set is now
+  exercised by a regression test and the development server boots successfully.
 
 ### KB-019 — `listWaitingOnMe` reads every open round and task in the database
 

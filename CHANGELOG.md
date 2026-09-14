@@ -8,6 +8,36 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Current revision after this entry is committed: **R8.39**
 - Next local revision: **R8.40**
 
+## R8.40 | 2026-09-14 | fix(foundation): restore unique app permission registration
+
+- Removed `masterdata.promotion.approve` from BQ's owned permission vocabulary.
+  BQ's retained legacy promotion-approval service paths now use the canonical
+  Master Data public permission export, preserving the authorization rule
+  without registering a cross-app permission twice.
+- Added a complete-app registry regression test, which composes the same public
+  registrations used during server boot and asserts that the Master Data
+  promotion permission has exactly one owner. The development server now starts
+  successfully instead of failing with `REGISTRY_DUPLICATE_PERMISSION`.
+- Updated the deferred-review receipt for F-B. The overall Foundation outcome
+  remains unaccepted pending authenticated browser and disposable integration
+  test evidence.
+- Recorded KB-030 after focused verification found that valid local private
+  storage keys still fail signed-read verification on Windows; it is outside
+  this ownership/navigation correction's locked scope.
+- No schema, migration, or dependency change.
+
+### Verification
+
+- Focused app-registration and permission-registry tests: passed.
+- `npx prisma generate` with `STUDIOFLOW_LOCATION=kantor`: passed.
+- `npm run typecheck`, `npm run lint`, `npm run check:boundaries`,
+  `npm run check:legacy-runtime`, and `npm run build`: passed.
+- Development server boot and unauthenticated `/masterdata`, `/bq`, and
+  `/studioflow` redirects to `/login`: passed.
+- Full `npm run test`: unavailable as a pass because kantor lacks a disposable
+  `PLATFORM_TEST_DATABASE_URL`; its focused filesystem test also reproduces the
+  separately tracked KB-030 failure.
+
 ## R8.39 | 2026-09-14 | docs(review): record F-B duplicate permission boot blocker
 
 - Runtime review of R8.38 found that BQ registers
