@@ -1,7 +1,8 @@
 # StudioFlow — Contract Index and Shared Rules
 
 Status: **ACTIVE CONTRACT INDEX — implemented project-workflow, Library, MOM
-and Product Catalogue slices reconciled through R7.55; remaining work is tracked in
+and Product Catalogue slices reconciled through R7.55; pinned recovery discovery
+is complete in R8.48; remaining work is tracked in
 [`../../roadmap.md`](../../roadmap.md)**
 
 Authority: owner decisions locked in the StudioFlow contract sessions of
@@ -11,6 +12,10 @@ and [`PLATFORM-ASSET-STORAGE-ROADMAP.md`](../platform/PLATFORM-ASSET-STORAGE-ROA
 Legacy code at the recorded audit commit is behavioral evidence only. The
 uncommitted StudioFlow scaffold in this checkout is owner work-in-progress and
 is **superseded by these contracts**; it is not implementation authority.
+
+The current pinned recovery evidence and decision register are in
+[`D-SF-RECOVERY-DISCOVERY.md`](D-SF-RECOVERY-DISCOVERY.md). It completes the
+read-only D-SF gate but does not activate an implementation slice.
 
 This index began as Gate 0 of the legacy audit roadmap. It now governs the
 implemented slices together with current owner instructions and the alignment
@@ -53,8 +58,11 @@ activates neither app execution nor a new foundation build.
 | [`studioflow-schedule-contract.md`](studioflow-schedule-contract.md) | Owner-approved Brands, StudioFlow-owned Product Catalogue, and project Schedule contract; Product Catalogue is implemented in R7.53 and Schedule remains unactivated |
 | [`studioflow-mom-contract.md`](studioflow-mom-contract.md) | Owner-approved project-owned Minutes of Meeting contract; executable work order remains deferred |
 
-Product Catalogue is implemented as a StudioFlow-owned reuse pool. Project
-Schedule/FFNI remains unactivated; project-owned MOM is implemented in R7.52.
+The R7.53 global Product Catalogue implementation is retained as historical
+implementation evidence, not recovery authority: D-SF found project-scoped
+legacy product/schedule records. Its existing-data treatment needs Planner
+decision D-SF-04 before SF-C. Project Schedule/FFNI remains unactivated;
+project-owned MOM is implemented in R7.52.
 
 ## 3. Permission vocabulary
 
@@ -134,10 +142,12 @@ StudioFlow follows the platform dependency law: `app -> platform` and
 boundary.
 
 - **Master Data.** StudioFlow reads only Brands through the Master Data public
-  read port, read-only. Product Catalogue is independently StudioFlow-owned and
-  shared across StudioFlow projects; it never reads Master Data SKU, unit, or
-  pricing. Schedule copies catalogue specifications into project snapshots, so
-  later edits cannot rewrite project history.
+  read port, read-only. The R7.53 global Product Catalogue premise is
+  superseded for recovery planning by the project-scoped evidence recorded in
+  `D-SF-RECOVERY-DISCOVERY.md`; the data disposition remains D-SF-04. Neither
+  form reads Master Data SKU, unit, or pricing. A future schedule must copy its
+  chosen specification into a project snapshot so later changes cannot rewrite
+  project history.
 - **BQ.** No relationship in either direction. BQ reads Master Data pricing on
   its own. A StudioFlow project and a BQ project are unrelated records and are
   not linked, joined, or synchronized.
@@ -208,7 +218,7 @@ or placeholder export is created for anything below.
 
 | Deferred | Reason |
 |---|---|
-| Project Schedule / FFNI | Contracted in [`studioflow-schedule-contract.md`](studioflow-schedule-contract.md) §4–§5 but not activated. Product Catalogue, its reuse pool, shipped in R7.53; the project-scoped entry/option/template slice needs its own executable work order (KB-003) |
+| Project Schedule / FFNI | Historical R7 schedule contract §4–§5 and the R7.53 global reuse-pool implementation are superseded for recovery scope by D-SF's project-scoped evidence. No data or schema change is authorized until D-SF-04; then a project-scoped entry/option/template work order may be written (KB-003). |
 | SketchUp plugin exchange | An authenticated, idempotent integration with retry and reconciliation. No plugin endpoint enters the first release |
 | Checklist templates and template-seeded requirements | Legacy root checklists were template requirements users could not create. Reintroduce only if a confirmed workflow needs them |
 | Legacy's Today's View feature set — saved filters, auto-hide, event feed | The one list that replaces it ships in the first release (project contract §10.2). What stays deferred is the accumulation that made legacy's version unreadable |

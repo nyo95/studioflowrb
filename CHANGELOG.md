@@ -5,8 +5,44 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.47**
-- Next local revision: **R8.48**
+- Current revision after this entry is committed: **R8.48**
+- Next local revision: **R8.49**
+
+## R8.48 | 2026-09-14 | docs(studioflow): recover pinned legacy discovery evidence
+
+### Changed
+
+- Completed the D-SF read-only recovery discovery from only committed legacy
+  blobs at `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27` and recorded a durable
+  capability/route, permission/ownership, and shared/downstream matrix.
+- Classified the project workflow, phase transitions, work feed, deliverables,
+  project catalogue/schedule, MOM, SketchUp, settings, and live-provider
+  evidence as KEEP, MERGE, ALREADY_REPLACED, REDESIGN, PURGE, or
+  DECISION_REQUIRED.
+- Recorded seven explicit Planner decisions, including overlapping
+  Upcoming/activity surfaces, settings/database ownership, MOM parity,
+  treatment of existing global catalogue data, realtime/chat, SketchUp, and
+  legacy route compatibility.
+- Marked D-SF discovery complete in the roadmap and linked its report from the
+  StudioFlow and documentation indexes. No implementation slice is activated.
+
+### Verification
+
+- Read-only Git identity check: supplied kantor legacy checkout `main` equals
+  the required pin and its remote matches the recorded repository.
+- Verified cited source paths from the pinned commit, then re-read the report
+  against the current StudioFlow project, schedule, MOM, and index contracts.
+- Documentation link/format checks, staged-diff review, and staged whitespace
+  checks: passed.
+
+### Limitations
+
+- No legacy working-tree artifact, legacy environment, database, application,
+  or script was accessed. The untracked recovery dumps and `foldering/` remain
+  excluded from evidence.
+- This is recovery evidence only: it changes no application code, schema,
+  migration, permission, route, dependency, or existing data. SF-A remains
+  blocked on Planner ratification of the D-SF decision register.
 
 ## R8.47 | 2026-09-14 | docs(plan): activate pinned StudioFlow recovery discovery
 

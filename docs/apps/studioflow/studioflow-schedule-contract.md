@@ -1,8 +1,10 @@
 # Library and Schedule Contract — StudioFlow
 
-Status: **OWNER-APPROVED LOGIC CONTRACT — Library discovery is partially
-implemented through R7.40; Product Catalogue reuse pool is implemented in
-R7.53; Product Schedule/FFNI remains unactivated and is tracked as KB-003**
+Status: **HISTORICAL R7 LOGIC CONTRACT — Library discovery is partially
+implemented through R7.40; its R7.53 global Product Catalogue reuse-pool
+premise is superseded for recovery planning by
+[`D-SF-RECOVERY-DISCOVERY.md`](D-SF-RECOVERY-DISCOVERY.md); Product
+Schedule/FFNI remains unactivated and is tracked as KB-003**
 
 Authority: owner decisions of 2026-09-08 — the Library reads the Master Data
 **brand catalogue** only, and FF&E is composed from **snapshots exactly as legacy
@@ -64,7 +66,13 @@ pricing methods on the port (`listMaterialPriceOptions`, `getSkuPricingOptions`,
 `listWorkPricesRead`) are BQ's and are never called from StudioFlow — mixing them
 in would turn a specification screen into a costing screen.
 
-### 3.2 Product Catalogue is StudioFlow-owned
+### 3.2 Historical R7 Product Catalogue ownership
+
+This section records the prior R7 decision only. It is not implementation
+authority for recovery: the pinned legacy evidence establishes project-scoped
+product/schedule behavior, while disposition of existing global rebuild data is
+Planner decision D-SF-04. Do not use this section to authorize a migration,
+deletion, or re-scope operation.
 
 Product Catalogue is an independent StudioFlow reuse pool shared across
 StudioFlow projects. It is not Master Data, is not project-owned, and never
