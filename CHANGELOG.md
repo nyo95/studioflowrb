@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.72**
-- Next local revision: **R8.73**
+- Current revision after this entry is committed: **R8.73**
+- Next local revision: **R8.74**
 
 ## R8.73 | 2026-09-14 | docs(agent): record harness, browser backlog, and SF-0 design lock
 
