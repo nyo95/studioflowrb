@@ -1,6 +1,6 @@
 # Documentation Hub
 
-Status: reconciled through **R8.24** on 2026-09-13. Contracts under `docs/apps/`
+Status: reconciled through **R8.75** on 2026-09-15. Contracts under `docs/apps/`
 were reorganized into one subfolder per application on 2026-09-10 at owner
 request; content is unchanged except for corrected cross-links.
 
@@ -13,7 +13,8 @@ tests, and migrations prove implemented state.
 
 | Document | Purpose |
 |---|---|
-| [`alignment.md`](alignment.md) | Owner explanation of how the StudioFlow rebuild preserves legacy outcomes while simplifying the workflow |
+| ~~[`alignment.md`](archive/studioflow-rb/alignment.md)~~ | **Superseded** — R7.xx rebuild alignment artifact; moved to `archive/studioflow-rb/` in R8.75. The active StudioFlow authority is the rework contract. |
+| [`UTILITY-INVENTORY.md`](UTILITY-INVENTORY.md) | Evidence-backed disposition ledger (REUSE/EXTEND/ADD/APP-OWNED/PURGE) for shared utilities and their duplicates; enforced by `scripts/check-boundaries.mjs` |
 | [`roadmap.md`](roadmap.md) | Remaining planned work, grouped by Platform, UI Engine, Master Data, BQ, and StudioFlow |
 | [`knownbug.md`](knownbug.md) | Open and closed defects grouped by application |
 | [`review.md`](review.md) | Implemented-but-unverified work, grouped by application — distinct from `roadmap.md` (not built) and `knownbug.md` (confirmed defect) |
@@ -23,10 +24,6 @@ tests, and migrations prove implemented state.
 | [`agent/PLANNER.md`](agent/PLANNER.md) | Planning half of the Planner/Reviewer Navigator lane |
 | [`agent/EXECUTOR.md`](agent/EXECUTOR.md) | Autonomous implementation within a READY plan's locked boundaries |
 | [`agent/REVIEWER.md`](agent/REVIEWER.md) | Risk-shaped verification and next-plan preparation |
-| [`StudioFlow workflow closure draft`](../scripts/work-orders/STUDIOFLOW-R7.56-WORKFLOW-CLOSURE.md) | **paused** by the owner priority below; assign the next unused revision when reactivated, not the historical filename's R7.56 |
-| [`StudioFlow R7.48 work order`](../scripts/work-orders/STUDIOFLOW-R7.48-PHASE-DELIVERABLE.md) | implemented in R7.48; retained as history |
-| [`StudioFlow R7.49 work order`](../scripts/work-orders/STUDIOFLOW-R7.49-COHERENT-WORK-SURFACE.md) | implemented in R7.50; retained as history |
-| [`StudioFlow R7.52 MOM work order`](../scripts/work-orders/STUDIOFLOW-R7.52-MOM.md) | implemented in R7.52; retained as history |
 
 
 A work order marked *implemented* above is evidence of what was built, never an
@@ -90,14 +87,9 @@ contracts sit outside any app folder because every app depends on them.
 
 | Contract | Owns |
 |---|---|
-| [`apps/studioflow/studioflow.md`](apps/studioflow/studioflow.md) | frozen RB contract index and implemented ownership evidence; recovery authority comes from the Recovery Reference and active roadmap |
-| [`apps/studioflow/studioflow-project-contract.md`](apps/studioflow/studioflow-project-contract.md) | frozen RB Client/Project/workflow contract and implementation evidence; parity differences require D-SF classification |
-| [`apps/studioflow/studioflow-ux-spec.md`](apps/studioflow/studioflow-ux-spec.md) | StudioFlow surface reference; partially implemented and subordinate to current owner alignment |
-| [`apps/studioflow/studioflow-implementation-plan.md`](apps/studioflow/studioflow-implementation-plan.md) | historical R7 execution plan; superseded for recovery scope and sequencing |
-| [`apps/studioflow/studioflow-schedule-contract.md`](apps/studioflow/studioflow-schedule-contract.md) | historical R7 catalogue/Schedule contract; its global catalogue premise is superseded and Schedule remains unactivated |
-| [`apps/studioflow/studioflow-mom-contract.md`](apps/studioflow/studioflow-mom-contract.md) | historical implemented MOM contract; actual owner workflow must be re-audited before recovery |
-| [`apps/studioflow/studioflow-work-orders.md`](apps/studioflow/studioflow-work-orders.md) | historical decision/work-order ledger; use `roadmap.md` for current remaining work |
-| [`apps/studioflow/STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md`](apps/studioflow/STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md) | historical read-only audit and staged roadmap; implemented phases and remaining work are reconciled in `roadmap.md` |
+| [`apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md`](apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md) | **sole active StudioFlow authority (R8.70):** legacy behavior on the Foundation — disposition matrix, permissions, Project/Phase/Revision/Task/Today, MOM, Schedule, centralization map, UI/UX direction |
+| [`apps/studioflow/D-SF-RECOVERY-DISCOVERY.md`](apps/studioflow/D-SF-RECOVERY-DISCOVERY.md) | R8.48 pinned legacy evidence; D-SF decisions apply except where the rework contract §9 overrides them |
+| [`archive/studioflow-rb/`](archive/studioflow-rb/) | **superseded** rebuild StudioFlow contracts and R7 work orders (moved in R8.71); history only |
 
 Execution and continuity are governed by [`AGENTS.md`](../AGENTS.md) and
 [`CHANGELOG.md`](../CHANGELOG.md). The completed
@@ -151,19 +143,14 @@ Forbidden: `platform -> app`, cross-app internal imports, implicit cross-app wri
 
 ## Active sequence
 
-Status: **superseded 2026-09-10 by explicit owner instruction.** The order
-below replaces the previous Master-Data-first sequence; it is the current
-execution priority, not a change to what `roadmap.md` lists as remaining.
+Status: **SF-R1–SF-RF wave 1 accepted in R8.75 (2026-09-15).** Foundation
+sequence (1–5 below) is complete. StudioFlow wave-1 rework is complete. Wave 2
+items are in `roadmap.md` under "Wave 2 (not activated)"; no activation yet.
 
-1. **Platform Foundation — routing first.** Main-route/routing settings are the
-   core app boundary everything else sits behind.
-2. **UI Engine and Shared Utilities.**
-3. **BQ.** The simplest remaining app; keep its reusable utilities in the
-   shared platform layer, not app-local — see `apps/bq/`.
-4. **AI file-organization exploration is parked**, not pursued for now (see
-   `roadmap.md`, Discovery and automation).
-5. **Everything else waits** — Master Data closure, StudioFlow's
-   client-answer/archive/phase-admin work (KB-013…KB-017), cross-app hardening,
-   and validation all hold until 1–3 above land.
+1. **Platform Foundation — routing first.** ✓ Accepted R8.34–R8.61.
+2. **UI Engine and Shared Utilities.** ✓ Accepted R8.56–R8.59.
+3. **BQ.** Implemented; browser acceptance in `review.md`.
+4. **AI file-organization exploration is parked**, not pursued for now.
+5. **StudioFlow wave-1 rework (SF-R1–SF-RF).** ✓ Accepted R8.71–R8.75.
 
 Documented deferred capabilities are routing memory, not implementation scope. Do not create code, folders, dependencies, or placeholder exports until a stage/consumer activates them.

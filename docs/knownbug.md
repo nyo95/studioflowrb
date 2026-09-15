@@ -1,27 +1,11 @@
 # Known Bugs by Application
 
-Status: active defect ledger, reconciled through R8.13 on 2026-09-12.
+Status: active defect ledger, reconciled through R8.74 on 2026-09-15.
 
 Planned features belong in [`roadmap.md`](roadmap.md). When a bug is fixed, move
 it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
 
 ## Platform Foundation
-
-### KB-029 — F-B app registry fails at dev boot on duplicate cross-app permission
-
-- **Observed (R8.38 runtime check):** `BQ_PERMISSIONS` includes
-  `masterdata.promotion.approve`, while Master Data owns and exports the same
-  permission. `composePermissionRegistry` correctly rejects the duplicate, so
-  `npm run dev` fails during instrumentation with `REGISTRY_DUPLICATE_PERMISSION`.
-- **Expected:** Each permission ID has one owning app. Cross-app capability use
-  must consume the owning app's public permission contract without registering
-  the same ID twice.
-- **Required correction:** Remove the duplicate from BQ's registered vocabulary
-  while preserving any legitimate cross-app authorization check through the
-  public Master Data permission contract, then add a boot/registry regression
-  test.
-- **Priority:** P1 — development/runtime boot failure.
-- **Status:** Open; blocks F-B acceptance.
 
 ### KB-028 — Symlink escape protection is incomplete and unproven
 
@@ -148,7 +132,7 @@ No open BQ bug is currently recorded.
 ## StudioFlow
 
 The R7.55 audit read the whole StudioFlow surface against
-[`apps/studioflow/studioflow-project-contract.md`](apps/studioflow/studioflow-project-contract.md) and
+[`docs/archive/studioflow-rb/studioflow-project-contract.md`](archive/studioflow-rb/studioflow-project-contract.md) and
 opened KB-012 … KB-018 below (KB-019 was closed in R8.05; KB-021 … KB-023 were added by the owner audit).
 KB-013, KB-014 and KB-015 are one gap seen from
 three sides: the client answer is persisted as a single immutable `SfResponse`
@@ -156,6 +140,15 @@ with no state, no replacement link and no reason, so the contract's whole §6.5
 / §6.6 correction and draft behaviour has nowhere to live. They are listed apart
 because each has its own observable symptom, but they must be fixed by one
 migration and one slice.
+
+> **StudioFlow Rework note (R8.70/R8.71, 2026-09-15).** The rebuild
+> StudioFlow was archived (tag `archive/studioflow-rb-r8.69`) and replaced by
+> the legacy rework (`apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md`).
+> **KB-013 … KB-018 and KB-023 are closed in R8.71 as superseded**: the code
+> they describe no longer exists, and SF-R1 implements the legacy behavior
+> instead (client answers → feedback/reject revisions; archive/restore;
+> fixed phases; general to-dos on Today). KB-012/KB-022 were closed with SF-R2
+> (MOM, R8.72); KB-003/KB-021 close with SF-R3 (Schedule).
 
 ### KB-012 — A MOM correction is issued instantly and cannot correct anything
 
@@ -168,7 +161,8 @@ migration and one slice.
   source content, and the source becomes `SUPERSEDED` when that draft is issued.
 - **Mitigation:** Discard-and-recreate is the only way to change issued content
   today, which loses the supersede link.
-- **Status:** Open; carried by the active R7.56 work order.
+- **Status:** Closed in R8.72 as superseded — SF-R2 ported the legacy MOM,
+  which has no issue/supersede lifecycle; every MOM stays editable.
 
 ### KB-013 — A recorded client answer cannot be corrected
 
@@ -184,7 +178,7 @@ migration and one slice.
   draft atomically; later rounds are never rolled back.
 - **Mitigation:** Stop the round and start a new one. This leaves a truthful but
   clumsy history and cannot undo a phase closed on a mistaken approval.
-- **Status:** Open; carried by the active R7.56 work order.
+- **Status:** Closed in R8.71 — superseded. SF-R1 removes the round/response model entirely; the code this described no longer exists.
 
 ### KB-014 — A client answer cannot be collected as a draft
 
@@ -196,7 +190,7 @@ migration and one slice.
   Stopping the round discards it silently and unaudited.
 - **Mitigation:** Record the answer once, when the client has finished
   answering; earlier remarks are kept outside the application until then.
-- **Status:** Open; carried by the active R7.56 work order.
+- **Status:** Closed in R8.71 — superseded. SF-R1 removes the round/response model; this gap no longer applies.
 
 ### KB-015 — Withdraw send has no command behind it
 
@@ -208,7 +202,7 @@ migration and one slice.
 - **Expected:** The command exists, is audited, and the menu entry returns with it.
 - **Mitigation:** Stop the round and start a new one, accepting a consumed
   round number.
-- **Status:** Open; carried by the active R7.56 work order.
+- **Status:** Closed in R8.71 — superseded. SF-R1 removes the send/withdraw surface; this gap no longer applies.
 
 ### KB-016 — A project cannot be archived or restored
 
@@ -220,7 +214,7 @@ migration and one slice.
 - **Expected:** Audited archive and restore for a project, archived projects
   read-only until restored, and a client that becomes archivable once its
   projects are.
-- **Status:** Open; carried by the active R7.56 work order.
+- **Status:** Closed in R8.71 — SF-R1 implements project archive/restore with read-only guard and client block-while-running.
 
 ### KB-017 — The phase template and a project's phases cannot be administered
 
@@ -234,7 +228,7 @@ migration and one slice.
   uses it, plus per-project add and remove-while-empty, none of which rewrites a
   running project.
 - **Mitigation:** Edit the seed and reseed the rebuild database.
-- **Status:** Open; carried by the active R7.56 work order.
+- **Status:** Closed in R8.71 — superseded. SF-R1 uses a fixed phase set seeded from a Studio Settings template; phase add/remove per-project is deferred to roadmap.
 
 ### KB-018 — Redirected phase and iteration routes still carry unreachable controls
 
@@ -247,9 +241,7 @@ migration and one slice.
 - **Expected:** No unreachable route surface. Dead code that contradicts the
   contract is worse than absent code: the next agent reads it as intent.
 - **Mitigation:** None needed at runtime — nothing renders it.
-- **Status:** Open; deletion only. Not fixed in R7.55 because that session could
-  not delete files on the owner's machine. Codex should confirm nothing imports
-  these modules and remove the two route folders' non-`page.tsx` files.
+- **Status:** Closed in R8.71 — superseded. The old `studioflow/[id]` route tree was removed entirely; SF-R1 routes under `studioflow/projects/[id]`.
 
 
 ### KB-021 — Product Catalogue is a global reuse pool; legacy was per-project
@@ -269,10 +261,10 @@ migration and one slice.
   Schedule slice (`KB-003`) was designed on top of the wrong ownership model.
   No catalogue work should continue until the per-project scoping is restored.
 - **Mitigation:** Use the current global list as a reference only.
-- **Status:** Open; owner-directed. Requires a migration, a schema change
-  (`project_id` FK on `SfProductCatalogue`), a contract correction, and route
-  restructuring to `/studioflow/[id]/catalogue`. Block all further catalogue
-  and Schedule development until resolved.
+- **Status:** Closed in R8.73 — SF-R3 replaces the wrong global catalogue
+  surface with project-owned Product Schedule entries and typed option
+  snapshots. Reuse is explicit cross-project snapshot copy, not a mutable
+  studio-wide catalogue pool.
 
 ### KB-022 — MOM implementation does not match owner's required behavior
 
@@ -290,8 +282,9 @@ migration and one slice.
 - **Mitigation:** Avoid issuing or superseding MOM documents in the current
   implementation until the correct shape is confirmed. KB-012 is blocked by
   this.
-- **Status:** Open; awaiting owner re-specification of MOM. Do not extend the
-  current implementation or fix KB-012 until the requirements are re-anchored.
+- **Status:** Closed in R8.72 — the owner re-anchored MOM on legacy (contract
+  §10); SF-R2 implements the legacy document/section/note/photo model with
+  print.
 
 ### KB-023 — General project todos not surfaced on StudioFlow home page
 
@@ -307,18 +300,14 @@ migration and one slice.
   standalone todo list, a combined view, or a project-grouped list — needs
   owner confirmation.
 - **Mitigation:** Navigate to the individual project to see its `GeneralTaskBlock`.
-- **Status:** Open; requires owner clarification of which page is "halaman
-  muka" (application home `/studioflow` vs. project home `/studioflow/[id]`)
-  and what the legacy presentation looked like before implementing.
+- **Status:** Closed in R8.71 — SF-R1 implements the Today view (`/studioflow`) showing general to-dos grouped by project, with filters, quick-add, and saved filter views. Confirmed parity with owner expectation.
 
-### KB-002 — Storage-byte retention policy is not finalized
+### KB-002 — Stored-file retention policy is not finalized
 
-- **Observed:** MOM removes unreferenced draft image objects best-effort, while
-  long-term retention and reconciliation for superseded records is not approved.
-- **Expected:** Retain metadata/audit and release bytes under approved retention.
-- **Mitigation:** Keep immutable MOM metadata and audit rows; do not claim byte
-  cleanup is complete until provider provisioning and retention policy exist.
-- **Status:** Open; blocked by retention policy/provider provisioning.
+- **Observed (updated R8.74):** SF-R2 implements legacy MOM (editable document/section/note/photo model, no DRAFT→ISSUED lifecycle). MOM section photos are stored via `LocalFilesystemStorage`. There is no approved policy for cleaning up photos removed from a MOM document, or for purging documents from archived projects.
+- **Expected:** A per-project retention window is approved and enforced: photos removed from a section are reaped after the window; archived-project files are purged or preserved under a documented policy.
+- **Mitigation:** No automatic cleanup runs today; files accumulate. The storage root is bounded by the kantor rebuild root and does not affect legacy data.
+- **Status:** Open; deferred by owner decision (2026-09-15). Google Drive activation deferred; local-only storage in use. Retention policy TBD when Google Drive is activated.
 
 ### KB-003 — Project Schedule/FFNI remains absent from project detail
 
@@ -329,7 +318,9 @@ migration and one slice.
   independent from phase/iteration/Task; Product Catalogue never reads Master
   Data SKU, unit, or pricing.
 - **Mitigation:** Continue using existing operational surfaces for Schedule/FFNI.
-- **Status:** Open; intentionally deferred to its own executable work order.
+- **Status:** Closed in R8.73 — SF-R3 adds the project Schedule page,
+  per-project entries, typed options, final approval, templates, CSV import,
+  and reuse from past projects.
 
 ### KB-005 — Add Project regresses legacy client/modal behavior
 
@@ -361,6 +352,22 @@ migration and one slice.
   does not exist.
 
 ## Closed
+
+### KB-030 — Valid local private storage keys fail signed-read verification on Windows
+
+- **Closed in R8.45:** `resolveSafePath` now derives canonical paths from the
+  deepest existing realpath ancestor for both the configured root and target.
+  This compares Windows short/long path representations consistently while
+  retaining lexical traversal rejection and canonical symlink/junction escape
+  rejection. The focused kantor test and the full disposable-database suite
+  pass.
+
+### KB-029 — F-B app registry duplicate cross-app permission
+
+- **Closed in R8.40:** BQ no longer registers Master Data's
+  `masterdata.promotion.approve`; BQ's retained authorization checks consume
+  the public Master Data permission export. The full registration set is now
+  exercised by a regression test and the development server boots successfully.
 
 ### KB-019 — `listWaitingOnMe` reads every open round and task in the database
 

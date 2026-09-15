@@ -21,7 +21,15 @@ and regression risk. Depth follows risk, not a fixed checklist.
 3. **Evidence** — do the diff, tests, migrations, and applicable running
    workflow prove the result without hiding limitations?
 
-Browser review is conditional, not automatic. Require it when the task changes or verifies user-facing flow, visual/layout behavior, interaction state, accessibility, navigation, or a contract acceptance criterion requiring browser evidence. For documentation-only, server-only, or pure utility work, explicitly record why browser review is not applicable and run proportionate non-browser evidence instead. A required but unavailable browser check is not a pass.
+Browser review is conditional, not universal, but Reviewer owns it after the
+Executor commit. Require it when the task changes or verifies user-facing flow,
+visual/layout behavior, interaction state, accessibility, navigation, or a
+contract acceptance criterion requiring browser evidence. Use the applicable
+browser-use skill and the approved local fixture; do not send ordinary browser
+acceptance back to Executor. For documentation-only, server-only, or pure
+utility work, explicitly record why browser review is not applicable and run
+proportionate non-browser evidence instead. A required but unavailable browser
+check is not a pass.
 
 ## Verdicts and findings
 
@@ -40,3 +48,8 @@ the next coherent plan and its copy-ready prompt when the next priority is
 known. If review can be completed immediately, no temporary `review.md` entry
 is required. If evidence is unavailable, keep the item in `review.md` and name
 the exact missing verification rather than claiming PASS.
+
+After recording the verdict and next plan, a separate-session final response
+contains only the copy-ready Executor prompt for the consolidated correction or
+next slice. When genuinely BLOCKED, return one copy-ready owner-decision prompt
+instead. Do not make the owner reconstruct a handoff from narrative status.

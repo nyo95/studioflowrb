@@ -380,6 +380,14 @@ PageShell or Drawer
 ### SettingsShell
 Keep the legacy two-column pattern concept, but make navigation generic/configurable instead of hardcoding StudioFlow settings tabs.
 
+The navigation column is composed from `ContextNavHeading` and `ContextNavLink`
+(R8.71, `layouts/context-nav.tsx`). `ContextNavLink` takes `active`, an optional
+decorative `marker` (e.g. a phase state dot), a trailing `detail` count, and a
+`component` (pass Next.js `Link` for client routing). The module is deliberately
+not a client module so server components can pass `Link`. Consumers: Platform
+settings navigation and the StudioFlow project workspace (same two-column
+shell, `navigationLabel="Project navigation"`).
+
 Compact-rail submenus open only through intentional click or keyboard activation.
 Pointer movement and focus traversal alone must not open a portalled menu over the
 current work surface.
@@ -684,6 +692,13 @@ Apps own:
 
 UI Engine must not become a generic report builder, schema-form generator, or PDF engine.
 
+Implemented (R8.72, first consumer: StudioFlow MOM print): `DocumentSheet`
+(server-safe A4 frame with a screen-only `toolbar`, `format`
+`a4-portrait`/`a4-landscape`), `DocumentBlock` (avoid page breaks inside), and
+`PrintButton` (client, opens the browser print dialog). `styles/base.css` owns
+`@page` A4 margins and the `.ui-print-hidden` helper. Print routes live in the
+`(document)` route group so the application shell is not rendered.
+
 ## 14. Legacy Migration Classification
 
 ### KEEP / MIGRATE
@@ -805,7 +820,13 @@ This stage includes a real login page, authenticated app launcher, user director
 - `InlineEdit` — activated in R4.56 by an approved cell-entry workflow;
 - `FileDropZone` — activated in R7.43 by the approved phase deliverable
   intake consumer. It carries interaction only: the metadata-only intake
-  flow needs no storage or upload contract, and none is implied here;
+  flow needs no storage or upload contract, and none is implied here.
+  **No active consumer since R8.71** (SF-R1 removed the rebuild deliverable
+  intake surface; the archived `_legacy_project_id` code retains the import
+  but is deactivated). Retained for the Wave 2 deliverable/files feature;
+- `CopyButton` — clipboard copy with accessible success/failure feedback.
+  **No active consumer since R8.71** (only consumer was `_legacy_project_id/phase-section.tsx`,
+  deactivated by SF-R1). Retained as a generic pattern for a future consumer.
 - `useDebouncedValue`, `useOptionOverlay`, `useConfirm`, `useUnsavedChangesGuard`, their accessible prompts, and generic pending/action feedback;
 - one internal UI Engine showcase route demonstrating realistic compositions without app/domain imports.
 
@@ -815,7 +836,6 @@ This stage includes a real login page, authenticated app launcher, user director
 |---|---|
 | `WorkspaceShell`, `SplitPane` | first approved StudioFlow/BQ workspace requiring the layout |
 | `ReorderHandle` | first persisted manual-order workflow with keyboard requirements |
-| `DocumentSheet` and print helpers | first approved document/print workflow |
 
 Deferred patterns may remain in design prose as routing memory. They are not required for the active closure gate and should not remain public implementation without a real approved consumer.
 
@@ -842,8 +862,10 @@ Deferred patterns may remain in design prose as routing memory. They are not req
   surrounding form; a consumer that needs bytes on a server sends them
   through its own approved boundary. Apps must consume this export rather
   than reimplement drop handlers locally.
-- `ImageWorkspace` owns browser selection, preview, crop through zoom/focus,
-  freehand annotation, preparation progress, and safe preparation errors. The
+- `ImageWorkspace` owns browser selection, preview, crop through zoom/focus
+  (optionally locked to an `aspect`), freehand annotation, PNG or JPEG output
+  (`outputType`, `outputQuality`), preparation progress, and safe preparation
+  errors. The
   consuming app supplies format/size/dimension policy and owns authorization,
   upload, object keys, storage, retention, and audit behavior.
 - StatusBadge receives an explicit semantic tone and never infers meaning from a domain status string.

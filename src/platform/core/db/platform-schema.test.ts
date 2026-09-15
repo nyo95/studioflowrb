@@ -162,6 +162,27 @@ describe("platform schema: settings singleton", () => {
       /check/i,
     );
   });
+
+  it("pins the approved global appearance theme in SQL, not only in application code", async () => {
+    await truncatePlatformTables(db);
+    await db.prisma.platformGeneralSettings.create({
+      data: {
+        id: "platform_general_settings",
+        organization_name: "StudioFlow",
+        app_title: "StudioFlow",
+        locale: "id-ID",
+        timezone: "Asia/Jakarta",
+        currency: "IDR",
+        week_starts_on: 1,
+      },
+    });
+    await expectReject(
+      () => db.prisma.$executeRawUnsafe(`UPDATE "platform"."PlatformGeneralSettings" SET "theme" = 'dark' WHERE "id" = 'platform_general_settings'`),
+      /check/i,
+    );
+    const row = await db.prisma.platformGeneralSettings.findUnique({ where: { id: "platform_general_settings" } });
+    assert.equal(row?.theme, "light");
+  });
 });
 
 describe("platform schema: rate limiter storage", () => {

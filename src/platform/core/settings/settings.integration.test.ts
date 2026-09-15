@@ -59,11 +59,13 @@ describe("general settings validation", () => {
       currency: "IDR",
       weekStartsOn: 1,
       brandMarkUrl: null,
+      theme: "light",
       mainAppId: null,
       landingAppId: null,
     });
     assert.equal(parsed.organizationName, "StudioFlow");
     assert.equal(parsed.brandMarkUrl, null);
+    assert.equal(parsed.theme, "light");
     assert.equal(parsed.mainAppId, null);
     assert.equal(parsed.landingAppId, null);
   });
@@ -77,6 +79,7 @@ describe("general settings validation", () => {
       currency: "IDR",
       weekStartsOn: 1,
       brandMarkUrl: null,
+      theme: "light",
       mainAppId: "bq",
       landingAppId: "studioflow",
     });
@@ -93,6 +96,7 @@ describe("general settings validation", () => {
       currency: "IDR",
       weekStartsOn: 1,
       brandMarkUrl: null,
+      theme: "light",
       mainAppId: null,
       landingAppId: null,
     };
@@ -111,6 +115,8 @@ describe("general settings validation", () => {
       { ...base, mainAppId: "Not-Lowercase" },
       { ...base, mainAppId: "" },
       { ...base, landingAppId: "has spaces" },
+      { ...base, theme: "dark" },
+      { ...base, theme: "" },
     ];
     for (const candidate of bad) {
       assert.throws(() => parsePlatformGeneralSettingsInput(candidate));
@@ -127,6 +133,7 @@ describe("general settings validation", () => {
         currency: "IDR",
         weekStartsOn: 1,
         brandMarkUrl: null,
+        theme: "light",
         mainAppId: null,
         landingAppId: null,
         arbitrarySetting: "nope",
@@ -180,6 +187,7 @@ describe("general settings service", () => {
             currency: "IDR",
             weekStartsOn: 1,
             brandMarkUrl: null,
+            theme: "light",
             mainAppId: null,
             landingAppId: null,
           }),
@@ -202,6 +210,7 @@ describe("general settings service", () => {
         currency: "IDR",
         weekStartsOn: 1,
         brandMarkUrl: null,
+        theme: "light",
         mainAppId: null,
         landingAppId: null,
       }),
@@ -220,6 +229,7 @@ describe("general settings service", () => {
         currency: "IDR",
         weekStartsOn: 1,
         brandMarkUrl: "https://cdn.example.com/mark.png",
+        theme: "light",
         mainAppId: "bq",
         landingAppId: null,
       }),
@@ -240,7 +250,7 @@ describe("general settings service", () => {
     const body = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
     await storage.put({ key: firstKey, body, bytes: body.length, contentType: "image/png" });
     await storage.put({ key: secondKey, body, bytes: body.length, contentType: "image/png" });
-    const values = parsePlatformGeneralSettingsInput({ organizationName: "StudioFlow", appTitle: "StudioFlow", locale: "id-ID", timezone: "Asia/Jakarta", currency: "IDR", weekStartsOn: 1, brandMarkUrl: null, mainAppId: null, landingAppId: null });
+    const values = parsePlatformGeneralSettingsInput({ organizationName: "StudioFlow", appTitle: "StudioFlow", locale: "id-ID", timezone: "Asia/Jakarta", currency: "IDR", weekStartsOn: 1, brandMarkUrl: null, theme: "light", mainAppId: null, landingAppId: null });
 
     await service.update({ grants: MANAGE_GRANTS, actor: ACTOR, values, brandMarkChange: { kind: "managed", storageKey: firstKey } });
     const first = await service.read({ grants: READ_GRANTS });
@@ -257,7 +267,7 @@ describe("general settings service", () => {
     const key = "brand-marks/remove.png";
     const body = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
     await storage.put({ key, body, bytes: body.length, contentType: "image/png" });
-    const values = parsePlatformGeneralSettingsInput({ organizationName: "StudioFlow", appTitle: "StudioFlow", locale: "id-ID", timezone: "Asia/Jakarta", currency: "IDR", weekStartsOn: 1, brandMarkUrl: null, mainAppId: null, landingAppId: null });
+    const values = parsePlatformGeneralSettingsInput({ organizationName: "StudioFlow", appTitle: "StudioFlow", locale: "id-ID", timezone: "Asia/Jakarta", currency: "IDR", weekStartsOn: 1, brandMarkUrl: null, theme: "light", mainAppId: null, landingAppId: null });
     await service.update({ grants: MANAGE_GRANTS, actor: ACTOR, values, brandMarkChange: { kind: "managed", storageKey: key } });
     await service.update({ grants: MANAGE_GRANTS, actor: ACTOR, values, brandMarkChange: { kind: "remove" } });
     const row = await db.prisma.platformGeneralSettings.findUniqueOrThrow({ where: { id: "platform_general_settings" } });
@@ -276,9 +286,42 @@ describe("general settings service", () => {
       now: () => new Date(), generateId: () => crypto.randomUUID(), objectStorage: storage,
       resolveBrandMarkUrl: (key) => `https://public.invalid/${encodeURIComponent(key)}`,
     });
-    const values = parsePlatformGeneralSettingsInput({ organizationName: "StudioFlow", appTitle: "StudioFlow", locale: "id-ID", timezone: "Asia/Jakarta", currency: "IDR", weekStartsOn: 1, brandMarkUrl: null, mainAppId: null, landingAppId: null });
+    const values = parsePlatformGeneralSettingsInput({ organizationName: "StudioFlow", appTitle: "StudioFlow", locale: "id-ID", timezone: "Asia/Jakarta", currency: "IDR", weekStartsOn: 1, brandMarkUrl: null, theme: "light", mainAppId: null, landingAppId: null });
     await assert.rejects(() => failing.update({ grants: MANAGE_GRANTS, actor: ACTOR, values, brandMarkChange: { kind: "managed", storageKey: key } }));
     assert.equal(storage.objects.has(key), false);
     assert.equal(await db.prisma.platformGeneralSettings.count(), 0);
+  });
+
+  it("round-trips the typed global appearance theme and rejects unapproved values in SQL", async () => {
+    await readPlatformGeneralSettings(db.prisma);
+    const seeded = await service.read({ grants: READ_GRANTS });
+    assert.equal(seeded.theme, "light");
+
+    const updated = await service.update({
+      grants: MANAGE_GRANTS,
+      actor: ACTOR,
+      values: parsePlatformGeneralSettingsInput({
+        organizationName: "Appearance Workspace",
+        appTitle: "StudioFlow",
+        locale: "id-ID",
+        timezone: "Asia/Jakarta",
+        currency: "IDR",
+        weekStartsOn: 1,
+        brandMarkUrl: null,
+        theme: "light",
+        mainAppId: null,
+        landingAppId: null,
+      }),
+    });
+    assert.equal(updated.changed, true);
+    assert.equal(updated.settings.theme, "light");
+    const row = await db.prisma.platformGeneralSettings.findUniqueOrThrow({ where: { id: "platform_general_settings" } });
+    assert.equal(row.theme, "light");
+    assert.equal(await db.prisma.platformGeneralSettings.count(), 1, "singleton must never grow a second row");
+
+    await assert.rejects(
+      () => db.pool.query(`UPDATE "platform"."PlatformGeneralSettings" SET "theme" = 'dark' WHERE "id" = 'platform_general_settings'`),
+      /check/i,
+    );
   });
 });

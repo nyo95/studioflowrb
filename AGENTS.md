@@ -68,6 +68,13 @@ Never commit or copy either file. Set `STUDIOFLOW_LOCATION` to the selected valu
 
 Legacy is separate, read-only evidence. When needed, ask the owner for its exact path on this computer, then record path, commit, branch, and dirty state before reading it. Do not scan drives or assume a path. Never edit, format, generate into, install in, run, test, migrate, seed, reset, stash, clean, switch, merge, rebase, pull, push, or otherwise alter legacy. Inspect committed evidence with read-only Git commands and name any working-tree-only evidence separately. Never copy legacy code, schema, migrations, database, or configuration as an implementation base.
 
+**StudioFlow Rework exception (owner, 2026-09-15).** For StudioFlow only,
+legacy behavior at commit `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27` is the
+functional specification, and an Executor may read and port its algorithms,
+rules, copy, and flows. It still may not import legacy modules or copy the
+legacy schema, migrations, UI kit, auth/RBAC/audit/db runtime, role enum, or
+configuration. See `docs/apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md` §1.
+
 StudioFlow legacy PostgreSQL is completely forbidden. Never connect to, query, inspect, dump, restore, migrate, seed, reset, truncate, or otherwise touch any legacy database, server, schema, role, connection string, container, volume, backup, or service. Never run a database command whose target could be legacy.
 
 For activated legacy work, inspect end-to-end route/navigation, UI state, server boundary, domain rules, persistence/transaction, permissions/audit, downstream reads, tests/migrations/errors. Classify behavior as **KEEP**, **FIX**, **MERGE**, or **PURGE**, with exact paths/symbols and rebuild destination. Prose, screenshots, and schema alone are not sufficient evidence.
@@ -98,6 +105,38 @@ The exact revision format and required ledger fields are mandatory in `docs/agen
 When an audit proves a defect not fixed in its scoped change, record it in `docs/knownbug.md`; do not discard it. Remove/strike roadmap work only after actual end-to-end verification. Review corrections always use the next local revision; never silently amend an accepted commit.
 
 A request to change, build, commit, or finish authorizes local commits only. It never authorizes push, remote tag, pull request, merge, deployment, publication, or release. Those require separate explicit owner instruction.
+
+## Acceptance and session handoff
+
+The Planner separates Executor verification from Reviewer acceptance in
+`PLAN.md`. Executor finishes implementation, automated/integration checks, and
+the local revision commit before handoff. Browser acceptance is normally owned
+by the Reviewer after that commit, using the applicable browser-use skill, and
+is required only for affected user-facing behavior. A plan assigns browser work
+to Executor only when it is needed to diagnose or complete the implementation;
+missing browser evidence alone does not block an otherwise valid Executor
+commit.
+
+Checks remain proportionate: a known, recorded failure outside the slice is
+reported but does not automatically reject an otherwise isolated outcome; the
+Reviewer must explain why it cannot hide an in-scope regression. Only the
+Reviewer records acceptance PASS.
+
+Environment discovery is Executor work, not an automatic owner blocker. A safe
+resource may come from the selected local env file, an owner-designated local
+test container/service, or explicit current-session input. The Executor may
+derive ephemeral connection settings and prepare fixtures inside an explicitly
+disposable rebuild-only target. Never print or commit secrets. Stop only when
+the target remains ambiguous or a truly external prerequisite is absent after
+safe discovery.
+
+Separate sessions use a copy-ready prompt loop. Planner/Reviewer ends a READY
+planning turn with only the Executor prompt. Executor ends with only a
+Planner/Reviewer prompt containing the outcome, commit, checks, limitations,
+dirty files, and a request for verdict/next plan. Reviewer returns one
+copy-ready Executor correction/next-slice prompt after PASS or CORRECTION
+REQUIRED; a BLOCKED verdict instead returns one bounded owner-decision prompt.
+Prompts never contain credentials or repeat the full plan.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

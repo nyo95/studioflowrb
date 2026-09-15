@@ -7,6 +7,7 @@ import { prepareAuditEvent } from "@platform/core/audit";
 import { requirePermission, hasAnyPermission } from "@platform/core/rbac";
 import { AppError } from "@platform/core/errors";
 import { compareDecimals, toDecimalString } from "@platform/utilities/decimal";
+import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
 
 type BqKategori =
   | "MATERIAL"
@@ -24,7 +25,6 @@ export const BQ_PERMISSIONS = {
   libraryRead: "bq.library.read",
   libraryManage: "bq.library.manage",
   libraryPromote: "bq.library.promote",
-  libraryPromoteApprove: "masterdata.promotion.approve",
 } as const;
 
 function requireKategori(value: string): BqKategori {
@@ -1843,7 +1843,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
   async function listPromotionRequests(input: {
     grants: PermissionGrants;
   }) {
-    requirePermission(input.grants, BQ_PERMISSIONS.libraryPromoteApprove);
+    requirePermission(input.grants, MASTERDATA_PERMISSIONS.promotionApprove);
 
     const [materials, labors, materialLabors] = await Promise.all([
       db.bqLibMaterial.findMany({ where: { promotion_status: "REQUESTED" } }),
@@ -1882,7 +1882,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     libItemId: string;
     masterdataRefId: string;
   }) {
-    requirePermission(input.grants, BQ_PERMISSIONS.libraryPromoteApprove);
+    requirePermission(input.grants, MASTERDATA_PERMISSIONS.promotionApprove);
     const masterdataRefId = input.masterdataRefId?.trim();
     if (!masterdataRefId) {
       throw new AppError(
@@ -1914,7 +1914,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     libItemId: string;
     reason: string;
   }) {
-    requirePermission(input.grants, BQ_PERMISSIONS.libraryPromoteApprove);
+    requirePermission(input.grants, MASTERDATA_PERMISSIONS.promotionApprove);
     const reason = input.reason?.trim();
     if (!reason) {
       throw new AppError("VALIDATION", "bq.promotion.reason-required", "A rejection must state its reason");

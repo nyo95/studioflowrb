@@ -1,464 +1,635 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { after, before, beforeEach, describe, it } from "node:test";
 
 import { createAuditEventWriter } from "@platform/core/audit/persistence";
-import {
-  closeTestDb,
-  createTestDb,
-  requireDisposableTestDatabaseUrl,
-  type TestDb,
-} from "@platform/core/db/test-support";
+import { closeTestDb, createTestDb, requireDisposableTestDatabaseUrl, truncatePlatformTables, type TestDb } from "@platform/core/db/test-support";
 import { AppError } from "@platform/core/errors";
+import { createPeopleDirectory } from "@platform/core/rbac/people";
+import { initializePermissionRegistry } from "@platform/core/rbac/registry";
+import { FakeObjectStorage } from "@platform/core/storage";
+import { createMasterDataPublicRead } from "@/apps/masterdata/public";
 import type { PrismaClient } from "@/generated/prisma/client";
 
-import { createStudioFlowService, STUDIOFLOW_PERMISSIONS } from "./service";
+import { APP_REGISTRATIONS } from "../../app/app-registrations";
+import { STUDIOFLOW_PERMISSIONS as P } from "./permissions";
+import { createStudioFlowService, type StudioFlowService } from "./service";
 
-const ACTOR = {
-  kind: "USER" as const,
-  userId: "studioflow-test-user",
-  label: "StudioFlow Test",
-};
+const ALL = [...Object.values(P)];
+const DRAFTER_GRANTS = [P.access, P.projectRead, P.phaseWork, P.taskManage];
 
 let testDb: TestDb;
-let service: ReturnType<typeof createStudioFlowService>;
+let sf: StudioFlowService;
+let storage: FakeObjectStorage;
+let designer: { id: string; actor: { kind: "USER"; userId: string; label: string } };
+let drafter: { id: string; actor: { kind: "USER"; userId: string; label: string } };
+let clock = new Date("2026-09-15T03:00:00Z");
 
-async function resetStudioFlow() {
-  await testDb.prisma.$executeRawUnsafe(`
-    TRUNCATE TABLE
-      "studioflow"."sf_product_catalogue",
-      "studioflow"."sf_client",
-      "studioflow"."sf_phase_template",
-      "platform"."AuditEvent"
-    RESTART IDENTITY CASCADE
-  `);
+function code(error: unknown): string | undefined {
+  return error instanceof AppError ? error.code : undefined;
 }
 
-async function seedRoundPhase() {
-  const client = await testDb.prisma.sfClient.create({ data: { name: "Client" } });
-  const template = await testDb.prisma.sfPhaseTemplate.create({
-    data: {
-      key: "DESIGN",
-      name: "Design",
-      sort_order: 1,
-      has_rounds: true,
-      round_prefix: "D",
-    },
+async function rejectsWith(promise: Promise<unknown>, expected: string) {
+  await assert.rejects(promise, (error: unknown) => {
+    assert.equal(code(error), expected);
+    return true;
   });
-  const project = await testDb.prisma.sfProject.create({
-    data: {
-      code: "SF26-TEST",
-      name: "Test project",
-      client_id: client.id,
-      opened_at: new Date("2026-09-09T00:00:00.000Z"),
-    },
-  });
-  const phase = await testDb.prisma.sfProjectPhase.create({
-    data: {
-      project_id: project.id,
-      template_id: template.id,
-      key: template.key,
-      name: template.name,
-      sort_order: template.sort_order,
-      has_rounds: true,
-      round_prefix: template.round_prefix,
-      folder_key: "design",
-    },
-  });
-  return { phase, project };
+}
+
+async function seedUser(name: string, grants: readonly string[]) {
+  const db = testDb.prisma;
+  const userId = randomUUID();
+  const roleId = randomUUID();
+  await db.user.create({ data: { id: userId, email: `${name.toLowerCase()}-${userId}@test.local`, display_name: name, password_hash: "x" } });
+  await db.role.create({ data: { id: roleId, code: `role-${roleId}`, name: `${name} role` } });
+  await db.rolePermission.createMany({ data: grants.map((permission) => ({ id: randomUUID(), role_id: roleId, permission_id: permission })) });
+  await db.userRole.create({ data: { id: randomUUID(), user_id: userId, role_id: roleId } });
+  return { id: userId, actor: { kind: "USER" as const, userId, label: name } };
+}
+
+async function reset() {
+  await testDb.pool.query(`TRUNCATE TABLE ${[
+    "sf_schedule_option", "sf_schedule_entry", "sf_schedule_template_item", "sf_schedule_template_category", "sf_schedule_prefix",
+    "sf_mom_image", "sf_mom_point", "sf_mom_item", "sf_mom_document",
+    "sf_checklist_item_label", "sf_checklist_label", "sf_checklist_filter_view", "sf_checklist_item", "sf_checklist_template",
+    "sf_activity", "sf_revision", "sf_phase", "sf_project", "sf_client", "sf_project_sequence", "sf_settings",
+  ].map((t) => `"studioflow"."${t}"`).join(", ")} RESTART IDENTITY CASCADE`);
+  await truncatePlatformTables(testDb);
+  designer = await seedUser("Dina Designer", ALL);
+  drafter = await seedUser("Dodi Drafter", DRAFTER_GRANTS);
+  clock = new Date("2026-09-15T03:00:00Z");
 }
 
 before(async () => {
+  initializePermissionRegistry(APP_REGISTRATIONS);
   testDb = await createTestDb(requireDisposableTestDatabaseUrl());
-  service = createStudioFlowService(testDb.prisma, {
-    runTransaction: <T>(work: (tx: PrismaClient) => Promise<T>) =>
-      testDb.prisma.$transaction((tx) => work(tx as unknown as PrismaClient)),
+  const db = testDb.prisma;
+  storage = new FakeObjectStorage();
+  sf = createStudioFlowService(db, {
+    runTransaction: <T>(work: (tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0]) => Promise<T>) => db.$transaction((tx) => work(tx)),
     auditWriter: createAuditEventWriter(),
+    people: createPeopleDirectory(db),
+    storage,
+    masterData: createMasterDataPublicRead(db),
+    now: () => clock,
   });
 });
-beforeEach(resetStudioFlow);
+beforeEach(reset);
 after(async () => closeTestDb(testDb));
 
-describe("StudioFlow round lifecycle", () => {
-  it("reserves send and stop for reviewers and blocks a second pending send", async () => {
-    const { phase } = await seedRoundPhase();
-    const first = await service.openIteration(
-      [STUDIOFLOW_PERMISSIONS.iterationManage],
-      ACTOR,
-      phase.id,
-    );
+const as = (user: typeof designer, grants: readonly string[] = ALL) => ({ grants, actor: user.actor });
 
-    await service.sendIteration(
-      [STUDIOFLOW_PERMISSIONS.iterationReview],
-      ACTOR,
-      first.iteration.id,
-    );
-    const second = await service.openIteration(
-      [STUDIOFLOW_PERMISSIONS.iterationManage],
-      ACTOR,
-      phase.id,
-    );
+async function newProject(name = "Heloskin Cimanggu") {
+  return sf.projects.createProject({ ...as(designer), name, newClientName: "Heloskin", picDesignerId: designer.id, picDrafterId: drafter.id, area: "120.5" });
+}
 
-    await assert.rejects(
-      () =>
-        service.sendIteration(
-          [STUDIOFLOW_PERMISSIONS.iterationReview],
-          ACTOR,
-          second.iteration.id,
-        ),
-      (error: unknown) =>
-        error instanceof AppError &&
-        error.code === "studioflow.iteration.pending-client-response",
-    );
+async function phaseOf(projectId: string, key: string) {
+  return testDb.prisma.sfPhase.findFirstOrThrow({ where: { project_id: projectId, key: key as never } });
+}
 
-    await service.voidIteration(
-      [STUDIOFLOW_PERMISSIONS.iterationReview],
-      ACTOR,
-      first.iteration.id,
-      "Incorrect send",
-    );
-    await service.sendIteration(
-      [STUDIOFLOW_PERMISSIONS.iterationReview],
-      ACTOR,
-      second.iteration.id,
-    );
+async function revisions(phaseId: string) {
+  return (await testDb.prisma.sfRevision.findMany({ where: { phase_id: phaseId }, orderBy: [{ major: "asc" }, { minor: "asc" }] })).map((r) => `v${r.major}.${r.minor}:${r.status}`);
+}
+
+describe("SF-R1 bootstrap and naming", () => {
+  it("creates the legacy project skeleton with auto naming and template seeding", async () => {
+    await sf.tasks.createTemplate({ ...as(designer), phaseKey: null, label: "Kick-off meeting" });
+    await sf.tasks.createTemplate({ ...as(designer), phaseKey: "MOODBOARD", label: "Collect references" });
+    const first = await newProject();
+    const second = await newProject("Kopi Kenangan");
+    assert.equal(first.name, "2026-001 Heloskin Cimanggu");
+    assert.equal(second.name, "2026-002 Kopi Kenangan");
+
+    const phases = await testDb.prisma.sfPhase.findMany({ where: { project_id: first.projectId }, orderBy: { order_index: "asc" } });
+    assert.deepEqual(phases.map((p) => [p.key, p.status, p.allow_parallel]), [
+      ["MOODBOARD", "IN_PROGRESS", false], ["LAYOUT", "PENDING", true], ["DESIGN_3D", "PENDING", true], ["CD", "PENDING", true], ["SUPERVISION", "PENDING", false],
+    ]);
+    assert.deepEqual(await revisions(phases[0].id), ["v1.0:ACTIVE"]);
+    const items = await testDb.prisma.sfChecklistItem.findMany({ where: { project_id: first.projectId } });
+    assert.deepEqual(items.map((i) => [i.label, i.phase_id === null]).sort(), [["Collect references", false], ["Kick-off meeting", true]]);
+    const clients = await sf.projects.listClients({ grants: ALL });
+    assert.equal(clients.length, 1);
+    assert.equal(clients[0].activeProjects, 2);
   });
 
-  it("reuses an existing successor draft and appends client points", async () => {
-    const { phase } = await seedRoundPhase();
-    const first = await service.openIteration(
-      [STUDIOFLOW_PERMISSIONS.iterationManage],
-      ACTOR,
-      phase.id,
-    );
-    await service.sendIteration(
-      [STUDIOFLOW_PERMISSIONS.iterationReview],
-      ACTOR,
-      first.iteration.id,
-    );
-    const successor = await service.openIteration(
-      [STUDIOFLOW_PERMISSIONS.iterationManage],
-      ACTOR,
-      phase.id,
-    );
-    await service.addIterationPoint(
-      [STUDIOFLOW_PERMISSIONS.iterationManage],
-      ACTOR,
-      successor.iteration.id,
-      "Existing work",
-    );
-
-    const result = await service.recordResponse(
-      [STUDIOFLOW_PERMISSIONS.iterationReview],
-      ACTOR,
-      first.iteration.id,
-      { kind: "REVISION", points: ["Client change"] },
-    );
-
-    assert.equal(result.nextIteration?.id, successor.iteration.id);
-    assert.equal(await testDb.prisma.sfIteration.count({ where: { phase_id: phase.id } }), 2);
-    const points = await testDb.prisma.sfIterationPoint.findMany({
-      where: { iteration_id: successor.iteration.id },
-      orderBy: { sort_order: "asc" },
-    });
-    assert.deepEqual(
-      points.map((point) => [point.text, point.source]),
-      [
-        ["Existing work", "INTERNAL"],
-        ["Client change", "CLIENT_REVISION"],
-      ],
-    );
+  it("rejects prefixed names in auto mode and validates manual format", async () => {
+    await rejectsWith(sf.projects.createProject({ ...as(designer), name: "2026-010 Manual", picDesignerId: designer.id, picDrafterId: drafter.id }), "PROJECT_NAME_AUTO_CONFLICT");
+    await sf.projects.setAutoNaming({ ...as(designer), enabled: false });
+    await rejectsWith(sf.projects.createProject({ ...as(designer), name: "No Number", picDesignerId: designer.id, picDrafterId: drafter.id }), "PROJECT_NAME_FORMAT");
+    const manual = await sf.projects.createProject({ ...as(designer), name: "2026-050 Manual", picDesignerId: designer.id, picDrafterId: drafter.id });
+    assert.equal(manual.name, "2026-050 Manual");
+    await sf.projects.setAutoNaming({ ...as(designer), enabled: true });
+    const next = await newProject("After Manual");
+    assert.equal(next.name, "2026-051 After Manual");
   });
 
-  it("saves approval and optional phase closure atomically", async () => {
-    const { phase } = await seedRoundPhase();
-    const first = await service.openIteration(
-      [STUDIOFLOW_PERMISSIONS.iterationManage],
-      ACTOR,
-      phase.id,
-    );
-    await service.sendIteration(
-      [STUDIOFLOW_PERMISSIONS.iterationReview],
-      ACTOR,
-      first.iteration.id,
-    );
-    const successor = await service.openIteration(
-      [STUDIOFLOW_PERMISSIONS.iterationManage],
-      ACTOR,
-      phase.id,
-    );
-
-    await assert.rejects(
-      () =>
-        service.recordResponse(
-          [STUDIOFLOW_PERMISSIONS.iterationReview],
-          ACTOR,
-          first.iteration.id,
-          { kind: "APPROVAL", also_finish_phase: true },
-        ),
-      (error: unknown) =>
-        error instanceof AppError && error.code === "studioflow.phase.open-iterations",
-    );
-    assert.equal(await testDb.prisma.sfResponse.count(), 0);
-    assert.equal(
-      (await testDb.prisma.sfIteration.findUniqueOrThrow({ where: { id: first.iteration.id } }))
-        .state,
-      "SENT",
-    );
-
-    await service.voidIteration(
-      [STUDIOFLOW_PERMISSIONS.iterationReview],
-      ACTOR,
-      successor.iteration.id,
-      "Not required",
-    );
-    await service.recordResponse(
-      [STUDIOFLOW_PERMISSIONS.iterationReview],
-      ACTOR,
-      first.iteration.id,
-      { kind: "APPROVAL", also_finish_phase: true },
-    );
-
-    assert.equal(
-      (await testDb.prisma.sfProjectPhase.findUniqueOrThrow({ where: { id: phase.id } })).state,
-      "DONE",
-    );
-    const responseAudit = await testDb.prisma.auditEvent.findFirstOrThrow({
-      where: { action: "response.record" },
-    });
-    assert.equal((responseAudit.metadata as { phase_closed?: boolean }).phase_closed, true);
+  it("requires eligible PICs and the manage grant", async () => {
+    const outsider = await seedUser("Outsider", [P.access, P.projectRead]);
+    await rejectsWith(sf.projects.createProject({ ...as(designer), name: "X", picDesignerId: outsider.id, picDrafterId: drafter.id }), "PIC_NOT_ELIGIBLE");
+    await rejectsWith(sf.projects.createProject({ ...as(drafter, DRAFTER_GRANTS), name: "X", picDesignerId: designer.id, picDrafterId: drafter.id }), "PERMISSION_DENIED");
+    const people = await sf.projects.listAssignablePeople({ grants: ALL });
+    assert.deepEqual(people.map((p) => p.displayName), ["Dina Designer", "Dodi Drafter"]);
   });
 
-  it("getNextFilename uses DRAFT round number when draft exists", async () => {
-    const { phase } = await seedRoundPhase();
-    const iter = await service.openIteration(
-      [STUDIOFLOW_PERMISSIONS.iterationManage],
-      ACTOR,
-      phase.id,
-    );
-    const projectId = (await testDb.prisma.sfProjectPhase.findUniqueOrThrow({ where: { id: phase.id } })).project_id;
-    const filename = await service.getNextFilename(
-      [STUDIOFLOW_PERMISSIONS.projectRead],
+  it("archives read-only and restores with audit", async () => {
+    const { projectId } = await newProject();
+    await rejectsWith(sf.projects.archiveProject({ ...as(designer), projectId, reason: " " }), "ARCHIVE_REASON_REQUIRED");
+    await sf.projects.archiveProject({ ...as(designer), projectId, reason: "Client paused" });
+    const moodboard = await phaseOf(projectId, "MOODBOARD");
+    await rejectsWith(sf.phases.addActivity({ ...as(designer), projectId, phaseId: moodboard.id, content: "x", mode: "TODO" }), "PROJECT_ARCHIVED");
+    await rejectsWith(sf.projects.updateProject({ ...as(designer), projectId, address: "New" }), "PROJECT_ARCHIVED");
+    assert.equal((await sf.projects.listProjects({ grants: ALL })).length, 0);
+    assert.equal((await sf.projects.listProjects({ grants: ALL, archived: true })).length, 1);
+    await sf.projects.restoreProject({ ...as(designer), projectId });
+    const history = await sf.projects.getProjectHistory({ grants: ALL, projectId });
+    assert.deepEqual(history.map((h) => h.action).slice(0, 3), ["studioflow.project.restored", "studioflow.project.archived", "studioflow.project.created"]);
+  });
+});
+
+describe("SF-R1 phase workflow (legacy parity)", () => {
+  it("walks internal review, internal and client rejection, and client approval", async () => {
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "MOODBOARD");
+    const base = { ...as(designer), projectId, phaseId: phase.id };
+
+    const todo = await sf.phases.addActivity({ ...base, content: "Draft board", mode: "TODO" });
+    await rejectsWith(sf.phases.submitForInternalReview(base), "PHASE_OPEN_TODOS");
+    await sf.phases.setActivityDone({ ...base, activityId: todo.activityId, done: true });
+    await sf.phases.submitForInternalReview(base);
+
+    await sf.phases.addActivity({ ...base, content: "Warmer palette", mode: "FEEDBACK" });
+    await rejectsWith(sf.phases.approveInternal(base), "PHASE_APPROVAL_BLOCKED");
+    const rejected = await sf.phases.rejectPhase({ ...base, type: "INTERNAL" });
+    assert.equal(rejected.revision, "v1.1");
+    assert.equal(rejected.converted, 1);
+    const converted = await testDb.prisma.sfActivity.findFirstOrThrow({ where: { phase_id: phase.id, mode: "TODO", status: "OPEN" } });
+    assert.equal(converted.assigned_to_id, designer.id);
+    const original = await testDb.prisma.sfActivity.findFirstOrThrow({ where: { phase_id: phase.id, mode: "FEEDBACK" } });
+    assert.equal(original.status, "COMPLETED", "carried-forward feedback no longer counts as open work");
+    const [listed] = (await sf.projects.listProjects({ grants: ALL })).filter((p) => p.id === projectId);
+    assert.ok(listed, "project is listed");
+
+    // An item kept on someone who lost phase.work stays editable when the assignee is unchanged.
+    const former = await seedUser("Former Staff", [P.access, P.projectRead]);
+    await testDb.prisma.sfActivity.update({ where: { id: converted.id }, data: { assigned_to_id: former.id } });
+    await sf.phases.updateActivity({ ...base, activityId: converted.id, content: "Warmer palette v2", assignedToId: former.id });
+    const viewer = await seedUser("Viewer Only", [P.access, P.projectRead]);
+    await rejectsWith(sf.phases.updateActivity({ ...base, activityId: converted.id, assignedToId: viewer.id }), "ASSIGNEE_NOT_ELIGIBLE");
+
+    await sf.phases.setActivityDone({ ...base, activityId: converted.id, done: true });
+    await sf.phases.submitForInternalReview(base);
+    await sf.phases.approveInternal(base);
+    await sf.phases.submitForClientReview(base);
+    await sf.phases.addActivity({ ...base, content: "Client wants marble", mode: "FEEDBACK" });
+    const clientReject = await sf.phases.rejectPhase({ ...base, type: "CLIENT" });
+    assert.equal(clientReject.revision, "v2.0");
+    assert.deepEqual(await revisions(phase.id), ["v1.0:COMPLETED", "v1.1:COMPLETED", "v2.0:ACTIVE"]);
+
+    const marble = await testDb.prisma.sfActivity.findFirstOrThrow({ where: { phase_id: phase.id, status: "OPEN", revision: { status: "ACTIVE" } } });
+    await sf.phases.setActivityDone({ ...base, activityId: marble.id, done: true });
+    await sf.phases.submitForClientReview(base);
+    clock = new Date("2026-09-18T03:00:00Z");
+    const approved = await sf.phases.approveClient(base);
+    assert.equal(approved.projectCompleted, false);
+    const after = await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: phase.id } });
+    assert.equal(after.status, "READY_FOR_NEXT");
+    assert.equal(after.is_locked, true);
+    await rejectsWith(sf.phases.addActivity({ ...base, content: "late", mode: "TODO" }), "PHASE_LOCKED");
+
+    const actions = (await testDb.prisma.auditEvent.findMany({ where: { entity_id: phase.id }, orderBy: { occurred_at: "asc" } })).map((e) => e.action);
+    assert.ok(actions.includes("studioflow.phase.rejected-internal"));
+    assert.ok(actions.includes("studioflow.phase.approved-client"));
+  });
+
+  it("blocks approval on unchecked root checklist items only", async () => {
+    await sf.tasks.createTemplate({ ...as(designer), phaseKey: "MOODBOARD", label: "Board printed" });
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "MOODBOARD");
+    const base = { ...as(designer), projectId, phaseId: phase.id };
+    await sf.phases.submitForClientReview(base).catch(() => undefined);
+    const [root] = await sf.tasks.listChecklist({ grants: ALL, projectId, phaseId: phase.id });
+    await rejectsWith(sf.phases.submitForClientReview(base), "PHASE_APPROVAL_BLOCKED");
+    const sub = await sf.tasks.createSubtask({ ...as(drafter, DRAFTER_GRANTS), projectId, parentId: root.id, label: "Print A3" });
+    await sf.tasks.setItemChecked({ ...as(designer), projectId, itemId: root.id, checked: true });
+    const child = await testDb.prisma.sfChecklistItem.findUniqueOrThrow({ where: { id: sub.itemId } });
+    assert.equal(child.is_checked, true, "parent cascades down");
+    await sf.tasks.setItemChecked({ ...as(designer), projectId, itemId: sub.itemId, checked: false });
+    await sf.phases.submitForClientReview(base);
+    const phases = await sf.phases.listProjectPhases({ grants: ALL, projectId });
+    assert.equal(phases[0].blockers.total, 0);
+  });
+
+  it("enforces sequential activation, parallel phases, ON_HOLD and completion", async () => {
+    const { projectId } = await newProject();
+    const layout = await phaseOf(projectId, "LAYOUT");
+    const supervision = await phaseOf(projectId, "SUPERVISION");
+    await sf.phases.activatePhase({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: layout.id });
+    await rejectsWith(sf.phases.activatePhase({ ...as(designer), projectId, phaseId: supervision.id }), "PHASE_SEQUENTIAL");
+    // "Reopen" must not sidestep the start rules for a phase that has not started.
+    await rejectsWith(sf.phases.reopenPhase({ ...as(designer), projectId, phaseId: supervision.id, intent: "INTERNAL", reason: "early" }), "PHASE_SEQUENTIAL");
+    const supervisionDetail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: supervision.id });
+    assert.equal(supervisionDetail.commands.includes("reopen"), false);
+    const cd = await phaseOf(projectId, "CD");
+    await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ON_HOLD" });
+    await rejectsWith(sf.phases.activatePhase({ ...as(designer), projectId, phaseId: cd.id }), "PROJECT_NOT_ACTIVE");
+    await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ACTIVE" });
+    const before = await sf.phases.listProjectPhases({ grants: ALL, projectId });
+    assert.equal(before.find((p) => p.key === "SUPERVISION")?.startBlockedReason, "Starts after Construction Drawing is approved.");
+    await sf.phases.bypassPhase({ ...as(designer), projectId, phaseId: cd.id, reason: "Client does own drawings" });
+    const phases = await sf.phases.listProjectPhases({ grants: ALL, projectId });
+    assert.equal(phases.find((p) => p.key === "CD")?.status, "READY_FOR_NEXT");
+    assert.equal(phases.find((p) => p.key === "SUPERVISION")?.startBlockedReason, null);
+    // CD approved → Supervision can start (its predecessor is CD).
+    await sf.phases.activatePhase({ ...as(designer), projectId, phaseId: supervision.id });
+    await sf.phases.completeSupervision({ ...as(designer), projectId, phaseId: supervision.id });
+    const project = await sf.projects.getProject({ grants: ALL, projectId });
+    assert.equal(project.status, "COMPLETED");
+  });
+
+  it("uses the drafter as fallback assignee on CD and restricts review to reviewers", async () => {
+    const { projectId } = await newProject();
+    const cd = await phaseOf(projectId, "CD");
+    const base = { projectId, phaseId: cd.id };
+    await sf.phases.activatePhase({ ...as(drafter, DRAFTER_GRANTS), ...base });
+    await sf.phases.submitForInternalReview({ ...as(drafter, DRAFTER_GRANTS), ...base });
+    await rejectsWith(sf.phases.approveInternal({ ...as(drafter, DRAFTER_GRANTS), ...base }), "PERMISSION_DENIED");
+    await sf.phases.addActivity({ ...as(designer), ...base, content: "Fix section A", mode: "FEEDBACK" });
+    await sf.phases.rejectPhase({ ...as(designer), ...base, type: "INTERNAL" });
+    const todo = await testDb.prisma.sfActivity.findFirstOrThrow({ where: { phase_id: cd.id, mode: "TODO" } });
+    assert.equal(todo.assigned_to_id, drafter.id);
+  });
+
+  it("defers to-dos, reopens with a reason, and overrides with a history snapshot", async () => {
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "MOODBOARD");
+    const base = { ...as(designer), projectId, phaseId: phase.id };
+    const fb = await sf.phases.addActivity({ ...base, content: "feedback", mode: "FEEDBACK" });
+    await rejectsWith(sf.phases.deferActivity({ ...base, activityId: fb.activityId }), "DEFER_FEEDBACK_BLOCKED");
+    await sf.phases.deleteActivity({ ...base, activityId: fb.activityId });
+    const todo = await sf.phases.addActivity({ ...base, content: "later", mode: "TODO" });
+    await sf.phases.deferActivity({ ...base, activityId: todo.activityId });
+    const deferred = await testDb.prisma.sfActivity.findUniqueOrThrow({ where: { id: todo.activityId } });
+    assert.equal(deferred.revision_id, null);
+    assert.equal(deferred.deferred_from_version, "v1.0");
+    await rejectsWith(sf.phases.submitForInternalReview(base), "PHASE_OPEN_TODOS");
+    await sf.phases.setActivityDone({ ...base, activityId: todo.activityId, done: true });
+    await sf.phases.submitForClientReview(base);
+    await sf.phases.approveClient(base);
+    await rejectsWith(sf.phases.reopenPhase({ ...base, intent: "CLIENT", reason: "" }), "REOPEN_REASON_REQUIRED");
+    const reopened = await sf.phases.reopenPhase({ ...base, intent: "CLIENT", reason: "Client changed brief" });
+    assert.equal(reopened.revision, "v2.0");
+    await rejectsWith(sf.phases.overrideRevision({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: phase.id, mode: "HARD_RESET_PENDING", note: "x" }), "PERMISSION_DENIED");
+    await sf.phases.overrideRevision({ ...base, mode: "HARD_RESET_ACTIVE", major: 3, minor: 0, note: "Align with client numbering" });
+    assert.deepEqual(await revisions(phase.id), ["v3.0:ACTIVE"]);
+    const event = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { entity_id: phase.id, action: "studioflow.phase.revision-overridden" } });
+    const history = (event.metadata as { history: Array<{ version: string }> }).history;
+    assert.deepEqual(history.map((h) => h.version), ["v1.0", "v2.0"]);
+  });
+});
+
+describe("SF-R1 checklist and Today", () => {
+  it("keeps template rows, syncs idempotently, reorders, labels, and detaches", async () => {
+    const general = await sf.tasks.createTemplate({ ...as(designer), phaseKey: null, label: "Site survey" });
+    const { projectId } = await newProject();
+    assert.equal((await sf.tasks.syncProjectChecklist({ ...as(designer), projectId })).created, 0);
+    await sf.tasks.createTemplate({ ...as(designer), phaseKey: null, label: "Contract signed" });
+    await sf.tasks.updateTemplate({ ...as(designer), templateId: general.templateId, label: "Site survey (renamed)" });
+    assert.equal((await sf.tasks.syncProjectChecklist({ ...as(designer), projectId })).created, 1);
+    const roots = await sf.tasks.listChecklist({ grants: ALL, projectId, phaseId: null });
+    assert.deepEqual(roots.map((r) => r.label), ["Site survey", "Contract signed"]);
+    await rejectsWith(sf.tasks.deleteItem({ ...as(designer), projectId, itemId: roots[0].id }), "CHECKLIST_TEMPLATE_ROW");
+    const sub = await sf.tasks.createSubtask({ ...as(designer), projectId, parentId: roots[0].id, label: "Measure", priority: 1, dueDate: "2026-09-10" });
+    await rejectsWith(sf.tasks.createSubtask({ ...as(designer), projectId, parentId: sub.itemId, label: "too deep" }), "CHECKLIST_DEPTH");
+    await sf.tasks.reorderItems({ ...as(designer), projectId, orderedIds: [roots[1].id, roots[0].id] });
+    await rejectsWith(sf.tasks.reorderItems({ ...as(designer), projectId, orderedIds: [roots[1].id] }), "REORDER_SCOPE");
+    await sf.tasks.attachLabel({ ...as(designer), projectId, itemId: sub.itemId, name: "Urgent", color: "danger" });
+    await sf.tasks.detachFromTemplate({ ...as(designer), projectId, itemId: roots[0].id });
+    await sf.tasks.deleteTemplate({ ...as(designer), templateId: general.templateId });
+    const after = await sf.tasks.listChecklist({ grants: ALL, projectId, phaseId: null });
+    assert.deepEqual(after.map((r) => [r.label, r.children.map((c) => c.labels.map((l) => l.name))]), [["Contract signed", []], ["Site survey", [["urgent"]]]]);
+    await sf.tasks.deleteItem({ ...as(designer), projectId, itemId: roots[0].id });
+    assert.equal(await testDb.prisma.sfChecklistItem.count({ where: { parent_id: roots[0].id } }), 0);
+  });
+
+  it("builds Today per project for the PIC, including empty and general work", async () => {
+    await sf.tasks.createTemplate({ ...as(designer), phaseKey: "LAYOUT", label: "Layout checklist" });
+    const one = await newProject("One");
+    await newProject("Two");
+    await sf.projects.setProjectPriority({ ...as(designer), projectId: one.projectId, priority: "URGENT" });
+    await sf.phases.addActivity({ ...as(designer), projectId: one.projectId, phaseId: null, content: "Call client", mode: "TODO", dueDate: "2026-09-14" });
+    await rejectsWith(sf.phases.addActivity({ ...as(designer), projectId: one.projectId, phaseId: null, content: "fb", mode: "FEEDBACK" }), "GENERAL_FEEDBACK_NOT_ALLOWED");
+    const moodboard = await phaseOf(one.projectId, "MOODBOARD");
+    await sf.phases.addActivity({ ...as(designer), projectId: one.projectId, phaseId: moodboard.id, content: "Board", mode: "TODO", assignedToId: drafter.id });
+
+    const today = await sf.today.getToday({ grants: DRAFTER_GRANTS, userId: drafter.id, scope: "all" });
+    assert.equal(today.scope, "mine", "scope all needs manage grant");
+    assert.deepEqual(today.groups.map((g) => [g.project.name, g.project.isUrgent, g.tasks.length]), [["2026-001 One", true, 2], ["2026-002 Two", false, 0]]);
+    assert.deepEqual(today.groups[0].tasks.map((t) => t.label), ["Call client", "Board"], "layout items stay quiet until the phase starts");
+    const layoutTarget = today.addTargets[0].targets.find((t) => t.label === "Layout Plan");
+    assert.equal(layoutTarget?.disabledReason, "Not started");
+
+    const outsider = await seedUser("Other", ALL);
+    const empty = await sf.today.getToday({ grants: ALL, userId: outsider.id });
+    assert.equal(empty.groups.length, 0);
+    const all = await sf.today.getToday({ grants: ALL, userId: outsider.id, scope: "all" });
+    assert.equal(all.groups.length, 2);
+  });
+
+  it("stores saved filters per user", async () => {
+    await sf.tasks.saveFilterView({ ...as(designer), name: "My P1", query: { status: "OPEN", priority: "P1", assignee: "ME", due: null } });
+    await rejectsWith(sf.tasks.saveFilterView({ ...as(designer), name: "Bad", query: { status: "X" } as never }), "FILTER_QUERY_INVALID");
+    assert.equal((await sf.tasks.listFilterViews({ grants: ALL, ownerId: designer.id })).length, 1);
+    assert.equal((await sf.tasks.listFilterViews({ grants: ALL, ownerId: drafter.id })).length, 0);
+  });
+});
+
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
+const png = () => ({ body: PNG, contentType: "image/png" });
+
+async function momShape(projectId: string, documentId: string) {
+  const doc = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+  return doc.items.map((item) => ({ points: item.points.map((p) => p.text), slots: item.images.map((i) => i.slot) }));
+}
+
+describe("SF-R2 MOM", () => {
+  it("creates a legacy-shaped document and edits its header", async () => {
+    const { projectId } = await newProject();
+    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId });
+    const doc = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+    assert.equal(doc.topic, "SITE INSPECTION REPORT");
+    assert.equal(doc.meetingDate, "2026-09-15");
+    assert.equal(doc.preparedByName, "Dina Designer");
+    assert.deepEqual(await momShape(projectId, documentId), [{ points: [""], slots: [] }]);
+
+    await sf.mom.updateDocument({ ...as(designer), projectId, documentId, topic: "Weekly meeting", meetingDate: "2026-09-20", venue: " Site ", attendees: "Client\nContractor", preparedByName: "Dina" });
+    const list = await sf.mom.listDocuments({ grants: DRAFTER_GRANTS, projectId });
+    assert.deepEqual(list.map((d) => [d.topic, d.meetingDate, d.venue, d.sectionCount]), [["Weekly meeting", "2026-09-20", "Site", 1]]);
+    await rejectsWith(sf.mom.updateDocument({ ...as(designer), projectId, documentId, topic: " ", meetingDate: "2026-09-20", preparedByName: "D" }), "MOM_TOPIC_REQUIRED");
+    await rejectsWith(sf.mom.updateDocument({ ...as(designer), projectId, documentId, topic: "T", meetingDate: "20-09-2026", preparedByName: "D" }), "MOM_DATE_INVALID");
+    const audit = await testDb.prisma.auditEvent.findMany({ where: { entity_id: documentId }, orderBy: { occurred_at: "asc" } });
+    assert.deepEqual(audit.map((a) => a.action), ["studioflow.mom.created", "studioflow.mom.updated"]);
+  });
+
+  it("orders sections and points, and keeps one point per section", async () => {
+    const { projectId } = await newProject();
+    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId });
+    const first = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0];
+    await sf.mom.updatePoint({ ...as(designer), projectId, pointId: first.points[0].id, text: "A", style: "DEFAULT" });
+    const b = await sf.mom.addPoint({ ...as(designer), projectId, itemId: first.id, text: "B" });
+    await sf.mom.movePoint({ ...as(designer), projectId, pointId: b.pointId, direction: "up" });
+    const second = await sf.mom.addItem({ ...as(designer), projectId, documentId });
+    await sf.mom.moveItem({ ...as(designer), projectId, itemId: second.itemId, direction: "up" });
+    assert.deepEqual(await momShape(projectId, documentId), [{ points: [""], slots: [] }, { points: ["B", "A"], slots: [] }]);
+
+    await rejectsWith(sf.mom.reorderItems({ ...as(designer), projectId, documentId, itemIds: [second.itemId] }), "MOM_REORDER_INVALID");
+    await sf.mom.reorderItems({ ...as(designer), projectId, documentId, itemIds: [first.id, second.itemId] });
+    const onlyPoint = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[1].points[0];
+    await sf.mom.deletePoint({ ...as(designer), projectId, pointId: onlyPoint.id });
+    const after = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+    assert.equal(after.items[1].points.length, 1);
+    assert.equal(after.items[1].points[0].text, "");
+    assert.notEqual(after.items[1].points[0].id, onlyPoint.id);
+
+    await sf.mom.updateItem({ ...as(designer), projectId, itemId: first.id, isTextOnly: true, listStyle: "DASH" });
+    await rejectsWith(sf.mom.updateItem({ ...as(designer), projectId, itemId: first.id, isTextOnly: true, listStyle: "ROMAN" }), "MOM_LIST_STYLE_INVALID");
+    await sf.mom.deleteItem({ ...as(designer), projectId, itemId: second.itemId });
+    const final = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+    assert.deepEqual(final.items.map((i) => [i.isTextOnly, i.listStyle, i.points.map((p) => p.text)]), [[true, "DASH", ["B", "A"]]]);
+  });
+
+  it("stores at most two images per section and cleans storage", async () => {
+    const { projectId } = await newProject();
+    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId });
+    const itemId = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0].id;
+
+    const placed = await sf.mom.setImage({ ...as(designer), projectId, itemId, slot: 1, file: png() });
+    assert.equal(placed.slot, 0, "slot 1 on an empty section lands in slot 0");
+    await sf.mom.setImage({ ...as(designer), projectId, itemId, slot: 1, file: png() });
+    assert.equal(storage.objects.size, 2);
+    await rejectsWith(sf.mom.setImage({ ...as(designer), projectId, itemId, slot: 2, file: png() }), "MOM_IMAGE_LIMIT");
+    await rejectsWith(sf.mom.setImage({ ...as(designer), projectId, itemId, slot: 0, file: { body: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), contentType: "image/png" } }), "MOM_IMAGE_TYPE");
+    await rejectsWith(sf.mom.setImage({ ...as(designer), projectId, itemId, slot: 0, file: { body: PNG, contentType: "image/gif" } }), "MOM_IMAGE_TYPE");
+
+    let doc = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+    const [img0, img1] = doc.items[0].images;
+    assert.ok(img0.url?.startsWith("https://storage.invalid/"));
+    await sf.mom.setImage({ ...as(designer), projectId, itemId, slot: 0, file: png() });
+    assert.equal(storage.objects.size, 2, "replacing removes the previous object");
+
+    await sf.mom.swapImages({ ...as(designer), projectId, itemId });
+    doc = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+    assert.equal(doc.items[0].images[0].url, img1.url, "swap moves the second image first");
+
+    await sf.mom.deleteImage({ ...as(designer), projectId, imageId: doc.items[0].images[0].id });
+    doc = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+    assert.deepEqual(doc.items[0].images.map((i) => i.slot), [0], "remaining image shifts to slot 0");
+    assert.equal(storage.objects.size, 1);
+    await rejectsWith(sf.mom.swapImages({ ...as(designer), projectId, itemId }), "MOM_IMAGE_SWAP_UNAVAILABLE");
+
+    await sf.mom.deleteDocument({ ...as(designer), projectId, documentId });
+    assert.equal(storage.objects.size, 0);
+    assert.equal((await sf.mom.listDocuments({ grants: ALL, projectId })).length, 0);
+    const deleted = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "studioflow.mom.deleted" } });
+    assert.deepEqual((deleted.metadata as { snapshot: { sections: number; images: number } }).snapshot.images, 1);
+  });
+
+  it("enforces permission, project scope, and archive read-only", async () => {
+    const { projectId } = await newProject();
+    const other = await newProject("Other project");
+    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId });
+    const itemId = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0].id;
+
+    await assert.rejects(sf.mom.createDocument({ ...as(drafter, DRAFTER_GRANTS), projectId }), (e: unknown) => e instanceof AppError && e.kind === "FORBIDDEN");
+    assert.equal(sf.mom.canManage(DRAFTER_GRANTS), false);
+    await rejectsWith(sf.mom.getDocument({ grants: ALL, projectId: other.projectId, documentId }), "MOM_RECORD_NOT_FOUND");
+    await rejectsWith(sf.mom.addItem({ ...as(designer), projectId: other.projectId, documentId }), "MOM_RECORD_NOT_FOUND");
+    await rejectsWith(sf.mom.setImage({ ...as(designer), projectId: other.projectId, itemId, slot: 0, file: png() }), "MOM_RECORD_NOT_FOUND");
+    assert.equal(storage.objects.size, 0, "no object is written for an out-of-scope item");
+
+    await sf.projects.archiveProject({ ...as(designer), projectId, reason: "Done" });
+    await rejectsWith(sf.mom.addItem({ ...as(designer), projectId, documentId }), "PROJECT_ARCHIVED");
+    await rejectsWith(sf.mom.setImage({ ...as(designer), projectId, itemId, slot: 0, file: png() }), "PROJECT_ARCHIVED");
+    assert.equal(storage.objects.size, 0, "a rejected upload leaves no orphan object");
+    assert.equal((await sf.mom.listDocuments({ grants: DRAFTER_GRANTS, projectId })).length, 1);
+  });
+});
+
+describe("SF-R3 Product Schedule", () => {
+  it("creates entries with gapless codes, options, final approval, and promotion on delete", async () => {
+    const { projectId } = await newProject();
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Paint", prefix: "PT" });
+    const first = await sf.schedule.createEntry({
+      ...as(designer),
       projectId,
-      phase.id,
-    );
-    assert.match(filename, new RegExp(`D${iter.iteration.number}(\\.|$)`));
-  });
-
-  it("getNextFilename previews max+1 when no DRAFT exists", async () => {
-    const { phase } = await seedRoundPhase();
-    const projectId = (await testDb.prisma.sfProjectPhase.findUniqueOrThrow({ where: { id: phase.id } })).project_id;
-    // No draft yet — should preview D1 (0 + 1). §5.2: the derived round label
-    // carries no separator, and one helper owns that format.
-    const filename = await service.getNextFilename(
-      [STUDIOFLOW_PERMISSIONS.projectRead],
-      projectId,
-      phase.id,
-    );
-    assert.match(filename, /D1$/);
-
-    // Open then void — max number is 1, so next preview should be D2
-    const first = await service.openIteration([STUDIOFLOW_PERMISSIONS.iterationManage], ACTOR, phase.id);
-    await service.voidIteration([STUDIOFLOW_PERMISSIONS.iterationReview], ACTOR, first.iteration.id, "Test void");
-    const filename2 = await service.getNextFilename(
-      [STUDIOFLOW_PERMISSIONS.projectRead],
-      projectId,
-      phase.id,
-    );
-    assert.match(filename2, /D2$/);
-  });
-
-  it("getNextFilename rejects a phase from a different project", async () => {
-    const { phase } = await seedRoundPhase();
-    const otherClient = await testDb.prisma.sfClient.create({ data: { name: "Other" } });
-    const otherProject = await testDb.prisma.sfProject.create({
-      data: {
-        code: "SF26-OTH",
-        name: "Other project",
-        client_id: otherClient.id,
-        opened_at: new Date("2026-09-09T00:00:00.000Z"),
-      },
+      section: "MATERIAL",
+      category: "Paint",
+      qty: "2",
+      unit: "pail",
+      location: "Bedroom",
+      snapshot: { productName: "Dulux Easy Clean", brandName: "Dulux", skuText: "DX-01", color: "Warm White" },
     });
-    await assert.rejects(
-      () =>
-        service.getNextFilename(
-          [STUDIOFLOW_PERMISSIONS.projectRead],
-          otherProject.id,
-          phase.id,
-        ),
-      (err: unknown) => err instanceof AppError && err.code === "studioflow.phase.not-found",
-    );
+    const second = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "Jotun Majestic", brandName: "Jotun" } });
+    assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => [e.code, e.category, e.options[0]?.label, e.options[0]?.isFinal]), [
+      ["PT-01", "Paint", "A", true],
+      ["PT-02", "Paint", "A", true],
+    ]);
+
+    const option = await sf.schedule.createOption({ ...as(designer), projectId, entryId: first.entryId, snapshot: { productName: "Nippon Spotless", brandName: "Nippon", color: "Bone" } });
+    await sf.schedule.markFinal({ ...as(designer), projectId, optionId: option.optionId });
+    let entry = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((row) => row.id === first.entryId)!;
+    assert.deepEqual(entry.options.map((o) => [o.label, o.status, o.isFinal]), [["A", "NOT_USED", false], ["B", "APPROVED", true]]);
+
+    await sf.schedule.deleteOption({ ...as(designer), projectId, optionId: option.optionId });
+    entry = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((row) => row.id === first.entryId)!;
+    assert.deepEqual(entry.options.map((o) => [o.label, o.status, o.isFinal]), [["A", "APPROVED", true]]);
+
+    await sf.schedule.deleteEntry({ ...as(designer), projectId, entryId: first.entryId });
+    assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => e.code), ["PT-01"]);
+    assert.equal(second.entryId.length > 0, true);
   });
 
-  it("DONE supervision phase refuses file intake", async () => {
-    const client = await testDb.prisma.sfClient.create({ data: { name: "SupClient" } });
-    const supTemplate = await testDb.prisma.sfPhaseTemplate.create({
-      data: { key: "SUPERVISION", name: "Supervision", sort_order: 2, has_rounds: false, round_prefix: null },
+  it("applies templates idempotently and snapshots Master Data Brand through the public port", async () => {
+    const tag = randomUUID().slice(0, 8);
+    const brand = await testDb.prisma.brand.create({ data: { id: randomUUID(), name: `TACO ${tag}`, slug: `taco-${tag}` } });
+    const category = await sf.schedule.upsertTemplateCategory({ ...as(designer), section: "MATERIAL", category: "HPL", isDefaultEntry: true });
+    await sf.schedule.createTemplateItem({
+      ...as(designer),
+      templateCategoryId: category.templateCategoryId,
+      section: "MATERIAL",
+      category: "HPL",
+      snapshot: { brandId: brand.id, productName: "TH 121 AA", skuText: "TH-121", finishing: "Doff" },
+      qty: "1",
+      unit: "sheet",
+      location: "Cabinet",
     });
-    const project = await testDb.prisma.sfProject.create({
-      data: {
-        code: "SF26-SUP",
-        name: "Sup project",
-        client_id: client.id,
-        opened_at: new Date("2026-09-09T00:00:00.000Z"),
-      },
+    const { projectId } = await newProject();
+    assert.equal((await sf.schedule.listSchedule({ grants: ALL, projectId })).length, 1, "seeded when the project was created");
+    assert.deepEqual(await sf.schedule.applyTemplates({ ...as(designer), projectId }), { created: 0 });
+    const older = await testDb.prisma.sfScheduleEntry.deleteMany({ where: { project_id: projectId } });
+    assert.equal(older.count, 1);
+    assert.deepEqual(await sf.schedule.applyTemplates({ ...as(designer), projectId }), { created: 1 });
+    assert.deepEqual(await sf.schedule.applyTemplates({ ...as(designer), projectId }), { created: 0 });
+    const [entry] = await sf.schedule.listSchedule({ grants: ALL, projectId });
+    assert.equal(entry.category, "HPL");
+    assert.equal(entry.options[0].brandId, brand.id);
+    assert.equal(entry.options[0].brandName, `TACO ${tag}`);
+  });
+
+  it("reuses past project snapshots and imports legacy CSV rows", async () => {
+    const source = await newProject("Source");
+    const target = await newProject("Target");
+    const sourceEntry = await sf.schedule.createEntry({ ...as(designer), projectId: source.projectId, section: "FIXTURE", category: "Loose Furniture", snapshot: { productName: "Aria Chair", brandName: "Cellini", color: "Grey" } });
+    const reusable = await sf.schedule.searchReusableOptions({ grants: ALL, projectId: target.projectId, query: "aria", section: "FIXTURE" });
+    assert.equal(reusable.length, 1);
+
+    const targetEntry = await sf.schedule.createEntry({ ...as(designer), projectId: target.projectId, section: "FIXTURE", category: "Loose Furniture" });
+    await sf.schedule.copyReusableOption({ ...as(designer), projectId: target.projectId, entryId: targetEntry.entryId, sourceOptionId: reusable[0].optionId });
+    const copied = (await sf.schedule.listSchedule({ grants: ALL, projectId: target.projectId })).find((row) => row.id === targetEntry.entryId)!;
+    assert.equal(copied.options[0].productName, "Aria Chair");
+
+    const imported = await sf.schedule.importCsv({
+      ...as(designer),
+      projectId: target.projectId,
+      section: "MATERIAL",
+      csv: "category,brand,product,sku,color,qty,unit,location\nTile,Roman,Granitio,GR-1,Ivory,12,m2,Lobby\n",
     });
-    const supPhase = await testDb.prisma.sfProjectPhase.create({
-      data: {
-        project_id: project.id,
-        template_id: supTemplate.id,
-        key: supTemplate.key,
-        name: supTemplate.name,
-        sort_order: supTemplate.sort_order,
-        has_rounds: false,
-        round_prefix: null,
-        folder_key: "supervision",
-      },
-    });
-    // Start and finish supervision
-    await service.startSupervision([STUDIOFLOW_PERMISSIONS.iterationReview], ACTOR, supPhase.id);
-    await service.finishSupervision([STUDIOFLOW_PERMISSIONS.iterationReview], ACTOR, supPhase.id);
-
-    await assert.rejects(
-      () =>
-        service.recordFile(
-          [STUDIOFLOW_PERMISSIONS.iterationManage],
-          ACTOR,
-          { project_id: project.id, folder_key: "supervision", original_filename: "site.skp", bytes: 100 },
-        ),
-      (err: unknown) => err instanceof AppError && err.code === "studioflow.phase.closed",
-    );
+    assert.equal(imported.created, 1);
+    assert.ok((await sf.schedule.listSchedule({ grants: ALL, projectId: target.projectId, section: "MATERIAL" })).some((row) => row.options[0].productName === "Granitio"));
+    assert.notEqual(sourceEntry.entryId, targetEntry.entryId);
   });
 
-  it("DONE round-bearing phases refuse both record and link intake", async () => {
-    const { phase } = await seedRoundPhase();
-    const projectId = (await testDb.prisma.sfProjectPhase.findUniqueOrThrow({ where: { id: phase.id } })).project_id;
-    await testDb.prisma.sfProjectPhase.update({ where: { id: phase.id }, data: { state: "DONE" } });
-
-    await assert.rejects(
-      () => service.recordFile(
-        [STUDIOFLOW_PERMISSIONS.iterationManage],
-        ACTOR,
-        { project_id: projectId, folder_key: "design", original_filename: "done.skp", bytes: 100 },
-      ),
-      (err: unknown) => err instanceof AppError && err.code === "studioflow.phase.closed",
-    );
-    await assert.rejects(
-      () => service.linkFile(
-        [STUDIOFLOW_PERMISSIONS.iterationManage],
-        ACTOR,
-        { project_id: projectId, folder_key: "design", original_filename: "done.pdf", external_url: "https://example.com/done.pdf" },
-      ),
-      (err: unknown) => err instanceof AppError && err.code === "studioflow.phase.closed",
-    );
+  it("enforces permissions, project scope, and archive read-only", async () => {
+    const { projectId } = await newProject();
+    const other = await newProject("Other");
+    const entry = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" });
+    await assert.rejects(sf.schedule.createEntry({ ...as(drafter, DRAFTER_GRANTS), projectId, section: "MATERIAL", category: "Stone" }), (e: unknown) => e instanceof AppError && e.kind === "FORBIDDEN");
+    assert.equal(sf.schedule.canManage(DRAFTER_GRANTS), false);
+    await rejectsWith(sf.schedule.createOption({ ...as(designer), projectId: other.projectId, entryId: entry.entryId, snapshot: { productName: "x" } }), "SCHEDULE_ITEM_NOT_FOUND");
+    await sf.projects.archiveProject({ ...as(designer), projectId, reason: "Done" });
+    await rejectsWith(sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" }), "PROJECT_ARCHIVED");
+    assert.equal((await sf.schedule.listSchedule({ grants: DRAFTER_GRANTS, projectId })).length, 1);
   });
 
-  it("current file excludes superseded and respects folder", async () => {
-    const { phase } = await seedRoundPhase();
-    const projectId = (await testDb.prisma.sfProjectPhase.findUniqueOrThrow({ where: { id: phase.id } })).project_id;
-    // Drop first file (will be superseded by second)
-    const first = await service.recordFile(
-      [STUDIOFLOW_PERMISSIONS.iterationManage],
-      ACTOR,
-      { project_id: projectId, folder_key: "design", original_filename: "v1.skp", bytes: 100 },
-    );
-    const second = await service.recordFile(
-      [STUDIOFLOW_PERMISSIONS.iterationManage],
-      ACTOR,
-      { project_id: projectId, folder_key: "design", original_filename: "v2.skp", bytes: 200 },
-    );
-    await service.recordFile(
-      [STUDIOFLOW_PERMISSIONS.iterationManage],
-      ACTOR,
-      { project_id: projectId, folder_key: "other", original_filename: "other.skp", bytes: 300 },
-    );
-    const files = await service.listFiles([STUDIOFLOW_PERMISSIONS.projectRead], projectId);
-    const active = files.filter((f) => f.folder_key === "design" && f.superseded_at === null);
-    assert.equal(active.length, 1);
-    assert.equal(active[0].id, second.file.id);
-    const superseded = files.filter((f) => f.id === first.file.id);
-    assert.ok(superseded[0].superseded_at !== null);
+  it("keeps labels unique, edits options and items partially, and moves rows between groups", async () => {
+    const { projectId } = await newProject();
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Paint", prefix: "PT" });
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Wallpaper", prefix: "WP" });
+    const a = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", qty: "2", unit: "pail", snapshot: { productName: "A paint" } });
+    const b = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "B paint" } });
+    const c = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });
+
+    const optB = await sf.schedule.createOption({ ...as(designer), projectId, entryId: a.entryId, snapshot: { productName: "Alt B" } });
+    await sf.schedule.createOption({ ...as(designer), projectId, entryId: a.entryId, snapshot: { productName: "Alt C" } });
+    await sf.schedule.deleteOption({ ...as(designer), projectId, optionId: optB.optionId });
+    await sf.schedule.createOption({ ...as(designer), projectId, entryId: a.entryId, snapshot: { productName: "Alt D" } });
+    const list = async () => sf.schedule.listSchedule({ grants: ALL, projectId });
+    let rowA = (await list()).find((row) => row.id === a.entryId)!;
+    assert.deepEqual(rowA.options.map((o) => o.label), ["A", "C", "D"], "a deleted label is never reused");
+
+    const optD = rowA.options.find((o) => o.label === "D")!;
+    await sf.schedule.markFinal({ ...as(designer), projectId, optionId: optD.id });
+    const entryRow = await testDb.prisma.sfScheduleEntry.findUniqueOrThrow({ where: { id: a.entryId } });
+    assert.equal(entryRow.active_index, 2);
+    assert.equal(entryRow.version_locked, false, "approval does not lock the row (legacy)");
+
+    await sf.schedule.updateOption({ ...as(designer), projectId, optionId: optD.id, snapshot: { productName: "Alt D2", brandName: "Jotun", color: "Ivory" } });
+    rowA = (await list()).find((row) => row.id === a.entryId)!;
+    assert.deepEqual([rowA.options[2].productName, rowA.options[2].brandName, rowA.options[2].color], ["Alt D2", "Jotun", "Ivory"]);
+    const hits = await sf.schedule.searchReusableOptions({ grants: ALL, projectId: (await newProject("Other")).projectId, query: "ivory" });
+    assert.equal(hits[0]?.sourceProjectName, "2026-001 Heloskin Cimanggu", "edited snapshot is searchable");
+
+    await sf.schedule.updateEntry({ ...as(designer), projectId, entryId: a.entryId, location: "Lobby" });
+    rowA = (await list()).find((row) => row.id === a.entryId)!;
+    assert.deepEqual([rowA.qty, rowA.unit, rowA.location], ["2", "pail", "Lobby"], "omitted fields keep their value");
+
+    await sf.schedule.moveEntry({ ...as(designer), projectId, entryId: c.entryId, direction: "up" });
+    assert.deepEqual((await list()).map((row) => [row.code, row.id]), [["PT-01", a.entryId], ["PT-02", c.entryId], ["PT-03", b.entryId]]);
+
+    const moved = await sf.schedule.moveEntryToCategory({ ...as(designer), projectId, entryId: a.entryId, category: "wallpaper" });
+    assert.equal(moved.code, "WP-01");
+    assert.deepEqual((await list()).map((row) => [row.code, row.category]), [["PT-01", "Paint"], ["PT-02", "Paint"], ["WP-01", "Wallpaper"]]);
   });
 
-  it("keeps one unsent current deliverable and freezes it on send", async () => {
-    const { phase } = await seedRoundPhase();
-    const first = await service.recordFile(
-      [STUDIOFLOW_PERMISSIONS.iterationManage],
-      ACTOR,
-      { project_id: (await testDb.prisma.sfProjectPhase.findUniqueOrThrow({ where: { id: phase.id } })).project_id, folder_key: "design", original_filename: "first.skp", bytes: 10 },
-    );
-    const second = await service.recordFile(
-      [STUDIOFLOW_PERMISSIONS.iterationManage],
-      ACTOR,
-      { project_id: first.file.project_id, folder_key: "design", original_filename: "second.skp", bytes: 20 },
-    );
-    assert.equal(second.iteration?.id, first.iteration?.id);
-    assert.equal((await testDb.prisma.sfFile.findUniqueOrThrow({ where: { id: first.file.id } })).superseded_at !== null, true);
-    assert.equal((await testDb.prisma.sfIteration.findUniqueOrThrow({ where: { id: first.iteration!.id } })).working_revision, 1);
+  it("imports the legacy Google Sheets export and updates existing codes", async () => {
+    const { projectId } = await newProject();
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Paint", prefix: "PT" });
+    const existing = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "Old paint" } });
+    const sheet = [
+      "MATERIAL SCHEDULE,,,,,,,,,",
+      "Code,Product Category,Ex,Type,Initials Type,Image,Location,Contact,Qty,Unit",
+      "PT-01,,Dulux,Easy Clean,EC,,Bedroom,Budi 0812,9,pail",
+      "FL-01,Floor Tile,Roman,Granitio,,,Lobby,,,m2",
+      "FL-02,Floor Tile,Roman,dBasic,,,Toilet,,,m2",
+    ].join("\n");
+    const result = await sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", csv: sheet });
+    assert.deepEqual(result, { created: 2, updated: 1 });
+    const rows = await sf.schedule.listSchedule({ grants: ALL, projectId, section: "MATERIAL" });
+    const pt = rows.find((row) => row.id === existing.entryId)!;
+    assert.deepEqual([pt.code, pt.options[0].productName, pt.options[0].brandName, pt.location, pt.qty], ["PT-01", "Easy Clean", "Dulux", "Bedroom", null]);
+    assert.match(pt.options[0].notes ?? "", /Contact: Budi 0812/);
+    assert.deepEqual(rows.filter((row) => row.category === "Floor Tile").map((row) => row.code), ["FL-01", "FL-02"], "a new category keeps the sheet prefix");
 
-    await service.sendIteration([STUDIOFLOW_PERMISSIONS.iterationReview], ACTOR, first.iteration!.id);
-    assert.equal((await testDb.prisma.sfFile.findUniqueOrThrow({ where: { id: second.file.id } })).sent_in_iteration_id, first.iteration!.id);
+    await rejectsWith(sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", csv: "Code,Product Category,Ex,Type\nZZ-01,,Brand,Thing" }), "SCHEDULE_CSV_CATEGORY");
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Tile Wall", prefix: "FL" });
+    await rejectsWith(sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", csv: "Code,Product Category,Ex,Type\nFL-09,,Brand,Thing" }), "SCHEDULE_CSV_CATEGORY");
+    assert.equal((await sf.schedule.listSchedule({ grants: ALL, projectId })).length, 3, "a failed import writes nothing");
   });
 
-  it("keeps MOM project-scoped, ordered, auditable, and immutable after issue", async () => {
-    const { project } = await seedRoundPhase();
-    const draft = await service.createMomDraft([STUDIOFLOW_PERMISSIONS.momManage], ACTOR, {
-      project_id: project.id,
-      topic: "Design review",
-      meeting_at: new Date("2026-09-10T03:00:00.000Z"),
-      prepared_by_name: "Designer",
-    });
-    assert.equal(draft.sequence, null);
-    assert.equal(draft.items.length, 1);
-
-    await service.updateMomContent([STUDIOFLOW_PERMISSIONS.momManage], ACTOR, project.id, draft.id, {
-      items: [{
-        sort_order: 0,
-        is_text_only: false,
-        list_style: "BULLET",
-        points: [{ sort_order: 0, text: "Approve tile sample", style: "BULLET" }],
-        images: [{ sort_order: 0, storage_key: `studioflow/mom/${project.id}/${draft.id}/sample.png`, alt_text: "Tile sample" }],
-      }],
-    });
-    const issued = await service.issueMom([STUDIOFLOW_PERMISSIONS.momIssue], ACTOR, project.id, draft.id);
-    assert.equal(issued.state, "ISSUED");
-    assert.equal(issued.sequence, 1);
-    await assert.rejects(
-      () => service.updateMomDraft([STUDIOFLOW_PERMISSIONS.momManage], ACTOR, project.id, draft.id, { topic: "Changed" }),
-      (error: unknown) => error instanceof AppError && error.code === "studioflow.mom.immutable",
-    );
-    assert.ok(await testDb.prisma.auditEvent.findFirst({ where: { action: "mom.issue", entity_id: draft.id } }));
-  });
-
-  it("refuses cross-project MOM child mutation and issues a correction without rewriting the source", async () => {
-    const { project } = await seedRoundPhase();
-    const otherClient = await testDb.prisma.sfClient.create({ data: { name: "Other client" } });
-    const otherProject = await testDb.prisma.sfProject.create({ data: { code: "SF26-MOM2", name: "Other", client_id: otherClient.id, opened_at: new Date() } });
-    const draft = await service.createMomDraft([STUDIOFLOW_PERMISSIONS.momManage], ACTOR, { project_id: project.id, topic: "Original", meeting_at: new Date(), prepared_by_name: "Designer" });
-    await assert.rejects(
-      () => service.updateMomContent([STUDIOFLOW_PERMISSIONS.momManage], ACTOR, otherProject.id, draft.id, { items: [{ sort_order: 0, is_text_only: true, list_style: "NONE", points: [{ sort_order: 0, text: "No", style: "TEXT" }], images: [] }] }),
-      (error: unknown) => error instanceof AppError && error.code === "studioflow.mom.not-found",
-    );
-    await service.updateMomContent([STUDIOFLOW_PERMISSIONS.momManage], ACTOR, project.id, draft.id, {
-      items: [{ sort_order: 0, is_text_only: true, list_style: "NONE", points: [{ sort_order: 0, text: "Approved content", style: "TEXT" }], images: [] }],
-    });
-    await service.issueMom([STUDIOFLOW_PERMISSIONS.momIssue], ACTOR, project.id, draft.id);
-    const correction = await service.supersedeMom([STUDIOFLOW_PERMISSIONS.momIssue], ACTOR, project.id, draft.id, { project_id: project.id, topic: "Corrected", meeting_at: new Date(), prepared_by_name: "Designer" });
-    assert.equal(correction.supersedes_id, draft.id);
-    assert.equal(correction.sequence, 2);
-    assert.equal((await testDb.prisma.sfMomDocument.findUniqueOrThrow({ where: { id: draft.id } })).state, "SUPERSEDED");
-  });
-
-  it("creates, searches, no-op edits, archives, and restores Product Catalogue rows", async () => {
-    const product = await service.createCatalogueProduct([STUDIOFLOW_PERMISSIONS.scheduleManage], ACTOR, { brand_md_id: "brand-1", brand_name: "Acme", product_name: "Tile", colour: "White", finishing: "Matte", unit: "pcs" });
-    assert.equal(product.search_key, "acme::tile::white::matte");
-    assert.equal((await service.listCatalogueProducts([STUDIOFLOW_PERMISSIONS.projectRead], { search: "WHITE" })).length, 1);
-    const beforeAudit = await testDb.prisma.auditEvent.count({ where: { action: "catalogue.edit", entity_id: product.id } });
-    await service.editCatalogueProduct([STUDIOFLOW_PERMISSIONS.scheduleManage], ACTOR, product.id, { product_name: "Tile" });
-    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "catalogue.edit", entity_id: product.id } }), beforeAudit);
-    await service.archiveCatalogueProduct([STUDIOFLOW_PERMISSIONS.scheduleManage], ACTOR, product.id);
-    assert.equal((await service.listCatalogueProducts([STUDIOFLOW_PERMISSIONS.projectRead])).length, 0);
-    await service.restoreCatalogueProduct([STUDIOFLOW_PERMISSIONS.scheduleManage], ACTOR, product.id);
-    assert.equal((await service.listCatalogueProducts([STUDIOFLOW_PERMISSIONS.projectRead])).length, 1);
-    await assert.rejects(() => service.createCatalogueProduct([], ACTOR, { product_name: "Forbidden" }), (error: unknown) => error instanceof AppError && error.kind === "FORBIDDEN");
+  it("manages template items and skips inactive ones", async () => {
+    const one = await sf.schedule.createTemplateItem({ ...as(designer), section: "FIXTURE", category: "Lighting", snapshot: { productName: "Downlight" } });
+    const two = await sf.schedule.createTemplateItem({ ...as(designer), section: "FIXTURE", category: "Lighting", snapshot: { productName: "Track light" } });
+    const templates = await sf.schedule.listTemplates({ grants: ALL });
+    assert.deepEqual(templates.map((t) => [t.category, t.items.length, t.is_default_entry]), [["Lighting", 2, false]], "items get a category row");
+    await sf.schedule.setTemplateItemActive({ ...as(designer), templateItemId: two.templateItemId, isActive: false });
+    await sf.schedule.upsertTemplateCategory({ ...as(designer), section: "MATERIAL", category: "Paint", isDefaultEntry: true });
+    const { projectId } = await newProject();
+    const seeded = await sf.schedule.listSchedule({ grants: ALL, projectId });
+    assert.deepEqual(seeded.map((row) => [row.category, row.options.length]).sort(), [["Lighting", 1], ["Paint", 0]], "new projects get template items and reserve rows");
+    assert.deepEqual(await sf.schedule.applyTemplates({ ...as(designer), projectId }), { created: 0 });
+    await sf.schedule.deleteTemplateItem({ ...as(designer), templateItemId: one.templateItemId });
+    const row = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((r) => r.category === "Lighting")!;
+    assert.equal(row.templateItemId, null, "project rows keep their snapshot after the template is deleted");
+    assert.equal(row.options[0].productName, "Downlight");
+    await rejectsWith(sf.schedule.deleteTemplateItem({ ...as(drafter, DRAFTER_GRANTS), templateItemId: two.templateItemId }).catch((e) => { throw e instanceof AppError && e.kind === "FORBIDDEN" ? new AppError("FORBIDDEN", "FORBIDDEN_OK", "x") : e; }), "FORBIDDEN_OK");
   });
 });

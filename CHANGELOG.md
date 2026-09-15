@@ -5,8 +5,1115 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.39**
-- Next local revision: **R8.40**
+- Current revision after this entry is committed: **R8.76**
+- Next local revision: **R8.77**
+
+## R8.76 | 2026-09-15 | fix(repo): keep runtime storage out of source control
+
+### Fixed
+
+- Removed a committed local MOM private asset from the Git index while leaving
+  the local runtime copy intact.
+- Added `.storage/` to `.gitignore` so future local ObjectStorage runtime files
+  do not enter source control.
+- Added `.next/dev/**` to `tsconfig.json` excludes. Next 16 writes separate
+  development route types there and may add its include automatically; excluding
+  the dev cache prevents stale route validators from breaking normal
+  typecheck/build after accepted route removals. Production `.next/types`
+  remains included.
+- Restored the missing `R8.75` changelog entry so the ledger matches the
+  existing commit history before GitHub merge.
+
+### Verification
+
+- `git ls-files .storage`: returns no tracked runtime storage files after this
+  correction is staged.
+- Focused repository review found this as a pre-merge code/data hygiene defect.
+- `npx prisma generate`: passed before rerunning typecheck.
+- Applied pending committed StudioFlow migrations to the local rumah rebuild
+  development database (`masterdata`) and test database (`masterdata_test`) so
+  the checked branch matches its schema.
+- `npm test`: 388 passed, 0 failed.
+- Typecheck, lint, boundary check, legacy-runtime check, production build, and
+  staged whitespace checks passed.
+
+## R8.75 | 2026-09-15 | chore(studioflow): wave-1 parity acceptance (SF-RF)
+
+### Changed
+
+- Completed SF-RF documentation cleanup across `PLAN.md`, `docs/review.md`,
+  `docs/roadmap.md`, `docs/knownbug.md`, `docs/UTILITY-INVENTORY.md`,
+  `docs/README.md`, `UI_ENGINE.md`, and the archived StudioFlow RB alignment
+  document.
+- Removed temporary legacy redirects from `next.config.ts`.
+- Archived the deactivated `studioflow/projects/[id]` rebuild route tree under
+  `_legacy_project_id`, excluded it from TypeScript compilation, and updated the
+  boundary allow-list.
+- Deleted dead StudioFlow new-project route action code and restored
+  `src/apps/studioflow/mom-images.ts` for the archived route/test references.
+- Fixed StudioFlow test assertions affected by the SF-RF cleanup.
+
+### Verification
+
+- Commit `4e2004f`: 388 tests passed.
+- Typecheck, lint, boundary check, legacy-runtime check, production build, and
+  Prisma migration diff all passed with no difference reported.
+- SF-RF browser acceptance passed on 2026-09-15 at desktop and 375 px with
+  owner and drafter-only accounts; evidence is recorded in `docs/review.md`.
+
+## R8.74 | 2026-09-15 | fix(studioflow): wave-1 review corrections (SF-R1–SF-R3)
+
+Pre-acceptance code review of SF-R1…SF-R3 (Planner acting as reviewer and
+fixer, owner direction). No schema change.
+
+### Fixed — SF-R1 backbone
+
+- "Reopen" on a not-started phase now follows the start rules (project active,
+  previous phase approved) and is only offered when the phase had revisions; a
+  phase without revisions always starts at v1.0 (no v0.x).
+- Editing a to-do or checklist item kept on a former member no longer fails:
+  the assignee is validated only when it changes. Editing a project whose
+  client was archived no longer fails, and the edit dialog lists that client.
+- Rejecting a phase closes the original feedback rows it carried into the new
+  revision, so project "open" counts stay correct.
+- "Apply checklist templates" skips locked (approved/finished) phases.
+- Phase page lists only open deferred items; checklist edit dialog caps labels
+  at 200 characters; template reorder is audited.
+- `useCommand` tracks overlapping commands per key (no early re-enable).
+
+### Fixed — SF-R2 MOM
+
+- Photo size limit aligned with the 4 MB server-action body limit (3 MB after
+  cropping) instead of a 10 MB limit the transport could never accept.
+
+### Fixed — SF-R3 Product Schedule
+
+- Option labels continue after the highest label (legacy); deleting B and
+  adding again gives D instead of a duplicate-label error. Labels sort A…Z, AA.
+- Approving no longer sets `version_locked`; `active_index` follows the final
+  option after approve/delete.
+- The legacy Google Sheets CSV (header row starting with `Code`, possibly
+  below title rows; `Product Category` / `Ex` / `Type` / `Location` /
+  `Contact` / `Qty` / `Unit`) now imports: existing codes update their final
+  option and quantities, new codes add rows, the category comes from the sheet
+  or the prefix dictionary, a new category keeps the sheet prefix, ambiguous or
+  unknown categories fail the whole import. The simple
+  `category,brand,product` sheet stays as a fallback.
+- New projects get the default schedule rows and template items (legacy
+  bootstrap), shared with "Apply templates" through `schedule/sync.ts`.
+- Added commands: edit option snapshot, move row up/down, move row to another
+  category (next code there, old group closes the gap), activate/deactivate or
+  delete template items, delete template categories and prefixes. Entry edits
+  are partial and audited with a diff; one spelling per category per project.
+- Reuse search returns the source project name; schedule events appear in
+  project History.
+- Schedule page rebuilt: Material/Fixture switch, rows grouped by category
+  with code / final option / location / qty, row menu (open, move, move to
+  category, delete), item drawer (details, options with set final / edit /
+  delete, add option, copy from a past project), add-item and CSV import
+  dialogs (file or paste). The old per-row "Save" that re-sent unchanged
+  values is gone. Settings list template items with activate/delete and
+  prefixes with remove.
+- Flaky Brand fixture in the schedule integration test fixed (unique name).
+- Archived the eight superseded StudioFlow contract/work-order documents under
+  `docs/archive/studioflow-rb/`; the active rework contract remains canonical.
+
+### Verification
+
+- Cloud workspace: `npm test` 372/372 (new cases for reopen rules, former
+  assignee edit, feedback closing, label continuation, partial entry edit,
+  option edit, move/recategorize, Google Sheets import create/update/errors,
+  template seeding on new projects, template item management; domain tests for
+  labels, codes, and sheet parsing). Typecheck, lint, `check:boundaries`,
+  `check:legacy-runtime`, `next build` passed.
+- Playwright smoke on the production build: settings prefix, add item, reserve
+  code, options + set final + qty, move down, Google Sheets import (1 new,
+  1 updated), reuse search, Fixture tab, 375 px without overflow, History
+  entries, drafter read-only, delete with gapless codes, MOM page — zero
+  console errors.
+- Not run here: `prisma migrate deploy/diff` (no schema change in R8.74).
+
+## R8.73 | 2026-09-15 | feat(studioflow): legacy product schedule (SF-R3)
+
+### Changed
+
+- New `studioflow` Product Schedule tables (migration
+  `20260915150000_sf_r3_schedule`, additive): per-project schedule entries,
+  typed options, final-option approval state, prefix dictionary, template
+  categories, and template items. Entry codes are gapless per
+  project/section/prefix (`PREFIX-NN`) with uniqueness enforced in SQL.
+- `studioFlow.schedule` service: list schedules, manage prefixes and templates,
+  apply default templates idempotently, create/update/delete/reorder entries,
+  add/delete/finalize options, reuse option snapshots from past projects, and
+  import legacy CSV rows. Commands enforce StudioFlow permissions, project
+  scope, archived-project read-only, and audit writes.
+- Master Data Brand reuse is read-only through the public Master Data port;
+  Product Schedule stores typed StudioFlow snapshots and does not depend on
+  Master Data SKU/unit/pricing or legacy database state.
+- Routes: project workspace **Schedule** page
+  (`/studioflow/projects/[projectId]/schedule`) plus StudioFlow settings
+  controls for schedule prefixes, default categories, and template items.
+- KB-003 and KB-021 closed by replacing the wrong global catalogue/reuse pool
+  with project-owned Product Schedule entries and cross-project snapshot reuse.
+
+### Verification
+
+- Local kantor rebuild DBs only. `npm test`: 366 passed, 0 failed (4 new
+  Product Schedule integration tests and 2 new schedule rule tests).
+- Typecheck, lint, production build, boundary fixtures, and legacy-runtime
+  fixtures passed.
+- `npx prisma migrate deploy` applied the SF-R3 migration on the disposable
+  test DB and the kantor rebuild DB; `npx prisma migrate diff --from-migrations
+  prisma/migrations --to-schema prisma/schema.prisma --exit-code` reported no
+  difference using the rebuild shadow DB.
+- Browser acceptance remains deferred to the SF-RF wave-1 parity gate.
+
+## R8.72 | 2026-09-15 | feat(studioflow): legacy MOM (SF-R2)
+
+### Changed
+
+- New `studioflow` MOM tables (migration `20260915120000_sf_r2_mom`,
+  additive): document, ordered sections (text-only flag, list style), ordered
+  notes (style), and up to two photos per section stored through
+  `ObjectStorage` (private keys, signed read URLs, magic-byte check, orphan
+  cleanup after commit).
+- `studioFlow.mom` service: create (default "SITE INSPECTION REPORT", today,
+  prepared by the signed-in person, one empty section), edit header, real
+  delete with an audit snapshot, add/move/delete sections, add/edit/move/delete
+  notes (a section keeps one note), set/replace/remove/swap photos. Parent-chain
+  project scope, `studioflow.mom.manage`, and archived-project read-only are
+  enforced for every command. Header, delete, section delete, and photo
+  changes appear in project History.
+- Routes: project workspace **MOM** list and editor
+  (`/studioflow/projects/[projectId]/mom[/[momId]]`) and a shell-less print
+  view (`/studioflow/print/projects/[projectId]/mom/[momId]`, new `(document)`
+  route group) with Print / Save PDF.
+- UX change against legacy, recorded in contract §10: a **Plain** note has
+  no marker and does not advance numbering (legacy stored the style but never
+  displayed it).
+- UI Engine: `DocumentSheet`, `DocumentBlock`, and `PrintButton` activated
+  (§13) with base `@media print` rules; `ImageWorkspace` gained `aspect`,
+  `outputType` (JPEG keeps photos under the 4 MB action limit), and
+  `outputQuality`. The private asset route serves WebP and sends `nosniff`.
+- KB-012 and KB-022 closed.
+
+### Verification
+
+- Cloud workspace (Planner acting as Executor; acceptance at the end of
+  wave 1). `npm test`: 360 passed, 0 failed (4 new MOM integration tests,
+  2 new MOM rule tests). Typecheck, lint, `check:boundaries`,
+  `check:legacy-runtime`, and `next build` passed (fonts stubbed only for the
+  sandbox build).
+- Playwright smoke on the production build: create MOM, save header, notes
+  with reorder, crop-and-upload photo, add text-only section, print preview
+  and A4 PDF (toolbar hidden in print), 375 px without horizontal overflow,
+  drafter read-only, delete with confirmation — zero console errors.
+- Not run: `prisma migrate deploy/diff` (sandbox) — required locally.
+
+## R8.71 | 2026-09-15 | feat(studioflow): rework legacy project backbone (SF-R1)
+
+### Changed
+
+- Archived the rebuild StudioFlow (tag `archive/studioflow-rb-r8.69`) and
+  removed its code, routes, tests, and work orders. Migration
+  `20260915100000_sf_r1_legacy_rework_cutover` drops and recreates the
+  `studioflow` schema on rebuild databases only and remaps StudioFlow role
+  grants to the new ten-permission vocabulary (contract §3).
+- New legacy-behavior StudioFlow on the Foundation (`src/apps/studioflow`):
+  pure `domain/` rules (phase machine, simplified labels, revisions, blockers,
+  naming, checklist filters, Today feed) and modular services for projects and
+  clients, phases and activities, checklist and templates, and Today.
+  Auto naming `[Year]-[Number] [Name]` with a row-locked yearly sequence; PIC
+  designer/drafter validated against holders of `studioflow.phase.work`;
+  archive/restore with reasons; FEEDBACK → TODO on rejection with the CD
+  drafter as fallback assignee; defer, reopen with reason, admin revision
+  reset with a history snapshot in the audit event.
+- New routes: `/studioflow` (Today), `/studioflow/projects`, project
+  workspace (overview with phase strip, five phase pages, history),
+  `/studioflow/clients`, `/studioflow/settings`; temporary redirects from
+  legacy `/projects`, `/upcoming`, `/settings/studio`, `/settings/clients`.
+- Foundation: `@platform/core/rbac/people` (`peopleDirectory`) for assignee
+  pickers; `currentDateOnly` and `diffDateOnlyDays` in the date utility; UI
+  Engine `ContextNavLink`/`ContextNavHeading` (server-safe module), now also
+  used by Platform settings navigation. CORE.md, UI_ENGINE.md, and the utility
+  inventory record them. Boundary allow-list entries for deleted StudioFlow
+  files removed.
+
+### Verification
+
+- Implemented and checked in the cloud workspace because the office shell
+  was unavailable (owner asked the Planner to act as Executor, acceptance at
+  the end of wave 1).
+- `npm test`: 354 passed, 0 failed (includes 12 new StudioFlow integration
+  tests and new date/UI Engine assertions) on disposable PostgreSQL 16 with all
+  migrations applied by `psql`.
+- Typecheck, lint, `check:boundaries`, `check:legacy-runtime`, and
+  `next build` passed (Google Fonts replaced by a stub layout only for the
+  sandbox build; the committed layout is unchanged).
+- Playwright smoke on the production build at 1440 px and 375 px passed with
+  zero console errors (see `docs/review.md`).
+- Not run: `prisma migrate deploy/diff` (schema engine download blocked in
+  the sandbox) — required on kantor before commit.
+
+## R8.70 | 2026-09-15 | docs(studioflow): ratify legacy rework and plan SF-R1
+
+### Changed
+
+- Owner direction: the rebuild StudioFlow (R7.xx–R8.69) diverges from studio
+  practice; it is archived (local tag, code deleted) and replaced by a
+  legacy-behavior rework on the accepted Foundation. Master Data and BQ are
+  unchanged.
+- Added `docs/apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md` as the sole
+  StudioFlow authority: legacy disposition matrix (pinned `c4b0c466`),
+  decisions RW-01…RW-04 (legacy phase machine with simplified labels, PIC
+  designer/drafter without a role enum, archive by tag, wave-1 scope), new
+  ten-grant permission vocabulary, Project/Phase/Revision/Activity/Checklist/
+  Today, MOM and Schedule models, Foundation centralization map, and UI/UX
+  direction. Purges Iteration/Response, Requirements, phase-template
+  administration, and the global catalogue.
+- Marked eight older StudioFlow contracts as superseded; updated the docs
+  index, roadmap (SF-R1…SF-RF replaces SF-A…SF-H), and knownbug disposition.
+- Added a StudioFlow-only exception to the legacy isolation rule in
+  `AGENTS.md` allowing behavior porting from the pinned legacy commit.
+- Replaced `PLAN.md` with READY `SF-R1-ARCHIVE-AND-LEGACY-PROJECT-BACKBONE`.
+
+### Verification
+
+- Documentation only; no code, schema, or migration changed.
+- Legacy read-only: HEAD `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27` on
+  `main`, read from committed-path files via the file bridge; no legacy
+  command, database, or environment accessed.
+- The device shell was unavailable in this session, so no git command,
+  test, or commit could be run. **This entry is not yet committed**; the next
+  session must commit these files as R8.70 before starting SF-R1.
+
+## R8.69 | 2026-09-14 | fix(studioflow): complete project requirement workflow UI
+
+### Corrected
+
+- Added guarded General and Phase Requirement controls on their existing
+  canonical project routes: create, edit, satisfy, reopen, archive, restore,
+  and lifecycle feedback.
+- Added existing same-project file selection for evidence link and explicit
+  reason forms for evidence unlink. Server actions continue to enforce
+  project/phase/file scope, archive, audit, and permission rules.
+- Added browser-oriented route/UI regression coverage and revalidation for
+  nested project requirement routes after each mutation.
+
+### Verification
+
+- `npm test`: 380 passed, 0 failed, including the workflow route regression.
+- Typecheck, lint, boundary check, legacy-runtime check, production build,
+  and whitespace checks passed.
+- Browser acceptance is handed back to Reviewer for desktop and 375 px:
+  Requirement lifecycle, evidence, permission denial, and signed-out redirects.
+
+## R8.68 | 2026-09-14 | fix(studioflow): expose requirement template management UI
+
+### Corrected
+
+- Implemented the canonical `/studioflow/settings/requirements/new` create
+  route and connected General/Phase template creation to the existing guarded
+  service actions.
+- Added edit, archive, restore, and delete controls for templates on the
+  canonical settings surfaces, including the parent-scoped Phase template
+  requirements route. No parallel CRUD route or permission was introduced.
+- Added route/UI regression coverage for canonical paths, lifecycle action
+  wiring, and fixed Phase scope/parent selection.
+
+### Verification
+
+- `npm test`: 378 passed, 0 failed; focused route/UI regression: 2 passed.
+- Typecheck, lint, boundary check, legacy-runtime check, production build,
+  and staged whitespace checks passed.
+- Browser acceptance is intentionally handed back to Reviewer for desktop and
+  375 px coverage, including template lifecycle, requirements/evidence,
+  permissions, and signed-out redirects.
+
+## R8.67 | 2026-09-14 | fix(platform): restore rebuild login limiter table
+
+### Corrected
+
+- Added an additive recovery migration that recreates the Foundation
+  `platform.LoginRateLimit` table with the canonical `key VARCHAR(255)` primary
+  key, `points INTEGER NOT NULL DEFAULT 0`, and nullable `expire BIGINT` shape.
+- The migration is limited to the approved StudioFlow rebuild Platform schema;
+  it does not rewrite migration history, reset data, or touch legacy.
+
+### Verification
+
+- Deployed to the explicitly validated kantor `studioflow_rebuild` database
+  without reset; migration status is up to date.
+- Confirmed the table schema and limiter insert/read contract against the
+  rebuild database. Focused/full automated checks and the production-equivalent
+  dev server restart were run after deployment.
+- Browser acceptance was not run; the sign-in fixture remains Reviewer-owned.
+
+## R8.66 | 2026-09-14 | fix(studioflow): preserve phase requirement scope
+
+### Corrected
+
+- Added the StudioFlow-only scope-guard migration that changes the project
+  phase requirement foreign key to `ON DELETE RESTRICT`; phase removal is also
+  service-guarded against any Phase Requirement, including archived records.
+  No requirement can silently become General.
+- Added the canonical server-validated route
+  `/studioflow/settings/phases/[phaseTemplateId]/requirements` and links from
+  the existing settings surfaces. The route validates the phase-template
+  parent and returns only `PHASE`-scoped templates for that parent.
+- Removed unrestricted `satisfaction_note` text from satisfaction audit
+  metadata while retaining project/phase identifiers and the satisfied state.
+  Added regression coverage for the audit envelope.
+
+### Verification
+
+- Disposable kantor rebuild database applied 40 migrations successfully and
+  reported up to date.
+- Focused Requirements integration suite: 23 passed, 0 failed.
+- `npm test`: 376 passed, 0 failed; typecheck, lint, boundary check,
+  legacy-runtime check, production build, and whitespace checks passed.
+- Browser acceptance was not run; it remains Reviewer-owned and requires the
+  approved fixture sign-in. No legacy source or database was accessed.
+
+## R8.65 | 2026-09-14 | fix(studioflow): make SF-A requirements migration additive
+
+### Corrected
+
+- Replaced the unsafe SF-A migration path with an additive StudioFlow-only
+  migration. It creates only the Requirements enums, tables, indexes, and
+  foreign keys; it does not drop `platform.LoginRateLimit`, alter Platform
+  identities/keys, or change BQ or unrelated StudioFlow constraints/indexes.
+- Restored `LoginRateLimit` to the platform test-table fixture so the platform
+  schema contract remains covered.
+- Split project requirement snapshotting so active General templates are copied
+  exactly once per project and Phase templates are copied once for their
+  corresponding project phase. The multi-phase integration regression covers
+  the no-duplicate-General invariant.
+
+### Verification
+
+- Recreated the approved disposable kantor rebuild database after creating a
+  local custom-format `master_data` backup; Prisma migration reset and status
+  completed successfully across all 39 migrations.
+- `npm test`: 375 passed, 0 failed; `npm run typecheck`, `npm run lint`,
+  `npm run check:boundaries`, `npm run check:legacy-runtime`, and `npm run
+  build` all passed.
+- Browser acceptance was not run; it remains Reviewer-owned. No legacy source
+  or database was accessed.
+
+### Limitations
+
+- The backup is retained outside the repository for the approved disposable
+  database and is not committed. No production or legacy data was used.
+
+## R8.64 | 2026-09-14 | feat(studioflow): implement SF-A Requirements templates and project snapshots
+
+### Added
+
+- **Requirement Templates**: CRUD with archive/restore/delete lifecycle in
+  settings/requirements route. Templates are project-independent and carry
+  an immutable `key` used for snapshot identity.
+- **Project Requirements**: Created from templates at project creation via
+  `snapshotRequirementsForProject`, with satisfy/reopen/archive/restore
+  lifecycle and satisfaction reasons.
+- **Phase Requirements**: Scoped to a project phase, inherit the phase key
+  constraint (at most one requirement per phase key per project).
+- **Evidence Linking**: Attach existing uploaded files as evidence; prevent
+  cross-project file references.
+- **Prisma schema**: `SfRequirementScope`, `SfRequirementSatisfactionState`
+  enums; `SfRequirementTemplate`, `SfProjectRequirement`,
+  `SfRequirementEvidence` models; relation fields on `SfPhaseTemplate`,
+  `SfProject`, `SfProjectPhase`, `SfFile`.
+- **Service methods**: `createRequirementTemplate`, `editRequirementTemplate`,
+  `archiveRequirementTemplate`, `restoreRequirementTemplate`,
+  `deleteRequirementTemplate`, `listRequirementTemplates`,
+  `createProjectRequirement`, `editProjectRequirement`,
+  `satisfyProjectRequirement`, `reopenProjectRequirement`,
+  `archiveProjectRequirement`, `restoreProjectRequirement`,
+  `linkEvidence`, `unlinkEvidence`, `listProjectRequirements`,
+  `listPhaseRequirements`, `listGeneralRequirements`.
+- **Canonical routes**:
+  - `/studioflow/settings/requirements` — template list (read-only list
+    with settings heading).
+  - `/studioflow/[id]/requirements` — project general requirements page
+    with create, satisfy, archive, evidence modals.
+  - `/studioflow/[id]/phases/[phaseId]/requirements` — phase-scoped
+    requirements page.
+- **Server actions**: template CRUD actions, project requirement CRUD actions.
+- **Snapshot seeding**: Project creation automatically snapshots all phase
+  requirements for each project phase. Editing the source template after
+  snapshot does not rewrite historical requirement titles.
+
+### Changed
+
+- `createProject` now calls `snapshotRequirementsForProject` after phase
+  seeding, using the atomic `updateMany` approach instead of a transaction.
+- `PLATFORM_TABLES` in `test-support.ts` no longer includes `LoginRateLimit`
+  (drift corrected).
+- Migration `20260914104750_sf_a_requirements` created and applied.
+
+### Verification
+
+- 21 SF-A requirement integration tests pass (template CRUD, scope validation,
+  key immutability, snapshot seeding, snapshot independence, requirement CRUD,
+  satisfy/reopen, archive/restore, evidence linking/unlinking, cross-project
+  evidence rejection, audit events).
+- Full suite: 374/375 pass; sole failure is pre-existing `LoginRateLimit`
+  schema expectation (not SF-A related).
+- TypeScript compiles cleanly (`npx tsc --noEmit`).
+
+### Limitations
+
+- The `LoginRateLimit` test failure in `platform-schema.test.ts` is
+  pre-existing drift unrelated to SF-A; not addressed in this revision.
+- Requirement ordering on list pages is database-default (insertion order);
+  no explicit sort control yet.
+
+## R8.63 | 2026-09-14 | docs(agent): advance revision ledger after SF-A contract
+
+### Fixed
+
+- Advanced the authoritative revision state after the completed R8.62 planning
+  decision, so the next Executor change starts at R8.64.
+
+### Verification
+
+- Revision ledger, local history, staged diff, and whitespace review: passed.
+
+### Limitations
+
+- Documentation ledger correction only; no application or legacy system changed.
+
+## R8.62 | 2026-09-14 | docs(studioflow): ratify SF-A Requirements contract
+
+### Changed
+
+- Replaced the deferred Requirements boundary with the complete SF-A contract:
+  template and project identities, General/Phase ownership, snapshot timing,
+  immutable used keys, satisfaction/evidence semantics, reversible lifecycle,
+  existing permission mapping, canonical routes, audit events, and server-side
+  scope guards.
+- Tightened the active SF-A plan to make that contract executable without
+  creating a duplicate checklist/task system or a new file-upload capability.
+
+### Verification
+
+- Cross-checked the decision against the existing Project/Phase/File schema,
+  StudioFlow permission registry, active SF-A plan, and contract access/audit
+  sections.
+- `git diff --check`: passed.
+
+### Limitations
+
+- This is a planning decision only: no application schema, migration, service,
+  route, fixture, dependency, or legacy system was changed or accessed.
+
+## R8.61 | 2026-09-14 | review(foundation): accept PF-8 and release SF-A planning
+
+### Changed
+
+- Accepted PF-8 after independently reviewing the R8.60 candidate receipt and
+  completing the required Master Data/BQ browser smoke. Closed F-E in the
+  roadmap and review ledger; the Foundation gate is released.
+- Replaced the PF-8 plan with the first StudioFlow Recovery plan, SF-A. The
+  frozen R8.12 reference remains evidence, not an implementation base.
+
+### Verification
+
+- Authorized browser smoke at desktop and 375 px passed for `/masterdata` →
+  Brands and `/bq` → BQ Library: app navigation and representative read-only
+  surfaces rendered normally. After sign-out, both app roots redirected to
+  `/login`.
+- R8.60 receipt/diff, workspace cleanliness, and PF-8 automated evidence were
+  independently checked; no correction was found.
+
+### Limitations
+
+- PF-8 releases SF-A planning only. StudioFlow implementation starts only with
+  the following READY SF-A plan; later MOM, Product Catalogue/Schedule,
+  delivery/client exchange, SketchUp, and collaboration remain out of scope.
+
+## R8.60 | 2026-09-14 | docs(foundation): record PF-8 acceptance candidate
+
+### Changed
+
+- Added the PF-8 candidate receipt with the frozen R8.12 StudioFlow reference,
+  accepted F-A through F-D revisions, automated gate results, and the verified
+  kantor disposable database scope.
+- Recorded F-E/PF-8 in `docs/review.md` as candidate-only. Reviewer browser
+  smoke remains required before closing the roadmap gate or releasing
+  StudioFlow implementation.
+
+### Verification
+
+- `npm test`: 353/353 passed across 82 suites against disposable
+  `studioflow_rebuild_test` in the approved `studioflowrb-gateb-test-db`
+  container.
+- `npm run typecheck`, `npm run lint`, `npm run check:boundaries`,
+  `npm run check:legacy-runtime`, `npm run build`, documentation link scan,
+  `git diff --check`, and staged whitespace review: passed.
+
+### Limitations
+
+- Reviewer browser acceptance is not run by this Executor receipt. F-E/PF-8
+  remains open; no StudioFlow recovery implementation is released.
+- No code, schema, migration, dependency, permission, route, data, or legacy
+  checkout/database was changed or accessed.
+
+## R8.59 | 2026-09-14 | review(foundation): accept F-D browser walkthrough
+
+### Changed
+
+- Accepted F-D/PF-6+PF-7 after the previously blocked Reviewer browser
+  walkthrough passed. Closed F-D in `docs/roadmap.md`, removed its deferred
+  review entry, and replaced the blocked plan with the next READY F-E/PF-8
+  Foundation acceptance-and-freeze plan.
+
+### Verification
+
+- Authorized desktop and 375 px smoke passed: Master Data Brand and Supplier
+  edit dialogs retained `Updated by … ·` medium-date/short-time metadata;
+  pending Deletion Requests retained `14 Sep 2026, 15.25`; BQ Library retained
+  the fixture item's medium-date-only `Updated 14 Sep 2026` cell. Navigation
+  and layouts remained usable at both widths.
+- After sign-out, both `/masterdata` and `/bq` redirected to `/login`.
+
+### Limitations
+
+- F-E/PF-8 is the remaining Foundation gate. StudioFlow recovery stays frozen
+  until its full repository, Master Data, and BQ evidence is accepted.
+
+## R8.58 | 2026-09-14 | review(foundation): defer F-D browser acceptance
+
+### Changed
+
+- Independently reviewed R8.57 F-D/PF-6+PF-7: the executable boundary rules,
+  focused negative fixtures, canonical date formatter use, utility inventory,
+  and allowed deferrals match the locked Foundation scope. No correction was
+  found.
+- Recorded the remaining browser scenarios in `docs/review.md`, kept F-D open
+  in `docs/roadmap.md`, and changed `PLAN.md` to BLOCKED. F-E cannot be planned
+  before this user-facing acceptance evidence exists.
+
+### Verification
+
+- Re-ran `npm run test:boundaries`, `npm run check:boundaries`,
+  `npm run typecheck`, `npm run lint`, `npm run check:legacy-runtime`, and the
+  complete `npm test` suite: 353/353 passed against the approved disposable
+  kantor test database.
+- Inspected the R8.57 diff and formatter option equivalence; working tree and
+  whitespace check were clean before this documentation-only review revision.
+
+### Limitations
+
+- Browser acceptance is required because four user-facing date cells changed.
+  Browser automation is unavailable in this Reviewer session, so F-D is
+  BLOCKED rather than PASS; this is not a defect finding.
+
+## R8.57 | 2026-09-14 | feat(boundaries,foundation): F-D utility curation and executable boundaries
+
+### Changed
+
+- Extended `scripts/check-boundaries.mjs` with seven executable rules and a
+  combined `collectAllViolations` entry point, all wired into
+  `npm run check:boundaries`:
+  - app route files under `src/app/(platform)/<app>` are classified as the
+    app's lane, so cross-app internal imports there are rejected;
+  - Core purity: `src/platform/core` may not import the UI Engine or
+    infrastructure;
+  - UI Engine ownership: apps may import only the canonical
+    `@/platform/ui_engine` surface (deep imports rejected) and raw legacy
+    `ui-*` class tokens in app `.tsx` are denied;
+  - permission vocabulary SSOT: `*_PERMISSIONS` maps must be disjoint,
+    appId-prefix-owned, and the composition root must register them via
+    `Object.values(...)` imported from the app public boundary; permission
+    literals at known consumption call sites must exist in the vocabulary
+    (audit actions and `AppError` codes share the id shape but are excluded);
+  - app route ownership: every app registers `rootPath "/<app>"`, owns its
+    client-safe import-free `public/nav.ts` declaring `/<app>`-rooted routes,
+    and has a matching route directory.
+- Duplicate-primitive enforcement: app-owned raw `new Intl.DateTimeFormat(`
+  now fails `check:boundaries` unless the file is in the explicit documented
+  allow list.
+- Consolidated the four behavior-identical date formatters onto the canonical
+  `formatInstant` (style `"datetime"` or `"date"`):
+  `masterdata/brands/brand-directory.tsx`, `masterdata/vendors/vendor-directory.tsx`,
+  `masterdata/deletions/deletion-directory.tsx`, and `bq/library/page.tsx`.
+- Added deterministic `date.test.ts` coverage locking the `"date"`/`"datetime"`
+  styles and Date-object input used by the directory consumers.
+- Created `docs/UTILITY-INVENTORY.md` (REUSE/EXTEND/ADD/APP-OWNED/PURGE ledger,
+  consumer matrix, convergence and deferral ledger, enforcement mapping) and
+  linked it from the `docs/README.md` operational table.
+- Recorded the six StudioFlow/BQ deferral candidates (service date-extraction
+  key, browser-local audit stamps, and custom component formatters) in the
+  inventory and allow-listed them so they remain unchanged; client-side
+  pagination duplicates were examined and recorded as semantically different
+  (merge PURGEd to preserve behavior; canonical `usePagination`/`buildPageMeta`
+  remains the surface).
+
+### Verification
+
+- `scripts/test-boundaries-checker.mjs` extended with regression fixtures for
+  every new rule (14 boundary rejections plus a foundation fixture tree covering
+  import/layer, permission SSOT, route ownership, and duplicate primitives);
+  both fixture scenarios pass.
+- `npm run check:boundaries`, `npm run typecheck`, `npm run lint`,
+  `npm run check:legacy-runtime`, `npm test`, and `npm run build` all pass.
+- `git diff --check` clean; only the pre-existing unrelated `next-env.d.ts`
+  working-tree churn remains uncommitted.
+
+### Limitations
+
+- Browser acceptance of the consolidated Master Data/BQ date cells is the
+  Reviewer's; it was not performed in this Executor session (per AGENTS.md the
+  implementation commit is not blocked by that). F-D roadmap closure and the
+  F-E plan replacement follow Reviewer PASS of this revision.
+
+## R8.56 | 2026-09-14 | review(foundation): accept F-C browser walkthrough
+
+### Changed
+
+- Recorded Reviewer PASS for F-C/PF-4+PF-5 after the four required browser
+  scenarios passed against the approved kantor fixture; marked F-C complete in
+  `docs/roadmap.md` and closed its deferred-review entry.
+- Replaced the completed F-C plan with the next active F-D/PF-6+PF-7 plan.
+
+### Verification
+
+- Browser acceptance passed: authorized `/settings/general` access and
+  unauthenticated refusal after sign-out; canonical read-only Light appearance
+  remained visible after Save/reload; SettingsShell rendered at desktop and
+  375 px; Master Data, BQ, and StudioFlow entry/navigation smoke passed.
+- Documentation link and whitespace checks: passed.
+
+### Limitations
+
+- F-D has not been implemented. StudioFlow recovery remains frozen until F-E
+  Foundation acceptance.
+
+## R8.55 | 2026-09-14 | docs(plan): correct F-C reviewer scenario route and wording
+
+### Changed
+
+- Corrected the F-C Reviewer acceptance scenarios in `PLAN.md`: the settings
+  route is `/settings/general` (the `(platform)` route group is never part of
+  a URL), the Appearance surface is a section of that page rather than a tab,
+  and the save/reload scenario now matches the read-only Theme behavior — the
+  form's Save persists the unchanged canonical light theme across reloads.
+- Advanced the PASS commit reference in `PLAN.md` from R8.55 to R8.56, since
+  R8.55 is used by this revision.
+
+### Verification
+
+- Documentation link and whitespace checks: passed.
+- No product, application, schema, data, migration, or route behavior changed.
+
+### Limitations
+
+- Browser acceptance remains deferred to a Reviewer/session with browser
+  access, so the F-C walkthrough is still pending; F-D is not planned before
+  that acceptance completes.
+
+## R8.54 | 2026-09-14 | review(studioflow,foundation): verify D-SF ratification; defer F-C browser acceptance
+
+### Changed
+
+- Verified D-SF-01 through D-SF-07 against the current owner ratification
+  instructions. All seven decisions are correctly captured in
+  `docs/apps/studioflow/D-SF-RECOVERY-DISCOVERY.md` §5 (ratified in R8.51),
+  `docs/apps/studioflow/studioflow.md`, `studioflow-project-contract.md`
+  §7.1.1, `studioflow-mom-contract.md` (§2 "at most two images per block" and
+  §10.1 two-step correction), and `studioflow-schedule-contract.md`. No
+  documentation conflict found; no change required.
+- Confirmed actual git HEAD is R8.53 — D-SF ratification (R8.51), roadmap
+  markup correction (R8.52), and F-C Settings/Appearance implementation (R8.53)
+  were all previously committed. The session prompt's "R8.50" tip was stale.
+- Added F-C / PF-4+PF-5 browser acceptance entry to `docs/review.md` with the
+  four exact Reviewer scenarios (settings access, appearance save/reload,
+  narrow/desktop shell, three-app smoke).
+- Updated `docs/roadmap.md` F-C entry to note R8.53 implementation committed
+  pending browser acceptance.
+- Updated `PLAN.md` to BLOCKED: noted that R8.53 implementation is complete,
+  documented the four Reviewer acceptance scenarios, and described what PASS
+  triggers (roadmap update, review.md closure, F-D plan at R8.55).
+
+### Verification
+
+- Cross-referenced each of the seven owner decisions with the D-SF decision
+  register, the StudioFlow index, the project contract, and the MOM and
+  Schedule contracts. No open decision remained and no conflict was found.
+- `device_bash` unavailable (Windows update since 2026-09-08); browser
+  acceptance for R8.53 cannot be completed in this session.
+
+### Limitations
+
+- F-C browser acceptance is deferred; `docs/review.md` names the exact
+  missing verification. F-C remains open in `docs/roadmap.md`.
+- F-D plan will be produced after F-C Reviewer PASS (target R8.55).
+- No production code, schema, migration, route, data disposition, or
+  StudioFlow feature was activated.
+
+## R8.53 | 2026-09-14 | feat(platform,settings): typed global appearance theme
+
+### Changed
+
+- Added the typed global Platform Appearance contract (`PlatformTheme`
+  union, sole approved value `"light"` per DESIGN.md) in
+  `src/platform/core/settings/appearance.ts` and wired it through the
+  `PlatformGeneralSettings` singleton: type, frozen defaults, strict Zod
+  input, seed/read/update persistence, and audited safe deltas.
+- Persisted the theme on the settings singleton via additive migration
+  `20260914090000_platform_appearance_theme` — `theme TEXT NOT NULL DEFAULT
+  'light'` plus a SQL CHECK (`theme IN ('light')`) so an unapproved value
+  can never be stored.
+- Split the General Settings page into General and Appearance sections. The
+  Appearance section hosts the application title, the Brand mark control,
+  and a read-only typed Theme field; the server action rejects a tampered
+  or missing theme value.
+- Applied SettingsShell to the platform General Settings page with a
+  boundary-explicit Settings navigation: Platform-owned settings (General
+  Settings, Users, Roles) plus gated links to the app-owned Master Data and
+  StudioFlow workflow settings, reinforcing the ratified D-SF-02 ownership
+  boundary.
+- Kept General Settings a narrow typed aggregate: no generic key/value
+  store, no per-app branding, no per-user or dark/density theme options, and
+  no raw legacy `ui-*` classes or duplicate UI Engine primitives were
+  introduced (PF-5 conformance audited).
+
+### Verification
+
+- `npm run typecheck`, `npm run lint`, `npm run check:boundaries`, and
+  `npm run check:legacy-runtime`: all passed.
+- `npm test`: 349/349 passing, including the settings integration suite and
+  the new SQL CHECK constraint test against the disposable
+  `studioflow_rebuild_test` database in the kantor container.
+- Additive migration `20260914090000_platform_appearance_theme` applied to
+  every rebuild-only database in the target container (test, dev, browser
+  test, regression test); no destructive migration.
+- `npm run build` (Prisma generate + Next.js production build): passed.
+- Whitespace and diff checks: passed.
+
+### Limitations
+
+- The appearance theme currently has exactly one approved variant
+  (`"light"`); a future variant extends the union, SQL CHECK, and Zod schema
+  in one changelog-scoped change, and the read-only Theme control always
+  shows the canonical value.
+- Application title and Brand mark stay on the same CORE.md §11 singleton
+  row; they were regrouped into the Appearance section in the UI only, so
+  schema and audit behavior for them are unchanged.
+- Browser acceptance of the reorganized settings layout is a Reviewer step
+  after this commit; this revision required automated checks only.
+
+## R8.52 | 2026-09-14 | docs(roadmap): close D-SF completion markup
+
+### Changed
+
+- Closed the D-SF roadmap strikethrough marker so the completed item does not
+  accidentally mark subsequent roadmap sections as historical.
+- Advanced the F-C Executor target to R8.53 for the next local implementation
+  revision.
+
+### Verification
+
+- Documentation link and whitespace checks: passed.
+
+### Limitations
+
+- No product, application, schema, data, or route behavior changed.
+
+## R8.51 | 2026-09-14 | docs(studioflow): ratify D-SF recovery decisions
+
+### Changed
+
+- Ratified D-SF-01 through D-SF-07 in the durable recovery report and aligned
+  StudioFlow route, settings, MOM, Product Catalogue, collaboration, SketchUp,
+  and requirement-domain documentation.
+- Locked Activity Center as the sole Today surface; deferred Upcoming toward a
+  planning timeline/Gantt; retained MOM as its canonical later module; and kept
+  temporary legacy route redirects only for later recovery cutover.
+- Made `Project → Product Catalogue` canonical and authorized later discard of
+  incorrect global rows only through a separately approved safe cutover.
+- Marked D-SF complete and activated F-C/PF-4+PF-5 planning. F-E remains the
+  gate before any StudioFlow implementation.
+
+### Verification
+
+- Reconciled every D-SF decision-register entry with the StudioFlow index,
+  project, MOM, Schedule, and roadmap contracts; no decision remains open.
+- Documentation links and whitespace checks: passed.
+
+### Limitations
+
+- This is planning/documentation only: no production code, schema, migration,
+  data disposition, route alias, realtime system, SketchUp integration, or
+  StudioFlow feature was activated.
+
+## R8.50 | 2026-09-14 | review(studioflow): accept D-SF evidence and hold ratification gate
+
+### Changed
+
+- Independently accepted R8.49: the roadmap now correctly distinguishes
+  completed D-SF evidence from the still-open Planner/owner ratification gate.
+- Replaced the completed discovery execution plan with the bounded owner
+  ratification gate for D-SF-01 through D-SF-07; no SF implementation slice is
+  active.
+
+### Verification
+
+- Reviewed the R8.49 diff, final whitespace, and decision-register references;
+  its open roadmap gate is consistent with the R8.48 discovery report.
+
+### Limitations
+
+- A READY implementation plan cannot be issued until the owner explicitly
+  ratifies the affected product, route, data, integration, and settings policy.
+
+## R8.49 | 2026-09-14 | docs(roadmap): retain D-SF ratification gate
+
+### Changed
+
+- Corrected the R8.48 roadmap ledger: its recovery evidence is complete, but
+  D-SF remains an open gate until the Planner/owner ratifies D-SF-01 through
+  D-SF-07. SF-A is not activated by the evidence record alone.
+
+### Verification
+
+- Documentation links, staged whitespace, and staged-diff review: passed.
+
+### Limitations
+
+- This correction changes only the roadmap and revision ledger. It does not
+  alter the discovery report, StudioFlow contracts, code, schema, data, or
+  legacy evidence.
+
+## R8.48 | 2026-09-14 | docs(studioflow): recover pinned legacy discovery evidence
+
+### Changed
+
+- Completed the D-SF read-only recovery discovery from only committed legacy
+  blobs at `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27` and recorded a durable
+  capability/route, permission/ownership, and shared/downstream matrix.
+- Classified the project workflow, phase transitions, work feed, deliverables,
+  project catalogue/schedule, MOM, SketchUp, settings, and live-provider
+  evidence as KEEP, MERGE, ALREADY_REPLACED, REDESIGN, PURGE, or
+  DECISION_REQUIRED.
+- Recorded seven explicit Planner decisions, including overlapping
+  Upcoming/activity surfaces, settings/database ownership, MOM parity,
+  treatment of existing global catalogue data, realtime/chat, SketchUp, and
+  legacy route compatibility.
+- Marked D-SF discovery complete in the roadmap and linked its report from the
+  StudioFlow and documentation indexes. No implementation slice is activated.
+
+### Verification
+
+- Read-only Git identity check: supplied kantor legacy checkout `main` equals
+  the required pin and its remote matches the recorded repository.
+- Verified cited source paths from the pinned commit, then re-read the report
+  against the current StudioFlow project, schedule, MOM, and index contracts.
+- Documentation link/format checks, staged-diff review, and staged whitespace
+  checks: passed.
+
+### Limitations
+
+- No legacy working-tree artifact, legacy environment, database, application,
+  or script was accessed. The untracked recovery dumps and `foldering/` remain
+  excluded from evidence.
+- This is recovery evidence only: it changes no application code, schema,
+  migration, permission, route, dependency, or existing data. SF-A remains
+  blocked on Planner ratification of the D-SF decision register.
+
+## R8.47 | 2026-09-14 | docs(plan): activate pinned StudioFlow recovery discovery
+
+### Changed
+- Recorded the owner-supplied legacy source baseline for D-SF at pinned commit
+  `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`, including its branch and the
+  working-tree-only artifacts excluded from evidence.
+- Replaced the path blocker with a READY, documentation-only discovery contract
+  covering the route, capability, settings, permission, persistence/ownership,
+  shared-capability, and downstream-read matrices.
+- Locked legacy working-tree artifacts and every legacy database-related target
+  out of scope, including untracked recovery dumps.
+
+### Verification
+- Read-only Git baseline verification confirms the supplied path's `main` HEAD
+  is the roadmap pin; no legacy working-tree file or database target was used.
+
+### Limitations
+- This only activates discovery. It does not implement a StudioFlow feature or
+  resolve product decisions that the pinned evidence cannot determine.
+
+## R8.46 | 2026-09-14 | review(storage): accept KB-030 and activate D-SF gate
+
+- Independently reviewed R8.45. The resolver now compares canonical paths
+  derived from the deepest existing realpath ancestor, preserving lexical and
+  canonical containment checks. Focused Windows filesystem tests passed again;
+  the reported full-suite, typecheck, lint, boundary, legacy-runtime, and build
+  evidence is consistent with the scoped change.
+- Accepted KB-030 as closed. Browser acceptance is not applicable to this
+  infrastructure-only correction because no user-facing behavior or route
+  changed.
+- Replaced the completed KB-030 plan with the next roadmap outcome, D-SF
+  read-only legacy recovery discovery. It is correctly BLOCKED pending the
+  owner's exact kantor legacy-checkout path; no legacy source or database has
+  been accessed.
+
+### Verification
+
+- Fresh focused `filesystem.test.ts`: 3/3 passed on kantor Windows.
+- Commit diff and whitespace review: passed.
+
+## R8.45 | 2026-09-14 | fix(storage): canonicalize local path containment
+
+- Fixed Windows private local-storage reads rejecting a valid, freshly written
+  key when the lexical storage root and `realpath` use different short/long
+  representations.
+- `resolveSafePath` now canonicalizes both root and target from their deepest
+  existing realpath ancestor before testing containment. Lexical traversal is
+  still rejected first, and canonical paths that escape through a symlink or
+  junction still fail closed. The same resolver remains used by the public and
+  private asset routes.
+- Closed KB-030. No schema, migration, dependency, permission, signed-URL, or
+  user-facing route behavior changed.
+
+### Verification
+
+- Focused local filesystem tests: 3/3 passed on kantor Windows.
+- `npm run test` against the owner-approved disposable
+  `studioflow_rebuild_test` container: 347/347 passed.
+- `npm run typecheck`, `npm run lint`, `npm run check:boundaries`,
+  `npm run check:legacy-runtime`, and `npm run build`: passed.
+- Browser acceptance: not required by this infrastructure-only plan; no route
+  or user-facing behavior changed.
+
+## R8.44 | 2026-09-14 | docs(agent): move browser acceptance to reviewer
+
+- Split plan evidence into Executor verification and Reviewer acceptance.
+  Executor now completes implementation, automated/integration checks, and its
+  local revision commit before handing off; ordinary browser acceptance runs
+  afterward in the Reviewer session.
+- Kept browser work with Executor only when a READY plan explicitly needs it to
+  diagnose or complete implementation. Missing post-commit browser evidence no
+  longer stalls an otherwise valid implementation commit.
+- Updated the prompt loop so Reviewer inspects the commit and performs required
+  browser-use acceptance before deciding PASS or returning one consolidated
+  correction prompt.
+- Shifted the still-READY KB-030 implementation target to R8.45. No application
+  behavior, schema, migration, dependency, or local credential changed.
+
+### Verification
+
+- Harness cross-check across `AGENTS.md`, all three role contracts, harness
+  README, active plan, and plan template: passed.
+- Staged diff and whitespace checks: passed.
+
+## R8.43 | 2026-09-14 | docs(agent): streamline prompt handoff and accept F-B
+
+- Simplified the acceptance rule: the Executor owns safe environment discovery
+  and fixture preparation, while the Planner defines outcome-specific evidence
+  and the Reviewer decides PASS. Owner-designated disposable local resources
+  and explicit current-session inputs are valid without duplicating secrets in
+  committed configuration.
+- Added the serial copy-ready prompt loop: Planner/Reviewer hands a READY plan
+  to Executor; Executor returns a commit/evidence prompt to Planner/Reviewer;
+  Reviewer returns one correction or next-slice Executor prompt. Role documents
+  now enforce that output shape without duplicating the full plan.
+- Accepted F-B/PF-2+PF-3. The owner-designated kantor container already held
+  `studioflow_rebuild_test`; migrations applied and the full suite ran against
+  it. Authenticated browser evidence verified grant-filtered launcher/sidebar
+  visibility, authorized app roots, and redirects away from ungranted app roots
+  for Master Data, BQ, and StudioFlow.
+- The full suite passed 346/347. Its sole failure is the pre-existing,
+  reproducible KB-030 Windows local-storage path defect; it does not overlap
+  permission registration, app navigation, or route authorization, so it does
+  not conceal an F-B regression. The next READY plan corrects KB-030.
+- Added the approved kantor acceptance resource and account references only to
+  ignored local configuration; no credential or connection secret is committed.
+- No schema, migration, dependency, or application behavior changed.
+
+### Verification
+
+- Disposable database migration deploy: passed.
+- Full test suite: 346/347 passed; only tracked KB-030 failed.
+- Production boot and authenticated browser smoke: passed for Master Data, BQ,
+  and StudioFlow full-access and per-app grant-filtered states.
+- Repository diff and whitespace checks: passed.
+
+## R8.42 | 2026-09-14 | docs(review): record F-B kantor acceptance preflight blocker
+
+- Ran the F-B acceptance preflight with `STUDIOFLOW_LOCATION=kantor`.
+  The local configuration has neither a `PLATFORM_TEST_DATABASE_URL` for a
+  disposable `studioflow-rebuild` database nor a configured non-production
+  browser test account/grant fixture.
+- Re-ran every safe available check: focused registration tests, typecheck,
+  lint, architecture boundary, legacy-runtime, and production build all pass.
+  A production server started without instrumentation or registry errors; the
+  unauthenticated root and each app root redirected to `/login`.
+- `npm run test`, authenticated launcher/sidebar verification, and the
+  authorized/unauthorized route matrix were intentionally not run: doing so
+  would require the missing disposable database and supplied test account.
+  F-B remains blocked and unaccepted; no application behavior changed.
+
+### Verification
+
+- Focused registration/registry tests: 9/9 passed.
+- `npm run typecheck`, `npm run lint`, `npm run check:boundaries`,
+  `npm run check:legacy-runtime`, and `npm run build`: passed.
+- Production server (`next start`) boot plus `/`, `/masterdata`, `/bq`, and
+  `/studioflow` unauthenticated redirects: passed.
+
+## R8.41 | 2026-09-14 | docs(agent): require executor acceptance preflight
+
+- Added a mandatory acceptance-execution protocol to `AGENTS.md`. Every READY
+  plan now needs an executable recipe, and Executors must preflight and run all
+  available acceptance checks before their local completion commit.
+- Specified the safe failure path for missing test databases, test accounts, or
+  browser runners: record the exact prerequisite and evidence, report
+  `BLOCKED: ACCEPTANCE ENVIRONMENT REQUIRED`, and never claim acceptance.
+- Replaced the stale F-B correction plan state with the valid `BLOCKED` state
+  and an explicit kantor acceptance recipe. F-B now names its two external
+  prerequisites: a disposable rebuild-only test database and a non-production
+  browser test account.
+- Aligned the deferred-review receipt with the same acceptance-environment
+  blocker so it cannot be mistaken for reviewer-ready evidence.
+- No application behavior, schema, migration, dependency, environment file, or
+  external service changed.
+
+### Verification
+
+- Documentation review against `AGENTS.md`, `docs/agent/PLAN-TEMPLATE.md`, and
+  the R8.40 deferred-review evidence: passed.
+- Staged diff and whitespace checks: passed.
+
+## R8.40 | 2026-09-14 | fix(foundation): restore unique app permission registration
+
+- Removed `masterdata.promotion.approve` from BQ's owned permission vocabulary.
+  BQ's retained legacy promotion-approval service paths now use the canonical
+  Master Data public permission export, preserving the authorization rule
+  without registering a cross-app permission twice.
+- Added a complete-app registry regression test, which composes the same public
+  registrations used during server boot and asserts that the Master Data
+  promotion permission has exactly one owner. The development server now starts
+  successfully instead of failing with `REGISTRY_DUPLICATE_PERMISSION`.
+- Updated the deferred-review receipt for F-B. The overall Foundation outcome
+  remains unaccepted pending authenticated browser and disposable integration
+  test evidence.
+- Recorded KB-030 after focused verification found that valid local private
+  storage keys still fail signed-read verification on Windows; it is outside
+  this ownership/navigation correction's locked scope.
+- No schema, migration, or dependency change.
+
+### Verification
+
+- Focused app-registration and permission-registry tests: passed.
+- `npx prisma generate` with `STUDIOFLOW_LOCATION=kantor`: passed.
+- `npm run typecheck`, `npm run lint`, `npm run check:boundaries`,
+  `npm run check:legacy-runtime`, and `npm run build`: passed.
+- Development server boot and unauthenticated `/masterdata`, `/bq`, and
+  `/studioflow` redirects to `/login`: passed.
+- Full `npm run test`: unavailable as a pass because kantor lacks a disposable
+  `PLATFORM_TEST_DATABASE_URL`; its focused filesystem test also reproduces the
+  separately tracked KB-030 failure.
 
 ## R8.39 | 2026-09-14 | docs(review): record F-B duplicate permission boot blocker
 

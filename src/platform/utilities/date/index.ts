@@ -101,3 +101,26 @@ export function formatInstant(value: string | Date, options: InstantDisplayOptio
     hourCycle: "h23",
   }).format(new Date(iso));
 }
+
+/**
+ * The calendar date (`YYYY-MM-DD`) that `now` falls on in the given timezone.
+ * Used to compare date-only due dates against "today" without passing a
+ * date-only value through a UTC instant.
+ */
+export function currentDateOnly(options: { now?: Date; timeZone?: string } = {}): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: options.timeZone ?? DEFAULT_DISPLAY_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(options.now ?? new Date());
+  const part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+/** Whole calendar days from `from` to `to` (both `YYYY-MM-DD`); negative when `to` is earlier. */
+export function diffDateOnlyDays(from: string, to: string): number {
+  assertDateOnly(from);
+  assertDateOnly(to);
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+}

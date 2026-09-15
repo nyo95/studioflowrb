@@ -40,6 +40,8 @@
   ],
   "exclude": [
     "node_modules",
-    "_to_delete/**"
+    ".next/dev/**",
+    "_to_delete/**",
+    "src/app/(platform)/studioflow/projects/_legacy_project_id/**"
   ]
 }

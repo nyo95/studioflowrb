@@ -15,6 +15,36 @@ function encodedKey(key: string): string {
   return key.split("/").map(encodeURIComponent).join("/");
 }
 
+function isSameOrDescendant(root: string, target: string): boolean {
+  const relative = path.relative(root, target);
+  return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
+}
+
+/**
+ * Resolve the deepest existing ancestor through realpath, then append missing
+ * segments. This gives existing and future paths the same canonical root on
+ * Windows, where a short lexical path and its long realpath may differ.
+ */
+async function canonicalizePath(target: string): Promise<string> {
+  const missingSegments: string[] = [];
+  let current = path.resolve(target);
+
+  for (;;) {
+    try {
+      const realPath = await fs.realpath(current);
+      return missingSegments.length === 0 ? realPath : path.join(realPath, ...missingSegments.reverse());
+    } catch (error: unknown) {
+      if (!(typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT")) {
+        throw error;
+      }
+      const parent = path.dirname(current);
+      if (parent === current) return current;
+      missingSegments.push(path.basename(current));
+      current = parent;
+    }
+  }
+}
+
 export async function resolveSafePath(rootDir: string, key: string): Promise<string> {
   if (!key || key.includes("..") || key.startsWith("/") || key.endsWith("/")) {
     throw new AppError("VALIDATION", "storage.invalid-key", "The storage object reference is invalid.");
@@ -22,44 +52,16 @@ export async function resolveSafePath(rootDir: string, key: string): Promise<str
   const resolvedRoot = path.resolve(rootDir);
   const targetPath = path.resolve(resolvedRoot, key);
 
-  const normRoot = path.resolve(resolvedRoot).toLowerCase();
-  const normTarget = path.resolve(targetPath).toLowerCase();
-  if (!normTarget.startsWith(normRoot + path.sep.toLowerCase()) && normTarget !== normRoot) {
+  if (!isSameOrDescendant(resolvedRoot, targetPath)) {
     throw new AppError("VALIDATION", "storage.invalid-key", "The storage object reference is invalid.");
   }
 
-  // Check every segment from root down to targetPath using realpath (covers Windows junctions & symlinks)
-  let currentPath = resolvedRoot;
-  const relative = path.relative(resolvedRoot, targetPath);
-  const segments = relative ? relative.split(path.sep) : [];
-
-  for (const segment of segments) {
-    currentPath = path.join(currentPath, segment);
-    try {
-      const realSegment = await fs.realpath(currentPath);
-      const normReal = path.resolve(realSegment).toLowerCase();
-      if (!normReal.startsWith(normRoot + path.sep.toLowerCase()) && normReal !== normRoot) {
-        throw new AppError("VALIDATION", "storage.invalid-key", "The storage object reference is invalid.");
-      }
-    } catch (err: unknown) {
-      if (typeof err === "object" && err !== null && "code" in err && (err as { code?: string }).code === "ENOENT") {
-        break;
-      }
-      if (err instanceof AppError) throw err;
-    }
-  }
-
-  // Final realpath verification if target exists
-  try {
-    const realRoot = await fs.realpath(resolvedRoot);
-    const realPath = await fs.realpath(targetPath);
-    const normRealRoot = path.resolve(realRoot).toLowerCase();
-    const normRealPath = path.resolve(realPath).toLowerCase();
-    if (!normRealPath.startsWith(normRealRoot + path.sep.toLowerCase()) && normRealPath !== normRealRoot) {
-      throw new AppError("VALIDATION", "storage.invalid-key", "The storage object reference is invalid.");
-    }
-  } catch (err: unknown) {
-    if (err instanceof AppError) throw err;
+  const [canonicalRoot, canonicalTarget] = await Promise.all([
+    canonicalizePath(resolvedRoot),
+    canonicalizePath(targetPath),
+  ]);
+  if (!isSameOrDescendant(canonicalRoot, canonicalTarget)) {
+    throw new AppError("VALIDATION", "storage.invalid-key", "The storage object reference is invalid.");
   }
 
   return targetPath;

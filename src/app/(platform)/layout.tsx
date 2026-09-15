@@ -9,7 +9,7 @@ import { readPlatformGeneralSettings } from "@platform/core/settings";
 import { brandMarkStorage } from "@platform/runtime";
 import { logoutAction } from "./logout-action";
 import { BqNav } from "./bq/nav";
-import { StudioFlowNav,StudioFlowUtilityNav } from "./studioflow/nav";
+import { StudioFlowNav, StudioFlowUtilityNav } from "./studioflow/nav";
 import { MasterDataNav } from "./masterdata/nav";
 
 export const dynamic = "force-dynamic";

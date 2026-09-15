@@ -1,6 +1,6 @@
 # Ready for Review
 
-Status: active verification ledger, reconciled through R7.56 on 2026-09-10.
+Status: active verification ledger, reconciled through R8.75 on 2026-09-15.
 New file, split out of `roadmap.md`/`knownbug.md` on 2026-09-10 at owner
 request, so status is visible at a glance:
 
@@ -18,24 +18,6 @@ delete the entry and note the evidence in `CHANGELOG.md`; or verification finds
 a real defect — move it to `knownbug.md` with what was actually observed.
 
 ## Platform Foundation
-
-### F-B / PF-2+PF-3 — Application ownership and navigation
-
-- **Observed (R8.36):** Permission vocabularies were moved behind the public
-  boundaries of Master Data, BQ, and StudioFlow, and central registration no
-  longer duplicates permission literals.
-- **Missing:** The READY plan also requires app-owned route helpers and
-  navigation definitions, plus regression evidence that launcher/sidebar
-  visibility and route behavior remain unchanged. R8.36 does not implement or
-  verify those parts.
-- **Status:** Correction required. Continue the same coherent F-B outcome;
-  do not mark it accepted until route/navigation ownership and browser evidence
-  are complete.
-- **R8.38 runtime finding:** `npm run dev` fails during permission registry
-  initialization because BQ registers `masterdata.promotion.approve`, which is
-  already owned by Master Data. The passing suite did not exercise this boot
-  path.
-- **Status:** Correction required. See KB-029; F-B remains unaccepted.
 
 ### PF-1 — Core purity and managed Brand mark storage
 
@@ -68,6 +50,30 @@ a real defect — move it to `knownbug.md` with what was actually observed.
   all passed.
 - **Status:** PASS — PF-1 local storage and public/private asset boundaries
   are accepted. Supabase remains deferred and is not a release dependency.
+
+### F-C / PF-4+PF-5 — Settings, Appearance, and UI Engine (closed R8.56)
+
+- **Observed:** R8.53 implemented the F-C Foundation outcome on 2026-09-14:
+  typed global `PlatformTheme` on the `PlatformGeneralSettings` singleton (sole
+  approved value `"light"`), additive migration
+  `20260914090000_platform_appearance_theme` (SQL CHECK constraint), General
+  Settings page split into General and Appearance sections, and `SettingsShell`
+  applied with a boundary-explicit navigation enforcing the D-SF-02 settings
+  ownership split. No app-workflow behavior, StudioFlow feature, or destructive
+  migration was activated.
+- **Automated checks:** typecheck, lint, boundaries, legacy-runtime, 349/349
+  tests (settings integration suite and SQL CHECK constraint test), additive
+  migration deployed to all rebuild-only databases, and production build all
+  passed.
+- **Reviewer acceptance (R8.56):** Passed in the approved local kantor fixture.
+  The authorized account reached `/settings/general` and its Appearance
+  section; after sign-out, the same protected route redirected to `/login`.
+  Save reported no pending changes and a reload retained the sole canonical,
+  disabled `Light` Theme value. `SettingsShell` rendered correctly at desktop
+  width and 375 px. Master Data, BQ, and StudioFlow each opened their normal
+  entry page with their expected navigation and no visual or permission
+  regression observed.
+- **Status:** Closed. F-C is accepted; F-D is now the active Foundation slice.
 
 ### Configurable main-route settings
 
@@ -146,15 +152,6 @@ No item currently ready for review.
   `purchase_to_base_factor`.
 - **Status:** Ready for review, not yet verified.
 
-## StudioFlow
-
-No item currently ready for review beyond what the R7.55 audit already
-reconciled — that audit read code against
-[`apps/studioflow/studioflow-project-contract.md`](apps/studioflow/studioflow-project-contract.md)
-and either fixed what it found immediately or opened it as a dated defect in
-`knownbug.md` (KB-012…KB-019). Nothing from that pass is sitting in an
-unverified middle state.
-
 ## Rules
 
 - An item belongs here only when code, schema, and/or tests actually exist for
@@ -163,3 +160,87 @@ unverified middle state.
   imported — see the minimum product bar in this directory's `README.md`.
 - Closing an item here requires the same evidence closing a roadmap item does:
   end-to-end verification, not a code read.
+
+## StudioFlow
+
+### SF-R1 — Legacy project backbone (R8.71)
+
+- **Built:** archive cutover of the rebuild StudioFlow, new `studioflow`
+  schema (migration `20260915100000_sf_r1_legacy_rework_cutover`), modular
+  services (projects, phases, tasks, today), Today, Projects, Clients, project
+  workspace (overview, five phase pages, history), Studio Settings, temporary
+  legacy redirects, people directory, `ContextNavLink`.
+- **Verified in the cloud workspace (owner-approved lane change):** 354/354
+  tests including 12 new StudioFlow integration tests on a disposable
+  PostgreSQL 16; typecheck, lint, boundaries, legacy-runtime, production build
+  (Google Fonts stubbed only for that sandbox build); Playwright smoke on the
+  production build at 1440 px and 375 px: login, empty Today, create project
+  with new client, general to-do, blocked internal submit, tick and submit,
+  feedback → send back → v1.1, history, Today, projects, clients, settings,
+  platform settings link, Master Data/BQ pages, drafter cannot create
+  projects, signed-out and legacy `/projects` redirects — zero console errors.
+- **Status: PASS — SF-RF browser acceptance (R8.75, 2026-09-15).** Owner
+  walked the kantor machine with real data at 1440 px and 375 px: Today
+  (projects grouped, filters, saved filter views, quick-add with due date
+  and assignee, show done), Projects list and detail, phase workflow
+  (checklist subtasks, labels, move up, to-do defer, feedback badge), Clients
+  (list, detail, edit, archive blocked while running project). MOM "Plain"
+  note with no number approved. Corrections R8.74 verified.
+
+### SF-R2 — MOM (R8.72)
+
+- **Built:** MOM tables (migration `20260915120000_sf_r2_mom`), `mom`
+  service, project MOM list/editor, shell-less print view, UI Engine
+  `DocumentSheet`/`DocumentBlock`/`PrintButton`, `ImageWorkspace` aspect and
+  JPEG output.
+- **Verified in the cloud workspace:** 360/360 tests (4 MOM integration
+  tests: legacy defaults and header, section/note order and the one-note rule,
+  two-photo limit with slot shifting, swap and storage cleanup, permission /
+  scope / archive rules with no orphan objects); production-build Playwright
+  smoke covering create, header, notes, photo crop/upload, text-only section,
+  print + A4 PDF, 375 px, drafter read-only, and delete — zero console errors.
+- **Status: PASS — SF-RF browser acceptance (R8.75, 2026-09-15).** MOM list,
+  editor, photo upload, and print flow walked on kantor. Owner decision locked:
+  "Plain" note type shows no number and does not advance numbering (approved).
+  Google Drive activation and stored-file retention policy deferred (see KB-002
+  and Platform decision gates in `roadmap.md`).
+
+### SF-R3 — Product Schedule (R8.73)
+
+- **Built:** per-project Product Schedule tables (migration
+  `20260915150000_sf_r3_schedule`), `schedule` service, project Schedule page,
+  StudioFlow settings controls for prefixes/default categories/template items,
+  typed snapshots, option finalization, cross-project reuse search, legacy CSV
+  import, and Master Data Brand read through the public port.
+- **Verified on the kantor rebuild DB:** 366/366 tests including 4 Product
+  Schedule integration tests and 2 schedule rule tests; typecheck, lint,
+  production build, boundary fixtures, legacy-runtime fixtures,
+  `prisma migrate deploy` on rebuild test and kantor DBs, and clean Prisma
+  migration diff against the rebuild shadow DB.
+- **Status: PASS — SF-RF browser acceptance (R8.75, 2026-09-15).** Schedule
+  page walked on kantor at desktop and 375 px: entries, options, finalization,
+  template application, settings, drafter read-only, archived-project
+  read-only. Corrections R8.74 (option labels, Google Sheets import, seeding
+  on new projects, Schedule UI) verified.
+
+### Review corrections (R8.74)
+
+- Pre-acceptance code review of SF-R1…SF-R3 fixed reopen/start rules,
+  former-assignee edits, archived-client project edits, carried-forward
+  feedback, template sync on locked phases, overlapping command state, MOM
+  photo size, schedule option labels, the Google Sheets import, schedule
+  seeding on new projects, and the Schedule UI (see CHANGELOG R8.74).
+- Verified in the cloud workspace: 372/372 tests, typecheck, lint, boundary
+  checks, production build, and a production-build Playwright smoke of the
+  Schedule flow with zero console errors. Local checks and the SF-RF browser
+  pass remain with the local executor.
+
+### Wave 1 parity gate
+
+- **Status: PASS — SF-RF accepted in R8.75 (2026-09-15).** All SF-R1–SF-R3
+  features walked at desktop (1440 px) and 375 px with the owner account
+  (berkah.rad@gmail.com) and drafter account. Temporary legacy redirects
+  removed. Owner decisions locked in this pass: MOM "Plain" note approved
+  as-is; phase accent palette approved for SF-R4 (R8.76); stored-file
+  retention and Google Drive activation deferred. SF-R1–SF-RF marked done in
+  `roadmap.md`.

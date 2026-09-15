@@ -40,11 +40,20 @@ necessary in-scope follow-through—types, migrations already approved by the
 plan, tests, exports, callers, and concise documentation—without listing every
 edit.
 
+Separate `## Verification` for checks the Executor must finish before commit
+from `## Reviewer Acceptance` for post-commit browser scenarios. Put browser
+work in Executor verification only when it is necessary to diagnose or complete
+the code; ordinary user-facing acceptance stays with Reviewer.
+
 End every READY plan with a short `## Executor Prompt` that can be pasted into a
 new session. The prompt identifies the Executor lane and location, tells the
 agent to read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and the active `PLAN.md`,
 and asks it to implement the whole plan, verify it, update the changelog, and
 commit locally. Do not repeat the full plan inside the prompt.
+
+When handing off, the final response contains only that copy-ready Executor
+prompt. Keep explanations and decisions in `PLAN.md`, where both sessions can
+verify them; never put credentials in the prompt.
 
 If a material product, ownership, schema-meaning, permission, security, or
 architecture decision is unresolved, keep the plan DRAFT or BLOCKED. Do not
