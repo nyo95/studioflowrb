@@ -1,5 +1,10 @@
 # StudioFlow Implementation Plan
 
+> **SUPERSEDED 2026-09-15 (R8.70).** Replaced by
+> [`STUDIOFLOW-REWORK-CONTRACT.md`](STUDIOFLOW-REWORK-CONTRACT.md). Kept as
+> history only; SF-R1 moves it to `docs/archive/studioflow-rb/`. Do not
+> implement from this file.
+
 **Status:** HISTORICAL R7 EXECUTION PLAN — implemented-state evidence only.
 Future StudioFlow work is governed by `../../STUDIOFLOW-RECOVERY-REFERENCE.md`
 and the consolidated milestones in `../../roadmap.md`.

@@ -1,5 +1,10 @@
 # StudioFlow — Contract Index and Shared Rules
 
+> **SUPERSEDED 2026-09-15 (R8.70).** Replaced by
+> [`STUDIOFLOW-REWORK-CONTRACT.md`](STUDIOFLOW-REWORK-CONTRACT.md). Kept as
+> history only; SF-R1 moves it to `docs/archive/studioflow-rb/`. Do not
+> implement from this file.
+
 Status: **ACTIVE CONTRACT INDEX — D-SF recovery ratified in R8.51; StudioFlow
 implementation remains sequenced after Foundation F-E; remaining work is tracked in
 [`../../roadmap.md`](../../roadmap.md)**

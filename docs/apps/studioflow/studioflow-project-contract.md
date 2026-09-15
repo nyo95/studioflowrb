@@ -1,5 +1,10 @@
 # Project Contract — StudioFlow
 
+> **SUPERSEDED 2026-09-15 (R8.70).** Replaced by
+> [`STUDIOFLOW-REWORK-CONTRACT.md`](STUDIOFLOW-REWORK-CONTRACT.md). Kept as
+> history only; SF-R1 moves it to `docs/archive/studioflow-rb/`. Do not
+> implement from this file.
+
 Status: **ACTIVE PROJECT-WORKFLOW CONTRACT — substantial slices implemented
 through R7.55; current deviations are tracked in
 [`../../knownbug.md`](../../knownbug.md) and [`../../roadmap.md`](../../roadmap.md)**

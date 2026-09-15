@@ -68,6 +68,13 @@ Never commit or copy either file. Set `STUDIOFLOW_LOCATION` to the selected valu
 
 Legacy is separate, read-only evidence. When needed, ask the owner for its exact path on this computer, then record path, commit, branch, and dirty state before reading it. Do not scan drives or assume a path. Never edit, format, generate into, install in, run, test, migrate, seed, reset, stash, clean, switch, merge, rebase, pull, push, or otherwise alter legacy. Inspect committed evidence with read-only Git commands and name any working-tree-only evidence separately. Never copy legacy code, schema, migrations, database, or configuration as an implementation base.
 
+**StudioFlow Rework exception (owner, 2026-09-15).** For StudioFlow only,
+legacy behavior at commit `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27` is the
+functional specification, and an Executor may read and port its algorithms,
+rules, copy, and flows. It still may not import legacy modules or copy the
+legacy schema, migrations, UI kit, auth/RBAC/audit/db runtime, role enum, or
+configuration. See `docs/apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md` §1.
+
 StudioFlow legacy PostgreSQL is completely forbidden. Never connect to, query, inspect, dump, restore, migrate, seed, reset, truncate, or otherwise touch any legacy database, server, schema, role, connection string, container, volume, backup, or service. Never run a database command whose target could be legacy.
 
 For activated legacy work, inspect end-to-end route/navigation, UI state, server boundary, domain rules, persistence/transaction, permissions/audit, downstream reads, tests/migrations/errors. Classify behavior as **KEEP**, **FIX**, **MERGE**, or **PURGE**, with exact paths/symbols and rebuild destination. Prose, screenshots, and schema alone are not sufficient evidence.

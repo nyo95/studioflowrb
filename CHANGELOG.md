@@ -5,8 +5,40 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.69**
-- Next local revision: **R8.70**
+- Current revision after this entry is committed: **R8.70**
+- Next local revision: **R8.71**
+
+## R8.70 | 2026-09-15 | docs(studioflow): ratify legacy rework and plan SF-R1
+
+### Changed
+
+- Owner direction: the rebuild StudioFlow (R7.xx–R8.69) diverges from studio
+  practice; it is archived (local tag, code deleted) and replaced by a
+  legacy-behavior rework on the accepted Foundation. Master Data and BQ are
+  unchanged.
+- Added `docs/apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md` as the sole
+  StudioFlow authority: legacy disposition matrix (pinned `c4b0c466`),
+  decisions RW-01…RW-04 (legacy phase machine with simplified labels, PIC
+  designer/drafter without a role enum, archive by tag, wave-1 scope), new
+  ten-grant permission vocabulary, Project/Phase/Revision/Activity/Checklist/
+  Today, MOM and Schedule models, Foundation centralization map, and UI/UX
+  direction. Purges Iteration/Response, Requirements, phase-template
+  administration, and the global catalogue.
+- Marked eight older StudioFlow contracts as superseded; updated the docs
+  index, roadmap (SF-R1…SF-RF replaces SF-A…SF-H), and knownbug disposition.
+- Added a StudioFlow-only exception to the legacy isolation rule in
+  `AGENTS.md` allowing behavior porting from the pinned legacy commit.
+- Replaced `PLAN.md` with READY `SF-R1-ARCHIVE-AND-LEGACY-PROJECT-BACKBONE`.
+
+### Verification
+
+- Documentation only; no code, schema, or migration changed.
+- Legacy read-only: HEAD `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27` on
+  `main`, read from committed-path files via the file bridge; no legacy
+  command, database, or environment accessed.
+- The device shell was unavailable in this session, so no git command,
+  test, or commit could be run. **This entry is not yet committed**; the next
+  session must commit these files as R8.70 before starting SF-R1.
 
 ## R8.69 | 2026-09-14 | fix(studioflow): complete project requirement workflow UI
 

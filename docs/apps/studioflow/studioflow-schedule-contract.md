@@ -1,5 +1,10 @@
 # Library and Schedule Contract — StudioFlow
 
+> **SUPERSEDED 2026-09-15 (R8.70).** Replaced by
+> [`STUDIOFLOW-REWORK-CONTRACT.md`](STUDIOFLOW-REWORK-CONTRACT.md). Kept as
+> history only; SF-R1 moves it to `docs/archive/studioflow-rb/`. Do not
+> implement from this file.
+
 Status: **RATIFIED RECOVERY DIRECTION — Product Catalogue is project-owned;
 the R7.53 global reuse pool is historical only; Schedule/FFNI remains deferred
 and is tracked as KB-003**

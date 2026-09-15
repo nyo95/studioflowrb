@@ -1,6 +1,6 @@
 # Product Roadmap by Application
 
-Status: active planning ledger, reconciled through R8.56 on 2026-09-14.
+Status: active planning ledger, reconciled through R8.70 on 2026-09-15.
 
 This file answers **what remains to be built**. It does not activate work by
 itself. Completed items are struck through or removed only after verification
@@ -11,8 +11,8 @@ unverified work belongs in [`review.md`](review.md), not here.
 
 The Project Rebuild Foundation Reference dated 2026-09-12 governs shared
 ownership. Master Data and BQ remain canonical and behaviorally unchanged. The
-current StudioFlow implementation stays frozen except for security/data-
-integrity fixes and narrow Foundation compatibility.
+rebuild StudioFlow implementation is archived by SF-R1 and replaced by the
+legacy rework.
 
 One exception resolves a sequencing deadlock in the two references: read-only
 StudioFlow recovery discovery occurs before the final UI Engine and utility
@@ -30,8 +30,8 @@ Normal sequence:
    D-SF rather than an incomplete StudioFlow abstraction.
 5. **F-D — Shared utility curation and executable boundaries** (PF-6 + PF-7).
 6. **F-E — Foundation acceptance and freeze** (PF-8).
-7. **SF-A through SF-F — StudioFlow recovery implementation and cutover.**
-8. **SF-G — Workflow Optimization vNext**, only after parity is accepted.
+7. **SF-R1 through SF-RF — StudioFlow legacy rework** (replaces SF-A…SF-H,
+   owner direction 2026-09-15).
 
 Each item above is one coherent Executor outcome by default. Split only for a
 real owner decision, external dependency, migration/security/rollback boundary,
@@ -132,90 +132,49 @@ independently useful outcome, or demonstrated context/tool limit.
 - [ ] Add revision/version comparison between BQ snapshots.
 - [ ] Define formal StudioFlow linking through a stable external reference.
 
-## StudioFlow Recovery
+## StudioFlow Rework (owner direction 2026-09-15)
 
-The recovery reference dated 2026-09-12 is the product baseline. Existing RB
-StudioFlow is evidence and a temporary runtime, not the destination. Its 111 KB
-service is not refactored as a standalone task; replacement modules acquire
-clean ownership while each capability is recovered.
+The rebuild StudioFlow of R7.xx–R8.69 diverged from how the studio works. The
+owner replaced the SF-A…SF-H recovery sequence with a legacy-behavior rework
+governed by
+[`apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md`](apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md).
+D-SF discovery stays as evidence. The previous SF-A plan (Requirements,
+phase-template administration) is cancelled; R8.62–R8.69 are archived with the
+rest of the rebuild StudioFlow.
 
-### Discovery gate before Foundation freeze
+### Wave 1
 
-- [x] ~~**D-SF — Full extraction and recovery contract:** At the owner-supplied
-  kantor checkout, inspect only pinned
-  commit `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`. Produce and ratify the
-  capability, route, settings, permission, persistence/ownership, and shared-
-  capability matrices. Classify every meaningful behavior as KEEP, MERGE,
-  ALREADY_REPLACED, REDESIGN, PURGE, or DECISION_REQUIRED.
+- [ ] **SF-R1 — Archive and legacy project backbone:** local archive tag,
+  delete rebuild StudioFlow code/routes/schema, then port Client, Project
+  (auto-naming, PIC designer/drafter), five-phase legacy workflow with
+  revisions, activities, checklist with templates, Today, and StudioFlow
+  settings. Active in `PLAN.md`.
+- [ ] **SF-R2 — MOM (legacy):** legacy document/item/point/image model,
+  editing flow, and print on `ObjectStorage` and UI Engine. Closes KB-012 and
+  KB-022 by replacing the ISSUED/SUPERSEDED lifecycle.
+- [ ] **SF-R3 — Product Schedule (legacy):** entries/options/final approval,
+  gapless codes, prefix dictionary, schedule templates and default entries,
+  reuse from past projects, CSV import, typed snapshots, Master Data Brand read
+  through the public port. Closes KB-003 and KB-021.
 
-  D-SF also locks the canonical `/studioflow/projects/...` hierarchy,
-  compatibility redirects, project-owned Product Catalogue, settings
-  ownership, cross-app reads, and the specific generic UI/utility pressure that
-  F-C/F-D must satisfy. The owner ratified Upcoming, Database Settings, project
-  live/chat, MOM behavior, and existing global catalogue data treatment in the
-  decision register.
-  D-SF is read-only discovery and documentation; it creates no production code,
-  schema, placeholder route, or dependency. Discovery evidence is recorded in
-  [`apps/studioflow/D-SF-RECOVERY-DISCOVERY.md`](apps/studioflow/D-SF-RECOVERY-DISCOVERY.md)
-  (R8.48), with D-SF-01 through D-SF-07 ratified in R8.51. It informs F-C/F-D;
-  Foundation F-E must still pass before any StudioFlow implementation begins.
-  ~~
+### Wave 2 (not activated)
 
-### Implementation after F-E Foundation acceptance
+- [ ] CD drawing list per CD phase.
+- [ ] Deliverables/files per revision through `ObjectStorage` (retention and
+  client-delivery decisions still open).
+- [ ] Library / Brand discovery page (read-only Master Data port).
+- [ ] Product requests and vendor follow-up (needs a Master Data write-port
+  decision).
+- [ ] Task comments and StudioFlow-global collaboration (D-SF-05).
+- [ ] Upcoming / planning timeline (D-SF-01).
+- [ ] SketchUp integration (D-SF-06).
+- [ ] Optional phase accent palette (contract §13.8) — owner approval needed.
 
-- [ ] **SF-A — Daily work and project operations:** Build the modular
-  StudioFlow backbone and canonical routes for home/general todos, activity,
-  projects, clients, project lifecycle/archive, project detail, phase
-  navigation, phase administration, project todos, first-class General and
-  Phase Requirements, and StudioFlow-owned phase/project-engine settings.
-  Activity Center is the sole Today surface; Upcoming remains deferred toward
-  planning/Gantt. Preserve accepted behavior, implement ratified
-  parity gaps such as KB-016/KB-017/KB-018/KB-023, use controlled redirects,
-  and cut over these routes together.
-- [ ] **SF-B — Delivery and client collaboration:** Recover deliverables/files,
-  iterations and revision provenance, send/withdraw, draft client answers,
-  corrected-answer chains, phase consequences, activity/history, permissions,
-  audit, error recovery, and relevant retention behavior as one end-to-end
-  production workflow. This absorbs KB-013 through KB-015 and any ratified
-  replacement for the frozen simplified workflow.
-- [ ] **SF-C — Project records and discovery:** Recover the canonical MOM module
-  and project-owned Product Catalogue; preserve useful project discovery
-  behavior; and cut over their project/global routes. The incorrect global rows
-  are discarded—not migrated, re-scoped, or retained—only through a separately
-  approved safe destructive cutover plan. Resolve KB-012, KB-021, and KB-022
-  only where the ratified model says they interact.
-- [ ] **SF-D — Product Schedule / FF&E:** Restore the complete project-owned
-  Schedule capability, its catalogue snapshots/options/lifecycle/templates,
-  Schedule-owned settings, permissions, history, and browser workflow. Keep it
-  separate because its domain and migration can be accepted or rolled back
-  independently from the other project-record modules.
-- [ ] **SF-E — SketchUp and external integration:** Implement only the ratified
-  SketchUp capability through an authenticated, idempotent adapter with retry,
-  observability, reconciliation, safe failure, and no legacy runtime/database
-  dependency. Keep this separate because external integration and operational
-  recovery form their own security and rollback boundary.
-- [ ] **SF-H — General collaboration:** Activate only the ratified temporary
-  StudioFlow-global discussion, presence, and realtime capability after a
-  separate retention, privacy, delivery, and persistence design. It is not a
-  project record and does not recover legacy project chat.
-- [ ] **SF-F — Parity cutover and frozen-code purge:** Prove every classified
-  route/capability, Master Data/BQ non-regression, migrations, permissions,
-  persistence, audit/history, error states, and real browser workflows. Remove
-  the frozen StudioFlow service/routes/contracts only after no live consumer
-  remains. Record every remaining deviation as an explicit owner decision and
-  freeze the recovered StudioFlow baseline.
-- [ ] **SF-G — Workflow Optimization vNext:** After SF-F PASS, compare recovered
-  parity, the frozen RB todo/phase/deliverable ideas, and the owner's current
-  daily workflow. Only then simplify clicks, transitions, and information
-  architecture deliberately. Reassess the Overview/Operational Catalog and any
-  Library crawler here; a crawler requires separate legal, security, source-
-  permission, failure, and deterministic-fallback decisions.
+### Closing gate
 
-Each milestone normally targets one implementation commit. When review finds
-material defects, bundle all related findings into one correction prompt and
-commit per review pass. Progressive compatibility redirects and route cutovers
-occur inside the owning milestone; SF-F is verification and dead-code removal,
-not a giant last-minute replacement.
+- [ ] **SF-RF — Parity acceptance:** walk every wave-1 legacy flow at desktop
+  and 375 px, remove the temporary `/projects/...` redirects, and freeze the
+  reworked StudioFlow baseline.
 
 ## Historical implemented or removed evidence
 

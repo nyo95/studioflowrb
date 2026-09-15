@@ -1,5 +1,10 @@
 # StudioFlow — Decisions, Open Questions, and Work Order Sequence
 
+> **SUPERSEDED 2026-09-15 (R8.70).** Replaced by
+> [`STUDIOFLOW-REWORK-CONTRACT.md`](STUDIOFLOW-REWORK-CONTRACT.md). Kept as
+> history only; SF-R1 moves it to `docs/archive/studioflow-rb/`. Do not
+> implement from this file.
+
 Status: **HISTORICAL PLANNING/DECISION LEDGER — implemented-state and remaining
 work are tracked in `CHANGELOG.md` and [`../../roadmap.md`](../../roadmap.md)**
 
