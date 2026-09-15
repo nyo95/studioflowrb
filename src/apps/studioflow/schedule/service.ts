@@ -1,12 +1,15 @@
 import {
   SCHEDULE_SECTIONS,
+  compareOptionLabels,
   fallbackPrefix,
   isPermutation,
   nextGapless,
+  nextOptionLabel,
   normalizeScheduleCategory,
   normalizeSchedulePrefix,
-  optionLabel,
   parseLegacyScheduleCsv,
+  parseLegacyScheduleSheet,
+  parseScheduleCode,
   scheduleCode,
   scheduleSearchKey,
   type ScheduleSection,
@@ -30,21 +33,11 @@ import {
   type TxClient,
 } from "../shared";
 
+import { cleanSnapshot, createEntryWithOptionalOption, optionData, resolvePrefix, seedScheduleFromTemplates, type SnapshotInput } from "./sync";
+
 const ENTRY_ENTITY = "schedule-entry";
 const OPTION_ENTITY = "schedule-option";
 const TEMPLATE_ENTITY = "schedule-template";
-
-type SnapshotInput = {
-  brandId?: string | null;
-  brandName?: string | null;
-  productName: string;
-  skuText?: string | null;
-  color?: string | null;
-  finishing?: string | null;
-  dimension?: string | null;
-  notes?: string | null;
-  imageKey?: string | null;
-};
 
 function sectionOf(value: string): ScheduleSection {
   if (!(SCHEDULE_SECTIONS as readonly string[]).includes(value)) throw invalid("SCHEDULE_SECTION_INVALID", "Choose Material or Fixture.");
@@ -69,44 +62,6 @@ function decimalText(value: string | null | undefined): string | null {
   if (!text) return null;
   if (!/^\d+(\.\d{1,2})?$/.test(text)) throw invalid("SCHEDULE_QTY_INVALID", "Quantity must be a positive number with up to two decimals.");
   return text;
-}
-
-function cleanSnapshot(input: SnapshotInput) {
-  const productName = requiredText(input.productName, "SCHEDULE_PRODUCT_REQUIRED", "Product name", 200);
-  const brandName = optionalText(input.brandName, 160);
-  const skuText = optionalText(input.skuText, 160);
-  const color = optionalText(input.color, 160);
-  const finishing = optionalText(input.finishing, 160);
-  const dimension = optionalText(input.dimension, 160);
-  const notes = optionalText(input.notes, 2000);
-  const imageKey = optionalText(input.imageKey, 500);
-  return {
-    brandId: optionalText(input.brandId, 80),
-    brandName,
-    productName,
-    skuText,
-    color,
-    finishing,
-    dimension,
-    notes,
-    imageKey,
-    searchKey: scheduleSearchKey({ brandName, productName, skuText, color, finishing, dimension }),
-  };
-}
-
-function optionData(snapshot: ReturnType<typeof cleanSnapshot>) {
-  return {
-    brand_id: snapshot.brandId,
-    brand_name: snapshot.brandName,
-    product_name: snapshot.productName,
-    sku_text: snapshot.skuText,
-    color: snapshot.color,
-    finishing: snapshot.finishing,
-    dimension: snapshot.dimension,
-    notes: snapshot.notes,
-    image_key: snapshot.imageKey,
-    search_key: snapshot.searchKey,
-  };
 }
 
 function templateItemData(snapshot: ReturnType<typeof cleanSnapshot>) {
@@ -137,11 +92,6 @@ function scopeError() {
 
 export function createScheduleService(db: Db, ports: StudioFlowPorts) {
   const { runTransaction } = ports;
-
-  async function resolvePrefix(tx: TxClient, section: ScheduleSection, category: string, categoryKey: string): Promise<string> {
-    const row = await tx.sfSchedulePrefix.findUnique({ where: { section_category_key: { section, category_key: categoryKey } } });
-    return row?.prefix ?? fallbackPrefix(category);
-  }
 
   async function entryIds(tx: TxClient, projectId: string, section: ScheduleSection, prefix: string) {
     return (await tx.sfScheduleEntry.findMany({
@@ -177,53 +127,26 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
   }
 
   async function nextLabel(tx: TxClient, entryId: string) {
-    const count = await tx.sfScheduleOption.count({ where: { entry_id: entryId } });
-    return optionLabel(count);
+    const rows = await tx.sfScheduleOption.findMany({ where: { entry_id: entryId }, select: { label: true } });
+    return nextOptionLabel(rows.map((row) => row.label));
+  }
+
+  async function orderedOptions(tx: TxClient, entryId: string) {
+    const rows = await tx.sfScheduleOption.findMany({ where: { entry_id: entryId } });
+    return rows.sort((a, b) => compareOptionLabels(a.label, b.label) || a.created_at.getTime() - b.created_at.getTime());
+  }
+
+  /** Keep `active_index` pointing at the final option (legacy smart delete / approve). */
+  async function syncActiveIndex(tx: TxClient, entryId: string) {
+    const options = await orderedOptions(tx, entryId);
+    const index = options.findIndex((row) => row.is_final);
+    await tx.sfScheduleEntry.update({ where: { id: entryId }, data: { active_index: Math.max(index, 0) } });
   }
 
   async function promoteFirstOption(tx: TxClient, entryId: string) {
-    const next = await tx.sfScheduleOption.findFirst({ where: { entry_id: entryId }, orderBy: [{ label: "asc" }, { created_at: "asc" }] });
+    const [next] = await orderedOptions(tx, entryId);
     if (!next) return;
     await tx.sfScheduleOption.update({ where: { id: next.id }, data: { is_final: true, status: "APPROVED" } });
-    await tx.sfScheduleEntry.update({ where: { id: entryId }, data: { active_index: 0 } });
-  }
-
-  async function createEntryWithOptionalOption(tx: TxClient, input: {
-    projectId: string;
-    section: ScheduleSection;
-    category: string;
-    categoryKey: string;
-    qty?: string | null;
-    unit?: string | null;
-    location?: string | null;
-    templateItemId?: string | null;
-    snapshot?: SnapshotInput | null;
-  }) {
-    const prefix = await resolvePrefix(tx, input.section, input.category, input.categoryKey);
-    const siblings = await tx.sfScheduleEntry.findMany({ where: { project_id: input.projectId, section: input.section, prefix }, orderBy: { increment: "asc" }, select: { increment: true } });
-    const increment = nextGapless(siblings);
-    const entry = await tx.sfScheduleEntry.create({
-      data: {
-        project_id: input.projectId,
-        section: input.section,
-        category: input.category,
-        category_key: input.categoryKey,
-        prefix,
-        increment,
-        sort_order: increment,
-        qty: input.qty ?? null,
-        unit: input.unit ?? null,
-        location: input.location ?? null,
-        template_item_id: input.templateItemId ?? null,
-      },
-    });
-    if (input.snapshot) {
-      const snapshot = cleanSnapshot(input.snapshot);
-      await tx.sfScheduleOption.create({
-        data: { entry_id: entry.id, label: "A", is_final: true, status: "APPROVED", ...optionData(snapshot) },
-      });
-    }
-    return entry;
   }
 
   return {
@@ -237,7 +160,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       const rows = await db.sfScheduleEntry.findMany({
         where: { project_id: input.projectId, ...(section ? { section } : {}) },
         orderBy: [{ section: "asc" }, { category_key: "asc" }, { increment: "asc" }],
-        include: { options: { orderBy: [{ label: "asc" }] } },
+        include: { options: true },
       });
       return rows.map((entry) => ({
         id: entry.id,
@@ -252,7 +175,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         location: entry.location,
         versionLocked: entry.version_locked,
         templateItemId: entry.template_item_id,
-        options: entry.options.map((option) => ({
+        options: [...entry.options].sort((a, b) => compareOptionLabels(a.label, b.label)).map((option) => ({
           id: option.id,
           label: option.label,
           isFinal: option.is_final,
@@ -332,10 +255,14 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
           ? await tx.sfScheduleTemplateCategory.findUnique({ where: { id: input.templateCategoryId } })
           : await tx.sfScheduleTemplateCategory.findUnique({ where: { section_category_key: { section, category_key: category.key } } });
         if (input.templateCategoryId && !parent) throw notFound("schedule template");
+        // Items always hang under a category row so settings can list and manage them.
+        const categoryRow = parent ?? await tx.sfScheduleTemplateCategory.create({
+          data: { section, category: category.label, category_key: category.key, is_default_entry: false, sort_order: (await tx.sfScheduleTemplateCategory.count({ where: { section } })) + 1 },
+        });
         const sortOrder = await tx.sfScheduleTemplateItem.count({ where: { section, category_key: category.key } });
         const item = await tx.sfScheduleTemplateItem.create({
           data: {
-            template_category_id: parent?.id ?? null,
+            template_category_id: categoryRow.id,
             section,
             category: category.label,
             category_key: category.key,
@@ -351,52 +278,58 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       });
     },
 
+    async setTemplateItemActive(input: CommandContext & { templateItemId: string; isActive: boolean }) {
+      requireCommand(input, P.settingsManage);
+      return runTransaction(async (tx) => {
+        const item = await tx.sfScheduleTemplateItem.findUnique({ where: { id: input.templateItemId } });
+        if (!item) throw notFound("schedule template");
+        if (item.is_active === input.isActive) return { templateItemId: item.id };
+        await tx.sfScheduleTemplateItem.update({ where: { id: item.id }, data: { is_active: input.isActive } });
+        await writeAudit(ports, tx, { action: "studioflow.schedule.template-item-updated", entityType: TEMPLATE_ENTITY, entityId: item.id, actor: input.actor, changes: { isActive: { from: item.is_active, to: input.isActive } } });
+        return { templateItemId: item.id };
+      });
+    },
+
+    /** Project rows created from the item keep their snapshot; only the link is cleared (FK SetNull). */
+    async deleteTemplateItem(input: CommandContext & { templateItemId: string }) {
+      requireCommand(input, P.settingsManage);
+      return runTransaction(async (tx) => {
+        const item = await tx.sfScheduleTemplateItem.findUnique({ where: { id: input.templateItemId }, include: { _count: { select: { entries: true } } } });
+        if (!item) throw notFound("schedule template");
+        await tx.sfScheduleTemplateItem.delete({ where: { id: item.id } });
+        await writeAudit(ports, tx, { action: "studioflow.schedule.template-item-deleted", entityType: TEMPLATE_ENTITY, entityId: item.id, actor: input.actor, metadata: { section: item.section, category: item.category, productName: item.product_name, detachedRows: item._count.entries } });
+        return { templateItemId: item.id };
+      });
+    },
+
+    async deleteTemplateCategory(input: CommandContext & { templateCategoryId: string }) {
+      requireCommand(input, P.settingsManage);
+      return runTransaction(async (tx) => {
+        const row = await tx.sfScheduleTemplateCategory.findUnique({ where: { id: input.templateCategoryId } });
+        if (!row) throw notFound("schedule template");
+        await tx.sfScheduleTemplateCategory.delete({ where: { id: row.id } });
+        await writeAudit(ports, tx, { action: "studioflow.schedule.template-category-deleted", entityType: TEMPLATE_ENTITY, entityId: row.id, actor: input.actor, metadata: { section: row.section, category: row.category } });
+        return { templateCategoryId: row.id };
+      });
+    },
+
+    async deletePrefix(input: CommandContext & { prefixId: string }) {
+      requireCommand(input, P.settingsManage);
+      return runTransaction(async (tx) => {
+        const row = await tx.sfSchedulePrefix.findUnique({ where: { id: input.prefixId } });
+        if (!row) throw notFound("schedule prefix");
+        await tx.sfSchedulePrefix.delete({ where: { id: row.id } });
+        await writeAudit(ports, tx, { action: "studioflow.schedule.prefix-deleted", entityType: TEMPLATE_ENTITY, entityId: row.id, actor: input.actor, metadata: { section: row.section, category: row.category, prefix: row.prefix } });
+        return { prefixId: row.id };
+      });
+    },
+
     async applyTemplates(input: CommandContext & { projectId: string }) {
       requireCommand(input, P.scheduleManage);
       return runTransaction(async (tx) => {
         await loadWritableProject(tx, input.projectId);
-        const [categories, items, existing] = await Promise.all([
-          tx.sfScheduleTemplateCategory.findMany({ where: { is_active: true, is_default_entry: true }, orderBy: [{ section: "asc" }, { sort_order: "asc" }] }),
-          tx.sfScheduleTemplateItem.findMany({ where: { is_active: true }, orderBy: [{ section: "asc" }, { sort_order: "asc" }] }),
-          tx.sfScheduleEntry.findMany({ where: { project_id: input.projectId }, select: { section: true, category_key: true, template_item_id: true } }),
-        ]);
-        const categoryKeys = new Set(existing.map((row) => `${row.section}:${row.category_key}`));
-        const templateIds = new Set(existing.map((row) => row.template_item_id).filter(Boolean));
-        let created = 0;
-        for (const item of items) {
-          if (templateIds.has(item.id)) continue;
-          await createEntryWithOptionalOption(tx, {
-            projectId: input.projectId,
-            section: item.section,
-            category: item.category,
-            categoryKey: item.category_key,
-            qty: item.qty?.toString() ?? null,
-            unit: item.unit,
-            location: item.location,
-            templateItemId: item.id,
-            snapshot: item.product_name ? {
-              brandId: item.brand_id,
-              brandName: item.brand_name,
-              productName: item.product_name,
-              skuText: item.sku_text,
-              color: item.color,
-              finishing: item.finishing,
-              dimension: item.dimension,
-              notes: item.notes,
-              imageKey: item.image_key,
-            } : null,
-          });
-          categoryKeys.add(`${item.section}:${item.category_key}`);
-          created += 1;
-        }
-        for (const category of categories) {
-          const key = `${category.section}:${category.category_key}`;
-          if (categoryKeys.has(key)) continue;
-          await createEntryWithOptionalOption(tx, { projectId: input.projectId, section: category.section, category: category.category, categoryKey: category.category_key });
-          categoryKeys.add(key);
-          created += 1;
-        }
-        if (created > 0) await writeAudit(ports, tx, { action: "studioflow.schedule.templates-applied", entityType: "project", entityId: input.projectId, actor: input.actor, metadata: { created } });
+        const created = await seedScheduleFromTemplates(tx, input.projectId);
+        if (created > 0) await writeAudit(ports, tx, { action: "studioflow.schedule.templates-applied", entityType: "project", entityId: input.projectId, actor: input.actor, metadata: { projectId: input.projectId, created } });
         return { created };
       });
     },
@@ -427,8 +360,22 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       requireCommand(input, P.scheduleManage);
       return runTransaction(async (tx) => {
         const entry = await loadEntry(tx, input.projectId, input.entryId, true);
-        await tx.sfScheduleEntry.update({ where: { id: entry.id }, data: { qty: decimalText(input.qty), unit: optionalText(input.unit, 40), location: optionalText(input.location, 160) } });
-        await writeAudit(ports, tx, { action: "studioflow.schedule.entry-updated", entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor, metadata: { projectId: input.projectId } });
+        // Only the fields that were sent change; omitted fields keep their value.
+        const data: { qty?: string | null; unit?: string | null; location?: string | null } = {};
+        if (input.qty !== undefined) data.qty = decimalText(input.qty);
+        if (input.unit !== undefined) data.unit = optionalText(input.unit, 40);
+        if (input.location !== undefined) data.location = optionalText(input.location, 160);
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        const before = { qty: entry.qty?.toString() ?? null, unit: entry.unit, location: entry.location };
+        const same = (key: keyof typeof data, a: string | null, b: string | null) =>
+          key === "qty" && a !== null && b !== null ? Number(a) === Number(b) : a === b;
+        for (const key of Object.keys(data) as (keyof typeof data)[]) {
+          const to = data[key] ?? null;
+          if (!same(key, before[key], to)) changes[key] = { from: before[key], to };
+        }
+        if (Object.keys(changes).length === 0) return { entryId: entry.id };
+        await tx.sfScheduleEntry.update({ where: { id: entry.id }, data });
+        await writeAudit(ports, tx, { action: "studioflow.schedule.entry-updated", entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor, changes, metadata: { projectId: input.projectId, code: scheduleCode(entry.prefix, entry.increment) } });
         return { entryId: entry.id };
       });
     },
@@ -458,6 +405,73 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       });
     },
 
+    /** Move one row up/down inside its code group; codes stay gapless. */
+    async moveEntry(input: CommandContext & { projectId: string; entryId: string; direction: "up" | "down" }) {
+      requireCommand(input, P.scheduleManage);
+      return runTransaction(async (tx) => {
+        const entry = await loadEntry(tx, input.projectId, input.entryId, true);
+        const ids = await entryIds(tx, input.projectId, entry.section, entry.prefix);
+        const index = ids.indexOf(entry.id);
+        const target = input.direction === "up" ? index - 1 : index + 1;
+        if (index < 0 || target < 0 || target >= ids.length) return { entryId: entry.id };
+        [ids[index], ids[target]] = [ids[target], ids[index]];
+        await renumber(tx, input.projectId, entry.section, entry.prefix, ids);
+        await writeAudit(ports, tx, { action: "studioflow.schedule.entries-reordered", entityType: "project", entityId: input.projectId, actor: input.actor, metadata: { projectId: input.projectId, section: entry.section, prefix: entry.prefix, count: ids.length } });
+        return { entryId: entry.id };
+      });
+    },
+
+    /** Legacy "move to category": the row takes the target category's prefix and the next free number there. */
+    async moveEntryToCategory(input: CommandContext & { projectId: string; entryId: string; category: string }) {
+      requireCommand(input, P.scheduleManage);
+      const category = categoryOf(input.category);
+      return runTransaction(async (tx) => {
+        const entry = await loadEntry(tx, input.projectId, input.entryId, true);
+        if (entry.category_key === category.key) return { entryId: entry.id };
+        // Reuse the spelling already used for that category (project rows first, then the prefix dictionary).
+        const known = await tx.sfScheduleEntry.findFirst({ where: { project_id: input.projectId, section: entry.section, category_key: category.key }, select: { category: true } })
+          ?? await tx.sfSchedulePrefix.findUnique({ where: { section_category_key: { section: entry.section, category_key: category.key } }, select: { category: true } });
+        if (known) category.label = known.category;
+        const prefix = await resolvePrefix(tx, entry.section, category.label, category.key);
+        const fromCode = scheduleCode(entry.prefix, entry.increment);
+        if (prefix === entry.prefix) {
+          await tx.sfScheduleEntry.update({ where: { id: entry.id }, data: { category: category.label, category_key: category.key } });
+        } else {
+          const siblings = await tx.sfScheduleEntry.count({ where: { project_id: input.projectId, section: entry.section, prefix } });
+          await tx.sfScheduleEntry.update({ where: { id: entry.id }, data: { category: category.label, category_key: category.key, prefix, increment: siblings + 1, sort_order: siblings + 1 } });
+          await renumber(tx, input.projectId, entry.section, entry.prefix);
+        }
+        const moved = await tx.sfScheduleEntry.findUniqueOrThrow({ where: { id: entry.id } });
+        await writeAudit(ports, tx, { action: "studioflow.schedule.entry-moved", entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor, changes: { category: { from: entry.category, to: category.label }, code: { from: fromCode, to: scheduleCode(moved.prefix, moved.increment) } }, metadata: { projectId: input.projectId } });
+        return { entryId: entry.id, code: scheduleCode(moved.prefix, moved.increment) };
+      });
+    },
+
+    /** Edit an option's snapshot (legacy inspector `updateScheduleOptionSnapshot`). */
+    async updateOption(input: CommandContext & { projectId: string; optionId: string; snapshot: SnapshotInput }) {
+      requireCommand(input, P.scheduleManage);
+      return runTransaction(async (tx) => {
+        const option = await loadOption(tx, input.projectId, input.optionId, true);
+        // Keep the stored brand when the same Master Data brand is sent again (it may have been archived since).
+        const brand = input.snapshot.brandId && input.snapshot.brandId === option.brand_id
+          ? { brandId: option.brand_id, brandName: option.brand_name }
+          : input.snapshot.brandId
+            ? await brandSnapshot(ports, input.snapshot.brandId)
+            : { brandId: null, brandName: input.snapshot.brandName ?? null };
+        const snapshot = cleanSnapshot({ ...input.snapshot, ...brand, imageKey: input.snapshot.imageKey === undefined ? option.image_key : input.snapshot.imageKey });
+        const next = optionData(snapshot);
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        for (const key of Object.keys(next) as (keyof typeof next)[]) {
+          if (key === "search_key") continue;
+          if ((option[key] ?? null) !== (next[key] ?? null)) changes[key] = { from: option[key] ?? null, to: next[key] ?? null };
+        }
+        if (Object.keys(changes).length === 0) return { optionId: option.id };
+        await tx.sfScheduleOption.update({ where: { id: option.id }, data: next });
+        await writeAudit(ports, tx, { action: "studioflow.schedule.option-updated", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, changes, metadata: { projectId: input.projectId, entryId: option.entry_id, label: option.label } });
+        return { optionId: option.id };
+      });
+    },
+
     async createOption(input: CommandContext & { projectId: string; entryId: string; snapshot: SnapshotInput }) {
       requireCommand(input, P.scheduleManage);
       const brand = await brandSnapshot(ports, input.snapshot.brandId);
@@ -477,8 +491,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         const option = await loadOption(tx, input.projectId, input.optionId, true);
         await tx.sfScheduleOption.updateMany({ where: { entry_id: option.entry_id }, data: { is_final: false, status: "NOT_USED" } });
         await tx.sfScheduleOption.update({ where: { id: option.id }, data: { is_final: true, status: "APPROVED" } });
-        const siblings = await tx.sfScheduleOption.findMany({ where: { entry_id: option.entry_id }, orderBy: [{ label: "asc" }] });
-        await tx.sfScheduleEntry.update({ where: { id: option.entry_id }, data: { active_index: Math.max(siblings.findIndex((row) => row.id === option.id), 0), version_locked: true } });
+        await syncActiveIndex(tx, option.entry_id);
         await writeAudit(ports, tx, { action: "studioflow.schedule.option-finalized", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, metadata: { projectId: input.projectId, entryId: option.entry_id } });
         return { optionId: option.id };
       });
@@ -491,6 +504,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         const wasFinal = option.is_final;
         await tx.sfScheduleOption.delete({ where: { id: option.id } });
         if (wasFinal) await promoteFirstOption(tx, option.entry_id);
+        await syncActiveIndex(tx, option.entry_id);
         await writeAudit(ports, tx, { action: "studioflow.schedule.option-deleted", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, metadata: { projectId: input.projectId, entryId: option.entry_id, wasFinal } });
         return { optionId: option.id };
       });
@@ -505,13 +519,15 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
           search_key: { contains: query },
           entry: { project_id: { not: input.projectId }, ...(input.section ? { section: sectionOf(input.section) } : {}) },
         },
-        include: { entry: { select: { project_id: true, section: true, category: true } } },
+        include: { entry: { select: { project_id: true, section: true, category: true, project: { select: { name: true } } } } },
         orderBy: { created_at: "desc" },
         take: Math.min(Math.max(input.limit ?? 20, 1), 80),
       });
       return rows.map((row) => ({
         optionId: row.id,
         sourceProjectId: row.entry.project_id,
+        sourceProjectName: row.entry.project.name,
+        isFinal: row.is_final,
         section: row.entry.section,
         category: row.entry.category,
         brandName: row.brand_name,
@@ -551,9 +567,87 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       });
     },
 
+    /**
+     * CSV import. The legacy Google Sheets export (header row starting with
+     * `code`, columns `product category` / `ex` / `type` …) is the primary
+     * format: a code that already exists updates that row's final option and
+     * quantities; a new code adds a row (numbering stays gapless). A simple
+     * `category,brand,product,…` sheet is accepted as a fallback.
+     */
     async importCsv(input: CommandContext & { projectId: string; section: string; csv: string }) {
       requireCommand(input, P.scheduleManage);
       const section = sectionOf(input.section);
+      const sheet = parseLegacyScheduleSheet(input.csv, section);
+      if (sheet) {
+        if (sheet.length === 0) throw invalid("SCHEDULE_CSV_EMPTY", "The sheet has a header but no rows.");
+        return runTransaction(async (tx) => {
+          await loadWritableProject(tx, input.projectId);
+          let created = 0;
+          let updated = 0;
+          for (const row of sheet) {
+            const code = parseScheduleCode(row.code);
+            const notes = [
+              row.initialsType ? `Initials type: ${row.initialsType}` : null,
+              row.contact ? `Contact: ${row.contact}` : null,
+              row.imageUrl ? `Image: ${row.imageUrl}` : null,
+            ].filter(Boolean).join("\n") || null;
+            const snapshot: SnapshotInput = { brandName: row.brand, productName: row.product || "Imported", notes };
+            const quantities = {
+              ...(row.qty !== null ? { qty: decimalText(row.qty.replace(",", ".")) } : {}),
+              ...(row.unit !== null ? { unit: optionalText(row.unit, 40) } : {}),
+              ...(row.location !== null ? { location: optionalText(row.location, 160) } : {}),
+            };
+            const existing = code
+              ? await tx.sfScheduleEntry.findUnique({ where: { project_id_section_prefix_increment: { project_id: input.projectId, section, prefix: code.prefix, increment: code.increment } } })
+              : null;
+            if (existing) {
+              const options = await orderedOptions(tx, existing.id);
+              const target = options.find((option) => option.is_final) ?? options[0];
+              const data = optionData(cleanSnapshot(snapshot));
+              if (target) {
+                await tx.sfScheduleOption.updateMany({ where: { entry_id: existing.id, id: { not: target.id }, is_final: true }, data: { is_final: false, status: "NOT_USED" } });
+                await tx.sfScheduleOption.update({ where: { id: target.id }, data: { ...data, brand_id: null, is_final: true, status: "APPROVED" } });
+              } else {
+                await tx.sfScheduleOption.create({ data: { entry_id: existing.id, label: "A", is_final: true, status: "APPROVED", ...data } });
+              }
+              if (Object.keys(quantities).length > 0) await tx.sfScheduleEntry.update({ where: { id: existing.id }, data: quantities });
+              await syncActiveIndex(tx, existing.id);
+              updated += 1;
+              continue;
+            }
+            let categoryLabel = row.category?.trim() || null;
+            if (categoryLabel && categoryLabel.toLowerCase() === "general") {
+              throw invalid("SCHEDULE_CSV_CATEGORY", `Row ${row.code}: "General" is not a valid category.`);
+            }
+            if (!categoryLabel && code) {
+              const matches = await tx.sfSchedulePrefix.findMany({ where: { section, prefix: code.prefix } });
+              if (matches.length > 1) throw invalid("SCHEDULE_CSV_CATEGORY", `Row ${row.code}: prefix ${code.prefix} matches several categories (${matches.map((m) => m.category).join(", ")}).`);
+              categoryLabel = matches[0]?.category ?? null;
+            }
+            if (!categoryLabel) throw invalid("SCHEDULE_CSV_CATEGORY", `Row ${row.code}: the category cannot be determined. Add a product category or a prefix in Studio Settings.`);
+            const category = categoryOf(categoryLabel);
+            // A category seen for the first time keeps the sheet's prefix, so imported codes stay recognisable.
+            if (code) {
+              const known = await tx.sfSchedulePrefix.findUnique({ where: { section_category_key: { section, category_key: category.key } } });
+              if (!known) await tx.sfSchedulePrefix.create({ data: { section, category: category.label, category_key: category.key, prefix: code.prefix } });
+            }
+            await createEntryWithOptionalOption(tx, {
+              projectId: input.projectId,
+              section,
+              category: category.label,
+              categoryKey: category.key,
+              qty: quantities.qty ?? null,
+              unit: quantities.unit ?? null,
+              location: quantities.location ?? null,
+              snapshot,
+            });
+            created += 1;
+          }
+          await writeAudit(ports, tx, { action: "studioflow.schedule.csv-imported", entityType: "project", entityId: input.projectId, actor: input.actor, metadata: { projectId: input.projectId, section, format: "gsheets", created, updated } });
+          return { created, updated };
+        });
+      }
+
       const rows = parseLegacyScheduleCsv(input.csv);
       if (rows.length === 0) throw invalid("SCHEDULE_CSV_EMPTY", "The CSV has no rows.");
       return runTransaction(async (tx) => {
@@ -584,9 +678,9 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
           });
           created += 1;
         }
-        if (created === 0) throw invalid("SCHEDULE_CSV_EMPTY", "No usable schedule rows were found.");
-        await writeAudit(ports, tx, { action: "studioflow.schedule.csv-imported", entityType: "project", entityId: input.projectId, actor: input.actor, metadata: { section, created } });
-        return { created };
+        if (created === 0) throw invalid("SCHEDULE_CSV_EMPTY", "No usable schedule rows were found. Use the Google Sheets export (with a Code column) or category, brand, product columns.");
+        await writeAudit(ports, tx, { action: "studioflow.schedule.csv-imported", entityType: "project", entityId: input.projectId, actor: input.actor, metadata: { projectId: input.projectId, section, format: "simple", created } });
+        return { created, updated: 0 };
       });
     },
   };

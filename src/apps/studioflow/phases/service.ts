@@ -223,6 +223,10 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           });
           converted.push(id);
         }
+        // The originals were carried into the new revision as to-dos; close them so they stop counting as open work.
+        if (feedback.length > 0) {
+          await tx.sfActivity.updateMany({ where: { id: { in: feedback.map((item) => item.id) } }, data: { status: "COMPLETED", completed_at: nowOf(ports) } });
+        }
         await setPhase(tx, phase, { status: "IN_PROGRESS" });
         await audit(tx, input.actor, input.type === "CLIENT" ? "rejected-client" : "rejected-internal", phase, from, "IN_PROGRESS", {
           previousRevision: revisionLabel(current),
@@ -254,9 +258,17 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       requireCommand(input, P.phaseReview);
       const reason = requiredText(input.reason, "REOPEN_REASON_REQUIRED", "A reason", 500);
       return runTransaction(async (tx) => {
-        const { phase } = await loadPhase(tx, input.projectId, input.phaseId);
+        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId);
         const from = phase.status as PhaseStatus;
         if (!phase.is_locked && from !== "PENDING") throw invalidState("Only an approved, finished, or not-started phase can be reopened.");
+        if (from === "PENDING") {
+          // A not-started phase follows the same start rules as "Start phase".
+          if (project.status !== "ACTIVE") throw conflict("PROJECT_NOT_ACTIVE", "The project must be active to reopen a phase.");
+          const previous = await tx.sfPhase.findFirst({ where: { project_id: project.id, order_index: phase.order_index - 1 } });
+          if (!canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null)) {
+            throw conflict("PHASE_SEQUENTIAL", `${phaseLabel(phase.key as PhaseKey)} starts after ${phaseLabel(previous!.key as PhaseKey)} is approved.`);
+          }
+        }
         const current = await activeRevision(tx, phase.id);
         if (current) await closeRevision(tx, current.id);
         const base = current ?? (await latestRevision(tx, phase.id));
@@ -378,9 +390,10 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     async updateActivity(input: CommandContext & { projectId: string; activityId: string; content?: string; dueDate?: string | null; assignedToId?: string | null }) {
       requireCommand(input, P.phaseWork);
       const due = parseDue(input.dueDate);
-      if (input.assignedToId !== undefined) await assertAssignee(input.assignedToId);
       return runTransaction(async (tx) => {
         const activity = await loadActivity(tx, input.projectId, input.activityId);
+        // Only a changed assignee is validated, so items kept on a former member stay editable.
+        if (input.assignedToId !== undefined && (input.assignedToId ?? null) !== activity.assigned_to_id) await assertAssignee(input.assignedToId);
         const data: { content?: string; due_at?: Date | null; assigned_to_id?: string | null } = {};
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (input.content !== undefined) {
@@ -498,7 +511,8 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       if (!phase || phase.project_id !== input.projectId) throw notFound("phase");
       const status = phase.status as PhaseStatus;
       const counts = await readBlockerCounts(db, phase.id);
-      const deferred = await db.sfActivity.findMany({ where: { phase_id: phase.id, revision_id: null }, orderBy: { created_at: "asc" } });
+      // Only open deferred items still block approval; finished ones are history.
+      const deferred = await db.sfActivity.findMany({ where: { phase_id: phase.id, revision_id: null, status: "OPEN" }, orderBy: { created_at: "asc" } });
       const previous = await db.sfPhase.findFirst({ where: { project_id: phase.project_id, order_index: phase.order_index - 1 } });
       const canStart = canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null);
       const active = phase.revisions.find((rev) => rev.status === "ACTIVE") ?? null;
@@ -506,6 +520,8 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       const commands = archived ? [] : availablePhaseCommands({ key: phase.key as PhaseKey, status, isLocked: phase.is_locked }).filter((command) => {
         if (command === "activate") return canStart && phase.project.status === "ACTIVE";
         if (command === "bypass") return phase.project.status === "ACTIVE";
+        // Reopening a not-started phase only makes sense after earlier revisions, under the start rules.
+        if (command === "reopen" && status === "PENDING") return canStart && phase.project.status === "ACTIVE" && phase.revisions.length > 0;
         return true;
       });
       return {

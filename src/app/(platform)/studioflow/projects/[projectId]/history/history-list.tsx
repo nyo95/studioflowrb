@@ -53,6 +53,18 @@ const PHRASES: Record<string, string> = {
   "studioflow.mom.image-added": "added a MOM photo",
   "studioflow.mom.image-replaced": "replaced a MOM photo",
   "studioflow.mom.image-removed": "removed a MOM photo",
+  "studioflow.schedule.entry-created": "added a schedule item",
+  "studioflow.schedule.entry-updated": "edited a schedule item",
+  "studioflow.schedule.entry-deleted": "deleted a schedule item",
+  "studioflow.schedule.entry-moved": "moved a schedule item to another category",
+  "studioflow.schedule.entries-reordered": "reordered schedule items",
+  "studioflow.schedule.option-created": "added a schedule option",
+  "studioflow.schedule.option-updated": "edited a schedule option",
+  "studioflow.schedule.option-finalized": "set a final schedule option",
+  "studioflow.schedule.option-deleted": "deleted a schedule option",
+  "studioflow.schedule.option-reused": "copied a product from a past project",
+  "studioflow.schedule.templates-applied": "applied schedule templates",
+  "studioflow.schedule.csv-imported": "imported the schedule CSV",
 };
 
 const PHASE_NAMES: Record<string, string> = { MOODBOARD: "Moodboard", LAYOUT: "Layout Plan", DESIGN_3D: "3D Design", CD: "Construction Drawing", SUPERVISION: "Supervision" };
@@ -66,6 +78,8 @@ function detail(event: Event): string | null {
   if (typeof meta.note === "string" && meta.note) parts.push(`“${meta.note}”`);
   if (typeof meta.label === "string") parts.push(meta.label);
   if (typeof meta.topic === "string") parts.push(meta.topic);
+  if (typeof meta.code === "string") parts.push(meta.code);
+  if (typeof meta.label === "undefined" && typeof meta.created === "number") parts.push(`${meta.created} added${typeof meta.updated === "number" ? `, ${meta.updated} updated` : ""}`);
   const snapshot = meta.snapshot as { topic?: unknown } | undefined;
   if (snapshot && typeof snapshot.topic === "string") parts.push(snapshot.topic);
   if (typeof meta.content === "string") parts.push(meta.content);

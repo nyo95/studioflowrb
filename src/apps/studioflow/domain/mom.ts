@@ -28,7 +28,8 @@ export const MOM_LIMITS = {
   attendees: 5000,
   preparedBy: 200,
   pointText: 5000,
-  imageBytes: 10 * 1024 * 1024,
+  /** Prepared (cropped JPEG) upload; must stay under the 4 MB server-action body limit. */
+  imageBytes: 3 * 1024 * 1024,
 } as const;
 
 export const MOM_IMAGE_TYPES: Record<string, string> = {

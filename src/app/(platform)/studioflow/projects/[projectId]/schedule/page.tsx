@@ -17,7 +17,7 @@ export default async function ProjectSchedulePage({ params }: { params: Promise<
   const canEdit = studioFlow.schedule.canManage(grants) && project.archivedAt === null;
 
   return (
-    <SectionCard title="Product Schedule" description="Project-owned FF&E / product schedule with typed snapshots and final options." count={entries.length} padded={false}>
+    <SectionCard title="Product Schedule" description="Materials and fixtures specified for this project, each with its options and the chosen final one." count={entries.length} padded={false}>
       <ScheduleBoard projectId={projectId} entries={entries} brands={brands} canEdit={canEdit} />
     </SectionCard>
   );

@@ -222,6 +222,18 @@ No item currently ready for review.
   drafter read-only behavior, archived-project read-only behavior, and mobile
   width rendering.
 
+### Review corrections (R8.74)
+
+- Pre-acceptance code review of SF-R1…SF-R3 fixed reopen/start rules,
+  former-assignee edits, archived-client project edits, carried-forward
+  feedback, template sync on locked phases, overlapping command state, MOM
+  photo size, schedule option labels, the Google Sheets import, schedule
+  seeding on new projects, and the Schedule UI (see CHANGELOG R8.74).
+- Verified in the cloud workspace: 372/372 tests, typecheck, lint, boundary
+  checks, production build, and a production-build Playwright smoke of the
+  Schedule flow with zero console errors. Local checks and the SF-RF browser
+  pass remain with the local executor.
+
 ### Wave 1 parity gate
 
 - **Needs:** One SF-RF browser acceptance pass over the complete wave-1 surface

@@ -132,6 +132,7 @@ export function ChecklistTree({
           initial={{ label: editing.label, priority: editing.priority, dueDate: editing.dueDate, assigneeId: editing.assigneeId }}
           people={people}
           showPriority
+          maxLength={200}
           pending={pendingKey === "edit"}
           error={error}
           onSave={async (values) => {

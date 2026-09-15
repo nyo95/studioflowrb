@@ -29,6 +29,7 @@ import {
   type StudioFlowPorts,
   type TxClient,
 } from "../shared";
+import { seedScheduleFromTemplates } from "../schedule/sync";
 import { seedChecklistFromTemplates } from "../tasks/sync";
 
 export const PROJECT_STATUSES = ["ACTIVE", "ON_HOLD", "COMPLETED"] as const;
@@ -421,7 +422,9 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         }
         await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phaseIds.get("MOODBOARD")!, major: 1, minor: 0, status: "ACTIVE" } });
         const seeded = await seedChecklistFromTemplates(tx, projectId, userId);
-        await writeAudit(ports, tx, { action: "studioflow.project.created", entityType: "project", entityId: projectId, actor: input.actor, metadata: { projectId, name, code, clientId, checklistItems: seeded } });
+        // Legacy: default schedule categories and template items land on every new project.
+        const scheduleRows = await seedScheduleFromTemplates(tx, projectId);
+        await writeAudit(ports, tx, { action: "studioflow.project.created", entityType: "project", entityId: projectId, actor: input.actor, metadata: { projectId, name, code, clientId, checklistItems: seeded, scheduleRows } });
         return { projectId, name };
       });
     },
@@ -452,7 +455,9 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         if (input.picDrafterId !== undefined && input.picDrafterId !== project.pic_drafter_id) await assertPic(input.picDrafterId, "drafter");
         track("picDesignerId", project.pic_designer_id, input.picDesignerId, () => { data.pic_designer_id = input.picDesignerId; });
         track("picDrafterId", project.pic_drafter_id, input.picDrafterId, () => { data.pic_drafter_id = input.picDrafterId; });
-        if (input.clientId !== undefined || input.newClientName) {
+        // Keeping the current client (even an archived one) is not a change.
+        const keepsClient = !input.newClientName?.trim() && input.clientId !== undefined && (input.clientId ?? null) === project.client_id;
+        if (!keepsClient && (input.clientId !== undefined || input.newClientName)) {
           const clientId = await resolveClientId(tx, input, input.actor);
           track("clientId", project.client_id, clientId, () => { data.client_id = clientId; });
         }

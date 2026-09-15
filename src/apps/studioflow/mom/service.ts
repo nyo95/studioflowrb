@@ -417,7 +417,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
       const extension = MOM_IMAGE_TYPES[input.file.contentType];
       if (!extension) throw invalid("MOM_IMAGE_TYPE", "Use a PNG, JPEG, or WebP image.");
       const bytes = input.file.body.byteLength;
-      if (bytes === 0 || bytes > MOM_LIMITS.imageBytes) throw invalid("MOM_IMAGE_SIZE", "Images must be smaller than 10 MB.");
+      if (bytes === 0 || bytes > MOM_LIMITS.imageBytes) throw invalid("MOM_IMAGE_SIZE", "Photos must be smaller than 3 MB after cropping.");
       if (!sniffImage(input.file.body, input.file.contentType)) throw invalid("MOM_IMAGE_TYPE", "This file is not a valid image.");
 
       // Scope check before touching storage.

@@ -164,6 +164,17 @@ describe("SF-R1 phase workflow (legacy parity)", () => {
     assert.equal(rejected.converted, 1);
     const converted = await testDb.prisma.sfActivity.findFirstOrThrow({ where: { phase_id: phase.id, mode: "TODO", status: "OPEN" } });
     assert.equal(converted.assigned_to_id, designer.id);
+    const original = await testDb.prisma.sfActivity.findFirstOrThrow({ where: { phase_id: phase.id, mode: "FEEDBACK" } });
+    assert.equal(original.status, "COMPLETED", "carried-forward feedback no longer counts as open work");
+    const [listed] = (await sf.projects.listProjects({ grants: ALL })).filter((p) => p.id === projectId);
+    assert.ok(listed, "project is listed");
+
+    // An item kept on someone who lost phase.work stays editable when the assignee is unchanged.
+    const former = await seedUser("Former Staff", [P.access, P.projectRead]);
+    await testDb.prisma.sfActivity.update({ where: { id: converted.id }, data: { assigned_to_id: former.id } });
+    await sf.phases.updateActivity({ ...base, activityId: converted.id, content: "Warmer palette v2", assignedToId: former.id });
+    const viewer = await seedUser("Viewer Only", [P.access, P.projectRead]);
+    await rejectsWith(sf.phases.updateActivity({ ...base, activityId: converted.id, assignedToId: viewer.id }), "ASSIGNEE_NOT_ELIGIBLE");
 
     await sf.phases.setActivityDone({ ...base, activityId: converted.id, done: true });
     await sf.phases.submitForInternalReview(base);
@@ -214,6 +225,10 @@ describe("SF-R1 phase workflow (legacy parity)", () => {
     const supervision = await phaseOf(projectId, "SUPERVISION");
     await sf.phases.activatePhase({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: layout.id });
     await rejectsWith(sf.phases.activatePhase({ ...as(designer), projectId, phaseId: supervision.id }), "PHASE_SEQUENTIAL");
+    // "Reopen" must not sidestep the start rules for a phase that has not started.
+    await rejectsWith(sf.phases.reopenPhase({ ...as(designer), projectId, phaseId: supervision.id, intent: "INTERNAL", reason: "early" }), "PHASE_SEQUENTIAL");
+    const supervisionDetail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: supervision.id });
+    assert.equal(supervisionDetail.commands.includes("reopen"), false);
     const cd = await phaseOf(projectId, "CD");
     await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ON_HOLD" });
     await rejectsWith(sf.phases.activatePhase({ ...as(designer), projectId, phaseId: cd.id }), "PROJECT_NOT_ACTIVE");
@@ -474,7 +489,8 @@ describe("SF-R3 Product Schedule", () => {
   });
 
   it("applies templates idempotently and snapshots Master Data Brand through the public port", async () => {
-    const brand = await testDb.prisma.brand.create({ data: { id: randomUUID(), name: "TACO", slug: "taco" } });
+    const tag = randomUUID().slice(0, 8);
+    const brand = await testDb.prisma.brand.create({ data: { id: randomUUID(), name: `TACO ${tag}`, slug: `taco-${tag}` } });
     const category = await sf.schedule.upsertTemplateCategory({ ...as(designer), section: "MATERIAL", category: "HPL", isDefaultEntry: true });
     await sf.schedule.createTemplateItem({
       ...as(designer),
@@ -487,12 +503,16 @@ describe("SF-R3 Product Schedule", () => {
       location: "Cabinet",
     });
     const { projectId } = await newProject();
+    assert.equal((await sf.schedule.listSchedule({ grants: ALL, projectId })).length, 1, "seeded when the project was created");
+    assert.deepEqual(await sf.schedule.applyTemplates({ ...as(designer), projectId }), { created: 0 });
+    const older = await testDb.prisma.sfScheduleEntry.deleteMany({ where: { project_id: projectId } });
+    assert.equal(older.count, 1);
     assert.deepEqual(await sf.schedule.applyTemplates({ ...as(designer), projectId }), { created: 1 });
     assert.deepEqual(await sf.schedule.applyTemplates({ ...as(designer), projectId }), { created: 0 });
     const [entry] = await sf.schedule.listSchedule({ grants: ALL, projectId });
     assert.equal(entry.category, "HPL");
     assert.equal(entry.options[0].brandId, brand.id);
-    assert.equal(entry.options[0].brandName, "TACO");
+    assert.equal(entry.options[0].brandName, `TACO ${tag}`);
   });
 
   it("reuses past project snapshots and imports legacy CSV rows", async () => {
@@ -528,5 +548,88 @@ describe("SF-R3 Product Schedule", () => {
     await sf.projects.archiveProject({ ...as(designer), projectId, reason: "Done" });
     await rejectsWith(sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" }), "PROJECT_ARCHIVED");
     assert.equal((await sf.schedule.listSchedule({ grants: DRAFTER_GRANTS, projectId })).length, 1);
+  });
+
+  it("keeps labels unique, edits options and items partially, and moves rows between groups", async () => {
+    const { projectId } = await newProject();
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Paint", prefix: "PT" });
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Wallpaper", prefix: "WP" });
+    const a = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", qty: "2", unit: "pail", snapshot: { productName: "A paint" } });
+    const b = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "B paint" } });
+    const c = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });
+
+    const optB = await sf.schedule.createOption({ ...as(designer), projectId, entryId: a.entryId, snapshot: { productName: "Alt B" } });
+    await sf.schedule.createOption({ ...as(designer), projectId, entryId: a.entryId, snapshot: { productName: "Alt C" } });
+    await sf.schedule.deleteOption({ ...as(designer), projectId, optionId: optB.optionId });
+    await sf.schedule.createOption({ ...as(designer), projectId, entryId: a.entryId, snapshot: { productName: "Alt D" } });
+    const list = async () => sf.schedule.listSchedule({ grants: ALL, projectId });
+    let rowA = (await list()).find((row) => row.id === a.entryId)!;
+    assert.deepEqual(rowA.options.map((o) => o.label), ["A", "C", "D"], "a deleted label is never reused");
+
+    const optD = rowA.options.find((o) => o.label === "D")!;
+    await sf.schedule.markFinal({ ...as(designer), projectId, optionId: optD.id });
+    const entryRow = await testDb.prisma.sfScheduleEntry.findUniqueOrThrow({ where: { id: a.entryId } });
+    assert.equal(entryRow.active_index, 2);
+    assert.equal(entryRow.version_locked, false, "approval does not lock the row (legacy)");
+
+    await sf.schedule.updateOption({ ...as(designer), projectId, optionId: optD.id, snapshot: { productName: "Alt D2", brandName: "Jotun", color: "Ivory" } });
+    rowA = (await list()).find((row) => row.id === a.entryId)!;
+    assert.deepEqual([rowA.options[2].productName, rowA.options[2].brandName, rowA.options[2].color], ["Alt D2", "Jotun", "Ivory"]);
+    const hits = await sf.schedule.searchReusableOptions({ grants: ALL, projectId: (await newProject("Other")).projectId, query: "ivory" });
+    assert.equal(hits[0]?.sourceProjectName, "2026-001 Heloskin Cimanggu", "edited snapshot is searchable");
+
+    await sf.schedule.updateEntry({ ...as(designer), projectId, entryId: a.entryId, location: "Lobby" });
+    rowA = (await list()).find((row) => row.id === a.entryId)!;
+    assert.deepEqual([rowA.qty, rowA.unit, rowA.location], ["2", "pail", "Lobby"], "omitted fields keep their value");
+
+    await sf.schedule.moveEntry({ ...as(designer), projectId, entryId: c.entryId, direction: "up" });
+    assert.deepEqual((await list()).map((row) => [row.code, row.id]), [["PT-01", a.entryId], ["PT-02", c.entryId], ["PT-03", b.entryId]]);
+
+    const moved = await sf.schedule.moveEntryToCategory({ ...as(designer), projectId, entryId: a.entryId, category: "wallpaper" });
+    assert.equal(moved.code, "WP-01");
+    assert.deepEqual((await list()).map((row) => [row.code, row.category]), [["PT-01", "Paint"], ["PT-02", "Paint"], ["WP-01", "Wallpaper"]]);
+  });
+
+  it("imports the legacy Google Sheets export and updates existing codes", async () => {
+    const { projectId } = await newProject();
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Paint", prefix: "PT" });
+    const existing = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "Old paint" } });
+    const sheet = [
+      "MATERIAL SCHEDULE,,,,,,,,,",
+      "Code,Product Category,Ex,Type,Initials Type,Image,Location,Contact,Qty,Unit",
+      "PT-01,,Dulux,Easy Clean,EC,,Bedroom,Budi 0812,9,pail",
+      "FL-01,Floor Tile,Roman,Granitio,,,Lobby,,,m2",
+      "FL-02,Floor Tile,Roman,dBasic,,,Toilet,,,m2",
+    ].join("\n");
+    const result = await sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", csv: sheet });
+    assert.deepEqual(result, { created: 2, updated: 1 });
+    const rows = await sf.schedule.listSchedule({ grants: ALL, projectId, section: "MATERIAL" });
+    const pt = rows.find((row) => row.id === existing.entryId)!;
+    assert.deepEqual([pt.code, pt.options[0].productName, pt.options[0].brandName, pt.location, pt.qty], ["PT-01", "Easy Clean", "Dulux", "Bedroom", null]);
+    assert.match(pt.options[0].notes ?? "", /Contact: Budi 0812/);
+    assert.deepEqual(rows.filter((row) => row.category === "Floor Tile").map((row) => row.code), ["FL-01", "FL-02"], "a new category keeps the sheet prefix");
+
+    await rejectsWith(sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", csv: "Code,Product Category,Ex,Type\nZZ-01,,Brand,Thing" }), "SCHEDULE_CSV_CATEGORY");
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Tile Wall", prefix: "FL" });
+    await rejectsWith(sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", csv: "Code,Product Category,Ex,Type\nFL-09,,Brand,Thing" }), "SCHEDULE_CSV_CATEGORY");
+    assert.equal((await sf.schedule.listSchedule({ grants: ALL, projectId })).length, 3, "a failed import writes nothing");
+  });
+
+  it("manages template items and skips inactive ones", async () => {
+    const one = await sf.schedule.createTemplateItem({ ...as(designer), section: "FIXTURE", category: "Lighting", snapshot: { productName: "Downlight" } });
+    const two = await sf.schedule.createTemplateItem({ ...as(designer), section: "FIXTURE", category: "Lighting", snapshot: { productName: "Track light" } });
+    const templates = await sf.schedule.listTemplates({ grants: ALL });
+    assert.deepEqual(templates.map((t) => [t.category, t.items.length, t.is_default_entry]), [["Lighting", 2, false]], "items get a category row");
+    await sf.schedule.setTemplateItemActive({ ...as(designer), templateItemId: two.templateItemId, isActive: false });
+    await sf.schedule.upsertTemplateCategory({ ...as(designer), section: "MATERIAL", category: "Paint", isDefaultEntry: true });
+    const { projectId } = await newProject();
+    const seeded = await sf.schedule.listSchedule({ grants: ALL, projectId });
+    assert.deepEqual(seeded.map((row) => [row.category, row.options.length]).sort(), [["Lighting", 1], ["Paint", 0]], "new projects get template items and reserve rows");
+    assert.deepEqual(await sf.schedule.applyTemplates({ ...as(designer), projectId }), { created: 0 });
+    await sf.schedule.deleteTemplateItem({ ...as(designer), templateItemId: one.templateItemId });
+    const row = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((r) => r.category === "Lighting")!;
+    assert.equal(row.templateItemId, null, "project rows keep their snapshot after the template is deleted");
+    assert.equal(row.options[0].productName, "Downlight");
+    await rejectsWith(sf.schedule.deleteTemplateItem({ ...as(drafter, DRAFTER_GRANTS), templateItemId: two.templateItemId }).catch((e) => { throw e instanceof AppError && e.kind === "FORBIDDEN" ? new AppError("FORBIDDEN", "FORBIDDEN_OK", "x") : e; }), "FORBIDDEN_OK");
   });
 });

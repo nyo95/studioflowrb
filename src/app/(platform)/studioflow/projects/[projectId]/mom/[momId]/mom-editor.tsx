@@ -229,9 +229,9 @@ function SectionEditor({
   onPickImage: (slot: 0 | 1) => void;
   confirm: ReturnType<typeof useConfirm>["confirm"];
 }) {
-  const { run, pendingKey } = command;
+  const { run, pendingKey, pendingKeys } = command;
   const markers = pointMarkers(item.listStyle, item.points.map((p) => p.style));
-  const busy = pendingKey?.startsWith(item.id) ?? false;
+  const busy = pendingKeys.some((key) => key.startsWith(item.id));
 
   const updateItem = (patch: Partial<Pick<MomItem, "isTextOnly" | "listStyle">>) =>
     run(`${item.id}-item`, () => updateMomItemAction({ projectId, itemId: item.id, isTextOnly: patch.isTextOnly ?? item.isTextOnly, listStyle: patch.listStyle ?? item.listStyle }));
@@ -361,13 +361,13 @@ function PhotoSlot({ slot, image, canEdit, busy, onPick, onRemove }: { slot: 0 |
 }
 
 function PointEditor({ projectId, point, marker, first, last, canEdit, command }: { projectId: string; point: MomPoint; marker: string; first: boolean; last: boolean; canEdit: boolean; command: Command }) {
-  const { run, pendingKey } = command;
+  const { run, pendingKeys } = command;
   const [text, setText] = useState(point.text);
   const save = (style: MomPointStyle = point.style) => {
     if (text === point.text && style === point.style) return;
     void run(`${point.id}-save`, () => updateMomPointAction({ projectId, pointId: point.id, text, style }));
   };
-  const busy = pendingKey?.startsWith(point.id) ?? false;
+  const busy = pendingKeys.some((key) => key.startsWith(point.id));
 
   if (!canEdit) {
     return (

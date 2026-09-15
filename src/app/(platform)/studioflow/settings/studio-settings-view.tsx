@@ -5,11 +5,24 @@ import { useState } from "react";
 import type { PhaseKey } from "@/apps/studioflow/domain/phase";
 import { Badge, Button, Field, InlineError, Input, RowActionMenu, SectionCard, Select, Switch, Text } from "@/platform/ui_engine";
 
-import { createScheduleTemplateItemAction, createTemplateAction, deleteTemplateAction, reorderTemplatesAction, setAutoNamingAction, updateTemplateAction, upsertSchedulePrefixAction, upsertScheduleTemplateCategoryAction } from "../actions";
+import {
+  createScheduleTemplateItemAction,
+  createTemplateAction,
+  deleteSchedulePrefixAction,
+  deleteScheduleTemplateCategoryAction,
+  deleteScheduleTemplateItemAction,
+  deleteTemplateAction,
+  reorderTemplatesAction,
+  setAutoNamingAction,
+  setScheduleTemplateItemActiveAction,
+  updateTemplateAction,
+  upsertSchedulePrefixAction,
+  upsertScheduleTemplateCategoryAction,
+} from "../actions";
 import { useCommand } from "../_components/use-command";
 
 type Template = { id: string; phaseKey: PhaseKey | null; label: string; isActive: boolean; sortOrder: number; usedBy: number };
-type ScheduleTemplate = { id: string; section: "MATERIAL" | "FIXTURE"; category: string; is_default_entry: boolean; is_active: boolean; items: Array<{ id: string; product_name: string; brand_name: string | null; sku_text: string | null }> };
+type ScheduleTemplate = { id: string; section: "MATERIAL" | "FIXTURE"; category: string; is_default_entry: boolean; is_active: boolean; items: Array<{ id: string; product_name: string; brand_name: string | null; sku_text: string | null; is_active: boolean; qty: { toString(): string } | null; unit: string | null; location: string | null }> };
 type SchedulePrefix = { id: string; section: "MATERIAL" | "FIXTURE"; category: string; prefix: string };
 type BrandChoice = { id: string; name: string };
 
@@ -80,7 +93,7 @@ function ScheduleSettings({
 }) {
   const [prefix, setPrefix] = useState({ section: "MATERIAL" as "MATERIAL" | "FIXTURE", category: "", prefix: "" });
   const [category, setCategory] = useState({ section: "MATERIAL" as "MATERIAL" | "FIXTURE", category: "", isDefaultEntry: true });
-  const [item, setItem] = useState({ section: "MATERIAL" as "MATERIAL" | "FIXTURE", category: "", brandId: "", productName: "", skuText: "", unit: "", qty: "" });
+  const [item, setItem] = useState({ section: "MATERIAL" as "MATERIAL" | "FIXTURE", category: "", brandId: "", productName: "", skuText: "", unit: "", qty: "", location: "" });
 
   return (
     <SectionCard title="Product Schedule" description="Prefix dictionary and default schedule rows for new or existing projects." count={scheduleTemplates.length} padded>
@@ -92,7 +105,14 @@ function ScheduleSettings({
         </div>
         {canManage ? <Button size="sm" className="justify-self-start" pending={pendingKey === "schedule-prefix"} disabled={!prefix.category.trim() || !prefix.prefix.trim()} onClick={() => run("schedule-prefix", () => upsertSchedulePrefixAction(prefix))}>Save prefix</Button> : null}
         <div className="flex flex-wrap gap-1">
-          {schedulePrefixes.map((row) => <Badge key={row.id}>{row.section === "MATERIAL" ? "Material" : "Fixture"} · {row.category}: {row.prefix}</Badge>)}
+          {schedulePrefixes.map((row) => (
+            <span key={row.id} className="inline-flex items-center gap-1">
+              <Badge>{row.section === "MATERIAL" ? "Material" : "Fixture"} · {row.category}: {row.prefix}</Badge>
+              {canManage ? (
+                <button type="button" className="text-xs text-ink-tertiary hover:text-danger" aria-label={`Remove prefix ${row.prefix} for ${row.category}`} disabled={pendingKey === row.id} onClick={() => run(row.id, () => deleteSchedulePrefixAction(row.id))}>×</button>
+              ) : null}
+            </span>
+          ))}
         </div>
 
         <div className="border-t border-line-subtle pt-4">
@@ -113,7 +133,9 @@ function ScheduleSettings({
             <Field label="Brand"><Select density="compact" value={item.brandId} onChange={(e) => setItem({ ...item, brandId: e.target.value })}><option value="">Manual</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</Select></Field>
             <Field label="Product"><Input density="compact" value={item.productName} onChange={(e) => setItem({ ...item, productName: e.target.value })} /></Field>
             <Field label="SKU"><Input density="compact" value={item.skuText} onChange={(e) => setItem({ ...item, skuText: e.target.value })} /></Field>
-            <Field label="Qty"><Input density="compact" value={item.qty} onChange={(e) => setItem({ ...item, qty: e.target.value })} /></Field>
+            <Field label="Qty"><Input density="compact" inputMode="decimal" value={item.qty} onChange={(e) => setItem({ ...item, qty: e.target.value })} /></Field>
+            <Field label="Unit"><Input density="compact" value={item.unit} onChange={(e) => setItem({ ...item, unit: e.target.value })} /></Field>
+            <Field label="Location"><Input density="compact" value={item.location} onChange={(e) => setItem({ ...item, location: e.target.value })} /></Field>
           </div>
           {canManage ? (
             <Button
@@ -121,7 +143,7 @@ function ScheduleSettings({
               className="mt-2"
               pending={pendingKey === "schedule-item"}
               disabled={!item.category.trim() || !item.productName.trim()}
-              onClick={() => run("schedule-item", () => createScheduleTemplateItemAction({ section: item.section, category: item.category, snapshot: { brandId: item.brandId || null, productName: item.productName, skuText: item.skuText || null }, qty: item.qty || null, unit: item.unit || null }))}
+              onClick={() => run("schedule-item", () => createScheduleTemplateItemAction({ section: item.section, category: item.category, snapshot: { brandId: item.brandId || null, productName: item.productName, skuText: item.skuText || null }, qty: item.qty || null, unit: item.unit || null, location: item.location || null }))}
             >
               Add template item
             </Button>
@@ -131,12 +153,38 @@ function ScheduleSettings({
         <div className="grid gap-2">
           {scheduleTemplates.map((template) => (
             <div key={template.id} className="rounded-card border border-line-subtle p-2">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Badge>{template.section === "MATERIAL" ? "Material" : "Fixture"}</Badge>
                 <Text className="font-medium">{template.category}</Text>
-                {template.is_default_entry ? <Text size="sm" tone="tertiary">default empty entry</Text> : null}
+                {template.is_default_entry ? <Text size="sm" tone="tertiary">reserves an empty row on new projects</Text> : null}
+                {canManage ? (
+                  <span className="ml-auto">
+                    <RowActionMenu pending={pendingKey === template.id} items={[
+                      { label: template.is_default_entry ? "Stop reserving an empty row" : "Reserve an empty row", onSelect: () => run(template.id, () => upsertScheduleTemplateCategoryAction({ section: template.section, category: template.category, isDefaultEntry: !template.is_default_entry, isActive: template.is_active })) },
+                      { label: "Delete category", danger: true, separatorBefore: true, onSelect: () => run(template.id, () => deleteScheduleTemplateCategoryAction(template.id)) },
+                    ]} />
+                  </span>
+                ) : null}
               </div>
-              {template.items.length ? <Text size="sm" tone="secondary">{template.items.map((row) => `${row.brand_name ? `${row.brand_name} · ` : ""}${row.product_name}`).join(", ")}</Text> : null}
+              {template.items.length ? (
+                <ul className="m-0 mt-1 grid list-none gap-px p-0">
+                  {template.items.map((row) => (
+                    <li key={row.id} className="flex items-center gap-2 rounded-control px-1.5 py-1 hover:bg-surface-muted">
+                      <span className={`min-w-0 flex-1 truncate text-sm ${row.is_active ? "" : "text-ink-tertiary line-through"}`}>
+                        {row.product_name}{row.brand_name ? ` · ex. ${row.brand_name}` : ""}{row.sku_text ? ` · ${row.sku_text}` : ""}
+                        {row.qty ? <span className="text-ink-tertiary"> — {row.qty.toString()} {row.unit ?? ""}</span> : null}
+                      </span>
+                      {!row.is_active ? <Badge>Inactive</Badge> : null}
+                      {canManage ? (
+                        <RowActionMenu pending={pendingKey === row.id} items={[
+                          { label: row.is_active ? "Deactivate" : "Activate", onSelect: () => run(row.id, () => setScheduleTemplateItemActiveAction({ templateItemId: row.id, isActive: !row.is_active })) },
+                          { label: "Delete", danger: true, separatorBefore: true, onSelect: () => run(row.id, () => deleteScheduleTemplateItemAction(row.id)) },
+                        ]} />
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
           ))}
         </div>

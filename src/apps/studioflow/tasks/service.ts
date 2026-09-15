@@ -199,9 +199,10 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
       requireCommand(input, P.taskManage);
       const priority = parsePriority(input.priority);
       const due = parseDue(input.dueDate);
-      if (input.assignedToId !== undefined) await assertAssignee(input.assignedToId);
       return runTransaction(async (tx) => {
         const item = await loadItem(tx, input.projectId, input.itemId);
+        // Only a changed assignee is validated, so items kept on a former member stay editable.
+        if (input.assignedToId !== undefined && (input.assignedToId ?? null) !== item.assigned_to_id) await assertAssignee(input.assignedToId);
         const data: Prisma.SfChecklistItemUncheckedUpdateInput = {};
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (input.label !== undefined) {
@@ -393,6 +394,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
         const ids = new Set(rows.map((row) => row.id));
         if (rows.length !== input.orderedIds.length || input.orderedIds.some((id) => !ids.has(id))) throw invalid("REORDER_SCOPE", "Reorder must include exactly the items of one list.");
         for (const { id, sortOrder } of steppedSortOrders(input.orderedIds)) await tx.sfChecklistTemplate.update({ where: { id }, data: { sort_order: sortOrder } });
+        await writeAudit(ports, tx, { action: "studioflow.checklist-template.reordered", entityType: "checklist-template", entityId: input.phaseKey ?? "GENERAL", actor: input.actor, metadata: { phaseKey: input.phaseKey, count: input.orderedIds.length } });
         return { count: input.orderedIds.length };
       });
     },

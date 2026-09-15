@@ -5,8 +5,80 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.73**
-- Next local revision: **R8.74**
+- Current revision after this entry is committed: **R8.74**
+- Next local revision: **R8.75**
+
+## R8.74 | 2026-09-15 | fix(studioflow): wave-1 review corrections (SF-R1–SF-R3)
+
+Pre-acceptance code review of SF-R1…SF-R3 (Planner acting as reviewer and
+fixer, owner direction). No schema change.
+
+### Fixed — SF-R1 backbone
+
+- "Reopen" on a not-started phase now follows the start rules (project active,
+  previous phase approved) and is only offered when the phase had revisions; a
+  phase without revisions always starts at v1.0 (no v0.x).
+- Editing a to-do or checklist item kept on a former member no longer fails:
+  the assignee is validated only when it changes. Editing a project whose
+  client was archived no longer fails, and the edit dialog lists that client.
+- Rejecting a phase closes the original feedback rows it carried into the new
+  revision, so project "open" counts stay correct.
+- "Apply checklist templates" skips locked (approved/finished) phases.
+- Phase page lists only open deferred items; checklist edit dialog caps labels
+  at 200 characters; template reorder is audited.
+- `useCommand` tracks overlapping commands per key (no early re-enable).
+
+### Fixed — SF-R2 MOM
+
+- Photo size limit aligned with the 4 MB server-action body limit (3 MB after
+  cropping) instead of a 10 MB limit the transport could never accept.
+
+### Fixed — SF-R3 Product Schedule
+
+- Option labels continue after the highest label (legacy); deleting B and
+  adding again gives D instead of a duplicate-label error. Labels sort A…Z, AA.
+- Approving no longer sets `version_locked`; `active_index` follows the final
+  option after approve/delete.
+- The legacy Google Sheets CSV (header row starting with `Code`, possibly
+  below title rows; `Product Category` / `Ex` / `Type` / `Location` /
+  `Contact` / `Qty` / `Unit`) now imports: existing codes update their final
+  option and quantities, new codes add rows, the category comes from the sheet
+  or the prefix dictionary, a new category keeps the sheet prefix, ambiguous or
+  unknown categories fail the whole import. The simple
+  `category,brand,product` sheet stays as a fallback.
+- New projects get the default schedule rows and template items (legacy
+  bootstrap), shared with "Apply templates" through `schedule/sync.ts`.
+- Added commands: edit option snapshot, move row up/down, move row to another
+  category (next code there, old group closes the gap), activate/deactivate or
+  delete template items, delete template categories and prefixes. Entry edits
+  are partial and audited with a diff; one spelling per category per project.
+- Reuse search returns the source project name; schedule events appear in
+  project History.
+- Schedule page rebuilt: Material/Fixture switch, rows grouped by category
+  with code / final option / location / qty, row menu (open, move, move to
+  category, delete), item drawer (details, options with set final / edit /
+  delete, add option, copy from a past project), add-item and CSV import
+  dialogs (file or paste). The old per-row "Save" that re-sent unchanged
+  values is gone. Settings list template items with activate/delete and
+  prefixes with remove.
+- Flaky Brand fixture in the schedule integration test fixed (unique name).
+- Archived the eight superseded StudioFlow contract/work-order documents under
+  `docs/archive/studioflow-rb/`; the active rework contract remains canonical.
+
+### Verification
+
+- Cloud workspace: `npm test` 372/372 (new cases for reopen rules, former
+  assignee edit, feedback closing, label continuation, partial entry edit,
+  option edit, move/recategorize, Google Sheets import create/update/errors,
+  template seeding on new projects, template item management; domain tests for
+  labels, codes, and sheet parsing). Typecheck, lint, `check:boundaries`,
+  `check:legacy-runtime`, `next build` passed.
+- Playwright smoke on the production build: settings prefix, add item, reserve
+  code, options + set final + qty, move down, Google Sheets import (1 new,
+  1 updated), reuse search, Fixture tab, 375 px without overflow, History
+  entries, drafter read-only, delete with gapless codes, MOM page — zero
+  console errors.
+- Not run here: `prisma migrate deploy/diff` (no schema change in R8.74).
 
 ## R8.73 | 2026-09-15 | feat(studioflow): legacy product schedule (SF-R3)
 

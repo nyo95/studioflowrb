@@ -8,11 +8,12 @@ import type { TxClient } from "../shared";
  * `executeSyncProjectChecklists`). Identity is (template_id, phase_id), so a
  * user task with the same label is never swallowed and a renamed template is
  * never duplicated. New rows append after the existing roots of their bucket.
- * Returns the number of rows created.
+ * Locked phases are skipped. Returns the number of rows created.
  */
 export async function seedChecklistFromTemplates(tx: TxClient, projectId: string, userId: string | null): Promise<number> {
   const [phases, templates, existing, roots] = await Promise.all([
-    tx.sfPhase.findMany({ where: { project_id: projectId }, select: { id: true, key: true } }),
+    // Approved/finished phases are locked (contract §5.2); templates never add work to them.
+    tx.sfPhase.findMany({ where: { project_id: projectId, is_locked: false }, select: { id: true, key: true } }),
     tx.sfChecklistTemplate.findMany({ where: { is_active: true }, orderBy: [{ sort_order: "asc" }, { created_at: "asc" }, { id: "asc" }] }),
     tx.sfChecklistItem.findMany({ where: { project_id: projectId, template_id: { not: null } }, select: { phase_id: true, template_id: true } }),
     tx.sfChecklistItem.groupBy({ by: ["phase_id"], where: { project_id: projectId, parent_id: null }, _max: { sort_order: true } }),

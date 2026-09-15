@@ -19,6 +19,7 @@ export function ItemEditDialog({
   pending,
   error,
   onSave,
+  maxLength = 2000,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -29,6 +30,8 @@ export function ItemEditDialog({
   pending: boolean;
   error: string | null;
   onSave: (values: ItemEditValues) => void;
+  /** Checklist labels are capped at 200 characters; activity text at 2000. */
+  maxLength?: number;
 }) {
   const [values, setValues] = useState(initial);
   return (
@@ -38,7 +41,7 @@ export function ItemEditDialog({
         onSubmit={(event) => { event.preventDefault(); onSave(values); }}
       >
         <Field label="Text" required>
-          <Textarea rows={2} value={values.label} maxLength={2000} onChange={(e) => setValues({ ...values, label: e.target.value })} />
+          <Textarea rows={2} value={values.label} maxLength={maxLength} onChange={(e) => setValues({ ...values, label: e.target.value })} />
         </Field>
         <div className="grid grid-cols-2 gap-3 max-[560px]:grid-cols-1">
           <Field label="Due date">

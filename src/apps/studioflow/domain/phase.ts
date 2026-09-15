@@ -147,8 +147,10 @@ export function revisionLabel(revision: RevisionNumber): string {
 
 /** CLIENT feedback opens a new major revision; INTERNAL feedback a new minor. */
 export function nextRevision(current: RevisionNumber | null, intent: "INTERNAL" | "CLIENT"): RevisionNumber {
-  const major = current?.major ?? 0;
-  const minor = current?.minor ?? 0;
+  // A phase without any revision always starts at v1.0 (never v0.x).
+  if (!current) return { major: 1, minor: 0 };
+  const major = current.major;
+  const minor = current.minor;
   return intent === "CLIENT" ? { major: major + 1, minor: 0 } : { major, minor: minor + 1 };
 }
 

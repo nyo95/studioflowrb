@@ -535,7 +535,7 @@ export async function createScheduleEntryAction(input: z.infer<typeof ScheduleEn
   });
 }
 
-const ScheduleEntryUpdate = z.strictObject({ projectId: Id, entryId: Id, qty: z.string().max(20).nullish(), unit: z.string().max(40).nullish(), location: z.string().max(160).nullish() });
+const ScheduleEntryUpdate = z.strictObject({ projectId: Id, entryId: Id, qty: z.string().max(20).nullable().optional(), unit: z.string().max(40).nullable().optional(), location: z.string().max(160).nullable().optional() });
 export async function updateScheduleEntryAction(input: z.infer<typeof ScheduleEntryUpdate>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
@@ -601,7 +601,7 @@ export async function applyScheduleTemplatesAction(input: z.infer<typeof Schedul
 }
 
 const ScheduleCsvImport = z.strictObject({ projectId: Id, section: ScheduleSection, csv: z.string().max(200000) });
-export async function importScheduleCsvAction(input: z.infer<typeof ScheduleCsvImport>): Promise<ActionResult<{ created: number }>> {
+export async function importScheduleCsvAction(input: z.infer<typeof ScheduleCsvImport>): Promise<ActionResult<{ created: number; updated: number }>> {
   return runSafeAction(async () => {
     const ctx = await context();
     const data = parse(ScheduleCsvImport, input);
@@ -615,7 +615,9 @@ const SchedulePrefixInput = z.strictObject({ section: ScheduleSection, category:
 export async function upsertSchedulePrefixAction(input: z.infer<typeof SchedulePrefixInput>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
-    return studioFlow.schedule.upsertPrefix({ ...ctx, ...parse(SchedulePrefixInput, input) });
+    const result = await studioFlow.schedule.upsertPrefix({ ...ctx, ...parse(SchedulePrefixInput, input) });
+    refresh();
+    return result;
   });
 }
 
@@ -623,7 +625,9 @@ const ScheduleTemplateCategoryInput = z.strictObject({ section: ScheduleSection,
 export async function upsertScheduleTemplateCategoryAction(input: z.infer<typeof ScheduleTemplateCategoryInput>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
-    return studioFlow.schedule.upsertTemplateCategory({ ...ctx, ...parse(ScheduleTemplateCategoryInput, input) });
+    const result = await studioFlow.schedule.upsertTemplateCategory({ ...ctx, ...parse(ScheduleTemplateCategoryInput, input) });
+    refresh();
+    return result;
   });
 }
 
@@ -639,6 +643,99 @@ const ScheduleTemplateItemInput = z.strictObject({
 export async function createScheduleTemplateItemAction(input: z.infer<typeof ScheduleTemplateItemInput>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
-    return studioFlow.schedule.createTemplateItem({ ...ctx, ...parse(ScheduleTemplateItemInput, input) });
+    const result = await studioFlow.schedule.createTemplateItem({ ...ctx, ...parse(ScheduleTemplateItemInput, input) });
+    refresh();
+    return result;
+  });
+}
+
+const ScheduleOptionUpdate = z.strictObject({ projectId: Id, optionId: Id, snapshot: ScheduleSnapshot });
+export async function updateScheduleOptionAction(input: z.infer<typeof ScheduleOptionUpdate>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleOptionUpdate, input);
+    const result = await studioFlow.schedule.updateOption({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
+const ScheduleEntryMove = z.strictObject({ projectId: Id, entryId: Id, direction: z.enum(["up", "down"]) });
+export async function moveScheduleEntryAction(input: z.infer<typeof ScheduleEntryMove>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleEntryMove, input);
+    const result = await studioFlow.schedule.moveEntry({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
+const ScheduleEntryRecategorize = z.strictObject({ projectId: Id, entryId: Id, category: z.string().min(1).max(80) });
+export async function moveScheduleEntryToCategoryAction(input: z.infer<typeof ScheduleEntryRecategorize>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleEntryRecategorize, input);
+    const result = await studioFlow.schedule.moveEntryToCategory({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
+const ScheduleReuseSearch = z.strictObject({ projectId: Id, query: z.string().max(120), section: ScheduleSection.optional() });
+/** Read-only search of other projects' options (reuse pool). */
+export async function searchReusableScheduleOptionsAction(input: z.infer<typeof ScheduleReuseSearch>) {
+  return runSafeAction(async () => {
+    const { grants } = await context();
+    const data = parse(ScheduleReuseSearch, input);
+    return studioFlow.schedule.searchReusableOptions({ grants, ...data, limit: 20 });
+  });
+}
+
+const ScheduleReuseCopy = z.strictObject({ projectId: Id, entryId: Id, sourceOptionId: Id });
+export async function copyReusableScheduleOptionAction(input: z.infer<typeof ScheduleReuseCopy>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleReuseCopy, input);
+    const result = await studioFlow.schedule.copyReusableOption({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
+const ScheduleTemplateItemToggle = z.strictObject({ templateItemId: Id, isActive: z.boolean() });
+export async function setScheduleTemplateItemActiveAction(input: z.infer<typeof ScheduleTemplateItemToggle>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const result = await studioFlow.schedule.setTemplateItemActive({ ...ctx, ...parse(ScheduleTemplateItemToggle, input) });
+    refresh();
+    return result;
+  });
+}
+
+export async function deleteScheduleTemplateItemAction(templateItemId: string): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const result = await studioFlow.schedule.deleteTemplateItem({ ...ctx, templateItemId: parse(Id, templateItemId) });
+    refresh();
+    return result;
+  });
+}
+
+export async function deleteScheduleTemplateCategoryAction(templateCategoryId: string): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const result = await studioFlow.schedule.deleteTemplateCategory({ ...ctx, templateCategoryId: parse(Id, templateCategoryId) });
+    refresh();
+    return result;
+  });
+}
+
+export async function deleteSchedulePrefixAction(prefixId: string): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const result = await studioFlow.schedule.deletePrefix({ ...ctx, prefixId: parse(Id, prefixId) });
+    refresh();
+    return result;
   });
 }

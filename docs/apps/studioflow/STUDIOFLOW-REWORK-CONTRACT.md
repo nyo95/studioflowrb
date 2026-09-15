@@ -336,7 +336,7 @@ Implementation notes (R8.72, SF-R2):
 - Photos: at most two per section in `slot` 0/1; filling slot 1 while slot 0
   is empty lands in slot 0, removing photo 1 moves photo 2 up, swap exchanges
   them. Browser crop is fixed 4:3 (legacy cropper), output JPEG ≤ 1600 px,
-  server accepts PNG/JPEG/WebP ≤ 10 MB with a magic-byte check. Objects are
+  server accepts PNG/JPEG/WebP ≤ 3 MB (under the 4 MB server-action body limit) with a magic-byte check. Objects are
   written before the row and removed after commit on replace/delete.
 - A section always keeps one note (deleting the last one leaves an empty
   note). The last section cannot be deleted from the UI.
@@ -383,6 +383,26 @@ Prefix dictionary `(section, category) → prefix`; schedule template
 categories with `is_default_entry` seed empty reserve entries on new projects
 and via an explicit "Apply template" action; template items with a snapshot.
 Managed in StudioFlow settings.
+
+### 11.6 Implementation notes (R8.73–R8.74)
+
+- Option labels continue after the highest existing label (A…Z, AA…); a
+  deleted label is not reused. Approving sets siblings NOT_USED and keeps
+  `active_index` on the final option; `version_locked` is not set (legacy did
+  not use it). An entry may have no options ("reserved code").
+- New projects receive every active template item once and an empty row for
+  each default category without a row (same routine as "Apply templates").
+- Moving a row to another category gives it the next code of that category's
+  prefix and renumbers the old group; one category spelling per project.
+- CSV import accepts the legacy Google Sheets export (header row starting with
+  `Code`; Material needs `Product Category`, both need `Ex` and `Type`; `Qty`
+  is ignored on Material like legacy). Existing codes update the final option
+  (brand text, product, notes from initials/contact/image) and
+  qty/unit/location; new codes add rows. Category: sheet value, else the
+  prefix dictionary (must be unique). A category seen for the first time
+  registers the sheet prefix. Any row error rolls back the whole import.
+  Legacy duplicate-product checks and image upload for options are not ported
+  (image URLs from the sheet are kept in notes).
 
 ## 12. Foundation centralization map
 

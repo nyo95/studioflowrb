@@ -158,7 +158,7 @@ rest of the rebuild StudioFlow.
   gapless codes, prefix dictionary, schedule templates and default entries,
   reuse from past projects, CSV import, typed snapshots, Master Data Brand read
   through the public port. Implemented in R8.73; closes KB-003 and KB-021;
-  owner acceptance deferred to the end of wave 1.
+  review corrections in R8.74; owner acceptance deferred to the end of wave 1.
 
 ### Wave 2 (not activated)
 

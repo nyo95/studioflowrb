@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import { fullBlockers, todoBlockers } from "./blockers";
 import { isPermutation, moveId, pointMarkers } from "./mom";
-import { fallbackPrefix, normalizeScheduleCategory, optionLabel, parseLegacyScheduleCsv, scheduleCode, scheduleSearchKey } from "./schedule";
+import { compareOptionLabels, fallbackPrefix, nextOptionLabel, normalizeScheduleCategory, optionLabel, optionLabelIndex, parseLegacyScheduleCsv, parseLegacyScheduleSheet, parseScheduleCode, scheduleCode, scheduleSearchKey } from "./schedule";
 import {
   applyChecklistFilter,
   buildTree,
@@ -78,6 +78,7 @@ describe("phase policy (legacy parity)", () => {
     assert.deepEqual(nextRevision({ major: 1, minor: 0 }, "INTERNAL"), { major: 1, minor: 1 });
     assert.deepEqual(nextRevision({ major: 1, minor: 3 }, "CLIENT"), { major: 2, minor: 0 });
     assert.deepEqual(nextRevision(null, "CLIENT"), { major: 1, minor: 0 });
+    assert.deepEqual(nextRevision(null, "INTERNAL"), { major: 1, minor: 0 }, "no v0.x revisions");
     assert.equal(revisionLabel({ major: 2, minor: 1 }), "v2.1");
   });
 
@@ -194,5 +195,39 @@ describe("schedule rules", () => {
   it("parses legacy CSV quoting", () => {
     const rows = parseLegacyScheduleCsv('category,brand,product,notes\nTile,Roman,"Tile, ivory","Use ""matte"""');
     assert.deepEqual(rows, [{ category: "Tile", brand: "Roman", product: "Tile, ivory", notes: 'Use "matte"' }]);
+  });
+});
+
+describe("schedule labels and legacy sheet", () => {
+  it("never reuses a label and orders AA after Z", () => {
+    assert.equal(optionLabelIndex("A"), 0);
+    assert.equal(optionLabelIndex("AA"), 26);
+    assert.equal(optionLabelIndex("a"), -1);
+    assert.equal(nextOptionLabel([]), "A");
+    assert.equal(nextOptionLabel(["A", "C"]), "D", "B was deleted; the next label continues after C");
+    assert.equal(nextOptionLabel(["Z"]), "AA");
+    assert.deepEqual(["AA", "B", "Z", "A"].sort(compareOptionLabels), ["A", "B", "Z", "AA"]);
+  });
+
+  it("parses schedule codes", () => {
+    assert.deepEqual(parseScheduleCode("pt-03"), { prefix: "PT", increment: 3 });
+    assert.deepEqual(parseScheduleCode(" FL - 12 "), { prefix: "FL", increment: 12 });
+    assert.equal(parseScheduleCode("PT"), null);
+    assert.equal(parseScheduleCode("PT-00"), null);
+  });
+
+  it("finds the Google Sheets header below title rows", () => {
+    const csv = [
+      "MATERIAL SCHEDULE,,,,,,,,,",
+      "Project Heloskin,,,,,,,,,",
+      "Code,Product Category,Ex,Type,Initials Type,Image,Location,Contact,Qty,Unit",
+      'PT-01,Paint,Dulux,"Easy Clean, Matt",EC,,Bedroom,"Budi, 0812",3,pail',
+      ",,,,,,,,,",
+    ].join("\r\n");
+    const rows = parseLegacyScheduleSheet(csv, "MATERIAL");
+    assert.deepEqual(rows, [{ code: "PT-01", category: "Paint", brand: "Dulux", product: "Easy Clean, Matt", initialsType: "EC", imageUrl: null, location: "Bedroom", contact: "Budi, 0812", qty: null, unit: "pail" }]);
+    assert.equal(parseLegacyScheduleSheet("category,brand,product\nTile,Roman,Granitio", "MATERIAL"), null);
+    assert.equal(parseLegacyScheduleSheet("Code,Ex,Type\nLF-01,Cellini,Aria", "MATERIAL"), null, "Material sheets need a Product Category column");
+    assert.equal(parseLegacyScheduleSheet("Code,Ex,Type,Qty\nLF-01,Cellini,Aria,4", "FIXTURE")?.[0]?.qty, "4");
   });
 });

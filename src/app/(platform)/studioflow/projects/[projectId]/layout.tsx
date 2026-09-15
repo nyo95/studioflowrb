@@ -60,7 +60,10 @@ export default async function ProjectLayout({ children, params }: { children: Re
             ]}
           />
         }
-        actions={canManage ? <ProjectHeaderActions project={project} people={people} clients={clients.map((c) => ({ id: c.id, name: c.name }))} /> : undefined}
+        actions={canManage ? <ProjectHeaderActions project={project} people={people} clients={[
+          ...clients.map((c) => ({ id: c.id, name: c.name })),
+          ...(project.client && !clients.some((c) => c.id === project.client!.id) ? [{ id: project.client.id, name: `${project.client.name} (archived)` }] : []),
+        ]} /> : undefined}
         divider
       />
       {project.archivedAt ? (
