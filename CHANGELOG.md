@@ -5,8 +5,53 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.70**
-- Next local revision: **R8.71**
+- Current revision after this entry is committed: **R8.71**
+- Next local revision: **R8.72**
+
+## R8.71 | 2026-09-15 | feat(studioflow): rework legacy project backbone (SF-R1)
+
+### Changed
+
+- Archived the rebuild StudioFlow (tag `archive/studioflow-rb-r8.69`) and
+  removed its code, routes, tests, and work orders. Migration
+  `20260915100000_sf_r1_legacy_rework_cutover` drops and recreates the
+  `studioflow` schema on rebuild databases only and remaps StudioFlow role
+  grants to the new ten-permission vocabulary (contract §3).
+- New legacy-behavior StudioFlow on the Foundation (`src/apps/studioflow`):
+  pure `domain/` rules (phase machine, simplified labels, revisions, blockers,
+  naming, checklist filters, Today feed) and modular services for projects and
+  clients, phases and activities, checklist and templates, and Today.
+  Auto naming `[Year]-[Number] [Name]` with a row-locked yearly sequence; PIC
+  designer/drafter validated against holders of `studioflow.phase.work`;
+  archive/restore with reasons; FEEDBACK → TODO on rejection with the CD
+  drafter as fallback assignee; defer, reopen with reason, admin revision
+  reset with a history snapshot in the audit event.
+- New routes: `/studioflow` (Today), `/studioflow/projects`, project
+  workspace (overview with phase strip, five phase pages, history),
+  `/studioflow/clients`, `/studioflow/settings`; temporary redirects from
+  legacy `/projects`, `/upcoming`, `/settings/studio`, `/settings/clients`.
+- Foundation: `@platform/core/rbac/people` (`peopleDirectory`) for assignee
+  pickers; `currentDateOnly` and `diffDateOnlyDays` in the date utility; UI
+  Engine `ContextNavLink`/`ContextNavHeading` (server-safe module), now also
+  used by Platform settings navigation. CORE.md, UI_ENGINE.md, and the utility
+  inventory record them. Boundary allow-list entries for deleted StudioFlow
+  files removed.
+
+### Verification
+
+- Implemented and checked in the cloud workspace because the office shell
+  was unavailable (owner asked the Planner to act as Executor, acceptance at
+  the end of wave 1).
+- `npm test`: 354 passed, 0 failed (includes 12 new StudioFlow integration
+  tests and new date/UI Engine assertions) on disposable PostgreSQL 16 with all
+  migrations applied by `psql`.
+- Typecheck, lint, `check:boundaries`, `check:legacy-runtime`, and
+  `next build` passed (Google Fonts replaced by a stub layout only for the
+  sandbox build; the committed layout is unchanged).
+- Playwright smoke on the production build at 1440 px and 375 px passed with
+  zero console errors (see `docs/review.md`).
+- Not run: `prisma migrate deploy/diff` (schema engine download blocked in
+  the sandbox) — required on kantor before commit.
 
 ## R8.70 | 2026-09-15 | docs(studioflow): ratify legacy rework and plan SF-R1
 

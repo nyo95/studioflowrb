@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { hasPermission, type PermissionGrants } from "@platform/core/rbac";
+import { ContextNavHeading, ContextNavLink } from "@/platform/ui_engine";
 
 export type SettingsNavActive = "general" | "users" | "roles";
 
@@ -9,12 +10,6 @@ const PLATFORM_ITEMS = [
   { key: "users", href: "/settings/access/users", label: "Users" },
   { key: "roles", href: "/settings/access/roles", label: "Roles & Access" },
 ] as const;
-
-const LINK_BASE = "flex min-h-8 items-center rounded-control px-2.5 py-1.5 text-sm no-underline transition-colors";
-const LINK_ACTIVE = "bg-surface-muted font-semibold text-ink";
-const LINK_IDLE = "text-ink-secondary hover:bg-surface-muted hover:text-ink";
-
-const SECTION_LABEL = "px-2.5 pb-1 pt-0.5 text-xs font-semibold uppercase tracking-wide text-ink-tertiary";
 
 /**
  * Platform settings navigation. Platform-owned settings (General, Users,
@@ -34,30 +29,20 @@ export function SettingsNavigation({
   const showStudioFlow = hasPermission(grants, "studioflow.project.read");
   return (
     <>
-      <div className={SECTION_LABEL}>Settings</div>
+      <ContextNavHeading>Settings</ContextNavHeading>
       {PLATFORM_ITEMS.map((item) => (
-        <Link
-          key={item.key}
-          href={item.href}
-          prefetch={false}
-          aria-current={active === item.key ? "page" : undefined}
-          className={`${LINK_BASE} ${active === item.key ? LINK_ACTIVE : LINK_IDLE}`}
-        >
+        <ContextNavLink key={item.key} component={Link} href={item.href} active={active === item.key}>
           {item.label}
-        </Link>
+        </ContextNavLink>
       ))}
       {showMasterData || showStudioFlow ? (
         <>
-          <div className="px-2.5 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-ink-tertiary">Applications</div>
+          <ContextNavHeading>Applications</ContextNavHeading>
           {showMasterData ? (
-            <Link href="/settings/general/masterdata" prefetch={false} className={`${LINK_BASE} ${LINK_IDLE}`}>
-              Master Data Settings
-            </Link>
+            <ContextNavLink component={Link} href="/settings/general/masterdata">Master Data Settings</ContextNavLink>
           ) : null}
           {showStudioFlow ? (
-            <Link href="/studioflow/settings" prefetch={false} className={`${LINK_BASE} ${LINK_IDLE}`}>
-              StudioFlow Settings
-            </Link>
+            <ContextNavLink component={Link} href="/studioflow/settings">StudioFlow Settings</ContextNavLink>
           ) : null}
         </>
       ) : null}

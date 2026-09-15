@@ -23,14 +23,25 @@ their app-owned duplicates. Owned by the Platform Foundation; created in
 
 | Utility | Canonical path | Public surface | Disposition | Representative consumers |
 |---|---|---|---|---|
-| Date/time display | `src/platform/utilities/date` | `formatInstant`, `formatDateOnly`, `isDateOnlyString`, `isIsoInstantString`, `DEFAULT_DISPLAY_LOCALE`, `DEFAULT_DISPLAY_TIME_ZONE` | **REUSE** | account page, BQ library page, StudioFlow catalogue table, Master Data brand/vendor/deletion directories, `ui_engine/components/formatted-instant.tsx`, `core/validation` |
+| Date/time display | `src/platform/utilities/date` | `formatInstant`, `formatDateOnly`, `isDateOnlyString`, `isIsoInstantString`, `currentDateOnly`, `diffDateOnlyDays`, `DEFAULT_DISPLAY_LOCALE`, `DEFAULT_DISPLAY_TIME_ZONE` | **REUSE** (`currentDateOnly`/`diffDateOnlyDays` **EXTEND**, R8.71: StudioFlow due-date labels and Today filters) | account page, BQ library page, StudioFlow catalogue table, Master Data brand/vendor/deletion directories, `ui_engine/components/formatted-instant.tsx`, `core/validation` |
 | Decimal arithmetic | `src/platform/utilities/decimal` | `toDecimalString`, `isDecimalString`, `formatDecimal`, `compareDecimals`, `addDecimals`, `multiplyDecimals`, `divideDecimals`, `truncateDecimal`, `DecimalString` | **REUSE** | BQ service/calculation engine, Master Data pricing service and directory, `money`, `measurement`, `core/audit`, `platform/contracts` |
 | Money | `src/platform/utilities/money` | `createMoney`, `formatMoney`, `isValidCurrencyCode`, `DEFAULT_MONEY_LOCALE` | **REUSE** | BQ project pages, BQ library, Master Data pricing/SKU directories, BQ project editor |
 | Normalization | `src/platform/utilities/normalization` | `normalizeText`, `normalizeEmail` | **REUSE** | `core/settings`, `core/auth` (login, identity-validation), Master Data unit service and shared service |
 | Pagination | `src/platform/utilities/pagination` | `buildPageMeta`, `calcOffset`, `normalizePage`, `normalizePageSize`, `normalizeSortDirection`, `PageMeta` | **REUSE** | `ui_engine/patterns/pagination.ts` (`usePagination`) consumed by every directory |
 | Slug | `src/platform/utilities/slug` | `toSlug` | **REUSE** | Master Data shared service (BRAND/SKU identity) |
 | Measurement | `src/platform/utilities/measurement` | `calculateRectangleAreaSquareMeters` | **ADD** | Master Data shared service, pricing directory |
+| People directory | `src/platform/core/rbac/people.ts` | `createPeopleDirectory`, `PersonSummary` (runtime: `peopleDirectory`) | **ADD** (R8.71) | StudioFlow PIC/assignee pickers and name resolution |
 | Unit label display | `src/platform/utilities/unit` | `formatUnitLabel` | **ADD** (proven, pending consumer wiring) | its own test suite only; Master Data Units UI is the intended consumer plane |
+
+### Recorded candidates (not yet shared)
+
+- **Stepped sort order / sibling reorder** — StudioFlow checklist and checklist
+  templates use `steppedSortOrders` (app-owned, `apps/studioflow/domain/checklist.ts`).
+  BQ keeps its own ordering. Promote to `platform/utilities/ordering` only when a
+  second app needs the same step-renumber semantics.
+- **Drag-to-reorder list (`SortableList`)** — StudioFlow R8.71 uses explicit
+  Move up/Move down menu actions instead. Add a UI Engine pattern once MOM or
+  Schedule (SF-R2/SF-R3) needs drag reordering too.
 
 ## Duplicate convergence ledger
 

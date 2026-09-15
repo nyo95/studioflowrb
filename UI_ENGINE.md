@@ -380,6 +380,14 @@ PageShell or Drawer
 ### SettingsShell
 Keep the legacy two-column pattern concept, but make navigation generic/configurable instead of hardcoding StudioFlow settings tabs.
 
+The navigation column is composed from `ContextNavHeading` and `ContextNavLink`
+(R8.71, `layouts/context-nav.tsx`). `ContextNavLink` takes `active`, an optional
+decorative `marker` (e.g. a phase state dot), a trailing `detail` count, and a
+`component` (pass Next.js `Link` for client routing). The module is deliberately
+not a client module so server components can pass `Link`. Consumers: Platform
+settings navigation and the StudioFlow project workspace (same two-column
+shell, `navigationLabel="Project navigation"`).
+
 Compact-rail submenus open only through intentional click or keyboard activation.
 Pointer movement and focus traversal alone must not open a portalled menu over the
 current work surface.

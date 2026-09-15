@@ -57,7 +57,7 @@ only:
   audit, and UI Engine components.
 
 Superseded (kept only as history, moved under `docs/archive/studioflow-rb/`
-by SF-R1): `studioflow.md`, `studioflow-project-contract.md`,
+in R8.71): `studioflow.md`, `studioflow-project-contract.md`,
 `studioflow-schedule-contract.md`, `studioflow-mom-contract.md`,
 `studioflow-ux-spec.md`, `studioflow-work-orders.md`,
 `studioflow-implementation-plan.md`, `STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md`.
@@ -367,20 +367,31 @@ Managed in StudioFlow settings.
 | Need | Classification | Canonical home |
 |---|---|---|
 | Session/principal, grants, audit envelope, errors/action wrapper, Zod validation, transactions | REUSE | `platform/core/*` |
-| Date-only due dates, instant formatting, "N days" age | REUSE / EXTEND | `platform/utilities/date` (+ `ageInDays` if missing) and `FormattedInstant` |
+| Date-only due dates, instant formatting, "N days" age | REUSE / EXTEND | `platform/utilities/date` (`currentDateOnly`, `diffDateOnlyDays` added in R8.71) and `FormattedInstant` |
 | Decimal area/qty | REUSE | `platform/utilities/decimal`, `measurement`, `unit` |
 | Text normalization for names/search keys | REUSE | `platform/utilities/normalization` |
-| Stepped sort order + sibling reorder (checklist, MOM, schedule, BQ lines) | ADD if the inventory confirms ≥2 apps | `platform/utilities/ordering` |
+| Stepped sort order + sibling reorder (checklist, MOM, schedule, BQ lines) | APP-OWNED until a second app needs it (R8.71) | `apps/studioflow/domain/checklist.ts` `steppedSortOrders`; candidate `platform/utilities/ordering` |
 | Image storage for client logo and MOM images | REUSE | `platform/core/storage` + `ImageWorkspace` |
 | Confirm, unsaved-changes guard, dialogs, drawers, tables, toolbars, inline edit, creatable search, rich text | REUSE | UI Engine |
-| Drag-to-reorder list | ADD | UI Engine pattern `SortableList` (consumers: checklist, MOM, schedule) |
-| Secondary context rail (project workspace nav) | EXTEND | UI Engine `AppShell`/`NavGroup`; no app-local shell |
-| Phase strip / stepper | APP-OWNED first | StudioFlow component composed from UI Engine primitives; promote only on a second consumer |
+| Drag-to-reorder list | DEFERRED (R8.71 uses Move up/Move down actions) | UI Engine pattern `SortableList` once MOM/Schedule also need drag |
+| Secondary context rail (project workspace nav) | EXTEND (R8.71) | UI Engine `SettingsShell` + new `ContextNavLink`/`ContextNavHeading`, shared with Platform settings navigation |
+| Assignee / PIC people lookup | ADD (R8.71) | `platform/core/rbac/people` (`peopleDirectory`) |
+| Phase strip / stepper | REUSE | UI Engine `PipelineStrip` (already existed) |
 | Phase state machine, revision numbering, naming policy, blocker projection, schedule codes | APP-OWNED | `src/apps/studioflow/domain/*` |
 
 `src/apps/studioflow` is modular (one folder per module: `projects`,
-`phases`, `tasks`, `today`, `mom`, `schedule`, `settings`) with a thin
-`public/` boundary. No 100 KB single service file.
+`phases`, `tasks`, `today`, later `mom`, `schedule`) plus pure `domain/`
+rules and a thin `public/` boundary. No 100 KB single service file.
+
+Implementation notes recorded in R8.71:
+
+- Checklist root items come only from templates (legacy rule); people add
+  one level of subtasks. General ad-hoc work is a project-level to-do
+  (activity with no phase), which Quick add on Today also creates.
+- Legacy `#PHASE` tags inside to-do text are not ported; Quick add selects the
+  phase explicitly.
+- Checked checklist rows older than 7 days drop out of Today (legacy
+  retention); nothing is deleted.
 
 ## 13. UI/UX direction (owner may veto)
 

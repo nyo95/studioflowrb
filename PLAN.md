@@ -2,7 +2,7 @@
 
 Plan ID: SF-R1-ARCHIVE-AND-LEGACY-PROJECT-BACKBONE
 Scope: Archive the rebuild StudioFlow; rebuild the legacy project backbone (Client, Project, Phase, Revision, Activity, Checklist, Today, StudioFlow settings) on the Foundation
-Status: READY
+Status: READY — implemented and committed in R8.71
 Priority: P1
 Owner: Repository owner
 Last updated: 2026-09-15

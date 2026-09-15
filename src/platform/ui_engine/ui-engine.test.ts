@@ -56,6 +56,8 @@ describe("UI Engine foundation", () => {
       "DirectoryShell",
       "DetailShell",
       "SettingsShell",
+      "ContextNavLink",
+      "ContextNavHeading",
       "Tabs",
       "PageSection",
       "SectionCard",

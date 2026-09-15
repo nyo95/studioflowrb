@@ -29,7 +29,7 @@ enum UserStatus {
 /// results. Users are disabled, never hard-deleted, so historical AuditEvent
 /// actor references stay readable.
 model User {
-  id String @id @default(uuid())
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
   /// Canonical normalized email (trimmed, lowercase). Unique index is the
   /// race-safe authority; the application validates format before insert.
@@ -54,7 +54,7 @@ model User {
 /// grants and blocks new assignments; there is no hard delete, so
 /// UserRole/RolePermission history is never silently destroyed.
 model Role {
-  id String @id @default(uuid())
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
   /// Immutable normalized role code (e.g. "platform-owner"). Unique index is
   /// the race-safe authority, including archived rows.
@@ -78,9 +78,9 @@ model Role {
 /// historical facts; users are disabled (never deleted) and roles are archived
 /// (never deleted).
 model UserRole {
-  id      String @id @default(uuid())
-  user_id String
-  role_id String
+  id      String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id String @db.Uuid
+  role_id String @db.Uuid
 
   assigned_at DateTime @default(now())
 
@@ -96,8 +96,8 @@ model UserRole {
 /// permission in the code-owned registry (application-enforced on write);
 /// unknown persisted IDs grant nothing and surface as integrity failures.
 model RolePermission {
-  id            String @id @default(uuid())
-  role_id       String
+  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  role_id       String @db.Uuid
   permission_id String
 
   granted_at DateTime @default(now())
@@ -114,11 +114,11 @@ model RolePermission {
 /// live-lookup authority; user/revocation/expiry indexes support revocation
 /// and cleanup.
 model Session {
-  id String @id @default(uuid())
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
   /// SHA-256 hex digest of the raw session token. Lookup authority.
   token_hash String @unique
-  user_id    String
+  user_id    String @db.Uuid
 
   created_at          DateTime  @default(now())
   last_seen_at        DateTime
@@ -136,6 +136,17 @@ model Session {
   @@index([user_id, revoked_at])
   @@index([idle_expires_at])
   @@index([absolute_expires_at])
+  @@schema("platform")
+}
+
+/// Infrastructure table owned by the login limiter adapter. It is declared so
+/// Prisma migration diff sees the platform schema as complete; application code
+/// still accesses it only through the limiter boundary.
+model LoginRateLimit {
+  key    String @id @db.VarChar(255)
+  points Int    @default(0)
+  expire BigInt?
+
   @@schema("platform")
 }
 
@@ -840,6 +851,7 @@ model BqTemplateSection {
   recommendations BqTemplateRecommendation[]
 
   @@map("bq_template_section")
+  @@index([template_id, parent_id, sort_order])
   @@schema("bq")
 }
 
@@ -862,6 +874,7 @@ model BqTemplateRecommendation {
   lib_custom_item         BqLibCustomItem?      @relation(fields: [lib_custom_item_id], references: [id])
 
   @@map("bq_template_recommendation")
+  @@index([template_section_id])
   @@schema("bq")
 }
 
@@ -958,6 +971,7 @@ model BqSection {
   items       BqItem[]       // L1 items langsung di section (tanpa subsection)
 
   @@map("bq_section")
+  @@index([project_id, sort_order])
   @@schema("bq")
 }
 
@@ -972,6 +986,7 @@ model BqSubsection {
   items       BqItem[]
 
   @@map("bq_subsection")
+  @@index([section_id, sort_order])
   @@schema("bq")
 }
 
@@ -999,6 +1014,8 @@ model BqItem {
   line_items     BqLineItem[]  // L3 langsung di L1 (tanpa L2)
 
   @@map("bq_item")
+  @@index([section_id, sort_order])
+  @@index([subsection_id, sort_order])
   @@schema("bq")
 }
 
@@ -1018,6 +1035,7 @@ model BqSubObject {
   line_items    BqLineItem[]
 
   @@map("bq_sub_object")
+  @@index([item_id, sort_order])
   @@schema("bq")
 }
 
@@ -1054,14 +1072,16 @@ model BqLineItem {
   updated_at                      DateTime     @updatedAt
 
   @@map("bq_line_item")
+  @@index([sub_object_id, sort_order])
+  @@index([item_id, sort_order])
   @@schema("bq")
 }
 
 // ============================================================================
-// STUDIOFLOW — Project management app (SF-WO-2)
-// No foreign keys into platform, master_data, or bq tables.
-// Cross-schema user references (lead_user_id, closed_by_id, etc.) are plain
-// String? columns — app resolves them via platform service, never via FK.
+// STUDIOFLOW — legacy-behavior rework (STUDIOFLOW-REWORK-CONTRACT.md, SF-R1)
+// No foreign keys into platform, master_data, or bq tables. User references
+// (pic_designer_id, assigned_to_id, ...) are plain ids resolved through the
+// platform, never through a cross-schema FK.
 // ============================================================================
 
 enum SfProjectStatus {
@@ -1073,652 +1093,294 @@ enum SfProjectStatus {
   @@schema("studioflow")
 }
 
-enum SfPhaseState {
-  NOT_STARTED
-  IN_PROGRESS
-  WAITING_CLIENT
-  DONE
-
-  @@map("sf_phase_state")
-  @@schema("studioflow")
-}
-
-enum SfPhaseClosureKind {
+enum SfProjectPriority {
+  URGENT
   NORMAL
-  EXCEPTION
+  LOW
 
-  @@map("sf_phase_closure_kind")
+  @@map("sf_project_priority")
   @@schema("studioflow")
 }
 
-enum SfTaskStatus {
+/// Fixed legacy phase set (contract §5.1). App code, not an administered template.
+enum SfPhaseKey {
+  MOODBOARD
+  LAYOUT
+  DESIGN_3D
+  CD
+  SUPERVISION
+
+  @@map("sf_phase_key")
+  @@schema("studioflow")
+}
+
+enum SfPhaseStatus {
+  PENDING
+  IN_PROGRESS
+  ON_REVIEW_INTERNAL
+  APPROVED_INTERNAL
+  ON_REVIEW_CLIENT
+  READY_FOR_NEXT
+  COMPLETED
+
+  @@map("sf_phase_status")
+  @@schema("studioflow")
+}
+
+enum SfRevisionStatus {
+  ACTIVE
+  COMPLETED
+
+  @@map("sf_revision_status")
+  @@schema("studioflow")
+}
+
+enum SfActivityMode {
+  TODO
+  FEEDBACK
+
+  @@map("sf_activity_mode")
+  @@schema("studioflow")
+}
+
+enum SfActivityStatus {
   OPEN
-  DONE
+  COMPLETED
 
-  @@map("sf_task_status")
+  @@map("sf_activity_status")
   @@schema("studioflow")
 }
 
-/// Studio phase template — the ordered list of phases for new projects.
-/// key is stable and immutable once any project snapshot uses it.
-model SfPhaseTemplate {
-  id           String  @id @default(uuid())
-  key          String  @unique
-  name         String
-  sort_order   Int
-  has_rounds   Boolean @default(true)
+/// Singleton StudioFlow workflow settings (id = "studio").
+model SfSettings {
+  id                  String   @id @default("studio")
+  auto_naming_enabled Boolean  @default(true)
+  updated_at          DateTime @updatedAt
+  updated_by_id       String?
 
-  /// Label prefix for round headings when has_rounds is true (e.g. "MB", "D", "CD").
-  round_prefix String?
-
-  /// Which output folder this phase owns (used in file-naming, SF-WO-3).
-  folder_key   String?
-
-  /// When true, Send action warns if no internal approval exists (SF-WO-4).
-  requires_internal_approval Boolean @default(false)
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  phases                SfProjectPhase[]
-  requirement_templates SfRequirementTemplate[]
-
-  @@map("sf_phase_template")
+  @@map("sf_settings")
   @@schema("studioflow")
 }
 
-/// A StudioFlow Client — paying counterparty of a project.
-/// Independent of Master Data; no FK into master_data schema.
+/// Per-year project sequence used by auto naming ("2026-007 Name").
+model SfProjectSequence {
+  year        Int @id
+  last_number Int @default(0)
+
+  @@map("sf_project_sequence")
+  @@schema("studioflow")
+}
+
 model SfClient {
-  id            String  @id @default(uuid())
-  name          String
-  contact_name  String?
-  contact_phone String?
-  contact_email String?
-  address       String?
-  notes         String?
-
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-
-  /// Archive state. A Client with live (non-archived) Projects cannot be archived.
-  deleted_at DateTime?
+  id               String    @id @default(uuid())
+  name             String
+  /// Lower-cased trimmed name; case-insensitive uniqueness authority.
+  name_key         String    @unique
+  address          String?
+  logo_storage_key String?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+  archived_at      DateTime?
 
   projects SfProject[]
 
-  @@index([deleted_at])
   @@map("sf_client")
   @@schema("studioflow")
 }
 
-/// A StudioFlow Project — the engagement with a Client.
 model SfProject {
-  id  String @id @default(uuid())
+  id              String            @id @default(uuid())
+  /// "YYYY-NNN" part of the formatted name.
+  project_code    String            @unique
+  /// Full formatted name "[Year]-[Number] [Name]".
+  name            String            @unique
+  client_id       String?
+  pic_designer_id String
+  pic_drafter_id  String
+  opening_date    DateTime?         @db.Date
+  project_type    String            @default("RETAIL")
+  status          SfProjectStatus   @default(ACTIVE)
+  priority        SfProjectPriority @default(NORMAL)
+  client_contact  String?
+  address         String?
+  area            Decimal?          @db.Decimal(12, 2)
+  created_by_id   String
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+  archived_at     DateTime?
+  archived_by_id  String?
+  archive_reason  String?
 
-  /// Server-generated unique code (e.g. "SF26-0001"). Immutable after creation.
-  code String @unique
+  client          SfClient?         @relation(fields: [client_id], references: [id])
+  phases          SfPhase[]
+  activities      SfActivity[]
+  checklist_items SfChecklistItem[]
 
-  name         String
-  client_id    String
-  lead_user_id String? // plain FK to platform.User; no Prisma relation
-
-  /// Short site label used in file names. Not a postal address.
-  location String?
-
-  /// Site address; independent of Client.address.
-  address  String?
-  area     Decimal?        @db.Decimal(10, 2)
-  status   SfProjectStatus @default(ACTIVE)
-
-  /// Ordering hint for the project list; not a workflow input.
-  priority   Int      @default(0)
-  opened_at  DateTime
-
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  deleted_at DateTime?
-
-  client SfClient       @relation(fields: [client_id], references: [id])
-  phases SfProjectPhase[]
-  files  SfFile[]
-  tasks  SfTask[]
-  mom_documents SfMomDocument[]
-  requirements SfProjectRequirement[]
-
+  @@index([status, archived_at])
+  @@index([pic_designer_id])
+  @@index([pic_drafter_id])
   @@index([client_id])
-  @@index([status])
-  @@index([deleted_at])
   @@map("sf_project")
   @@schema("studioflow")
 }
 
-// ── MOM — project-owned meeting records ─────────────────────────────────────
+model SfPhase {
+  id                String        @id @default(uuid())
+  project_id        String
+  key               SfPhaseKey
+  order_index       Int
+  status            SfPhaseStatus @default(PENDING)
+  is_locked         Boolean       @default(false)
+  allow_parallel    Boolean       @default(false)
+  /// When status last changed; drives "waiting N days".
+  status_changed_at DateTime?
+  created_at        DateTime      @default(now())
+  updated_at        DateTime      @updatedAt
 
-enum SfMomState {
-  DRAFT
-  ISSUED
-  SUPERSEDED
+  project         SfProject         @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  revisions       SfRevision[]
+  activities      SfActivity[]
+  checklist_items SfChecklistItem[]
 
-  @@map("sf_mom_state")
-  @@schema("studioflow")
-}
-
-enum SfMomListStyle {
-  NONE
-  BULLET
-  NUMBERED
-
-  @@map("sf_mom_list_style")
-  @@schema("studioflow")
-}
-
-enum SfMomPointStyle {
-  TEXT
-  BULLET
-  NUMBERED
-
-  @@map("sf_mom_point_style")
-  @@schema("studioflow")
-}
-
-model SfMomDocument {
-  id String @id @default(uuid())
-  project_id String
-  topic String
-  meeting_at DateTime
-  venue String?
-  attendees_text String?
-  prepared_by_name String
-  state SfMomState @default(DRAFT)
-  sequence Int?
-  supersedes_id String?
-  created_by String
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  issued_by String?
-  issued_at DateTime?
-
-  project SfProject @relation(fields: [project_id], references: [id])
-  supersedes SfMomDocument? @relation("MomCorrection", fields: [supersedes_id], references: [id], onDelete: Restrict)
-  corrections SfMomDocument[] @relation("MomCorrection")
-  items SfMomItem[]
-
-  @@unique([project_id, sequence])
-  @@index([project_id, state, created_at])
-  @@index([supersedes_id])
-  @@map("sf_mom_document")
-  @@schema("studioflow")
-}
-
-model SfMomItem {
-  id String @id @default(uuid())
-  document_id String
-  sort_order Int @default(0)
-  is_text_only Boolean @default(false)
-  list_style SfMomListStyle @default(NONE)
-  document SfMomDocument @relation(fields: [document_id], references: [id], onDelete: Cascade)
-  points SfMomPoint[]
-  images SfMomImage[]
-
-  @@index([document_id, sort_order])
-  @@map("sf_mom_item")
-  @@schema("studioflow")
-}
-
-model SfMomPoint {
-  id String @id @default(uuid())
-  item_id String
-  sort_order Int @default(0)
-  text String
-  style SfMomPointStyle @default(TEXT)
-  item SfMomItem @relation(fields: [item_id], references: [id], onDelete: Cascade)
-
-  @@index([item_id, sort_order])
-  @@map("sf_mom_point")
-  @@schema("studioflow")
-}
-
-model SfMomImage {
-  id String @id @default(uuid())
-  item_id String
-  sort_order Int @default(0)
-  storage_key String
-  alt_text String?
-  item SfMomItem @relation(fields: [item_id], references: [id], onDelete: Cascade)
-
-  @@index([item_id, sort_order])
-  @@map("sf_mom_image")
-  @@schema("studioflow")
-}
-
-/// A phase on a specific project — snapshot of SfPhaseTemplate at project creation.
-/// state is persisted and maintained by the service (§4.3).
-model SfProjectPhase {
-  id          String @id @default(uuid())
-  project_id  String
-  template_id String
-
-  // ── Snapshot fields (immutable; survive template edits) ───────────────────
-  key          String
-  name         String
-  sort_order   Int
-  has_rounds   Boolean
-  round_prefix String?
-  folder_key   String?
-  requires_internal_approval Boolean @default(false)
-
-  // ── Service-maintained state (§4.3) ───────────────────────────────────────
-  state SfPhaseState @default(NOT_STARTED)
-
-  // ── Closure metadata (populated only when state = DONE) ──────────────────
-  closed_at      DateTime?
-  closed_by_id   String?            // plain FK to platform.User
-  closure_reason String?
-  closure_kind   SfPhaseClosureKind?
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  project  SfProject       @relation(fields: [project_id], references: [id])
-  template SfPhaseTemplate @relation(fields: [template_id], references: [id])
-  iterations SfIteration[]
-  requirements SfProjectRequirement[]
-
-  /// One phase-key per project; the snapshot is the authority.
   @@unique([project_id, key])
-  @@index([project_id, sort_order])
-  @@map("sf_project_phase")
+  @@unique([project_id, order_index])
+  @@map("sf_phase")
   @@schema("studioflow")
 }
 
-// ── WO-3: Iteration, Files, Settings ─────────────────────────────────────────
+/// At most one ACTIVE revision per phase (partial unique index in migration).
+model SfRevision {
+  id         String           @id @default(uuid())
+  phase_id   String
+  major      Int              @default(1)
+  minor      Int              @default(0)
+  status     SfRevisionStatus @default(ACTIVE)
+  created_at DateTime         @default(now())
+  closed_at  DateTime?
 
-enum SfIterationState {
-  DRAFT
-  SENT
-  APPROVED
-  SUPERSEDED
-  VOIDED
+  phase      SfPhase      @relation(fields: [phase_id], references: [id], onDelete: Cascade)
+  activities SfActivity[]
 
-  @@map("sf_iteration_state")
+  @@index([phase_id, status])
+  @@map("sf_revision")
   @@schema("studioflow")
 }
 
-enum SfIterationPointSource {
-  CLIENT_REVISION
-  INTERNAL
+model SfActivity {
+  id                    String           @id @default(uuid())
+  project_id            String
+  phase_id              String?
+  /// Null = deferred (detached from its revision but still phase-tagged).
+  revision_id           String?
+  content               String
+  mode                  SfActivityMode   @default(TODO)
+  status                SfActivityStatus @default(OPEN)
+  assigned_to_id        String?
+  deferred_from_version String?
+  /// Date-only.
+  due_at                DateTime?        @db.Date
+  created_by_id         String?
+  created_at            DateTime         @default(now())
+  updated_at            DateTime         @updatedAt
+  completed_at          DateTime?
 
-  @@map("sf_iteration_point_source")
+  project  SfProject   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  phase    SfPhase?    @relation(fields: [phase_id], references: [id], onDelete: Cascade)
+  revision SfRevision? @relation(fields: [revision_id], references: [id], onDelete: Cascade)
+
+  @@index([project_id, status])
+  @@index([phase_id, revision_id, status])
+  @@index([assigned_to_id, status])
+  @@map("sf_activity")
   @@schema("studioflow")
 }
 
-enum SfFileTreatment {
-  RECORDED
-  STORED
-  LINKED
+model SfChecklistTemplate {
+  id         String      @id @default(uuid())
+  /// Null = general (project-level) template.
+  phase_key  SfPhaseKey?
+  label      String
+  is_active  Boolean     @default(true)
+  sort_order Int         @default(0)
+  created_at DateTime    @default(now())
+  updated_at DateTime    @updatedAt
 
-  @@map("sf_file_treatment")
+  generated_items SfChecklistItem[]
+
+  @@index([phase_key, is_active, sort_order])
+  @@map("sf_checklist_template")
   @@schema("studioflow")
 }
 
-/// Studio-wide settings. One row, id is always "studio".
-/// naming_template token vocabulary: {date} {project} {location} {round} {code}
-model SfStudioSettings {
-  id String @id @default("studio")
+model SfChecklistItem {
+  id             String    @id @default(uuid())
+  project_id     String
+  /// Null = general project task.
+  phase_id       String?
+  /// Depth capped at one level by the service.
+  parent_id      String?
+  label          String
+  is_checked     Boolean   @default(false)
+  checked_at     DateTime?
+  sort_order     Int       @default(0)
+  /// 1 = P1 (highest) … 4 = none.
+  priority       Int       @default(4)
+  /// Date-only.
+  due_at         DateTime? @db.Date
+  assigned_to_id String?
+  template_id    String?
+  created_by_id  String?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
 
-  /// Naming template for standard filenames (§8.5).
-  /// Default: "{date} {project} {location} {round}"
-  naming_template String @default("{date} {project} {location} {round}")
+  project  SfProject            @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  phase    SfPhase?             @relation(fields: [phase_id], references: [id], onDelete: Cascade)
+  parent   SfChecklistItem?     @relation("SfChecklistTree", fields: [parent_id], references: [id], onDelete: Cascade)
+  children SfChecklistItem[]    @relation("SfChecklistTree")
+  template SfChecklistTemplate? @relation(fields: [template_id], references: [id], onDelete: SetNull)
+  labels   SfChecklistItemLabel[]
 
-  updated_at    DateTime @updatedAt
-  updated_by_id String?
-
-  @@map("sf_studio_settings")
+  @@index([project_id, phase_id, parent_id])
+  @@index([phase_id, is_checked])
+  @@index([assigned_to_id, is_checked])
+  @@map("sf_checklist_item")
   @@schema("studioflow")
 }
 
-/// One numbered round of work in a phase. Replaces legacy Revision.
-/// `number` is server-assigned, sequential, gapless within the phase (§5.3).
-model SfIteration {
-  id       String @id @default(uuid())
-  phase_id String
+model SfChecklistLabel {
+  id         String   @id @default(uuid())
+  name       String   @unique
+  color      String   @default("neutral")
+  created_at DateTime @default(now())
 
-  /// Sequential and gapless within the phase, starting at 1. Server-assigned.
-  number Int
+  items SfChecklistItemLabel[]
 
-  state       SfIterationState @default(DRAFT)
-  assignee_id String?
+  @@map("sf_checklist_label")
+  @@schema("studioflow")
+}
 
-  sent_at      DateTime?
-  responded_at DateTime?
+model SfChecklistItemLabel {
+  item_id  String
+  label_id String
 
-  /// Starts at 0. Incremented when the working file is replaced (§5.4).
-  working_revision Int @default(0)
+  item  SfChecklistItem  @relation(fields: [item_id], references: [id], onDelete: Cascade)
+  label SfChecklistLabel @relation(fields: [label_id], references: [id], onDelete: Cascade)
 
-  voided_at    DateTime?
-  voided_by_id String?
-  void_reason  String?
+  @@id([item_id, label_id])
+  @@index([label_id])
+  @@map("sf_checklist_item_label")
+  @@schema("studioflow")
+}
 
+model SfChecklistFilterView {
+  id         String   @id @default(uuid())
+  owner_id   String
+  name       String
+  query_json Json
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  phase SfProjectPhase @relation(fields: [phase_id], references: [id])
-
-  points            SfIterationPoint[]
-  internal_approval SfInternalApproval?
-  sent_files        SfFile[]
-  responses         SfResponse[]
-
-  @@unique([phase_id, number])
-  @@index([phase_id, state])
-  @@map("sf_iteration")
-  @@schema("studioflow")
-}
-
-/// A checklist item inside a round. `source` is immutable.
-model SfIterationPoint {
-  id           String @id @default(uuid())
-  iteration_id String
-
-  text String
-  done Boolean @default(false)
-
-  /// Immutable. CLIENT_REVISION = created by a client answer; INTERNAL = studio.
-  source SfIterationPointSource
-
-  source_response_id String?
-  source_point_id    String?
-
-  withdrawn_at      DateTime?
-  withdrawn_by_id   String?
-  withdrawal_reason String?
-
-  sort_order Int @default(0)
-
-  iteration SfIteration @relation(fields: [iteration_id], references: [id])
-
-  @@index([iteration_id, source])
-  @@map("sf_iteration_point")
-  @@schema("studioflow")
-}
-
-/// Optional internal sign-off on a round. At most one per iteration.
-model SfInternalApproval {
-  id           String @id @default(uuid())
-  iteration_id String @unique
-
-  approved_by_id String
-  approved_at    DateTime @default(now())
-  note           String?
-
-  iteration SfIteration @relation(fields: [iteration_id], references: [id])
-
-  @@map("sf_internal_approval")
-  @@schema("studioflow")
-}
-
-/// A permanent file record. The bytes may be released (§8.6); the record never is.
-/// folder_key = null means the unsorted tray (§8.8).
-model SfFile {
-  id         String @id @default(uuid())
-  project_id String
-
-  folder_key String?
-  treatment  SfFileTreatment
-
-  filename          String
-  original_filename String
-
-  bytes            BigInt
-  file_modified_at DateTime?
-
-  dropped_by_id String
-  dropped_at    DateTime @default(now())
-
-  /// Set only by a Send action (§8.3); immutable afterwards.
-  sent_in_iteration_id String?
-
-  storage_key String?
-  checksum    String?
-  external_url String?
-
-  superseded_at     DateTime?
-  bytes_released_at DateTime?
-
-  project           SfProject    @relation(fields: [project_id], references: [id])
-  sent_in_iteration SfIteration? @relation(fields: [sent_in_iteration_id], references: [id])
-  task_attachments  SfTask[]
-  requirement_evidence SfRequirementEvidence[]
-
-  @@index([project_id, folder_key])
-  @@index([sent_in_iteration_id])
-  @@index([project_id, superseded_at])
-  @@map("sf_file")
-  @@schema("studioflow")
-}
-
-/// General or phase-scoped work that is not already represented by an
-/// iteration. A null phase_scope is the intentional General scope.
-model SfTask {
-  id         String @id @default(uuid())
-  project_id String
-
-  /// Snapshot phase key from SfProjectPhase. Kept as a plain nullable value so
-  /// project-specific template evolution does not require a closed enum.
-  phase_scope String?
-  title       String
-  status      SfTaskStatus @default(OPEN)
-  assignee_id String?
-  due_date    DateTime?
-
-  /// Optional evidence of internal work; it never marks the file as sent.
-  attachment_file_id String?
-  sort_order         Int @default(0)
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  project         SfProject @relation(fields: [project_id], references: [id])
-  attachment_file SfFile?   @relation(fields: [attachment_file_id], references: [id])
-
-  @@index([project_id, status, phase_scope, sort_order])
-  @@index([assignee_id, status, created_at])
-  @@index([attachment_file_id])
-  @@map("sf_task")
-  @@schema("studioflow")
-}
-
-// ── WO-5: Client responses ───────────────────────────────────────────────────
-
-enum SfResponseKind {
-  APPROVAL
-  REVISION
-
-  @@map("sf_response_kind")
-  @@schema("studioflow")
-}
-
-/// A recorded client answer to a SENT round (§6).
-/// APPROVAL closes the round as APPROVED.
-/// REVISION supersedes the round and seeds the next one with CLIENT_REVISION points.
-model SfResponse {
-  id           String @id @default(uuid())
-  iteration_id String
-
-  kind SfResponseKind
-  note String?
-
-  received_at    DateTime @default(now())
-  recorded_by_id String
-
-  iteration SfIteration       @relation(fields: [iteration_id], references: [id])
-  points    SfResponsePoint[]
-
-  @@index([iteration_id])
-  @@map("sf_response")
-  @@schema("studioflow")
-}
-
-/// One revision request inside a client response.
-/// `text` is the client's own wording and is never edited after recording (§7.2).
-model SfResponsePoint {
-  id          String @id @default(uuid())
-  response_id String
-
-  text       String
-  sort_order Int    @default(0)
-
-  response SfResponse @relation(fields: [response_id], references: [id])
-
-  @@index([response_id])
-  @@map("sf_response_point")
-  @@schema("studioflow")
-}
-
-model SfProductCatalogue {
-  id              String    @id @default(uuid())
-  brand_md_id     String?
-  brand_name      String?
-  product_name    String
-  colour          String?
-  finishing       String?
-  dimension_text  String?
-  unit            String?
-  notes           String?
-  search_key      String
-  sort_order      Int       @default(0)
-  created_at      DateTime  @default(now())
-  updated_at      DateTime  @updatedAt
-  deleted_at      DateTime?
-
-  @@index([search_key])
-  @@index([brand_md_id])
-  @@index([deleted_at, sort_order])
-  @@map("sf_product_catalogue")
-  @@schema("studioflow")
-}
-
-// ── §7.1.1 Requirements — first-class domain behavior ────────────────────────
-
-enum SfRequirementScope {
-  GENERAL
-  PHASE
-
-  @@map("sf_requirement_scope")
-  @@schema("studioflow")
-}
-
-enum SfRequirementSatisfactionState {
-  OPEN
-  SATISFIED
-
-  @@map("sf_requirement_satisfaction_state")
-  @@schema("studioflow")
-}
-
-/// Studio setting: a requirement template used to seed future projects.
-/// key is stable, lowercase, machine-readable; immutable after first snapshot use.
-model SfRequirementTemplate {
-  id      String @id @default(uuid())
-  key     String
-  scope   SfRequirementScope
-
-  title       String
-  description String?
-  sort_order  Int @default(0)
-
-  /// For PHASE scope: exactly which SfPhaseTemplate this belongs to.
-  /// Null for GENERAL scope.
-  phase_template_id String?
-
-  /// Immutable after the first project snapshot uses this key.
-  key_immutable Boolean @default(false)
-
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-
-  /// Archive state (reversible, not permanent delete).
-  deleted_at DateTime?
-
-  phase_template SfPhaseTemplate? @relation(fields: [phase_template_id], references: [id])
-  project_requirements SfProjectRequirement[]
-
-  /// (scope, phase_template_id, key) is the logical unique; Prisma enforces
-  /// with a partial index below.
-  @@unique([scope, phase_template_id, key])
-  @@index([scope, phase_template_id, deleted_at])
-  @@map("sf_requirement_template")
-  @@schema("studioflow")
-}
-
-/// Authoritative project record for a requirement.
-/// scope + project + phase never move after creation; create a replacement
-/// and archive the old record instead.
-model SfProjectRequirement {
-  id         String @id @default(uuid())
-  project_id String
-  phase_id   String?
-
-  source_template_id     String?
-  template_key_snapshot  String?
-
-  title       String
-  description String?
-  sort_order  Int @default(0)
-
-  satisfaction_state SfRequirementSatisfactionState @default(OPEN)
-  satisfied_at       DateTime?
-  satisfied_by_id    String?
-  satisfaction_note  String?
-
-  /// Archive state (reversible, not permanent delete).
-  /// Archived records are read-only and excluded from open-work counts.
-  deleted_at     DateTime?
-  archived_at    DateTime?
-  archived_by_id String?
-  archive_reason String?
-
-  restored_at    DateTime?
-  restored_by_id String?
-  restore_reason String?
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  project  SfProject       @relation(fields: [project_id], references: [id])
-  phase    SfProjectPhase? @relation(fields: [phase_id], references: [id], onDelete: Restrict)
-  source_template SfRequirementTemplate? @relation(fields: [source_template_id], references: [id])
-  evidence SfRequirementEvidence[]
-
-  /// phase_id = null is General; otherwise must identify a phase of this project.
-  @@index([project_id, satisfaction_state, archived_at])
-  @@index([project_id, phase_id])
-  @@index([source_template_id])
-  @@map("sf_project_requirement")
-  @@schema("studioflow")
-}
-
-/// Links existing SfFile records as evidence for a requirement.
-/// Upload, storage, and file classification remain governed by §8.
-model SfRequirementEvidence {
-  id            String @id @default(uuid())
-  requirement_id String
-  file_id       String
-
-  linked_at    DateTime @default(now())
-  linked_by_id String?
-
-  /// Unlink requires a reason (stored in audit only).
-  unlinked_at    DateTime?
-  unlinked_by_id String?
-  unlink_reason  String?
-
-  requirement SfProjectRequirement @relation(fields: [requirement_id], references: [id])
-  file        SfFile               @relation(fields: [file_id], references: [id])
-
-  @@unique([requirement_id, file_id])
-  @@index([requirement_id])
-  @@index([file_id])
-  @@map("sf_requirement_evidence")
+  @@unique([owner_id, name])
+  @@map("sf_checklist_filter_view")
   @@schema("studioflow")
 }

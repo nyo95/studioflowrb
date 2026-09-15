@@ -1,6 +1,6 @@
 # Product Roadmap by Application
 
-Status: active planning ledger, reconciled through R8.70 on 2026-09-15.
+Status: active planning ledger, reconciled through R8.71 on 2026-09-15.
 
 This file answers **what remains to be built**. It does not activate work by
 itself. Completed items are struck through or removed only after verification
@@ -148,7 +148,8 @@ rest of the rebuild StudioFlow.
   delete rebuild StudioFlow code/routes/schema, then port Client, Project
   (auto-naming, PIC designer/drafter), five-phase legacy workflow with
   revisions, activities, checklist with templates, Today, and StudioFlow
-  settings. Active in `PLAN.md`.
+  settings. Implemented in R8.71; owner browser acceptance is deferred to the
+  end of wave 1 (see `review.md`).
 - [ ] **SF-R2 — MOM (legacy):** legacy document/item/point/image model,
   editing flow, and print on `ObjectStorage` and UI Engine. Closes KB-012 and
   KB-022 by replacing the ISSUED/SUPERSEDED lifecycle.

@@ -1,7 +1,7 @@
 "use client";
 
 import { Tabs as RTabs } from "radix-ui";
-import type { HTMLAttributes,ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 
 import { cx } from "../internal/cx";
 

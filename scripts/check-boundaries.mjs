@@ -21,12 +21,7 @@ export const RULE_DUPLICATE_PRIMITIVE = "app-local duplicate primitive";
  * "@platform/utilities/date".
  */
 export const APP_DUPLICATE_PRIMITIVE_ALLOW_LIST = [
-  "src/apps/studioflow/service.ts",
   "src/app/(platform)/bq/project-deletion-review.tsx",
-  "src/app/(platform)/studioflow/page.tsx",
-  "src/app/(platform)/studioflow/[id]/page.tsx",
-  "src/app/(platform)/studioflow/[id]/files/page.tsx",
-  "src/app/(platform)/studioflow/[id]/mom/[momId]/page.tsx",
 ];
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);

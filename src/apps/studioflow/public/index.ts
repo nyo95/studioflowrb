@@ -1,29 +1,7 @@
 /**
- * StudioFlow public boundary.
- *
- * Only this file may be imported by other apps. StudioFlow's internals
- * (service.ts, runtime.ts, components) are private.
+ * StudioFlow public boundary. Other apps and the composition root may import
+ * only from here; everything else under `src/apps/studioflow` is private.
  */
-
-import { STUDIOFLOW_PERMISSIONS } from "../service";
-
+export { STUDIOFLOW_PERMISSIONS } from "../permissions";
+export type { StudioFlowPermission } from "../permissions";
 export * from "./nav";
-
-export { STUDIOFLOW_PERMISSIONS };
-export type {
-  CreateClientInput,
-  EditClientInput,
-  CreateProjectInput,
-  EditProjectInput,
-  RecordFileInput,
-  UpdateNamingTemplateInput,
-  RecordResponseInput,
-  SendIterationInput,
-  AddIterationPointInput,
-  WithdrawPointInput,
-  CreateTaskInput,
-  AssignTaskInput,
-  SetTaskCompletionInput,
-  ReorderTaskInput,
-  WaitingOnMeItem,
-} from "../service";

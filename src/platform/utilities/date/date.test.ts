@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 
 import {
   DEFAULT_DISPLAY_LOCALE,
+  currentDateOnly,
+  diffDateOnlyDays,
   DEFAULT_DISPLAY_TIME_ZONE,
   formatDateOnly,
   formatInstant,
@@ -130,5 +132,19 @@ describe("formatInstant display styles (shared by app directories)", () => {
 
   it("accepts Date objects the way the directory consumers pass Prisma Date fields", () => {
     assert.equal(formatInstant(new Date(instant), { locale: "en-US", timeZone: "UTC", style: "date" }), "Aug 23, 2026");
+  });
+});
+
+describe("currentDateOnly / diffDateOnlyDays", () => {
+  it("returns the calendar date in the requested timezone", () => {
+    const now = new Date("2026-09-15T18:30:00Z");
+    assert.equal(currentDateOnly({ now, timeZone: "Asia/Jakarta" }), "2026-09-16");
+    assert.equal(currentDateOnly({ now, timeZone: "UTC" }), "2026-09-15");
+  });
+
+  it("counts whole calendar days between date-only values", () => {
+    assert.equal(diffDateOnlyDays("2026-09-15", "2026-09-18"), 3);
+    assert.equal(diffDateOnlyDays("2026-03-01", "2026-02-27"), -2);
+    assert.throws(() => diffDateOnlyDays("2026-02-30", "2026-03-01"));
   });
 });

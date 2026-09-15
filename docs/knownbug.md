@@ -141,12 +141,14 @@ with no state, no replacement link and no reason, so the contract's whole §6.5
 because each has its own observable symptom, but they must be fixed by one
 migration and one slice.
 
-> **StudioFlow Rework note (R8.70, 2026-09-15).** The rebuild StudioFlow is
-> being archived and replaced by the legacy rework
-> (`apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md`). SF-R1 closes KB-013 …
-> KB-018 and KB-023 as superseded; KB-012/KB-022 close with SF-R2 (MOM);
-> KB-003/KB-021 close with SF-R3 (Schedule). Do not fix them in the archived
-> code.
+> **StudioFlow Rework note (R8.70/R8.71, 2026-09-15).** The rebuild
+> StudioFlow was archived (tag `archive/studioflow-rb-r8.69`) and replaced by
+> the legacy rework (`apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md`).
+> **KB-013 … KB-018 and KB-023 are closed in R8.71 as superseded**: the code
+> they describe no longer exists, and SF-R1 implements the legacy behavior
+> instead (client answers → feedback/reject revisions; archive/restore;
+> fixed phases; general to-dos on Today). KB-012/KB-022 close with SF-R2
+> (MOM); KB-003/KB-021 close with SF-R3 (Schedule).
 
 ### KB-012 — A MOM correction is issued instantly and cannot correct anything
 

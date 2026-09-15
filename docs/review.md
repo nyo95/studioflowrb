@@ -1,6 +1,6 @@
 # Ready for Review
 
-Status: active verification ledger, reconciled through R8.61 on 2026-09-14.
+Status: active verification ledger, reconciled through R8.71 on 2026-09-15.
 New file, split out of `roadmap.md`/`knownbug.md` on 2026-09-10 at owner
 request, so status is visible at a glance:
 
@@ -169,3 +169,30 @@ unverified middle state.
   imported — see the minimum product bar in this directory's `README.md`.
 - Closing an item here requires the same evidence closing a roadmap item does:
   end-to-end verification, not a code read.
+
+## StudioFlow
+
+### SF-R1 — Legacy project backbone (R8.71)
+
+- **Built:** archive cutover of the rebuild StudioFlow, new `studioflow`
+  schema (migration `20260915100000_sf_r1_legacy_rework_cutover`), modular
+  services (projects, phases, tasks, today), Today, Projects, Clients, project
+  workspace (overview, five phase pages, history), Studio Settings, temporary
+  legacy redirects, people directory, `ContextNavLink`.
+- **Verified in the cloud workspace (owner-approved lane change):** 354/354
+  tests including 12 new StudioFlow integration tests on a disposable
+  PostgreSQL 16; typecheck, lint, boundaries, legacy-runtime, production build
+  (Google Fonts stubbed only for that sandbox build); Playwright smoke on the
+  production build at 1440 px and 375 px: login, empty Today, create project
+  with new client, general to-do, blocked internal submit, tick and submit,
+  feedback → send back → v1.1, history, Today, projects, clients, settings,
+  platform settings link, Master Data/BQ pages, drafter cannot create
+  projects, signed-out and legacy `/projects` redirects — zero console errors.
+- **Deferred to owner acceptance (end of wave 1):** the same walk on the
+  kantor machine and data, client approval → locked phase, parallel Layout/3D/CD,
+  skip/reopen/admin reset dialogs, archive/restore, saved Today filters,
+  checklist labels/subtasks/move up-down, and a check of the migration with
+  `npx prisma migrate deploy` plus `npx prisma migrate diff` (the cloud
+  sandbox could not download Prisma's schema engine, so migration SQL was
+  applied with `psql` and proven by the integration suite, not by Prisma's
+  diff).

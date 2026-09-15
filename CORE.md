@@ -170,6 +170,10 @@ Rules:
 - The final active user capable of managing users and roles cannot be disabled, stripped of all such Roles, or have the last required grants removed. The whole change is validated atomically.
 - Self-demotion is allowed only when another active access administrator remains. User restore/reactivation is explicit; creating an existing archived email never silently revives it.
 
+### People directory (assignment pickers)
+
+`@platform/core/rbac/people` (`createPeopleDirectory`, composed as `peopleDirectory` in `@platform/runtime`) is the only app-facing user lookup. It returns id, display name, and active flag — never email, roles, or grants — for (a) active holders of one registered permission and (b) stored ids resolved for historical display. Apps decide which permission defines eligibility and who may call it; the administration directory (`listUsers`) keeps requiring `platform.user.read`. Added in R8.71 for StudioFlow PIC/assignee pickers.
+
 The legacy role enum and static matrix are evidence only; they do not define rebuild roles. Initial role names/grants are a seed/work-order decision reviewed against the apps that actually exist.
 
 ## 5. Audit envelope

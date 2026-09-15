@@ -1,6 +1,6 @@
 # Documentation Hub
 
-Status: reconciled through **R8.70** on 2026-09-15. Contracts under `docs/apps/`
+Status: reconciled through **R8.71** on 2026-09-15. Contracts under `docs/apps/`
 were reorganized into one subfolder per application on 2026-09-10 at owner
 request; content is unchanged except for corrected cross-links.
 
@@ -24,10 +24,6 @@ tests, and migrations prove implemented state.
 | [`agent/PLANNER.md`](agent/PLANNER.md) | Planning half of the Planner/Reviewer Navigator lane |
 | [`agent/EXECUTOR.md`](agent/EXECUTOR.md) | Autonomous implementation within a READY plan's locked boundaries |
 | [`agent/REVIEWER.md`](agent/REVIEWER.md) | Risk-shaped verification and next-plan preparation |
-| [`StudioFlow workflow closure draft`](../scripts/work-orders/STUDIOFLOW-R7.56-WORKFLOW-CLOSURE.md) | **paused** by the owner priority below; assign the next unused revision when reactivated, not the historical filename's R7.56 |
-| [`StudioFlow R7.48 work order`](../scripts/work-orders/STUDIOFLOW-R7.48-PHASE-DELIVERABLE.md) | implemented in R7.48; retained as history |
-| [`StudioFlow R7.49 work order`](../scripts/work-orders/STUDIOFLOW-R7.49-COHERENT-WORK-SURFACE.md) | implemented in R7.50; retained as history |
-| [`StudioFlow R7.52 MOM work order`](../scripts/work-orders/STUDIOFLOW-R7.52-MOM.md) | implemented in R7.52; retained as history |
 
 
 A work order marked *implemented* above is evidence of what was built, never an
@@ -93,7 +89,7 @@ contracts sit outside any app folder because every app depends on them.
 |---|---|
 | [`apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md`](apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md) | **sole active StudioFlow authority (R8.70):** legacy behavior on the Foundation — disposition matrix, permissions, Project/Phase/Revision/Task/Today, MOM, Schedule, centralization map, UI/UX direction |
 | [`apps/studioflow/D-SF-RECOVERY-DISCOVERY.md`](apps/studioflow/D-SF-RECOVERY-DISCOVERY.md) | R8.48 pinned legacy evidence; D-SF decisions apply except where the rework contract §9 overrides them |
-| `studioflow.md`, `studioflow-project-contract.md`, `studioflow-schedule-contract.md`, `studioflow-mom-contract.md`, `studioflow-ux-spec.md`, `studioflow-work-orders.md`, `studioflow-implementation-plan.md`, `STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md` | **superseded** 2026-09-15; history only, moved to `archive/studioflow-rb/` by SF-R1 |
+| [`archive/studioflow-rb/`](archive/studioflow-rb/) | **superseded** rebuild StudioFlow contracts and R7 work orders (moved in R8.71); history only |
 
 Execution and continuity are governed by [`AGENTS.md`](../AGENTS.md) and
 [`CHANGELOG.md`](../CHANGELOG.md). The completed

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { createAuditEventWriter } from "@platform/core/audit/persistence";
 import { prisma, runSerializableTransaction } from "@platform/core/db";
 import { createPlatformAccessService } from "@platform/core/rbac/services";
+import { createPeopleDirectory } from "@platform/core/rbac/people";
 import { createPlatformSettingsService } from "@platform/core/settings";
 import { createPlatformAccountService } from "@platform/core/auth/account";
 import path from "node:path";
@@ -54,3 +55,6 @@ export const platformAccount = createPlatformAccountService({
   db: prisma,
   ...commonPorts,
 });
+
+/** Name/eligibility lookup for app assignment pickers (no admin data). */
+export const peopleDirectory = createPeopleDirectory(prisma);
