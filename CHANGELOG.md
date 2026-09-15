@@ -5,8 +5,20 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.78**
-- Next local revision: **R8.79**
+- Current revision after this entry is committed: **R8.79**
+- Next local revision: **R8.80**
+
+## R8.79 | 2026-09-16 | docs(platform): add global menu design brief
+
+### Changed
+
+- Added a dedicated global menu design brief for the next design pass. The
+  brief records placement options and decision questions for the global app
+  switcher without locking a final UI pattern.
+
+### Verification
+
+- Documentation-only change; no application runtime behavior changed.
 
 ## R8.78 | 2026-09-16 | docs(studioflow): record schedule settings table bug
 
