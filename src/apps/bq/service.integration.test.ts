@@ -5,6 +5,7 @@ import { createAuditEventWriter } from "@platform/core/audit/persistence";
 import { closeTestDb, createTestDb, requireDisposableTestDatabaseUrl, type TestDb } from "@platform/core/db/test-support";
 import { AppError } from "@platform/core/errors";
 import type { PrismaClient } from "@/generated/prisma/client";
+import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
 import { createBqService, BQ_PERMISSIONS } from "./service";
 
 const ACTOR = { kind: "USER" as const, userId: "bq-test-user", label: "BQ Test" };
@@ -89,6 +90,58 @@ describe("BQ R6.1 invariants", () => {
     await assert.rejects(
       () => service.updateLibMaterial({ grants: GRANTS, actor: ACTOR, id: material.id, defaultKoefisien: "0" }),
       (error: unknown) => error instanceof AppError && error.code === "bq.koefisien.not-positive",
+    );
+  });
+
+  it("keeps the Library promotion state machine behind BQ request and Master Data approval grants", async () => {
+    const material = await service.createLibMaterial({
+      grants: GRANTS,
+      actor: ACTOR,
+      name: "Promotable board",
+      purchaseUnit: "SHEET",
+      harga: "100",
+      currency: "IDR",
+    });
+    const masterDataGrants = [MASTERDATA_PERMISSIONS.promotionApprove];
+
+    await service.requestPromotion({
+      grants: GRANTS,
+      actor: ACTOR,
+      type: "material",
+      libItemId: material.id,
+    });
+
+    const requested = await service.listPromotionRequests({ grants: masterDataGrants });
+    assert.deepEqual(requested.map((request) => request.id), [material.id]);
+
+    await assert.rejects(
+      () => service.requestPromotion({ grants: GRANTS, actor: ACTOR, type: "material", libItemId: material.id }),
+      (error: unknown) => error instanceof AppError && error.code === "bq.promotion.invalid-status",
+    );
+    await assert.rejects(
+      () => service.approvePromotion({ grants: masterDataGrants, actor: ACTOR, type: "material", libItemId: material.id, masterdataRefId: " " }),
+      (error: unknown) => error instanceof AppError && error.code === "bq.promotion.masterdata-ref-required",
+    );
+
+    await service.approvePromotion({
+      grants: masterDataGrants,
+      actor: ACTOR,
+      type: "material",
+      libItemId: material.id,
+      masterdataRefId: "masterdata-price-1",
+    });
+
+    const approved = await testDb.prisma.bqLibMaterial.findUniqueOrThrow({ where: { id: material.id } });
+    assert.equal(approved.promotion_status, "APPROVED");
+    assert.equal(approved.masterdata_ref_id, "masterdata-price-1");
+    await assert.rejects(
+      () => service.requestPromotion({ grants: GRANTS, actor: ACTOR, type: "material", libItemId: material.id }),
+      (error: unknown) => error instanceof AppError && error.code === "bq.promotion.invalid-status",
+    );
+    assert.deepEqual(
+      (await testDb.prisma.auditEvent.findMany({ where: { entity_id: material.id }, orderBy: { occurred_at: "asc" }, select: { action: true } }))
+        .map((event) => event.action),
+      ["bq.lib-material.created", "bq.promotion.requested", "bq.promotion.approved"],
     );
   });
 

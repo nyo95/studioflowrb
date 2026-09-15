@@ -1,6 +1,6 @@
 # Product Roadmap by Application
 
-Status: active planning ledger, reconciled through R8.75 on 2026-09-15.
+Status: active planning ledger, reconciled through R8.80 on 2026-09-16.
 
 This file answers **what remains to be built**. It does not activate work by
 itself. Completed items are struck through or removed only after verification
@@ -120,12 +120,18 @@ independently useful outcome, or demonstrated context/tool limit.
 
 ## BQ
 
-- [ ] Decompose the BQ service as a separate architecture backlog. This is not
-  a prerequisite or work item inside StudioFlow Recovery.
-- [ ] Add a safe calculator expression input such as `=15000*3` or
-  `0.5*80000`, with exact decimal parsing and no arbitrary code execution.
-- [ ] Decide the smallest reusable exact-decimal arithmetic extension while
-  keeping BQ formula and rounding policy app-owned.
+- [x] ~~Decompose the BQ service as a separate architecture backlog.~~ R8.80
+  splits the domain service into Library, Template, Project lifecycle,
+  Project tree, Promotion, Assembly, and shared service context modules while
+  preserving the existing service facade.
+- [x] ~~Add a safe calculator expression input such as `=15000*3` or
+  `0.5*80000`, with exact decimal parsing and no arbitrary code execution.~~
+  Implemented before R8.80 and reconciled in R8.80; `calc-expression` uses exact
+  decimal arithmetic and feeds normalized values to server actions.
+- [x] ~~Decide the smallest reusable exact-decimal arithmetic extension while
+  keeping BQ formula and rounding policy app-owned.~~ Closed by the existing
+  shared decimal arithmetic utilities; BQ retains its app-owned formula and
+  truncation policy.
 - [ ] Add Quotation PDF output and Terms & Conditions.
 - [ ] Add price modes such as TBC and By Owner.
 - [ ] Add Rate Library after sufficient project-line evidence exists.

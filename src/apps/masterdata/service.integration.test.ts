@@ -565,6 +565,12 @@ describe("Master Data service", () => {
     assert.equal(workPrices.length, 2);
     assert.equal(workPrices.some((w) => w.id === mlPrice.priceMaterialLaborId && w.kind === "material-labor"), true);
     assert.equal(workPrices.some((w) => w.id === laborPrice.priceLaborId && w.kind === "labor"), true);
+
+    const searchedWorkPrices = await publicRead.listWorkPricesRead({ search: "Upah", limit: 1 });
+    assert.deepEqual(searchedWorkPrices.map((w) => w.id), [laborPrice.priceLaborId]);
+
+    const searchedMaterialLabor = await publicRead.listWorkPricesRead({ kind: "material-labor", search: "Termasuk", limit: 1 });
+    assert.deepEqual(searchedMaterialLabor.map((w) => w.id), [mlPrice.priceMaterialLaborId]);
   });
 
   it("creates Pricing quick-entry vendors only with an active matching capability", async () => {

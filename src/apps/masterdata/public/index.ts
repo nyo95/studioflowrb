@@ -277,8 +277,12 @@ export function createMasterDataPublicRead(db: PrismaClient) {
       kind?: "material-labor" | "labor";
       categoryId?: string;
       vendorId?: string;
+      search?: string;
+      limit?: number;
     }): Promise<PriceWorkRead[]> {
       const results: PriceWorkRead[] = [];
+      const search = filter?.search?.trim();
+      const take = filter?.limit === undefined ? undefined : Math.min(Math.max(filter.limit, 1), 200);
 
       if (!filter?.kind || filter.kind === "material-labor") {
         const ml = await db.priceMaterialLabor.findMany({
@@ -286,11 +290,21 @@ export function createMasterDataPublicRead(db: PrismaClient) {
             deleted_at: null,
             ...(filter?.categoryId ? { category_id: filter.categoryId } : {}),
             ...(filter?.vendorId ? { vendor_id: filter.vendorId } : {}),
+            ...(search
+              ? {
+                  OR: [
+                    { name: { contains: search, mode: "insensitive" } },
+                    { vendor: { name: { contains: search, mode: "insensitive" } } },
+                    { category: { name: { contains: search, mode: "insensitive" } } },
+                  ],
+                }
+              : {}),
             category: { status: "ACTIVE", kind: "WORK" },
             vendor: { deleted_at: null },
             unit: { status: "ACTIVE" },
           },
           orderBy: { name: "asc" },
+          take,
           select: {
             id: true,
             name: true,
@@ -331,11 +345,21 @@ export function createMasterDataPublicRead(db: PrismaClient) {
             deleted_at: null,
             ...(filter?.categoryId ? { category_id: filter.categoryId } : {}),
             ...(filter?.vendorId ? { vendor_id: filter.vendorId } : {}),
+            ...(search
+              ? {
+                  OR: [
+                    { name: { contains: search, mode: "insensitive" } },
+                    { vendor: { name: { contains: search, mode: "insensitive" } } },
+                    { category: { name: { contains: search, mode: "insensitive" } } },
+                  ],
+                }
+              : {}),
             category: { status: "ACTIVE", kind: "WORK" },
             vendor: { deleted_at: null },
             unit: { status: "ACTIVE" },
           },
           orderBy: { name: "asc" },
+          take,
           select: {
             id: true,
             name: true,
@@ -369,7 +393,7 @@ export function createMasterDataPublicRead(db: PrismaClient) {
         );
       }
 
-      return results.sort((a, b) => a.name.localeCompare(b.name));
+      return results.sort((a, b) => a.name.localeCompare(b.name)).slice(0, take);
     },
   };
 }

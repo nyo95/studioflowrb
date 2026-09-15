@@ -516,10 +516,11 @@ yang lain (K-05).
 | **BQ-F2** | BQ Library CRUD (Items + BqLibCustomItem) + Template Editor | Library bisa ditambah/edit; Template bisa dibuat | selesai R4.56 |
 | **BQ-F3** | BQ Project + Section/Subsection + L1/L2/L3 + engine kalkulasi | Angka terhitung benar (lihat §6), ubah qty L3 update semua ke atas | selesai R4.56 |
 | **BQ-F4** | Import dari Master Data ke L3 (snapshot flow) | Pilih material dari MD, harga tersimpan sebagai snapshot, override bisa | selesai R4.56 |
-| **BQ-F5** | Promotion flow (Library → Master Data) | Estimator ajukan, Admin/staff MD approve/reject di Master Data | perlu implementasi ulang |
+| **BQ-F5** | Promotion flow (Library → Master Data) | Estimator ajukan, Admin/staff MD approve/reject di Master Data | selesai; reconciled R8.80 |
 
-Belum diverifikasi di browser sungguhan; lihat catatan keterbatasan di
-`CHANGELOG.md` R4.56.
+F1-F5 punya bukti kode dan integration coverage per R8.80. Browser acceptance
+khusus BQ tetap dicatat di `docs/review.md` sampai ada walkthrough user-facing
+yang eksplisit direkam.
 
 ---
 
@@ -576,4 +577,4 @@ teknis masih harus diselesaikan sebelum arithmetic baru ditambahkan.
 | Item | Status |
 |---|---|
 | Rounding policy | **LOCKED** — truncate 2 desimal di intermediate dan output final |
-| Exact decimal capability placement | **OPEN TECHNICAL DECISION** — navigator harus menilai apakah `@platform/utilities/decimal` perlu diextend dengan arithmetic generik (add/multiply/divide/truncate) sebelum fitur kalkulator/waste, atau BQ membuat adapter domain yang sempit. |
+| Exact decimal capability placement | **CLOSED** — shared Utilities sudah menyediakan arithmetic decimal generik minimal; BQ tetap memiliki parser kalkulator, formula, dan truncation policy sendiri. |

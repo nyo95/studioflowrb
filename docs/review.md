@@ -1,6 +1,6 @@
 # Ready for Review
 
-Status: active verification ledger, reconciled through R8.75 on 2026-09-15.
+Status: active verification ledger, reconciled through R8.80 on 2026-09-16.
 New file, split out of `roadmap.md`/`knownbug.md` on 2026-09-10 at owner
 request, so status is visible at a glance:
 
@@ -142,13 +142,26 @@ No item currently ready for review.
   client-side arithmetic — every mutation returns the server-recomputed
   `BqProjectDetail` and the client swaps state; each L1 is computed
   independently so one unpriced item does not blank the document.
+- **R8.80 code review:** The old note that F5 still needed implementation is
+  stale. BQ exposes `requestPromotion`, `listPromotionRequests`,
+  `approvePromotion`, and `rejectPromotion` through the runtime/public command
+  boundary; Master Data approval consumes that command boundary rather than
+  importing BQ internals. R8.80 adds an integration test for the promotion
+  state machine and Master Data approval grant.
+- **R8.80 calculator review:** The calculator already exists and is not a
+  roadmap gap. `calc-expression` parses decimal expressions with exact shared
+  decimal utilities and does not evaluate arbitrary JavaScript.
+- **R8.80 source-picker debt correction:** BQ no longer asks Master Data for
+  all work prices before filtering. Master Data's public work-price read now
+  accepts backward-compatible `search` and `limit` filters, and BQ uses those
+  filters from its source picker action.
 - **Needs:** A real browser walkthrough (add/edit/import at every level,
   confirm totals recompute correctly, confirm one unpriced item doesn't blank
-  the document) and at least one integration test. No `InlineEdit` interaction
-  test exists yet — only markup and source-contract assertions.
+  the document, confirm calculator input from inline numeric cells, and confirm
+  promotion status/review controls in BQ Library/Master Data). No `InlineEdit`
+  browser interaction evidence is recorded yet.
 - **Not blocking review, already tracked in `roadmap.md`:** no reorder for
-  Sections/L1/L2/L3 inside a project; import picker filters client-side and
-  caps at 80 rows with no paging; no unit-conversion helper for
+  Sections/L1/L2/L3 inside a project; no unit-conversion helper for
   `purchase_to_base_factor`.
 - **Status:** Ready for review, not yet verified.
 

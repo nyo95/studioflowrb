@@ -5,8 +5,36 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.79**
-- Next local revision: **R8.80**
+- Current revision after this entry is committed: **R8.80**
+- Next local revision: **R8.81**
+
+## R8.80 | 2026-09-16 | refactor(bq): decompose service and reconcile delivered status
+
+### Changed
+
+- Reconciled BQ documentation with current implementation evidence: BQ-F5
+  promotion flow is implemented, calculator expression input already exists,
+  shared decimal arithmetic placement is closed, and Quotation PDF/T&C remains
+  deferred.
+- Split the BQ domain service into focused Library, Template, Project
+  lifecycle, Project tree, Promotion, Assembly, and shared service context
+  modules while preserving the existing `createBqService` facade.
+- Split the BQ project editor's source-picker and assembly-picker dialogs into
+  focused client components, and moved source lookup into its own server action
+  file.
+- Extended the Master Data public work-price read with backward-compatible
+  `search` and `limit` filters so the BQ source picker no longer reads all work
+  prices before filtering.
+
+### Verification
+
+- `STUDIOFLOW_LOCATION=rumah npm test`: 389 passed, 0 failed.
+- `STUDIOFLOW_LOCATION=rumah npm run typecheck`: passed.
+- `STUDIOFLOW_LOCATION=rumah npm run lint`: passed.
+- `STUDIOFLOW_LOCATION=rumah npm run check:boundaries`: passed.
+- `STUDIOFLOW_LOCATION=rumah npm run check:legacy-runtime`: passed.
+- `STUDIOFLOW_LOCATION=rumah npm run build`: passed.
+- `git diff --check`: passed.
 
 ## R8.79 | 2026-09-16 | docs(platform): add global menu design brief
 
