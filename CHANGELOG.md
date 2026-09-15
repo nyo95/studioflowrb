@@ -5,8 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.77**
-- Next local revision: **R8.78**
+- Current revision after this entry is committed: **R8.78**
+- Next local revision: **R8.79**
+
+## R8.78 | 2026-09-16 | docs(studioflow): record schedule settings table bug
+
+### Changed
+
+- Added KB-032 to record the owner-reviewed StudioFlow Product Schedule
+  settings usability defect: prefix dictionary, default categories, and template
+  items should be presented as clear table/grid configuration surfaces instead
+  of stacked form sections.
+
+### Verification
+
+- Documentation-only change; no application runtime behavior changed.
 
 ## R8.77 | 2026-09-16 | docs(settings): record centralized settings IA bug
 

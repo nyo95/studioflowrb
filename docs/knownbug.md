@@ -1,6 +1,6 @@
 # Known Bugs by Application
 
-Status: active defect ledger, reconciled through R8.77 on 2026-09-16.
+Status: active defect ledger, reconciled through R8.78 on 2026-09-16.
 
 Planned features belong in [`roadmap.md`](roadmap.md). When a bug is fixed, move
 it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
@@ -371,6 +371,29 @@ migration and one slice.
   standalone settings label.
 - **Priority:** P2 — settings IA and ownership clarity.
 - **Status:** Open; needs a focused Foundation Settings plan before execution.
+
+### KB-032 — Product Schedule settings form does not show its dictionaries as tables
+
+- **Observed (owner UI review, 2026-09-16):** On `/studioflow/settings`, the
+  Product Schedule area renders prefix dictionary, default categories, and
+  template items as stacked form sections. The visual grouping makes the
+  difference between schedule section, default category, and default row/item
+  unclear.
+- **Expected:** Product Schedule settings should read like configuration data,
+  not a long free-form editor. Prefixes, default categories, and template items
+  should each use a table/grid presentation with explicit columns, visible
+  existing rows, inline row actions, and compact add-row controls.
+- **Required correction:** Redesign the Product Schedule settings surface into
+  clear tables:
+  **Prefix dictionary** (`Section`, `Category`, `Prefix`, actions),
+  **Default categories** (`Section`, `Category`, `Create empty entry`, order,
+  actions), and **Template items** (`Section`, `Category`, `Brand`, `Product`,
+  `SKU`, `Qty`, `Unit`, `Location`, active/order, actions). Preserve existing
+  permissions and behavior; the change is mainly information architecture and
+  table ergonomics.
+- **Priority:** P2 — settings usability and configuration clarity.
+- **Status:** Open; should be planned together with the centralized Settings
+  canvas work if the same UI shell is touched.
 
 ## Closed
 
