@@ -1,6 +1,6 @@
 # Known Bugs by Application
 
-Status: active defect ledger, reconciled through R8.74 on 2026-09-15.
+Status: active defect ledger, reconciled through R8.77 on 2026-09-16.
 
 Planned features belong in [`roadmap.md`](roadmap.md). When a bug is fixed, move
 it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
@@ -350,6 +350,27 @@ migration and one slice.
   Clients and Account/Profile surfaces alongside phase and naming settings.
   Database Settings remains intentionally deferred because its backend contract
   does not exist.
+
+### KB-031 — Users and Roles & Access are split out of the General Settings canvas
+
+- **Observed (owner UI review, 2026-09-16):** The account dropdown exposes
+  **General Settings**, **Users**, and **Roles & Access** as separate destinations.
+  The StudioFlow settings page also labels the active area as **Studio
+  Settings**, which makes the foundation/general settings boundary feel split
+  instead of centralized.
+- **Expected:** Users and Roles & Access are part of Foundation/General
+  Settings. The default settings experience should keep one central settings
+  canvas with one shared sidebar, where Users and Roles & Access are sections
+  within the general settings structure rather than sibling account-menu
+  entries.
+- **Required correction:** Rework the settings information architecture so the
+  account menu points to the centralized General/Foundation Settings surface.
+  Move Users and Roles & Access into that settings shell/sidebar, preserve the
+  existing access checks, and keep StudioFlow-specific settings scoped inside
+  the same coherent settings experience instead of presenting a competing
+  standalone settings label.
+- **Priority:** P2 — settings IA and ownership clarity.
+- **Status:** Open; needs a focused Foundation Settings plan before execution.
 
 ## Closed
 

@@ -5,8 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.76**
-- Next local revision: **R8.77**
+- Current revision after this entry is committed: **R8.77**
+- Next local revision: **R8.78**
+
+## R8.77 | 2026-09-16 | docs(settings): record centralized settings IA bug
+
+### Changed
+
+- Added KB-031 to record the owner-reviewed settings information architecture
+  defect: Users and Roles & Access should live inside the centralized
+  Foundation/General Settings canvas and sidebar, not as separate account-menu
+  destinations.
+
+### Verification
+
+- Documentation-only change; no application runtime behavior changed.
 
 ## R8.76 | 2026-09-15 | fix(repo): keep runtime storage out of source control
 
