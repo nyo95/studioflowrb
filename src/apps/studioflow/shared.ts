@@ -4,6 +4,7 @@ import { AppError, mapPrismaKnownError } from "@platform/core/errors";
 import { hasPermission, requirePermission, type PermissionGrants } from "@platform/core/rbac";
 import type { PeopleDirectory } from "@platform/core/rbac/people";
 import type { ObjectStorage } from "@platform/core/storage";
+import type { createMasterDataPublicRead } from "@/apps/masterdata/public";
 
 import { STUDIOFLOW_PERMISSIONS } from "./permissions";
 
@@ -16,6 +17,8 @@ export type StudioFlowPorts = {
   people: PeopleDirectory;
   /** Private object storage (MOM images). */
   storage: ObjectStorage;
+  /** Public Master Data reads used only for typed snapshots, never FK ownership. */
+  masterData: ReturnType<typeof createMasterDataPublicRead>;
   now?: () => Date;
 };
 

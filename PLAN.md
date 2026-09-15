@@ -1,74 +1,68 @@
 # Active Plan
 
-Plan ID: SF-R2-LEGACY-MOM
-Scope: Port the legacy project MOM (document, sections, notes, photos, print) onto the Foundation
-Status: READY — implemented and committed in R8.72
+Plan ID: SF-R3-LEGACY-PRODUCT-SCHEDULE
+Scope: Port the legacy Product Schedule onto the StudioFlow legacy rework foundation
+Status: READY — implemented locally in R8.73; awaiting wave-1 owner acceptance
 Priority: P1
 Owner: Repository owner
 Last updated: 2026-09-15
 
 ## Outcome
 
-Inside a project, the studio writes minutes of meeting and site reports the
-way legacy did: a MOM opens as "SITE INSPECTION REPORT" dated today and
-prepared by the signed-in person, with one section. Each section has up to
-two cropped/annotated photos (or is text-only), an ordered list of notes with
-a list style, and can be reordered or removed. The MOM prints on A4 without
-the app shell, and can be deleted with confirmation.
+Inside each project, the studio can manage the legacy Product Schedule:
+Material and Fixture entries receive gapless project-owned codes, carry typed
+quantity/location and option snapshots, support A/B/C-style alternatives, and
+mark exactly one option final. Settings maintain the prefix dictionary and
+default schedule templates. Existing project options can be reused by snapshot,
+and legacy CSV rows can be imported without touching the legacy database.
 
 ## Context and Evidence
 
-- Authority: `docs/apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md` §10 (plus
-  §3 permissions, §4.4 archive read-only, §12 centralization, §13 UI).
+- Authority: `docs/apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md` §11, plus
+  §3 permissions, §4.4 archive read-only, §12 centralization, and §13 UI.
 - Legacy evidence (`c4b0c466`, committed files only):
-  `src/extensions/mom/{validations.ts, actions/mom-actions.ts,
-  services/mom-service.ts, components/mom-document-list.tsx,
-  components/mom-editor.tsx, components/mom-print-view.tsx}`,
-  `src/app/(dashboard)/projects/[id]/mom/**`, `prisma/schema.prisma`
-  (`ProjectMomDocument`, `ProjectMomItem`, `ProjectMomPoint`,
-  `ProjectMomImage`, `MomListStyle`, `MomPointStyle`).
-- Depends on R8.71 (SF-R1) being committed.
+  `src/extensions/schedule/types.ts`,
+  `src/extensions/schedule/services/schedule-service.ts`, and
+  `src/extensions/schedule/services/schedule-option-writer.ts`.
+- Depends on R8.71 (SF-R1) and R8.72 (SF-R2) being committed.
 
 ## Locked Decisions
 
-- **Schema:** additive migration `20260915120000_sf_r2_mom` with
-  `sf_mom_document` (project FK cascade, DATE `meeting_date`),
-  `sf_mom_item`, `sf_mom_point`, `sf_mom_image` (`slot` 0/1 unique per item,
-  `storage_key` unique, CHECKs). No change to other schemas.
-- **Service:** `src/apps/studioflow/mom/service.ts` composed as
-  `studioFlow.mom`; `StudioFlowPorts` gains `storage: ObjectStorage`
-  (runtime passes the platform `objectStorage`). Behavior and notes per
-  contract §10 implementation notes.
-- **Images:** browser preparation through UI Engine `ImageWorkspace`
-  (4:3, JPEG ≤ 1600 px); upload via a multipart server action; policy (type,
-  size, magic bytes, key prefix `studioflow/mom/<projectId>`) in the service;
-  signed read URLs through the existing private asset route.
-- **Print:** UI Engine §13 activated (`DocumentSheet`, `DocumentBlock`,
-  `PrintButton`, base print CSS) with the `(document)` route group; content
-  and vocabulary stay in the app.
-- **Navigation:** project workspace "Records" gets **MOM** (with count)
-  above History. No global nav entry.
+- **Schema:** additive migration `20260915150000_sf_r3_schedule` with
+  `sf_schedule_entry`, `sf_schedule_option`, `sf_schedule_prefix`,
+  `sf_schedule_template_category`, and `sf_schedule_template_item`.
+  Entry code uniqueness is enforced per project/section/prefix/increment.
+- **Service:** `src/apps/studioflow/schedule/service.ts` composed as
+  `studioFlow.schedule`. Behavior includes gapless renumbering, final-option
+  promotion, template application, CSV import, and snapshot reuse.
+- **Master Data:** StudioFlow may read Brand names through the public Master
+  Data port only. Schedule snapshots remain StudioFlow-owned and do not read
+  Master Data SKU, Unit, pricing, or supplier internals.
+- **Navigation:** project workspace gets **Schedule** under Records; StudioFlow
+  settings gets prefix/default/template maintenance.
 
 ## Boundaries and Non-goals
 
-Product Schedule (SF-R3), issue/supersede/approval states, MOM templates,
-sharing with clients, server-side PDF rendering, legacy data import, photo
-retention policy beyond delete-on-remove, push/PR/deploy.
+No legacy database access, no global mutable Product Catalogue, no Master Data
+write port, no SKU/unit/pricing coupling, no vendor follow-up workflow, no
+file deliverables, no push/PR/deploy.
 
 ## Acceptance Criteria
 
-- Integration tests prove legacy defaults, header validation and audit,
-  section/note ordering and the one-note rule, the two-photo limit with slot
-  normalization, replace/swap/remove with storage cleanup, scope isolation,
-  `mom.manage` denial, and archived-project read-only with no orphan objects.
-- Unit tests cover note markers and reorder helpers.
-- Browser: create → header → notes (reorder) → photo → text-only section →
-  print (toolbar hidden in print) → delete; 375 px without horizontal
-  overflow; a user without `mom.manage` sees a read-only MOM.
+- Integration tests prove gapless code creation and renumbering, final option
+  rules, template idempotency, Brand snapshot reads through the public port,
+  cross-project reuse, CSV import, permission denial, project scoping, and
+  archived-project read-only behavior.
+- Unit tests cover category/prefix/code/option label/search-key normalization
+  and CSV parsing.
+- Browser acceptance at SF-RF walks entries/options/finalization, template
+  application, CSV import, cross-project reuse, settings maintenance, drafter
+  read-only behavior, archived-project read-only behavior, and 375 px layout.
 
 ## Verification
 
-`npm test`, typecheck, lint, `check:boundaries`, `check:legacy-runtime`,
-`next build`, `npx prisma migrate deploy` on the disposable test DB and the
-kantor rebuild DB, `npx prisma migrate diff … --exit-code`. Owner acceptance
-at the end of wave 1.
+Completed locally on the kantor rebuild databases: `npm test` (366 passed,
+0 failed), typecheck, lint, production build, boundary fixtures,
+legacy-runtime fixtures, `npx prisma migrate deploy` on rebuild test and
+kantor DBs, and clean `npx prisma migrate diff` against the rebuild shadow DB.
+Owner browser acceptance remains deferred to the SF-RF wave-1 parity gate.

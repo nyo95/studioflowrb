@@ -8,6 +8,7 @@ import { AppError } from "@platform/core/errors";
 import { createPeopleDirectory } from "@platform/core/rbac/people";
 import { initializePermissionRegistry } from "@platform/core/rbac/registry";
 import { FakeObjectStorage } from "@platform/core/storage";
+import { createMasterDataPublicRead } from "@/apps/masterdata/public";
 import type { PrismaClient } from "@/generated/prisma/client";
 
 import { APP_REGISTRATIONS } from "../../app/app-registrations";
@@ -48,6 +49,7 @@ async function seedUser(name: string, grants: readonly string[]) {
 
 async function reset() {
   await testDb.pool.query(`TRUNCATE TABLE ${[
+    "sf_schedule_option", "sf_schedule_entry", "sf_schedule_template_item", "sf_schedule_template_category", "sf_schedule_prefix",
     "sf_mom_image", "sf_mom_point", "sf_mom_item", "sf_mom_document",
     "sf_checklist_item_label", "sf_checklist_label", "sf_checklist_filter_view", "sf_checklist_item", "sf_checklist_template",
     "sf_activity", "sf_revision", "sf_phase", "sf_project", "sf_client", "sf_project_sequence", "sf_settings",
@@ -68,6 +70,7 @@ before(async () => {
     auditWriter: createAuditEventWriter(),
     people: createPeopleDirectory(db),
     storage,
+    masterData: createMasterDataPublicRead(db),
     now: () => clock,
   });
 });
@@ -433,5 +436,97 @@ describe("SF-R2 MOM", () => {
     await rejectsWith(sf.mom.setImage({ ...as(designer), projectId, itemId, slot: 0, file: png() }), "PROJECT_ARCHIVED");
     assert.equal(storage.objects.size, 0, "a rejected upload leaves no orphan object");
     assert.equal((await sf.mom.listDocuments({ grants: DRAFTER_GRANTS, projectId })).length, 1);
+  });
+});
+
+describe("SF-R3 Product Schedule", () => {
+  it("creates entries with gapless codes, options, final approval, and promotion on delete", async () => {
+    const { projectId } = await newProject();
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Paint", prefix: "PT" });
+    const first = await sf.schedule.createEntry({
+      ...as(designer),
+      projectId,
+      section: "MATERIAL",
+      category: "Paint",
+      qty: "2",
+      unit: "pail",
+      location: "Bedroom",
+      snapshot: { productName: "Dulux Easy Clean", brandName: "Dulux", skuText: "DX-01", color: "Warm White" },
+    });
+    const second = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "Jotun Majestic", brandName: "Jotun" } });
+    assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => [e.code, e.category, e.options[0]?.label, e.options[0]?.isFinal]), [
+      ["PT-01", "Paint", "A", true],
+      ["PT-02", "Paint", "A", true],
+    ]);
+
+    const option = await sf.schedule.createOption({ ...as(designer), projectId, entryId: first.entryId, snapshot: { productName: "Nippon Spotless", brandName: "Nippon", color: "Bone" } });
+    await sf.schedule.markFinal({ ...as(designer), projectId, optionId: option.optionId });
+    let entry = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((row) => row.id === first.entryId)!;
+    assert.deepEqual(entry.options.map((o) => [o.label, o.status, o.isFinal]), [["A", "NOT_USED", false], ["B", "APPROVED", true]]);
+
+    await sf.schedule.deleteOption({ ...as(designer), projectId, optionId: option.optionId });
+    entry = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((row) => row.id === first.entryId)!;
+    assert.deepEqual(entry.options.map((o) => [o.label, o.status, o.isFinal]), [["A", "APPROVED", true]]);
+
+    await sf.schedule.deleteEntry({ ...as(designer), projectId, entryId: first.entryId });
+    assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => e.code), ["PT-01"]);
+    assert.equal(second.entryId.length > 0, true);
+  });
+
+  it("applies templates idempotently and snapshots Master Data Brand through the public port", async () => {
+    const brand = await testDb.prisma.brand.create({ data: { id: randomUUID(), name: "TACO", slug: "taco" } });
+    const category = await sf.schedule.upsertTemplateCategory({ ...as(designer), section: "MATERIAL", category: "HPL", isDefaultEntry: true });
+    await sf.schedule.createTemplateItem({
+      ...as(designer),
+      templateCategoryId: category.templateCategoryId,
+      section: "MATERIAL",
+      category: "HPL",
+      snapshot: { brandId: brand.id, productName: "TH 121 AA", skuText: "TH-121", finishing: "Doff" },
+      qty: "1",
+      unit: "sheet",
+      location: "Cabinet",
+    });
+    const { projectId } = await newProject();
+    assert.deepEqual(await sf.schedule.applyTemplates({ ...as(designer), projectId }), { created: 1 });
+    assert.deepEqual(await sf.schedule.applyTemplates({ ...as(designer), projectId }), { created: 0 });
+    const [entry] = await sf.schedule.listSchedule({ grants: ALL, projectId });
+    assert.equal(entry.category, "HPL");
+    assert.equal(entry.options[0].brandId, brand.id);
+    assert.equal(entry.options[0].brandName, "TACO");
+  });
+
+  it("reuses past project snapshots and imports legacy CSV rows", async () => {
+    const source = await newProject("Source");
+    const target = await newProject("Target");
+    const sourceEntry = await sf.schedule.createEntry({ ...as(designer), projectId: source.projectId, section: "FIXTURE", category: "Loose Furniture", snapshot: { productName: "Aria Chair", brandName: "Cellini", color: "Grey" } });
+    const reusable = await sf.schedule.searchReusableOptions({ grants: ALL, projectId: target.projectId, query: "aria", section: "FIXTURE" });
+    assert.equal(reusable.length, 1);
+
+    const targetEntry = await sf.schedule.createEntry({ ...as(designer), projectId: target.projectId, section: "FIXTURE", category: "Loose Furniture" });
+    await sf.schedule.copyReusableOption({ ...as(designer), projectId: target.projectId, entryId: targetEntry.entryId, sourceOptionId: reusable[0].optionId });
+    const copied = (await sf.schedule.listSchedule({ grants: ALL, projectId: target.projectId })).find((row) => row.id === targetEntry.entryId)!;
+    assert.equal(copied.options[0].productName, "Aria Chair");
+
+    const imported = await sf.schedule.importCsv({
+      ...as(designer),
+      projectId: target.projectId,
+      section: "MATERIAL",
+      csv: "category,brand,product,sku,color,qty,unit,location\nTile,Roman,Granitio,GR-1,Ivory,12,m2,Lobby\n",
+    });
+    assert.equal(imported.created, 1);
+    assert.ok((await sf.schedule.listSchedule({ grants: ALL, projectId: target.projectId, section: "MATERIAL" })).some((row) => row.options[0].productName === "Granitio"));
+    assert.notEqual(sourceEntry.entryId, targetEntry.entryId);
+  });
+
+  it("enforces permissions, project scope, and archive read-only", async () => {
+    const { projectId } = await newProject();
+    const other = await newProject("Other");
+    const entry = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" });
+    await assert.rejects(sf.schedule.createEntry({ ...as(drafter, DRAFTER_GRANTS), projectId, section: "MATERIAL", category: "Stone" }), (e: unknown) => e instanceof AppError && e.kind === "FORBIDDEN");
+    assert.equal(sf.schedule.canManage(DRAFTER_GRANTS), false);
+    await rejectsWith(sf.schedule.createOption({ ...as(designer), projectId: other.projectId, entryId: entry.entryId, snapshot: { productName: "x" } }), "SCHEDULE_ITEM_NOT_FOUND");
+    await sf.projects.archiveProject({ ...as(designer), projectId, reason: "Done" });
+    await rejectsWith(sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" }), "PROJECT_ARCHIVED");
+    assert.equal((await sf.schedule.listSchedule({ grants: DRAFTER_GRANTS, projectId })).length, 1);
   });
 });

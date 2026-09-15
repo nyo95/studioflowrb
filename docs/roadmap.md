@@ -1,6 +1,6 @@
 # Product Roadmap by Application
 
-Status: active planning ledger, reconciled through R8.71 on 2026-09-15.
+Status: active planning ledger, reconciled through R8.73 on 2026-09-15.
 
 This file answers **what remains to be built**. It does not activate work by
 itself. Completed items are struck through or removed only after verification
@@ -157,7 +157,8 @@ rest of the rebuild StudioFlow.
 - [ ] **SF-R3 — Product Schedule (legacy):** entries/options/final approval,
   gapless codes, prefix dictionary, schedule templates and default entries,
   reuse from past projects, CSV import, typed snapshots, Master Data Brand read
-  through the public port. Closes KB-003 and KB-021.
+  through the public port. Implemented in R8.73; closes KB-003 and KB-021;
+  owner acceptance deferred to the end of wave 1.
 
 ### Wave 2 (not activated)
 

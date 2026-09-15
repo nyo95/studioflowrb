@@ -1216,6 +1216,7 @@ model SfProject {
   activities      SfActivity[]
   checklist_items SfChecklistItem[]
   mom_documents   SfMomDocument[]
+  schedule_entries SfScheduleEntry[]
 
   @@index([status, archived_at])
   @@index([pic_designer_id])
@@ -1475,5 +1476,144 @@ model SfMomImage {
 
   @@unique([item_id, slot])
   @@map("sf_mom_image")
+  @@schema("studioflow")
+}
+
+// ── SF-R3 Product Schedule (contract §11; legacy extensions/schedule) ──────
+
+enum SfScheduleSection {
+  MATERIAL
+  FIXTURE
+
+  @@map("sf_schedule_section")
+  @@schema("studioflow")
+}
+
+enum SfScheduleOptionStatus {
+  DRAFT
+  APPROVED
+  NOT_USED
+
+  @@map("sf_schedule_option_status")
+  @@schema("studioflow")
+}
+
+model SfSchedulePrefix {
+  id           String            @id @default(uuid())
+  section      SfScheduleSection
+  category     String
+  category_key String
+  prefix       String
+  created_at   DateTime          @default(now())
+  updated_at   DateTime          @updatedAt
+
+  @@unique([section, category_key])
+  @@map("sf_schedule_prefix")
+  @@schema("studioflow")
+}
+
+model SfScheduleTemplateCategory {
+  id               String            @id @default(uuid())
+  section          SfScheduleSection
+  category         String
+  category_key     String
+  is_default_entry Boolean           @default(false)
+  is_active        Boolean           @default(true)
+  sort_order       Int               @default(0)
+  created_at       DateTime          @default(now())
+  updated_at       DateTime          @updatedAt
+
+  items SfScheduleTemplateItem[]
+
+  @@unique([section, category_key])
+  @@index([section, is_active, sort_order])
+  @@map("sf_schedule_template_category")
+  @@schema("studioflow")
+}
+
+model SfScheduleTemplateItem {
+  id                   String                      @id @default(uuid())
+  template_category_id String?
+  section              SfScheduleSection
+  category             String
+  category_key         String
+  brand_id             String?
+  brand_name           String?
+  product_name         String
+  sku_text             String?
+  color                String?
+  finishing            String?
+  dimension            String?
+  notes                String?
+  image_key            String?
+  qty                  Decimal?                    @db.Decimal(12, 2)
+  unit                 String?
+  location             String?
+  is_active            Boolean                     @default(true)
+  sort_order           Int                         @default(0)
+  created_at           DateTime                    @default(now())
+  updated_at           DateTime                    @updatedAt
+
+  template_category SfScheduleTemplateCategory? @relation(fields: [template_category_id], references: [id], onDelete: SetNull)
+  entries           SfScheduleEntry[]
+
+  @@index([section, category_key, is_active, sort_order])
+  @@map("sf_schedule_template_item")
+  @@schema("studioflow")
+}
+
+model SfScheduleEntry {
+  id              String            @id @default(uuid())
+  project_id      String
+  section         SfScheduleSection
+  category        String
+  category_key    String
+  prefix          String
+  increment       Int
+  sort_order      Int
+  qty             Decimal?          @db.Decimal(12, 2)
+  unit            String?
+  location        String?
+  active_index    Int               @default(0)
+  version_locked  Boolean           @default(false)
+  template_item_id String?
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+
+  project       SfProject               @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  template_item SfScheduleTemplateItem? @relation(fields: [template_item_id], references: [id], onDelete: SetNull)
+  options       SfScheduleOption[]
+
+  @@unique([project_id, section, prefix, increment], map: "sf_schedule_entry_code_key")
+  @@index([project_id, section, category_key, sort_order])
+  @@index([template_item_id])
+  @@map("sf_schedule_entry")
+  @@schema("studioflow")
+}
+
+model SfScheduleOption {
+  id           String                 @id @default(uuid())
+  entry_id     String
+  label        String
+  is_final     Boolean                @default(false)
+  status       SfScheduleOptionStatus @default(DRAFT)
+  brand_id     String?
+  brand_name   String?
+  product_name String
+  sku_text     String?
+  color        String?
+  finishing    String?
+  dimension    String?
+  notes        String?
+  image_key    String?
+  search_key   String
+  created_at   DateTime               @default(now())
+  updated_at   DateTime               @updatedAt
+
+  entry SfScheduleEntry @relation(fields: [entry_id], references: [id], onDelete: Cascade)
+
+  @@unique([entry_id, label])
+  @@index([search_key])
+  @@map("sf_schedule_option")
   @@schema("studioflow")
 }

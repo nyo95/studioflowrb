@@ -11,9 +11,12 @@ export const dynamic = "force-dynamic";
 
 export default async function StudioSettingsPage() {
   const { grants } = await pageSession();
-  const [settings, templates] = await Promise.all([
+  const [settings, templates, scheduleTemplates, schedulePrefixes, brands] = await Promise.all([
     studioFlow.projects.getStudioSettings({ grants }),
     studioFlow.tasks.listTemplates({ grants, includeInactive: true }),
+    studioFlow.schedule.listTemplates({ grants }),
+    studioFlow.schedule.listPrefixes({ grants }),
+    studioFlow.schedule.listBrandChoices({ grants }),
   ]);
   return (
     <>
@@ -21,6 +24,9 @@ export default async function StudioSettingsPage() {
       <StudioSettingsView
         autoNaming={settings.autoNamingEnabled}
         templates={templates}
+        scheduleTemplates={scheduleTemplates}
+        schedulePrefixes={schedulePrefixes}
+        brands={brands}
         phases={PHASE_BLUEPRINT.map((p) => ({ key: p.key, label: p.label }))}
         canManage={hasPermission(grants, P.settingsManage)}
       />

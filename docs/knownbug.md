@@ -1,6 +1,6 @@
 # Known Bugs by Application
 
-Status: active defect ledger, reconciled through R8.46 on 2026-09-14.
+Status: active defect ledger, reconciled through R8.73 on 2026-09-15.
 
 Planned features belong in [`roadmap.md`](roadmap.md). When a bug is fixed, move
 it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
@@ -263,11 +263,10 @@ migration and one slice.
   Schedule slice (`KB-003`) was designed on top of the wrong ownership model.
   No catalogue work should continue until the per-project scoping is restored.
 - **Mitigation:** Use the current global list as a reference only.
-- **Status:** Open; owner-ratified in D-SF-04 (R8.51). The recovery model is
-  `Project → Product Catalogue`; existing global rows are discarded, not
-  migrated, re-scoped, or preserved. Its destructive schema/data cutover and
-  canonical project route belong to a separately approved future recovery plan;
-  no catalogue or Schedule implementation may proceed before that plan.
+- **Status:** Closed in R8.73 — SF-R3 replaces the wrong global catalogue
+  surface with project-owned Product Schedule entries and typed option
+  snapshots. Reuse is explicit cross-project snapshot copy, not a mutable
+  studio-wide catalogue pool.
 
 ### KB-022 — MOM implementation does not match owner's required behavior
 
@@ -325,7 +324,9 @@ migration and one slice.
   independent from phase/iteration/Task; Product Catalogue never reads Master
   Data SKU, unit, or pricing.
 - **Mitigation:** Continue using existing operational surfaces for Schedule/FFNI.
-- **Status:** Open; intentionally deferred to its own executable work order.
+- **Status:** Closed in R8.73 — SF-R3 adds the project Schedule page,
+  per-project entries, typed options, final approval, templates, CSV import,
+  and reuse from past projects.
 
 ### KB-005 — Add Project regresses legacy client/modal behavior
 

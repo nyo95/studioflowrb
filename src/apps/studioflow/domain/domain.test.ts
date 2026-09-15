@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import { fullBlockers, todoBlockers } from "./blockers";
 import { isPermutation, moveId, pointMarkers } from "./mom";
+import { fallbackPrefix, normalizeScheduleCategory, optionLabel, parseLegacyScheduleCsv, scheduleCode, scheduleSearchKey } from "./schedule";
 import {
   applyChecklistFilter,
   buildTree,
@@ -177,5 +178,21 @@ describe("MOM rules", () => {
     assert.deepEqual(moveId(["a", "b", "c"], "b", "up"), ["b", "a", "c"]);
     assert.equal(moveId(["a", "b"], "a", "up"), null);
     assert.equal(moveId(["a", "b"], "z", "down"), null);
+  });
+});
+
+describe("schedule rules", () => {
+  it("normalizes categories, prefixes, codes, labels, and search keys", () => {
+    assert.deepEqual(normalizeScheduleCategory(" loose   furniture "), { label: "loose furniture", key: "LOOSE FURNITURE" });
+    assert.equal(fallbackPrefix("Loose Furniture"), "LO");
+    assert.equal(scheduleCode("pt", 3), "PT-03");
+    assert.equal(optionLabel(0), "A");
+    assert.equal(optionLabel(26), "AA");
+    assert.equal(scheduleSearchKey({ brandName: "TACO", productName: "TH 121", color: "Ivory" }), "taco | th 121 | ivory");
+  });
+
+  it("parses legacy CSV quoting", () => {
+    const rows = parseLegacyScheduleCsv('category,brand,product,notes\nTile,Roman,"Tile, ivory","Use ""matte"""');
+    assert.deepEqual(rows, [{ category: "Tile", brand: "Roman", product: "Tile, ivory", notes: 'Use "matte"' }]);
   });
 });

@@ -1,6 +1,6 @@
 # Ready for Review
 
-Status: active verification ledger, reconciled through R8.71 on 2026-09-15.
+Status: active verification ledger, reconciled through R8.73 on 2026-09-15.
 New file, split out of `roadmap.md`/`knownbug.md` on 2026-09-10 at owner
 request, so status is visible at a glance:
 
@@ -152,15 +152,6 @@ No item currently ready for review.
   `purchase_to_base_factor`.
 - **Status:** Ready for review, not yet verified.
 
-## StudioFlow
-
-No item currently ready for review beyond what the R7.55 audit already
-reconciled — that audit read code against
-[`apps/studioflow/studioflow-project-contract.md`](apps/studioflow/studioflow-project-contract.md)
-and either fixed what it found immediately or opened it as a dated defect in
-`knownbug.md` (KB-012…KB-019). Nothing from that pass is sitting in an
-unverified middle state.
-
 ## Rules
 
 - An item belongs here only when code, schema, and/or tests actually exist for
@@ -212,3 +203,32 @@ unverified middle state.
 - **Deferred to owner acceptance (end of wave 1):** a real site-visit MOM on
   kantor with phone photos, annotation marks, printing to PDF, and
   `prisma migrate deploy/diff` for the new migration.
+
+### SF-R3 — Product Schedule (R8.73)
+
+- **Built:** per-project Product Schedule tables (migration
+  `20260915150000_sf_r3_schedule`), `schedule` service, project Schedule page,
+  StudioFlow settings controls for prefixes/default categories/template items,
+  typed snapshots, option finalization, cross-project reuse search, legacy CSV
+  import, and Master Data Brand read through the public port.
+- **Verified on the kantor rebuild DB:** 366/366 tests including 4 Product
+  Schedule integration tests and 2 schedule rule tests; typecheck, lint,
+  production build, boundary fixtures, legacy-runtime fixtures,
+  `prisma migrate deploy` on rebuild test and kantor DBs, and clean Prisma
+  migration diff against the rebuild shadow DB.
+- **Deferred to owner acceptance (end of wave 1):** a browser walkthrough for
+  creating schedule entries, adding/finalizing/deleting options, template
+  application, CSV import, reuse from another project, settings maintenance,
+  drafter read-only behavior, archived-project read-only behavior, and mobile
+  width rendering.
+
+### Wave 1 parity gate
+
+- **Needs:** One SF-RF browser acceptance pass over the complete wave-1 surface
+  at desktop and 375 px: Today/projects/clients/settings, phase workflow and
+  checklist, MOM list/editor/print/delete, Product Schedule entries/options/
+  final approval/templates/import/reuse/settings, read-only drafter behavior,
+  and archived-project read-only behavior. Temporary legacy redirects should be
+  removed only after this pass.
+- **Status:** Ready for review; acceptance intentionally deferred to the
+  wave-1 parity gate.

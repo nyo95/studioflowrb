@@ -3,14 +3,33 @@
 import { useState } from "react";
 
 import type { PhaseKey } from "@/apps/studioflow/domain/phase";
-import { Badge, Button, InlineError, Input, RowActionMenu, SectionCard, Switch, Text } from "@/platform/ui_engine";
+import { Badge, Button, Field, InlineError, Input, RowActionMenu, SectionCard, Select, Switch, Text } from "@/platform/ui_engine";
 
-import { createTemplateAction, deleteTemplateAction, reorderTemplatesAction, setAutoNamingAction, updateTemplateAction } from "../actions";
+import { createScheduleTemplateItemAction, createTemplateAction, deleteTemplateAction, reorderTemplatesAction, setAutoNamingAction, updateTemplateAction, upsertSchedulePrefixAction, upsertScheduleTemplateCategoryAction } from "../actions";
 import { useCommand } from "../_components/use-command";
 
 type Template = { id: string; phaseKey: PhaseKey | null; label: string; isActive: boolean; sortOrder: number; usedBy: number };
+type ScheduleTemplate = { id: string; section: "MATERIAL" | "FIXTURE"; category: string; is_default_entry: boolean; is_active: boolean; items: Array<{ id: string; product_name: string; brand_name: string | null; sku_text: string | null }> };
+type SchedulePrefix = { id: string; section: "MATERIAL" | "FIXTURE"; category: string; prefix: string };
+type BrandChoice = { id: string; name: string };
 
-export function StudioSettingsView({ autoNaming, templates, phases, canManage }: { autoNaming: boolean; templates: Template[]; phases: Array<{ key: PhaseKey; label: string }>; canManage: boolean }) {
+export function StudioSettingsView({
+  autoNaming,
+  templates,
+  scheduleTemplates,
+  schedulePrefixes,
+  brands,
+  phases,
+  canManage,
+}: {
+  autoNaming: boolean;
+  templates: Template[];
+  scheduleTemplates: ScheduleTemplate[];
+  schedulePrefixes: SchedulePrefix[];
+  brands: BrandChoice[];
+  phases: Array<{ key: PhaseKey; label: string }>;
+  canManage: boolean;
+}) {
   const { run, pendingKey, error } = useCommand();
   const groups: Array<{ key: PhaseKey | null; label: string; description: string }> = [
     { key: null, label: "General", description: "Added to every project's general checklist." },
@@ -38,8 +57,91 @@ export function StudioSettingsView({ autoNaming, templates, phases, canManage }:
           <TemplateGroup key={group.key ?? "general"} group={group} templates={templates.filter((t) => t.phaseKey === group.key)} canManage={canManage} run={run} pendingKey={pendingKey} />
         ))}
       </div>
+      <ScheduleSettings scheduleTemplates={scheduleTemplates} schedulePrefixes={schedulePrefixes} brands={brands} canManage={canManage} run={run} pendingKey={pendingKey} />
       <Text size="sm" tone="tertiary">Changes apply to new projects. Use “Apply checklist templates” on a project to add new items to it; renamed items are not rewritten in existing projects.</Text>
     </div>
+  );
+}
+
+function ScheduleSettings({
+  scheduleTemplates,
+  schedulePrefixes,
+  brands,
+  canManage,
+  run,
+  pendingKey,
+}: {
+  scheduleTemplates: ScheduleTemplate[];
+  schedulePrefixes: SchedulePrefix[];
+  brands: BrandChoice[];
+  canManage: boolean;
+  run: ReturnType<typeof useCommand>["run"];
+  pendingKey: string | null;
+}) {
+  const [prefix, setPrefix] = useState({ section: "MATERIAL" as "MATERIAL" | "FIXTURE", category: "", prefix: "" });
+  const [category, setCategory] = useState({ section: "MATERIAL" as "MATERIAL" | "FIXTURE", category: "", isDefaultEntry: true });
+  const [item, setItem] = useState({ section: "MATERIAL" as "MATERIAL" | "FIXTURE", category: "", brandId: "", productName: "", skuText: "", unit: "", qty: "" });
+
+  return (
+    <SectionCard title="Product Schedule" description="Prefix dictionary and default schedule rows for new or existing projects." count={scheduleTemplates.length} padded>
+      <div className="grid gap-4">
+        <div className="grid grid-cols-3 gap-2 max-[760px]:grid-cols-1">
+          <Field label="Section"><Select density="compact" value={prefix.section} onChange={(e) => setPrefix({ ...prefix, section: e.target.value as "MATERIAL" | "FIXTURE" })}><option value="MATERIAL">Material</option><option value="FIXTURE">Fixture</option></Select></Field>
+          <Field label="Category"><Input density="compact" value={prefix.category} onChange={(e) => setPrefix({ ...prefix, category: e.target.value })} /></Field>
+          <Field label="Prefix"><Input density="compact" value={prefix.prefix} onChange={(e) => setPrefix({ ...prefix, prefix: e.target.value })} /></Field>
+        </div>
+        {canManage ? <Button size="sm" className="justify-self-start" pending={pendingKey === "schedule-prefix"} disabled={!prefix.category.trim() || !prefix.prefix.trim()} onClick={() => run("schedule-prefix", () => upsertSchedulePrefixAction(prefix))}>Save prefix</Button> : null}
+        <div className="flex flex-wrap gap-1">
+          {schedulePrefixes.map((row) => <Badge key={row.id}>{row.section === "MATERIAL" ? "Material" : "Fixture"} · {row.category}: {row.prefix}</Badge>)}
+        </div>
+
+        <div className="border-t border-line-subtle pt-4">
+          <Text className="mb-2 font-medium">Default categories</Text>
+          <div className="grid grid-cols-3 gap-2 max-[760px]:grid-cols-1">
+            <Field label="Section"><Select density="compact" value={category.section} onChange={(e) => setCategory({ ...category, section: e.target.value as "MATERIAL" | "FIXTURE" })}><option value="MATERIAL">Material</option><option value="FIXTURE">Fixture</option></Select></Field>
+            <Field label="Category"><Input density="compact" value={category.category} onChange={(e) => setCategory({ ...category, category: e.target.value })} /></Field>
+            <Field label="Create empty entry"><Select density="compact" value={category.isDefaultEntry ? "yes" : "no"} onChange={(e) => setCategory({ ...category, isDefaultEntry: e.target.value === "yes" })}><option value="yes">Yes</option><option value="no">No</option></Select></Field>
+          </div>
+          {canManage ? <Button size="sm" className="mt-2" pending={pendingKey === "schedule-category"} disabled={!category.category.trim()} onClick={() => run("schedule-category", () => upsertScheduleTemplateCategoryAction(category))}>Save category</Button> : null}
+        </div>
+
+        <div className="border-t border-line-subtle pt-4">
+          <Text className="mb-2 font-medium">Template items</Text>
+          <div className="grid grid-cols-3 gap-2 max-[900px]:grid-cols-1">
+            <Field label="Section"><Select density="compact" value={item.section} onChange={(e) => setItem({ ...item, section: e.target.value as "MATERIAL" | "FIXTURE" })}><option value="MATERIAL">Material</option><option value="FIXTURE">Fixture</option></Select></Field>
+            <Field label="Category"><Input density="compact" value={item.category} onChange={(e) => setItem({ ...item, category: e.target.value })} /></Field>
+            <Field label="Brand"><Select density="compact" value={item.brandId} onChange={(e) => setItem({ ...item, brandId: e.target.value })}><option value="">Manual</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</Select></Field>
+            <Field label="Product"><Input density="compact" value={item.productName} onChange={(e) => setItem({ ...item, productName: e.target.value })} /></Field>
+            <Field label="SKU"><Input density="compact" value={item.skuText} onChange={(e) => setItem({ ...item, skuText: e.target.value })} /></Field>
+            <Field label="Qty"><Input density="compact" value={item.qty} onChange={(e) => setItem({ ...item, qty: e.target.value })} /></Field>
+          </div>
+          {canManage ? (
+            <Button
+              size="sm"
+              className="mt-2"
+              pending={pendingKey === "schedule-item"}
+              disabled={!item.category.trim() || !item.productName.trim()}
+              onClick={() => run("schedule-item", () => createScheduleTemplateItemAction({ section: item.section, category: item.category, snapshot: { brandId: item.brandId || null, productName: item.productName, skuText: item.skuText || null }, qty: item.qty || null, unit: item.unit || null }))}
+            >
+              Add template item
+            </Button>
+          ) : null}
+        </div>
+
+        <div className="grid gap-2">
+          {scheduleTemplates.map((template) => (
+            <div key={template.id} className="rounded-card border border-line-subtle p-2">
+              <div className="flex flex-wrap gap-2">
+                <Badge>{template.section === "MATERIAL" ? "Material" : "Fixture"}</Badge>
+                <Text className="font-medium">{template.category}</Text>
+                {template.is_default_entry ? <Text size="sm" tone="tertiary">default empty entry</Text> : null}
+              </div>
+              {template.items.length ? <Text size="sm" tone="secondary">{template.items.map((row) => `${row.brand_name ? `${row.brand_name} · ` : ""}${row.product_name}`).join(", ")}</Text> : null}
+            </div>
+          ))}
+        </div>
+      </div>
+    </SectionCard>
   );
 }
 

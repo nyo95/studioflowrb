@@ -5,8 +5,43 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.72**
-- Next local revision: **R8.73**
+- Current revision after this entry is committed: **R8.73**
+- Next local revision: **R8.74**
+
+## R8.73 | 2026-09-15 | feat(studioflow): legacy product schedule (SF-R3)
+
+### Changed
+
+- New `studioflow` Product Schedule tables (migration
+  `20260915150000_sf_r3_schedule`, additive): per-project schedule entries,
+  typed options, final-option approval state, prefix dictionary, template
+  categories, and template items. Entry codes are gapless per
+  project/section/prefix (`PREFIX-NN`) with uniqueness enforced in SQL.
+- `studioFlow.schedule` service: list schedules, manage prefixes and templates,
+  apply default templates idempotently, create/update/delete/reorder entries,
+  add/delete/finalize options, reuse option snapshots from past projects, and
+  import legacy CSV rows. Commands enforce StudioFlow permissions, project
+  scope, archived-project read-only, and audit writes.
+- Master Data Brand reuse is read-only through the public Master Data port;
+  Product Schedule stores typed StudioFlow snapshots and does not depend on
+  Master Data SKU/unit/pricing or legacy database state.
+- Routes: project workspace **Schedule** page
+  (`/studioflow/projects/[projectId]/schedule`) plus StudioFlow settings
+  controls for schedule prefixes, default categories, and template items.
+- KB-003 and KB-021 closed by replacing the wrong global catalogue/reuse pool
+  with project-owned Product Schedule entries and cross-project snapshot reuse.
+
+### Verification
+
+- Local kantor rebuild DBs only. `npm test`: 366 passed, 0 failed (4 new
+  Product Schedule integration tests and 2 new schedule rule tests).
+- Typecheck, lint, production build, boundary fixtures, and legacy-runtime
+  fixtures passed.
+- `npx prisma migrate deploy` applied the SF-R3 migration on the disposable
+  test DB and the kantor rebuild DB; `npx prisma migrate diff --from-migrations
+  prisma/migrations --to-schema prisma/schema.prisma --exit-code` reported no
+  difference using the rebuild shadow DB.
+- Browser acceptance remains deferred to the SF-RF wave-1 parity gate.
 
 ## R8.72 | 2026-09-15 | feat(studioflow): legacy MOM (SF-R2)
 

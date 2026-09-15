@@ -497,3 +497,148 @@ export async function swapMomImagesAction(input: z.infer<typeof MomItemRef>): Pr
     return result;
   });
 }
+
+// ── Product Schedule (SF-R3) ───────────────────────────────────────────────
+
+function refreshSchedule(projectId: string) {
+  revalidatePath(`/studioflow/projects/${projectId}`, "layout");
+}
+
+const ScheduleSection = z.enum(["MATERIAL", "FIXTURE"]);
+const ScheduleSnapshot = z.strictObject({
+  brandId: Id.nullish(),
+  brandName: z.string().max(160).nullish(),
+  productName: z.string().max(200),
+  skuText: z.string().max(160).nullish(),
+  color: z.string().max(160).nullish(),
+  finishing: z.string().max(160).nullish(),
+  dimension: z.string().max(160).nullish(),
+  notes: z.string().max(2000).nullish(),
+  imageKey: z.string().max(500).nullish(),
+});
+const ScheduleEntryInput = z.strictObject({
+  projectId: Id,
+  section: ScheduleSection,
+  category: z.string().min(1).max(80),
+  qty: z.string().max(20).nullish(),
+  unit: z.string().max(40).nullish(),
+  location: z.string().max(160).nullish(),
+  snapshot: ScheduleSnapshot.nullish(),
+});
+export async function createScheduleEntryAction(input: z.infer<typeof ScheduleEntryInput>): Promise<ActionResult<{ entryId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleEntryInput, input);
+    const result = await studioFlow.schedule.createEntry({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
+const ScheduleEntryUpdate = z.strictObject({ projectId: Id, entryId: Id, qty: z.string().max(20).nullish(), unit: z.string().max(40).nullish(), location: z.string().max(160).nullish() });
+export async function updateScheduleEntryAction(input: z.infer<typeof ScheduleEntryUpdate>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleEntryUpdate, input);
+    const result = await studioFlow.schedule.updateEntry({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
+const ScheduleEntryRef = z.strictObject({ projectId: Id, entryId: Id });
+export async function deleteScheduleEntryAction(input: z.infer<typeof ScheduleEntryRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleEntryRef, input);
+    const result = await studioFlow.schedule.deleteEntry({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
+const ScheduleOptionInput = z.strictObject({ projectId: Id, entryId: Id, snapshot: ScheduleSnapshot });
+export async function createScheduleOptionAction(input: z.infer<typeof ScheduleOptionInput>): Promise<ActionResult<{ optionId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleOptionInput, input);
+    const result = await studioFlow.schedule.createOption({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
+const ScheduleOptionRef = z.strictObject({ projectId: Id, optionId: Id });
+export async function markScheduleFinalAction(input: z.infer<typeof ScheduleOptionRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleOptionRef, input);
+    const result = await studioFlow.schedule.markFinal({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
+export async function deleteScheduleOptionAction(input: z.infer<typeof ScheduleOptionRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleOptionRef, input);
+    const result = await studioFlow.schedule.deleteOption({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
+const ScheduleApply = z.strictObject({ projectId: Id });
+export async function applyScheduleTemplatesAction(input: z.infer<typeof ScheduleApply>): Promise<ActionResult<{ created: number }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleApply, input);
+    const result = await studioFlow.schedule.applyTemplates({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
+const ScheduleCsvImport = z.strictObject({ projectId: Id, section: ScheduleSection, csv: z.string().max(200000) });
+export async function importScheduleCsvAction(input: z.infer<typeof ScheduleCsvImport>): Promise<ActionResult<{ created: number }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleCsvImport, input);
+    const result = await studioFlow.schedule.importCsv({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
+const SchedulePrefixInput = z.strictObject({ section: ScheduleSection, category: z.string().min(1).max(80), prefix: z.string().min(1).max(8) });
+export async function upsertSchedulePrefixAction(input: z.infer<typeof SchedulePrefixInput>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    return studioFlow.schedule.upsertPrefix({ ...ctx, ...parse(SchedulePrefixInput, input) });
+  });
+}
+
+const ScheduleTemplateCategoryInput = z.strictObject({ section: ScheduleSection, category: z.string().min(1).max(80), isDefaultEntry: z.boolean().optional(), isActive: z.boolean().optional() });
+export async function upsertScheduleTemplateCategoryAction(input: z.infer<typeof ScheduleTemplateCategoryInput>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    return studioFlow.schedule.upsertTemplateCategory({ ...ctx, ...parse(ScheduleTemplateCategoryInput, input) });
+  });
+}
+
+const ScheduleTemplateItemInput = z.strictObject({
+  templateCategoryId: Id.nullish(),
+  section: ScheduleSection,
+  category: z.string().min(1).max(80),
+  snapshot: ScheduleSnapshot,
+  qty: z.string().max(20).nullish(),
+  unit: z.string().max(40).nullish(),
+  location: z.string().max(160).nullish(),
+});
+export async function createScheduleTemplateItemAction(input: z.infer<typeof ScheduleTemplateItemInput>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    return studioFlow.schedule.createTemplateItem({ ...ctx, ...parse(ScheduleTemplateItemInput, input) });
+  });
+}

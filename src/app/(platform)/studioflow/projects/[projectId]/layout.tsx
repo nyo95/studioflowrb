@@ -25,13 +25,15 @@ export default async function ProjectLayout({ children, params }: { children: Re
     if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
     throw error;
   });
-  const [phases, people, clients, momDocuments] = await Promise.all([
+  const [phases, people, clients, momDocuments, scheduleEntries] = await Promise.all([
     studioFlow.phases.listProjectPhases({ grants, projectId }),
     studioFlow.projects.listAssignablePeople({ grants }),
     studioFlow.projects.listClients({ grants }),
     studioFlow.mom.listDocuments({ grants, projectId }),
+    studioFlow.schedule.listSchedule({ grants, projectId }),
   ]);
   const momCount = momDocuments.length;
+  const scheduleCount = scheduleEntries.length;
   const canManage = hasPermission(grants, P.projectManage);
 
   const phaseNav = phases.map((phase) => ({
@@ -77,6 +79,7 @@ export default async function ProjectLayout({ children, params }: { children: Re
             <ContextNavHeading>Records</ContextNavHeading>
             <ProjectNavLinks items={[
               { href: STUDIOFLOW_ROUTES.projectMom(projectId), label: "MOM", marker: null, detail: momCount > 0 ? String(momCount) : null },
+              { href: STUDIOFLOW_ROUTES.projectSchedule(projectId), label: "Schedule", marker: null, detail: scheduleCount > 0 ? String(scheduleCount) : null },
               { href: STUDIOFLOW_ROUTES.projectHistory(projectId), label: "History", marker: null, detail: null },
             ]} />
           </>
