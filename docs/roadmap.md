@@ -1,6 +1,6 @@
 # Product Roadmap by Application
 
-Status: active planning ledger, reconciled through R8.73 on 2026-09-15.
+Status: active planning ledger, reconciled through R8.75 on 2026-09-15.
 
 This file answers **what remains to be built**. It does not activate work by
 itself. Completed items are struck through or removed only after verification
@@ -144,21 +144,18 @@ rest of the rebuild StudioFlow.
 
 ### Wave 1
 
-- [ ] **SF-R1 — Archive and legacy project backbone:** local archive tag,
+- [x] ~~**SF-R1 — Archive and legacy project backbone:** local archive tag,
   delete rebuild StudioFlow code/routes/schema, then port Client, Project
   (auto-naming, PIC designer/drafter), five-phase legacy workflow with
   revisions, activities, checklist with templates, Today, and StudioFlow
-  settings. Implemented in R8.71; owner browser acceptance is deferred to the
-  end of wave 1 (see `review.md`).
-- [ ] **SF-R2 — MOM (legacy):** legacy document/item/point/image model,
+  settings.~~ Implemented R8.71; corrections R8.74; browser acceptance passed SF-RF (R8.75).
+- [x] ~~**SF-R2 — MOM (legacy):** legacy document/item/point/image model,
   editing flow, and print on `ObjectStorage` and UI Engine. Closes KB-012 and
-  KB-022 by replacing the ISSUED/SUPERSEDED lifecycle. Implemented in R8.72;
-  owner acceptance deferred to the end of wave 1.
-- [ ] **SF-R3 — Product Schedule (legacy):** entries/options/final approval,
+  KB-022 by replacing the ISSUED/SUPERSEDED lifecycle.~~ Implemented R8.72; browser acceptance passed SF-RF (R8.75).
+- [x] ~~**SF-R3 — Product Schedule (legacy):** entries/options/final approval,
   gapless codes, prefix dictionary, schedule templates and default entries,
   reuse from past projects, CSV import, typed snapshots, Master Data Brand read
-  through the public port. Implemented in R8.73; closes KB-003 and KB-021;
-  review corrections in R8.74; owner acceptance deferred to the end of wave 1.
+  through the public port. Closes KB-003 and KB-021.~~ Implemented R8.73; corrections R8.74; browser acceptance passed SF-RF (R8.75).
 
 ### Wave 2 (not activated)
 
@@ -171,18 +168,18 @@ rest of the rebuild StudioFlow.
 - [ ] Task comments and StudioFlow-global collaboration (D-SF-05).
 - [ ] Upcoming / planning timeline (D-SF-01).
 - [ ] SketchUp integration (D-SF-06).
-- [ ] Optional phase accent palette (contract §13.8) — owner approval needed.
+- [ ] Phase accent palette (contract §13.8) — approved by owner 2026-09-15; implement as SF-R4 commit R8.76 after SF-RF.
 
 ### Closing gate
 
-- [ ] **SF-RF — Parity acceptance:** walk every wave-1 legacy flow at desktop
+- [x] ~~**SF-RF — Parity acceptance:** walk every wave-1 legacy flow at desktop
   and 375 px, remove the temporary `/projects/...` redirects, and freeze the
-  reworked StudioFlow baseline.
+  reworked StudioFlow baseline.~~ Accepted in R8.75 (2026-09-15).
 
 ## Historical implemented or removed evidence
 
-These entries describe what the frozen RB implementation delivered. They do
-not count as Recovery parity and may be replaced by SF-A through SF-F.
+These entries describe what the frozen RB implementation delivered. They did
+not count as wave-1 parity; the SF-R1–SF-RF rework (above) replaced them.
 
 - ~~Project-owned MOM with draft/issue/supersede lifecycle and images.~~ R7.52;
   behavior must be re-anchored in D-SF/SF-C.

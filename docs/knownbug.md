@@ -1,6 +1,6 @@
 # Known Bugs by Application
 
-Status: active defect ledger, reconciled through R8.73 on 2026-09-15.
+Status: active defect ledger, reconciled through R8.74 on 2026-09-15.
 
 Planned features belong in [`roadmap.md`](roadmap.md). When a bug is fixed, move
 it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
@@ -132,7 +132,7 @@ No open BQ bug is currently recorded.
 ## StudioFlow
 
 The R7.55 audit read the whole StudioFlow surface against
-[`apps/studioflow/studioflow-project-contract.md`](apps/studioflow/studioflow-project-contract.md) and
+[`docs/archive/studioflow-rb/studioflow-project-contract.md`](archive/studioflow-rb/studioflow-project-contract.md) and
 opened KB-012 … KB-018 below (KB-019 was closed in R8.05; KB-021 … KB-023 were added by the owner audit).
 KB-013, KB-014 and KB-015 are one gap seen from
 three sides: the client answer is persisted as a single immutable `SfResponse`
@@ -178,7 +178,7 @@ migration and one slice.
   draft atomically; later rounds are never rolled back.
 - **Mitigation:** Stop the round and start a new one. This leaves a truthful but
   clumsy history and cannot undo a phase closed on a mistaken approval.
-- **Status:** Open; carried by the active R7.56 work order.
+- **Status:** Closed in R8.71 — superseded. SF-R1 removes the round/response model entirely; the code this described no longer exists.
 
 ### KB-014 — A client answer cannot be collected as a draft
 
@@ -190,7 +190,7 @@ migration and one slice.
   Stopping the round discards it silently and unaudited.
 - **Mitigation:** Record the answer once, when the client has finished
   answering; earlier remarks are kept outside the application until then.
-- **Status:** Open; carried by the active R7.56 work order.
+- **Status:** Closed in R8.71 — superseded. SF-R1 removes the round/response model; this gap no longer applies.
 
 ### KB-015 — Withdraw send has no command behind it
 
@@ -202,7 +202,7 @@ migration and one slice.
 - **Expected:** The command exists, is audited, and the menu entry returns with it.
 - **Mitigation:** Stop the round and start a new one, accepting a consumed
   round number.
-- **Status:** Open; carried by the active R7.56 work order.
+- **Status:** Closed in R8.71 — superseded. SF-R1 removes the send/withdraw surface; this gap no longer applies.
 
 ### KB-016 — A project cannot be archived or restored
 
@@ -214,7 +214,7 @@ migration and one slice.
 - **Expected:** Audited archive and restore for a project, archived projects
   read-only until restored, and a client that becomes archivable once its
   projects are.
-- **Status:** Open; carried by the active R7.56 work order.
+- **Status:** Closed in R8.71 — SF-R1 implements project archive/restore with read-only guard and client block-while-running.
 
 ### KB-017 — The phase template and a project's phases cannot be administered
 
@@ -228,7 +228,7 @@ migration and one slice.
   uses it, plus per-project add and remove-while-empty, none of which rewrites a
   running project.
 - **Mitigation:** Edit the seed and reseed the rebuild database.
-- **Status:** Open; carried by the active R7.56 work order.
+- **Status:** Closed in R8.71 — superseded. SF-R1 uses a fixed phase set seeded from a Studio Settings template; phase add/remove per-project is deferred to roadmap.
 
 ### KB-018 — Redirected phase and iteration routes still carry unreachable controls
 
@@ -241,9 +241,7 @@ migration and one slice.
 - **Expected:** No unreachable route surface. Dead code that contradicts the
   contract is worse than absent code: the next agent reads it as intent.
 - **Mitigation:** None needed at runtime — nothing renders it.
-- **Status:** Open; deletion only. Not fixed in R7.55 because that session could
-  not delete files on the owner's machine. Codex should confirm nothing imports
-  these modules and remove the two route folders' non-`page.tsx` files.
+- **Status:** Closed in R8.71 — superseded. The old `studioflow/[id]` route tree was removed entirely; SF-R1 routes under `studioflow/projects/[id]`.
 
 
 ### KB-021 — Product Catalogue is a global reuse pool; legacy was per-project
@@ -302,18 +300,14 @@ migration and one slice.
   standalone todo list, a combined view, or a project-grouped list — needs
   owner confirmation.
 - **Mitigation:** Navigate to the individual project to see its `GeneralTaskBlock`.
-- **Status:** Open; requires owner clarification of which page is "halaman
-  muka" (application home `/studioflow` vs. project home `/studioflow/[id]`)
-  and what the legacy presentation looked like before implementing.
+- **Status:** Closed in R8.71 — SF-R1 implements the Today view (`/studioflow`) showing general to-dos grouped by project, with filters, quick-add, and saved filter views. Confirmed parity with owner expectation.
 
-### KB-002 — Storage-byte retention policy is not finalized
+### KB-002 — Stored-file retention policy is not finalized
 
-- **Observed:** MOM removes unreferenced draft image objects best-effort, while
-  long-term retention and reconciliation for superseded records is not approved.
-- **Expected:** Retain metadata/audit and release bytes under approved retention.
-- **Mitigation:** Keep immutable MOM metadata and audit rows; do not claim byte
-  cleanup is complete until provider provisioning and retention policy exist.
-- **Status:** Open; blocked by retention policy/provider provisioning.
+- **Observed (updated R8.74):** SF-R2 implements legacy MOM (editable document/section/note/photo model, no DRAFT→ISSUED lifecycle). MOM section photos are stored via `LocalFilesystemStorage`. There is no approved policy for cleaning up photos removed from a MOM document, or for purging documents from archived projects.
+- **Expected:** A per-project retention window is approved and enforced: photos removed from a section are reaped after the window; archived-project files are purged or preserved under a documented policy.
+- **Mitigation:** No automatic cleanup runs today; files accumulate. The storage root is bounded by the kantor rebuild root and does not affect legacy data.
+- **Status:** Open; deferred by owner decision (2026-09-15). Google Drive activation deferred; local-only storage in use. Retention policy TBD when Google Drive is activated.
 
 ### KB-003 — Project Schedule/FFNI remains absent from project detail
 

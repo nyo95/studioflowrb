@@ -13,9 +13,9 @@ describe("StudioFlow MOM UI", () => {
   it("covers empty, permission, immutable, loading, and error states", () => {
     assert.match(section, /No MOM documents yet/);
     assert.match(page, /Access denied/);
-    assert.match(page, /Immutable issued record/);
+    assert.match(page, /Immutable project meeting record/);
     assert.match(loading, /Loading MOM/);
-    assert.match(error, /MOM could not be loaded/);
+    assert.match(error, /MOM unavailable|meeting record could not be loaded/);
   });
 
   it("uses shared confirmation and unsaved-change patterns", () => {

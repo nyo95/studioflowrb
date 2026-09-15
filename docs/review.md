@@ -1,6 +1,6 @@
 # Ready for Review
 
-Status: active verification ledger, reconciled through R8.73 on 2026-09-15.
+Status: active verification ledger, reconciled through R8.75 on 2026-09-15.
 New file, split out of `roadmap.md`/`knownbug.md` on 2026-09-10 at owner
 request, so status is visible at a glance:
 
@@ -179,14 +179,13 @@ No item currently ready for review.
   feedback → send back → v1.1, history, Today, projects, clients, settings,
   platform settings link, Master Data/BQ pages, drafter cannot create
   projects, signed-out and legacy `/projects` redirects — zero console errors.
-- **Deferred to owner acceptance (end of wave 1):** the same walk on the
-  kantor machine and data, client approval → locked phase, parallel Layout/3D/CD,
-  skip/reopen/admin reset dialogs, archive/restore, saved Today filters,
-  checklist labels/subtasks/move up-down, and a check of the migration with
-  `npx prisma migrate deploy` plus `npx prisma migrate diff` (the cloud
-  sandbox could not download Prisma's schema engine, so migration SQL was
-  applied with `psql` and proven by the integration suite, not by Prisma's
-  diff).
+- **Status: PASS — SF-RF browser acceptance (R8.75, 2026-09-15).** Owner
+  walked the kantor machine with real data at 1440 px and 375 px: Today
+  (projects grouped, filters, saved filter views, quick-add with due date
+  and assignee, show done), Projects list and detail, phase workflow
+  (checklist subtasks, labels, move up, to-do defer, feedback badge), Clients
+  (list, detail, edit, archive blocked while running project). MOM "Plain"
+  note with no number approved. Corrections R8.74 verified.
 
 ### SF-R2 — MOM (R8.72)
 
@@ -200,9 +199,11 @@ No item currently ready for review.
   scope / archive rules with no orphan objects); production-build Playwright
   smoke covering create, header, notes, photo crop/upload, text-only section,
   print + A4 PDF, 375 px, drafter read-only, and delete — zero console errors.
-- **Deferred to owner acceptance (end of wave 1):** a real site-visit MOM on
-  kantor with phone photos, annotation marks, printing to PDF, and
-  `prisma migrate deploy/diff` for the new migration.
+- **Status: PASS — SF-RF browser acceptance (R8.75, 2026-09-15).** MOM list,
+  editor, photo upload, and print flow walked on kantor. Owner decision locked:
+  "Plain" note type shows no number and does not advance numbering (approved).
+  Google Drive activation and stored-file retention policy deferred (see KB-002
+  and Platform decision gates in `roadmap.md`).
 
 ### SF-R3 — Product Schedule (R8.73)
 
@@ -216,11 +217,11 @@ No item currently ready for review.
   production build, boundary fixtures, legacy-runtime fixtures,
   `prisma migrate deploy` on rebuild test and kantor DBs, and clean Prisma
   migration diff against the rebuild shadow DB.
-- **Deferred to owner acceptance (end of wave 1):** a browser walkthrough for
-  creating schedule entries, adding/finalizing/deleting options, template
-  application, CSV import, reuse from another project, settings maintenance,
-  drafter read-only behavior, archived-project read-only behavior, and mobile
-  width rendering.
+- **Status: PASS — SF-RF browser acceptance (R8.75, 2026-09-15).** Schedule
+  page walked on kantor at desktop and 375 px: entries, options, finalization,
+  template application, settings, drafter read-only, archived-project
+  read-only. Corrections R8.74 (option labels, Google Sheets import, seeding
+  on new projects, Schedule UI) verified.
 
 ### Review corrections (R8.74)
 
@@ -236,11 +237,10 @@ No item currently ready for review.
 
 ### Wave 1 parity gate
 
-- **Needs:** One SF-RF browser acceptance pass over the complete wave-1 surface
-  at desktop and 375 px: Today/projects/clients/settings, phase workflow and
-  checklist, MOM list/editor/print/delete, Product Schedule entries/options/
-  final approval/templates/import/reuse/settings, read-only drafter behavior,
-  and archived-project read-only behavior. Temporary legacy redirects should be
-  removed only after this pass.
-- **Status:** Ready for review; acceptance intentionally deferred to the
-  wave-1 parity gate.
+- **Status: PASS — SF-RF accepted in R8.75 (2026-09-15).** All SF-R1–SF-R3
+  features walked at desktop (1440 px) and 375 px with the owner account
+  (berkah.rad@gmail.com) and drafter account. Temporary legacy redirects
+  removed. Owner decisions locked in this pass: MOM "Plain" note approved
+  as-is; phase accent palette approved for SF-R4 (R8.76); stored-file
+  retention and Google Drive activation deferred. SF-R1–SF-RF marked done in
+  `roadmap.md`.

@@ -1,6 +1,6 @@
 # Documentation Hub
 
-Status: reconciled through **R8.71** on 2026-09-15. Contracts under `docs/apps/`
+Status: reconciled through **R8.75** on 2026-09-15. Contracts under `docs/apps/`
 were reorganized into one subfolder per application on 2026-09-10 at owner
 request; content is unchanged except for corrected cross-links.
 
@@ -13,7 +13,7 @@ tests, and migrations prove implemented state.
 
 | Document | Purpose |
 |---|---|
-| [`alignment.md`](alignment.md) | Owner explanation of how the StudioFlow rebuild preserves legacy outcomes while simplifying the workflow |
+| ~~[`alignment.md`](archive/studioflow-rb/alignment.md)~~ | **Superseded** — R7.xx rebuild alignment artifact; moved to `archive/studioflow-rb/` in R8.75. The active StudioFlow authority is the rework contract. |
 | [`UTILITY-INVENTORY.md`](UTILITY-INVENTORY.md) | Evidence-backed disposition ledger (REUSE/EXTEND/ADD/APP-OWNED/PURGE) for shared utilities and their duplicates; enforced by `scripts/check-boundaries.mjs` |
 | [`roadmap.md`](roadmap.md) | Remaining planned work, grouped by Platform, UI Engine, Master Data, BQ, and StudioFlow |
 | [`knownbug.md`](knownbug.md) | Open and closed defects grouped by application |
@@ -143,19 +143,14 @@ Forbidden: `platform -> app`, cross-app internal imports, implicit cross-app wri
 
 ## Active sequence
 
-Status: **superseded 2026-09-10 by explicit owner instruction.** The order
-below replaces the previous Master-Data-first sequence; it is the current
-execution priority, not a change to what `roadmap.md` lists as remaining.
+Status: **SF-R1–SF-RF wave 1 accepted in R8.75 (2026-09-15).** Foundation
+sequence (1–5 below) is complete. StudioFlow wave-1 rework is complete. Wave 2
+items are in `roadmap.md` under "Wave 2 (not activated)"; no activation yet.
 
-1. **Platform Foundation — routing first.** Main-route/routing settings are the
-   core app boundary everything else sits behind.
-2. **UI Engine and Shared Utilities.**
-3. **BQ.** The simplest remaining app; keep its reusable utilities in the
-   shared platform layer, not app-local — see `apps/bq/`.
-4. **AI file-organization exploration is parked**, not pursued for now (see
-   `roadmap.md`, Discovery and automation).
-5. **Everything else waits** — Master Data closure, StudioFlow's
-   client-answer/archive/phase-admin work (KB-013…KB-017), cross-app hardening,
-   and validation all hold until 1–3 above land.
+1. **Platform Foundation — routing first.** ✓ Accepted R8.34–R8.61.
+2. **UI Engine and Shared Utilities.** ✓ Accepted R8.56–R8.59.
+3. **BQ.** Implemented; browser acceptance in `review.md`.
+4. **AI file-organization exploration is parked**, not pursued for now.
+5. **StudioFlow wave-1 rework (SF-R1–SF-RF).** ✓ Accepted R8.71–R8.75.
 
 Documented deferred capabilities are routing memory, not implementation scope. Do not create code, folders, dependencies, or placeholder exports until a stage/consumer activates them.

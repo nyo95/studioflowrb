@@ -22,6 +22,10 @@ export const RULE_DUPLICATE_PRIMITIVE = "app-local duplicate primitive";
  */
 export const APP_DUPLICATE_PRIMITIVE_ALLOW_LIST = [
   "src/app/(platform)/bq/project-deletion-review.tsx",
+  // Archived rebuild StudioFlow code — deactivated by SF-R1 (R8.71), custom formatters preserved as-is.
+  "src/app/(platform)/studioflow/projects/_legacy_project_id/page.tsx",
+  "src/app/(platform)/studioflow/projects/_legacy_project_id/files/page.tsx",
+  "src/app/(platform)/studioflow/projects/_legacy_project_id/mom/[momId]/page.tsx",
 ];
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);

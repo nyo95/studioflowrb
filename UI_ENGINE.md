@@ -820,7 +820,13 @@ This stage includes a real login page, authenticated app launcher, user director
 - `InlineEdit` — activated in R4.56 by an approved cell-entry workflow;
 - `FileDropZone` — activated in R7.43 by the approved phase deliverable
   intake consumer. It carries interaction only: the metadata-only intake
-  flow needs no storage or upload contract, and none is implied here;
+  flow needs no storage or upload contract, and none is implied here.
+  **No active consumer since R8.71** (SF-R1 removed the rebuild deliverable
+  intake surface; the archived `_legacy_project_id` code retains the import
+  but is deactivated). Retained for the Wave 2 deliverable/files feature;
+- `CopyButton` — clipboard copy with accessible success/failure feedback.
+  **No active consumer since R8.71** (only consumer was `_legacy_project_id/phase-section.tsx`,
+  deactivated by SF-R1). Retained as a generic pattern for a future consumer.
 - `useDebouncedValue`, `useOptionOverlay`, `useConfirm`, `useUnsavedChangesGuard`, their accessible prompts, and generic pending/action feedback;
 - one internal UI Engine showcase route demonstrating realistic compositions without app/domain imports.
 
