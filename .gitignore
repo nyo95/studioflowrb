@@ -9,5 +9,6 @@ coverage/
 dist/
 .DS_Store
 *.log
+.storage/
 Claude outputs/
 _to_delete/

@@ -5,8 +5,61 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.74**
-- Next local revision: **R8.75**
+- Current revision after this entry is committed: **R8.76**
+- Next local revision: **R8.77**
+
+## R8.76 | 2026-09-15 | fix(repo): keep runtime storage out of source control
+
+### Fixed
+
+- Removed a committed local MOM private asset from the Git index while leaving
+  the local runtime copy intact.
+- Added `.storage/` to `.gitignore` so future local ObjectStorage runtime files
+  do not enter source control.
+- Added `.next/dev/**` to `tsconfig.json` excludes. Next 16 writes separate
+  development route types there and may add its include automatically; excluding
+  the dev cache prevents stale route validators from breaking normal
+  typecheck/build after accepted route removals. Production `.next/types`
+  remains included.
+- Restored the missing `R8.75` changelog entry so the ledger matches the
+  existing commit history before GitHub merge.
+
+### Verification
+
+- `git ls-files .storage`: returns no tracked runtime storage files after this
+  correction is staged.
+- Focused repository review found this as a pre-merge code/data hygiene defect.
+- `npx prisma generate`: passed before rerunning typecheck.
+- Applied pending committed StudioFlow migrations to the local rumah rebuild
+  development database (`masterdata`) and test database (`masterdata_test`) so
+  the checked branch matches its schema.
+- `npm test`: 388 passed, 0 failed.
+- Typecheck, lint, boundary check, legacy-runtime check, production build, and
+  staged whitespace checks passed.
+
+## R8.75 | 2026-09-15 | chore(studioflow): wave-1 parity acceptance (SF-RF)
+
+### Changed
+
+- Completed SF-RF documentation cleanup across `PLAN.md`, `docs/review.md`,
+  `docs/roadmap.md`, `docs/knownbug.md`, `docs/UTILITY-INVENTORY.md`,
+  `docs/README.md`, `UI_ENGINE.md`, and the archived StudioFlow RB alignment
+  document.
+- Removed temporary legacy redirects from `next.config.ts`.
+- Archived the deactivated `studioflow/projects/[id]` rebuild route tree under
+  `_legacy_project_id`, excluded it from TypeScript compilation, and updated the
+  boundary allow-list.
+- Deleted dead StudioFlow new-project route action code and restored
+  `src/apps/studioflow/mom-images.ts` for the archived route/test references.
+- Fixed StudioFlow test assertions affected by the SF-RF cleanup.
+
+### Verification
+
+- Commit `4e2004f`: 388 tests passed.
+- Typecheck, lint, boundary check, legacy-runtime check, production build, and
+  Prisma migration diff all passed with no difference reported.
+- SF-RF browser acceptance passed on 2026-09-15 at desktop and 375 px with
+  owner and drafter-only accounts; evidence is recorded in `docs/review.md`.
 
 ## R8.74 | 2026-09-15 | fix(studioflow): wave-1 review corrections (SF-R1–SF-R3)
 
