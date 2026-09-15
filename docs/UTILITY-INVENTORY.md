@@ -73,9 +73,9 @@ off the raw primitive fails `check:boundaries`.
 | `src/apps/studioflow/service.ts` | `Intl.DateTimeFormat("en-CA")` used for deterministic date-only extraction to build a stable slug key, not for display; merging would change stored values |
 | `src/app/(platform)/bq/project-deletion-review.tsx` | `"id-ID"` with no explicit time zone renders in the browser-local zone, deliberately (audit timestamp, zone-agnostic); `formatInstant` defaults to `Asia/Jakarta` |
 | `src/app/(platform)/studioflow/page.tsx` | custom `dueFmt`/`headerFmt` options (weekday context) beyond the three supported styles |
-| `src/app/(platform)/studioflow/[id]/page.tsx` | custom component-level formatters with distinct options (same pattern as above) |
-| `src/app/(platform)/studioflow/[id]/files/page.tsx` | custom component-level formatter |
-| `src/app/(platform)/studioflow/[id]/mom/[momId]/page.tsx` | `Intl.DateTimeFormat(undefined, ...)` intentionally formats in the viewer's locale without an app time zone |
+| `src/app/(platform)/studioflow/projects/[id]/page.tsx` | custom component-level formatters with distinct options (same pattern as above) |
+| `src/app/(platform)/studioflow/projects/[id]/files/page.tsx` | custom component-level formatter |
+| `src/app/(platform)/studioflow/projects/[id]/mom/[momId]/page.tsx` | `Intl.DateTimeFormat(undefined, ...)` intentionally formats in the viewer's locale without an app time zone |
 
 If an upstream consumer ever needs one of these exactly, the correct move is to
 **EXTEND** `formatInstant` (new style or option) and migrate the consumer, not
