@@ -10,3 +10,4 @@ export * from "./image-workspace";
 export * from "./inline-edit";
 export * from "./pagination";
 export * from "./simple-text-editor";
+export * from "./print-button";

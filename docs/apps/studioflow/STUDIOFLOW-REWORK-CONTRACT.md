@@ -325,6 +325,28 @@ kept. Print view kept (UI_ENGINE §13). No issue/supersede state. Delete is a
 real delete of a MOM document with confirmation (legacy behavior) and an audit
 snapshot.
 
+Implementation notes (R8.72, SF-R2):
+
+- Enum values are stored upper-case (`DECIMAL|DISC|DASH|NONE`,
+  `DEFAULT|PLAIN`); UI labels: Numbered, Bullets, Dashes, No markers; Normal,
+  Plain.
+- **UX change vs legacy (proposal, confirm at acceptance):** a `PLAIN` note
+  shows no marker and does not advance numbering. Legacy stored the style but
+  never rendered it.
+- Photos: at most two per section in `slot` 0/1; filling slot 1 while slot 0
+  is empty lands in slot 0, removing photo 1 moves photo 2 up, swap exchanges
+  them. Browser crop is fixed 4:3 (legacy cropper), output JPEG ≤ 1600 px,
+  server accepts PNG/JPEG/WebP ≤ 10 MB with a magic-byte check. Objects are
+  written before the row and removed after commit on replace/delete.
+- A section always keeps one note (deleting the last one leaves an empty
+  note). The last section cannot be deleted from the UI.
+- Every child change bumps the document `updated_at`. Audited: created,
+  header updated (field diff), deleted (snapshot), section deleted, photo
+  added/replaced/removed; note edits and reorders are not audited (legacy).
+- Routes: `/studioflow/projects/[projectId]/mom`, `…/mom/[momId]`, print at
+  `/studioflow/print/projects/[projectId]/mom/[momId]` (no app shell).
+- Read: `studioflow.project.read`; write: `studioflow.mom.manage`.
+
 ## 11. Product Schedule (port `extensions/schedule` + `CatalogBoard`)
 
 ### 11.1 Entry

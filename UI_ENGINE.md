@@ -692,6 +692,13 @@ Apps own:
 
 UI Engine must not become a generic report builder, schema-form generator, or PDF engine.
 
+Implemented (R8.72, first consumer: StudioFlow MOM print): `DocumentSheet`
+(server-safe A4 frame with a screen-only `toolbar`, `format`
+`a4-portrait`/`a4-landscape`), `DocumentBlock` (avoid page breaks inside), and
+`PrintButton` (client, opens the browser print dialog). `styles/base.css` owns
+`@page` A4 margins and the `.ui-print-hidden` helper. Print routes live in the
+`(document)` route group so the application shell is not rendered.
+
 ## 14. Legacy Migration Classification
 
 ### KEEP / MIGRATE
@@ -823,7 +830,6 @@ This stage includes a real login page, authenticated app launcher, user director
 |---|---|
 | `WorkspaceShell`, `SplitPane` | first approved StudioFlow/BQ workspace requiring the layout |
 | `ReorderHandle` | first persisted manual-order workflow with keyboard requirements |
-| `DocumentSheet` and print helpers | first approved document/print workflow |
 
 Deferred patterns may remain in design prose as routing memory. They are not required for the active closure gate and should not remain public implementation without a real approved consumer.
 
@@ -850,8 +856,10 @@ Deferred patterns may remain in design prose as routing memory. They are not req
   surrounding form; a consumer that needs bytes on a server sends them
   through its own approved boundary. Apps must consume this export rather
   than reimplement drop handlers locally.
-- `ImageWorkspace` owns browser selection, preview, crop through zoom/focus,
-  freehand annotation, preparation progress, and safe preparation errors. The
+- `ImageWorkspace` owns browser selection, preview, crop through zoom/focus
+  (optionally locked to an `aspect`), freehand annotation, PNG or JPEG output
+  (`outputType`, `outputQuality`), preparation progress, and safe preparation
+  errors. The
   consuming app supplies format/size/dimension policy and owns authorization,
   upload, object keys, storage, retention, and audit behavior.
 - StatusBadge receives an explicit semantic tone and never infers meaning from a domain status string.

@@ -196,3 +196,19 @@ unverified middle state.
   sandbox could not download Prisma's schema engine, so migration SQL was
   applied with `psql` and proven by the integration suite, not by Prisma's
   diff).
+
+### SF-R2 — MOM (R8.72)
+
+- **Built:** MOM tables (migration `20260915120000_sf_r2_mom`), `mom`
+  service, project MOM list/editor, shell-less print view, UI Engine
+  `DocumentSheet`/`DocumentBlock`/`PrintButton`, `ImageWorkspace` aspect and
+  JPEG output.
+- **Verified in the cloud workspace:** 360/360 tests (4 MOM integration
+  tests: legacy defaults and header, section/note order and the one-note rule,
+  two-photo limit with slot shifting, swap and storage cleanup, permission /
+  scope / archive rules with no orphan objects); production-build Playwright
+  smoke covering create, header, notes, photo crop/upload, text-only section,
+  print + A4 PDF, 375 px, drafter read-only, and delete — zero console errors.
+- **Deferred to owner acceptance (end of wave 1):** a real site-visit MOM on
+  kantor with phone photos, annotation marks, printing to PDF, and
+  `prisma migrate deploy/diff` for the new migration.

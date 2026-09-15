@@ -97,6 +97,10 @@ describe("UI Engine foundation", () => {
       "SegmentBar",
       "GroupHeader",
       "PipelineStrip",
+      // R8.72 — activated by the StudioFlow MOM print view (SF-R2).
+      "DocumentSheet",
+      "DocumentBlock",
+      "PrintButton",
     ]) {
       const exported = ui[name as keyof typeof ui];
       assert.ok(
@@ -104,7 +108,7 @@ describe("UI Engine foundation", () => {
         name,
       );
     }
-    for (const deferred of ["WorkspaceShell", "SplitPane", "ReorderHandle", "DocumentSheet"]) {
+    for (const deferred of ["WorkspaceShell", "SplitPane", "ReorderHandle"]) {
       assert.equal(deferred in ui, false, `${deferred} must remain deferred`);
     }
   });

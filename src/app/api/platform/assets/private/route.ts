@@ -43,13 +43,16 @@ export async function GET(request: Request) {
         ? "image/png"
         : ext === ".jpg" || ext === ".jpeg"
           ? "image/jpeg"
-          : "application/octet-stream";
+          : ext === ".webp"
+            ? "image/webp"
+            : "application/octet-stream";
 
     return new NextResponse(data, {
       status: 200,
       headers: {
         "Content-Type": contentType,
         "Cache-Control": "private, no-cache",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch {

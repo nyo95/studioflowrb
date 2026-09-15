@@ -147,8 +147,8 @@ migration and one slice.
 > **KB-013 … KB-018 and KB-023 are closed in R8.71 as superseded**: the code
 > they describe no longer exists, and SF-R1 implements the legacy behavior
 > instead (client answers → feedback/reject revisions; archive/restore;
-> fixed phases; general to-dos on Today). KB-012/KB-022 close with SF-R2
-> (MOM); KB-003/KB-021 close with SF-R3 (Schedule).
+> fixed phases; general to-dos on Today). KB-012/KB-022 were closed with SF-R2
+> (MOM, R8.72); KB-003/KB-021 close with SF-R3 (Schedule).
 
 ### KB-012 — A MOM correction is issued instantly and cannot correct anything
 
@@ -161,7 +161,8 @@ migration and one slice.
   source content, and the source becomes `SUPERSEDED` when that draft is issued.
 - **Mitigation:** Discard-and-recreate is the only way to change issued content
   today, which loses the supersede link.
-- **Status:** Open; carried by the active R7.56 work order.
+- **Status:** Closed in R8.72 as superseded — SF-R2 ported the legacy MOM,
+  which has no issue/supersede lifecycle; every MOM stays editable.
 
 ### KB-013 — A recorded client answer cannot be corrected
 
@@ -284,8 +285,9 @@ migration and one slice.
 - **Mitigation:** Avoid issuing or superseding MOM documents in the current
   implementation until the correct shape is confirmed. KB-012 is blocked by
   this.
-- **Status:** Open; awaiting owner re-specification of MOM. Do not extend the
-  current implementation or fix KB-012 until the requirements are re-anchored.
+- **Status:** Closed in R8.72 — the owner re-anchored MOM on legacy (contract
+  §10); SF-R2 implements the legacy document/section/note/photo model with
+  print.
 
 ### KB-023 — General project todos not surfaced on StudioFlow home page
 

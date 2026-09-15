@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
+import { AppError } from "@platform/core/errors";
 import { validationError } from "@platform/core/validation";
 import { studioFlow } from "@/apps/studioflow/runtime";
 
@@ -323,6 +324,176 @@ export async function deleteFilterViewAction(filterId: string): Promise<ActionRe
     const ctx = await context();
     const result = await studioFlow.tasks.deleteFilterView({ ...ctx, filterId: parse(Id, filterId) });
     refresh();
+    return result;
+  });
+}
+
+// ── MOM (SF-R2) ─────────────────────────────────────────────────────────────
+
+function refreshMom(projectId: string) {
+  revalidatePath(`/studioflow/projects/${projectId}`, "layout");
+  revalidatePath(`/studioflow/print/projects/${projectId}`, "layout");
+}
+
+export async function createMomDocumentAction(projectId: string): Promise<ActionResult<{ documentId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const result = await studioFlow.mom.createDocument({ ...ctx, projectId: parse(Id, projectId) });
+    refreshMom(projectId);
+    return result;
+  });
+}
+
+const MomHeader = z.strictObject({
+  projectId: Id,
+  documentId: Id,
+  topic: z.string().max(200),
+  meetingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  venue: z.string().max(500).nullish(),
+  attendees: z.string().max(5000).nullish(),
+  preparedByName: z.string().max(200),
+});
+export async function updateMomDocumentAction(input: z.infer<typeof MomHeader>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(MomHeader, input);
+    const result = await studioFlow.mom.updateDocument({ ...ctx, ...data });
+    refreshMom(data.projectId);
+    return result;
+  });
+}
+
+const MomDocRef = z.strictObject({ projectId: Id, documentId: Id });
+export async function deleteMomDocumentAction(input: z.infer<typeof MomDocRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(MomDocRef, input);
+    const result = await studioFlow.mom.deleteDocument({ ...ctx, ...data });
+    refreshMom(data.projectId);
+    return result;
+  });
+}
+
+export async function addMomItemAction(input: z.infer<typeof MomDocRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(MomDocRef, input);
+    const result = await studioFlow.mom.addItem({ ...ctx, ...data });
+    refreshMom(data.projectId);
+    return result;
+  });
+}
+
+const MomListStyle = z.enum(["DECIMAL", "DISC", "DASH", "NONE"]);
+const MomItemUpdate = z.strictObject({ projectId: Id, itemId: Id, isTextOnly: z.boolean(), listStyle: MomListStyle });
+export async function updateMomItemAction(input: z.infer<typeof MomItemUpdate>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(MomItemUpdate, input);
+    const result = await studioFlow.mom.updateItem({ ...ctx, ...data });
+    refreshMom(data.projectId);
+    return result;
+  });
+}
+
+const MomItemRef = z.strictObject({ projectId: Id, itemId: Id });
+export async function deleteMomItemAction(input: z.infer<typeof MomItemRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(MomItemRef, input);
+    const result = await studioFlow.mom.deleteItem({ ...ctx, ...data });
+    refreshMom(data.projectId);
+    return result;
+  });
+}
+
+const Direction = z.enum(["up", "down"]);
+const MomItemMove = z.strictObject({ projectId: Id, itemId: Id, direction: Direction });
+export async function moveMomItemAction(input: z.infer<typeof MomItemMove>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(MomItemMove, input);
+    const result = await studioFlow.mom.moveItem({ ...ctx, ...data });
+    refreshMom(data.projectId);
+    return result;
+  });
+}
+
+const MomPointAdd = z.strictObject({ projectId: Id, itemId: Id, text: z.string().max(5000).optional() });
+export async function addMomPointAction(input: z.infer<typeof MomPointAdd>): Promise<ActionResult<{ pointId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(MomPointAdd, input);
+    const result = await studioFlow.mom.addPoint({ ...ctx, ...data });
+    refreshMom(data.projectId);
+    return result;
+  });
+}
+
+const MomPointUpdate = z.strictObject({ projectId: Id, pointId: Id, text: z.string().max(5000), style: z.enum(["DEFAULT", "PLAIN"]) });
+export async function updateMomPointAction(input: z.infer<typeof MomPointUpdate>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(MomPointUpdate, input);
+    const result = await studioFlow.mom.updatePoint({ ...ctx, ...data });
+    refreshMom(data.projectId);
+    return result;
+  });
+}
+
+const MomPointRef = z.strictObject({ projectId: Id, pointId: Id });
+export async function deleteMomPointAction(input: z.infer<typeof MomPointRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(MomPointRef, input);
+    const result = await studioFlow.mom.deletePoint({ ...ctx, ...data });
+    refreshMom(data.projectId);
+    return result;
+  });
+}
+
+const MomPointMove = z.strictObject({ projectId: Id, pointId: Id, direction: Direction });
+export async function moveMomPointAction(input: z.infer<typeof MomPointMove>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(MomPointMove, input);
+    const result = await studioFlow.mom.movePoint({ ...ctx, ...data });
+    refreshMom(data.projectId);
+    return result;
+  });
+}
+
+const MomImageForm = z.strictObject({ projectId: Id, itemId: Id, slot: z.coerce.number().int() });
+/** Multipart upload: `projectId`, `itemId`, `slot`, `file`. Size/type policy lives in the service. */
+export async function setMomImageAction(formData: FormData): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(MomImageForm, { projectId: formData.get("projectId"), itemId: formData.get("itemId"), slot: formData.get("slot") });
+    const file = formData.get("file");
+    if (!(file instanceof File)) throw new AppError("VALIDATION", "MOM_IMAGE_REQUIRED", "Choose an image.");
+    const result = await studioFlow.mom.setImage({ ...ctx, ...data, file: { body: new Uint8Array(await file.arrayBuffer()), contentType: file.type } });
+    refreshMom(data.projectId);
+    return result;
+  });
+}
+
+const MomImageRef = z.strictObject({ projectId: Id, imageId: Id });
+export async function deleteMomImageAction(input: z.infer<typeof MomImageRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(MomImageRef, input);
+    const result = await studioFlow.mom.deleteImage({ ...ctx, ...data });
+    refreshMom(data.projectId);
+    return result;
+  });
+}
+
+export async function swapMomImagesAction(input: z.infer<typeof MomItemRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(MomItemRef, input);
+    const result = await studioFlow.mom.swapImages({ ...ctx, ...data });
+    refreshMom(data.projectId);
     return result;
   });
 }

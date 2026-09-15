@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { fullBlockers, todoBlockers } from "./blockers";
+import { isPermutation, moveId, pointMarkers } from "./mom";
 import {
   applyChecklistFilter,
   buildTree,
@@ -158,5 +159,23 @@ describe("today feed", () => {
     assert.deepEqual(sortFeed(nested).map((t) => t.id), ["a", "r", "d"]);
     const groups = groupFeed([{ id: "p1", name: "One", isUrgent: false }, { id: "p2", name: "Two", isUrgent: true }], nested);
     assert.deepEqual(groups.map((g) => [g.project.id, g.tasks.length]), [["p1", 3], ["p2", 0]]);
+  });
+});
+
+describe("MOM rules", () => {
+  it("numbers only normal points and honours list style", () => {
+    assert.deepEqual(pointMarkers("DECIMAL", ["DEFAULT", "PLAIN", "DEFAULT"]), ["1.", "", "2."]);
+    assert.deepEqual(pointMarkers("DISC", ["DEFAULT", "DEFAULT"]), ["•", "•"]);
+    assert.deepEqual(pointMarkers("DASH", ["PLAIN", "DEFAULT"]), ["", "–"]);
+    assert.deepEqual(pointMarkers("NONE", ["DEFAULT"]), [""]);
+  });
+
+  it("validates reorder payloads and moves", () => {
+    assert.equal(isPermutation(["a", "b"], ["b", "a"]), true);
+    assert.equal(isPermutation(["a", "b"], ["a", "a"]), false);
+    assert.equal(isPermutation(["a", "b"], ["a"]), false);
+    assert.deepEqual(moveId(["a", "b", "c"], "b", "up"), ["b", "a", "c"]);
+    assert.equal(moveId(["a", "b"], "a", "up"), null);
+    assert.equal(moveId(["a", "b"], "z", "down"), null);
   });
 });

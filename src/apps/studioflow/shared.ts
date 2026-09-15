@@ -3,6 +3,7 @@ import { prepareAuditEvent, type AuditActor, type AuditWriter } from "@platform/
 import { AppError, mapPrismaKnownError } from "@platform/core/errors";
 import { hasPermission, requirePermission, type PermissionGrants } from "@platform/core/rbac";
 import type { PeopleDirectory } from "@platform/core/rbac/people";
+import type { ObjectStorage } from "@platform/core/storage";
 
 import { STUDIOFLOW_PERMISSIONS } from "./permissions";
 
@@ -13,6 +14,8 @@ export type StudioFlowPorts = {
   runTransaction: <T>(work: (tx: TxClient) => Promise<T>) => Promise<T>;
   auditWriter: AuditWriter;
   people: PeopleDirectory;
+  /** Private object storage (MOM images). */
+  storage: ObjectStorage;
   now?: () => Date;
 };
 

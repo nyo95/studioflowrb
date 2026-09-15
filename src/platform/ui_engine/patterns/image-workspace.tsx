@@ -14,11 +14,17 @@ export type ImageWorkspaceProps = {
   accept?: string;
   maxBytes?: number;
   maxDimension?: number;
+  /** Encoded output; JPEG keeps photos small enough for server-action uploads. */
+  outputType?: "image/png" | "image/jpeg";
+  /** JPEG quality 0-1 (ignored for PNG). */
+  outputQuality?: number;
+  /** Fixed crop aspect (width / height); omitted keeps the source aspect. */
+  aspect?: number;
   disabled?: boolean;
 };
 
 /** Browser image preparation only; storage and consumer policy stay outside. */
-export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jpeg,image/webp", maxBytes = 10 * 1024 * 1024, maxDimension = 1800, disabled = false }: ImageWorkspaceProps) {
+export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jpeg,image/webp", maxBytes = 10 * 1024 * 1024, maxDimension = 1800, outputType = "image/png", outputQuality = 0.86, aspect, disabled = false }: ImageWorkspaceProps) {
   const pickerRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -85,8 +91,14 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
     if (!file || !image?.naturalWidth || !image.naturalHeight) return;
     setPending(true); setError(null);
     try {
-      const cropWidth = image.naturalWidth / zoom;
-      const cropHeight = image.naturalHeight / zoom;
+      let baseWidth = image.naturalWidth;
+      let baseHeight = image.naturalHeight;
+      if (aspect && aspect > 0) {
+        if (baseWidth / baseHeight > aspect) baseWidth = baseHeight * aspect;
+        else baseHeight = baseWidth / aspect;
+      }
+      const cropWidth = baseWidth / zoom;
+      const cropHeight = baseHeight / zoom;
       const sourceX = (image.naturalWidth - cropWidth) * (panX / 100);
       const sourceY = (image.naturalHeight - cropHeight) * (panY / 100);
       const scale = Math.min(1, maxDimension / Math.max(cropWidth, cropHeight));
@@ -96,6 +108,7 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
       canvas.width = width; canvas.height = height;
       const context = canvas.getContext("2d");
       if (!context) throw new Error("Canvas is unavailable");
+      if (outputType === "image/jpeg") { context.fillStyle = "#ffffff"; context.fillRect(0, 0, width, height); }
       context.drawImage(image, sourceX, sourceY, cropWidth, cropHeight, 0, 0, width, height);
       context.strokeStyle = "#dc2626"; context.lineWidth = Math.max(2, width / 700); context.lineCap = "round"; context.lineJoin = "round";
       for (const path of paths) {
@@ -104,9 +117,10 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
         for (const point of path.slice(1)) context.lineTo(point.x * width, point.y * height);
         context.stroke();
       }
-      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error("Image preparation failed")), "image/png"));
+      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error("Image preparation failed")), outputType, outputQuality));
       if (blob.size > maxBytes) throw new Error("Prepared image is too large");
-      await onPrepared(new File([blob], `${file.name.replace(/\.[^.]+$/, "") || "image"}.png`, { type: "image/png" }));
+      const extension = outputType === "image/jpeg" ? "jpg" : "png";
+      await onPrepared(new File([blob], `${file.name.replace(/\.[^.]+$/, "") || "image"}.${extension}`, { type: outputType }));
     } catch {
       setError("The image could not be prepared. Try a smaller image.");
     } finally { setPending(false); }
@@ -115,7 +129,7 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
   return <div className="grid gap-3 rounded-control border border-line p-3" aria-label={label}>
     <input ref={pickerRef} className="sr-only" type="file" accept={accept} disabled={disabled || pending} onChange={(event) => { select(event.target.files?.[0]); event.target.value = ""; }} />
     {!previewUrl ? <Button type="button" variant="secondary" onClick={() => pickerRef.current?.click()} disabled={disabled}>Choose image</Button> : <>
-      <div className="relative aspect-video overflow-hidden rounded-control border border-line bg-surface-muted touch-none">
+      <div className={aspect ? "relative overflow-hidden rounded-control border border-line bg-surface-muted touch-none" : "relative aspect-video overflow-hidden rounded-control border border-line bg-surface-muted touch-none"} style={aspect ? { aspectRatio: String(aspect) } : undefined}>
         <Image ref={imageRef} src={previewUrl} alt="Image preview" fill unoptimized className="object-cover" style={{ transform: `scale(${zoom})`, transformOrigin: `${panX}% ${panY}%` }} />
         <canvas ref={overlayRef} className="absolute inset-0 h-full w-full cursor-crosshair" aria-label="Annotation canvas" onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setDrawing(true); setPaths((current) => [...current, [pointFromEvent(event)]]); }} onPointerMove={(event) => { if (!drawing) return; const point = pointFromEvent(event); setPaths((current) => current.map((path, index) => index === current.length - 1 ? [...path, point] : path)); }} onPointerUp={() => setDrawing(false)} onPointerCancel={() => setDrawing(false)} />
       </div>

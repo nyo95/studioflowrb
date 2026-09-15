@@ -152,7 +152,8 @@ rest of the rebuild StudioFlow.
   end of wave 1 (see `review.md`).
 - [ ] **SF-R2 — MOM (legacy):** legacy document/item/point/image model,
   editing flow, and print on `ObjectStorage` and UI Engine. Closes KB-012 and
-  KB-022 by replacing the ISSUED/SUPERSEDED lifecycle.
+  KB-022 by replacing the ISSUED/SUPERSEDED lifecycle. Implemented in R8.72;
+  owner acceptance deferred to the end of wave 1.
 - [ ] **SF-R3 — Product Schedule (legacy):** entries/options/final approval,
   gapless codes, prefix dictionary, schedule templates and default entries,
   reuse from past projects, CSV import, typed snapshots, Master Data Brand read

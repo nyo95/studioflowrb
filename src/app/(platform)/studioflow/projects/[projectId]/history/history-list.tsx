@@ -46,6 +46,13 @@ const PHRASES: Record<string, string> = {
   "studioflow.checklist.label-attached": "labelled a checklist item",
   "studioflow.checklist.label-detached": "removed a label",
   "studioflow.checklist.synced": "applied checklist templates",
+  "studioflow.mom.created": "created a MOM",
+  "studioflow.mom.updated": "edited a MOM header",
+  "studioflow.mom.deleted": "deleted a MOM",
+  "studioflow.mom.section-deleted": "removed a MOM section",
+  "studioflow.mom.image-added": "added a MOM photo",
+  "studioflow.mom.image-replaced": "replaced a MOM photo",
+  "studioflow.mom.image-removed": "removed a MOM photo",
 };
 
 const PHASE_NAMES: Record<string, string> = { MOODBOARD: "Moodboard", LAYOUT: "Layout Plan", DESIGN_3D: "3D Design", CD: "Construction Drawing", SUPERVISION: "Supervision" };
@@ -58,6 +65,9 @@ function detail(event: Event): string | null {
   if (typeof meta.reason === "string" && meta.reason) parts.push(`“${meta.reason}”`);
   if (typeof meta.note === "string" && meta.note) parts.push(`“${meta.note}”`);
   if (typeof meta.label === "string") parts.push(meta.label);
+  if (typeof meta.topic === "string") parts.push(meta.topic);
+  const snapshot = meta.snapshot as { topic?: unknown } | undefined;
+  if (snapshot && typeof snapshot.topic === "string") parts.push(snapshot.topic);
   if (typeof meta.content === "string") parts.push(meta.content);
   for (const [key, change] of Object.entries(event.changes ?? {})) {
     if (key === "status" || key === "priority") parts.push(`${String(change.from)} → ${String(change.to)}`);

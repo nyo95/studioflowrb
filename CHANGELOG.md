@@ -5,8 +5,50 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.71**
-- Next local revision: **R8.72**
+- Current revision after this entry is committed: **R8.72**
+- Next local revision: **R8.73**
+
+## R8.72 | 2026-09-15 | feat(studioflow): legacy MOM (SF-R2)
+
+### Changed
+
+- New `studioflow` MOM tables (migration `20260915120000_sf_r2_mom`,
+  additive): document, ordered sections (text-only flag, list style), ordered
+  notes (style), and up to two photos per section stored through
+  `ObjectStorage` (private keys, signed read URLs, magic-byte check, orphan
+  cleanup after commit).
+- `studioFlow.mom` service: create (default "SITE INSPECTION REPORT", today,
+  prepared by the signed-in person, one empty section), edit header, real
+  delete with an audit snapshot, add/move/delete sections, add/edit/move/delete
+  notes (a section keeps one note), set/replace/remove/swap photos. Parent-chain
+  project scope, `studioflow.mom.manage`, and archived-project read-only are
+  enforced for every command. Header, delete, section delete, and photo
+  changes appear in project History.
+- Routes: project workspace **MOM** list and editor
+  (`/studioflow/projects/[projectId]/mom[/[momId]]`) and a shell-less print
+  view (`/studioflow/print/projects/[projectId]/mom/[momId]`, new `(document)`
+  route group) with Print / Save PDF.
+- UX change against legacy, recorded in contract §10: a **Plain** note has
+  no marker and does not advance numbering (legacy stored the style but never
+  displayed it).
+- UI Engine: `DocumentSheet`, `DocumentBlock`, and `PrintButton` activated
+  (§13) with base `@media print` rules; `ImageWorkspace` gained `aspect`,
+  `outputType` (JPEG keeps photos under the 4 MB action limit), and
+  `outputQuality`. The private asset route serves WebP and sends `nosniff`.
+- KB-012 and KB-022 closed.
+
+### Verification
+
+- Cloud workspace (Planner acting as Executor; acceptance at the end of
+  wave 1). `npm test`: 360 passed, 0 failed (4 new MOM integration tests,
+  2 new MOM rule tests). Typecheck, lint, `check:boundaries`,
+  `check:legacy-runtime`, and `next build` passed (fonts stubbed only for the
+  sandbox build).
+- Playwright smoke on the production build: create MOM, save header, notes
+  with reorder, crop-and-upload photo, add text-only section, print preview
+  and A4 PDF (toolbar hidden in print), 375 px without horizontal overflow,
+  drafter read-only, delete with confirmation — zero console errors.
+- Not run: `prisma migrate deploy/diff` (sandbox) — required locally.
 
 ## R8.71 | 2026-09-15 | feat(studioflow): rework legacy project backbone (SF-R1)
 

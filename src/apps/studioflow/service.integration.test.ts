@@ -7,6 +7,7 @@ import { closeTestDb, createTestDb, requireDisposableTestDatabaseUrl, truncatePl
 import { AppError } from "@platform/core/errors";
 import { createPeopleDirectory } from "@platform/core/rbac/people";
 import { initializePermissionRegistry } from "@platform/core/rbac/registry";
+import { FakeObjectStorage } from "@platform/core/storage";
 import type { PrismaClient } from "@/generated/prisma/client";
 
 import { APP_REGISTRATIONS } from "../../app/app-registrations";
@@ -18,6 +19,7 @@ const DRAFTER_GRANTS = [P.access, P.projectRead, P.phaseWork, P.taskManage];
 
 let testDb: TestDb;
 let sf: StudioFlowService;
+let storage: FakeObjectStorage;
 let designer: { id: string; actor: { kind: "USER"; userId: string; label: string } };
 let drafter: { id: string; actor: { kind: "USER"; userId: string; label: string } };
 let clock = new Date("2026-09-15T03:00:00Z");
@@ -46,6 +48,7 @@ async function seedUser(name: string, grants: readonly string[]) {
 
 async function reset() {
   await testDb.pool.query(`TRUNCATE TABLE ${[
+    "sf_mom_image", "sf_mom_point", "sf_mom_item", "sf_mom_document",
     "sf_checklist_item_label", "sf_checklist_label", "sf_checklist_filter_view", "sf_checklist_item", "sf_checklist_template",
     "sf_activity", "sf_revision", "sf_phase", "sf_project", "sf_client", "sf_project_sequence", "sf_settings",
   ].map((t) => `"studioflow"."${t}"`).join(", ")} RESTART IDENTITY CASCADE`);
@@ -59,10 +62,12 @@ before(async () => {
   initializePermissionRegistry(APP_REGISTRATIONS);
   testDb = await createTestDb(requireDisposableTestDatabaseUrl());
   const db = testDb.prisma;
+  storage = new FakeObjectStorage();
   sf = createStudioFlowService(db, {
     runTransaction: <T>(work: (tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0]) => Promise<T>) => db.$transaction((tx) => work(tx)),
     auditWriter: createAuditEventWriter(),
     people: createPeopleDirectory(db),
+    storage,
     now: () => clock,
   });
 });
@@ -317,5 +322,116 @@ describe("SF-R1 checklist and Today", () => {
     await rejectsWith(sf.tasks.saveFilterView({ ...as(designer), name: "Bad", query: { status: "X" } as never }), "FILTER_QUERY_INVALID");
     assert.equal((await sf.tasks.listFilterViews({ grants: ALL, ownerId: designer.id })).length, 1);
     assert.equal((await sf.tasks.listFilterViews({ grants: ALL, ownerId: drafter.id })).length, 0);
+  });
+});
+
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
+const png = () => ({ body: PNG, contentType: "image/png" });
+
+async function momShape(projectId: string, documentId: string) {
+  const doc = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+  return doc.items.map((item) => ({ points: item.points.map((p) => p.text), slots: item.images.map((i) => i.slot) }));
+}
+
+describe("SF-R2 MOM", () => {
+  it("creates a legacy-shaped document and edits its header", async () => {
+    const { projectId } = await newProject();
+    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId });
+    const doc = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+    assert.equal(doc.topic, "SITE INSPECTION REPORT");
+    assert.equal(doc.meetingDate, "2026-09-15");
+    assert.equal(doc.preparedByName, "Dina Designer");
+    assert.deepEqual(await momShape(projectId, documentId), [{ points: [""], slots: [] }]);
+
+    await sf.mom.updateDocument({ ...as(designer), projectId, documentId, topic: "Weekly meeting", meetingDate: "2026-09-20", venue: " Site ", attendees: "Client\nContractor", preparedByName: "Dina" });
+    const list = await sf.mom.listDocuments({ grants: DRAFTER_GRANTS, projectId });
+    assert.deepEqual(list.map((d) => [d.topic, d.meetingDate, d.venue, d.sectionCount]), [["Weekly meeting", "2026-09-20", "Site", 1]]);
+    await rejectsWith(sf.mom.updateDocument({ ...as(designer), projectId, documentId, topic: " ", meetingDate: "2026-09-20", preparedByName: "D" }), "MOM_TOPIC_REQUIRED");
+    await rejectsWith(sf.mom.updateDocument({ ...as(designer), projectId, documentId, topic: "T", meetingDate: "20-09-2026", preparedByName: "D" }), "MOM_DATE_INVALID");
+    const audit = await testDb.prisma.auditEvent.findMany({ where: { entity_id: documentId }, orderBy: { occurred_at: "asc" } });
+    assert.deepEqual(audit.map((a) => a.action), ["studioflow.mom.created", "studioflow.mom.updated"]);
+  });
+
+  it("orders sections and points, and keeps one point per section", async () => {
+    const { projectId } = await newProject();
+    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId });
+    const first = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0];
+    await sf.mom.updatePoint({ ...as(designer), projectId, pointId: first.points[0].id, text: "A", style: "DEFAULT" });
+    const b = await sf.mom.addPoint({ ...as(designer), projectId, itemId: first.id, text: "B" });
+    await sf.mom.movePoint({ ...as(designer), projectId, pointId: b.pointId, direction: "up" });
+    const second = await sf.mom.addItem({ ...as(designer), projectId, documentId });
+    await sf.mom.moveItem({ ...as(designer), projectId, itemId: second.itemId, direction: "up" });
+    assert.deepEqual(await momShape(projectId, documentId), [{ points: [""], slots: [] }, { points: ["B", "A"], slots: [] }]);
+
+    await rejectsWith(sf.mom.reorderItems({ ...as(designer), projectId, documentId, itemIds: [second.itemId] }), "MOM_REORDER_INVALID");
+    await sf.mom.reorderItems({ ...as(designer), projectId, documentId, itemIds: [first.id, second.itemId] });
+    const onlyPoint = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[1].points[0];
+    await sf.mom.deletePoint({ ...as(designer), projectId, pointId: onlyPoint.id });
+    const after = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+    assert.equal(after.items[1].points.length, 1);
+    assert.equal(after.items[1].points[0].text, "");
+    assert.notEqual(after.items[1].points[0].id, onlyPoint.id);
+
+    await sf.mom.updateItem({ ...as(designer), projectId, itemId: first.id, isTextOnly: true, listStyle: "DASH" });
+    await rejectsWith(sf.mom.updateItem({ ...as(designer), projectId, itemId: first.id, isTextOnly: true, listStyle: "ROMAN" }), "MOM_LIST_STYLE_INVALID");
+    await sf.mom.deleteItem({ ...as(designer), projectId, itemId: second.itemId });
+    const final = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+    assert.deepEqual(final.items.map((i) => [i.isTextOnly, i.listStyle, i.points.map((p) => p.text)]), [[true, "DASH", ["B", "A"]]]);
+  });
+
+  it("stores at most two images per section and cleans storage", async () => {
+    const { projectId } = await newProject();
+    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId });
+    const itemId = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0].id;
+
+    const placed = await sf.mom.setImage({ ...as(designer), projectId, itemId, slot: 1, file: png() });
+    assert.equal(placed.slot, 0, "slot 1 on an empty section lands in slot 0");
+    await sf.mom.setImage({ ...as(designer), projectId, itemId, slot: 1, file: png() });
+    assert.equal(storage.objects.size, 2);
+    await rejectsWith(sf.mom.setImage({ ...as(designer), projectId, itemId, slot: 2, file: png() }), "MOM_IMAGE_LIMIT");
+    await rejectsWith(sf.mom.setImage({ ...as(designer), projectId, itemId, slot: 0, file: { body: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), contentType: "image/png" } }), "MOM_IMAGE_TYPE");
+    await rejectsWith(sf.mom.setImage({ ...as(designer), projectId, itemId, slot: 0, file: { body: PNG, contentType: "image/gif" } }), "MOM_IMAGE_TYPE");
+
+    let doc = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+    const [img0, img1] = doc.items[0].images;
+    assert.ok(img0.url?.startsWith("https://storage.invalid/"));
+    await sf.mom.setImage({ ...as(designer), projectId, itemId, slot: 0, file: png() });
+    assert.equal(storage.objects.size, 2, "replacing removes the previous object");
+
+    await sf.mom.swapImages({ ...as(designer), projectId, itemId });
+    doc = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+    assert.equal(doc.items[0].images[0].url, img1.url, "swap moves the second image first");
+
+    await sf.mom.deleteImage({ ...as(designer), projectId, imageId: doc.items[0].images[0].id });
+    doc = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+    assert.deepEqual(doc.items[0].images.map((i) => i.slot), [0], "remaining image shifts to slot 0");
+    assert.equal(storage.objects.size, 1);
+    await rejectsWith(sf.mom.swapImages({ ...as(designer), projectId, itemId }), "MOM_IMAGE_SWAP_UNAVAILABLE");
+
+    await sf.mom.deleteDocument({ ...as(designer), projectId, documentId });
+    assert.equal(storage.objects.size, 0);
+    assert.equal((await sf.mom.listDocuments({ grants: ALL, projectId })).length, 0);
+    const deleted = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "studioflow.mom.deleted" } });
+    assert.deepEqual((deleted.metadata as { snapshot: { sections: number; images: number } }).snapshot.images, 1);
+  });
+
+  it("enforces permission, project scope, and archive read-only", async () => {
+    const { projectId } = await newProject();
+    const other = await newProject("Other project");
+    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId });
+    const itemId = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0].id;
+
+    await assert.rejects(sf.mom.createDocument({ ...as(drafter, DRAFTER_GRANTS), projectId }), (e: unknown) => e instanceof AppError && e.kind === "FORBIDDEN");
+    assert.equal(sf.mom.canManage(DRAFTER_GRANTS), false);
+    await rejectsWith(sf.mom.getDocument({ grants: ALL, projectId: other.projectId, documentId }), "MOM_RECORD_NOT_FOUND");
+    await rejectsWith(sf.mom.addItem({ ...as(designer), projectId: other.projectId, documentId }), "MOM_RECORD_NOT_FOUND");
+    await rejectsWith(sf.mom.setImage({ ...as(designer), projectId: other.projectId, itemId, slot: 0, file: png() }), "MOM_RECORD_NOT_FOUND");
+    assert.equal(storage.objects.size, 0, "no object is written for an out-of-scope item");
+
+    await sf.projects.archiveProject({ ...as(designer), projectId, reason: "Done" });
+    await rejectsWith(sf.mom.addItem({ ...as(designer), projectId, documentId }), "PROJECT_ARCHIVED");
+    await rejectsWith(sf.mom.setImage({ ...as(designer), projectId, itemId, slot: 0, file: png() }), "PROJECT_ARCHIVED");
+    assert.equal(storage.objects.size, 0, "a rejected upload leaves no orphan object");
+    assert.equal((await sf.mom.listDocuments({ grants: DRAFTER_GRANTS, projectId })).length, 1);
   });
 });
