@@ -1,9 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import type { PhaseKey } from "@/apps/studioflow/domain/phase";
-import { Badge, Button, Field, InlineError, Input, RowActionMenu, SectionCard, Select, Switch, Text } from "@/platform/ui_engine";
+import {
+  Badge,
+  Button,
+  DataTable,
+  Dialog,
+  Field,
+  InlineError,
+  Input,
+  RowActionMenu,
+  SectionCard,
+  Select,
+  Switch,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Text,
+  Textarea,
+} from "@/platform/ui_engine";
 
 import {
   createScheduleTemplateItemAction,
@@ -15,6 +34,7 @@ import {
   reorderTemplatesAction,
   setAutoNamingAction,
   setScheduleTemplateItemActiveAction,
+  updateScheduleTemplateItemAction,
   updateTemplateAction,
   upsertSchedulePrefixAction,
   upsertScheduleTemplateCategoryAction,
@@ -22,7 +42,29 @@ import {
 import { useCommand } from "../_components/use-command";
 
 type Template = { id: string; phaseKey: PhaseKey | null; label: string; isActive: boolean; sortOrder: number; usedBy: number };
-type ScheduleTemplate = { id: string; section: "MATERIAL" | "FIXTURE"; category: string; is_default_entry: boolean; is_active: boolean; items: Array<{ id: string; product_name: string; brand_name: string | null; sku_text: string | null; is_active: boolean; qty: { toString(): string } | null; unit: string | null; location: string | null }> };
+type ScheduleTemplate = {
+  id: string;
+  section: "MATERIAL" | "FIXTURE";
+  category: string;
+  is_default_entry: boolean;
+  is_active: boolean;
+  items: Array<{
+    id: string;
+    product_name: string;
+    brand_id: string | null;
+    brand_name: string | null;
+    sku_text: string | null;
+    color: string | null;
+    finishing: string | null;
+    dimension: string | null;
+    notes: string | null;
+    is_active: boolean;
+    sort_order: number;
+    qty: { toString(): string } | null;
+    unit: string | null;
+    location: string | null;
+  }>;
+};
 type SchedulePrefix = { id: string; section: "MATERIAL" | "FIXTURE"; category: string; prefix: string };
 type BrandChoice = { id: string; name: string };
 
@@ -76,6 +118,29 @@ export function StudioSettingsView({
   );
 }
 
+type Section = "MATERIAL" | "FIXTURE";
+type TemplateItemRow = ScheduleTemplate["items"][number] & { section: Section; category: string };
+
+const SECTION_LABEL: Record<Section, string> = { MATERIAL: "Material", FIXTURE: "Fixture" };
+
+function SectionSelect({ value, onChange, disabled }: { value: Section; onChange: (value: Section) => void; disabled?: boolean }) {
+  return (
+    <Select density="compact" aria-label="Section" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value as Section)}>
+      <option value="MATERIAL">Material</option>
+      <option value="FIXTURE">Fixture</option>
+    </Select>
+  );
+}
+
+function TableTitle({ title, count, children }: { title: string; count: number; children?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 px-(--ui-section-px) pb-2 pt-4">
+      <Text weight="semibold">{title} <span className="font-ui-mono text-xs font-normal text-ink-tertiary">{count}</span></Text>
+      {children}
+    </div>
+  );
+}
+
 function ScheduleSettings({
   scheduleTemplates,
   schedulePrefixes,
@@ -91,105 +156,244 @@ function ScheduleSettings({
   run: ReturnType<typeof useCommand>["run"];
   pendingKey: string | null;
 }) {
-  const [prefix, setPrefix] = useState({ section: "MATERIAL" as "MATERIAL" | "FIXTURE", category: "", prefix: "" });
-  const [category, setCategory] = useState({ section: "MATERIAL" as "MATERIAL" | "FIXTURE", category: "", isDefaultEntry: true });
-  const [item, setItem] = useState({ section: "MATERIAL" as "MATERIAL" | "FIXTURE", category: "", brandId: "", productName: "", skuText: "", unit: "", qty: "", location: "" });
+  const [prefix, setPrefix] = useState({ section: "MATERIAL" as Section, category: "", prefix: "" });
+  const [category, setCategory] = useState({ section: "MATERIAL" as Section, category: "", isDefaultEntry: true });
+  const [itemDialog, setItemDialog] = useState<TemplateItemRow | "new" | null>(null);
+
+  const items: TemplateItemRow[] = scheduleTemplates.flatMap((template) => template.items.map((item) => ({ ...item, section: template.section, category: template.category })));
+  const categoryNames = [...new Set([...scheduleTemplates.map((t) => t.category), ...schedulePrefixes.map((p) => p.category)])].sort((a, b) => a.localeCompare(b));
+  const orderOf = (template: ScheduleTemplate) => scheduleTemplates.filter((t) => t.section === template.section).indexOf(template) + 1;
 
   return (
-    <SectionCard title="Product Schedule" description="Prefix dictionary and default schedule rows for new or existing projects." count={scheduleTemplates.length} padded>
-      <div className="grid gap-4">
-        <div className="grid grid-cols-3 gap-2 max-[760px]:grid-cols-1">
-          <Field label="Section"><Select density="compact" value={prefix.section} onChange={(e) => setPrefix({ ...prefix, section: e.target.value as "MATERIAL" | "FIXTURE" })}><option value="MATERIAL">Material</option><option value="FIXTURE">Fixture</option></Select></Field>
-          <Field label="Category"><Input density="compact" value={prefix.category} onChange={(e) => setPrefix({ ...prefix, category: e.target.value })} /></Field>
-          <Field label="Prefix"><Input density="compact" value={prefix.prefix} onChange={(e) => setPrefix({ ...prefix, prefix: e.target.value })} /></Field>
-        </div>
-        {canManage ? <Button size="sm" className="justify-self-start" pending={pendingKey === "schedule-prefix"} disabled={!prefix.category.trim() || !prefix.prefix.trim()} onClick={() => run("schedule-prefix", () => upsertSchedulePrefixAction(prefix))}>Save prefix</Button> : null}
-        <div className="flex flex-wrap gap-1">
-          {schedulePrefixes.map((row) => (
-            <span key={row.id} className="inline-flex items-center gap-1">
-              <Badge>{row.section === "MATERIAL" ? "Material" : "Fixture"} · {row.category}: {row.prefix}</Badge>
+    <SectionCard id="product-schedule" title="Product Schedule" description="Prefix dictionary, default categories, and template items for new or existing projects." padded={false}>
+      <datalist id="schedule-settings-categories">{categoryNames.map((name) => <option key={name} value={name} />)}</datalist>
+
+      <TableTitle title="Prefix dictionary" count={schedulePrefixes.length} />
+      <DataTable density="compact" minWidth={520}>
+        <TableHeader><TableRow><TableHead>Section</TableHead><TableHead>Category</TableHead><TableHead>Prefix</TableHead>{canManage ? <TableHead stickyEnd align="end">Actions</TableHead> : null}</TableRow></TableHeader>
+        <TableBody>
+          {schedulePrefixes.length === 0 ? (
+            <TableRow><TableCell colSpan={canManage ? 4 : 3}><Text size="sm" tone="tertiary">No prefixes yet. Codes fall back to the first letters of the category.</Text></TableCell></TableRow>
+          ) : schedulePrefixes.map((row) => (
+            <TableRow key={row.id}>
+              <TableCell>{SECTION_LABEL[row.section]}</TableCell>
+              <TableCell>{row.category}</TableCell>
+              <TableCell><span className="font-ui-mono font-semibold">{row.prefix}</span></TableCell>
               {canManage ? (
-                <button type="button" className="text-xs text-ink-tertiary hover:text-danger" aria-label={`Remove prefix ${row.prefix} for ${row.category}`} disabled={pendingKey === row.id} onClick={() => run(row.id, () => deleteSchedulePrefixAction(row.id))}>×</button>
+                <TableCell stickyEnd align="end">
+                  <RowActionMenu label={`Actions for prefix ${row.prefix}`} pending={pendingKey === row.id} items={[
+                    { label: "Edit", onSelect: () => setPrefix({ section: row.section, category: row.category, prefix: row.prefix }) },
+                    { label: "Delete", danger: true, separatorBefore: true, onSelect: () => run(row.id, () => deleteSchedulePrefixAction(row.id)) },
+                  ]} />
+                </TableCell>
               ) : null}
-            </span>
+            </TableRow>
           ))}
-        </div>
-
-        <div className="border-t border-line-subtle pt-4">
-          <Text className="mb-2 font-medium">Default categories</Text>
-          <div className="grid grid-cols-3 gap-2 max-[760px]:grid-cols-1">
-            <Field label="Section"><Select density="compact" value={category.section} onChange={(e) => setCategory({ ...category, section: e.target.value as "MATERIAL" | "FIXTURE" })}><option value="MATERIAL">Material</option><option value="FIXTURE">Fixture</option></Select></Field>
-            <Field label="Category"><Input density="compact" value={category.category} onChange={(e) => setCategory({ ...category, category: e.target.value })} /></Field>
-            <Field label="Create empty entry"><Select density="compact" value={category.isDefaultEntry ? "yes" : "no"} onChange={(e) => setCategory({ ...category, isDefaultEntry: e.target.value === "yes" })}><option value="yes">Yes</option><option value="no">No</option></Select></Field>
-          </div>
-          {canManage ? <Button size="sm" className="mt-2" pending={pendingKey === "schedule-category"} disabled={!category.category.trim()} onClick={() => run("schedule-category", () => upsertScheduleTemplateCategoryAction(category))}>Save category</Button> : null}
-        </div>
-
-        <div className="border-t border-line-subtle pt-4">
-          <Text className="mb-2 font-medium">Template items</Text>
-          <div className="grid grid-cols-3 gap-2 max-[900px]:grid-cols-1">
-            <Field label="Section"><Select density="compact" value={item.section} onChange={(e) => setItem({ ...item, section: e.target.value as "MATERIAL" | "FIXTURE" })}><option value="MATERIAL">Material</option><option value="FIXTURE">Fixture</option></Select></Field>
-            <Field label="Category"><Input density="compact" value={item.category} onChange={(e) => setItem({ ...item, category: e.target.value })} /></Field>
-            <Field label="Brand"><Select density="compact" value={item.brandId} onChange={(e) => setItem({ ...item, brandId: e.target.value })}><option value="">Manual</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</Select></Field>
-            <Field label="Product"><Input density="compact" value={item.productName} onChange={(e) => setItem({ ...item, productName: e.target.value })} /></Field>
-            <Field label="SKU"><Input density="compact" value={item.skuText} onChange={(e) => setItem({ ...item, skuText: e.target.value })} /></Field>
-            <Field label="Qty"><Input density="compact" inputMode="decimal" value={item.qty} onChange={(e) => setItem({ ...item, qty: e.target.value })} /></Field>
-            <Field label="Unit"><Input density="compact" value={item.unit} onChange={(e) => setItem({ ...item, unit: e.target.value })} /></Field>
-            <Field label="Location"><Input density="compact" value={item.location} onChange={(e) => setItem({ ...item, location: e.target.value })} /></Field>
-          </div>
           {canManage ? (
-            <Button
-              size="sm"
-              className="mt-2"
-              pending={pendingKey === "schedule-item"}
-              disabled={!item.category.trim() || !item.productName.trim()}
-              onClick={() => run("schedule-item", () => createScheduleTemplateItemAction({ section: item.section, category: item.category, snapshot: { brandId: item.brandId || null, productName: item.productName, skuText: item.skuText || null }, qty: item.qty || null, unit: item.unit || null, location: item.location || null }))}
-            >
-              Add template item
-            </Button>
+            <TableRow>
+              <TableCell><SectionSelect value={prefix.section} onChange={(section) => setPrefix({ ...prefix, section })} /></TableCell>
+              <TableCell><Input density="compact" aria-label="Prefix category" list="schedule-settings-categories" placeholder="Category" value={prefix.category} maxLength={80} onChange={(e) => setPrefix({ ...prefix, category: e.target.value })} /></TableCell>
+              <TableCell><Input density="compact" aria-label="Prefix" placeholder="PT" className="font-ui-mono uppercase" value={prefix.prefix} maxLength={8} onChange={(e) => setPrefix({ ...prefix, prefix: e.target.value })} /></TableCell>
+              <TableCell stickyEnd align="end">
+                <Button
+                  size="sm"
+                  pending={pendingKey === "schedule-prefix"}
+                  disabled={!prefix.category.trim() || !prefix.prefix.trim()}
+                  onClick={async () => { if (await run("schedule-prefix", () => upsertSchedulePrefixAction(prefix))) setPrefix({ ...prefix, category: "", prefix: "" }); }}
+                >
+                  Save
+                </Button>
+              </TableCell>
+            </TableRow>
           ) : null}
-        </div>
+        </TableBody>
+      </DataTable>
 
-        <div className="grid gap-2">
-          {scheduleTemplates.map((template) => (
-            <div key={template.id} className="rounded-card border border-line-subtle p-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge>{template.section === "MATERIAL" ? "Material" : "Fixture"}</Badge>
-                <Text className="font-medium">{template.category}</Text>
-                {template.is_default_entry ? <Text size="sm" tone="tertiary">reserves an empty row on new projects</Text> : null}
-                {canManage ? (
-                  <span className="ml-auto">
-                    <RowActionMenu pending={pendingKey === template.id} items={[
-                      { label: template.is_default_entry ? "Stop reserving an empty row" : "Reserve an empty row", onSelect: () => run(template.id, () => upsertScheduleTemplateCategoryAction({ section: template.section, category: template.category, isDefaultEntry: !template.is_default_entry, isActive: template.is_active })) },
-                      { label: "Delete category", danger: true, separatorBefore: true, onSelect: () => run(template.id, () => deleteScheduleTemplateCategoryAction(template.id)) },
-                    ]} />
-                  </span>
-                ) : null}
-              </div>
-              {template.items.length ? (
-                <ul className="m-0 mt-1 grid list-none gap-px p-0">
-                  {template.items.map((row) => (
-                    <li key={row.id} className="flex items-center gap-2 rounded-control px-1.5 py-1 hover:bg-surface-muted">
-                      <span className={`min-w-0 flex-1 truncate text-sm ${row.is_active ? "" : "text-ink-tertiary line-through"}`}>
-                        {row.product_name}{row.brand_name ? ` · ex. ${row.brand_name}` : ""}{row.sku_text ? ` · ${row.sku_text}` : ""}
-                        {row.qty ? <span className="text-ink-tertiary"> — {row.qty.toString()} {row.unit ?? ""}</span> : null}
-                      </span>
-                      {!row.is_active ? <Badge>Inactive</Badge> : null}
-                      {canManage ? (
-                        <RowActionMenu pending={pendingKey === row.id} items={[
-                          { label: row.is_active ? "Deactivate" : "Activate", onSelect: () => run(row.id, () => setScheduleTemplateItemActiveAction({ templateItemId: row.id, isActive: !row.is_active })) },
-                          { label: "Delete", danger: true, separatorBefore: true, onSelect: () => run(row.id, () => deleteScheduleTemplateItemAction(row.id)) },
-                        ]} />
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
+      <TableTitle title="Default categories" count={scheduleTemplates.length} />
+      <DataTable density="compact" minWidth={560}>
+        <TableHeader><TableRow><TableHead>Section</TableHead><TableHead>Category</TableHead><TableHead>Create empty entry</TableHead><TableHead align="end">Order</TableHead>{canManage ? <TableHead stickyEnd align="end">Actions</TableHead> : null}</TableRow></TableHeader>
+        <TableBody>
+          {scheduleTemplates.length === 0 ? (
+            <TableRow><TableCell colSpan={canManage ? 5 : 4}><Text size="sm" tone="tertiary">No default categories yet.</Text></TableCell></TableRow>
+          ) : scheduleTemplates.map((template) => (
+            <TableRow key={template.id}>
+              <TableCell>{SECTION_LABEL[template.section]}</TableCell>
+              <TableCell><span className={template.is_active ? "" : "text-ink-tertiary line-through"}>{template.category}</span></TableCell>
+              <TableCell>{template.is_default_entry ? <Badge tone="success">Yes</Badge> : <Text size="sm" tone="tertiary">No</Text>}</TableCell>
+              <TableCell align="end"><span className="font-ui-mono tabular-nums">{orderOf(template)}</span></TableCell>
+              {canManage ? (
+                <TableCell stickyEnd align="end">
+                  <RowActionMenu label={`Actions for category ${template.category}`} pending={pendingKey === template.id} items={[
+                    { label: template.is_default_entry ? "Stop creating an empty entry" : "Create an empty entry", onSelect: () => run(template.id, () => upsertScheduleTemplateCategoryAction({ section: template.section, category: template.category, isDefaultEntry: !template.is_default_entry, isActive: template.is_active })) },
+                    { label: "Delete category", danger: true, separatorBefore: true, onSelect: () => run(template.id, () => deleteScheduleTemplateCategoryAction(template.id)) },
+                  ]} />
+                </TableCell>
               ) : null}
-            </div>
+            </TableRow>
           ))}
-        </div>
-      </div>
+          {canManage ? (
+            <TableRow>
+              <TableCell><SectionSelect value={category.section} onChange={(section) => setCategory({ ...category, section })} /></TableCell>
+              <TableCell><Input density="compact" aria-label="Default category" list="schedule-settings-categories" placeholder="Category" value={category.category} maxLength={80} onChange={(e) => setCategory({ ...category, category: e.target.value })} /></TableCell>
+              <TableCell>
+                <Select density="compact" aria-label="Create empty entry" value={category.isDefaultEntry ? "yes" : "no"} onChange={(e) => setCategory({ ...category, isDefaultEntry: e.target.value === "yes" })}>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </Select>
+              </TableCell>
+              <TableCell />
+              <TableCell stickyEnd align="end">
+                <Button
+                  size="sm"
+                  pending={pendingKey === "schedule-category"}
+                  disabled={!category.category.trim()}
+                  onClick={async () => { if (await run("schedule-category", () => upsertScheduleTemplateCategoryAction(category))) setCategory({ ...category, category: "" }); }}
+                >
+                  Add
+                </Button>
+              </TableCell>
+            </TableRow>
+          ) : null}
+        </TableBody>
+      </DataTable>
+
+      <TableTitle title="Template items" count={items.length}>
+        {canManage ? <Button size="sm" variant="secondary" onClick={() => setItemDialog("new")}>Add template item</Button> : null}
+      </TableTitle>
+      <DataTable density="compact" minWidth={980}>
+        <TableHeader><TableRow><TableHead>Section</TableHead><TableHead>Category</TableHead><TableHead>Brand</TableHead><TableHead>Product</TableHead><TableHead>SKU</TableHead><TableHead align="end">Qty</TableHead><TableHead>Unit</TableHead><TableHead>Location</TableHead><TableHead>Status</TableHead><TableHead align="end">Order</TableHead>{canManage ? <TableHead stickyEnd align="end">Actions</TableHead> : null}</TableRow></TableHeader>
+        <TableBody>
+          {items.length === 0 ? (
+            <TableRow><TableCell colSpan={canManage ? 11 : 10}><Text size="sm" tone="tertiary">No template items yet. Add one here or use “Save as template item” on a project schedule row.</Text></TableCell></TableRow>
+          ) : items.map((row) => (
+            <TableRow key={row.id}>
+              <TableCell>{SECTION_LABEL[row.section]}</TableCell>
+              <TableCell>{row.category}</TableCell>
+              <TableCell>{row.brand_name ?? <Text size="sm" tone="tertiary">—</Text>}</TableCell>
+              <TableCell><span className={`font-medium ${row.is_active ? "" : "text-ink-tertiary line-through"}`}>{row.product_name}</span></TableCell>
+              <TableCell>{row.sku_text ?? ""}</TableCell>
+              <TableCell align="end"><span className="tabular-nums">{row.qty?.toString() ?? ""}</span></TableCell>
+              <TableCell>{row.unit ?? ""}</TableCell>
+              <TableCell>{row.location ?? ""}</TableCell>
+              <TableCell>{row.is_active ? <Badge tone="success">Active</Badge> : <Badge>Inactive</Badge>}</TableCell>
+              <TableCell align="end"><span className="font-ui-mono tabular-nums">{row.sort_order}</span></TableCell>
+              {canManage ? (
+                <TableCell stickyEnd align="end">
+                  <RowActionMenu label={`Actions for template item ${row.product_name}`} pending={pendingKey === row.id} items={[
+                    { label: "Edit", onSelect: () => setItemDialog(row) },
+                    { label: row.is_active ? "Deactivate" : "Activate", onSelect: () => run(row.id, () => setScheduleTemplateItemActiveAction({ templateItemId: row.id, isActive: !row.is_active })) },
+                    { label: "Delete", danger: true, separatorBefore: true, onSelect: () => run(row.id, () => deleteScheduleTemplateItemAction(row.id)) },
+                  ]} />
+                </TableCell>
+              ) : null}
+            </TableRow>
+          ))}
+        </TableBody>
+      </DataTable>
+      <div className="h-2" />
+
+      {itemDialog ? (
+        <TemplateItemDialog
+          item={itemDialog === "new" ? null : itemDialog}
+          brands={brands}
+          run={run}
+          pendingKey={pendingKey}
+          onClose={() => setItemDialog(null)}
+        />
+      ) : null}
     </SectionCard>
+  );
+}
+
+function TemplateItemDialog({
+  item,
+  brands,
+  run,
+  pendingKey,
+  onClose,
+}: {
+  item: TemplateItemRow | null;
+  brands: BrandChoice[];
+  run: ReturnType<typeof useCommand>["run"];
+  pendingKey: string | null;
+  onClose: () => void;
+}) {
+  const text = (value: string | null | undefined) => value ?? "";
+  const [draft, setDraft] = useState({
+    section: (item?.section ?? "MATERIAL") as Section,
+    category: text(item?.category),
+    brandId: text(item?.brand_id),
+    brandName: item?.brand_id ? "" : text(item?.brand_name),
+    productName: text(item?.product_name),
+    skuText: text(item?.sku_text),
+    color: text(item?.color),
+    finishing: text(item?.finishing),
+    dimension: text(item?.dimension),
+    notes: text(item?.notes),
+    qty: item?.qty?.toString() ?? "",
+    unit: text(item?.unit),
+    location: text(item?.location),
+  });
+  const set = (key: keyof typeof draft) => (event: { target: { value: string } }) => setDraft({ ...draft, [key]: event.target.value });
+  const key = item ? `template-item-${item.id}` : "schedule-item";
+  const pending = pendingKey === key;
+  const brandOptions = item?.brand_id && !brands.some((b) => b.id === item.brand_id) ? [{ id: item.brand_id, name: item.brand_name ?? "Brand" }, ...brands] : brands;
+  const nullable = (value: string) => value.trim() || null;
+
+  const save = async () => {
+    const snapshot = {
+      brandId: draft.brandId || null,
+      brandName: draft.brandId ? null : nullable(draft.brandName),
+      productName: draft.productName.trim(),
+      skuText: nullable(draft.skuText),
+      color: nullable(draft.color),
+      finishing: nullable(draft.finishing),
+      dimension: nullable(draft.dimension),
+      notes: nullable(draft.notes),
+    };
+    const quantities = { qty: nullable(draft.qty), unit: nullable(draft.unit), location: nullable(draft.location) };
+    const ok = await run(key, () => item
+      ? updateScheduleTemplateItemAction({ templateItemId: item.id, snapshot, ...quantities })
+      : createScheduleTemplateItemAction({ section: draft.section, category: draft.category.trim(), snapshot, ...quantities }));
+    if (ok) onClose();
+  };
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(value) => { if (!value) onClose(); }}
+      title={item ? `Edit template item` : "Add template item"}
+      description={item ? "Projects that already received this item keep their own copy." : "New projects receive this row; “Apply templates” adds it to existing ones."}
+      size="lg"
+      dismissible={!pending}
+      footer={
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="ghost" onClick={onClose} disabled={pending}>Cancel</Button>
+          <Button variant="primary" pending={pending} disabled={!draft.productName.trim() || !draft.category.trim()} onClick={save}>{item ? "Save item" : "Add item"}</Button>
+        </div>
+      }
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Section"><SectionSelect value={draft.section} disabled={!!item} onChange={(section) => setDraft({ ...draft, section })} /></Field>
+        <Field label="Category" required><Input list="schedule-settings-categories" value={draft.category} disabled={!!item} maxLength={80} onChange={set("category")} /></Field>
+        <Field label="Product" required className="sm:col-span-2"><Input value={draft.productName} maxLength={200} onChange={set("productName")} /></Field>
+        <Field label="Brand">
+          <Select value={draft.brandId} onChange={(e) => setDraft({ ...draft, brandId: e.target.value, brandName: e.target.value ? "" : draft.brandName })}>
+            <option value="">Other (type the name)</option>
+            {brandOptions.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
+          </Select>
+        </Field>
+        <Field label="Brand name"><Input value={draft.brandId ? brandOptions.find((b) => b.id === draft.brandId)?.name ?? "" : draft.brandName} disabled={!!draft.brandId} maxLength={160} onChange={set("brandName")} /></Field>
+        <Field label="SKU / code"><Input value={draft.skuText} maxLength={160} onChange={set("skuText")} /></Field>
+        <Field label="Color"><Input value={draft.color} maxLength={160} onChange={set("color")} /></Field>
+        <Field label="Finishing"><Input value={draft.finishing} maxLength={160} onChange={set("finishing")} /></Field>
+        <Field label="Dimension"><Input value={draft.dimension} maxLength={160} onChange={set("dimension")} /></Field>
+        <Field label="Qty"><Input inputMode="decimal" value={draft.qty} maxLength={20} onChange={set("qty")} /></Field>
+        <Field label="Unit"><Input value={draft.unit} maxLength={40} onChange={set("unit")} /></Field>
+        <Field label="Location" className="sm:col-span-2"><Input value={draft.location} maxLength={160} onChange={set("location")} /></Field>
+        <Field label="Notes" className="sm:col-span-2"><Textarea rows={2} value={draft.notes} maxLength={2000} onChange={set("notes")} /></Field>
+      </div>
+    </Dialog>
   );
 }
 

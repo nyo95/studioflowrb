@@ -5,8 +5,54 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.80**
-- Next local revision: **R8.81**
+- Current revision after this entry is committed: **R8.81**
+- Next local revision: **R8.82**
+
+## R8.81 | 2026-09-16 | fix(studioflow): restore schedule option photos and template settings
+
+Owner review of legacy (`D:\Projects\studioflow` @ `102ff85`, read-only)
+against R8.80. Technical items first; the workspace skeleton and Master Data
+home are deferred to a design pass (see `PLAN.md`).
+
+### Fixed
+
+- Product Schedule regression: options can carry a photo again (legacy
+  CatalogBoard). New `setOptionImage` / `removeOptionImage` commands store
+  objects under private keys with the MOM upload rules (PNG/JPEG/WebP,
+  magic-byte check, ≤3 MB) and a 4:5 crop; the schedule list shows the final
+  option thumbnail and the item panel shows each option's photo.
+- Storage keys are no longer accepted from the client on option/entry/template
+  writes; option edits keep the stored photo.
+- Stored objects are released after commit only when no option or template
+  item still references them (reuse, template seeding, and save-as-template
+  share keys); deleting options, entries, and template items now releases
+  their photos.
+- KB-032: Product Schedule settings render the prefix dictionary, default
+  categories, and template items as tables with inline add rows and row
+  actions.
+
+### Added
+
+- `updateTemplateItem` command and edit dialog for schedule template items.
+- `saveEntryAsTemplate` command and "Save as template item" row action
+  (legacy `createScheduleTemplateItemFromEntryAction`).
+- "Template settings" link on the project schedule for `settings.manage`.
+- Shared `apps/studioflow/domain/images.ts` (image types and magic-byte check)
+  used by MOM and Schedule.
+- Contract §11.5 and new §11.7; KB-032 moved to awaiting browser acceptance.
+
+### Verification
+
+- `tsc --noEmit`: passed.
+- `eslint` on StudioFlow app and routes: passed.
+- `check-boundaries`, `check-legacy-runtime`: passed.
+- Non-database suites (StudioFlow domain, MOM contract, requirements UI, UI
+  Engine): 71 passed, 0 failed.
+- **Not run:** `npm test` integration suites (two new Product Schedule
+  integration tests included) and `npm run build` — the rebuild test database
+  on port 5433 is not reachable from the agent VM. Browser acceptance pending
+  (`review.md`).
+- No migration, no dependency change.
 
 ## R8.80 | 2026-09-16 | refactor(bq): decompose service and reconcile delivered status
 

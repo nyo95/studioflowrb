@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowDown, ArrowUp, FileUp, History, Plus, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, FileUp, History, ImageIcon, Plus, Search, Settings2 } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 
 import {
@@ -11,6 +12,7 @@ import {
   EmptyState,
   Field,
   FilterChip,
+  ImageWorkspace,
   InlineError,
   Input,
   RowActionMenu,
@@ -31,7 +33,10 @@ import {
   markScheduleFinalAction,
   moveScheduleEntryAction,
   moveScheduleEntryToCategoryAction,
+  removeScheduleOptionImageAction,
+  saveScheduleEntryAsTemplateAction,
   searchReusableScheduleOptionsAction,
+  setScheduleOptionImageAction,
   updateScheduleEntryAction,
   updateScheduleOptionAction,
 } from "../../../actions";
@@ -53,6 +58,8 @@ export type ScheduleOptionView = {
   finishing: string | null;
   dimension: string | null;
   notes: string | null;
+  /** Short-lived signed URL of the option photo. */
+  imageUrl: string | null;
 };
 
 export type ScheduleEntryView = {
@@ -96,16 +103,43 @@ function finalOf(entry: ScheduleEntryView) {
   return entry.options.find((option) => option.isFinal) ?? null;
 }
 
+/** The option a template would be made from: the final one, or the only one. */
+function templateSourceOf(entry: ScheduleEntryView) {
+  return finalOf(entry) ?? (entry.options.length === 1 ? entry.options[0] : null);
+}
+
+/** Legacy catalog photos are portrait 4:5. */
+const PHOTO_ASPECT = 4 / 5;
+
+function Thumb({ url, alt, className = "h-10 w-8" }: { url: string | null; alt: string; className?: string }) {
+  return (
+    <span className={`grid shrink-0 place-items-center overflow-hidden rounded-[4px] border border-line-subtle bg-surface-muted ${className}`}>
+      {url ? (
+        // Signed private URLs are short-lived; next/image optimization would cache them.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt={alt} className="h-full w-full object-cover" draggable={false} />
+      ) : (
+        <ImageIcon aria-hidden="true" className="h-3.5 w-3.5 text-ink-tertiary" />
+      )}
+    </span>
+  );
+}
+
 export function ScheduleBoard({
   projectId,
   entries,
   brands,
   canEdit,
+  canManageTemplates,
+  settingsHref,
 }: {
   projectId: string;
   entries: readonly ScheduleEntryView[];
   brands: readonly Brand[];
   canEdit: boolean;
+  /** Studio settings permission: template settings link and "Save as template". */
+  canManageTemplates: boolean;
+  settingsHref: string;
 }) {
   const command = useCommand();
   const { run, isPending, error } = command;
@@ -152,8 +186,18 @@ export function ScheduleBoard({
             </FilterChip>
           ))}
         </div>
-        {canEdit ? (
+        {canEdit || canManageTemplates ? (
           <div className="flex flex-wrap gap-2">
+            {canManageTemplates ? (
+              <Link
+                prefetch={false}
+                href={`${settingsHref}#product-schedule`}
+                className="inline-flex min-h-(--ui-control-height-sm) items-center gap-1.5 rounded-control px-2.5 text-xs font-medium text-ink-secondary hover:bg-surface-muted hover:text-ink"
+              >
+                <Settings2 aria-hidden="true" className="h-3.5 w-3.5" /> Template settings
+              </Link>
+            ) : null}
+            {canEdit ? <>
             <Button size="sm" variant="ghost" pending={isPending("templates")} onClick={() => run("templates", () => applyScheduleTemplatesAction({ projectId }))}>
               Apply templates
             </Button>
@@ -163,6 +207,7 @@ export function ScheduleBoard({
             <Button size="sm" variant="primary" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => setDialog("add")}>
               Add item
             </Button>
+            </> : null}
           </div>
         ) : null}
       </div>
@@ -190,6 +235,7 @@ export function ScheduleBoard({
                   return (
                     <li key={entry.id} className="flex items-center gap-3 px-(--ui-section-px) py-2 hover:bg-surface-muted">
                       <button type="button" onClick={() => setOpenId(entry.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                        <Thumb url={final?.imageUrl ?? null} alt={final ? final.productName : `${entry.code} has no photo`} />
                         <span className="w-14 shrink-0 font-ui-mono text-sm font-semibold tabular-nums text-ink">{entry.code}</span>
                         <span className="grid min-w-0 flex-1 gap-0.5">
                           {final ? (
@@ -208,16 +254,21 @@ export function ScheduleBoard({
                         <span className="hidden w-20 shrink-0 text-right text-sm tabular-nums text-ink-secondary sm:block">{entry.qty ? `${entry.qty} ${entry.unit ?? ""}` : ""}</span>
                         {entry.options.length > 1 ? <Badge>{entry.options.length} options</Badge> : null}
                       </button>
-                      {canEdit ? (
+                      {canEdit || canManageTemplates ? (
                         <RowActionMenu
                           label={`Actions for ${entry.code}`}
                           pending={busy}
                           items={[
                             { label: "Open", onSelect: () => setOpenId(entry.id) },
+                            ...(canManageTemplates && templateSourceOf(entry)
+                              ? [{ label: "Save as template item", onSelect: () => void run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })) }]
+                              : []),
+                            ...(canEdit ? [
                             { label: "Move up", icon: <ArrowUp className="h-3.5 w-3.5" />, disabled: index === 0, separatorBefore: true, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "up" })) },
                             { label: "Move down", icon: <ArrowDown className="h-3.5 w-3.5" />, disabled: index === group.rows.length - 1, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "down" })) },
                             { label: "Move to category…", onSelect: () => setDialog({ move: entry }) },
                             { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeEntry(entry) },
+                            ] : []),
                           ]}
                         />
                       ) : null}
@@ -416,6 +467,8 @@ function EntryDrawer({
   const [fields, setFields] = useState(initial);
   const [editing, setEditing] = useState<ScheduleOptionView | "new" | null>(null);
   const [reuse, setReuse] = useState(false);
+  const [photoFor, setPhotoFor] = useState<ScheduleOptionView | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const dirty = fields.qty !== initial.qty || fields.unit !== initial.unit || fields.location !== initial.location;
 
   const saveFields = () => run(`${entry.id}-fields`, () => updateScheduleEntryAction({
@@ -425,6 +478,31 @@ function EntryDrawer({
     unit: fields.unit.trim() || null,
     location: fields.location.trim() || null,
   }));
+
+  const onPhotoPrepared = async (file: File) => {
+    if (!photoFor) return;
+    setPhotoError(null);
+    const form = new FormData();
+    form.set("projectId", projectId);
+    form.set("optionId", photoFor.id);
+    form.set("file", file);
+    const ok = await run(`${entry.id}-photo`, async () => {
+      const result = await setScheduleOptionImageAction(form);
+      if (!result.ok) setPhotoError(result.error.safeMessage);
+      return result;
+    });
+    if (ok) setPhotoFor(null);
+  };
+
+  const removePhoto = async (option: ScheduleOptionView) => {
+    const ok = await confirm({
+      title: `Remove the photo of option ${option.label}?`,
+      description: "The option keeps its product details.",
+      confirmLabel: "Remove photo",
+      tone: "danger",
+    });
+    if (ok) await run(`${entry.id}-opt-${option.id}`, () => removeScheduleOptionImageAction({ projectId, optionId: option.id }));
+  };
 
   const removeOption = async (option: ScheduleOptionView) => {
     const ok = await confirm({
@@ -470,6 +548,19 @@ function EntryDrawer({
                   <li key={option.id} className={`rounded-control border px-3 py-2 ${option.isFinal ? "border-success-line bg-success-surface/40" : "border-line"}`}>
                     <div className="flex items-start gap-2">
                       <span className="mt-0.5 font-ui-mono text-sm font-semibold">{option.label}</span>
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          onClick={() => { setPhotoError(null); setPhotoFor(option); }}
+                          aria-label={option.imageUrl ? `Change photo of option ${option.label}` : `Add photo to option ${option.label}`}
+                          title={option.imageUrl ? "Change photo" : "Add photo"}
+                          className="rounded-[4px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus"
+                        >
+                          <Thumb url={option.imageUrl} alt={option.productName} className="h-20 w-16" />
+                        </button>
+                      ) : (
+                        <Thumb url={option.imageUrl} alt={option.productName} className="h-20 w-16" />
+                      )}
                       <div className="grid min-w-0 flex-1 gap-0.5">
                         <span className="text-sm font-medium">{option.productName}{option.brandName ? <span className="font-normal text-ink-secondary"> · ex. {option.brandName}</span> : null}</span>
                         {specLine(option) ? <span className="text-xs text-ink-tertiary">{specLine(option)}</span> : null}
@@ -483,6 +574,8 @@ function EntryDrawer({
                           items={[
                             ...(option.isFinal ? [] : [{ label: "Set as final", onSelect: () => void run(`${entry.id}-opt-${option.id}`, () => markScheduleFinalAction({ projectId, optionId: option.id })) }]),
                             { label: "Edit", onSelect: () => setEditing(option) },
+                            { label: option.imageUrl ? "Change photo" : "Add photo", onSelect: () => { setPhotoError(null); setPhotoFor(option); } },
+                            ...(option.imageUrl ? [{ label: "Remove photo", onSelect: () => void removePhoto(option) }] : []),
                             { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeOption(option) },
                           ]}
                         />
@@ -494,7 +587,7 @@ function EntryDrawer({
             </ul>
           )}
         </div>
-        {command.error && !editing && !reuse ? <InlineError>{command.error}</InlineError> : null}
+        {command.error && !editing && !reuse && !photoFor ? <InlineError>{command.error}</InlineError> : null}
       </div>
 
       {editing ? (
@@ -508,6 +601,21 @@ function EntryDrawer({
         />
       ) : null}
       {reuse ? <ReuseDialog projectId={projectId} entry={entry} command={command} onClose={() => setReuse(false)} /> : null}
+      <Dialog
+        open={photoFor !== null}
+        onOpenChange={(value) => { if (!value) setPhotoFor(null); }}
+        title={photoFor ? `Photo — ${entry.code} option ${photoFor.label}` : "Photo"}
+        description="Choose a photo and crop it to the 4:5 catalog frame."
+        size="lg"
+        dismissible={!isPending(`${entry.id}-photo`)}
+      >
+        {photoFor ? (
+          <div className="grid gap-2">
+            <ImageWorkspace label="Schedule photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" onPrepared={onPhotoPrepared} disabled={isPending(`${entry.id}-photo`)} />
+            {photoError ? <InlineError>{photoError}</InlineError> : null}
+          </div>
+        ) : null}
+      </Dialog>
     </Drawer>
   );
 }

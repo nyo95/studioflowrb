@@ -1,6 +1,9 @@
 export const SCHEDULE_SECTIONS = ["MATERIAL", "FIXTURE"] as const;
 export type ScheduleSection = (typeof SCHEDULE_SECTIONS)[number];
 
+/** One photo per option; prepared (cropped JPEG) upload stays under the server-action body limit. */
+export const SCHEDULE_IMAGE_BYTES = 3 * 1024 * 1024;
+
 export const SCHEDULE_OPTION_STATUSES = ["DRAFT", "APPROVED", "NOT_USED"] as const;
 export type ScheduleOptionStatus = (typeof SCHEDULE_OPTION_STATUSES)[number];
 

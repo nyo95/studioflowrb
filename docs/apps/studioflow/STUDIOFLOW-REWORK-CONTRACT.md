@@ -382,7 +382,14 @@ legacy Google Sheets format is kept (port `lib/schedule/csv-*`).
 Prefix dictionary `(section, category) → prefix`; schedule template
 categories with `is_default_entry` seed empty reserve entries on new projects
 and via an explicit "Apply template" action; template items with a snapshot.
-Managed in StudioFlow settings.
+Managed in StudioFlow settings as three tables (prefix dictionary, default
+categories, template items); template items can be added and edited there
+(section/category fixed after creation; rows already copied into projects keep
+their own snapshot). A schedule row whose final option (or only option) is set
+can be saved as a template item from the project schedule ("Save as template
+item", legacy `createScheduleTemplateItemFromEntryAction`); the item keeps the
+option photo and the row's qty/unit/location. Both need `settings.manage`; the
+schedule page links to these settings for that permission.
 
 ### 11.6 Implementation notes (R8.73–R8.74)
 
@@ -401,8 +408,23 @@ Managed in StudioFlow settings.
   qty/unit/location; new codes add rows. Category: sheet value, else the
   prefix dictionary (must be unique). A category seen for the first time
   registers the sheet prefix. Any row error rolls back the whole import.
-  Legacy duplicate-product checks and image upload for options are not ported
-  (image URLs from the sheet are kept in notes).
+  Legacy duplicate-product checks are not ported; image URLs from the sheet
+  are kept in notes.
+
+### 11.7 Option photos (R8.81, owner review 2026-09-16)
+
+Legacy per-item photos (CatalogBoard) are restored as **one photo per option**:
+`image_key` on the option, uploaded through `platform/core/storage` private
+keys (`studioflow/schedule/<projectId>/…`) and the UI Engine image workspace
+with a 4:5 crop, PNG/JPEG/WebP, magic-byte checked, ≤3 MB after crop, read
+through short-lived signed URLs. Commands: set (add/replace) and remove, both
+`schedule.manage`, project-scoped, blocked on archived projects, audited.
+Clients never send storage keys; edits keep the stored photo. Reuse from a
+past project, template seeding, and "Save as template item" share the stored
+object, so an object is deleted only after commit and only when no option or
+template item references it. The schedule list shows the final option's
+thumbnail; the item panel shows each option's photo. Retention of objects left
+behind by failures stays under KB-002.
 
 ## 12. Foundation centralization map
 

@@ -1,79 +1,74 @@
 # Active Plan
 
-Plan ID: BQ-HEALTH-PASS-R8.80
-Scope: Reconcile BQ delivered status, decompose BQ monolith, add characterization tests, and split the BQ project editor/action surface
+Plan ID: OWNER-REVIEW-CORRECTIONS-R8.81
+Scope: Owner review 2026-09-16 (legacy vs R8.80) — technical items first: Product Schedule photos, Schedule template settings, BQ lifecycle tabs. Design items (workspace skeleton, Master Data home) are deferred to a design pass by owner instruction.
 Status: READY
-Priority: P1
+Priority: P1 (Schedule photo regression, workspace skeleton) / P2 (rest)
 Owner: Repository owner
 Last updated: 2026-09-16
+Lane: Planner + Executor (owner-combined), rumah
 
-## Outcome
+## Evidence
 
-BQ F1-F5 and the calculator status are reconciled against current code, then
-the main BQ implementation is made easier to continue by splitting the large
-domain service and project editor surfaces without changing product behavior.
+- Rebuild HEAD `beb4969` (R8.80), branch `main`.
+- Legacy evidence available on this computer: `D:\Projects\studioflow`, branch
+  `main`, commit `102ff85` (clean). The pinned rework commit `c4b0c466` is not
+  present in this clone; 102ff85 is used as read-only evidence only.
+- Legacy workspace skeleton: `src/components/project-layout-shell.tsx`,
+  `src/components/nav-inner.tsx` (pinned, full-height, collapsible project rail
+  with Overview, phases with icons/open-item marker, MOM, Product Schedule).
+- Legacy schedule photos: `src/extensions/sketchup/components/CatalogBoard.tsx`
+  (per-item photo add/change/remove with 4:5 crop, board cards, "set as default
+  template item", "apply default template").
+- Legacy schedule template settings: `src/components/template-manager.tsx`.
+- Rebuild gaps: `SfScheduleOption.image_key` exists but no command/UI;
+  contract §11.6 excluded image upload; project workspace renders its nav as an
+  in-content `SettingsShell` column, contradicting contract §8; KB-032.
 
-## Context and Evidence
+## Owner points and disposition
 
-- Authority: `docs/apps/bq/bq-contract.md`, especially §2 app boundaries, §6
-  server-owned calculations, §8-§9 Library promotion, and §14 build order.
-- Current evidence: `src/apps/bq/service.ts`, `src/apps/bq/lib/calc-expression.ts`,
-  `src/apps/bq/service.integration.test.ts`, and BQ route files under
-  `src/app/(platform)/bq`.
-- Owner direction: exclude design decisions; keep Quotation PDF/T&C deferred;
-  StudioFlow Wave 2 remains a later roadmap candidate after this BQ health pass.
+1. UI skeleton follows legacy (colors stay current) → DEFERRED to design pass
+   (roadmap). Direction: pinned full-height collapsible project rail per
+   contract §8, as a domain-neutral UI Engine workspace shell.
+2. MOM → no change.
+3. Schedule photos → regression, FIX in R8.81.
+4. Schedule template settings → FIX in R8.81 (tables, edit, link, save-as-template).
+5. BQ deletion review → tabs Active / Archived / Deletion review in R8.82.
+6. Master Data home → DEFERRED to design pass (roadmap; legacy had none).
+7. Per-app contract/UX evolution → roadmap entry, not in these slices.
 
-## Locked Decisions
+## Locked decisions
 
-- No schema migration, dependency addition, product redesign, BQ quotation work,
-  or StudioFlow feature work in this slice.
-- Preserve the existing BQ public service facade so route actions, runtime
-  composition, and Master Data coordination do not need behavior changes.
-- Master Data remains the owner of canonical promotion approval. BQ may only
-  expose and consume explicit public contracts.
-- Source picker improvements may extend Master Data public read filters only in
-  a backward-compatible way.
+- No schema migration and no new dependency.
+- Schedule option photo: one image per option, stored through
+  `platform/core/storage` private keys (same policy as MOM: PNG/JPEG/WebP,
+  magic-byte check, ≤3 MB after crop, 4:5 crop in `ImageWorkspace`), read via
+  signed URL. Client-supplied `imageKey` in snapshots is no longer accepted.
+  Objects are removed only when no other option/template row references the
+  key (reuse copies share keys). Retention of orphaned objects stays KB-002.
+- Schedule template item edit is a new `updateTemplateItem` command
+  (`settingsManage`, audited). "Save as template" uses the entry's final
+  option snapshot through the existing create command.
+- BQ tabs are URL-addressable (`?view=active|archived|deletion`); Locked
+  projects stay in Active. No lifecycle change.
 
-## Boundaries and Non-goals
+## Non-goals
 
-Do not touch the legacy database or legacy code. Do not redesign BQ UI flows or
-change calculator syntax, BQ formulas, rounding/truncation, lifecycle rules, or
-promotion state transitions.
+Workspace skeleton and Master Data home (design pass), global menu redesign (GLOBAL-MENU-DESIGN-BRIEF), centralized settings canvas
+(KB-031), Schedule drag-reorder, render boards, cover page, phase accent
+palette tokens.
 
 ## Verification
 
-- `npm test`
-- `npm run typecheck`
-- `npm run lint`
-- `npm run check:boundaries`
-- `npm run check:legacy-runtime`
-- `npm run build`
-- Staged and unstaged whitespace checks
-
-## Reviewer Acceptance
-
-This is a behavior-preserving code-health slice. Browser acceptance for BQ F1-F5
-may be run after the commit if a live authenticated fixture is available; missing
-browser evidence must be reported separately rather than blocking the Executor
-commit.
-
-## Risks and Recovery
-
-- The service refactor is mostly mechanical but touches transaction/audit
-  plumbing. Integration tests must cover representative writes and promotion.
-- The BQ project editor split crosses a Next client/server boundary; typecheck
-  and lint must catch import direction mistakes.
-- Existing unrelated dirty files must remain unstaged.
+`npm test`, `npm run typecheck`, `npm run lint`, `npm run check:boundaries`,
+`npm run check:legacy-runtime`, `npm run build` (as available on this
+machine), `git diff --cached --check`. Browser acceptance (desktop + 840px)
+is Reviewer/owner work after commit.
 
 ## Executor Prompt
 
-You are the Planner and Executor for `BQ-HEALTH-PASS-R8.80`. Location: rumah.
-Read `AGENTS.md`, `docs/agent/PLANNER.md`, `docs/agent/REVIEWER.md`,
-`docs/agent/EXECUTOR.md`, and this `PLAN.md`, then execute the whole outcome:
-reconcile BQ docs with actual F1-F5/calculator status, decompose the BQ domain
-service while preserving the facade, add characterization tests for promotion
-and source lookup behavior, split the BQ project editor/action surface where it
-is clearly safe, update `CHANGELOG.md`, run the required checks, inspect the
-staged diff, commit locally as R8.80, and push the resulting commits to GitHub.
-Stop only for a material behavior conflict, unsafe boundary, or unavailable
-required local prerequisite.
+Execute OWNER-REVIEW-CORRECTIONS as two local commits: R8.81
+(StudioFlow: schedule option photos, schedule settings tables/edit/link/
+save-as-template, contract §11 + KB-032 update) and R8.82 (BQ lifecycle tabs,
+roadmap entries for the deferred design pass and per-app evolution). Follow the locked
+decisions above, run the checks, update CHANGELOG, commit locally, do not push.

@@ -1,5 +1,7 @@
 /** MOM vocabulary and pure rules (contract §10, legacy extensions/mom). */
 
+import { STUDIOFLOW_IMAGE_TYPES } from "./images";
+
 export const MOM_LIST_STYLES = ["DECIMAL", "DISC", "DASH", "NONE"] as const;
 export type MomListStyle = (typeof MOM_LIST_STYLES)[number];
 
@@ -32,11 +34,7 @@ export const MOM_LIMITS = {
   imageBytes: 3 * 1024 * 1024,
 } as const;
 
-export const MOM_IMAGE_TYPES: Record<string, string> = {
-  "image/png": "png",
-  "image/jpeg": "jpg",
-  "image/webp": "webp",
-};
+export const MOM_IMAGE_TYPES: Record<string, string> = STUDIOFLOW_IMAGE_TYPES;
 
 /**
  * Marker shown before a point. Legacy numbered only the points that carry the

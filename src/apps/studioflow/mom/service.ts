@@ -2,6 +2,7 @@ import { createPrivateObjectKey } from "@platform/core/storage";
 import { currentDateOnly, isDateOnlyString } from "@platform/utilities/date";
 
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
+import { sniffImage } from "../domain/images";
 import {
   MOM_DEFAULT_TOPIC,
   MOM_IMAGE_TYPES,
@@ -58,17 +59,6 @@ function pointText(value: string | null | undefined): string {
   const text = (value ?? "").replace(/\r\n/g, "\n");
   if (text.length > MOM_LIMITS.pointText) throw invalid("MOM_POINT_TOO_LONG", "This note is too long.");
   return text;
-}
-
-/** Magic-byte check so a renamed file cannot pose as an image. */
-function sniffImage(body: Uint8Array, contentType: string): boolean {
-  const b = body;
-  if (contentType === "image/png") return b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47;
-  if (contentType === "image/jpeg") return b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
-  if (contentType === "image/webp") {
-    return b.length > 12 && String.fromCharCode(b[0], b[1], b[2], b[3]) === "RIFF" && String.fromCharCode(b[8], b[9], b[10], b[11]) === "WEBP";
-  }
-  return false;
 }
 
 export function createMomService(db: Db, ports: StudioFlowPorts) {

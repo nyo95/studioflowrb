@@ -1,6 +1,6 @@
 # Ready for Review
 
-Status: active verification ledger, reconciled through R8.80 on 2026-09-16.
+Status: active verification ledger, reconciled through R8.81 on 2026-09-16.
 New file, split out of `roadmap.md`/`knownbug.md` on 2026-09-10 at owner
 request, so status is visible at a glance:
 
@@ -247,6 +247,22 @@ No item currently ready for review.
   checks, production build, and a production-build Playwright smoke of the
   Schedule flow with zero console errors. Local checks and the SF-RF browser
   pass remain with the local executor.
+
+### Owner review corrections — Schedule photos and template settings (R8.81)
+
+- **Built:** option photos (add/change/remove, 4:5 crop, thumbnails in the
+  schedule list and item panel), reference-counted object cleanup, template
+  item edit, "Save as template item" from a schedule row, "Template settings"
+  link on the schedule page, and table layout for the Product Schedule
+  settings (KB-032). Contract §11.5 and §11.7.
+- **Verified (rumah, agent VM):** typecheck, lint, boundary and legacy-runtime
+  checks, and the non-database unit suites passed. Two new Product Schedule
+  integration tests were added but **not run** — the rebuild test database is
+  not reachable from the agent VM.
+- **To check:** `npm test` on a machine with the rebuild test DB; browser walk
+  of the schedule page (upload/replace/remove photo, drafter read-only,
+  archived read-only) and `/studioflow/settings#product-schedule` at desktop
+  and 840 px.
 
 ### Wave 1 parity gate
 

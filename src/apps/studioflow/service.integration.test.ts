@@ -632,4 +632,59 @@ describe("SF-R3 Product Schedule", () => {
     assert.equal(row.options[0].productName, "Downlight");
     await rejectsWith(sf.schedule.deleteTemplateItem({ ...as(drafter, DRAFTER_GRANTS), templateItemId: two.templateItemId }).catch((e) => { throw e instanceof AppError && e.kind === "FORBIDDEN" ? new AppError("FORBIDDEN", "FORBIDDEN_OK", "x") : e; }), "FORBIDDEN_OK");
   });
+
+  it("stores one photo per option, shares it on reuse and templates, and releases unreferenced objects", async () => {
+    const { projectId } = await newProject();
+    const other = await newProject("Other");
+    const entry = await sf.schedule.createEntry({ ...as(designer), projectId, section: "FIXTURE", category: "Lamp", qty: "3", unit: "pcs", location: "Lobby", snapshot: { productName: "Pendant", brandName: "Louis" } });
+    const [row] = await sf.schedule.listSchedule({ grants: ALL, projectId });
+    const optionId = row.options[0].id;
+    assert.equal(row.options[0].imageUrl, null);
+
+    await rejectsWith(sf.schedule.setOptionImage({ ...as(designer), projectId, optionId, file: { body: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), contentType: "image/png" } }), "SCHEDULE_IMAGE_TYPE");
+    await rejectsWith(sf.schedule.setOptionImage({ ...as(designer), projectId: other.projectId, optionId, file: png() }), "SCHEDULE_ITEM_NOT_FOUND");
+    await assert.rejects(sf.schedule.setOptionImage({ ...as(drafter, DRAFTER_GRANTS), projectId, optionId, file: png() }), (e: unknown) => e instanceof AppError && e.kind === "FORBIDDEN");
+    assert.equal(storage.objects.size, 0, "rejected uploads write nothing");
+
+    await sf.schedule.setOptionImage({ ...as(designer), projectId, optionId, file: png() });
+    await sf.schedule.setOptionImage({ ...as(designer), projectId, optionId, file: png() });
+    assert.equal(storage.objects.size, 1, "replacing releases the previous object");
+    const url = (await sf.schedule.listSchedule({ grants: ALL, projectId }))[0].options[0].imageUrl;
+    assert.ok(url?.startsWith("https://storage.invalid/"));
+
+    // A client-sent key is never trusted: editing keeps the stored photo.
+    await sf.schedule.updateOption({ ...as(designer), projectId, optionId, snapshot: { productName: "Pendant L", imageKey: "studioflow/mom/other.png" } });
+    const stored = await testDb.prisma.sfScheduleOption.findUniqueOrThrow({ where: { id: optionId } });
+    assert.ok(stored.image_key?.startsWith(`studioflow/schedule/${projectId}`));
+
+    // Reuse and save-as-template share the object.
+    const target = await sf.schedule.createEntry({ ...as(designer), projectId: other.projectId, section: "FIXTURE", category: "Lamp" });
+    await sf.schedule.copyReusableOption({ ...as(designer), projectId: other.projectId, entryId: target.entryId, sourceOptionId: optionId });
+    const template = await sf.schedule.saveEntryAsTemplate({ ...as(designer), projectId, entryId: entry.entryId });
+    const templateRow = await testDb.prisma.sfScheduleTemplateItem.findUniqueOrThrow({ where: { id: template.templateItemId } });
+    assert.equal(templateRow.image_key, stored.image_key);
+    assert.equal(templateRow.qty?.toString(), "3");
+    assert.equal(templateRow.location, "Lobby");
+
+    await sf.schedule.removeOptionImage({ ...as(designer), projectId, optionId });
+    assert.equal(storage.objects.size, 1, "still referenced by the reused option and the template");
+    await sf.schedule.deleteEntry({ ...as(designer), projectId: other.projectId, entryId: target.entryId });
+    assert.equal(storage.objects.size, 1, "still referenced by the template");
+    await sf.schedule.deleteTemplateItem({ ...as(designer), templateItemId: template.templateItemId });
+    assert.equal(storage.objects.size, 0, "released once nothing points at it");
+  });
+
+  it("edits template items without touching their photo or seeded project rows", async () => {
+    const created = await sf.schedule.createTemplateItem({ ...as(designer), section: "MATERIAL", category: `Veneer ${randomUUID().slice(0, 6)}`, snapshot: { productName: "Oak", imageKey: "forged/key.png" }, qty: "1", unit: "sheet" });
+    let item = await testDb.prisma.sfScheduleTemplateItem.findUniqueOrThrow({ where: { id: created.templateItemId } });
+    assert.equal(item.image_key, null, "client keys are ignored on create");
+    const { projectId } = await newProject();
+    await sf.schedule.updateTemplateItem({ ...as(designer), templateItemId: created.templateItemId, snapshot: { productName: "Walnut", finishing: "Matte" }, qty: "2", unit: "sheet", location: null });
+    item = await testDb.prisma.sfScheduleTemplateItem.findUniqueOrThrow({ where: { id: created.templateItemId } });
+    assert.deepEqual([item.product_name, item.finishing, item.qty?.toString()], ["Walnut", "Matte", "2"]);
+    const seeded = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((row) => row.options[0]?.productName === "Oak");
+    assert.ok(seeded, "rows seeded before the edit keep their snapshot");
+    await assert.rejects(sf.schedule.updateTemplateItem({ ...as(drafter, DRAFTER_GRANTS), templateItemId: created.templateItemId, snapshot: { productName: "x" } }), (e: unknown) => e instanceof AppError && e.kind === "FORBIDDEN");
+    await rejectsWith(sf.schedule.saveEntryAsTemplate({ ...as(designer), projectId, entryId: (await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Empty" })).entryId }), "SCHEDULE_TEMPLATE_SOURCE_REQUIRED");
+  });
 });

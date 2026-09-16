@@ -1,3 +1,5 @@
+import { hasPermission } from "@platform/core/rbac";
+import { STUDIOFLOW_PERMISSIONS as P, STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { SectionCard } from "@/platform/ui_engine";
 
@@ -18,7 +20,14 @@ export default async function ProjectSchedulePage({ params }: { params: Promise<
 
   return (
     <SectionCard title="Product Schedule" description="Materials and fixtures specified for this project, each with its options and the chosen final one." count={entries.length} padded={false}>
-      <ScheduleBoard projectId={projectId} entries={entries} brands={brands} canEdit={canEdit} />
+      <ScheduleBoard
+        projectId={projectId}
+        entries={entries}
+        brands={brands}
+        canEdit={canEdit}
+        canManageTemplates={hasPermission(grants, P.settingsManage)}
+        settingsHref={STUDIOFLOW_ROUTES.settings}
+      />
     </SectionCard>
   );
 }

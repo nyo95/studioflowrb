@@ -1,4 +1,8 @@
+import { createPrivateObjectKey } from "@platform/core/storage";
+
+import { STUDIOFLOW_IMAGE_TYPES, sniffImage } from "../domain/images";
 import {
+  SCHEDULE_IMAGE_BYTES,
   SCHEDULE_SECTIONS,
   compareOptionLabels,
   fallbackPrefix,
@@ -38,6 +42,17 @@ import { cleanSnapshot, createEntryWithOptionalOption, optionData, resolvePrefix
 const ENTRY_ENTITY = "schedule-entry";
 const OPTION_ENTITY = "schedule-option";
 const TEMPLATE_ENTITY = "schedule-template";
+const SIGNED_URL_SECONDS = 15 * 60;
+
+export type ScheduleImageUpload = { body: Uint8Array; contentType: string };
+
+/** Template item fields an operator may edit; the photo is managed by its own command. */
+export type TemplateItemInput = {
+  snapshot: SnapshotInput;
+  qty?: string | null;
+  unit?: string | null;
+  location?: string | null;
+};
 
 function sectionOf(value: string): ScheduleSection {
   if (!(SCHEDULE_SECTIONS as readonly string[]).includes(value)) throw invalid("SCHEDULE_SECTION_INVALID", "Choose Material or Fixture.");
@@ -91,7 +106,70 @@ function scopeError() {
 }
 
 export function createScheduleService(db: Db, ports: StudioFlowPorts) {
-  const { runTransaction } = ports;
+  const { runTransaction, storage } = ports;
+
+  async function signedUrl(key: string | null): Promise<string | null> {
+    if (!key) return null;
+    try {
+      return await storage.createSignedReadUrl(key, SIGNED_URL_SECONDS);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Reused and template-seeded options share one stored object, so an object is
+   * removed only after commit and only when no option or template row still
+   * points at it. A failure leaves an orphan object, never a broken row.
+   */
+  async function removeUnreferenced(keys: readonly (string | null | undefined)[]) {
+    const unique = [...new Set(keys.filter((key): key is string => !!key))];
+    await Promise.all(unique.map(async (key) => {
+      const [options, templates] = await Promise.all([
+        db.sfScheduleOption.count({ where: { image_key: key } }),
+        db.sfScheduleTemplateItem.count({ where: { image_key: key } }),
+      ]);
+      if (options + templates > 0) return;
+      await storage.remove(key).catch(() => undefined);
+    }));
+  }
+
+  function validateImage(file: ScheduleImageUpload): string {
+    const extension = STUDIOFLOW_IMAGE_TYPES[file.contentType];
+    if (!extension) throw invalid("SCHEDULE_IMAGE_TYPE", "Use a PNG, JPEG, or WebP image.");
+    const bytes = file.body.byteLength;
+    if (bytes === 0 || bytes > SCHEDULE_IMAGE_BYTES) throw invalid("SCHEDULE_IMAGE_SIZE", "Photos must be smaller than 3 MB after cropping.");
+    if (!sniffImage(file.body, file.contentType)) throw invalid("SCHEDULE_IMAGE_TYPE", "This file is not a valid image.");
+    return extension;
+  }
+
+  async function insertTemplateItem(tx: TxClient, input: { actor: CommandContext["actor"]; templateCategoryId?: string | null; section: ScheduleSection; category: { label: string; key: string }; snapshot: ReturnType<typeof cleanSnapshot>; qty: string | null; unit: string | null; location: string | null; metadata?: Record<string, unknown> }) {
+    const { section, category } = input;
+    const parent = input.templateCategoryId
+      ? await tx.sfScheduleTemplateCategory.findUnique({ where: { id: input.templateCategoryId } })
+      : await tx.sfScheduleTemplateCategory.findUnique({ where: { section_category_key: { section, category_key: category.key } } });
+    if (input.templateCategoryId && !parent) throw notFound("schedule template");
+    // Items always hang under a category row so settings can list and manage them.
+    const categoryRow = parent ?? await tx.sfScheduleTemplateCategory.create({
+      data: { section, category: category.label, category_key: category.key, is_default_entry: false, sort_order: (await tx.sfScheduleTemplateCategory.count({ where: { section } })) + 1 },
+    });
+    const sortOrder = await tx.sfScheduleTemplateItem.count({ where: { section, category_key: category.key } });
+    const item = await tx.sfScheduleTemplateItem.create({
+      data: {
+        template_category_id: categoryRow.id,
+        section,
+        category: category.label,
+        category_key: category.key,
+        ...templateItemData(input.snapshot),
+        qty: input.qty,
+        unit: input.unit,
+        location: input.location,
+        sort_order: sortOrder + 1,
+      },
+    });
+    await writeAudit(ports, tx, { action: "studioflow.schedule.template-item-created", entityType: TEMPLATE_ENTITY, entityId: item.id, actor: input.actor, metadata: { section, category: category.label, ...input.metadata } });
+    return item;
+  }
 
   async function entryIds(tx: TxClient, projectId: string, section: ScheduleSection, prefix: string) {
     return (await tx.sfScheduleEntry.findMany({
@@ -162,6 +240,8 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         orderBy: [{ section: "asc" }, { category_key: "asc" }, { increment: "asc" }],
         include: { options: true },
       });
+      const keys = [...new Set(rows.flatMap((entry) => entry.options.map((option) => option.image_key)).filter((key): key is string => !!key))];
+      const urls = new Map(await Promise.all(keys.map(async (key) => [key, await signedUrl(key)] as const)));
       return rows.map((entry) => ({
         id: entry.id,
         projectId: entry.project_id,
@@ -188,7 +268,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
           finishing: option.finishing,
           dimension: option.dimension,
           notes: option.notes,
-          imageKey: option.image_key,
+          imageUrl: option.image_key ? urls.get(option.image_key) ?? null : null,
         })),
       }));
     },
@@ -244,36 +324,95 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       });
     },
 
-    async createTemplateItem(input: CommandContext & { templateCategoryId?: string | null; section: string; category: string; snapshot: SnapshotInput; qty?: string | null; unit?: string | null; location?: string | null }) {
+    async createTemplateItem(input: CommandContext & TemplateItemInput & { templateCategoryId?: string | null; section: string; category: string }) {
       requireCommand(input, P.settingsManage);
       const section = sectionOf(input.section);
       const category = categoryOf(input.category);
       const brand = await brandSnapshot(ports, input.snapshot.brandId);
-      const snapshot = cleanSnapshot({ ...input.snapshot, ...brand });
+      const snapshot = cleanSnapshot({ ...input.snapshot, ...brand, imageKey: null });
       return runTransaction(async (tx) => {
-        const parent = input.templateCategoryId
-          ? await tx.sfScheduleTemplateCategory.findUnique({ where: { id: input.templateCategoryId } })
-          : await tx.sfScheduleTemplateCategory.findUnique({ where: { section_category_key: { section, category_key: category.key } } });
-        if (input.templateCategoryId && !parent) throw notFound("schedule template");
-        // Items always hang under a category row so settings can list and manage them.
-        const categoryRow = parent ?? await tx.sfScheduleTemplateCategory.create({
-          data: { section, category: category.label, category_key: category.key, is_default_entry: false, sort_order: (await tx.sfScheduleTemplateCategory.count({ where: { section } })) + 1 },
+        const item = await insertTemplateItem(tx, {
+          actor: input.actor,
+          templateCategoryId: input.templateCategoryId,
+          section,
+          category,
+          snapshot,
+          qty: decimalText(input.qty),
+          unit: optionalText(input.unit, 40),
+          location: optionalText(input.location, 160),
         });
-        const sortOrder = await tx.sfScheduleTemplateItem.count({ where: { section, category_key: category.key } });
-        const item = await tx.sfScheduleTemplateItem.create({
-          data: {
-            template_category_id: categoryRow.id,
-            section,
-            category: category.label,
-            category_key: category.key,
-            ...templateItemData(snapshot),
-            qty: decimalText(input.qty),
-            unit: optionalText(input.unit, 40),
-            location: optionalText(input.location, 160),
-            sort_order: sortOrder + 1,
-          },
+        return { templateItemId: item.id };
+      });
+    },
+
+    /** Edit a template item's snapshot and default quantities. Existing project rows keep their own snapshot. */
+    async updateTemplateItem(input: CommandContext & TemplateItemInput & { templateItemId: string }) {
+      requireCommand(input, P.settingsManage);
+      const current = await db.sfScheduleTemplateItem.findUnique({ where: { id: input.templateItemId } });
+      if (!current) throw notFound("schedule template");
+      const brand = input.snapshot.brandId && input.snapshot.brandId === current.brand_id
+        ? { brandId: current.brand_id, brandName: current.brand_name }
+        : input.snapshot.brandId
+          ? await brandSnapshot(ports, input.snapshot.brandId)
+          : { brandId: null, brandName: input.snapshot.brandName ?? null };
+      const snapshot = cleanSnapshot({ ...input.snapshot, ...brand, imageKey: current.image_key });
+      const next = {
+        ...templateItemData(snapshot),
+        qty: decimalText(input.qty),
+        unit: optionalText(input.unit, 40),
+        location: optionalText(input.location, 160),
+      };
+      return runTransaction(async (tx) => {
+        const item = await tx.sfScheduleTemplateItem.findUnique({ where: { id: input.templateItemId } });
+        if (!item) throw notFound("schedule template");
+        const before: Record<string, unknown> = { ...item, qty: item.qty?.toString() ?? null };
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        for (const key of Object.keys(next) as (keyof typeof next)[]) {
+          const from = before[key] ?? null;
+          const to = next[key] ?? null;
+          const same = key === "qty" && from !== null && to !== null ? Number(from) === Number(to) : from === to;
+          if (!same) changes[key] = { from, to };
+        }
+        if (Object.keys(changes).length === 0) return { templateItemId: item.id };
+        await tx.sfScheduleTemplateItem.update({ where: { id: item.id }, data: next });
+        await writeAudit(ports, tx, { action: "studioflow.schedule.template-item-updated", entityType: TEMPLATE_ENTITY, entityId: item.id, actor: input.actor, changes, metadata: { section: item.section, category: item.category } });
+        return { templateItemId: item.id };
+      });
+    },
+
+    /**
+     * Legacy "set as default template item": the row's final option (or its
+     * only option) becomes a template item in the same section/category,
+     * keeping its photo and the row's qty/unit/location.
+     */
+    async saveEntryAsTemplate(input: CommandContext & { projectId: string; entryId: string }) {
+      requireCommand(input, P.settingsManage);
+      return runTransaction(async (tx) => {
+        const entry = await loadEntry(tx, input.projectId, input.entryId, false);
+        const options = await orderedOptions(tx, entry.id);
+        const source = options.find((row) => row.is_final) ?? (options.length === 1 ? options[0] : null);
+        if (!source) throw invalid("SCHEDULE_TEMPLATE_SOURCE_REQUIRED", "Choose a final option before saving this item as a template.");
+        const snapshot = cleanSnapshot({
+          brandId: source.brand_id,
+          brandName: source.brand_name,
+          productName: source.product_name,
+          skuText: source.sku_text,
+          color: source.color,
+          finishing: source.finishing,
+          dimension: source.dimension,
+          notes: source.notes,
+          imageKey: source.image_key,
         });
-        await writeAudit(ports, tx, { action: "studioflow.schedule.template-item-created", entityType: TEMPLATE_ENTITY, entityId: item.id, actor: input.actor, metadata: { section, category: category.label } });
+        const item = await insertTemplateItem(tx, {
+          actor: input.actor,
+          section: entry.section,
+          category: { label: entry.category, key: entry.category_key },
+          snapshot,
+          qty: entry.qty?.toString() ?? null,
+          unit: entry.unit,
+          location: entry.location,
+          metadata: { projectId: input.projectId, entryId: entry.id, optionId: source.id },
+        });
         return { templateItemId: item.id };
       });
     },
@@ -293,13 +432,15 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     /** Project rows created from the item keep their snapshot; only the link is cleared (FK SetNull). */
     async deleteTemplateItem(input: CommandContext & { templateItemId: string }) {
       requireCommand(input, P.settingsManage);
-      return runTransaction(async (tx) => {
+      const result = await runTransaction(async (tx) => {
         const item = await tx.sfScheduleTemplateItem.findUnique({ where: { id: input.templateItemId }, include: { _count: { select: { entries: true } } } });
         if (!item) throw notFound("schedule template");
         await tx.sfScheduleTemplateItem.delete({ where: { id: item.id } });
         await writeAudit(ports, tx, { action: "studioflow.schedule.template-item-deleted", entityType: TEMPLATE_ENTITY, entityId: item.id, actor: input.actor, metadata: { section: item.section, category: item.category, productName: item.product_name, detachedRows: item._count.entries } });
-        return { templateItemId: item.id };
+        return { templateItemId: item.id, imageKey: item.image_key };
       });
+      await removeUnreferenced([result.imageKey]);
+      return { templateItemId: result.templateItemId };
     },
 
     async deleteTemplateCategory(input: CommandContext & { templateCategoryId: string }) {
@@ -349,7 +490,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
           qty: decimalText(input.qty),
           unit: optionalText(input.unit, 40),
           location: optionalText(input.location, 160),
-          snapshot: input.snapshot ? { ...input.snapshot, ...brand } : null,
+          snapshot: input.snapshot ? { ...input.snapshot, ...brand, imageKey: null } : null,
         });
         await writeAudit(ports, tx, { action: "studioflow.schedule.entry-created", entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor, metadata: { projectId: input.projectId, code: scheduleCode(entry.prefix, entry.increment) } });
         return { entryId: entry.id };
@@ -382,13 +523,16 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
 
     async deleteEntry(input: CommandContext & { projectId: string; entryId: string }) {
       requireCommand(input, P.scheduleManage);
-      return runTransaction(async (tx) => {
+      const result = await runTransaction(async (tx) => {
         const entry = await loadEntry(tx, input.projectId, input.entryId, true);
+        const images = await tx.sfScheduleOption.findMany({ where: { entry_id: entry.id }, select: { image_key: true } });
         await tx.sfScheduleEntry.delete({ where: { id: entry.id } });
         await renumber(tx, input.projectId, entry.section, entry.prefix);
         await writeAudit(ports, tx, { action: "studioflow.schedule.entry-deleted", entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor, metadata: { projectId: input.projectId, code: scheduleCode(entry.prefix, entry.increment) } });
-        return { entryId: entry.id };
+        return { entryId: entry.id, imageKeys: images.map((row) => row.image_key) };
       });
+      await removeUnreferenced(result.imageKeys);
+      return { entryId: result.entryId };
     },
 
     async reorderEntries(input: CommandContext & { projectId: string; section: string; prefix: string; orderedIds: string[] }) {
@@ -458,7 +602,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
           : input.snapshot.brandId
             ? await brandSnapshot(ports, input.snapshot.brandId)
             : { brandId: null, brandName: input.snapshot.brandName ?? null };
-        const snapshot = cleanSnapshot({ ...input.snapshot, ...brand, imageKey: input.snapshot.imageKey === undefined ? option.image_key : input.snapshot.imageKey });
+        const snapshot = cleanSnapshot({ ...input.snapshot, ...brand, imageKey: option.image_key });
         const next = optionData(snapshot);
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         for (const key of Object.keys(next) as (keyof typeof next)[]) {
@@ -475,7 +619,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     async createOption(input: CommandContext & { projectId: string; entryId: string; snapshot: SnapshotInput }) {
       requireCommand(input, P.scheduleManage);
       const brand = await brandSnapshot(ports, input.snapshot.brandId);
-      const snapshot = cleanSnapshot({ ...input.snapshot, ...brand });
+      const snapshot = cleanSnapshot({ ...input.snapshot, ...brand, imageKey: null });
       return runTransaction(async (tx) => {
         const entry = await loadEntry(tx, input.projectId, input.entryId, true);
         const label = await nextLabel(tx, entry.id);
@@ -499,15 +643,59 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
 
     async deleteOption(input: CommandContext & { projectId: string; optionId: string }) {
       requireCommand(input, P.scheduleManage);
-      return runTransaction(async (tx) => {
+      const result = await runTransaction(async (tx) => {
         const option = await loadOption(tx, input.projectId, input.optionId, true);
         const wasFinal = option.is_final;
         await tx.sfScheduleOption.delete({ where: { id: option.id } });
         if (wasFinal) await promoteFirstOption(tx, option.entry_id);
         await syncActiveIndex(tx, option.entry_id);
         await writeAudit(ports, tx, { action: "studioflow.schedule.option-deleted", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, metadata: { projectId: input.projectId, entryId: option.entry_id, wasFinal } });
-        return { optionId: option.id };
+        return { optionId: option.id, imageKey: option.image_key };
       });
+      await removeUnreferenced([result.imageKey]);
+      return { optionId: result.optionId };
+    },
+
+    /** Put the object first, then record it; the replaced object is released after commit. */
+    async setOptionImage(input: CommandContext & { projectId: string; optionId: string; file: ScheduleImageUpload }) {
+      requireCommand(input, P.scheduleManage);
+      const extension = validateImage(input.file);
+      // Scope check before touching storage.
+      const precheck = await db.sfScheduleOption.findUnique({ where: { id: input.optionId }, include: { entry: { select: { project_id: true } } } });
+      if (!precheck || precheck.entry.project_id !== input.projectId) throw scopeError();
+
+      const key = createPrivateObjectKey(`studioflow/schedule/${input.projectId}`, extension);
+      await storage.put({ key, contentType: input.file.contentType, bytes: input.file.body.byteLength, body: input.file.body });
+      try {
+        const result = await runTransaction(async (tx) => {
+          const option = await loadOption(tx, input.projectId, input.optionId, true);
+          await tx.sfScheduleOption.update({ where: { id: option.id }, data: { image_key: key } });
+          await writeAudit(ports, tx, {
+            action: option.image_key ? "studioflow.schedule.option-image-replaced" : "studioflow.schedule.option-image-added",
+            entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor,
+            metadata: { projectId: input.projectId, entryId: option.entry_id, label: option.label, bytes: input.file.body.byteLength },
+          });
+          return { optionId: option.id, previousKey: option.image_key };
+        });
+        await removeUnreferenced([result.previousKey]);
+        return { optionId: result.optionId };
+      } catch (error) {
+        await storage.remove(key).catch(() => undefined);
+        throw error;
+      }
+    },
+
+    async removeOptionImage(input: CommandContext & { projectId: string; optionId: string }) {
+      requireCommand(input, P.scheduleManage);
+      const result = await runTransaction(async (tx) => {
+        const option = await loadOption(tx, input.projectId, input.optionId, true);
+        if (!option.image_key) return { optionId: option.id, previousKey: null };
+        await tx.sfScheduleOption.update({ where: { id: option.id }, data: { image_key: null } });
+        await writeAudit(ports, tx, { action: "studioflow.schedule.option-image-removed", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, metadata: { projectId: input.projectId, entryId: option.entry_id, label: option.label } });
+        return { optionId: option.id, previousKey: option.image_key };
+      });
+      await removeUnreferenced([result.previousKey]);
+      return { optionId: result.optionId };
     },
 
     async searchReusableOptions(input: ReadContext & { projectId: string; query: string; section?: string; limit?: number }) {

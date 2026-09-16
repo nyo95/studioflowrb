@@ -514,7 +514,6 @@ const ScheduleSnapshot = z.strictObject({
   finishing: z.string().max(160).nullish(),
   dimension: z.string().max(160).nullish(),
   notes: z.string().max(2000).nullish(),
-  imageKey: z.string().max(500).nullish(),
 });
 const ScheduleEntryInput = z.strictObject({
   projectId: Id,
@@ -589,6 +588,40 @@ export async function deleteScheduleOptionAction(input: z.infer<typeof ScheduleO
   });
 }
 
+const ScheduleImageForm = z.strictObject({ projectId: Id, optionId: Id });
+/** Option photo upload (FormData: projectId, optionId, file). */
+export async function setScheduleOptionImageAction(formData: FormData): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleImageForm, { projectId: formData.get("projectId"), optionId: formData.get("optionId") });
+    const file = formData.get("file");
+    if (!(file instanceof File)) throw new AppError("VALIDATION", "SCHEDULE_IMAGE_REQUIRED", "Choose an image.");
+    const result = await studioFlow.schedule.setOptionImage({ ...ctx, ...data, file: { body: new Uint8Array(await file.arrayBuffer()), contentType: file.type } });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
+export async function removeScheduleOptionImageAction(input: z.infer<typeof ScheduleOptionRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleOptionRef, input);
+    const result = await studioFlow.schedule.removeOptionImage({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
+export async function saveScheduleEntryAsTemplateAction(input: z.infer<typeof ScheduleEntryRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleEntryRef, input);
+    const result = await studioFlow.schedule.saveEntryAsTemplate({ ...ctx, ...data });
+    refresh();
+    return result;
+  });
+}
+
 const ScheduleApply = z.strictObject({ projectId: Id });
 export async function applyScheduleTemplatesAction(input: z.infer<typeof ScheduleApply>): Promise<ActionResult<{ created: number }>> {
   return runSafeAction(async () => {
@@ -644,6 +677,22 @@ export async function createScheduleTemplateItemAction(input: z.infer<typeof Sch
   return runSafeAction(async () => {
     const ctx = await context();
     const result = await studioFlow.schedule.createTemplateItem({ ...ctx, ...parse(ScheduleTemplateItemInput, input) });
+    refresh();
+    return result;
+  });
+}
+
+const ScheduleTemplateItemUpdate = z.strictObject({
+  templateItemId: Id,
+  snapshot: ScheduleSnapshot,
+  qty: z.string().max(20).nullish(),
+  unit: z.string().max(40).nullish(),
+  location: z.string().max(160).nullish(),
+});
+export async function updateScheduleTemplateItemAction(input: z.infer<typeof ScheduleTemplateItemUpdate>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const result = await studioFlow.schedule.updateTemplateItem({ ...ctx, ...parse(ScheduleTemplateItemUpdate, input) });
     refresh();
     return result;
   });

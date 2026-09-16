@@ -1,6 +1,6 @@
 # Known Bugs by Application
 
-Status: active defect ledger, reconciled through R8.78 on 2026-09-16.
+Status: active defect ledger, reconciled through R8.81 on 2026-09-16.
 
 Planned features belong in [`roadmap.md`](roadmap.md). When a bug is fixed, move
 it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
@@ -392,8 +392,11 @@ migration and one slice.
   permissions and behavior; the change is mainly information architecture and
   table ergonomics.
 - **Priority:** P2 — settings usability and configuration clarity.
-- **Status:** Open; should be planned together with the centralized Settings
-  canvas work if the same UI shell is touched.
+- **Status:** Corrected in R8.81 — the three dictionaries are tables with
+  inline add rows and row actions; template items gained an edit dialog and
+  the schedule page links to the settings. Awaiting browser acceptance
+  (`review.md`); close after it passes. The centralized settings canvas
+  remains KB-031.
 
 ## Closed
 
