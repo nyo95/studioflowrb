@@ -5,8 +5,34 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.85**
-- Next local revision: **R8.86**
+- Current revision after this entry is committed: **R8.86**
+- Next local revision: **R8.87**
+
+## R8.86 | 2026-09-16 | fix(studioflow): restore schedule photo add flow
+
+### Fixed
+
+- Closed KB-033: Product Schedule reserved rows led users into `Add option`,
+  but that dialog had no photo control. The option-level `...` menu also only
+  appears after an option exists, so "add photo" was not discoverable at the
+  point the user naturally needed it.
+- `Add option` / `Edit option` now include the 4:5 `ImageWorkspace` photo
+  flow. Creating a new option with a prepared photo creates the option first
+  and immediately saves the photo onto that option.
+- Existing option cards now show a visible `Add photo` / `Change photo` text
+  action under the thumbnail, matching the legacy CatalogBoard behavior where
+  photo editing is a primary card action rather than hidden in overflow.
+
+### Verification
+
+- `npm test`: passed.
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `npm run check:boundaries`: passed.
+- `npm run check:legacy-runtime`: passed.
+- `npm run build`: passed.
+- Browser acceptance pending for the full create-option-with-photo flow.
+- No migration, no new dependencies.
 
 ## R8.85 | 2026-09-16 | refactor(masterdata): type promotion reference mapping
 

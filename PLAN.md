@@ -1,30 +1,38 @@
 # Active Plan
 
-Plan ID: KB-024-MASTERDATA-PROMOTION-TYPING
-Scope: Non-design cleanup for Master Data promotion reference mapping.
-Status: READY (implemented locally in R8.85; automated verification pending)
-Priority: P2
+Plan ID: KB-033-SCHEDULE-PHOTO-ADD-FLOW
+Scope: Restore legacy-functional Product Schedule photo flow.
+Status: READY (implemented locally in R8.86; browser acceptance pending)
+Priority: P1
 Owner: Repository owner
 Last updated: 2026-09-16
 Lane: Planner + Executor (owner-combined), rumah
 
 ## Evidence
 
-- `docs/knownbug.md` KB-024 records avoidable `(p: any)` parameters in
-  `src/apps/masterdata/service.ts` promotion mapping.
-- The behavior is already covered by Master Data service integration tests that
-  list promotion references and validate material/labor type mismatches.
+- Owner browser comment on `/studioflow/projects/.../schedule`: reserved row
+  opens `Add option`, but the dialog has no photo control; asking for the
+  overflow menu is a UX regression because the menu only exists after an option
+  is created.
+- Legacy evidence: `D:\Projects\studioflow` commit `102ff85`, branch `main`,
+  clean working tree, `src/extensions/sketchup/components/CatalogBoard.tsx`.
+  Legacy exposed `+ Add photo` / `Change photo` directly on catalog cards and
+  opened a 4:5 cropper.
 
 ## Locked decisions
 
-- Preserve all promotion reference behavior and labels.
-- Do not change schema, permissions, public API shape, dependencies, or UI.
-- Use generated Prisma payload types scoped to the queried relations.
+- Use existing rebuild storage and Schedule service commands: `createOption` /
+  `updateOption` for product details and `setOptionImage` for photo bytes.
+- No schema, dependency, permission, or storage-policy change.
+- A new option with a prepared photo is saved in two safe steps: create option,
+  then attach the photo to the returned `optionId`.
+- Keep overflow actions, but do not make photo upload dependent on discovering
+  an overflow menu.
 
 ## Non-goals
 
-KB-025 services barrel cleanup, Settings IA, Master Data home, browser
-acceptance, and any promotion workflow change.
+Card-board redesign, full legacy CatalogBoard port, Google Drive, retention
+policy, Product Schedule settings IA, and cross-project reuse changes.
 
 ## Verification
 
@@ -32,9 +40,14 @@ Executor: `npm test`, `npm run typecheck`, `npm run lint`,
 `npm run check:boundaries`, `npm run check:legacy-runtime`, `npm run build`,
 and `git diff --cached --check`.
 
+Reviewer/browser acceptance: on a reserved Schedule row, open Add option,
+prepare a photo, save, and confirm the new option displays the photo and the
+row thumbnail updates; also confirm an existing option exposes a visible
+`Change photo` action.
+
 ## Executor Prompt
 
 Executor lane, rumah. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this
-`PLAN.md`. Finish KB-024 by removing the avoidable `any` types from Master
-Data promotion reference mapping without behavior changes, run the required
-checks, update ledgers, commit locally, and do not push.
+`PLAN.md`. Finish KB-033 by restoring the legacy-functional Schedule photo flow
+in the rebuild Product Schedule without schema/dependency changes, run the
+required checks, update ledgers, commit locally, and do not push.

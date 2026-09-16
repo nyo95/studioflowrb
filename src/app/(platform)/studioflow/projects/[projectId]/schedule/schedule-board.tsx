@@ -548,19 +548,30 @@ function EntryDrawer({
                   <li key={option.id} className={`rounded-control border px-3 py-2 ${option.isFinal ? "border-success-line bg-success-surface/40" : "border-line"}`}>
                     <div className="flex items-start gap-2">
                       <span className="mt-0.5 font-ui-mono text-sm font-semibold">{option.label}</span>
-                      {canEdit ? (
-                        <button
-                          type="button"
-                          onClick={() => { setPhotoError(null); setPhotoFor(option); }}
-                          aria-label={option.imageUrl ? `Change photo of option ${option.label}` : `Add photo to option ${option.label}`}
-                          title={option.imageUrl ? "Change photo" : "Add photo"}
-                          className="rounded-[4px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus"
-                        >
+                      <div className="grid shrink-0 justify-items-center gap-1">
+                        {canEdit ? (
+                          <button
+                            type="button"
+                            onClick={() => { setPhotoError(null); setPhotoFor(option); }}
+                            aria-label={option.imageUrl ? `Change photo of option ${option.label}` : `Add photo to option ${option.label}`}
+                            title={option.imageUrl ? "Change photo" : "Add photo"}
+                            className="rounded-[4px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus"
+                          >
+                            <Thumb url={option.imageUrl} alt={option.productName} className="h-20 w-16" />
+                          </button>
+                        ) : (
                           <Thumb url={option.imageUrl} alt={option.productName} className="h-20 w-16" />
-                        </button>
-                      ) : (
-                        <Thumb url={option.imageUrl} alt={option.productName} className="h-20 w-16" />
-                      )}
+                        )}
+                        {canEdit ? (
+                          <button
+                            type="button"
+                            onClick={() => { setPhotoError(null); setPhotoFor(option); }}
+                            className="text-xs font-medium text-ink-secondary hover:text-ink hover:underline"
+                          >
+                            {option.imageUrl ? "Change photo" : "Add photo"}
+                          </button>
+                        ) : null}
+                      </div>
                       <div className="grid min-w-0 flex-1 gap-0.5">
                         <span className="text-sm font-medium">{option.productName}{option.brandName ? <span className="font-normal text-ink-secondary"> · ex. {option.brandName}</span> : null}</span>
                         {specLine(option) ? <span className="text-xs text-ink-tertiary">{specLine(option)}</span> : null}
@@ -622,27 +633,60 @@ function EntryDrawer({
 
 function OptionDialog({ projectId, entryId, option, brands, command, onClose }: { projectId: string; entryId: string; option: ScheduleOptionView | null; brands: readonly Brand[]; command: Command; onClose: () => void }) {
   const [product, setProduct] = useState<ProductDraft>(option ? productFromOption(option) : EMPTY_PRODUCT);
+  const [preparedPhoto, setPreparedPhoto] = useState<File | null>(null);
   const key = `${entryId}-option-form`;
+  const photoKey = `${entryId}-option-photo`;
   const pending = command.isPending(key);
+  const photoPending = command.isPending(photoKey);
   const save = async () => {
     const snapshot = toSnapshot(product);
+    let optionId = option?.id ?? null;
     const ok = await command.run(key, () => option
       ? updateScheduleOptionAction({ projectId, optionId: option.id, snapshot })
-      : createScheduleOptionAction({ projectId, entryId, snapshot }));
-    if (ok) onClose();
+      : createScheduleOptionAction({ projectId, entryId, snapshot }), (data) => {
+        if (!option && data && typeof data === "object" && "optionId" in data && typeof data.optionId === "string") optionId = data.optionId;
+      });
+    if (!ok) return;
+    if (preparedPhoto && optionId) {
+      const form = new FormData();
+      form.set("projectId", projectId);
+      form.set("optionId", optionId);
+      form.set("file", preparedPhoto);
+      const photoOk = await command.run(photoKey, () => setScheduleOptionImageAction(form));
+      if (!photoOk) return;
+    }
+    onClose();
   };
   return (
     <Dialog
       open
       onOpenChange={(value) => { if (!value) onClose(); }}
       title={option ? `Edit option ${option.label}` : "Add option"}
-      description={option ? undefined : "A new option is added as an alternative; set it as final when it is chosen."}
+      description={option ? "Update the product details and replace its catalog photo in one step." : "Add the product details and catalog photo together, matching the legacy schedule flow."}
       size="lg"
-      dismissible={!pending}
-      footer={<Footer><Button variant="ghost" onClick={onClose} disabled={pending}>Cancel</Button><Button variant="primary" pending={pending} disabled={!product.productName.trim()} onClick={save}>{option ? "Save option" : "Add option"}</Button></Footer>}
+      dismissible={!pending && !photoPending}
+      footer={<Footer><Button variant="ghost" onClick={onClose} disabled={pending || photoPending}>Cancel</Button><Button variant="primary" pending={pending || photoPending} disabled={!product.productName.trim()} onClick={save}>{option ? "Save option" : "Add option"}</Button></Footer>}
     >
       <div className="grid gap-3">
         <ProductFields value={product} onChange={setProduct} brands={brands} extraBrand={option?.brandId ? { id: option.brandId, name: option.brandName ?? "Brand" } : null} />
+        <div className="grid gap-2">
+          <Text weight="semibold">Photo</Text>
+          {option?.imageUrl && !preparedPhoto ? (
+            <div className="flex items-center gap-3 rounded-control border border-line-subtle bg-surface-muted p-2">
+              <Thumb url={option.imageUrl} alt={option.productName} className="h-20 w-16" />
+              <Text size="sm" tone="secondary">Current photo. Choose an image below to replace it.</Text>
+            </div>
+          ) : null}
+          <ImageWorkspace
+            label="Schedule option photo"
+            aspect={PHOTO_ASPECT}
+            maxDimension={1600}
+            outputType="image/jpeg"
+            onPrepared={(file) => setPreparedPhoto(file)}
+            disabled={pending || photoPending}
+          />
+          {preparedPhoto ? <Text size="sm" tone="secondary">Photo ready: {preparedPhoto.name}</Text> : null}
+        </div>
         {command.error ? <InlineError>{command.error}</InlineError> : null}
       </div>
     </Dialog>

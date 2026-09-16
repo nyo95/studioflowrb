@@ -400,6 +400,23 @@ migration and one slice.
   (`review.md`); close after it passes. The centralized settings canvas
   remains KB-031.
 
+### KB-033 — Product Schedule add-option flow hides photo upload
+
+- **Observed (browser comment, 2026-09-16):** On a reserved Schedule row,
+  opening `Add option` shows product fields only. There is no photo control in
+  the dialog, and the option-level overflow menu that contains `Add photo`
+  does not exist until after the option has already been created.
+- **Legacy evidence:** `D:\Projects\studioflow` commit `102ff85`,
+  `src/extensions/sketchup/components/CatalogBoard.tsx` exposed photo editing
+  as a visible card action (`+ Add photo` / `Change photo`) with a 4:5 cropper.
+- **Expected:** Adding or editing a schedule option should allow adding the
+  catalog photo in the same flow, and existing options should expose the photo
+  action visibly instead of requiring hidden overflow discovery.
+- **Priority:** P1 — owner-observed workflow regression.
+- **Status:** Corrected in R8.86 — `Add option` / `Edit option` include the
+  4:5 image workspace and existing option cards show visible photo actions.
+  Awaiting browser acceptance of the upload/crop/save path.
+
 ## Closed
 
 ### KB-030 — Valid local private storage keys fail signed-read verification on Windows
