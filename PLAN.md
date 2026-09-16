@@ -1,8 +1,8 @@
 # Active Plan
 
-Plan ID: SF-R4-PHASE-ACCENT-PALETTE
-Scope: StudioFlow phase accent palette from contract §13.8.
-Status: READY (implemented locally in R8.84; Reviewer/browser acceptance pending)
+Plan ID: KB-024-MASTERDATA-PROMOTION-TYPING
+Scope: Non-design cleanup for Master Data promotion reference mapping.
+Status: READY (implemented locally in R8.85; automated verification pending)
 Priority: P2
 Owner: Repository owner
 Last updated: 2026-09-16
@@ -10,38 +10,31 @@ Lane: Planner + Executor (owner-combined), rumah
 
 ## Evidence
 
-- `docs/apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md` §13.8 approves a
-  restrained five-hue phase accent set, tokens only, used for the phase strip,
-  project rail dots, and Today group/task markers.
-- `docs/roadmap.md` lists SF-R4 as approved after SF-RF.
-- Current implementation before this plan used status colors for phase markers,
-  so the StudioFlow UI still read as generic status chrome rather than
-  phase-aware navigation.
+- `docs/knownbug.md` KB-024 records avoidable `(p: any)` parameters in
+  `src/apps/masterdata/service.ts` promotion mapping.
+- The behavior is already covered by Master Data service integration tests that
+  list promotion references and validate material/labor type mismatches.
 
 ## Locked decisions
 
-- Token-only visual identity: no schema, migration, dependency, or app behavior
-  change.
-- The accent indicates phase identity. Workflow state must remain available via
-  text, labels, `aria-current`, notes, titles, and existing status semantics.
-- StudioFlow owns the `PhaseKey` to accent mapping; UI Engine owns the generic
-  token and `PipelineStrip` affordance.
+- Preserve all promotion reference behavior and labels.
+- Do not change schema, permissions, public API shape, dependencies, or UI.
+- Use generated Prisma payload types scoped to the queried relations.
 
 ## Non-goals
 
-Workspace skeleton redesign, Master Data home, app-wide UX redesign, browser
-acceptance verdict, and any lifecycle/status behavior change.
+KB-025 services barrel cleanup, Settings IA, Master Data home, browser
+acceptance, and any promotion workflow change.
 
 ## Verification
 
-Executor: `npm run typecheck`, `git diff --cached --check`.
-Reviewer acceptance: browser walk of StudioFlow project overview, project rail,
-and Today at desktop and 840 px; confirm the accents are visible but restrained
-and status remains understandable without color alone.
+Executor: `npm test`, `npm run typecheck`, `npm run lint`,
+`npm run check:boundaries`, `npm run check:legacy-runtime`, `npm run build`,
+and `git diff --cached --check`.
 
 ## Executor Prompt
 
 Executor lane, rumah. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this
-`PLAN.md`. Finish SF-R4 phase accent palette within the locked boundaries,
-run proportionate checks, update `CHANGELOG.md`, commit locally, and do not
-push.
+`PLAN.md`. Finish KB-024 by removing the avoidable `any` types from Master
+Data promotion reference mapping without behavior changes, run the required
+checks, update ledgers, commit locally, and do not push.

@@ -1,4 +1,4 @@
-import { type PrismaClient } from "@/generated/prisma/client";
+import { type Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
@@ -12,6 +12,10 @@ import { createVendorService } from "./services/vendor.service";
 import { createSkuService } from "./services/sku.service";
 import { createPricingService } from "./services/pricing.service";
 import { createDeletionService } from "./services/deletion.service";
+
+type PromotionMaterial = Prisma.PriceMaterialGetPayload<{ include: { sku: true; supplier_vendor: true; unit: true } }>;
+type PromotionLabor = Prisma.PriceLaborGetPayload<{ include: { vendor: true; unit: true } }>;
+type PromotionCombined = Prisma.PriceMaterialLaborGetPayload<{ include: { vendor: true; unit: true } }>;
 
 export function createMasterDataService(db: PrismaClient, ports: MasterDataServicePorts) {
   const p = ports;
@@ -60,9 +64,9 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
         db.priceMaterialLabor.findMany({ where: { deleted_at: null }, include: { vendor: true, unit: true }, orderBy: { name: "asc" } }),
       ]);
       return [
-        ...materials.map((p: any) => ({ id: p.id, type: "material" as const, label: `${p.sku.name ?? p.sku.code ?? "SKU"} · ${p.supplier_vendor.name} · ${p.amount} ${p.currency}/${p.unit.code}` })),
-        ...labor.map((p: any) => ({ id: p.id, type: "labor" as const, label: `${p.name} · ${p.vendor.name} · ${p.amount} ${p.currency}/${p.unit.code}` })),
-        ...combined.map((p: any) => ({ id: p.id, type: "material_labor" as const, label: `${p.name} · ${p.vendor.name} · ${p.amount} ${p.currency}/${p.unit.code}` })),
+        ...materials.map((p: PromotionMaterial) => ({ id: p.id, type: "material" as const, label: `${p.sku.name ?? p.sku.code ?? "SKU"} · ${p.supplier_vendor.name} · ${p.amount} ${p.currency}/${p.unit.code}` })),
+        ...labor.map((p: PromotionLabor) => ({ id: p.id, type: "labor" as const, label: `${p.name} · ${p.vendor.name} · ${p.amount} ${p.currency}/${p.unit.code}` })),
+        ...combined.map((p: PromotionCombined) => ({ id: p.id, type: "material_labor" as const, label: `${p.name} · ${p.vendor.name} · ${p.amount} ${p.currency}/${p.unit.code}` })),
       ];
     },
 

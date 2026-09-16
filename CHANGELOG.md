@@ -5,8 +5,30 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.84**
-- Next local revision: **R8.85**
+- Current revision after this entry is committed: **R8.85**
+- Next local revision: **R8.86**
+
+## R8.85 | 2026-09-16 | refactor(masterdata): type promotion reference mapping
+
+### Fixed
+
+- Closed KB-024 by replacing the remaining avoidable `(p: any)` promotion
+  reference mapping parameters in `src/apps/masterdata/service.ts` with narrow
+  Prisma payload types for material, labor, and combined material/labor price
+  rows.
+- Promotion reference behavior is unchanged: labels still use the same SKU,
+  vendor, amount, currency, and unit fields, and authorization remains on
+  `masterdata.promotion.approve`.
+
+### Verification
+
+- `npm test`: passed (391 tests).
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `npm run check:boundaries`: passed.
+- `npm run check:legacy-runtime`: passed.
+- `npm run build`: passed.
+- No migration, no new dependencies.
 
 ## R8.84 | 2026-09-16 | style(studioflow): add phase accent palette
 

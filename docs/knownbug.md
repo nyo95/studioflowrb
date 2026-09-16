@@ -111,7 +111,9 @@ defects.
 - **Mitigation:** No current functional impact or blocker; keep the mapping
   behavior unchanged until the focused typing cleanup is scheduled.
 - **Priority:** P2 — cleanup, non-blocking.
-- **Status:** Open; deferred cleanup.
+- **Status:** Closed in R8.85 — promotion reference mapping now uses narrow
+  Prisma payload types instead of `(p: any)` parameters, with behavior
+  unchanged.
 
 ### KB-025 — Master Data services barrel exposes internal helpers too broadly
 
