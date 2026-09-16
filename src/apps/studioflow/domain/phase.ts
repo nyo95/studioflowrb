@@ -33,6 +33,18 @@ export function phaseLabel(key: PhaseKey): string {
   return PHASE_BLUEPRINT.find((phase) => phase.key === key)?.label ?? key;
 }
 
+export const PHASE_ACCENT_DOT_CLASSES: Record<PhaseKey, string> = {
+  MOODBOARD: "bg-[var(--ui-phase-moodboard)]",
+  LAYOUT: "bg-[var(--ui-phase-layout)]",
+  DESIGN_3D: "bg-[var(--ui-phase-design-3d)]",
+  CD: "bg-[var(--ui-phase-cd)]",
+  SUPERVISION: "bg-[var(--ui-phase-supervision)]",
+};
+
+export function phaseAccentDotClass(key: PhaseKey | null | undefined): string {
+  return key ? PHASE_ACCENT_DOT_CLASSES[key] : "bg-line-strong";
+}
+
 /** CD is the drafter's phase; every other phase belongs to the designer (RW-02). */
 export function phaseOwnerSeat(key: PhaseKey): "designer" | "drafter" {
   return key === "CD" ? "drafter" : "designer";

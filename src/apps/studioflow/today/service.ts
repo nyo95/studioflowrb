@@ -52,35 +52,36 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
       });
 
       const rows: FeedTask[] = [];
-      const activityRow = (projectId: string, phaseId: string | null, label: string | null, a: { id: string; content: string; status: string; mode: string; due_at: Date | null; assigned_to_id: string | null; deferred_from_version: string | null }): FeedTask => ({
+      const activityRow = (projectId: string, phaseId: string | null, phaseKey: PhaseKey | null, label: string | null, a: { id: string; content: string; status: string; mode: string; due_at: Date | null; assigned_to_id: string | null; deferred_from_version: string | null }): FeedTask => ({
         key: `activity:${a.id}`, id: a.id, source: "activity", label: a.content, isChecked: a.status === "COMPLETED",
-        projectId, phaseId, phaseLabel: a.deferred_from_version && label ? `${label} · deferred` : label,
+        projectId, phaseId, phaseKey, phaseLabel: a.deferred_from_version && label ? `${label} · deferred` : label,
         priority: 4, dueDate: dateToDateOnly(a.due_at), assigneeId: a.assigned_to_id, labels: [],
         mode: a.mode === "FEEDBACK" ? "FEEDBACK" : "TODO", templateId: null, parentId: null, children: [],
       });
-      const itemRow = (projectId: string, label: string | null, row: Parameters<typeof toItemView>[0]): FeedTask => {
+      const itemRow = (projectId: string, phaseKey: PhaseKey | null, label: string | null, row: Parameters<typeof toItemView>[0]): FeedTask => {
         const view = toItemView(row);
         return {
           key: `checklist:${view.id}`, id: view.id, source: "checklist", label: view.label, isChecked: view.isChecked,
-          projectId, phaseId: view.phaseId, phaseLabel: label, priority: view.priority, dueDate: view.dueDate,
+          projectId, phaseId: view.phaseId, phaseKey, phaseLabel: label, priority: view.priority, dueDate: view.dueDate,
           assigneeId: view.assigneeId, labels: view.labels, mode: null, templateId: view.templateId, parentId: view.parentId, children: [],
         };
       };
 
       const addTargets: TodayAddTarget[] = [];
       for (const project of projects) {
-        for (const a of project.activities) rows.push(activityRow(project.id, null, null, a));
-        for (const item of project.checklist_items) rows.push(itemRow(project.id, null, item));
+        for (const a of project.activities) rows.push(activityRow(project.id, null, null, null, a));
+        for (const item of project.checklist_items) rows.push(itemRow(project.id, null, null, item));
         const targets: TodayAddTarget["targets"] = [{ phaseId: null, label: "General", disabledReason: null }];
         for (const phase of project.phases) {
-          const label = phaseLabel(phase.key as PhaseKey);
+          const phaseKey = phase.key as PhaseKey;
+          const label = phaseLabel(phaseKey);
           const active = (ACTIVE_PHASE_STATUSES as readonly string[]).includes(phase.status);
           const revision = phase.revisions[0];
           targets.push({ phaseId: phase.id, label, disabledReason: phase.is_locked ? "Approved" : !revision ? "Not started" : null });
           if (!active) continue;
-          for (const a of revision?.activities ?? []) rows.push(activityRow(project.id, phase.id, label, a));
-          for (const a of phase.activities) rows.push(activityRow(project.id, phase.id, label, a));
-          for (const item of phase.checklist_items) rows.push(itemRow(project.id, label, item));
+          for (const a of revision?.activities ?? []) rows.push(activityRow(project.id, phase.id, phaseKey, label, a));
+          for (const a of phase.activities) rows.push(activityRow(project.id, phase.id, phaseKey, label, a));
+          for (const item of phase.checklist_items) rows.push(itemRow(project.id, phaseKey, label, item));
         }
         addTargets.push({ projectId: project.id, projectName: project.name, targets });
       }

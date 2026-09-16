@@ -13,6 +13,7 @@ import {
   type ChecklistFilterQuery,
 } from "@/apps/studioflow/domain/checklist";
 import { countOpen, type FeedGroup, type FeedTask } from "@/apps/studioflow/domain/feed";
+import { phaseAccentDotClass, type PhaseKey } from "@/apps/studioflow/domain/phase";
 import type { TodayAddTarget } from "@/apps/studioflow/today/service";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
 import { currentDateOnly } from "@platform/utilities/date";
@@ -107,9 +108,12 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
           />
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             {task.phaseLabel ? (
-              <Link className="text-xs text-ink-secondary hover:underline" prefetch={false} href={task.phaseId ? STUDIOFLOW_ROUTES.projectPhase(task.projectId, task.phaseId) : STUDIOFLOW_ROUTES.project(task.projectId)}>
-                {task.phaseLabel}
-              </Link>
+              <span className="inline-flex items-center gap-1.5">
+                <span aria-hidden="true" className={`h-2 w-2 rounded-pill ${phaseAccentDotClass(task.phaseKey as PhaseKey | null)}`} />
+                <Link className="text-xs text-ink-secondary hover:underline" prefetch={false} href={task.phaseId ? STUDIOFLOW_ROUTES.projectPhase(task.projectId, task.phaseId) : STUDIOFLOW_ROUTES.project(task.projectId)}>
+                  {task.phaseLabel}
+                </Link>
+              </span>
             ) : <Text size="sm" tone="tertiary">General</Text>}
             {task.priority < 4 ? <Badge tone={task.priority === 1 ? "danger" : task.priority === 2 ? "warning" : "neutral"}>P{task.priority}</Badge> : null}
             {task.labels.map((label) => <Badge key={label.id}>#{label.name}</Badge>)}

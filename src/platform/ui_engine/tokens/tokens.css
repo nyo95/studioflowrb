@@ -22,6 +22,11 @@
   --ui-warning-fg: #b45309;
   --ui-warning-bg: #fffbeb;
   --ui-warning-border: #fde68a;
+  --ui-phase-moodboard: #6f7d45;
+  --ui-phase-layout: #b6782f;
+  --ui-phase-design-3d: #9b5f55;
+  --ui-phase-cd: #466f88;
+  --ui-phase-supervision: #695b8a;
   --ui-table-header-bg: #f5f4f2;
   --ui-table-header-fg: #55524d;
   --ui-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;

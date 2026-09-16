@@ -5,8 +5,37 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.83**
-- Next local revision: **R8.84**
+- Current revision after this entry is committed: **R8.84**
+- Next local revision: **R8.85**
+
+## R8.84 | 2026-09-16 | style(studioflow): add phase accent palette
+
+Owner-approved SF-R4 phase accent palette from contract §13.8.
+
+### Changed
+
+- Added five restrained UI tokens for the StudioFlow phases:
+  Moodboard, Layout, 3D Design, CD, and Supervision.
+- Added a StudioFlow domain helper that maps each `PhaseKey` to its accent
+  marker class, keeping phase color ownership in StudioFlow while reusing UI
+  Engine tokens.
+- `PipelineStrip` now accepts an optional per-step accent marker class; state
+  labels/notes still carry the workflow status so color is not the only signal.
+- Project overview phase strip and project navigation phase dots now use the
+  phase accent palette.
+- Today task rows now retain `phaseKey` in the feed projection and show a small
+  phase marker beside phase-scoped task links.
+
+### Verification
+
+- `npm test`: passed (391 tests).
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `npm run check:boundaries`: passed.
+- `npm run check:legacy-runtime`: passed.
+- `npm run build`: passed.
+- Browser acceptance pending in `docs/review.md`.
+- No migration, no new dependencies.
 
 ## R8.83 | 2026-09-16 | style(ui): Round 3 design system pass — sharp radii, grounded sidebar
 

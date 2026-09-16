@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { AppError } from "@platform/core/errors";
 import { hasPermission } from "@platform/core/rbac";
-import { phaseStatusDisplay } from "@/apps/studioflow/domain/phase";
+import { phaseAccentDotClass, phaseStatusDisplay } from "@/apps/studioflow/domain/phase";
 import { STUDIOFLOW_PERMISSIONS as P, STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { Badge, Breadcrumb, ContextNavHeading, MetaList, Notice, PageHeader, SettingsShell } from "@/platform/ui_engine";
@@ -15,8 +15,6 @@ import { ProjectNavLinks } from "./project-nav-links";
 import { ProjectHeaderActions } from "./project-header-actions";
 
 export const dynamic = "force-dynamic";
-
-const DOT: Record<string, string> = { neutral: "bg-line-strong", warning: "bg-warning", success: "bg-success", danger: "bg-danger" };
 
 export default async function ProjectLayout({ children, params }: { children: ReactNode; params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
@@ -39,7 +37,7 @@ export default async function ProjectLayout({ children, params }: { children: Re
   const phaseNav = phases.map((phase) => ({
       href: STUDIOFLOW_ROUTES.projectPhase(projectId, phase.id),
       label: phase.label,
-      marker: DOT[phaseStatusDisplay(phase.status).tone],
+      marker: phaseAccentDotClass(phase.key),
       detail: phase.openRootChecklist > 0 ? String(phase.openRootChecklist) : null,
       title: `${phase.label}: ${phaseStatusDisplay(phase.status).label}${phase.openRootChecklist ? ` · ${phase.openRootChecklist} checklist item(s) open` : ""}`,
   }));

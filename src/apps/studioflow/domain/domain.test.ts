@@ -147,7 +147,7 @@ describe("checklist rules", () => {
 });
 
 describe("today feed", () => {
-  const base = { projectId: "p1", phaseId: null, phaseLabel: null, assigneeId: null, labels: [], templateId: null, children: [] };
+  const base = { projectId: "p1", phaseId: null, phaseKey: null, phaseLabel: null, assigneeId: null, labels: [], templateId: null, children: [] };
   const rows: FeedTask[] = [
     { ...base, key: "checklist:c", id: "c", source: "checklist", label: "child", isChecked: false, priority: 4, dueDate: null, mode: null, parentId: "r" },
     { ...base, key: "checklist:r", id: "r", source: "checklist", label: "root", isChecked: false, priority: 2, dueDate: null, mode: null, parentId: null },

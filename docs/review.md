@@ -287,3 +287,15 @@ No item currently ready for review.
 - **To check:** Browser walk of any page with Badge, FilterChip, Avatar,
   Switch, multi-select tags, empty-state panel, and the sidebar at desktop
   and 840 px — confirm sharper chip edges, darker sidebar, circular avatars.
+
+### SF-R4 phase accent palette (R8.84)
+
+- **Built:** five phase accent CSS tokens, StudioFlow `phaseAccentDotClass`
+  helper, accent-aware `PipelineStrip` markers, phase-color project rail dots,
+  and Today task phase markers.
+- **Verified (rumah, agent VM):** `npm test` (391 tests), typecheck, lint,
+  boundary check, legacy-runtime check, and production build passed. No
+  migration, no new dependencies.
+- **To check:** Browser walk of StudioFlow project overview, project rail, and
+  Today at desktop and 840 px — confirm phase colors are visible but restrained
+  and that status remains readable without relying on color alone.

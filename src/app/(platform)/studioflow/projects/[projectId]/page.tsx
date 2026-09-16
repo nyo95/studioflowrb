@@ -1,6 +1,6 @@
 import { hasPermission } from "@platform/core/rbac";
 import { formatDateOnly } from "@platform/utilities/date";
-import { PHASE_COMMAND_LABELS, availablePhaseCommands, phaseStatusDisplay, type PhaseStatus } from "@/apps/studioflow/domain/phase";
+import { PHASE_COMMAND_LABELS, availablePhaseCommands, phaseAccentDotClass, phaseStatusDisplay, type PhaseStatus } from "@/apps/studioflow/domain/phase";
 import { STUDIOFLOW_PERMISSIONS as P, STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { DescriptionItem, DescriptionList, PipelineStrip, SectionCard, Text, type PipelineStepState } from "@/platform/ui_engine";
@@ -42,6 +42,7 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
             href: STUDIOFLOW_ROUTES.projectPhase(projectId, phase.id),
             label: phase.label,
             state: stepState(phase.status),
+            accentClass: phaseAccentDotClass(phase.key),
             note: [phase.startBlockedReason ? "Waits for previous phase" : phaseStatusDisplay(phase.status).label, phase.waitingDays ? `${phase.waitingDays}d` : null, phase.seat === "drafter" ? "drafter" : null].filter(Boolean).join(" · "),
             detail: phase.activeRevision ?? (phase.blockers.total > 0 ? `${phase.blockers.total} open` : undefined),
           }))}

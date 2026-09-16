@@ -174,7 +174,8 @@ rest of the rebuild StudioFlow.
 - [ ] Task comments and StudioFlow-global collaboration (D-SF-05).
 - [ ] Upcoming / planning timeline (D-SF-01).
 - [ ] SketchUp integration (D-SF-06).
-- [ ] Phase accent palette (contract §13.8) — approved by owner 2026-09-15; implement as SF-R4 commit R8.76 after SF-RF.
+- [ ] Phase accent palette (contract §13.8) — implemented in R8.84; browser
+  acceptance pending in `docs/review.md` before this can be closed.
 
 ### Owner review 2026-09-16 — design pass (not activated)
 

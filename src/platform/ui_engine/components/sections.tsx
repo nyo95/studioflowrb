@@ -136,6 +136,8 @@ export type PipelineStep = {
   /** Monospace trailing detail, e.g. a revision count. */
   detail?: ReactNode;
   state?: PipelineStepState;
+  /** Optional domain accent for the leading marker; state remains available through label/note. */
+  accentClass?: string;
   href?: string;
 };
 
@@ -178,7 +180,7 @@ export function PipelineStrip({
         const body = (
           <>
             <div className="flex items-center gap-1.5">
-              <span aria-hidden="true" className={cx("h-2 w-2 shrink-0 rounded-pill", PIPELINE_STATE_DOT_CLASSES[state])} />
+              <span aria-hidden="true" className={cx("h-2 w-2 shrink-0 rounded-pill", step.accentClass ?? PIPELINE_STATE_DOT_CLASSES[state])} />
               <span className={cx("truncate text-[0.8125rem] font-semibold", PIPELINE_STATE_LABEL_CLASSES[state])}>
                 {step.label}
               </span>
