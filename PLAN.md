@@ -2,7 +2,7 @@
 
 Plan ID: OWNER-REVIEW-CORRECTIONS-R8.81
 Scope: Owner review 2026-09-16 (legacy vs R8.80) — technical items first: Product Schedule photos, Schedule template settings, BQ lifecycle tabs. Design items (workspace skeleton, Master Data home) are deferred to a design pass by owner instruction.
-Status: READY
+Status: READY (R8.81 committed; R8.82 in this commit)
 Priority: P1 (Schedule photo regression, workspace skeleton) / P2 (rest)
 Owner: Repository owner
 Last updated: 2026-09-16

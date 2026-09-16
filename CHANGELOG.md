@@ -5,8 +5,30 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.81**
-- Next local revision: **R8.82**
+- Current revision after this entry is committed: **R8.82**
+- Next local revision: **R8.83**
+
+## R8.82 | 2026-09-16 | feat(bq): split project list into lifecycle tabs
+
+### Changed
+
+- The BQ projects page shows **Active**, **Archived**, and **Deletion
+  review** tabs (with counts) instead of one list followed by a "Pending
+  deletion review" section. Locked projects stay under Active and are marked
+  "Locked"; archived projects with an open deletion request are marked
+  "Deletion requested" for approvers. The tab is URL-addressable
+  (`?view=archived|deletion`) and pagination keeps it. Deletion review is
+  visible only with the approval permission; lifecycle rules are unchanged.
+- Roadmap: recorded the deferred design pass from the 2026-09-16 owner review
+  (legacy workspace skeleton, Master Data home, per-app contract/UX
+  evolution).
+
+### Verification
+
+- `tsc --noEmit`: passed. `eslint` on the BQ projects page: passed.
+- Not run: integration suites and production build (rebuild test DB not
+  reachable from the agent VM). Browser acceptance pending.
+- No migration, no dependency change.
 
 ## R8.81 | 2026-09-16 | fix(studioflow): restore schedule option photos and template settings
 
