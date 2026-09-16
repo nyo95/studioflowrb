@@ -2,7 +2,7 @@
   --ui-canvas: #fbfbfb;
   --ui-surface: #ffffff;
   --ui-surface-raised: #ffffff;
-  --ui-surface-muted: #f5f4f2;
+  --ui-surface-muted: #edece9;
   --ui-border-subtle: #eeedeb;
   --ui-border-default: #e0dfdc;
   --ui-border-strong: #c2c0bc;
@@ -28,7 +28,7 @@
   --ui-radius-card: 8px;
   --ui-radius-control: 6px;
   --ui-radius-action: 4px;
-  --ui-radius-pill: 9999px;
+  --ui-radius-pill: 3px;
   --ui-section-px: 16px;
   --ui-section-py: 16px;
   --ui-section-gap: 16px;

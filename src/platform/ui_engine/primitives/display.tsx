@@ -167,7 +167,7 @@ export function Avatar({
   return (
     <span
       className={cx(
-        "grid shrink-0 place-items-center rounded-pill border border-line bg-surface-muted font-semibold text-ink-secondary",
+        "grid shrink-0 place-items-center rounded-full border border-line bg-surface-muted font-semibold text-ink-secondary",
         AVATAR_SIZE_CLASSES[size],
         className,
       )}

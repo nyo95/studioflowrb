@@ -351,7 +351,7 @@ export function CreatableSearch({
                 aria-busy={creating || undefined}
                 onClick={() => createOption(activeQuery.trim())}
               >
-                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-pill bg-action text-ink-inverse">
+                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-action text-ink-inverse">
                   {creating
                     ? <LoaderCircle aria-hidden="true" className="h-3 w-3 animate-ui-spin" />
                     : <Plus aria-hidden="true" className="h-3 w-3" />}

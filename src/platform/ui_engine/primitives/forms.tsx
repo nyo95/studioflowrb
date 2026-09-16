@@ -198,7 +198,7 @@ export function Switch({ id, label, className, ...props }: SwitchProps) {
     <label className={cx(CHOICE_CLASSES, className)} htmlFor={controlId}>
       <RSwitch.Root
         id={controlId}
-        className="inline-flex h-5 w-[34px] shrink-0 rounded-pill border-0 bg-line-strong p-0.5 data-[state=checked]:bg-action"
+        className="inline-flex h-5 w-[34px] shrink-0 rounded-full border-0 bg-line-strong p-0.5 data-[state=checked]:bg-action"
         {...props}
       >
         <RSwitch.Thumb className="block h-4 w-4 rounded-full bg-surface transition-transform duration-[120ms] data-[state=checked]:translate-x-[14px]" />

@@ -273,3 +273,17 @@ No item currently ready for review.
   as-is; phase accent palette approved for SF-R4 (R8.76); stored-file
   retention and Google Drive activation deferred. SF-R1–SF-RF marked done in
   `roadmap.md`.
+
+### Round 3 design system pass (R8.83)
+
+- **Built:** `--ui-radius-pill` → 3 px, `--ui-surface-muted` → #edece9.
+  Avatar and Switch preserved circular/capsule shape. Empty-state icon ring,
+  and circular "+" icon badges in creatable-search / multi-select set to
+  `rounded-full` explicitly. Legacy files status spans updated to
+  `rounded-[3px]`. Tab underline and left-bar nav indicator confirmed already
+  in place in `templates.tsx` / `shells.tsx` (no edit required).
+- **Verified (agent VM):** `tsc --noEmit` clean. No migration, no new
+  dependencies.
+- **To check:** Browser walk of any page with Badge, FilterChip, Avatar,
+  Switch, multi-select tags, empty-state panel, and the sidebar at desktop
+  and 840 px — confirm sharper chip edges, darker sidebar, circular avatars.

@@ -5,8 +5,52 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.82**
-- Next local revision: **R8.83**
+- Current revision after this entry is committed: **R8.83**
+- Next local revision: **R8.84**
+
+## R8.83 | 2026-09-16 | style(ui): Round 3 design system pass — sharp radii, grounded sidebar
+
+Owner-approved design direction from Round 3 canvas (`oke eksekusi`). Primary
+intent: reduce pill/bubble softness for a more grounded, masculine aesthetic.
+
+### Changed
+
+- **`tokens.css`** — `--ui-radius-pill` lowered from `9999px` → `3px`; all
+  `Badge`, `FilterChip`, and multi-select tag chips now render with sharp
+  rectangular corners aligned with the button family.
+- **`tokens.css`** — `--ui-surface-muted` darkened from `#f5f4f2` → `#edece9`;
+  the sidebar rail inherits this via `bg-[color-mix(...)]` in `shells.tsx`,
+  giving the chrome a heavier, more grounded feel without introducing a new
+  token.
+- **`display.tsx`** — `Avatar` stays circular (`rounded-full`); was using the
+  now-3px `rounded-pill` token which would have squared off user initials.
+- **`forms.tsx`** — `Switch` track stays capsule-shaped (`rounded-full`); the
+  pill shape is load-bearing UX for a toggle.
+- **`feedback.tsx`** — empty-state icon ring changed from `rounded-pill` →
+  `rounded-[8px]`; a 38×38 px element at 3px looked too angular.
+- **`creatable-multi-select.tsx` / `creatable-search.tsx`** — the small "+"
+  icon badge changed to `rounded-full`; a circular icon glyph container.
+- **`files/page.tsx`** (legacy view) — inline status spans using `rounded-full`
+  updated to `rounded-[3px]` to match the new badge vocabulary.
+
+### Not changed
+
+- Nav active indicator: already implements the left-bar design (`before:w-[3px]`
+  in `shells.tsx`) — confirmed correct, no edit needed.
+- Tabs underline: `templates.tsx` already uses `after:h-0.5 after:bg-action`
+  underline pattern — confirmed correct.
+- Radio buttons, switch thumbs, info icon buttons: stay `rounded-full`
+  (functional/conventional circular shapes).
+- Progress bars and SegmentBar dots: stay on `rounded-pill` (now 3px) — slight
+  rounding on thin bars is cosmetically neutral and not pill-shaped.
+
+### Verification
+
+- `tsc --noEmit`: passed. No runtime imports changed; only Tailwind class strings
+  and two CSS custom-property values updated.
+- Not run: integration suites and production build (rebuild test DB not reachable
+  from agent VM). Browser acceptance pending.
+- No migration, no new dependencies.
 
 ## R8.82 | 2026-09-16 | feat(bq): split project list into lifecycle tabs
 

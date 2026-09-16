@@ -132,7 +132,7 @@ function State({
         <span
           aria-hidden="true"
           className={cx(
-            "grid h-9.5 w-9.5 place-items-center rounded-pill border",
+            "grid h-9.5 w-9.5 place-items-center rounded-[8px] border",
             kind === "error" ? "border-danger-line bg-surface text-danger" : "border-line bg-surface-muted text-ink-tertiary",
           )}
         >

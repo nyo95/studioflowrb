@@ -156,14 +156,14 @@ export default async function ProjectFilesPage({
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2 text-xs">
-                      <span className="rounded-full bg-surface-muted px-2 py-0.5">
+                      <span className="rounded-[3px] bg-surface-muted px-2 py-0.5">
                         {TREATMENT_LABELS[file.treatment] ?? file.treatment}
                       </span>
                       {file.sent_in_iteration_id && (
-                        <span className="rounded-full bg-surface-muted px-2 py-0.5">sent</span>
+                        <span className="rounded-[3px] bg-surface-muted px-2 py-0.5">sent</span>
                       )}
                       {file.superseded_at && (
-                        <span className="rounded-full bg-surface-muted px-2 py-0.5">superseded</span>
+                        <span className="rounded-[3px] bg-surface-muted px-2 py-0.5">superseded</span>
                       )}
                       {file.external_url && (
                         <a
