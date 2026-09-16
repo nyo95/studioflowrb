@@ -56,7 +56,8 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
         key: `activity:${a.id}`, id: a.id, source: "activity", label: a.content, isChecked: a.status === "COMPLETED",
         projectId, phaseId, phaseKey, phaseLabel: a.deferred_from_version && label ? `${label} · deferred` : label,
         priority: 4, dueDate: dateToDateOnly(a.due_at), assigneeId: a.assigned_to_id, labels: [],
-        mode: a.mode === "FEEDBACK" ? "FEEDBACK" : "TODO", templateId: null, parentId: null, children: [],
+        // V2-D1: SfActivity is FEEDBACK-only
+        mode: "FEEDBACK", templateId: null, parentId: null, children: [],
       });
       const itemRow = (projectId: string, phaseKey: PhaseKey | null, label: string | null, row: Parameters<typeof toItemView>[0]): FeedTask => {
         const view = toItemView(row);

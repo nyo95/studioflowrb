@@ -240,7 +240,8 @@ export async function phaseCommandAction(input: z.infer<typeof PhaseCommand>): P
 
 // ── Activities ──────────────────────────────────────────────────────────────
 
-const ActivityAdd = z.strictObject({ projectId: Id, phaseId: Id.nullable(), content: z.string().min(1).max(2000), mode: z.enum(["TODO", "FEEDBACK"]), dueDate: DateOnly, assignedToId: Id.nullish() });
+// V2-D1: SfActivity is FEEDBACK-only. phaseId is required. For todos use checklistAction.
+const ActivityAdd = z.strictObject({ projectId: Id, phaseId: Id, content: z.string().min(1).max(2000), mode: z.literal("FEEDBACK"), dueDate: DateOnly, assignedToId: Id.nullish() });
 export async function addActivityAction(input: z.infer<typeof ActivityAdd>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
@@ -273,6 +274,33 @@ export async function activityAction(input: z.infer<typeof ActivityOp>): Promise
 }
 
 // ── Checklist ───────────────────────────────────────────────────────────────
+
+// V2-D1: Separate schema for creating a new root checklist item (Todo)
+const ChecklistCreate = z.strictObject({
+  projectId: Id,
+  phaseId: Id.nullable(),
+  label: z.string().min(1).max(200),
+  priority: z.number().int().optional(),
+  dueDate: DateOnly.optional(),
+  assignedToId: Id.nullish(),
+});
+export async function addChecklistItemAction(input: z.infer<typeof ChecklistCreate>): Promise<ActionResult<{ itemId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ChecklistCreate, input);
+    const result = await studioFlow.tasks.createItem({
+      ...ctx,
+      projectId: data.projectId,
+      phaseId: data.phaseId,
+      label: data.label,
+      priority: data.priority,
+      dueDate: data.dueDate,
+      assignedToId: data.assignedToId,
+    });
+    refresh(data.projectId);
+    return result;
+  });
+}
 
 const ChecklistOp = z.discriminatedUnion("op", [
   z.strictObject({ op: z.literal("check"), projectId: Id, itemId: Id, checked: z.boolean() }),

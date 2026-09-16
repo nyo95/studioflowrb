@@ -10,7 +10,8 @@ type Revision = {
   label: string;
   createdAt: Date;
   closedAt: Date | null;
-  activities: Array<{ id: string; content: string; mode: "TODO" | "FEEDBACK"; done: boolean }>;
+  // V2-D1: SfActivity is FEEDBACK-only; todos live in SfChecklistItem
+  activities: Array<{ id: string; content: string; mode: "FEEDBACK"; done: boolean }>;
 };
 
 export function RevisionHistory({ revisions }: { revisions: Revision[] }) {
@@ -31,7 +32,7 @@ export function RevisionHistory({ revisions }: { revisions: Revision[] }) {
             <ul className="mt-2 grid list-none gap-1 p-0">
               {revision.activities.length === 0 ? <Text size="sm" tone="tertiary">No items.</Text> : revision.activities.map((activity) => (
                 <li key={activity.id} className="flex items-start gap-2 text-sm">
-                  {activity.mode === "FEEDBACK" ? <MessageSquareText aria-label="Feedback" className="mt-0.5 h-3.5 w-3.5 text-warning" /> : <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 rounded-pill bg-line-strong" />}
+                  <MessageSquareText aria-label="Feedback" className="mt-0.5 h-3.5 w-3.5 text-warning" />
                   <span className={activity.done ? "text-ink-tertiary line-through" : ""}>{activity.content}</span>
                 </li>
               ))}

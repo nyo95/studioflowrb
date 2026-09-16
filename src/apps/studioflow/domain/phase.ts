@@ -130,7 +130,7 @@ export function availablePhaseCommands(phase: PhaseState & { key: PhaseKey }): P
     else if (status === "IN_PROGRESS") commands.push("submitInternal", "submitClient");
     if (status === "ON_REVIEW_INTERNAL") commands.push("approveInternal", "rejectInternal", "submitClient");
     if (status === "APPROVED_INTERNAL") commands.push("submitClient");
-    if (status === "ON_REVIEW_CLIENT") commands.push("approveClient", "rejectClient", "rejectInternal");
+    if (status === "ON_REVIEW_CLIENT") commands.push("approveClient", "rejectClient");
   }
   if (isLocked || status === "PENDING") commands.push("reopen");
   return commands;
@@ -153,8 +153,8 @@ export const PHASE_COMMAND_LABELS: Record<PhaseCommand, string> = {
 
 export type RevisionNumber = { major: number; minor: number };
 
-export function revisionLabel(revision: RevisionNumber): string {
-  return `v${revision.major}.${revision.minor}`;
+export function revisionLabel(revision: RevisionNumber, prefix = "v"): string {
+  return `${prefix}${revision.major}.${revision.minor}`;
 }
 
 /** CLIENT feedback opens a new major revision; INTERNAL feedback a new minor. */

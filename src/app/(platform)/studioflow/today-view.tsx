@@ -37,7 +37,7 @@ import {
   Text,
 } from "@/platform/ui_engine";
 
-import { activityAction, addActivityAction, checklistAction, deleteFilterViewAction, saveFilterViewAction } from "./actions";
+import { activityAction, addChecklistItemAction, checklistAction, deleteFilterViewAction, saveFilterViewAction } from "./actions";
 import { DueLabel } from "./_components/due-label";
 import { PersonChip, PersonSelect, type Person } from "./_components/people";
 import { useCommand } from "./_components/use-command";
@@ -225,7 +225,7 @@ function QuickAddDialog({ targets, people, onClose }: { targets: TodayAddTarget[
     <Dialog open onOpenChange={(open) => { if (!open && !pending) onClose(); }} title="Quick add to-do" dismissible={!pending}>
       <form className="grid gap-3.5" onSubmit={async (event) => {
         event.preventDefault();
-        const ok = await run("quick-add", () => addActivityAction({ projectId, phaseId, content, mode: "TODO", dueDate: dueDate || null, assignedToId: assignee }));
+        const ok = await run("quick-add", () => addChecklistItemAction({ projectId, phaseId, label: content, dueDate: dueDate || null, assignedToId: assignee }));
         if (ok) onClose();
       }}>
         <Field label="To-do" required>

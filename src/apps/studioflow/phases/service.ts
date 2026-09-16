@@ -189,14 +189,14 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       });
     },
 
-    /** Legacy `executeRejectPhase`: new revision, open FEEDBACK becomes TODO. */
+    /** V2-D1: new revision; open FEEDBACK activities become SfChecklistItem todos (not SfActivity TODO). */
     async rejectPhase(input: PhaseCommandInput & { type: "INTERNAL" | "CLIENT" }) {
       requireCommand(input, P.phaseReview);
       return runTransaction(async (tx) => {
         const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId);
         if (phase.is_locked) throw lockedError();
         const from = phase.status as PhaseStatus;
-        if (input.type === "INTERNAL" && from !== "ON_REVIEW_INTERNAL" && from !== "ON_REVIEW_CLIENT") throw invalidState("Only a phase under review can be sent back.");
+        if (input.type === "INTERNAL" && from !== "ON_REVIEW_INTERNAL") throw invalidState("Only a phase in internal review can be sent back for internal changes.");
         if (input.type === "CLIENT" && from !== "ON_REVIEW_CLIENT") throw invalidState("Only a phase with the client can record client changes.");
         const current = await activeRevision(tx, phase.id);
         if (!current) throw invalidState("This phase has no active revision.");
@@ -207,23 +207,23 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const fallbackAssignee = phaseOwnerSeat(phase.key as PhaseKey) === "drafter" ? project.pic_drafter_id : project.pic_designer_id;
         const converted: string[] = [];
         for (const item of feedback) {
+          // V2-D1: Feedback converts to SfChecklistItem (Todo SSOT) instead of a new SfActivity(TODO).
           const id = randomUUID();
-          await tx.sfActivity.create({
+          await tx.sfChecklistItem.create({
             data: {
               id,
               project_id: project.id,
               phase_id: phase.id,
-              revision_id: revision.id,
-              content: item.content,
-              mode: "TODO",
-              status: "OPEN",
+              label: item.content,
+              is_checked: false,
               assigned_to_id: item.assigned_to_id ?? fallbackAssignee,
               due_at: item.due_at,
+              created_by_id: item.created_by_id,
             },
           });
           converted.push(id);
         }
-        // The originals were carried into the new revision as to-dos; close them so they stop counting as open work.
+        // Mark the original feedback activities as completed so they no longer count as open work.
         if (feedback.length > 0) {
           await tx.sfActivity.updateMany({ where: { id: { in: feedback.map((item) => item.id) } }, data: { status: "COMPLETED", completed_at: nowOf(ports) } });
         }
@@ -314,6 +314,12 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           include: { activities: { select: { content: true, mode: true, status: true } } },
         });
         const history = revisions.map((rev) => ({ version: revisionLabel(rev), status: rev.status, createdAt: rev.created_at.toISOString(), activities: rev.activities }));
+        // V2-D6: override is forward-only — target version must exceed the latest existing revision.
+        if (input.mode === "HARD_RESET_ACTIVE" && revisions.length > 0) {
+          const latest = revisions[revisions.length - 1]!;
+          const isForward = input.major! > latest.major || (input.major! === latest.major && input.minor! > latest.minor);
+          if (!isForward) throw invalid("OVERRIDE_VERSION_BACKWARD", `v${input.major}.${input.minor} must be higher than the latest v${latest.major}.${latest.minor}.`);
+        }
         await tx.sfRevision.deleteMany({ where: { phase_id: phase.id } });
         const from = phase.status as PhaseStatus;
         let target: PhaseStatus = "PENDING";
@@ -358,9 +364,14 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
   }
 
   const activities = {
-    /** phaseId null = project-level (general) to-do. */
-    async addActivity(input: CommandContext & { projectId: string; phaseId: string | null; content: string; mode: "TODO" | "FEEDBACK"; dueDate?: string | null; assignedToId?: string | null }) {
+    /**
+     * V2-D1: SfActivity is FEEDBACK-only. TODO items use SfChecklistItem instead.
+     * phaseId is required for FEEDBACK (feedback must belong to a phase+revision).
+     */
+    async addActivity(input: CommandContext & { projectId: string; phaseId: string; content: string; mode: "FEEDBACK"; dueDate?: string | null; assignedToId?: string | null }) {
       const userId = requireCommand(input, P.phaseWork);
+      if (input.mode !== "FEEDBACK") throw invalid("ACTIVITY_TODO_DEPRECATED", "Use a checklist item for to-dos. SfActivity is feedback-only.");
+      if (!input.phaseId) throw invalid("FEEDBACK_PHASE_REQUIRED", "Client feedback must belong to a phase.");
       const content = requiredText(input.content, "ACTIVITY_CONTENT_REQUIRED", "Text", 2000);
       const due = parseDue(input.dueDate) ?? null;
       await assertAssignee(input.assignedToId);
@@ -371,14 +382,12 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           const { phase } = await loadPhase(tx, input.projectId, input.phaseId);
           if (!isPhaseModifiable({ status: phase.status as PhaseStatus, isLocked: phase.is_locked })) throw lockedError();
           const revision = await activeRevision(tx, phase.id);
-          if (!revision) throw invalidState("Start this phase before adding items to it.");
+          if (!revision) throw invalidState("Start this phase before recording feedback.");
           phaseId = phase.id;
           revisionId = revision.id;
         } else {
-          const project = await tx.sfProject.findUnique({ where: { id: input.projectId } });
-          if (!project) throw notFound("project");
-          if (project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
-          if (input.mode !== "TODO") throw invalid("GENERAL_FEEDBACK_NOT_ALLOWED", "Client feedback belongs to a phase.");
+          // This branch is unreachable after the guard above but kept for type safety.
+          throw invalid("FEEDBACK_PHASE_REQUIRED", "Client feedback must belong to a phase.");
         }
         const id = randomUUID();
         await tx.sfActivity.create({ data: { id, project_id: input.projectId, phase_id: phaseId, revision_id: revisionId, content, mode: input.mode, due_at: due, assigned_to_id: input.assignedToId ?? null, created_by_id: userId } });
@@ -452,7 +461,8 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     return {
       id: row.id,
       content: row.content,
-      mode: row.mode as "TODO" | "FEEDBACK",
+      // V2-D1: SfActivity is FEEDBACK-only
+      mode: "FEEDBACK" as const,
       done: row.status === "COMPLETED",
       assigneeId: row.assigned_to_id,
       dueDate: dateToDateOnly(row.due_at),
@@ -473,12 +483,21 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         orderBy: { order_index: "asc" },
         include: { revisions: { where: { status: "ACTIVE" }, take: 1 } },
       });
+      const project = await db.sfProject.findUnique({ where: { id: input.projectId }, select: { status: true, archived_at: true } });
       const results = [];
       for (const phase of phases) {
         const counts = await readBlockerCounts(db, phase.id);
         const status = phase.status as PhaseStatus;
         const previous = phases.find((p) => p.order_index === phase.order_index - 1) ?? null;
         const canStart = canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null);
+        // Compute available commands for inline Overview actions (V2-D9).
+        const archived = project?.archived_at != null;
+        const commands = archived ? [] : availablePhaseCommands({ key: phase.key as PhaseKey, status, isLocked: phase.is_locked }).filter((command) => {
+          if (command === "activate") return canStart && project?.status === "ACTIVE";
+          if (command === "bypass") return project?.status === "ACTIVE";
+          if (command === "reopen" && status === "PENDING") return canStart && project?.status === "ACTIVE" && phase.revisions.length > 0;
+          return true;
+        });
         results.push({
           id: phase.id,
           key: phase.key as PhaseKey,
@@ -493,6 +512,8 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           activeRevision: phase.revisions[0] ? revisionLabel(phase.revisions[0]) : null,
           openRootChecklist: counts.openRootChecklistItems,
           blockers: fullBlockers(counts),
+          todoBlockers: todoBlockers(counts),
+          commands,
           startBlockedReason: status === "PENDING" && !canStart && previous ? `Starts after ${phaseLabel(previous.key as PhaseKey)} is approved.` : null,
         });
       }

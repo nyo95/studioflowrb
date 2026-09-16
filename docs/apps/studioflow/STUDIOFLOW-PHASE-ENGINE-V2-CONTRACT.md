@@ -1,0 +1,176 @@
+# StudioFlow Phase Engine v2 — Contract
+
+Status: DRAFT
+Revision: R8.87
+Date: 2026-09-16
+Author: berkah.rad@gmail.com
+Supersedes clauses: STUDIOFLOW-REWORK-CONTRACT.md §2 (PURGE list items A/B/C), §5.1, §5.4, §6.1, §8 (main workspace), §9 (Requirements), RW-01 label format, RW-04 (Deliverables wave)
+
+---
+
+## 0. Authority
+
+This document ratifies Owner decisions V2-D1 through V2-D9 collected 2026-09-16.
+It supersedes the listed clauses of the 2026-09-15 rework contract.
+All other clauses of STUDIOFLOW-REWORK-CONTRACT.md remain in force.
+Executors must treat this document as co-equal authority alongside the rework contract,
+with this document taking precedence where conflicts exist.
+
+---
+
+## 1. Superseded clauses — explicit list
+
+| Rework contract clause | What it said | What replaces it |
+|---|---|---|
+| §2 PURGE item: "phase-template administration, per-project phase add/remove" | Purged forever | Restored: SfPhaseTemplate + SfPhaseDefinition (§4) |
+| §5.1 "Phase set is app code, not an administered template" | Hardcoded PHASE_KEYS / PHASE_BLUEPRINT | Replaced by SfPhaseDefinition rows; PHASE_KEYS enum retained only for migration bridge |
+| §5.4 "Label vMAJOR.MINOR" | revisionLabel → `vM.m` | Replaced by `{PREFIX}{major}.{minor}` where PREFIX comes from SfPhaseDefinition (§6) |
+| §6.1 "Activity = revision work" | SfActivity owns revision work (TODO) | SfActivity restricted to FEEDBACK only; SfChecklistItem is the sole Todo SSOT (§3) |
+| §8 "Phase page is the main workspace" | Phase page has all actions; project rail lists phases | Overview is the main workspace; phase page becomes detail/deep-link (§7) |
+| §9 "Requirements are checklist templates" | SfChecklistTemplate with phase_key | SfRequirement is a first-class lightweight model, separate from Todo (§5) |
+| RW-01 "vMAJOR.MINOR format everywhere" | All labels use v prefix | Phase prefix from definition (§6) |
+| RW-04 "Deliverables = wave 2" | Deliverables deferred | SfDeliverable is on the critical path, warning-only (§8) |
+| §2 PURGE item: "Requirement templates/project requirements/evidence" | Purged with evidence | Re-introduced without evidence; lightweight warning model only (§5) |
+
+---
+
+## 2. Phase states (V2-D7) — retained enum, updated semantics
+
+The stored `SfPhaseStatus` enum is **not renamed** (avoids destructive migration).
+Presentation names and gate UX change; stored values stay identical.
+
+| Stored value | V2 display name |
+|---|---|
+| PENDING | Not started |
+| IN_PROGRESS | Working |
+| ON_REVIEW_INTERNAL | Internal review |
+| APPROVED_INTERNAL | Ready to send |
+| ON_REVIEW_CLIENT | With client |
+| READY_FOR_NEXT | Approved |
+| COMPLETED | Done |
+
+State machine changes (V2-D7):
+- `rejectInternal` (minor bump) is **removed** from `ON_REVIEW_CLIENT` state.
+  From client review, only `approveClient` (major approved) or `rejectClient` (major bump) are available.
+- Direct `submitClient` from `IN_PROGRESS` is **allowed** (skip internal review path).
+- `bypass` from `PENDING` is **allowed** (skip a non-applicable phase).
+
+---
+
+## 3. Todo SSOT — SfChecklistItem only (V2-D1)
+
+`SfChecklistItem` is the single source of truth for all project work items (todos).
+- `project_id` required; `phase_id` optional (null = project-wide).
+- Todoist-like: priority 1–4, due, assignee, labels, subtasks (depth 1), reorder, saved filters.
+
+`SfActivity` is **restricted to FEEDBACK mode only**.
+- `SfActivityMode.TODO` is deprecated; no new TODO-mode activities may be created.
+- Existing TODO-mode activities remain readable; migration to SfChecklistItem is wave 2.
+- The feedback→todo conversion on `rejectPhase` **changes target**: instead of creating a new SfActivity(TODO), it creates a `SfChecklistItem` in the same project+phase.
+
+The "General to-dos" section on the Overview that previously showed SfActivity(TODO) now shows SfChecklistItem with `phase_id IS NULL`.
+The "General checklist" and "Phase checklist" are the same model (SfChecklistItem) — the distinction is `phase_id` only.
+
+---
+
+## 4. Phase Definition (V2-D3) — replaces hardcoded enum
+
+### 4.1 Models
+
+```
+SfPhaseTemplate   — office-level set of phase definitions; one default template.
+SfPhaseDefinition — one row per phase within a template.
+                    Fields: name, prefix (≤4 chars), order_index, allow_parallel, seat.
+```
+
+### 4.2 Project bootstrap
+
+When a project is created, the active default `SfPhaseTemplate` is snapshotted:
+one `SfPhase` per `SfPhaseDefinition` row, storing `definition_id` as FK.
+The phase inherits `name/prefix/order_index/allow_parallel/seat` from the definition at creation time.
+**After creation, the project's phases are immutable** (V2-D3 decision: no per-project add/remove).
+
+### 4.3 Migration bridge
+
+`SfPhaseKey` enum and the `key` column on `SfPhase` are **retained** until a dedicated migration
+(V2-E) replaces them with `definition_id`. During the bridge period:
+- New phases created from a template set `definition_id`; existing phases keep their `key`.
+- Code that reads `phase.key` remains valid for existing rows.
+
+---
+
+## 5. Requirements (V2-D2) — lightweight, warning-only
+
+`SfRequirement` is a new first-class model.
+
+Fields: `project_id`, `phase_id` (nullable), `title`, `description` (nullable), `is_met`, `met_at`, `met_by_id`.
+
+Rules:
+- Requirements **never block approval** (warning-only; §6.4 blocker logic is not extended).
+- Requirements are **separate from SfChecklistItem** — no template-generated todos for requirements.
+- Requirements have **no evidence links** (kept out of scope; may be added later).
+- A requirement may be project-wide (`phase_id IS NULL`) or phase-specific.
+
+The old SfChecklistTemplate-generated "requirements" (checklist items that came from templates with `phase_key`)
+continue to function as ordinary checklist items. No data migration required for the bridge period.
+
+---
+
+## 6. Revision label format (V2-D5)
+
+The label format changes from `vM.m` to `{PREFIX}{major}.{minor}`.
+- `PREFIX` comes from `SfPhaseDefinition.prefix` (e.g. "MB", "D", "CD").
+- Example: Moodboard prefix "MB" → `MB1.0`, `MB2.0`; Design 3D prefix "D" → `D3.1`.
+- `revisionLabel(revision, prefix)` gains a `prefix` parameter (defaults to "v" for backward compat).
+- The `{major}` counter is the revision-within-phase counter; it does **not** carry the phase order index
+  (so Design 3D's first revision is `D1.0`, not `D3.0`).
+
+---
+
+## 7. Override — forward-only (V2-D6)
+
+`overrideRevision` is restricted: the requested `major.minor` must be strictly greater than
+the latest existing revision for that phase. Backward resets are no longer allowed.
+
+---
+
+## 8. Deliverables — warning-only (V2-D8)
+
+`SfDeliverable` is a new model per phase: `project_id`, `phase_id`, `revision_id` (nullable), `name`, `storage_key`, `file_size_bytes`, `content_type`.
+
+Computed status:
+- `MISSING` — no deliverable for this phase.
+- `CURRENT` — at least one deliverable; uploaded in the current (active) revision.
+- `OUTDATED` — at least one deliverable; all uploads are from a prior (closed) revision.
+
+Deliverable status **does not block approval** (warning-only).
+
+---
+
+## 9. Overview as main workspace (V2-D9)
+
+The project Overview page (`/projects/[projectId]`) becomes the primary workspace:
+- Phase cards: one per phase, showing status badge, iteration label, inline action buttons (primary command), per-phase todo count.
+- Active revision label shown in each phase card.
+- Blockers and warnings shown inline (Requirements warnings, Deliverable warnings).
+- The `PipelineStrip` nav strip is demoted to a visual indicator; primary actions live in phase cards.
+
+The phase detail page (`/projects/[projectId]/phases/[phaseId]`) becomes a detail/deep-link view:
+- Full `PhaseActions` block.
+- Revision work (SfActivity FEEDBACK + deferred items).
+- Phase checklist (SfChecklistItem).
+- Revision history.
+
+---
+
+## 10. Implementation waves
+
+| Wave | Scope | Schema? |
+|---|---|---|
+| V2-C0 | This contract (doc only) | No |
+| V2-A | State machine fixes (V2-D4/D6/D7), Todo SSOT domain update (V2-D1), label format function (V2-D5) | No |
+| V2-B | Prisma schema additions: SfPhaseTemplate, SfPhaseDefinition, SfRequirement, SfDeliverable; migration | Yes |
+| V2-C | Overview v2 page rewrite (V2-D9); phase cards with inline actions | No (uses existing data + new schema from V2-B) |
+| V2-D | Admin UI: phase template editor (SfPhaseTemplate/SfPhaseDefinition CRUD) | Depends on V2-B |
+| V2-E | Full enum-to-definition migration: drop SfPhaseKey, make definition_id required | Yes (destructive) |
+

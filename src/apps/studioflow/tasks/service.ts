@@ -161,6 +161,52 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
 
     // ── Items ──────────────────────────────────────────────────────────────
     /**
+     * V2-D1: Create a freestanding root checklist item (Todo).
+     * phaseId = null → general project todo; phaseId set → phase-scoped todo.
+     */
+    async createItem(input: CommandContext & { projectId: string; phaseId: string | null; label: string; priority?: number; dueDate?: string | null; assignedToId?: string | null }) {
+      const userId = requireCommand(input, P.taskManage);
+      const label = requiredText(input.label, "CHECKLIST_LABEL_REQUIRED", "Task", CHECKLIST_LABEL_MAX_LENGTH);
+      const priority = parsePriority(input.priority) ?? CHECKLIST_PRIORITY_NONE;
+      const due = parseDue(input.dueDate) ?? null;
+      await assertAssignee(input.assignedToId);
+      return runTransaction(async (tx) => {
+        const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true, archived_at: true } });
+        if (!project) throw notFound("project");
+        if (project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
+        if (input.phaseId) {
+          const phase = await tx.sfPhase.findUnique({ where: { id: input.phaseId }, select: { project_id: true, status: true, is_locked: true } });
+          if (!phase || phase.project_id !== input.projectId) throw notFound("phase");
+          if (!isPhaseModifiable({ status: phase.status as PhaseStatus, isLocked: phase.is_locked })) {
+            throw conflict("PHASE_LOCKED", "This phase is approved and locked. Reopen it first.");
+          }
+        }
+        const last = await tx.sfChecklistItem.findFirst({
+          where: { project_id: input.projectId, phase_id: input.phaseId, parent_id: null },
+          orderBy: { sort_order: "desc" },
+          select: { sort_order: true },
+        });
+        const id = randomUUID();
+        await tx.sfChecklistItem.create({
+          data: {
+            id,
+            project_id: input.projectId,
+            phase_id: input.phaseId,
+            parent_id: null,
+            label,
+            priority,
+            due_at: due,
+            assigned_to_id: input.assignedToId ?? null,
+            sort_order: (last?.sort_order ?? 0) + CHECKLIST_SORT_STEP,
+            created_by_id: userId,
+          },
+        });
+        await writeAudit(ports, tx, { action: "studioflow.checklist.item-created", entityType: "checklist-item", entityId: id, actor: input.actor, metadata: { projectId: input.projectId, phaseId: input.phaseId, label } });
+        return { itemId: id };
+      });
+    },
+
+    /**
      * Root items come from templates only (legacy rule). People add subtasks
      * that break a requirement down; subtasks inherit project and phase and
      * never block approval.

@@ -22,7 +22,8 @@ export type FeedTask = {
   dueDate: string | null;
   assigneeId: string | null;
   labels: FeedLabel[];
-  mode: "TODO" | "FEEDBACK" | null;
+  // V2-D1: SfActivity is FEEDBACK-only; SfChecklistItem has no mode (null)
+  mode: "FEEDBACK" | null;
   templateId: string | null;
   parentId: string | null;
   children: FeedTask[];

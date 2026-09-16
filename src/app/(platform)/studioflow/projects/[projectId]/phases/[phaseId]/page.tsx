@@ -69,7 +69,7 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
       <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-4 max-[1100px]:grid-cols-1">
         <SectionCard
           title={phase.activeRevision ? `Revision ${phase.activeRevision.label}` : "Revision work"}
-          description="To-dos for this round and feedback from review. Client-requested changes become to-dos in the next revision."
+          description="Client and reviewer feedback on this revision. Unresolved feedback becomes a to-do when the phase is sent back."
         >
           {phase.activeRevision ? (
             <ActivityList
@@ -78,7 +78,6 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
               items={phase.activeRevision.activities}
               people={people}
               canEdit={canWork}
-              allowFeedback
               allowDefer
               emptyText="Nothing recorded for this revision"
             />
@@ -88,7 +87,7 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
           {phase.deferred.length > 0 ? (
             <div className="mt-4 grid gap-2">
               <Text meta>Deferred — still blocks approval</Text>
-              <ActivityList projectId={projectId} phaseId={phaseId} items={phase.deferred} people={people} canEdit={canWork} allowFeedback={false} allowDefer={false} emptyText="" />
+              <ActivityList projectId={projectId} phaseId={phaseId} items={phase.deferred} people={people} canEdit={canWork} allowDefer={false} emptyText="" />
             </div>
           ) : null}
         </SectionCard>

@@ -1211,12 +1211,14 @@ model SfProject {
   archived_by_id  String?
   archive_reason  String?
 
-  client          SfClient?         @relation(fields: [client_id], references: [id])
-  phases          SfPhase[]
-  activities      SfActivity[]
-  checklist_items SfChecklistItem[]
-  mom_documents   SfMomDocument[]
+  client           SfClient?          @relation(fields: [client_id], references: [id])
+  phases           SfPhase[]
+  activities       SfActivity[]
+  checklist_items  SfChecklistItem[]
+  mom_documents    SfMomDocument[]
   schedule_entries SfScheduleEntry[]
+  requirements     SfRequirement[]
+  deliverables     SfDeliverable[]
 
   @@index([status, archived_at])
   @@index([pic_designer_id])
@@ -1230,6 +1232,8 @@ model SfPhase {
   id                String        @id @default(uuid())
   project_id        String
   key               SfPhaseKey
+  /// V2-D3: FK to SfPhaseDefinition; null for phases created before v2. Replaces key in V2-E.
+  definition_id     String?
   order_index       Int
   status            SfPhaseStatus @default(PENDING)
   is_locked         Boolean       @default(false)
@@ -1240,9 +1244,12 @@ model SfPhase {
   updated_at        DateTime      @updatedAt
 
   project         SfProject         @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  definition      SfPhaseDefinition? @relation(fields: [definition_id], references: [id], onDelete: SetNull)
   revisions       SfRevision[]
   activities      SfActivity[]
   checklist_items SfChecklistItem[]
+  requirements    SfRequirement[]
+  deliverables    SfDeliverable[]
 
   @@unique([project_id, key])
   @@unique([project_id, order_index])
@@ -1260,8 +1267,9 @@ model SfRevision {
   created_at DateTime         @default(now())
   closed_at  DateTime?
 
-  phase      SfPhase      @relation(fields: [phase_id], references: [id], onDelete: Cascade)
-  activities SfActivity[]
+  phase        SfPhase        @relation(fields: [phase_id], references: [id], onDelete: Cascade)
+  activities   SfActivity[]
+  deliverables SfDeliverable[]
 
   @@index([phase_id, status])
   @@map("sf_revision")
@@ -1275,7 +1283,8 @@ model SfActivity {
   /// Null = deferred (detached from its revision but still phase-tagged).
   revision_id           String?
   content               String
-  mode                  SfActivityMode   @default(TODO)
+  // V2-D1: FEEDBACK is the only valid mode going forward; TODO kept in enum for legacy rows
+  mode                  SfActivityMode   @default(FEEDBACK)
   status                SfActivityStatus @default(OPEN)
   assigned_to_id        String?
   deferred_from_version String?
@@ -1384,6 +1393,94 @@ model SfChecklistFilterView {
 
   @@unique([owner_id, name])
   @@map("sf_checklist_filter_view")
+  @@schema("studioflow")
+}
+
+// ── SF-V2 Phase Engine additions (contract §4/5/8 V2-D2/D3/D8) ──────────────
+
+/// Office-level phase template — container for SfPhaseDefinition rows (V2-D3).
+model SfPhaseTemplate {
+  id         String   @id @default(uuid())
+  name       String   @unique
+  is_default Boolean  @default(false)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  definitions SfPhaseDefinition[]
+
+  @@map("sf_phase_template")
+  @@schema("studioflow")
+}
+
+/// One row per phase within a template; projects snapshot from this on creation (V2-D3).
+model SfPhaseDefinition {
+  id             String   @id @default(uuid())
+  template_id    String
+  name           String
+  /// Short prefix for revision labels: "MB", "D", "CD", etc. (≤4 chars; V2-D5).
+  prefix         String   @db.VarChar(4)
+  order_index    Int
+  allow_parallel Boolean  @default(false)
+  /// "designer" | "drafter"
+  seat           String   @default("designer")
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  template SfPhaseTemplate @relation(fields: [template_id], references: [id], onDelete: Cascade)
+  /// Phases that were created from this definition.
+  phases   SfPhase[]
+
+  @@unique([template_id, order_index])
+  @@map("sf_phase_definition")
+  @@schema("studioflow")
+}
+
+/// Lightweight project/phase requirement — warning-only, never blocks approval (V2-D2).
+model SfRequirement {
+  id            String    @id @default(uuid())
+  project_id    String
+  /// Null = project-wide requirement.
+  phase_id      String?
+  title         String
+  description   String?
+  is_met        Boolean   @default(false)
+  met_at        DateTime?
+  met_by_id     String?
+  created_by_id String?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  project SfProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  phase   SfPhase?  @relation(fields: [phase_id], references: [id], onDelete: Cascade)
+
+  @@index([project_id, phase_id])
+  @@map("sf_requirement")
+  @@schema("studioflow")
+}
+
+/// Phase deliverable uploaded file; status computed from revision (V2-D8).
+/// status: MISSING (no row), CURRENT (revision_id = active revision), OUTDATED (revision closed).
+model SfDeliverable {
+  id              String   @id @default(uuid())
+  project_id      String
+  phase_id        String
+  /// The revision when this file was last uploaded; null means pre-revision upload.
+  revision_id     String?
+  name            String
+  storage_key     String
+  file_size_bytes Int?
+  content_type    String?
+  created_by_id   String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  project  SfProject   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  phase    SfPhase     @relation(fields: [phase_id], references: [id], onDelete: Cascade)
+  revision SfRevision? @relation(fields: [revision_id], references: [id], onDelete: SetNull)
+
+  @@index([project_id, phase_id])
+  @@map("sf_deliverable")
   @@schema("studioflow")
 }
 

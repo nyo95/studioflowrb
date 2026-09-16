@@ -1,16 +1,13 @@
 /**
  * The single blocker projection (contract §6.4), ported from legacy
  * `assertNoPendingTasks` and the submit-for-internal-review guard.
+ * V2-D1: SfActivity is FEEDBACK-only; todos live in SfChecklistItem.
  */
 export type PhaseBlockerCounts = {
-  /** Open activities (TODO + FEEDBACK) in the active revision. */
+  /** Open FEEDBACK activities in the active revision. */
   openRevisionActivities: number;
-  /** Open TODO activities in the active revision. */
-  openRevisionTodos: number;
-  /** Open deferred activities tagged to the phase (any mode). */
+  /** Open deferred FEEDBACK activities tagged to the phase. */
   openDeferredActivities: number;
-  /** Open deferred TODO activities tagged to the phase. */
-  openDeferredTodos: number;
   /** Unchecked ROOT checklist items of the phase (subtasks never block). */
   openRootChecklistItems: number;
 };
@@ -24,14 +21,14 @@ function plural(count: number, noun: string): string {
 /** Blockers for approveInternal, submitClient, approveClient. */
 export function fullBlockers(counts: PhaseBlockerCounts): PhaseBlockers {
   const reasons: string[] = [];
-  if (counts.openRevisionActivities > 0) reasons.push(`${plural(counts.openRevisionActivities, "open item")} in this revision`);
-  if (counts.openDeferredActivities > 0) reasons.push(`${plural(counts.openDeferredActivities, "deferred item")}`);
+  if (counts.openRevisionActivities > 0) reasons.push(`${plural(counts.openRevisionActivities, "open feedback item")} in this revision`);
+  if (counts.openDeferredActivities > 0) reasons.push(`${plural(counts.openDeferredActivities, "deferred feedback item")}`);
   if (counts.openRootChecklistItems > 0) reasons.push(`${plural(counts.openRootChecklistItems, "checklist item")} not ticked`);
   return { total: counts.openRevisionActivities + counts.openDeferredActivities + counts.openRootChecklistItems, reasons };
 }
 
-/** Blockers for submitInternal: open to-dos only. */
+/** Blockers for submitInternal: open todos (unchecked root checklist items) only (V2-D1). */
 export function todoBlockers(counts: PhaseBlockerCounts): PhaseBlockers {
-  const total = counts.openRevisionTodos + counts.openDeferredTodos;
+  const total = counts.openRootChecklistItems;
   return { total, reasons: total > 0 ? [`${plural(total, "open to-do")}`] : [] };
 }
