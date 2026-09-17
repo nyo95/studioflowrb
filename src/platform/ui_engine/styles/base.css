@@ -8,7 +8,7 @@
     margin: 0;
     background: var(--ui-canvas);
     color: var(--ui-text-primary);
-    font-family: var(--font-inter), sans-serif;
+    font-family: var(--font-sans), sans-serif;
     font-size: 14px;
     line-height: 1.5;
   }

@@ -10,8 +10,8 @@ export type HeadingProps = HTMLAttributes<HTMLHeadingElement> & {
 
 /* H1–H2 carry the serif product identity; H3–H6 are sans operational heads. */
 const HEADING_LEVEL_CLASSES: Record<HeadingLevel, string> = {
-  1: "font-display font-[650] tracking-[-0.025em] text-[2rem]",
-  2: "font-display font-[650] tracking-[-0.025em] text-[1.5rem]",
+  1: "font-display italic font-normal tracking-[-0.01em] text-[2rem] leading-[1.05]",
+  2: "font-display font-normal tracking-[-0.01em] text-[1.5rem] leading-[1.08]",
   3: "text-[1.125rem] font-semibold",
   4: "text-base font-semibold",
   5: "text-sm font-semibold",

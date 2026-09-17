@@ -188,20 +188,21 @@ Browser acceptance for R8.87–R8.93 is pending in `review.md`.
 - [ ] Upcoming / planning timeline (D-SF-01).
 - [ ] SketchUp integration (D-SF-06).
 
-### Owner review 2026-09-16 — design pass (not activated)
+### Owner review 2026-09-16 — design pass
 
 Recorded from the owner's legacy-vs-R8.80 review. The technical items shipped
 in R8.81 (Schedule photos, template settings) and R8.82 (BQ lifecycle tabs);
-these need a design pass first and wait for owner direction:
+design direction confirmed by owner artifact `7kbX1SwA7Q7kU1QG47jn1v` (2026-09-17).
 
+- [x] ~~**Master Data home** is generic: replace the plain link list with an
+  overview (key counts, items needing attention, recent changes).~~ Implemented R8.94.
+- [x] ~~**Font system pass:** Instrument Sans (UI) + Instrument Serif (display),
+  replacing Inter + Lora globally.~~ Implemented R8.94.
 - [ ] **Workspace skeleton follows legacy** (colors stay current): pinned,
   full-height, collapsible project rail beside the work area (legacy
   `project-layout-shell.tsx` / `nav-inner.tsx`, contract §8) instead of the
   in-content `SettingsShell` column; candidate domain-neutral UI Engine
   workspace shell shared with other record workspaces.
-- [ ] **Master Data home** is generic: replace the plain link list with an
-  overview (key counts, items needing attention, recent changes). Legacy had
-  no home page (it redirected), so this is new design, not parity.
 - [ ] **Per-app contract and UI/UX evolution** — revisit each app's contract
   and detail UX after the design pass (evolution, not regression).
 

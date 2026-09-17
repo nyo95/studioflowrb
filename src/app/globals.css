@@ -46,7 +46,7 @@
 
   --shadow-elevated: var(--ui-shadow-elevated);
 
-  --font-display: var(--font-lora), serif;
+  --font-display: var(--font-serif), serif;
   --font-ui-mono: var(--ui-font-mono);
 
   --animate-ui-spin: ui-spin 800ms linear infinite;

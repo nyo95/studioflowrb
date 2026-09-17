@@ -5,8 +5,33 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.93**
-- Next local revision: **R8.94**
+- Current revision after this entry is committed: **R8.94**
+- Next local revision: **R8.95**
+
+## R8.94 | 2026-09-17 | feat(design): font system pass + Master Data home overview
+
+### Changed
+
+- **Font system:** swapped Inter + Lora for Instrument Sans (UI) and Instrument Serif (display)
+  globally (`layout.tsx`, `base.css`, `globals.css`). H1/H2 display tracking updated to
+  match Instrument Serif's optical weight (400, −0.01em, leading 1.05/1.08).
+- **Master Data home (`/masterdata`):** replaced plain link list with a rich overview —
+  hero section (eyebrow + display h1 + Brand/Price CTAs), count tiles for Brands/Suppliers/
+  SKUs/Pricing with monthly-delta badges, "Recent changes" feed (last 8 records across
+  brands/vendors/SKUs), "Waiting on you" panel (pending deletion requests), and "Reference"
+  mini-grid (Units/Categories/Vendor types).
+- **`masterDataService.summary`:** added `vendorTypes`, `brandsThisMonth`, `vendorsThisMonth`,
+  `skusThisMonth`, `pricingThisMonth` to the existing summary payload (additive, no
+  breaking change). Converted sequential workPrices chain to `Promise.all`.
+- **`masterDataService.recentChanges`:** new method — fetches and merges the 8 most recently
+  updated Brands, Vendors, and SKUs; returns `{ id, label, kind, updatedAt, isNew, href }[]`.
+- **Roadmap:** activated Master Data home + font pass items under "Owner review 2026-09-16".
+
+### Verification
+
+- Automated checks pending commit.
+
+---
 
 ## R8.93 | 2026-09-17 | fix(sf-v2): update tests and UI to match V2 FEEDBACK-only activity model
 

@@ -33,17 +33,90 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
   return {
     async summary(input: { grants: PermissionGrants }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.access);
-      const [brands, vendors, skus, materialPrices, workPrices, units, categories, deletionRequests] = await Promise.all([
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      const [
+        brands, vendors, skus, materialPrices, workPrices, units, categories, deletionRequests,
+        vendorTypes,
+        brandsThisMonth, vendorsThisMonth, skusThisMonth, pricingThisMonth,
+      ] = await Promise.all([
         db.brand.count({ where: { deleted_at: null } }),
         db.vendor.count({ where: { deleted_at: null } }),
         db.sku.count({ where: { deleted_at: null } }),
         db.priceMaterial.count({ where: { deleted_at: null } }),
-        db.priceMaterialLabor.count({ where: { deleted_at: null } }).then((n) => db.priceLabor.count({ where: { deleted_at: null } }).then((m) => n + m)),
+        Promise.all([
+          db.priceMaterialLabor.count({ where: { deleted_at: null } }),
+          db.priceLabor.count({ where: { deleted_at: null } }),
+        ]).then(([n, m]) => n + m),
         db.unit.count({ where: { status: "ACTIVE" } }),
         db.category.count({ where: { status: "ACTIVE" } }),
         db.deletionRequest.count({ where: { status: "PENDING" } }),
+        db.vendorType.count({ where: { deleted_at: null } }),
+        db.brand.count({ where: { deleted_at: null, created_at: { gte: monthStart } } }),
+        db.vendor.count({ where: { deleted_at: null, created_at: { gte: monthStart } } }),
+        db.sku.count({ where: { deleted_at: null, created_at: { gte: monthStart } } }),
+        Promise.all([
+          db.priceMaterial.count({ where: { deleted_at: null, created_at: { gte: monthStart } } }),
+          db.priceLabor.count({ where: { deleted_at: null, created_at: { gte: monthStart } } }),
+          db.priceMaterialLabor.count({ where: { deleted_at: null, created_at: { gte: monthStart } } }),
+        ]).then(([m, l, ml]) => m + l + ml),
       ]);
-      return { brands, vendors, skus, materialPrices, workPrices, units, categories, deletionRequests };
+      return {
+        brands, vendors, skus, materialPrices, workPrices, units, categories, deletionRequests,
+        vendorTypes,
+        brandsThisMonth, vendorsThisMonth, skusThisMonth, pricingThisMonth,
+      };
+    },
+
+    async recentChanges(input: { grants: PermissionGrants; limit?: number }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.access);
+      const limit = input.limit ?? 8;
+      const [brands, vendors, skus] = await Promise.all([
+        db.brand.findMany({
+          where: { deleted_at: null },
+          orderBy: { updated_at: "desc" },
+          take: limit,
+          select: { id: true, name: true, updated_at: true, created_at: true },
+        }),
+        db.vendor.findMany({
+          where: { deleted_at: null },
+          orderBy: { updated_at: "desc" },
+          take: limit,
+          select: { id: true, name: true, updated_at: true, created_at: true },
+        }),
+        db.sku.findMany({
+          where: { deleted_at: null },
+          orderBy: { updated_at: "desc" },
+          take: limit,
+          select: { id: true, code: true, name: true, updated_at: true, created_at: true },
+        }),
+      ]);
+      type RecentItem = {
+        id: string; label: string;
+        kind: "brand" | "vendor" | "sku";
+        updatedAt: Date; isNew: boolean;
+        href: string;
+      };
+      const all: RecentItem[] = [
+        ...brands.map((b) => ({
+          id: b.id, label: b.name, kind: "brand" as const,
+          updatedAt: b.updated_at, isNew: b.created_at.getTime() === b.updated_at.getTime(),
+          href: `/masterdata/brands`,
+        })),
+        ...vendors.map((v) => ({
+          id: v.id, label: v.name, kind: "vendor" as const,
+          updatedAt: v.updated_at, isNew: v.created_at.getTime() === v.updated_at.getTime(),
+          href: `/masterdata/vendors`,
+        })),
+        ...skus.map((s) => ({
+          id: s.id, label: s.name ?? s.code ?? s.id, kind: "sku" as const,
+          updatedAt: s.updated_at, isNew: s.created_at.getTime() === s.updated_at.getTime(),
+          href: `/masterdata/skus`,
+        })),
+      ];
+      all.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+      return all.slice(0, limit);
     },
 
     ...unitService,
