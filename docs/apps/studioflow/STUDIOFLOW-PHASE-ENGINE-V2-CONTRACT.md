@@ -1,6 +1,6 @@
 # StudioFlow Phase Engine v2 — Contract
 
-Status: DRAFT
+Status: ACTIVE — ratified by owner implementation (R8.87–R8.93, 2026-09-16/17)
 Revision: R8.87
 Date: 2026-09-16
 Author: berkah.rad@gmail.com

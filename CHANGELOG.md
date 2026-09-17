@@ -5,8 +5,130 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.86**
-- Next local revision: **R8.87**
+- Current revision after this entry is committed: **R8.93**
+- Next local revision: **R8.94**
+
+## R8.93 | 2026-09-17 | fix(sf-v2): update tests and UI to match V2 FEEDBACK-only activity model
+
+### Fixed
+
+- `InlinePhaseAction`: renamed `onClick` → `onSelect` for `ButtonMenuItem`, added required `label` prop to `RadioGroup`, removed unsupported `size` prop from `ButtonMenu`.
+- `domain.test.ts`: dropped removed `openRevisionTodos`/`openDeferredTodos` fields from `PhaseBlockerCounts`; fixed `todoBlockers` assertions to use `openRootChecklistItems`; updated `FeedTask` mode `"TODO"` → `"FEEDBACK"`.
+- `service.integration.test.ts`: migrated integration tests to V2 semantics — `addActivity(mode:"TODO")` → `tasks.createItem` for all to-do scenarios; post-rejection conversion now creates `SfChecklistItem` (not `SfActivity`); deferred to-dos test covers `DEFER_FEEDBACK_BLOCKED` + reopen/override; Today test uses `createItem`; error code `GENERAL_FEEDBACK_NOT_ALLOWED` → `FEEDBACK_PHASE_REQUIRED`; removed compile-invalid `phaseId:null` call.
+
+### Verification
+
+- Automated checks not separately recorded for this commit.
+
+---
+
+## R8.92 | 2026-09-17 | feat(studioflow): project overview redesign — hero + stat cards + phase track
+
+### Changed
+
+- Overview page (`projects/[projectId]/page.tsx`): hero `SectionCard` with project name, code badge, status/priority badges, client name, and team chips (designer + drafter).
+- Stat grid (2×2 → 4 cols on `sm`): phases done/total, open to-dos, days open, active phase name.
+- `PipelineStrip` phase track: maps each phase to done/current/blocked/upcoming with accent colour dot and revision detail.
+- Phase cards section retained with inline `InlinePhaseAction` buttons (V2-D9).
+- General to-dos and project details sections retained.
+
+### Verification
+
+- Automated checks not separately recorded for this commit.
+
+---
+
+## R8.91 | 2026-09-17 | feat(studioflow): requirements + deliverables panels in phase workspace
+
+### Added
+
+- `phases/service.ts`: `listRequirements`, `createRequirement`, `toggleRequirement`, `deleteRequirement`; `listDeliverables`, `uploadDeliverable` (via `ObjectStorage`), `deleteDeliverable`.
+- Six new server actions: `createRequirementAction`, `toggleRequirementAction`, `deleteRequirementAction`, `uploadDeliverableAction` (multipart `FormData`), `deleteDeliverableAction`.
+- Phase page: parallel-fetches requirements + deliverables alongside checklist; renders `RequirementsPanel` + `DeliverablesPanel` in a two-column grid.
+- `RequirementsPanel`: check-to-mark-met with circle/checkmark toggle (`phaseWork`); inline add form gated on `projectManage`; phase-scoped vs project-wide separation.
+- `DeliverablesPanel`: file list with download links and delete (`projectManage`); file input for upload (`phaseWork`); accepts PDF/PNG/JPEG/WebP/ZIP ≤ 25 MB; MISSING/CURRENT/OUTDATED computed status; warning-only (does not block approval).
+
+### Verification
+
+- Automated checks not separately recorded for this commit.
+
+---
+
+## R8.90 | 2026-09-17 | feat(studioflow): phase template admin — service, actions, settings UI
+
+### Added
+
+- `phases/service.ts`: `phaseTemplates` block — `listPhaseTemplates`, `createPhaseTemplate`, `updatePhaseTemplate`, `deletePhaseTemplate`, `createPhaseDefinition`, `updatePhaseDefinition`, `deletePhaseDefinition`, `reorderPhaseDefinitions`; exports `PhaseTemplateView` + `PhaseDefinitionView`.
+- Seven new server actions for phase template CRUD + reorder, gated on `settingsManage`, with Zod input validation.
+- `studio-settings-view.tsx`: `PhaseTemplatesSection` + `PhaseDefDialog` components; row action menus per template and per definition; inline add-template form; move-up/down via `reorderPhaseDefinitionsAction`.
+- `settings/page.tsx`: fetches phase templates via `listPhaseTemplates` and passes to `StudioSettingsView`.
+
+### Verification
+
+- Automated checks not separately recorded for this commit.
+
+---
+
+## R8.89 | 2026-09-17 | feat(schedule): P0 design pass — split-view, stat bar, chip nav, Set final
+
+### Changed
+
+- `useIsDesktop` hook (matchMedia `md` breakpoint, SSR-safe).
+- `StatBar`: finals/photos count computed from `entries` prop; no additional server round-trip.
+- Desktop split-view grid (`md:grid-cols-[1fr_22rem]`); mobile retains Drawer.
+- Active-entry row highlight (`bg-surface-muted`).
+- Extracted `EntryPanelContent` shared between desktop panel and mobile Drawer.
+- Option chip nav: `scrollIntoView` on `id=opt-<id>` anchors; final chip styled green.
+- `Set final` button on card face for non-final options (in addition to `RowActionMenu`).
+- `EntryDrawer` reduced to a thin `Drawer` wrapper around `EntryPanelContent`.
+
+### Verification
+
+- Automated checks not separately recorded for this commit.
+
+---
+
+## R8.88 | 2026-09-16 | feat(studioflow): add InlinePhaseAction component for Overview phase cards (V2-D9)
+
+### Added
+
+- `inline-phase-action.tsx`: new client component rendering the primary phase action button + overflow menu inside phase cards on the Overview page. Handles bypass/reopen dialogs (reason textarea + intent `RadioGroup`) and `ConfirmDialog`s for reject/approve.
+
+### Verification
+
+- Automated checks not separately recorded for this commit.
+
+---
+
+## R8.87 | 2026-09-16 | feat(studioflow): Phase Engine v2 — V2-A domain + V2-B schema
+
+Owner-ratified decisions V2-D1 through V2-D9. Authority: `docs/apps/studioflow/STUDIOFLOW-PHASE-ENGINE-V2-CONTRACT.md`.
+
+### Changed (V2-A — domain, no schema change)
+
+- `SfActivity` restricted to FEEDBACK-only (`ActivityList` removes mode toggle; `addActivityAction` schema restricts mode to `FEEDBACK`; `phaseId` required).
+- Rejection (`rejectPhase`) now creates a `SfChecklistItem` instead of a `SfActivity(TODO)`.
+- `todoBlockers()` in `blockers.ts` gates `submitInternal` on `openRootChecklistItems`; removed `openRevisionTodos`/`openDeferredTodos` (always 0 under V2-D1).
+- `tasks/service.ts`: added `createItem()` for freestanding root `SfChecklistItem`; `addChecklistItemAction` replaces `addActivityAction` for todo creation.
+- Today quick-add uses `addChecklistItemAction`.
+- `revisionLabel(revision, prefix)` gains an optional `prefix` parameter (defaults to `"v"` for backward compat).
+- `overrideRevision` is forward-only (V2-D6).
+- `rejectInternal` removed from `ON_REVIEW_CLIENT` state; direct `submitClient` from `IN_PROGRESS` allowed; `bypass` from `PENDING` allowed (V2-D7, V2-D4).
+
+### Added (V2-B — new schema)
+
+- Prisma models: `SfPhaseTemplate`, `SfPhaseDefinition`, `SfRequirement`, `SfDeliverable`.
+- `SfPhase.definition_id`: nullable FK to `SfPhaseDefinition`.
+- `SfActivity.mode` default changed from `TODO` to `FEEDBACK`.
+- Migration: `prisma/migrations/20260916100000_sf_v2_phase_engine/migration.sql`.
+- New contract + audit: `docs/apps/studioflow/STUDIOFLOW-PHASE-ENGINE-V2-CONTRACT.md`, `docs/apps/studioflow/PHASE-ENGINE-V2-BASELINE-AUDIT.md`.
+
+### Verification
+
+- Migration authored; run `STUDIOFLOW_LOCATION=rumah npx prisma migrate dev` to apply locally.
+- Full automated suite and browser acceptance pending in `docs/review.md`.
+
+---
 
 ## R8.86 | 2026-09-16 | fix(studioflow): restore schedule photo add flow
 

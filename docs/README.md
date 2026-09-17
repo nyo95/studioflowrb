@@ -87,8 +87,10 @@ contracts sit outside any app folder because every app depends on them.
 
 | Contract | Owns |
 |---|---|
-| [`apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md`](apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md) | **sole active StudioFlow authority (R8.70):** legacy behavior on the Foundation — disposition matrix, permissions, Project/Phase/Revision/Task/Today, MOM, Schedule, centralization map, UI/UX direction |
-| [`apps/studioflow/D-SF-RECOVERY-DISCOVERY.md`](apps/studioflow/D-SF-RECOVERY-DISCOVERY.md) | R8.48 pinned legacy evidence; D-SF decisions apply except where the rework contract §9 overrides them |
+| [`apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md`](apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md) | **active StudioFlow authority (R8.70):** legacy behavior on the Foundation — disposition matrix, permissions, Project/Phase/Revision/Task/Today, MOM, Schedule, centralization map, UI/UX direction. Read alongside the V2 contract. |
+| [`apps/studioflow/STUDIOFLOW-PHASE-ENGINE-V2-CONTRACT.md`](apps/studioflow/STUDIOFLOW-PHASE-ENGINE-V2-CONTRACT.md) | **co-equal authority (R8.87, active):** supersedes listed clauses of the rework contract — phase state machine, Todo SSOT (SfChecklistItem), phase definition schema (SfPhaseTemplate/SfPhaseDefinition), SfRequirement, SfDeliverable, Overview as main workspace |
+| [`apps/studioflow/PHASE-ENGINE-V2-BASELINE-AUDIT.md`](apps/studioflow/PHASE-ENGINE-V2-BASELINE-AUDIT.md) | Planner evidence: baseline audit of V2 draft vs codebase at R8.86 — confirms V2 contract does not conflict with stored state |
+| [`apps/studioflow/D-SF-RECOVERY-DISCOVERY.md`](apps/studioflow/D-SF-RECOVERY-DISCOVERY.md) | R8.48 pinned legacy evidence; D-SF decisions apply except where the rework contract §9 or V2 contract overrides them |
 | [`archive/studioflow-rb/`](archive/studioflow-rb/) | **superseded** rebuild StudioFlow contracts and R7 work orders (moved in R8.71); history only |
 
 Execution and continuity are governed by [`AGENTS.md`](../AGENTS.md) and
@@ -143,14 +145,17 @@ Forbidden: `platform -> app`, cross-app internal imports, implicit cross-app wri
 
 ## Active sequence
 
-Status: **SF-R1–SF-RF wave 1 accepted in R8.75 (2026-09-15).** Foundation
-sequence (1–5 below) is complete. StudioFlow wave-1 rework is complete. Wave 2
-items are in `roadmap.md` under "Wave 2 (not activated)"; no activation yet.
+Status: **Phase Engine v2 (R8.87–R8.93) implemented 2026-09-16/17.** Foundation
+sequence (1–5 below) is complete. StudioFlow wave-1 rework is complete. Phase
+Engine v2 (V2-A through V2-D) is implemented; V2-E (destructive migration) is
+pending a separate owner decision. Wave 2 features not covered by V2 remain in
+`roadmap.md`.
 
 1. **Platform Foundation — routing first.** ✓ Accepted R8.34–R8.61.
 2. **UI Engine and Shared Utilities.** ✓ Accepted R8.56–R8.59.
 3. **BQ.** Implemented; browser acceptance in `review.md`.
 4. **AI file-organization exploration is parked**, not pursued for now.
 5. **StudioFlow wave-1 rework (SF-R1–SF-RF).** ✓ Accepted R8.71–R8.75.
+6. **StudioFlow Phase Engine v2 (V2-A–V2-D).** Implemented R8.87–R8.93; browser acceptance in `review.md`.
 
 Documented deferred capabilities are routing memory, not implementation scope. Do not create code, folders, dependencies, or placeholder exports until a stage/consumer activates them.

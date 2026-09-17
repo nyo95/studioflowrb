@@ -2,7 +2,7 @@
 
 Plan ID: KB-033-SCHEDULE-PHOTO-ADD-FLOW
 Scope: Restore legacy-functional Product Schedule photo flow.
-Status: READY (implemented locally in R8.86; browser acceptance pending)
+Status: IMPLEMENTED — R8.86 committed; browser acceptance pending
 Priority: P1
 Owner: Repository owner
 Last updated: 2026-09-16

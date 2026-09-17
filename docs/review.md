@@ -248,6 +248,25 @@ No item currently ready for review.
   Schedule flow with zero console errors. Local checks and the SF-RF browser
   pass remain with the local executor.
 
+### KB-033 — Schedule add-option photo flow (R8.86)
+
+- **Built:** `Add option` / `Edit option` dialogs include the 4:5 `ImageWorkspace` photo flow. A new option with a prepared photo creates the option first, then saves the photo onto that `optionId`. Existing option cards show a visible `Add photo` / `Change photo` text action under the thumbnail (matching legacy CatalogBoard behavior).
+- **To check:** Browser walk of the Schedule page on a reserved row: open `Add option`, prepare a photo, save, confirm the new option shows the photo and the row thumbnail updates. Also confirm an existing option exposes a visible `Change photo` action. Drafter read-only and archived-project read-only remain unchanged.
+
+### Phase Engine v2 — V2-A through V2-D (R8.87–R8.93)
+
+- **Built:** SfActivity restricted to FEEDBACK-only; SfChecklistItem as sole Todo SSOT; SfRequirement (warning-only, no evidence); SfDeliverable (MISSING/CURRENT/OUTDATED, warning-only, ObjectStorage-backed); SfPhaseTemplate + SfPhaseDefinition schema; Overview v2 (hero, stat cards, PipelineStrip, phase cards with inline `InlinePhaseAction`); phase template admin UI (Studio Settings); requirements + deliverables panels on phase page; Schedule P0 split-view + stat bar + chip nav + Set-final on card face.
+- **Schema migration:** `prisma/migrations/20260916100000_sf_v2_phase_engine/migration.sql` — run `STUDIOFLOW_LOCATION=rumah npx prisma migrate dev` before browser acceptance.
+- **Verification (automated):** not separately recorded for each commit; tests were updated in `d934e8f` to match V2 semantics — run `npm test`, `npm run typecheck`, `npm run lint`, `npm run check:boundaries`, `npm run check:legacy-runtime`, `npm run build` before browser walk.
+- **To check (browser):**
+  - Phase Engine v2: project Overview (hero, stat cards, pipeline strip, phase cards with inline actions); bypass a non-applicable phase; submit directly to client from IN_PROGRESS (skip internal review); confirm rejectInternal is absent from ON_REVIEW_CLIENT state.
+  - Phase template admin: Studio Settings → Phase Templates (create template, add/rename/reorder definition, delete empty definition); new project bootstrap uses the active template.
+  - Requirements panel: phase page — add requirement, mark met, delete; project-wide vs phase-scoped separation.
+  - Deliverables panel: upload PDF/image ≤ 25 MB, download link works, delete removes file; MISSING/CURRENT/OUTDATED status shown; does not block approval.
+  - Schedule P0: desktop split-view, stat bar counts, chip nav scrolls to option, Set final button on card face.
+  - Today + History: FEEDBACK-only activities (no TODO-mode activity should appear); general to-dos are SfChecklistItem.
+  - All at desktop (1440 px) and 375 px.
+
 ### Owner review corrections — Schedule photos and template settings (R8.81)
 
 - **Built:** option photos (add/change/remove, 4:5 crop, thumbnails in the

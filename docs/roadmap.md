@@ -163,19 +163,30 @@ rest of the rebuild StudioFlow.
   reuse from past projects, CSV import, typed snapshots, Master Data Brand read
   through the public port. Closes KB-003 and KB-021.~~ Implemented R8.73; corrections R8.74; browser acceptance passed SF-RF (R8.75).
 
-### Wave 2 (not activated)
+### Phase Engine v2 (R8.87–R8.93, activated 2026-09-16/17)
+
+Authority: `docs/apps/studioflow/STUDIOFLOW-PHASE-ENGINE-V2-CONTRACT.md`.
+Supersedes listed clauses of the rework contract.
+
+- [x] ~~**V2-A** — SfActivity FEEDBACK-only; SfChecklistItem as sole Todo SSOT; bypass/rejectInternal changes; revisionLabel prefix parameter.~~ R8.87.
+- [x] ~~**V2-B** — Schema: SfPhaseTemplate, SfPhaseDefinition, SfRequirement, SfDeliverable; SfPhase.definition_id FK.~~ R8.87.
+- [x] ~~**V2-C** — Overview v2: hero, stat cards, PipelineStrip phase track, phase cards with inline actions.~~ R8.87–R8.92.
+- [x] ~~**V2-D** — Phase template admin UI (CRUD + reorder for SfPhaseTemplate/SfPhaseDefinition in Studio Settings).~~ R8.90.
+- [x] ~~**Schedule P0** — split-view desktop layout, stat bar, option chip nav, Set final on card face.~~ R8.89.
+- [x] ~~**Requirements + Deliverables panels** — phase workspace panels; SfRequirement create/toggle/delete; SfDeliverable upload/download/delete via ObjectStorage.~~ R8.91.
+- [ ] **V2-E** — Full enum-to-definition migration: drop `SfPhaseKey`, make `definition_id` required. **Destructive — separate owner migration decision required.**
+
+Browser acceptance for R8.87–R8.93 is pending in `review.md`.
+
+### Wave 2 (remaining — not activated)
 
 - [ ] CD drawing list per CD phase.
-- [ ] Deliverables/files per revision through `ObjectStorage` (retention and
-  client-delivery decisions still open).
 - [ ] Library / Brand discovery page (read-only Master Data port).
 - [ ] Product requests and vendor follow-up (needs a Master Data write-port
   decision).
 - [ ] Task comments and StudioFlow-global collaboration (D-SF-05).
 - [ ] Upcoming / planning timeline (D-SF-01).
 - [ ] SketchUp integration (D-SF-06).
-- [ ] Phase accent palette (contract §13.8) — implemented in R8.84; browser
-  acceptance pending in `docs/review.md` before this can be closed.
 
 ### Owner review 2026-09-16 — design pass (not activated)
 
