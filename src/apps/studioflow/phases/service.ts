@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
+import { createPrivateObjectKey } from "@platform/core/storage";
 
 import { fullBlockers, todoBlockers } from "../domain/blockers";
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
@@ -682,5 +683,131 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     };
   }
 
-  return { ...commands, ...activities, ...reads, ...phaseTemplates };
+  // ── Requirements ────────────────────────────────────────────────────────
+
+  const requirements = {
+    async listRequirements(input: ReadContext & { projectId: string; phaseId: string }) {
+      requireRead(input.grants);
+      const rows = await db.sfRequirement.findMany({
+        where: { project_id: input.projectId, OR: [{ phase_id: input.phaseId }, { phase_id: null }] },
+        orderBy: [{ phase_id: "desc" }, { created_at: "asc" }],
+      });
+      return rows.map((r) => ({
+        id: r.id,
+        phaseId: r.phase_id,
+        title: r.title,
+        description: r.description,
+        isMet: r.is_met,
+        metAt: r.met_at,
+        metById: r.met_by_id,
+        createdAt: r.created_at,
+      }));
+    },
+
+    async createRequirement(input: CommandContext & { projectId: string; phaseId: string; title: string; description?: string | null }) {
+      requireCommand(input, P.projectManage);
+      const title = requiredText(input.title, "REQUIREMENT_TITLE_REQUIRED", "Title", 400);
+      const description = input.description?.trim() || null;
+      await runTransaction(async (tx) => {
+        const phase = await tx.sfPhase.findUnique({ where: { id: input.phaseId }, select: { id: true, project_id: true } });
+        if (!phase || phase.project_id !== input.projectId) throw notFound("phase");
+        await tx.sfRequirement.create({ data: { project_id: input.projectId, phase_id: input.phaseId, title, description, created_by_id: input.actor.userId } });
+      });
+      return { phaseId: input.phaseId };
+    },
+
+    async toggleRequirement(input: CommandContext & { projectId: string; requirementId: string; met: boolean }) {
+      requireCommand(input, P.phaseWork);
+      await runTransaction(async (tx) => {
+        const req = await tx.sfRequirement.findUnique({ where: { id: input.requirementId }, select: { id: true, project_id: true, is_met: true } });
+        if (!req || req.project_id !== input.projectId) throw notFound("requirement");
+        await tx.sfRequirement.update({
+          where: { id: req.id },
+          data: { is_met: input.met, met_at: input.met ? new Date() : null, met_by_id: input.met ? input.actor.userId : null },
+        });
+      });
+      return { requirementId: input.requirementId };
+    },
+
+    async deleteRequirement(input: CommandContext & { projectId: string; requirementId: string }) {
+      requireCommand(input, P.projectManage);
+      await runTransaction(async (tx) => {
+        const req = await tx.sfRequirement.findUnique({ where: { id: input.requirementId }, select: { id: true, project_id: true } });
+        if (!req || req.project_id !== input.projectId) throw notFound("requirement");
+        await tx.sfRequirement.delete({ where: { id: req.id } });
+      });
+      return { requirementId: input.requirementId };
+    },
+  };
+
+  // ── Deliverables ─────────────────────────────────────────────────────────
+
+  const DELIVERABLE_SIGNED_URL_SECONDS = 3600;
+  const DELIVERABLE_ALLOWED_TYPES: Record<string, string> = {
+    "application/pdf": "pdf",
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/webp": "webp",
+    "application/zip": "zip",
+  };
+  const DELIVERABLE_MAX_BYTES = 25 * 1024 * 1024; // 25 MB
+
+  const deliverables = {
+    async listDeliverables(input: ReadContext & { projectId: string; phaseId: string }) {
+      requireRead(input.grants);
+      const rows = await db.sfDeliverable.findMany({
+        where: { project_id: input.projectId, phase_id: input.phaseId },
+        orderBy: { created_at: "asc" },
+      });
+      return Promise.all(
+        rows.map(async (d) => ({
+          id: d.id,
+          name: d.name,
+          contentType: d.content_type,
+          fileSizeBytes: d.file_size_bytes,
+          revisionId: d.revision_id,
+          createdAt: d.created_at,
+          url: await ports.storage.createSignedReadUrl(d.storage_key, DELIVERABLE_SIGNED_URL_SECONDS),
+        })),
+      );
+    },
+
+    async uploadDeliverable(input: CommandContext & { projectId: string; phaseId: string; name: string; file: { body: Uint8Array; contentType: string } }) {
+      requireCommand(input, P.phaseWork);
+      const name = requiredText(input.name, "DELIVERABLE_NAME_REQUIRED", "File name", 200);
+      const ext = DELIVERABLE_ALLOWED_TYPES[input.file.contentType];
+      if (!ext) throw invalid("DELIVERABLE_TYPE", "Unsupported file type.");
+      const bytes = input.file.body.byteLength;
+      if (bytes === 0 || bytes > DELIVERABLE_MAX_BYTES) throw invalid("DELIVERABLE_SIZE", "File must be smaller than 25 MB.");
+
+      const key = createPrivateObjectKey(`studioflow/deliverables/${input.projectId}`, ext);
+      await ports.storage.put({ key, contentType: input.file.contentType, bytes, body: input.file.body });
+      try {
+        await runTransaction(async (tx) => {
+          const phase = await tx.sfPhase.findUnique({ where: { id: input.phaseId }, select: { id: true, project_id: true, revisions: { where: { status: "ACTIVE" }, select: { id: true }, take: 1 } } });
+          if (!phase || phase.project_id !== input.projectId) throw notFound("phase");
+          const revisionId = phase.revisions[0]?.id ?? null;
+          await tx.sfDeliverable.create({ data: { project_id: input.projectId, phase_id: input.phaseId, revision_id: revisionId, name, storage_key: key, file_size_bytes: bytes, content_type: input.file.contentType, created_by_id: input.actor.userId } });
+        });
+      } catch (error) {
+        await ports.storage.remove(key).catch(() => undefined);
+        throw error;
+      }
+      return { phaseId: input.phaseId };
+    },
+
+    async deleteDeliverable(input: CommandContext & { projectId: string; deliverableId: string }) {
+      requireCommand(input, P.projectManage);
+      const key = await runTransaction(async (tx) => {
+        const d = await tx.sfDeliverable.findUnique({ where: { id: input.deliverableId }, select: { id: true, project_id: true, storage_key: true } });
+        if (!d || d.project_id !== input.projectId) throw notFound("deliverable");
+        await tx.sfDeliverable.delete({ where: { id: d.id } });
+        return d.storage_key;
+      });
+      await ports.storage.remove(key).catch(() => undefined);
+      return { deliverableId: input.deliverableId };
+    },
+  };
+
+  return { ...commands, ...activities, ...reads, ...phaseTemplates, ...requirements, ...deliverables };
 }

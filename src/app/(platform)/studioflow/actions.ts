@@ -886,3 +886,65 @@ export async function reorderPhaseDefinitionsAction(input: z.infer<typeof PhaseD
     return result;
   });
 }
+
+// ── Requirements ──────────────────────────────────────────────────────────
+
+const RequirementCreate = z.strictObject({ projectId: Id, phaseId: Id, title: z.string().min(1).max(400), description: z.string().max(2000).nullish() });
+export async function createRequirementAction(input: z.infer<typeof RequirementCreate>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(RequirementCreate, input);
+    const result = await studioFlow.phases.createRequirement({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+const RequirementToggle = z.strictObject({ projectId: Id, requirementId: Id, met: z.boolean() });
+export async function toggleRequirementAction(input: z.infer<typeof RequirementToggle>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(RequirementToggle, input);
+    const result = await studioFlow.phases.toggleRequirement({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+const RequirementDelete = z.strictObject({ projectId: Id, requirementId: Id });
+export async function deleteRequirementAction(input: z.infer<typeof RequirementDelete>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(RequirementDelete, input);
+    const result = await studioFlow.phases.deleteRequirement({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+// ── Deliverables ──────────────────────────────────────────────────────────
+
+const DeliverableRef = z.strictObject({ projectId: Id, deliverableId: Id });
+export async function deleteDeliverableAction(input: z.infer<typeof DeliverableRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(DeliverableRef, input);
+    const result = await studioFlow.phases.deleteDeliverable({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+const DeliverableUploadMeta = z.strictObject({ projectId: Id, phaseId: Id, name: z.string().min(1).max(200) });
+/** Multipart upload: `projectId`, `phaseId`, `name`, `file`. Size policy lives in the service. */
+export async function uploadDeliverableAction(formData: FormData): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(DeliverableUploadMeta, { projectId: formData.get("projectId"), phaseId: formData.get("phaseId"), name: formData.get("name") });
+    const file = formData.get("file");
+    if (!(file instanceof File)) throw new AppError("VALIDATION", "DELIVERABLE_FILE_REQUIRED", "Choose a file.");
+    const result = await studioFlow.phases.uploadDeliverable({ ...ctx, ...data, file: { body: new Uint8Array(await file.arrayBuffer()), contentType: file.type } });
+    refresh(data.projectId);
+    return result;
+  });
+}
