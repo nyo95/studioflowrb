@@ -94,13 +94,12 @@ export function InlinePhaseAction({
 
         {secondaryCommands.length > 0 ? (
           <ButtonMenu
-            size="sm"
             variant="ghost"
             label="More"
             items={secondaryCommands.map((cmd) => ({
               label: PHASE_COMMAND_LABELS[cmd],
               disabled: isDisabled(cmd) || pending,
-              onClick: () => handleClick(cmd),
+              onSelect: () => handleClick(cmd),
             }))}
           />
         ) : null}
@@ -120,6 +119,7 @@ export function InlinePhaseAction({
         {reasonFor === "reopen" ? (
           <Field label="New revision intent">
             <RadioGroup
+              label="New revision intent"
               value={intent}
               onValueChange={(v) => setIntent(v as "INTERNAL" | "CLIENT")}
               options={[

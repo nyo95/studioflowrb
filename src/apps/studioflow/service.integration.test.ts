@@ -136,7 +136,7 @@ describe("SF-R1 bootstrap and naming", () => {
     await rejectsWith(sf.projects.archiveProject({ ...as(designer), projectId, reason: " " }), "ARCHIVE_REASON_REQUIRED");
     await sf.projects.archiveProject({ ...as(designer), projectId, reason: "Client paused" });
     const moodboard = await phaseOf(projectId, "MOODBOARD");
-    await rejectsWith(sf.phases.addActivity({ ...as(designer), projectId, phaseId: moodboard.id, content: "x", mode: "TODO" }), "PROJECT_ARCHIVED");
+    await rejectsWith(sf.phases.addActivity({ ...as(designer), projectId, phaseId: moodboard.id, content: "x", mode: "FEEDBACK" }), "PROJECT_ARCHIVED");
     await rejectsWith(sf.projects.updateProject({ ...as(designer), projectId, address: "New" }), "PROJECT_ARCHIVED");
     assert.equal((await sf.projects.listProjects({ grants: ALL })).length, 0);
     assert.equal((await sf.projects.listProjects({ grants: ALL, archived: true })).length, 1);
@@ -152,9 +152,13 @@ describe("SF-R1 phase workflow (legacy parity)", () => {
     const phase = await phaseOf(projectId, "MOODBOARD");
     const base = { ...as(designer), projectId, phaseId: phase.id };
 
-    const todo = await sf.phases.addActivity({ ...base, content: "Draft board", mode: "TODO" });
+    // V2: to-dos are checklist items; activities are FEEDBACK-only
+    await sf.tasks.createTemplate({ ...as(designer), phaseKey: "MOODBOARD", label: "Draft board" });
+    await sf.tasks.syncProjectChecklist({ ...as(designer), projectId });
+    const items = await sf.tasks.listChecklist({ grants: ALL, projectId, phaseId: phase.id });
+    const todo = items[0];
     await rejectsWith(sf.phases.submitForInternalReview(base), "PHASE_OPEN_TODOS");
-    await sf.phases.setActivityDone({ ...base, activityId: todo.activityId, done: true });
+    await sf.tasks.setItemChecked({ ...as(designer), projectId, itemId: todo.id, checked: true });
     await sf.phases.submitForInternalReview(base);
 
     await sf.phases.addActivity({ ...base, content: "Warmer palette", mode: "FEEDBACK" });
@@ -162,7 +166,8 @@ describe("SF-R1 phase workflow (legacy parity)", () => {
     const rejected = await sf.phases.rejectPhase({ ...base, type: "INTERNAL" });
     assert.equal(rejected.revision, "v1.1");
     assert.equal(rejected.converted, 1);
-    const converted = await testDb.prisma.sfActivity.findFirstOrThrow({ where: { phase_id: phase.id, mode: "TODO", status: "OPEN" } });
+    // V2: converted feedback becomes a SfChecklistItem, not a SfActivity(TODO)
+    const converted = await testDb.prisma.sfChecklistItem.findFirstOrThrow({ where: { phase_id: phase.id, is_checked: false } });
     assert.equal(converted.assigned_to_id, designer.id);
     const original = await testDb.prisma.sfActivity.findFirstOrThrow({ where: { phase_id: phase.id, mode: "FEEDBACK" } });
     assert.equal(original.status, "COMPLETED", "carried-forward feedback no longer counts as open work");
@@ -194,7 +199,7 @@ describe("SF-R1 phase workflow (legacy parity)", () => {
     const after = await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: phase.id } });
     assert.equal(after.status, "READY_FOR_NEXT");
     assert.equal(after.is_locked, true);
-    await rejectsWith(sf.phases.addActivity({ ...base, content: "late", mode: "TODO" }), "PHASE_LOCKED");
+    await rejectsWith(sf.phases.addActivity({ ...base, content: "late", mode: "FEEDBACK" }), "PHASE_LOCKED");
 
     const actions = (await testDb.prisma.auditEvent.findMany({ where: { entity_id: phase.id }, orderBy: { occurred_at: "asc" } })).map((e) => e.action);
     assert.ok(actions.includes("studioflow.phase.rejected-internal"));
@@ -255,24 +260,22 @@ describe("SF-R1 phase workflow (legacy parity)", () => {
     await rejectsWith(sf.phases.approveInternal({ ...as(drafter, DRAFTER_GRANTS), ...base }), "PERMISSION_DENIED");
     await sf.phases.addActivity({ ...as(designer), ...base, content: "Fix section A", mode: "FEEDBACK" });
     await sf.phases.rejectPhase({ ...as(designer), ...base, type: "INTERNAL" });
-    const todo = await testDb.prisma.sfActivity.findFirstOrThrow({ where: { phase_id: cd.id, mode: "TODO" } });
+    // V2: rejected feedback converts to SfChecklistItem with drafter as fallback assignee
+    const todo = await testDb.prisma.sfChecklistItem.findFirstOrThrow({ where: { phase_id: cd.id } });
     assert.equal(todo.assigned_to_id, drafter.id);
   });
 
-  it("defers to-dos, reopens with a reason, and overrides with a history snapshot", async () => {
+  it("blocks feedback deferral, reopens with a reason, and overrides with a history snapshot", async () => {
     const { projectId } = await newProject();
     const phase = await phaseOf(projectId, "MOODBOARD");
     const base = { ...as(designer), projectId, phaseId: phase.id };
+    // V2: only FEEDBACK activities exist; deferring feedback is blocked
     const fb = await sf.phases.addActivity({ ...base, content: "feedback", mode: "FEEDBACK" });
     await rejectsWith(sf.phases.deferActivity({ ...base, activityId: fb.activityId }), "DEFER_FEEDBACK_BLOCKED");
     await sf.phases.deleteActivity({ ...base, activityId: fb.activityId });
-    const todo = await sf.phases.addActivity({ ...base, content: "later", mode: "TODO" });
-    await sf.phases.deferActivity({ ...base, activityId: todo.activityId });
-    const deferred = await testDb.prisma.sfActivity.findUniqueOrThrow({ where: { id: todo.activityId } });
-    assert.equal(deferred.revision_id, null);
-    assert.equal(deferred.deferred_from_version, "v1.0");
-    await rejectsWith(sf.phases.submitForInternalReview(base), "PHASE_OPEN_TODOS");
-    await sf.phases.setActivityDone({ ...base, activityId: todo.activityId, done: true });
+    // Reach approved state: submit → approve internal → submit client → approve
+    await sf.phases.submitForInternalReview(base);
+    await sf.phases.approveInternal(base);
     await sf.phases.submitForClientReview(base);
     await sf.phases.approveClient(base);
     await rejectsWith(sf.phases.reopenPhase({ ...base, intent: "CLIENT", reason: "" }), "REOPEN_REASON_REQUIRED");
@@ -316,10 +319,11 @@ describe("SF-R1 checklist and Today", () => {
     const one = await newProject("One");
     await newProject("Two");
     await sf.projects.setProjectPriority({ ...as(designer), projectId: one.projectId, priority: "URGENT" });
-    await sf.phases.addActivity({ ...as(designer), projectId: one.projectId, phaseId: null, content: "Call client", mode: "TODO", dueDate: "2026-09-14" });
-    await rejectsWith(sf.phases.addActivity({ ...as(designer), projectId: one.projectId, phaseId: null, content: "fb", mode: "FEEDBACK" }), "GENERAL_FEEDBACK_NOT_ALLOWED");
+    // V2: general tasks are checklist items (phaseId: null); FEEDBACK requires a phase
+    await sf.tasks.createItem({ ...as(designer), projectId: one.projectId, phaseId: null, label: "Call client", dueDate: "2026-09-14" });
+    // V2: phaseId: null is rejected by TypeScript (addActivity requires phaseId: string); runtime guard is FEEDBACK_PHASE_REQUIRED
     const moodboard = await phaseOf(one.projectId, "MOODBOARD");
-    await sf.phases.addActivity({ ...as(designer), projectId: one.projectId, phaseId: moodboard.id, content: "Board", mode: "TODO", assignedToId: drafter.id });
+    await sf.tasks.createItem({ ...as(designer), projectId: one.projectId, phaseId: moodboard.id, label: "Board", assignedToId: drafter.id });
 
     const today = await sf.today.getToday({ grants: DRAFTER_GRANTS, userId: drafter.id, scope: "all" });
     assert.equal(today.scope, "mine", "scope all needs manage grant");

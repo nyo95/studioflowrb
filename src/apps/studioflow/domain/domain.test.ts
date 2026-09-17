@@ -91,15 +91,15 @@ describe("phase policy (legacy parity)", () => {
 });
 
 describe("blockers", () => {
-  const counts = { openRevisionActivities: 2, openRevisionTodos: 1, openDeferredActivities: 1, openDeferredTodos: 0, openRootChecklistItems: 3 };
+  const counts = { openRevisionActivities: 2, openDeferredActivities: 1, openRootChecklistItems: 3 };
   it("counts root checklist, revision and deferred items for approval", () => {
     const result = fullBlockers(counts);
     assert.equal(result.total, 6);
     assert.equal(result.reasons.length, 3);
   });
-  it("counts only to-dos for internal submission", () => {
-    assert.equal(todoBlockers(counts).total, 1);
-    assert.equal(todoBlockers({ ...counts, openRevisionTodos: 0 }).total, 0);
+  it("counts only checklist items for internal submission", () => {
+    assert.equal(todoBlockers(counts).total, 3);
+    assert.equal(todoBlockers({ ...counts, openRootChecklistItems: 0 }).total, 0);
   });
 });
 
@@ -151,8 +151,8 @@ describe("today feed", () => {
   const rows: FeedTask[] = [
     { ...base, key: "checklist:c", id: "c", source: "checklist", label: "child", isChecked: false, priority: 4, dueDate: null, mode: null, parentId: "r" },
     { ...base, key: "checklist:r", id: "r", source: "checklist", label: "root", isChecked: false, priority: 2, dueDate: null, mode: null, parentId: null },
-    { ...base, key: "activity:a", id: "a", source: "activity", label: "todo", isChecked: false, priority: 4, dueDate: "2026-09-01", mode: "TODO", parentId: null },
-    { ...base, key: "activity:d", id: "d", source: "activity", label: "done", isChecked: true, priority: 4, dueDate: "2026-08-01", mode: "TODO", parentId: null },
+    { ...base, key: "activity:a", id: "a", source: "activity", label: "todo", isChecked: false, priority: 4, dueDate: "2026-09-01", mode: "FEEDBACK", parentId: null },
+    { ...base, key: "activity:d", id: "d", source: "activity", label: "done", isChecked: true, priority: 4, dueDate: "2026-08-01", mode: "FEEDBACK", parentId: null },
   ];
   it("nests, sorts, and keeps empty projects", () => {
     const nested = nestFeed(rows);
