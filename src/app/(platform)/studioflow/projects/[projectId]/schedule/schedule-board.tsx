@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowDown, ArrowUp, FileUp, History, ImageIcon, Plus, Search, Settings2 } from "lucide-react";
+import { ArrowDown, ArrowUp, FileUp, History, ImageIcon, Plus, Search, Settings2, X } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import {
   Badge,
@@ -96,7 +96,7 @@ const STATUS_LABEL: Record<string, { label: string; tone: "success" | "neutral" 
 type Command = ReturnType<typeof useCommand>;
 
 function specLine(option: Pick<ScheduleOptionView, "skuText" | "color" | "finishing" | "dimension">) {
-  return [option.skuText, option.color, option.finishing, option.dimension].filter(Boolean).join(" · ");
+  return [option.skuText, option.color, option.finishing, option.dimension].filter(Boolean).join(" \u00b7 ");
 }
 
 function finalOf(entry: ScheduleEntryView) {
@@ -125,6 +125,36 @@ function Thumb({ url, alt, className = "h-10 w-8" }: { url: string | null; alt: 
   );
 }
 
+// ── Responsive hook ───────────────────────────────────────────────────────────
+
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    setIsDesktop(mq.matches);
+    const listener = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener("change", listener);
+    return () => mq.removeEventListener("change", listener);
+  }, []);
+  return isDesktop;
+}
+
+// ── Stat bar ──────────────────────────────────────────────────────────────────
+
+function StatBar({ entries, section }: { entries: readonly ScheduleEntryView[]; section: Section }) {
+  const sectionEntries = useMemo(() => entries.filter((e) => e.section === section), [entries, section]);
+  const total = sectionEntries.length;
+  const finalized = sectionEntries.filter((e) => e.options.some((o) => o.isFinal)).length;
+  const withPhotos = sectionEntries.filter((e) => e.options.some((o) => o.imageUrl !== null)).length;
+  if (total === 0) return null;
+  return (
+    <div className="flex gap-4 border-b border-line-subtle px-(--ui-section-px) py-2 text-sm text-ink-secondary">
+      <span><span className="font-semibold text-ink">{finalized}</span> / {total} finalized</span>
+      <span><span className="font-semibold text-ink">{withPhotos}</span> photos</span>
+    </div>
+  );
+}
+
 export function ScheduleBoard({
   projectId,
   entries,
@@ -144,6 +174,7 @@ export function ScheduleBoard({
   const command = useCommand();
   const { run, isPending, error } = command;
   const confirm = useConfirm();
+  const isDesktop = useIsDesktop();
   const [section, setSection] = useState<Section>(() => (entries.some((e) => e.section === "MATERIAL") || !entries.length ? "MATERIAL" : "FIXTURE"));
   const [openId, setOpenId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<null | "add" | "import" | { move: ScheduleEntryView }>(null);
@@ -212,6 +243,8 @@ export function ScheduleBoard({
         ) : null}
       </div>
 
+      <StatBar entries={entries} section={section} />
+
       {error && !open && !dialog ? <InlineError className="px-(--ui-section-px) pt-2">{error}</InlineError> : null}
 
       {groups.length === 0 ? (
@@ -221,67 +254,102 @@ export function ScheduleBoard({
           className="py-10"
         />
       ) : (
-        <div className="grid">
-          {groups.map((group) => (
-            <section key={group.category} className="border-b border-line-subtle last:border-b-0">
-              <div className="flex items-baseline gap-2 bg-surface-muted px-(--ui-section-px) py-1.5">
-                <h3 className="m-0 text-xs font-semibold uppercase tracking-[0.08em] text-ink-secondary">{group.category}</h3>
-                <Text size="sm" tone="tertiary">{group.rows.length}</Text>
+        <div className={`grid ${open && isDesktop ? "md:grid-cols-[1fr_22rem]" : ""}`}>
+          <div className="grid">
+            {groups.map((group) => (
+              <section key={group.category} className="border-b border-line-subtle last:border-b-0">
+                <div className="flex items-baseline gap-2 bg-surface-muted px-(--ui-section-px) py-1.5">
+                  <h3 className="m-0 text-xs font-semibold uppercase tracking-[0.08em] text-ink-secondary">{group.category}</h3>
+                  <Text size="sm" tone="tertiary">{group.rows.length}</Text>
+                </div>
+                <ul className="m-0 list-none divide-y divide-line-subtle p-0">
+                  {group.rows.map((entry, index) => {
+                    const final = finalOf(entry);
+                    const busy = command.pendingKeys.some((key) => key.startsWith(entry.id));
+                    return (
+                      <li key={entry.id} className={`flex items-center gap-3 px-(--ui-section-px) py-2 ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"}`}>
+                        <button type="button" onClick={() => setOpenId(entry.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                          <Thumb url={final?.imageUrl ?? null} alt={final ? final.productName : `${entry.code} has no photo`} />
+                          <span className="w-14 shrink-0 font-ui-mono text-sm font-semibold tabular-nums text-ink">{entry.code}</span>
+                          <span className="grid min-w-0 flex-1 gap-0.5">
+                            {final ? (
+                              <>
+                                <span className="truncate text-sm font-medium text-ink">
+                                  {final.productName}
+                                  {final.brandName ? <span className="font-normal text-ink-secondary"> \u00b7 ex. {final.brandName}</span> : null}
+                                </span>
+                                {specLine(final) ? <span className="truncate text-xs text-ink-tertiary">{specLine(final)}</span> : null}
+                              </>
+                            ) : (
+                              <span className="text-sm italic text-ink-tertiary">{entry.options.length ? "No final option yet" : "Reserved \u2014 no product yet"}</span>
+                            )}
+                          </span>
+                          <span className="hidden w-28 shrink-0 truncate text-sm text-ink-secondary sm:block">{entry.location ?? ""}</span>
+                          <span className="hidden w-20 shrink-0 text-right text-sm tabular-nums text-ink-secondary sm:block">{entry.qty ? `${entry.qty} ${entry.unit ?? ""}` : ""}</span>
+                          {entry.options.length > 1 ? <Badge>{entry.options.length} options</Badge> : null}
+                        </button>
+                        {canEdit || canManageTemplates ? (
+                          <RowActionMenu
+                            label={`Actions for ${entry.code}`}
+                            pending={busy}
+                            items={[
+                              { label: "Open", onSelect: () => setOpenId(entry.id) },
+                              ...(canManageTemplates && templateSourceOf(entry)
+                                ? [{ label: "Save as template item", onSelect: () => void run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })) }]
+                                : []),
+                              ...(canEdit ? [
+                              { label: "Move up", icon: <ArrowUp className="h-3.5 w-3.5" />, disabled: index === 0, separatorBefore: true, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "up" })) },
+                              { label: "Move down", icon: <ArrowDown className="h-3.5 w-3.5" />, disabled: index === group.rows.length - 1, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "down" })) },
+                              { label: "Move to category\u2026", onSelect: () => setDialog({ move: entry }) },
+                              { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeEntry(entry) },
+                              ] : []),
+                            ]}
+                          />
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
+          </div>
+
+          {/* Desktop inline panel */}
+          {open && isDesktop ? (
+            <div className="hidden md:flex md:flex-col border-l border-line-subtle">
+              <div className="flex shrink-0 items-start justify-between gap-2 border-b border-line-subtle px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold leading-tight text-ink">{open.code} \u00b7 {open.category}</p>
+                  <p className="text-xs text-ink-secondary">{SECTION_LABEL[open.section]}</p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Close"
+                  onClick={() => setOpenId(null)}
+                  className="mt-0.5 rounded-control p-1 text-ink-tertiary hover:bg-surface hover:text-ink"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
               </div>
-              <ul className="m-0 list-none divide-y divide-line-subtle p-0">
-                {group.rows.map((entry, index) => {
-                  const final = finalOf(entry);
-                  const busy = command.pendingKeys.some((key) => key.startsWith(entry.id));
-                  return (
-                    <li key={entry.id} className="flex items-center gap-3 px-(--ui-section-px) py-2 hover:bg-surface-muted">
-                      <button type="button" onClick={() => setOpenId(entry.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                        <Thumb url={final?.imageUrl ?? null} alt={final ? final.productName : `${entry.code} has no photo`} />
-                        <span className="w-14 shrink-0 font-ui-mono text-sm font-semibold tabular-nums text-ink">{entry.code}</span>
-                        <span className="grid min-w-0 flex-1 gap-0.5">
-                          {final ? (
-                            <>
-                              <span className="truncate text-sm font-medium text-ink">
-                                {final.productName}
-                                {final.brandName ? <span className="font-normal text-ink-secondary"> · ex. {final.brandName}</span> : null}
-                              </span>
-                              {specLine(final) ? <span className="truncate text-xs text-ink-tertiary">{specLine(final)}</span> : null}
-                            </>
-                          ) : (
-                            <span className="text-sm italic text-ink-tertiary">{entry.options.length ? "No final option yet" : "Reserved — no product yet"}</span>
-                          )}
-                        </span>
-                        <span className="hidden w-28 shrink-0 truncate text-sm text-ink-secondary sm:block">{entry.location ?? ""}</span>
-                        <span className="hidden w-20 shrink-0 text-right text-sm tabular-nums text-ink-secondary sm:block">{entry.qty ? `${entry.qty} ${entry.unit ?? ""}` : ""}</span>
-                        {entry.options.length > 1 ? <Badge>{entry.options.length} options</Badge> : null}
-                      </button>
-                      {canEdit || canManageTemplates ? (
-                        <RowActionMenu
-                          label={`Actions for ${entry.code}`}
-                          pending={busy}
-                          items={[
-                            { label: "Open", onSelect: () => setOpenId(entry.id) },
-                            ...(canManageTemplates && templateSourceOf(entry)
-                              ? [{ label: "Save as template item", onSelect: () => void run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })) }]
-                              : []),
-                            ...(canEdit ? [
-                            { label: "Move up", icon: <ArrowUp className="h-3.5 w-3.5" />, disabled: index === 0, separatorBefore: true, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "up" })) },
-                            { label: "Move down", icon: <ArrowDown className="h-3.5 w-3.5" />, disabled: index === group.rows.length - 1, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "down" })) },
-                            { label: "Move to category…", onSelect: () => setDialog({ move: entry }) },
-                            { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeEntry(entry) },
-                            ] : []),
-                          ]}
-                        />
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
+              <div className="flex-1 overflow-y-auto p-4">
+                <EntryPanelContent
+                  key={open.id}
+                  projectId={projectId}
+                  entry={open}
+                  brands={brands}
+                  canEdit={canEdit}
+                  command={command}
+                  confirm={confirm.confirm}
+                  onClose={() => setOpenId(null)}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
 
-      {open ? (
+      {/* Mobile drawer */}
+      {open && !isDesktop ? (
         <EntryDrawer
           key={open.id}
           projectId={projectId}
@@ -368,7 +436,7 @@ function ProductFields({ value, onChange, brands, extraBrand }: { value: Product
       <Field label="SKU / code"><Input value={value.skuText} onChange={set("skuText")} maxLength={160} /></Field>
       <Field label="Color"><Input value={value.color} onChange={set("color")} maxLength={160} /></Field>
       <Field label="Finishing"><Input value={value.finishing} onChange={set("finishing")} maxLength={160} /></Field>
-      <Field label="Dimension"><Input value={value.dimension} onChange={set("dimension")} maxLength={160} placeholder="e.g. 60 × 60 cm" /></Field>
+      <Field label="Dimension"><Input value={value.dimension} onChange={set("dimension")} maxLength={160} placeholder="e.g. 60 \u00d7 60 cm" /></Field>
       <Field label="Notes" className="sm:col-span-2">
         <Textarea value={value.notes} onChange={set("notes")} maxLength={2000} rows={2} className="min-h-[60px]" />
       </Field>
@@ -443,9 +511,9 @@ function AddItemDialog({ projectId, section, categories, brands, command, onClos
   );
 }
 
-// ── Entry drawer ─────────────────────────────────────────────────────────────
+// ── Entry panel content (shared between desktop panel and mobile drawer) ──────
 
-function EntryDrawer({
+function EntryPanelContent({
   projectId,
   entry,
   brands,
@@ -515,91 +583,123 @@ function EntryDrawer({
   };
 
   return (
-    <Drawer open onOpenChange={(value) => { if (!value) onClose(); }} title={`${entry.code} · ${entry.category}`} description={SECTION_LABEL[entry.section]} size="lg">
-      <div className="grid gap-5">
-        <div className="grid gap-3 sm:grid-cols-[1fr_6rem_6rem]">
-          <Field label="Location"><Input value={fields.location} onChange={(e) => setFields({ ...fields, location: e.target.value })} disabled={!canEdit} maxLength={160} /></Field>
-          <Field label="Qty"><Input inputMode="decimal" value={fields.qty} onChange={(e) => setFields({ ...fields, qty: e.target.value })} disabled={!canEdit} maxLength={20} /></Field>
-          <Field label="Unit"><Input value={fields.unit} onChange={(e) => setFields({ ...fields, unit: e.target.value })} disabled={!canEdit} maxLength={40} /></Field>
+    <div className="grid gap-5">
+      <div className="grid gap-3 sm:grid-cols-[1fr_6rem_6rem]">
+        <Field label="Location"><Input value={fields.location} onChange={(e) => setFields({ ...fields, location: e.target.value })} disabled={!canEdit} maxLength={160} /></Field>
+        <Field label="Qty"><Input inputMode="decimal" value={fields.qty} onChange={(e) => setFields({ ...fields, qty: e.target.value })} disabled={!canEdit} maxLength={20} /></Field>
+        <Field label="Unit"><Input value={fields.unit} onChange={(e) => setFields({ ...fields, unit: e.target.value })} disabled={!canEdit} maxLength={40} /></Field>
+      </div>
+      {canEdit ? (
+        <div className="-mt-2 flex justify-end">
+          <Button size="sm" variant="secondary" disabled={!dirty} pending={isPending(`${entry.id}-fields`)} onClick={() => void saveFields()}>Save details</Button>
         </div>
-        {canEdit ? (
-          <div className="-mt-2 flex justify-end">
-            <Button size="sm" variant="secondary" disabled={!dirty} pending={isPending(`${entry.id}-fields`)} onClick={() => void saveFields()}>Save details</Button>
+      ) : null}
+
+      <div className="grid gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Text weight="semibold">Options</Text>
+          {canEdit ? (
+            <div className="flex gap-2">
+              <Button size="sm" variant="ghost" leadingIcon={<History className="h-3.5 w-3.5" />} onClick={() => setReuse(true)}>From past project</Button>
+              <Button size="sm" variant="secondary" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => setEditing("new")}>Add option</Button>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Option chip nav */}
+        {entry.options.length > 1 ? (
+          <div className="flex gap-1.5" role="group" aria-label="Jump to option">
+            {entry.options.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => document.getElementById(`opt-${opt.id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" })}
+                className={`inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full px-2 text-xs font-semibold transition-colors ${
+                  opt.isFinal
+                    ? "border border-success-line bg-success-surface text-success-ink"
+                    : "border border-line bg-surface-muted text-ink-secondary hover:border-line-subtle hover:text-ink"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
         ) : null}
 
-        <div className="grid gap-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Text weight="semibold">Options</Text>
-            {canEdit ? (
-              <div className="flex gap-2">
-                <Button size="sm" variant="ghost" leadingIcon={<History className="h-3.5 w-3.5" />} onClick={() => setReuse(true)}>From past project</Button>
-                <Button size="sm" variant="secondary" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => setEditing("new")}>Add option</Button>
-              </div>
-            ) : null}
-          </div>
-          {entry.options.length === 0 ? (
-            <Text tone="tertiary" size="sm">No product yet. Add an option or copy one from a past project.</Text>
-          ) : (
-            <ul className="m-0 grid list-none gap-2 p-0">
-              {entry.options.map((option) => {
-                const status = STATUS_LABEL[option.status] ?? STATUS_LABEL.DRAFT;
-                return (
-                  <li key={option.id} className={`rounded-control border px-3 py-2 ${option.isFinal ? "border-success-line bg-success-surface/40" : "border-line"}`}>
-                    <div className="flex items-start gap-2">
-                      <span className="mt-0.5 font-ui-mono text-sm font-semibold">{option.label}</span>
-                      <div className="grid shrink-0 justify-items-center gap-1">
-                        {canEdit ? (
-                          <button
-                            type="button"
-                            onClick={() => { setPhotoError(null); setPhotoFor(option); }}
-                            aria-label={option.imageUrl ? `Change photo of option ${option.label}` : `Add photo to option ${option.label}`}
-                            title={option.imageUrl ? "Change photo" : "Add photo"}
-                            className="rounded-[4px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus"
-                          >
-                            <Thumb url={option.imageUrl} alt={option.productName} className="h-20 w-16" />
-                          </button>
-                        ) : (
-                          <Thumb url={option.imageUrl} alt={option.productName} className="h-20 w-16" />
-                        )}
-                        {canEdit ? (
-                          <button
-                            type="button"
-                            onClick={() => { setPhotoError(null); setPhotoFor(option); }}
-                            className="text-xs font-medium text-ink-secondary hover:text-ink hover:underline"
-                          >
-                            {option.imageUrl ? "Change photo" : "Add photo"}
-                          </button>
-                        ) : null}
-                      </div>
-                      <div className="grid min-w-0 flex-1 gap-0.5">
-                        <span className="text-sm font-medium">{option.productName}{option.brandName ? <span className="font-normal text-ink-secondary"> · ex. {option.brandName}</span> : null}</span>
-                        {specLine(option) ? <span className="text-xs text-ink-tertiary">{specLine(option)}</span> : null}
-                        {option.notes ? <span className="whitespace-pre-wrap text-xs text-ink-secondary">{option.notes}</span> : null}
-                      </div>
-                      <Badge tone={status.tone}>{status.label}</Badge>
+        {entry.options.length === 0 ? (
+          <Text tone="tertiary" size="sm">No product yet. Add an option or copy one from a past project.</Text>
+        ) : (
+          <ul className="m-0 grid list-none gap-2 p-0">
+            {entry.options.map((option) => {
+              const status = STATUS_LABEL[option.status] ?? STATUS_LABEL.DRAFT;
+              return (
+                <li id={`opt-${option.id}`} key={option.id} className={`rounded-control border px-3 py-2 ${option.isFinal ? "border-success-line bg-success-surface/40" : "border-line"}`}>
+                  <div className="flex items-start gap-2">
+                    <span className="mt-0.5 font-ui-mono text-sm font-semibold">{option.label}</span>
+                    <div className="grid shrink-0 justify-items-center gap-1">
                       {canEdit ? (
-                        <RowActionMenu
-                          label={`Option ${option.label} actions`}
-                          pending={isPending(`${entry.id}-opt-${option.id}`)}
-                          items={[
-                            ...(option.isFinal ? [] : [{ label: "Set as final", onSelect: () => void run(`${entry.id}-opt-${option.id}`, () => markScheduleFinalAction({ projectId, optionId: option.id })) }]),
-                            { label: "Edit", onSelect: () => setEditing(option) },
-                            { label: option.imageUrl ? "Change photo" : "Add photo", onSelect: () => { setPhotoError(null); setPhotoFor(option); } },
-                            ...(option.imageUrl ? [{ label: "Remove photo", onSelect: () => void removePhoto(option) }] : []),
-                            { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeOption(option) },
-                          ]}
-                        />
+                        <button
+                          type="button"
+                          onClick={() => { setPhotoError(null); setPhotoFor(option); }}
+                          aria-label={option.imageUrl ? `Change photo of option ${option.label}` : `Add photo to option ${option.label}`}
+                          title={option.imageUrl ? "Change photo" : "Add photo"}
+                          className="rounded-[4px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus"
+                        >
+                          <Thumb url={option.imageUrl} alt={option.productName} className="h-20 w-16" />
+                        </button>
+                      ) : (
+                        <Thumb url={option.imageUrl} alt={option.productName} className="h-20 w-16" />
+                      )}
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          onClick={() => { setPhotoError(null); setPhotoFor(option); }}
+                          className="text-xs font-medium text-ink-secondary hover:text-ink hover:underline"
+                        >
+                          {option.imageUrl ? "Change photo" : "Add photo"}
+                        </button>
                       ) : null}
                     </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-        {command.error && !editing && !reuse && !photoFor ? <InlineError>{command.error}</InlineError> : null}
+                    <div className="grid min-w-0 flex-1 gap-0.5">
+                      <span className="text-sm font-medium">{option.productName}{option.brandName ? <span className="font-normal text-ink-secondary"> \u00b7 ex. {option.brandName}</span> : null}</span>
+                      {specLine(option) ? <span className="text-xs text-ink-tertiary">{specLine(option)}</span> : null}
+                      {option.notes ? <span className="whitespace-pre-wrap text-xs text-ink-secondary">{option.notes}</span> : null}
+                      {/* Set final button on card face */}
+                      {!option.isFinal && canEdit ? (
+                        <div className="mt-1.5">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            pending={isPending(`${entry.id}-opt-${option.id}`)}
+                            onClick={() => void run(`${entry.id}-opt-${option.id}`, () => markScheduleFinalAction({ projectId, optionId: option.id }))}
+                          >
+                            Set final
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                    <Badge tone={status.tone}>{status.label}</Badge>
+                    {canEdit ? (
+                      <RowActionMenu
+                        label={`Option ${option.label} actions`}
+                        pending={isPending(`${entry.id}-opt-${option.id}`)}
+                        items={[
+                          ...(option.isFinal ? [] : [{ label: "Set as final", onSelect: () => void run(`${entry.id}-opt-${option.id}`, () => markScheduleFinalAction({ projectId, optionId: option.id })) }]),
+                          { label: "Edit", onSelect: () => setEditing(option) },
+                          { label: option.imageUrl ? "Change photo" : "Add photo", onSelect: () => { setPhotoError(null); setPhotoFor(option); } },
+                          ...(option.imageUrl ? [{ label: "Remove photo", onSelect: () => void removePhoto(option) }] : []),
+                          { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeOption(option) },
+                        ]}
+                      />
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
+      {command.error && !editing && !reuse && !photoFor ? <InlineError>{command.error}</InlineError> : null}
 
       {editing ? (
         <OptionDialog
@@ -615,7 +715,7 @@ function EntryDrawer({
       <Dialog
         open={photoFor !== null}
         onOpenChange={(value) => { if (!value) setPhotoFor(null); }}
-        title={photoFor ? `Photo — ${entry.code} option ${photoFor.label}` : "Photo"}
+        title={photoFor ? `Photo \u2014 ${entry.code} option ${photoFor.label}` : "Photo"}
         description="Choose a photo and crop it to the 4:5 catalog frame."
         size="lg"
         dismissible={!isPending(`${entry.id}-photo`)}
@@ -627,6 +727,40 @@ function EntryDrawer({
           </div>
         ) : null}
       </Dialog>
+    </div>
+  );
+}
+
+// ── Entry drawer (mobile wrapper) ─────────────────────────────────────────────
+
+function EntryDrawer({
+  projectId,
+  entry,
+  brands,
+  canEdit,
+  command,
+  confirm,
+  onClose,
+}: {
+  projectId: string;
+  entry: ScheduleEntryView;
+  brands: readonly Brand[];
+  canEdit: boolean;
+  command: Command;
+  confirm: ReturnType<typeof useConfirm>["confirm"];
+  onClose: () => void;
+}) {
+  return (
+    <Drawer open onOpenChange={(value) => { if (!value) onClose(); }} title={`${entry.code} \u00b7 ${entry.category}`} description={SECTION_LABEL[entry.section]} size="lg">
+      <EntryPanelContent
+        projectId={projectId}
+        entry={entry}
+        brands={brands}
+        canEdit={canEdit}
+        command={command}
+        confirm={confirm}
+        onClose={onClose}
+      />
     </Drawer>
   );
 }
@@ -723,7 +857,7 @@ function ReuseDialog({ projectId, entry, command, onClose }: { projectId: string
     <Dialog open onOpenChange={(value) => { if (!value) onClose(); }} title="Copy from a past project" description={`Search products used in other projects and copy one into ${entry.code} as a new option.`} size="lg">
       <div className="grid gap-3">
         <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); void search(); }}>
-          <Input aria-label="Search products" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Brand, product, SKU, color…" maxLength={120} />
+          <Input aria-label="Search products" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Brand, product, SKU, color\u2026" maxLength={120} />
           <Button type="submit" variant="secondary" leadingIcon={<Search className="h-3.5 w-3.5" />} pending={searching} disabled={query.trim().length < 2}>Search</Button>
         </form>
         {searchError ? <InlineError>{searchError}</InlineError> : null}
@@ -734,8 +868,8 @@ function ReuseDialog({ projectId, entry, command, onClose }: { projectId: string
             {hits.map((hit) => (
               <li key={hit.optionId} className="flex items-center gap-3 rounded-control border border-line px-3 py-2">
                 <div className="grid min-w-0 flex-1 gap-0.5">
-                  <span className="truncate text-sm font-medium">{hit.productName}{hit.brandName ? <span className="font-normal text-ink-secondary"> · ex. {hit.brandName}</span> : null}</span>
-                  <span className="truncate text-xs text-ink-tertiary">{[specLine(hit), `${hit.sourceProjectName} · ${hit.category}`].filter(Boolean).join(" — ")}</span>
+                  <span className="truncate text-sm font-medium">{hit.productName}{hit.brandName ? <span className="font-normal text-ink-secondary"> \u00b7 ex. {hit.brandName}</span> : null}</span>
+                  <span className="truncate text-xs text-ink-tertiary">{[specLine(hit), `${hit.sourceProjectName} \u00b7 ${hit.category}`].filter(Boolean).join(" \u2014 ")}</span>
                 </div>
                 {hit.isFinal ? <Badge tone="success">Final there</Badge> : null}
                 <Button size="sm" variant="primary" pending={command.isPending(`${entry.id}-reuse-${hit.optionId}`)} onClick={() => void use(hit)}>Use</Button>
@@ -803,7 +937,7 @@ function ImportDialog({ projectId, section, command, onClose }: { projectId: str
       open
       onOpenChange={(value) => { if (!value) onClose(); }}
       title="Import schedule CSV"
-      description="Use the Google Sheets export (File → Download → CSV). Rows whose code already exists update that item; new codes are added."
+      description="Use the Google Sheets export (File \u2192 Download \u2192 CSV). Rows whose code already exists update that item; new codes are added."
       size="lg"
       dismissible={!pending}
       footer={<Footer><Button variant="ghost" onClick={onClose} disabled={pending}>{result ? "Close" : "Cancel"}</Button><Button variant="primary" pending={pending} disabled={!csv.trim()} onClick={submit}>Import</Button></Footer>}
