@@ -816,3 +816,73 @@ export async function deleteSchedulePrefixAction(prefixId: string): Promise<Acti
     return result;
   });
 }
+
+// ── Phase templates (V2) ─────────────────────────────────────────────────────
+
+const PhaseTemplateCreate = z.strictObject({ name: z.string().min(1).max(200), isDefault: z.boolean().optional() });
+export async function createPhaseTemplateAction(input: z.infer<typeof PhaseTemplateCreate>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const result = await studioFlow.phases.createPhaseTemplate({ ...ctx, ...parse(PhaseTemplateCreate, input) });
+    refresh();
+    return result;
+  });
+}
+
+const PhaseTemplateUpdate = z.strictObject({ templateId: Id, name: z.string().min(1).max(200).optional(), isActive: z.boolean().optional(), isDefault: z.boolean().optional() });
+export async function updatePhaseTemplateAction(input: z.infer<typeof PhaseTemplateUpdate>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const result = await studioFlow.phases.updatePhaseTemplate({ ...ctx, ...parse(PhaseTemplateUpdate, input) });
+    refresh();
+    return result;
+  });
+}
+
+export async function deletePhaseTemplateAction(templateId: string): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const result = await studioFlow.phases.deletePhaseTemplate({ ...ctx, templateId: parse(Id, templateId) });
+    refresh();
+    return result;
+  });
+}
+
+const PhaseDefinitionCreate = z.strictObject({ templateId: Id, name: z.string().min(1).max(200), prefix: z.string().min(1).max(4), seat: z.enum(["designer", "drafter"]).optional(), allowParallel: z.boolean().optional() });
+export async function createPhaseDefinitionAction(input: z.infer<typeof PhaseDefinitionCreate>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const result = await studioFlow.phases.createPhaseDefinition({ ...ctx, ...parse(PhaseDefinitionCreate, input) });
+    refresh();
+    return result;
+  });
+}
+
+const PhaseDefinitionUpdate = z.strictObject({ definitionId: Id, name: z.string().min(1).max(200).optional(), prefix: z.string().min(1).max(4).optional(), seat: z.enum(["designer", "drafter"]).optional(), allowParallel: z.boolean().optional() });
+export async function updatePhaseDefinitionAction(input: z.infer<typeof PhaseDefinitionUpdate>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const result = await studioFlow.phases.updatePhaseDefinition({ ...ctx, ...parse(PhaseDefinitionUpdate, input) });
+    refresh();
+    return result;
+  });
+}
+
+export async function deletePhaseDefinitionAction(definitionId: string): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const result = await studioFlow.phases.deletePhaseDefinition({ ...ctx, definitionId: parse(Id, definitionId) });
+    refresh();
+    return result;
+  });
+}
+
+const PhaseDefinitionReorder = z.strictObject({ templateId: Id, orderedIds: z.array(Id).min(1).max(100) });
+export async function reorderPhaseDefinitionsAction(input: z.infer<typeof PhaseDefinitionReorder>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const result = await studioFlow.phases.reorderPhaseDefinitions({ ...ctx, ...parse(PhaseDefinitionReorder, input) });
+    refresh();
+    return result;
+  });
+}

@@ -26,6 +26,7 @@ import {
   notFound,
   nowOf,
   requireCommand,
+  requirePermission,
   requireRead,
   requiredText,
   writeAudit,
@@ -591,5 +592,95 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     blueprint: PHASE_BLUEPRINT,
   };
 
-  return { ...commands, ...activities, ...reads };
+  const phaseTemplates = {
+    async listPhaseTemplates(input: ReadContext) {
+      requireRead(input.grants);
+      const rows = await db.sfPhaseTemplate.findMany({
+        include: { definitions: { orderBy: { order_index: "asc" } } },
+        orderBy: { name: "asc" },
+      });
+      return rows.map(toTemplateView);
+    },
+
+    async createPhaseTemplate(input: CommandContext & { name: string; isDefault?: boolean }) {
+      requirePermission(input.grants, P.settingsManage);
+      const name = requiredText(input.name, "TEMPLATE_NAME_REQUIRED", "Template name", 200);
+      const isDefault = input.isDefault ?? false;
+      await db.sfPhaseTemplate.create({ data: { name, is_default: isDefault } });
+    },
+
+    async updatePhaseTemplate(input: CommandContext & { templateId: string; name?: string; isActive?: boolean; isDefault?: boolean }) {
+      requirePermission(input.grants, P.settingsManage);
+      const data: Record<string, unknown> = {};
+      if (input.name !== undefined) data.name = requiredText(input.name, "TEMPLATE_NAME_REQUIRED", "Template name", 200);
+      if (input.isActive !== undefined) data.is_active = input.isActive;
+      if (input.isDefault !== undefined) data.is_default = input.isDefault;
+      if (Object.keys(data).length === 0) return;
+      await db.sfPhaseTemplate.update({ where: { id: input.templateId }, data });
+    },
+
+    async deletePhaseTemplate(input: CommandContext & { templateId: string }) {
+      requirePermission(input.grants, P.settingsManage);
+      await db.sfPhaseTemplate.delete({ where: { id: input.templateId } });
+    },
+
+    async createPhaseDefinition(input: CommandContext & { templateId: string; name: string; prefix: string; seat?: string; allowParallel?: boolean }) {
+      requirePermission(input.grants, P.settingsManage);
+      const name = requiredText(input.name, "PHASE_DEF_NAME_REQUIRED", "Phase name", 200);
+      const prefix = requiredText(input.prefix, "PREFIX_REQUIRED", "Prefix", 4);
+      const lastDef = await db.sfPhaseDefinition.findFirst({ where: { template_id: input.templateId }, orderBy: { order_index: "desc" } });
+      const orderIndex = (lastDef?.order_index ?? -1) + 1;
+      await db.sfPhaseDefinition.create({
+        data: { template_id: input.templateId, name, prefix, order_index: orderIndex, seat: input.seat ?? "designer", allow_parallel: input.allowParallel ?? false },
+      });
+    },
+
+    async updatePhaseDefinition(input: CommandContext & { definitionId: string; name?: string; prefix?: string; seat?: string; allowParallel?: boolean }) {
+      requirePermission(input.grants, P.settingsManage);
+      const data: Record<string, unknown> = {};
+      if (input.name !== undefined) data.name = requiredText(input.name, "PHASE_DEF_NAME_REQUIRED", "Phase name", 200);
+      if (input.prefix !== undefined) data.prefix = requiredText(input.prefix, "PREFIX_REQUIRED", "Prefix", 4);
+      if (input.seat !== undefined) data.seat = input.seat;
+      if (input.allowParallel !== undefined) data.allow_parallel = input.allowParallel;
+      if (Object.keys(data).length === 0) return;
+      await db.sfPhaseDefinition.update({ where: { id: input.definitionId }, data });
+    },
+
+    async deletePhaseDefinition(input: CommandContext & { definitionId: string }) {
+      requirePermission(input.grants, P.settingsManage);
+      const def = await db.sfPhaseDefinition.findUniqueOrThrow({ where: { id: input.definitionId } });
+      await db.sfPhaseDefinition.delete({ where: { id: input.definitionId } });
+      // Close gap in order_index for remaining defs
+      const siblings = await db.sfPhaseDefinition.findMany({ where: { template_id: def.template_id, order_index: { gt: def.order_index } }, orderBy: { order_index: "asc" } });
+      for (const sib of siblings) {
+        await db.sfPhaseDefinition.update({ where: { id: sib.id }, data: { order_index: sib.order_index - 1 } });
+      }
+    },
+
+    async reorderPhaseDefinitions(input: CommandContext & { templateId: string; orderedIds: string[] }) {
+      requirePermission(input.grants, P.settingsManage);
+      for (let i = 0; i < input.orderedIds.length; i++) {
+        await db.sfPhaseDefinition.update({ where: { id: input.orderedIds[i], template_id: input.templateId }, data: { order_index: i } });
+      }
+    },
+  };
+
+  function toTemplateView(row: { id: string; name: string; is_default: boolean; is_active: boolean; definitions: Array<{ id: string; name: string; prefix: string; order_index: number; allow_parallel: boolean; seat: string }> }) {
+    return {
+      id: row.id,
+      name: row.name,
+      isDefault: row.is_default,
+      isActive: row.is_active,
+      definitions: row.definitions.map((d) => ({
+        id: d.id,
+        name: d.name,
+        prefix: d.prefix,
+        orderIndex: d.order_index,
+        allowParallel: d.allow_parallel,
+        seat: d.seat as "designer" | "drafter",
+      })),
+    };
+  }
+
+  return { ...commands, ...activities, ...reads, ...phaseTemplates };
 }

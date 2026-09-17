@@ -25,15 +25,22 @@ import {
 } from "@/platform/ui_engine";
 
 import {
+  createPhaseDefinitionAction,
+  createPhaseTemplateAction,
   createScheduleTemplateItemAction,
   createTemplateAction,
+  deletePhaseDefinitionAction,
+  deletePhaseTemplateAction,
   deleteSchedulePrefixAction,
   deleteScheduleTemplateCategoryAction,
   deleteScheduleTemplateItemAction,
   deleteTemplateAction,
+  reorderPhaseDefinitionsAction,
   reorderTemplatesAction,
   setAutoNamingAction,
   setScheduleTemplateItemActiveAction,
+  updatePhaseDefinitionAction,
+  updatePhaseTemplateAction,
   updateScheduleTemplateItemAction,
   updateTemplateAction,
   upsertSchedulePrefixAction,
@@ -42,6 +49,8 @@ import {
 import { useCommand } from "../_components/use-command";
 
 type Template = { id: string; phaseKey: PhaseKey | null; label: string; isActive: boolean; sortOrder: number; usedBy: number };
+type PhaseDefinitionDraft = { id: string; name: string; prefix: string; orderIndex: number; allowParallel: boolean; seat: "designer" | "drafter" };
+type PhaseTemplateDraft = { id: string; name: string; isDefault: boolean; isActive: boolean; definitions: PhaseDefinitionDraft[] };
 type ScheduleTemplate = {
   id: string;
   section: "MATERIAL" | "FIXTURE";
@@ -75,6 +84,7 @@ export function StudioSettingsView({
   schedulePrefixes,
   brands,
   phases,
+  phaseTemplates,
   canManage,
 }: {
   autoNaming: boolean;
@@ -83,6 +93,7 @@ export function StudioSettingsView({
   schedulePrefixes: SchedulePrefix[];
   brands: BrandChoice[];
   phases: Array<{ key: PhaseKey; label: string }>;
+  phaseTemplates: PhaseTemplateDraft[];
   canManage: boolean;
 }) {
   const { run, pendingKey, error } = useCommand();
@@ -112,6 +123,7 @@ export function StudioSettingsView({
           <TemplateGroup key={group.key ?? "general"} group={group} templates={templates.filter((t) => t.phaseKey === group.key)} canManage={canManage} run={run} pendingKey={pendingKey} />
         ))}
       </div>
+      <PhaseTemplatesSection phaseTemplates={phaseTemplates} canManage={canManage} run={run} pendingKey={pendingKey} />
       <ScheduleSettings scheduleTemplates={scheduleTemplates} schedulePrefixes={schedulePrefixes} brands={brands} canManage={canManage} run={run} pendingKey={pendingKey} />
       <Text size="sm" tone="tertiary">Changes apply to new projects. Use “Apply checklist templates” on a project to add new items to it; renamed items are not rewritten in existing projects.</Text>
     </div>
@@ -394,6 +406,150 @@ function TemplateItemDialog({
         <Field label="Notes" className="sm:col-span-2"><Textarea rows={2} value={draft.notes} maxLength={2000} onChange={set("notes")} /></Field>
       </div>
     </Dialog>
+  );
+}
+
+
+// ── Phase templates (V2) ─────────────────────────────────────────────────────
+
+type PhaseDefDialogProps = { def: PhaseDefinitionDraft | null; templateId: string; run: ReturnType<typeof useCommand>["run"]; pendingKey: string | null; onClose: () => void };
+
+function PhaseDefDialog({ def, templateId, run, pendingKey, onClose }: PhaseDefDialogProps) {
+  const [draft, setDraft] = useState({ name: def?.name ?? "", prefix: def?.prefix ?? "", seat: (def?.seat ?? "designer") as "designer" | "drafter", allowParallel: def?.allowParallel ?? false });
+  const key = def ? `def-${def.id}` : `def-new-${templateId}`;
+  const pending = pendingKey === key;
+  const save = async () => {
+    const ok = def
+      ? await run(key, () => updatePhaseDefinitionAction({ definitionId: def.id, name: draft.name, prefix: draft.prefix, seat: draft.seat, allowParallel: draft.allowParallel }))
+      : await run(key, () => createPhaseDefinitionAction({ templateId, name: draft.name, prefix: draft.prefix, seat: draft.seat, allowParallel: draft.allowParallel }));
+    if (ok) onClose();
+  };
+  return (
+    <Dialog
+      open
+      onOpenChange={(v) => { if (!v) onClose(); }}
+      title={def ? "Edit phase" : "Add phase"}
+      description={def ? "Update this phase definition. Existing project phases are not renamed." : "Add a phase to this template."}
+      size="sm"
+      dismissible={!pending}
+      footer={<div className="flex flex-wrap justify-end gap-2"><Button variant="ghost" onClick={onClose} disabled={pending}>Cancel</Button><Button variant="primary" pending={pending} disabled={!draft.name.trim() || !draft.prefix.trim()} onClick={save}>{def ? "Save" : "Add"}</Button></div>}
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Phase name" required className="sm:col-span-2"><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} maxLength={200} placeholder="e.g. Moodboard" /></Field>
+        <Field label="Prefix" description="Up to 4 chars, used for revision labels."><Input value={draft.prefix} onChange={(e) => setDraft({ ...draft, prefix: e.target.value.toUpperCase() })} maxLength={4} className="font-ui-mono uppercase" placeholder="MB" /></Field>
+        <Field label="Seat">
+          <Select value={draft.seat} onChange={(e) => setDraft({ ...draft, seat: e.target.value as "designer" | "drafter" })}>
+            <option value="designer">Designer</option>
+            <option value="drafter">Drafter</option>
+          </Select>
+        </Field>
+        <Field label="Can run parallel" className="sm:col-span-2">
+          <Switch label={draft.allowParallel ? "Yes" : "No"} checked={draft.allowParallel} onCheckedChange={(v) => setDraft({ ...draft, allowParallel: v })} />
+        </Field>
+      </div>
+    </Dialog>
+  );
+}
+
+function PhaseTemplatesSection({
+  phaseTemplates,
+  canManage,
+  run,
+  pendingKey,
+}: {
+  phaseTemplates: PhaseTemplateDraft[];
+  canManage: boolean;
+  run: ReturnType<typeof useCommand>["run"];
+  pendingKey: string | null;
+}) {
+  const [newName, setNewName] = useState("");
+  const [defDialog, setDefDialog] = useState<{ def: PhaseDefinitionDraft | null; templateId: string } | null>(null);
+
+  const moveDefinition = async (template: PhaseTemplateDraft, index: number, delta: number) => {
+    const ids = template.definitions.map((d) => d.id);
+    const target = index + delta;
+    if (target < 0 || target >= ids.length) return;
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    void run(`def-reorder-${template.id}`, () => reorderPhaseDefinitionsAction({ templateId: template.id, orderedIds: ids }));
+  };
+
+  return (
+    <SectionCard id="phase-templates" title="Phase Templates (V2)" description="Templates define the phases a project gets on creation. The default template is applied automatically." padded={false}>
+      {phaseTemplates.length === 0 ? (
+        <div className="px-(--ui-section-px) py-4"><Text tone="tertiary" size="sm">No phase templates yet. {canManage ? "Add one below." : ""}</Text></div>
+      ) : phaseTemplates.map((template) => (
+        <section key={template.id} className="border-b border-line-subtle last:border-b-0">
+          <div className="flex flex-wrap items-center gap-2 px-(--ui-section-px) py-2.5">
+            <div className="flex flex-1 items-center gap-2 min-w-0">
+              <span className={`text-sm font-semibold ${template.isActive ? "" : "text-ink-tertiary line-through"}`}>{template.name}</span>
+              {template.isDefault ? <Badge tone="success">Default</Badge> : null}
+              {!template.isActive ? <Badge>Inactive</Badge> : null}
+            </div>
+            {canManage ? (
+              <RowActionMenu
+                label={`Template ${template.name} actions`}
+                pending={pendingKey === template.id}
+                items={[
+                  ...(!template.isDefault ? [{ label: "Set as default", onSelect: () => void run(template.id, () => updatePhaseTemplateAction({ templateId: template.id, isDefault: true })) }] : []),
+                  { label: template.isActive ? "Deactivate" : "Activate", onSelect: () => void run(template.id, () => updatePhaseTemplateAction({ templateId: template.id, isActive: !template.isActive })) },
+                  { label: "Add phase", separatorBefore: true, onSelect: () => setDefDialog({ def: null, templateId: template.id }) },
+                  { label: "Delete template", danger: true, separatorBefore: true, onSelect: () => void run(template.id, () => deletePhaseTemplateAction(template.id)) },
+                ]}
+              />
+            ) : null}
+          </div>
+          {template.definitions.length === 0 ? (
+            <div className="px-(--ui-section-px) pb-3"><Text tone="tertiary" size="sm">No phases defined.</Text></div>
+          ) : (
+            <ol className="m-0 grid list-none gap-px px-(--ui-section-px) pb-3 p-0">
+              {template.definitions.map((def, index) => (
+                <li key={def.id} className="flex items-center gap-2 rounded-control px-1.5 py-1.5 hover:bg-surface-muted">
+                  <span className="w-5 shrink-0 text-right font-ui-mono text-[0.6875rem] text-ink-tertiary">{index + 1}</span>
+                  <span className="flex-1 text-sm">{def.name}</span>
+                  <span className="font-ui-mono text-xs text-ink-tertiary">{def.prefix}</span>
+                  <Badge>{def.seat}</Badge>
+                  {def.allowParallel ? <Badge>parallel</Badge> : null}
+                  {canManage ? (
+                    <RowActionMenu
+                      label={`Phase ${def.name} actions`}
+                      pending={pendingKey === `def-${def.id}`}
+                      items={[
+                        { label: "Edit", onSelect: () => setDefDialog({ def, templateId: template.id }) },
+                        { label: "Move up", disabled: index === 0, separatorBefore: true, onSelect: () => void moveDefinition(template, index, -1) },
+                        { label: "Move down", disabled: index === template.definitions.length - 1, onSelect: () => void moveDefinition(template, index, 1) },
+                        { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void run(`def-${def.id}`, () => deletePhaseDefinitionAction(def.id)) },
+                      ]}
+                    />
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          )}
+          {canManage ? (
+            <div className="px-(--ui-section-px) pb-3">
+              <Button size="sm" variant="ghost" onClick={() => setDefDialog({ def: null, templateId: template.id })}>+ Add phase</Button>
+            </div>
+          ) : null}
+        </section>
+      ))}
+      {canManage ? (
+        <div className="px-(--ui-section-px) py-3 border-t border-line-subtle">
+          <form className="flex gap-2" onSubmit={async (e) => { e.preventDefault(); if (await run("phase-template-new", () => createPhaseTemplateAction({ name: newName }))) setNewName(""); }}>
+            <Input aria-label="New template name" density="compact" className="flex-1" placeholder="New template name…" value={newName} maxLength={200} onChange={(e) => setNewName(e.target.value)} />
+            <Button type="submit" size="sm" pending={pendingKey === "phase-template-new"} disabled={!newName.trim()}>Add template</Button>
+          </form>
+        </div>
+      ) : null}
+      {defDialog ? (
+        <PhaseDefDialog
+          def={defDialog.def}
+          templateId={defDialog.templateId}
+          run={run}
+          pendingKey={pendingKey}
+          onClose={() => setDefDialog(null)}
+        />
+      ) : null}
+    </SectionCard>
   );
 }
 
