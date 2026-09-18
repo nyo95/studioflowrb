@@ -245,4 +245,13 @@ describe("schedule labels and legacy sheet", () => {
     assert.equal(parseLegacyScheduleSheet("Code,Ex,Type\nLF-01,Cellini,Aria", "MATERIAL"), null, "Material sheets need a Product Category column");
     assert.equal(parseLegacyScheduleSheet("Code,Ex,Type,Qty\nLF-01,Cellini,Aria,4", "FIXTURE")?.[0]?.qty, "4");
   });
+
+  it("includes pattern in scheduleSearchKey", () => {
+    assert.equal(scheduleSearchKey({ productName: "x", pattern: "Woodgrain" }), "x | woodgrain");
+    assert.equal(scheduleSearchKey({ productName: "TACO", brandName: "BRAND", pattern: "Solid" }), "brand | taco | solid");
+  });
+
+  it("normalizes pattern in search key with empty and whitespace", () => {
+    assert.equal(scheduleSearchKey({ productName: "x", pattern: "  " }), "x");
+  });
 });

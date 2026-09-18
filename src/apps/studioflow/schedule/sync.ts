@@ -76,10 +76,24 @@ export async function createEntryWithOptionalOption(tx: TxClient, input: {
   templateItemId?: string | null;
   snapshot?: SnapshotInput | null;
 }) {
-  const prefix = await resolvePrefix(tx, input.section, input.category, input.categoryKey);
-  // One spelling per category inside a project (the first one wins).
-  const sameCategory = await tx.sfScheduleEntry.findFirst({ where: { project_id: input.projectId, section: input.section, category_key: input.categoryKey }, select: { category: true } });
-  const categoryLabel = sameCategory?.category ?? input.category;
+  // One spelling and one code prefix per category inside a project (the first wins).
+  // Persisted rows keep their historical prefix (e.g. PA for Paint) so a new
+  // row never starts a mixed PT/PA code sequence for an existing project group.
+  const existingCategory = await tx.sfScheduleEntry.findFirst({
+    where: {
+      project_id: input.projectId,
+      section: input.section,
+      category_key: input.categoryKey,
+    },
+    select: {
+      category: true,
+      prefix: true,
+    },
+  });
+  const categoryLabel = existingCategory?.category ?? input.category;
+  const prefix =
+    existingCategory?.prefix ??
+    (await resolvePrefix(tx, input.section, input.category, input.categoryKey));
   const siblings = await tx.sfScheduleEntry.findMany({ where: { project_id: input.projectId, section: input.section, prefix }, orderBy: { increment: "asc" }, select: { increment: true } });
   const increment = nextGapless(siblings);
   const entry = await tx.sfScheduleEntry.create({

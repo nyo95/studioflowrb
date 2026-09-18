@@ -5,31 +5,110 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.96**
-- Next local revision: **R8.97**
+- Current revision after this entry is committed: **R8.97**
+- Next local revision: **R8.98**
 
-## R8.96 | 2026-09-18 | feat(sf): Product Schedule parity — prefix, pattern, Board view, Unicode cleanup
+## R8.97 | 2026-09-18 | fix(sf): close Product Schedule parity regressions — pattern round-trip, PT/PA codes, Board/List branching
+
+Correction pass over R8.96. The R8.96 commit shipped the domain/service foundation and the `pattern`
+columns but left the Product Schedule UI/action layer unable to round-trip `pattern`, kept the Board
+view nested inside every list row, and did not preserve legacy `PA-xx` codes. This revision completes
+and corrects that work, and fixes the R8.96 ledger claims below.
 
 ### Changed
 
-- **WO-SCHED-R2-01 Prefix parity:** Added `LEGACY_PREFIX_MAP` with `PAINT → PT` override to `fallbackPrefix()`. Paint categories now correctly use `PT-xx` codes instead of `PA-xx`.
-- **WO-SCHED-R2-02 Pattern field full-stack:** Added `pattern` column to `SfScheduleOption` and `SfScheduleTemplateItem` models. Updated `SnapshotInput`, `cleanSnapshot()`, `optionData()`, `templateItemData()`, CSV import (`pattern`/`motif`/`catalog_motif` column aliases), template save, copy reusable, and all option view mappings.
-- **WO-SCHED-R2-03 Unicode escape leakage:** Replaced literal `\u00b7` (·), `\u00d7` (×), `\u2014` (—), `\u2026` (…), `\u2192` (→) escape sequences with real Unicode characters in `schedule-board.tsx`.
-- **WO-SCHED-R2-04 Board presentation view:** Added `BoardView` component — card grid with 4:5 photo aspect ratio, grouped by category, showing code/product/brand/specs/status badges.
-- **WO-SCHED-R2-05 List preservation + toggle:** Added Board/List presentation toggle in the toolbar. List remains the default view; Board available via toggle button.
-- **WO-SCHED-R2-06 Visual hierarchy:** Already aligned via UI Engine typography consolidation (WO-R2-08/R2-09).
-- **WO-SCHED-R2-08 Search key parity:** `scheduleSearchKey()` now includes the `pattern` field in the searchable index.
+- **WO-SCHED-R2-02 Pattern field complete (full-stack):** The client round-trip is now closed.
+  `action.ts` `ScheduleSnapshot` (a `z.strictObject`) accepts `pattern` (max 160); before it rejected
+  the key, so every create/update silently dropped the pattern. `schedule-board.tsx` now carries
+  `pattern` through `ProductDraft`, `EMPTY_PRODUCT`, `productFromOption`, `toSnapshot`, the
+  `ScheduleOptionView`/`ReuseHit` view types, `specLine`, and `ProductFields` (new "Pattern / motif"
+  input between Color and Finishing). The studio template editor
+  (`studio-settings-view.tsx`) preserves `pattern` on template-item create/update and gains the same
+  "Pattern / motif" field.
+- **WO-SCHED-R2-05 Board/List toggle corrected:** The R8.96 commit rendered `BoardView` nested inside
+  the list-row branch (one Board card per list item). The view-mode conditional is now a single outer
+  branch that renders `<BoardView>` exactly once, co-located with the list and the shared desktop
+  inspector, with a proper empty state and the `md:grid-cols-[1fr_22rem]` split layout.
+- **WO-SCHED-R2-01 PA prefix compatibility:** `createEntryWithOptionalOption()` now reuses the first
+  persisted prefix and category spelling for the project/member (`project_id`, `section`, `category_key`)
+  so rows imported as `PA-xx` continue `PA-xx` and never start a mixed PA/PT sequence. Configured
+  prefixes still win; a new Paint category in a fresh project still falls back to `PT-xx`.
+- **Migration now committed:** `20260918000000_sf_r2_02_pattern_column` adds `pattern TEXT` to
+  `studioflow.sf_schedule_option` and `studioflow.sf_schedule_template_item`. Recorded as applied on
+  the `studioflow_rebuild` and `studioflow_rebuild_test` databases (it had previously been applied
+  manually without a ledger entry).
+- **WO-SCHED-R2-06 Typography wording:** `DESIGN.md` and the UI Engine showcase now name
+  `Instrument Serif` (display/font-serif) and `Instrument Sans` (UI/font-sans) directly — no
+  "legacy parity" framing around the type swap.
 
 ### Added
 
-- **Integration test:** Pattern field roundtrip (create → list → update → list) and `PAINT → PT` prefix fallback verification.
-- **Domain tests:** Legacy-compatible prefix for PAINT (3 cases), first-2-char fallback (4 cases), pattern in search key.
+- Structural regression tests (`schedule.regression.test.ts`): single outer board branch, exactly one
+  `BoardView` render, list rows confined to the else branch, one shared `EntryDrawer`, per-field
+  pattern assertions across `schedule-board.tsx`, `actions.ts`, the template editor, and the service.
+- Behavioral integration tests (`service.integration.test.ts`): PAINT→PT fallback, configured prefix
+  override, existing-project `PA-xx` continuation, pattern create→list→update, unrelated-field edits
+  preserving pattern, template-item create/update and template seeding preserving pattern, reuse
+  copying pattern, and search key matching on pattern.
+- Domain tests: corrected the search-key expectation to the canonical brand-first ordering.
 
 ### Verification
 
-- `npm test`: 415 passed, 0 failed.
-- `npx tsc --noEmit`: no new errors (pre-existing `phase.ts:91` error unrelated).
-- Migration applied to both `studioflow_rebuild` and `studioflow_rebuild_test` databases.
+- `npm test`: 431 passed, 0 failed (includes the structural and behavioral regression suites).
+- `npx tsc --noEmit`: only the pre-existing `phase.ts:91` error (introduced in `7f5e87f`, prior to
+  R8.95; unrelated to this slice).
+- `npm run lint`: only the pre-existing `projects/[projectId]/page.tsx:61` `Date.now`-in-render
+  error; `schedule-board.tsx` is lint-clean after the `useIsDesktop` hook was rewritten with
+  `useSyncExternalStore`.
+- `npm run check:boundaries`: passed. `npm run check:legacy-runtime`: passed.
+- `npm run build`: blocked by the same pre-existing `phase.ts:91` type error; failing before this
+  revision.
+
+---
+
+## R8.96 | 2026-09-18 | feat(sf): Product Schedule parity — prefix, pattern, Board view, Unicode cleanup
+
+> Corrected ledger (R8.97 review). The original entry claimed completed behavior that a0f130e did not
+> actually ship. The accurate record follows; completion landed in R8.97.
+
+### Changed
+
+- **WO-SCHED-R2-01 Prefix parity:** Added `LEGACY_PREFIX_MAP` with `PAINT → PT` override to
+  `fallbackPrefix()`. Paint categories now use `PT-xx` codes instead of `PA-xx`. (Existing-project
+  `PA-xx` continuation was added in R8.97.)
+- **WO-SCHED-R2-02 Pattern field (service/domain layer only):** Added `pattern` column to
+  `SfScheduleOption` and `SfScheduleTemplateItem` in `schema.prisma` (the migration file itself was
+  authored but not committed here; the column was applied manually to both local databases). Updated
+  `SnapshotInput`, `cleanSnapshot()`, `optionData()`, `templateItemData()`, CSV import
+  (`pattern`/`motif`/`catalog_motif` aliases), template save, copy reusable, and option view
+  mappings. The client round-trip (draft → snapshot → action schema → template editor) was NOT
+  delivered in this revision — `ScheduleSnapshot` rejected `pattern`, the Board "edit" flow could
+  clear it, and the template editor dropped it. Completed in R8.97.
+- **WO-SCHED-R2-03 Unicode escape leakage:** Replaced literal `\u00b7` (·), `\u00d7` (×),
+  `\u2014` (—), `\u2026` (…), `\u2192` (→) escape sequences with real Unicode characters in
+  `schedule-board.tsx`.
+- **WO-SCHED-R2-04 Board presentation view:** Added the `BoardView` card grid component (4:5 photo
+  aspect, grouped by category, code/product/brand/spec/status badges). In this revision it was only
+  reachable incorrectly: the toggle branch rendered one Board card inside every list row. Corrected
+  in R8.97.
+- **WO-SCHED-R2-05 List preservation + toggle:** Added the List/Board toggle buttons in the toolbar;
+  the list remained the default. The toggle's render branch was misnested into the list rows, so the
+  Board view was not actually switchable. Corrected in R8.97.
+- **WO-SCHED-R2-06 Visual hierarchy:** Aligned via the UI Engine typography consolidation
+  (WO-R2-08/R2-09); `DESIGN.md`/showcase wording was made explicit about Instrument Serif/Sans in
+  R8.97.
+- **WO-SCHED-R2-08 Search key parity:** `scheduleSearchKey()` includes the `pattern` field.
+
+### Added
+
+- Domain tests for the PAINT→PT prefix and pattern-in-search-key helpers (some expectations were
+  corrected in R8.97).
+
+### Verification
+
+- `npm test` and `npx tsc --noEmit` were recorded as green at commit time, but the Board/List and
+  pattern round-trip regressions made those results misleading; both are re-verified in R8.97.
+- Migration ledger entry and reproducible apply were missing; both fixed in R8.97.
 
 ---
 

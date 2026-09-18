@@ -64,6 +64,7 @@ type ScheduleTemplate = {
     brand_name: string | null;
     sku_text: string | null;
     color: string | null;
+    pattern: string | null;
     finishing: string | null;
     dimension: string | null;
     notes: string | null;
@@ -339,6 +340,7 @@ function TemplateItemDialog({
     productName: text(item?.product_name),
     skuText: text(item?.sku_text),
     color: text(item?.color),
+    pattern: text(item?.pattern),
     finishing: text(item?.finishing),
     dimension: text(item?.dimension),
     notes: text(item?.notes),
@@ -359,6 +361,7 @@ function TemplateItemDialog({
       productName: draft.productName.trim(),
       skuText: nullable(draft.skuText),
       color: nullable(draft.color),
+      pattern: nullable(draft.pattern),
       finishing: nullable(draft.finishing),
       dimension: nullable(draft.dimension),
       notes: nullable(draft.notes),
@@ -398,6 +401,7 @@ function TemplateItemDialog({
         <Field label="Brand name"><Input value={draft.brandId ? brandOptions.find((b) => b.id === draft.brandId)?.name ?? "" : draft.brandName} disabled={!!draft.brandId} maxLength={160} onChange={set("brandName")} /></Field>
         <Field label="SKU / code"><Input value={draft.skuText} maxLength={160} onChange={set("skuText")} /></Field>
         <Field label="Color"><Input value={draft.color} maxLength={160} onChange={set("color")} /></Field>
+        <Field label="Pattern / motif"><Input value={draft.pattern} maxLength={160} onChange={set("pattern")} /></Field>
         <Field label="Finishing"><Input value={draft.finishing} maxLength={160} onChange={set("finishing")} /></Field>
         <Field label="Dimension"><Input value={draft.dimension} maxLength={160} onChange={set("dimension")} /></Field>
         <Field label="Qty"><Input inputMode="decimal" value={draft.qty} maxLength={20} onChange={set("qty")} /></Field>

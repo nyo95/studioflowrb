@@ -539,6 +539,7 @@ const ScheduleSnapshot = z.strictObject({
   productName: z.string().max(200),
   skuText: z.string().max(160).nullish(),
   color: z.string().max(160).nullish(),
+  pattern: z.string().max(160).nullish(),
   finishing: z.string().max(160).nullish(),
   dimension: z.string().max(160).nullish(),
   notes: z.string().max(2000).nullish(),

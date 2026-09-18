@@ -21,8 +21,8 @@ All apps must feel like one product. Do not create a separate visual language pe
 
 ## 2. Canonical Typography
 
-- Page and major-view headings: `Lora` / `font-serif`
-- Operational UI/body: `Inter` / `font-sans`
+- Page and major-view headings: `Instrument Serif` / `font-serif`
+- Operational UI/body: `Instrument Sans` / `font-sans`
 
 | Role | Default |
 |---|---|

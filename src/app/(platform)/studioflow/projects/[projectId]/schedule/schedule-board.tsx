@@ -2,7 +2,7 @@
 
 import { ArrowDown, ArrowUp, FileUp, History, ImageIcon, Plus, Search, Settings2, X } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import {
   Badge,
@@ -55,6 +55,7 @@ export type ScheduleOptionView = {
   productName: string;
   skuText: string | null;
   color: string | null;
+  pattern: string | null;
   finishing: string | null;
   dimension: string | null;
   notes: string | null;
@@ -81,6 +82,7 @@ type ReuseHit = {
   productName: string;
   skuText: string | null;
   color: string | null;
+  pattern: string | null;
   finishing: string | null;
   dimension: string | null;
   isFinal: boolean;
@@ -95,8 +97,8 @@ const STATUS_LABEL: Record<string, { label: string; tone: "success" | "neutral" 
 
 type Command = ReturnType<typeof useCommand>;
 
-function specLine(option: Pick<ScheduleOptionView, "skuText" | "color" | "finishing" | "dimension">) {
-  return [option.skuText, option.color, option.finishing, option.dimension].filter(Boolean).join(" · ");
+function specLine(option: Pick<ScheduleOptionView, "skuText" | "color" | "pattern" | "finishing" | "dimension">) {
+  return [option.skuText, option.color, option.pattern, option.finishing, option.dimension].filter(Boolean).join(" · ");
 }
 
 function finalOf(entry: ScheduleEntryView) {
@@ -128,15 +130,16 @@ function Thumb({ url, alt, className = "h-10 w-8" }: { url: string | null; alt: 
 // ── Responsive hook ───────────────────────────────────────────────────────────
 
 function useIsDesktop() {
-  const [isDesktop, setIsDesktop] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 768px)");
-    setIsDesktop(mq.matches);
-    const listener = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    mq.addEventListener("change", listener);
-    return () => mq.removeEventListener("change", listener);
-  }, []);
-  return isDesktop;
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      const mq = window.matchMedia("(min-width: 768px)");
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
+    },
+    [],
+  );
+  const getSnapshot = () => window.matchMedia("(min-width: 768px)").matches;
+  return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }
 
 // ── Board view ─────────────────────────────────────────────────────────────
@@ -329,73 +332,77 @@ export function ScheduleBoard({
         />
       ) : (
         <div className={`grid ${open && isDesktop ? "md:grid-cols-[1fr_22rem]" : ""}`}>
-          <div className="grid">
-            {groups.map((group) => (
-              <section key={group.category} className="border-b border-line-subtle last:border-b-0">
-                <div className="flex items-baseline gap-2 bg-surface-muted px-(--ui-section-px) py-1.5">
-                  <h3 className="m-0 text-xs font-semibold uppercase tracking-[0.08em] text-ink-secondary">{group.category}</h3>
-                  <Text size="sm" tone="tertiary">{group.rows.length}</Text>
-                </div>
-                <ul className="m-0 list-none divide-y divide-line-subtle p-0">
-                  {group.rows.map((entry, index) => {
-                    const final = finalOf(entry);
-                    const busy = command.pendingKeys.some((key) => key.startsWith(entry.id));
-                    return (
-                      <li key={entry.id} className={`flex items-center gap-3 px-(--ui-section-px) py-2 ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"}`}>
-                        <button type="button" onClick={() => setOpenId(entry.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                          <Thumb url={final?.imageUrl ?? null} alt={final ? final.productName : `${entry.code} has no photo`} />
-                          <span className="w-14 shrink-0 font-ui-mono text-sm font-semibold tabular-nums text-ink">{entry.code}</span>
-                          <span className="grid min-w-0 flex-1 gap-0.5">
-                            {final ? (
-                              <>
-                                <span className="truncate text-sm font-medium text-ink">
-                                  {final.productName}
-                                  {final.brandName ? <span className="font-normal text-ink-secondary"> · ex. {final.brandName}</span> : null}
-                                </span>
-                                {specLine(final) ? <span className="truncate text-xs text-ink-tertiary">{specLine(final)}</span> : null}
-                              </>
-      ) : viewMode === "board" ? (
-        <BoardView
-          groups={groups}
-          command={command}
-          onOpen={setOpenId}
-          canEdit={canEdit}
-          canManageTemplates={canManageTemplates}
-          onMoveCategory={(entry) => setDialog({ move: entry })}
-          onDelete={removeEntry}
-        />
-      ) : (
-                              <span className="text-sm italic text-ink-tertiary">{entry.options.length ? "No final option yet" : "Reserved — no product yet"}</span>
-                            )}
-                          </span>
-                          <span className="hidden w-28 shrink-0 truncate text-sm text-ink-secondary sm:block">{entry.location ?? ""}</span>
-                          <span className="hidden w-20 shrink-0 text-right text-sm tabular-nums text-ink-secondary sm:block">{entry.qty ? `${entry.qty} ${entry.unit ?? ""}` : ""}</span>
-                          {entry.options.length > 1 ? <Badge>{entry.options.length} options</Badge> : null}
-                        </button>
-                        {canEdit || canManageTemplates ? (
-                          <RowActionMenu
-                            label={`Actions for ${entry.code}`}
-                            pending={busy}
-                            items={[
-                              { label: "Open", onSelect: () => setOpenId(entry.id) },
-                              ...(canManageTemplates && templateSourceOf(entry)
-                                ? [{ label: "Save as template item", onSelect: () => void run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })) }]
-                                : []),
-                              ...(canEdit ? [
-                              { label: "Move up", icon: <ArrowUp className="h-3.5 w-3.5" />, disabled: index === 0, separatorBefore: true, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "up" })) },
-                              { label: "Move down", icon: <ArrowDown className="h-3.5 w-3.5" />, disabled: index === group.rows.length - 1, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "down" })) },
-                              { label: "Move to category…", onSelect: () => setDialog({ move: entry }) },
-                              { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeEntry(entry) },
-                              ] : []),
-                            ]}
-                          />
-                        ) : null}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            ))}
+          <div className="min-w-0">
+            {viewMode === "board" ? (
+              <BoardView
+                groups={groups}
+                command={command}
+                onOpen={setOpenId}
+                canEdit={canEdit}
+                canManageTemplates={canManageTemplates}
+                onMoveCategory={(entry) => setDialog({ move: entry })}
+                onDelete={removeEntry}
+              />
+            ) : (
+              <div className="grid">
+                {groups.map((group) => (
+                  <section key={group.category} className="border-b border-line-subtle last:border-b-0">
+                    <div className="flex items-baseline gap-2 bg-surface-muted px-(--ui-section-px) py-1.5">
+                      <h3 className="m-0 text-xs font-semibold uppercase tracking-[0.08em] text-ink-secondary">{group.category}</h3>
+                      <Text size="sm" tone="tertiary">{group.rows.length}</Text>
+                    </div>
+                    <ul className="m-0 list-none divide-y divide-line-subtle p-0">
+                      {group.rows.map((entry, index) => {
+                        const final = finalOf(entry);
+                        const busy = command.pendingKeys.some((key) => key.startsWith(entry.id));
+                        return (
+                          <li key={entry.id} className={`flex items-center gap-3 px-(--ui-section-px) py-2 ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"}`}>
+                            <button type="button" onClick={() => setOpenId(entry.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                              <Thumb url={final?.imageUrl ?? null} alt={final ? final.productName : `${entry.code} has no photo`} />
+                              <span className="w-14 shrink-0 font-ui-mono text-sm font-semibold tabular-nums text-ink">{entry.code}</span>
+                              <span className="grid min-w-0 flex-1 gap-0.5">
+                                {final ? (
+                                  <>
+                                    <span className="truncate text-sm font-medium text-ink">
+                                      {final.productName}
+                                      {final.brandName ? <span className="font-normal text-ink-secondary"> · ex. {final.brandName}</span> : null}
+                                    </span>
+                                    {specLine(final) ? <span className="truncate text-xs text-ink-tertiary">{specLine(final)}</span> : null}
+                                  </>
+                                ) : (
+                                  <span className="text-sm italic text-ink-tertiary">{entry.options.length ? "No final option yet" : "Reserved — no product yet"}</span>
+                                )}
+                              </span>
+                              <span className="hidden w-28 shrink-0 truncate text-sm text-ink-secondary sm:block">{entry.location ?? ""}</span>
+                              <span className="hidden w-20 shrink-0 text-right text-sm tabular-nums text-ink-secondary sm:block">{entry.qty ? `${entry.qty} ${entry.unit ?? ""}` : ""}</span>
+                              {entry.options.length > 1 ? <Badge>{entry.options.length} options</Badge> : null}
+                            </button>
+                            {canEdit || canManageTemplates ? (
+                              <RowActionMenu
+                                label={`Actions for ${entry.code}`}
+                                pending={busy}
+                                items={[
+                                  { label: "Open", onSelect: () => setOpenId(entry.id) },
+                                  ...(canManageTemplates && templateSourceOf(entry)
+                                    ? [{ label: "Save as template item", onSelect: () => void run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })) }]
+                                    : []),
+                                  ...(canEdit ? [
+                                    { label: "Move up", icon: <ArrowUp className="h-3.5 w-3.5" />, disabled: index === 0, separatorBefore: true, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "up" })) },
+                                    { label: "Move down", icon: <ArrowDown className="h-3.5 w-3.5" />, disabled: index === group.rows.length - 1, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "down" })) },
+                                    { label: "Move to category…", onSelect: () => setDialog({ move: entry }) },
+                                    { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeEntry(entry) },
+                                  ] : []),
+                                ]}
+                              />
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Desktop inline panel */}
@@ -468,10 +475,11 @@ type ProductDraft = {
   color: string;
   finishing: string;
   dimension: string;
+  pattern: string;
   notes: string;
 };
 
-const EMPTY_PRODUCT: ProductDraft = { brandId: "", brandName: "", productName: "", skuText: "", color: "", finishing: "", dimension: "", notes: "" };
+const EMPTY_PRODUCT: ProductDraft = { brandId: "", brandName: "", productName: "", skuText: "", color: "", finishing: "", dimension: "", pattern: "", notes: "" };
 
 function productFromOption(option: ScheduleOptionView): ProductDraft {
   return {
@@ -482,6 +490,7 @@ function productFromOption(option: ScheduleOptionView): ProductDraft {
     color: option.color ?? "",
     finishing: option.finishing ?? "",
     dimension: option.dimension ?? "",
+    pattern: option.pattern ?? "",
     notes: option.notes ?? "",
   };
 }
@@ -495,6 +504,7 @@ function toSnapshot(draft: ProductDraft) {
     skuText: text(draft.skuText),
     color: text(draft.color),
     finishing: text(draft.finishing),
+    pattern: text(draft.pattern),
     dimension: text(draft.dimension),
     notes: text(draft.notes),
   };
@@ -519,6 +529,7 @@ function ProductFields({ value, onChange, brands, extraBrand }: { value: Product
       </Field>
       <Field label="SKU / code"><Input value={value.skuText} onChange={set("skuText")} maxLength={160} /></Field>
       <Field label="Color"><Input value={value.color} onChange={set("color")} maxLength={160} /></Field>
+      <Field label="Pattern / motif"><Input value={value.pattern} onChange={set("pattern")} maxLength={160} /></Field>
       <Field label="Finishing"><Input value={value.finishing} onChange={set("finishing")} maxLength={160} /></Field>
       <Field label="Dimension"><Input value={value.dimension} onChange={set("dimension")} maxLength={160} placeholder="e.g. 60 × 60 cm" /></Field>
       <Field label="Notes" className="sm:col-span-2">

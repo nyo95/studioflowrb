@@ -585,6 +585,72 @@ describe("SF-R3 Product Schedule", () => {
     assert.equal(listed2.options[0].pattern, "Woodgrain", "pattern updates correctly");
   });
 
+  it("keeps the existing project prefix for a category (PA compat) instead of mixing codes", async () => {
+    const { projectId } = await newProject();
+    const first = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });
+    // Simulate persisted legacy rows that predate the PT fallback and already use PA.
+    await testDb.prisma.sfScheduleEntry.update({ where: { id: first.entryId }, data: { prefix: "PA" } });
+    const second = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "More paint" } });
+    const rows = await sf.schedule.listSchedule({ grants: ALL, projectId });
+    const codes = rows.map((r) => r.code);
+    assert.deepEqual(codes, ["PA-01", "PA-02"], "a new Paint row follows the existing project prefix (PA)");
+    assert.ok(codes.every((c) => c.startsWith("PA-")), `no mixed PA/PT codes, got ${codes.join(", ")}`);
+    assert.equal(second.entryId.length > 0, true);
+  });
+
+  it("preserves pattern through template items, seeding, reuse, and search", async () => {
+    const category = await sf.schedule.upsertTemplateCategory({ ...as(designer), section: "MATERIAL", category: "Paint" });
+    await sf.schedule.createTemplateItem({
+      ...as(designer),
+      templateCategoryId: category.templateCategoryId,
+      section: "MATERIAL",
+      category: "Paint",
+      snapshot: { productName: "Easy Clean", pattern: "Marble" },
+      qty: "1",
+      unit: "pail",
+      location: "Lobby",
+    });
+    const seeded = await testDb.prisma.sfScheduleTemplateItem.findFirst({ where: { product_name: "Easy Clean" } });
+    assert.equal(seeded?.pattern, "Marble", "template item create preserves pattern");
+
+    await sf.schedule.updateTemplateItem({
+      ...as(designer),
+      templateItemId: seeded!.id,
+      snapshot: { productName: "Easy Clean", pattern: "Marble", color: "White" },
+      qty: "1",
+      unit: "pail",
+      location: "Lobby",
+    });
+    const after = await testDb.prisma.sfScheduleTemplateItem.findUniqueOrThrow({ where: { id: seeded!.id } });
+    assert.equal(after.pattern, "Marble", "editing an unrelated template field keeps pattern");
+    assert.equal(after.color, "White");
+
+    const seededProject = (await sf.schedule.listSchedule({ grants: ALL, projectId: (await newProject()).projectId })).find((r) => r.category === "Paint")!;
+    assert.equal(seededProject.options[0]?.pattern, "Marble", "template seeding propagates pattern to the project row");
+
+    const source = await newProject("Source");
+    const sourceEntry = await sf.schedule.createEntry({ ...as(designer), projectId: source.projectId, section: "MATERIAL", category: "Stone", snapshot: { productName: "Granite Slab", brandName: "Cotto", pattern: "Flaming" } });
+    const sourceOption = await testDb.prisma.sfScheduleOption.findFirstOrThrow({ where: { entry_id: sourceEntry.entryId } });
+    const target = await newProject("Target");
+    const hits = await sf.schedule.searchReusableOptions({ grants: ALL, projectId: target.projectId, query: "flaming", section: "MATERIAL" });
+    assert.ok(hits.some((h) => h.pattern === "Flaming"), "search key includes pattern");
+
+    const targetEntry = await sf.schedule.createEntry({ ...as(designer), projectId: target.projectId, section: "MATERIAL", category: "Stone" });
+    await sf.schedule.copyReusableOption({ ...as(designer), projectId: target.projectId, entryId: targetEntry.entryId, sourceOptionId: sourceOption.id });
+    const copied = (await sf.schedule.listSchedule({ grants: ALL, projectId: target.projectId })).find((r) => r.id === targetEntry.entryId)!;
+    assert.equal(copied.options[0].pattern, "Flaming", "reuse copies pattern");
+
+    const edited = await sf.schedule.updateOption({
+      ...as(designer),
+      projectId: target.projectId,
+      optionId: copied.options[0].id,
+      snapshot: { productName: "Granite Slab", brandName: "Cotto", pattern: "Flaming", color: "Grey" },
+    });
+    const editedRow = (await sf.schedule.listSchedule({ grants: ALL, projectId: target.projectId })).find((r) => r.id === targetEntry.entryId)!;
+    assert.equal(editedRow.options[0].pattern, "Flaming", "editing another option field preserves pattern");
+    assert.equal(editedRow.options[0].color, "Grey");
+  });
+
   it("enforces permissions, project scope, and archive read-only", async () => {
     const { projectId } = await newProject();
     const other = await newProject("Other");

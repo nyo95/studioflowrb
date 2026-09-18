@@ -222,7 +222,7 @@ export function UiEngineShowcase() {
               </Notice>
               <DescriptionList columns={2}>
                 <DescriptionItem label="Canvas">Near-white ground and bordered white surfaces.</DescriptionItem>
-                <DescriptionItem label="Typography">Lora for headings, Inter for controls and data.</DescriptionItem>
+                <DescriptionItem label="Typography">Instrument Serif for headings, Instrument Sans for controls and data.</DescriptionItem>
                 <DescriptionItem label="Density">Compact operational spacing, 16px page rhythm.</DescriptionItem>
                 <DescriptionItem label="Motion">Short, predictable transitions only.</DescriptionItem>
               </DescriptionList>
