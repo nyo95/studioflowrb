@@ -669,10 +669,20 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           if (!otherActive) throw conflict("NEED_DEFAULT_TEMPLATE", "At least one template must be the default.");
         }
 
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
         const data: Record<string, unknown> = {};
-        if (input.name !== undefined) data.name = requiredText(input.name, "TEMPLATE_NAME_REQUIRED", "Template name", 200);
-        if (input.isActive !== undefined) data.is_active = input.isActive;
-        if (input.isDefault !== undefined) data.is_default = input.isDefault;
+        if (input.name !== undefined) {
+          const name = requiredText(input.name, "TEMPLATE_NAME_REQUIRED", "Template name", 200);
+          if (name !== template.name) { changes.name = { from: template.name, to: name }; data.name = name; }
+        }
+        if (input.isActive !== undefined && input.isActive !== template.is_active) {
+          changes.isActive = { from: template.is_active, to: input.isActive };
+          data.is_active = input.isActive;
+        }
+        if (input.isDefault !== undefined && input.isDefault !== template.is_default) {
+          changes.isDefault = { from: template.is_default, to: input.isDefault };
+          data.is_default = input.isDefault;
+        }
 
         if (input.isDefault === true) {
           await tx.sfPhaseTemplate.updateMany({ where: { is_default: true, id: { not: input.templateId } }, data: { is_default: false } });
@@ -680,7 +690,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
 
         if (Object.keys(data).length === 0) return { templateId: input.templateId };
         await tx.sfPhaseTemplate.update({ where: { id: input.templateId }, data });
-        await writeAudit(ports, tx, { action: "studioflow.phase-template.updated", entityType: "phase-template", entityId: input.templateId, actor: input.actor, metadata: { ...data } });
+        await writeAudit(ports, tx, { action: "studioflow.phase-template.updated", entityType: "phase-template", entityId: input.templateId, actor: input.actor, changes, metadata: { name: template.name } });
         return { templateId: input.templateId };
       });
     },
@@ -726,24 +736,30 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const def = await tx.sfPhaseDefinition.findUnique({ where: { id: input.definitionId } });
         if (!def) throw notFound("phase definition");
 
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
         const data: Record<string, unknown> = {};
-        if (input.name !== undefined) data.name = requiredText(input.name, "PHASE_DEF_NAME_REQUIRED", "Phase name", 200);
+        if (input.name !== undefined) {
+          const name = requiredText(input.name, "PHASE_DEF_NAME_REQUIRED", "Phase name", 200);
+          if (name !== def.name) { changes.name = { from: def.name, to: name }; data.name = name; }
+        }
         if (input.prefix !== undefined) {
           const prefix = input.prefix.toUpperCase();
           if (prefix.length < 1 || prefix.length > 4) throw invalid("PREFIX_LENGTH", "Prefix must be 1-4 characters.");
           const existing = await tx.sfPhaseDefinition.findFirst({ where: { template_id: def.template_id, prefix, id: { not: input.definitionId } } });
           if (existing) throw conflict("PREFIX_DUPLICATE", `Prefix "${prefix}" is already used in this template.`);
-          data.prefix = prefix;
+          if (prefix !== def.prefix) { changes.prefix = { from: def.prefix, to: prefix }; data.prefix = prefix; }
         }
         if (input.seat !== undefined) {
           if (input.seat !== "designer" && input.seat !== "drafter") throw invalid("INVALID_SEAT", "Seat must be 'designer' or 'drafter'.");
-          data.seat = input.seat;
+          if (input.seat !== def.seat) { changes.seat = { from: def.seat, to: input.seat }; data.seat = input.seat; }
         }
-        if (input.allowParallel !== undefined) data.allow_parallel = input.allowParallel;
+        if (input.allowParallel !== undefined) {
+          if (input.allowParallel !== def.allow_parallel) { changes.allowParallel = { from: def.allow_parallel, to: input.allowParallel }; data.allow_parallel = input.allowParallel; }
+        }
 
         if (Object.keys(data).length === 0) return { definitionId: input.definitionId };
         await tx.sfPhaseDefinition.update({ where: { id: input.definitionId }, data });
-        await writeAudit(ports, tx, { action: "studioflow.phase-definition.updated", entityType: "phase-definition", entityId: input.definitionId, actor: input.actor, metadata: { ...data } });
+        await writeAudit(ports, tx, { action: "studioflow.phase-definition.updated", entityType: "phase-definition", entityId: input.definitionId, actor: input.actor, changes, metadata: { templateId: def.template_id } });
         return { definitionId: input.definitionId };
       });
     },
@@ -753,6 +769,12 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       return runTransaction(async (tx) => {
         const def = await tx.sfPhaseDefinition.findUnique({ where: { id: input.definitionId } });
         if (!def) throw notFound("phase definition");
+        // R2.3B: Prevent deleting the final definition from the default template.
+        const template = await tx.sfPhaseTemplate.findUnique({ where: { id: def.template_id } });
+        if (template?.is_default) {
+          const count = await tx.sfPhaseDefinition.count({ where: { template_id: def.template_id } });
+          if (count <= 1) throw conflict("DEFAULT_TEMPLATE_REQUIRES_PHASE", "Cannot delete the last phase from the default template. Add another phase first, or set a different default.");
+        }
         await tx.sfPhaseDefinition.delete({ where: { id: input.definitionId } });
         const siblings = await tx.sfPhaseDefinition.findMany({ where: { template_id: def.template_id, order_index: { gt: def.order_index } }, orderBy: { order_index: "asc" } });
         for (const sib of siblings) {
@@ -776,6 +798,13 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           if (!defIds.has(id)) throw invalid("REORDER_INVALID_ID", "Ordered IDs contain unknown definition IDs.");
         }
 
+        // R2.3C: Two-pass reorder to avoid unique constraint violations.
+        // Pass 1: move all to temporary high offsets.
+        const TEMP_BASE = 10_000;
+        for (let i = 0; i < input.orderedIds.length; i++) {
+          await tx.sfPhaseDefinition.update({ where: { id: input.orderedIds[i] }, data: { order_index: TEMP_BASE + i } });
+        }
+        // Pass 2: assign final offsets.
         for (let i = 0; i < input.orderedIds.length; i++) {
           await tx.sfPhaseDefinition.update({ where: { id: input.orderedIds[i] }, data: { order_index: i } });
         }
