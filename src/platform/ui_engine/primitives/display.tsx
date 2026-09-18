@@ -12,15 +12,15 @@ export type HeadingProps = HTMLAttributes<HTMLHeadingElement> & {
 const HEADING_LEVEL_CLASSES: Record<HeadingLevel, string> = {
   1: "font-display italic font-normal tracking-[-0.01em] text-[2rem] leading-[1.05]",
   2: "font-display font-normal tracking-[-0.01em] text-[1.5rem] leading-[1.08]",
-  3: "text-[1.125rem] font-semibold",
-  4: "text-base font-semibold",
-  5: "text-sm font-semibold",
-  6: "text-xs font-semibold",
+  3: "text-[1.125rem] font-semibold leading-[1.2]",
+  4: "text-base font-semibold leading-[1.25]",
+  5: "text-sm font-semibold leading-[1.3]",
+  6: "text-xs font-semibold leading-[1.3]",
 };
 
 export function Heading({ level = 2, className, ...props }: HeadingProps) {
   const Tag = `h${level}` as keyof Pick<HTMLElementTagNameMap, "h1" | "h2" | "h3" | "h4" | "h5" | "h6">;
-  return <Tag className={cx("m-0 leading-[1.2] text-ink", HEADING_LEVEL_CLASSES[level], className)} {...props} />;
+  return <Tag className={cx("m-0 text-ink", HEADING_LEVEL_CLASSES[level], className)} {...props} />;
 }
 
 export type TextProps = HTMLAttributes<HTMLElement> & {
@@ -186,6 +186,24 @@ export function CountBadge({ className, ...props }: HTMLAttributes<HTMLSpanEleme
   return (
     <span
       className={cx("font-ui-mono text-[0.6875rem] font-medium text-ink-tertiary tabular-nums", className)}
+      {...props}
+    />
+  );
+}
+
+/** Canonical numeric display role for metrics and statistics. */
+export type MetricSize = "sm" | "md" | "lg";
+
+const METRIC_SIZE_CLASSES: Record<MetricSize, string> = {
+  sm: "text-lg font-semibold tabular-nums",
+  md: "text-[1.5rem] font-semibold tabular-nums",
+  lg: "text-[1.75rem] font-semibold tabular-nums",
+};
+
+export function MetricValue({ size = "md", className, ...props }: HTMLAttributes<HTMLElement> & { size?: MetricSize }) {
+  return (
+    <span
+      className={cx("font-sans text-ink", METRIC_SIZE_CLASSES[size], className)}
       {...props}
     />
   );
