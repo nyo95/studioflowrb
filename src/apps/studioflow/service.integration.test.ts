@@ -176,12 +176,12 @@ describe("SF-R1 phase workflow (legacy parity)", () => {
 
     // An item kept on someone who lost phase.work stays editable when the assignee is unchanged.
     const former = await seedUser("Former Staff", [P.access, P.projectRead]);
-    await testDb.prisma.sfActivity.update({ where: { id: converted.id }, data: { assigned_to_id: former.id } });
-    await sf.phases.updateActivity({ ...base, activityId: converted.id, content: "Warmer palette v2", assignedToId: former.id });
+    await testDb.prisma.sfActivity.update({ where: { id: original.id }, data: { assigned_to_id: former.id } });
+    await sf.phases.updateActivity({ ...base, activityId: original.id, content: "Warmer palette v2", assignedToId: former.id });
     const viewer = await seedUser("Viewer Only", [P.access, P.projectRead]);
-    await rejectsWith(sf.phases.updateActivity({ ...base, activityId: converted.id, assignedToId: viewer.id }), "ASSIGNEE_NOT_ELIGIBLE");
+    await rejectsWith(sf.phases.updateActivity({ ...base, activityId: original.id, assignedToId: viewer.id }), "ASSIGNEE_NOT_ELIGIBLE");
 
-    await sf.phases.setActivityDone({ ...base, activityId: converted.id, done: true });
+    await sf.tasks.setItemChecked({ ...as(designer), projectId, itemId: converted.id, checked: true });
     await sf.phases.submitForInternalReview(base);
     await sf.phases.approveInternal(base);
     await sf.phases.submitForClientReview(base);
@@ -190,8 +190,9 @@ describe("SF-R1 phase workflow (legacy parity)", () => {
     assert.equal(clientReject.revision, "v2.0");
     assert.deepEqual(await revisions(phase.id), ["v1.0:COMPLETED", "v1.1:COMPLETED", "v2.0:ACTIVE"]);
 
-    const marble = await testDb.prisma.sfActivity.findFirstOrThrow({ where: { phase_id: phase.id, status: "OPEN", revision: { status: "ACTIVE" } } });
-    await sf.phases.setActivityDone({ ...base, activityId: marble.id, done: true });
+    // V2: client feedback converts to checklist item on rejection, so complete that instead.
+    const marble = await testDb.prisma.sfChecklistItem.findFirstOrThrow({ where: { phase_id: phase.id, label: "Client wants marble", is_checked: false } });
+    await sf.tasks.setItemChecked({ ...as(designer), projectId, itemId: marble.id, checked: true });
     await sf.phases.submitForClientReview(base);
     clock = new Date("2026-09-18T03:00:00Z");
     const approved = await sf.phases.approveClient(base);
