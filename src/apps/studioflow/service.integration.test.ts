@@ -47,14 +47,33 @@ async function seedUser(name: string, grants: readonly string[]) {
   return { id: userId, actor: { kind: "USER" as const, userId, label: name } };
 }
 
+async function seedDefaultTemplate() {
+  const db = testDb.prisma;
+  const template = await db.sfPhaseTemplate.create({ data: { name: "Standard", is_default: true, is_active: true } });
+  const defs: Array<{ name: string; prefix: string; orderIndex: number; allowParallel: boolean; seat: string }> = [
+    { name: "Moodboard", prefix: "MB", orderIndex: 1, allowParallel: false, seat: "designer" },
+    { name: "Layout Plan", prefix: "L", orderIndex: 2, allowParallel: true, seat: "designer" },
+    { name: "Design 3D", prefix: "D", orderIndex: 3, allowParallel: true, seat: "designer" },
+    { name: "Construction Drawing", prefix: "CD", orderIndex: 4, allowParallel: true, seat: "drafter" },
+    { name: "Supervision", prefix: "SV", orderIndex: 5, allowParallel: false, seat: "designer" },
+  ];
+  for (const d of defs) {
+    await db.sfPhaseDefinition.create({ data: { template_id: template.id, name: d.name, prefix: d.prefix, order_index: d.orderIndex, allow_parallel: d.allowParallel, seat: d.seat } });
+  }
+}
+
 async function reset() {
   await testDb.pool.query(`TRUNCATE TABLE ${[
     "sf_schedule_option", "sf_schedule_entry", "sf_schedule_template_item", "sf_schedule_template_category", "sf_schedule_prefix",
     "sf_mom_image", "sf_mom_point", "sf_mom_item", "sf_mom_document",
     "sf_checklist_item_label", "sf_checklist_label", "sf_checklist_filter_view", "sf_checklist_item", "sf_checklist_template",
-    "sf_activity", "sf_revision", "sf_phase", "sf_project", "sf_client", "sf_project_sequence", "sf_settings",
+    "sf_deliverable", "sf_requirement",
+    "sf_activity", "sf_revision", "sf_phase",
+    "sf_phase_definition", "sf_phase_template",
+    "sf_project", "sf_client", "sf_project_sequence", "sf_settings",
   ].map((t) => `"studioflow"."${t}"`).join(", ")} RESTART IDENTITY CASCADE`);
   await truncatePlatformTables(testDb);
+  await seedDefaultTemplate();
   designer = await seedUser("Dina Designer", ALL);
   drafter = await seedUser("Dodi Drafter", DRAFTER_GRANTS);
   clock = new Date("2026-09-15T03:00:00Z");
@@ -691,5 +710,215 @@ describe("SF-R3 Product Schedule", () => {
     assert.ok(seeded, "rows seeded before the edit keep their snapshot");
     await assert.rejects(sf.schedule.updateTemplateItem({ ...as(drafter, DRAFTER_GRANTS), templateItemId: created.templateItemId, snapshot: { productName: "x" } }), (e: unknown) => e instanceof AppError && e.kind === "FORBIDDEN");
     await rejectsWith(sf.schedule.saveEntryAsTemplate({ ...as(designer), projectId, entryId: (await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Empty" })).entryId }), "SCHEDULE_TEMPLATE_SOURCE_REQUIRED");
+  });
+});
+
+// ── R2.7: Phase Template V2 integration tests ──────────────────────────────
+
+describe("Phase Template V2 invariants", () => {
+  it("default template bootstrap works", async () => {
+    const templates = await sf.phases.listPhaseTemplates({ grants: ALL });
+    const defaults = templates.filter((t) => t.isDefault && t.isActive);
+    assert.equal(defaults.length, 1, "exactly one active default template");
+    assert.ok(defaults[0].definitions.length > 0, "default template has definitions");
+  });
+
+  it("template snapshot copied into project", async () => {
+    const { projectId } = await newProject();
+    const phases = await sf.phases.listProjectPhases({ grants: ALL, projectId });
+    for (const phase of phases) {
+      assert.ok(phase.label, "phase has snapshot label");
+      assert.ok(phase.seat, "phase has snapshot seat");
+    }
+  });
+
+  it("template edit does not mutate existing project", async () => {
+    const { projectId } = await newProject();
+    const before = await sf.phases.listProjectPhases({ grants: ALL, projectId });
+    const moodboardLabel = before.find((p) => p.key === "MOODBOARD")?.label;
+    const templates = await sf.phases.listPhaseTemplates({ grants: ALL });
+    const defaultTemplate = templates.find((t) => t.isDefault);
+    assert.ok(defaultTemplate);
+    const moodboardDef = defaultTemplate.definitions.find((d) => d.name === "Moodboard");
+    if (moodboardDef) {
+      await sf.phases.updatePhaseDefinition({ ...as(designer), definitionId: moodboardDef.id, name: "Moodboard Renamed" });
+    }
+    const after = await sf.phases.listProjectPhases({ grants: ALL, projectId });
+    assert.equal(after.find((p) => p.key === "MOODBOARD")?.label, moodboardLabel, "project phase label unchanged by template edit");
+  });
+
+  it("rejects non-legacy-compatible template names", async () => {
+    const { templateId } = await sf.phases.createPhaseTemplate({ ...as(designer), name: `Custom ${randomUUID().slice(0, 4)}` });
+    await sf.phases.createPhaseDefinition({ ...as(designer), templateId, name: "Custom Phase", prefix: "CP" });
+    await sf.phases.updatePhaseTemplate({ ...as(designer), templateId, isDefault: true });
+    await rejectsWith(newProject("Should Fail"), "PHASE_TEMPLATE_NOT_LEGACY_COMPATIBLE");
+    const templates = await sf.phases.listPhaseTemplates({ grants: ALL });
+    const original = templates.find((t) => t.name === "Standard");
+    if (original) await sf.phases.updatePhaseTemplate({ ...as(designer), templateId: original.id, isDefault: true });
+  });
+
+  it("default template cannot become empty — deleting the last definition is rejected", async () => {
+    const { templateId } = await sf.phases.createPhaseTemplate({ ...as(designer), name: `Single ${randomUUID().slice(0, 4)}` });
+    const { definitionId } = await sf.phases.createPhaseDefinition({ ...as(designer), templateId, name: "Solo Phase", prefix: "SP", seat: "designer" });
+    await sf.phases.updatePhaseTemplate({ ...as(designer), templateId, isDefault: true });
+    await rejectsWith(sf.phases.deletePhaseDefinition({ ...as(designer), definitionId }), "DEFAULT_TEMPLATE_REQUIRES_PHASE");
+    // Cleanup: restore original default
+    const templates = await sf.phases.listPhaseTemplates({ grants: ALL });
+    const original = templates.find((t) => t.name === "Standard");
+    if (original) await sf.phases.updatePhaseTemplate({ ...as(designer), templateId: original.id, isDefault: true });
+  });
+
+  it("deactivating the default template is rejected when no other template is default", async () => {
+    const templates = await sf.phases.listPhaseTemplates({ grants: ALL });
+    const defaultTemplate = templates.find((t) => t.isDefault && t.isActive);
+    assert.ok(defaultTemplate);
+    await rejectsWith(sf.phases.updatePhaseTemplate({ ...as(designer), templateId: defaultTemplate.id, isActive: false }), "CANNOT_DEACTIVATE_DEFAULT");
+  });
+
+  it("safe phase reorder persists without constraint violations", async () => {
+    const templates = await sf.phases.listPhaseTemplates({ grants: ALL });
+    const defaultTemplate = templates.find((t) => t.isDefault);
+    assert.ok(defaultTemplate);
+    const ids = defaultTemplate.definitions.map((d) => d.id);
+    assert.ok(ids.length >= 2, "need at least 2 definitions to reorder");
+    const reversed = [...ids].reverse();
+    await sf.phases.reorderPhaseDefinitions({ ...as(designer), templateId: defaultTemplate.id, orderedIds: reversed });
+    const after = await sf.phases.listPhaseTemplates({ grants: ALL });
+    const updated = after.find((t) => t.id === defaultTemplate.id);
+    assert.deepEqual(updated?.definitions.map((d) => d.id), reversed, "definitions reordered to reverse order");
+  });
+});
+
+describe("Snapshot runtime truth", () => {
+  it("custom phase name used in reads", async () => {
+    const { projectId } = await newProject();
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: (await phaseOf(projectId, "MOODBOARD")).id });
+    assert.equal(detail.label, "Moodboard", "detail uses snapshot label");
+  });
+
+  it("custom prefix used in revision labels", async () => {
+    const { projectId } = await newProject();
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: (await phaseOf(projectId, "MOODBOARD")).id });
+    assert.ok(detail.activeRevision?.label.startsWith("MB"), "revision uses snapshot prefix");
+  });
+
+  it("custom seat controls fallback assignee", async () => {
+    const { projectId } = await newProject();
+    const cd = await phaseOf(projectId, "CD");
+    await sf.phases.activatePhase({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id });
+    await sf.phases.submitForInternalReview({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id });
+    await sf.phases.addActivity({ ...as(designer), projectId, phaseId: cd.id, content: "Fix", mode: "FEEDBACK" });
+    await sf.phases.rejectPhase({ ...as(designer), projectId, phaseId: cd.id, type: "INTERNAL" });
+    const todo = await testDb.prisma.sfChecklistItem.findFirstOrThrow({ where: { phase_id: cd.id } });
+    assert.equal(todo.assigned_to_id, drafter.id, "CD fallback assignee is drafter from snapshot");
+  });
+
+  it("getPhaseDetail returns warnings with deliverable status and open requirement count", async () => {
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "MOODBOARD");
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: phase.id });
+    assert.ok(detail.warnings, "warnings field present");
+    assert.equal(typeof detail.warnings.requirementsOpen, "number");
+    assert.ok(["MISSING", "CURRENT", "OUTDATED"].includes(detail.warnings.deliverableStatus), "deliverableStatus is a valid enum value");
+    assert.equal(detail.warnings.deliverableStatus, "MISSING", "no deliverables yet");
+  });
+
+  it("listProjectPhases returns snapshot labels from phase_snapshot", async () => {
+    const { projectId } = await newProject();
+    const phases = await sf.phases.listProjectPhases({ grants: ALL, projectId });
+    const moodboard = phases.find((p) => p.key === "MOODBOARD");
+    assert.ok(moodboard);
+    assert.equal(moodboard.label, "Moodboard", "label from snapshot, not legacy key");
+  });
+
+  it("today feed uses snapshot phase names", async () => {
+    const { projectId } = await newProject();
+    const result = await sf.today.getToday({ ...as(designer), userId: designer.id });
+    const project = result.addTargets.find((t) => t.projectId === projectId);
+    assert.ok(project, "project in today targets");
+    const moodboardTarget = project.targets.find((t) => t.label === "Moodboard");
+    assert.ok(moodboardTarget, "Today addTargets uses snapshot label, not legacy key");
+  });
+
+  it("project directory uses snapshot phase labels", async () => {
+    const { projectId } = await newProject();
+    const projects = await sf.projects.listProjects({ ...as(designer) });
+    const project = projects.find((p) => p.id === projectId);
+    assert.ok(project);
+    const moodboardPhase = project.phases.find((p) => p.key === "MOODBOARD");
+    assert.ok(moodboardPhase);
+    assert.equal(moodboardPhase.label, "Moodboard", "listProjects uses snapshot label");
+  });
+});
+
+describe("Requirement phase lock enforcement", () => {
+  it("locked phase blocks toggle", async () => {
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "MOODBOARD");
+    const base = { ...as(designer), projectId, phaseId: phase.id };
+    await sf.phases.createRequirement({ ...base, title: "Test" });
+    const req = await testDb.prisma.sfRequirement.findFirstOrThrow({ where: { phase_id: phase.id } });
+    await testDb.prisma.sfPhase.update({ where: { id: phase.id }, data: { is_locked: true } });
+    await rejectsWith(sf.phases.toggleRequirement({ ...as(designer), projectId, requirementId: req.id, met: true }), "PHASE_LOCKED");
+  });
+
+  it("locked phase blocks delete", async () => {
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "MOODBOARD");
+    const base = { ...as(designer), projectId, phaseId: phase.id };
+    await sf.phases.createRequirement({ ...base, title: "Test" });
+    const req = await testDb.prisma.sfRequirement.findFirstOrThrow({ where: { phase_id: phase.id } });
+    await testDb.prisma.sfPhase.update({ where: { id: phase.id }, data: { is_locked: true } });
+    await rejectsWith(sf.phases.deleteRequirement({ ...as(designer), projectId, requirementId: req.id }), "PHASE_LOCKED");
+  });
+});
+
+describe("Deliverable reference revision", () => {
+  it("upload requires active revision", async () => {
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "SUPERVISION");
+    await rejectsWith(sf.phases.uploadDeliverable({ ...as(designer), projectId, phaseId: phase.id, name: "test.pdf", file: { body: new Uint8Array(10), contentType: "application/pdf" } }), "ACTIVE_REVISION_REQUIRED");
+  });
+
+  it("deliverable status: no file → MISSING", async () => {
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "MOODBOARD");
+    const result = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
+    assert.equal(result.status, "MISSING");
+  });
+
+  it("deliverable status: upload on active revision → CURRENT", async () => {
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "MOODBOARD");
+    const base = { ...as(designer), projectId, phaseId: phase.id };
+    await sf.phases.uploadDeliverable({ ...base, name: "design.pdf", file: { body: new Uint8Array(100), contentType: "application/pdf" } });
+    const result = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
+    assert.equal(result.status, "CURRENT");
+    assert.equal(result.items.length, 1);
+  });
+
+  it("deliverable status: old files after reject → OUTDATED", async () => {
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "MOODBOARD");
+    const base = { ...as(designer), projectId, phaseId: phase.id };
+    await sf.phases.uploadDeliverable({ ...base, name: "design.pdf", file: { body: new Uint8Array(100), contentType: "application/pdf" } });
+    const before = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
+    assert.equal(before.status, "CURRENT");
+    await sf.phases.submitForInternalReview(base);
+    await sf.phases.addActivity({ ...base, content: "Needs revision", mode: "FEEDBACK" });
+    await sf.phases.rejectPhase({ ...base, type: "INTERNAL" });
+    const after = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
+    assert.equal(after.status, "OUTDATED", "files belong to old revision after reject");
+  });
+});
+
+describe("Project code immutability", () => {
+  it("normal edit preserves project_code", async () => {
+    const { projectId } = await newProject("Test Project");
+    const before = await sf.projects.getProject({ grants: ALL, projectId });
+    const originalCode = before.code;
+    await sf.projects.updateProject({ ...as(designer), projectId, name: "Renamed Project" });
+    const after = await sf.projects.getProject({ grants: ALL, projectId });
+    assert.equal(after.code, originalCode, "project code preserved after rename");
   });
 });
