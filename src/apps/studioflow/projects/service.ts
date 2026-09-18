@@ -468,7 +468,8 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           const next = looksFormatted(readable) ? readable : parsed ? `${parsed.code} ${readable}` : readable;
           const nextParsed = parseProjectName(next);
           if (!nextParsed) throw invalid("PROJECT_NAME_FORMAT", "Project name must use the format: [YYYY]-[Number] [Name].");
-          track("name", project.name, next, () => { data.name = next; data.project_code = nextParsed.code; });
+          // R2.5D: Normal editing preserves project_code; only the readable name changes.
+          track("name", project.name, next, () => { data.name = next; });
         }
         if (input.picDesignerId !== undefined && input.picDesignerId !== project.pic_designer_id) await assertPic(input.picDesignerId, "designer");
         if (input.picDrafterId !== undefined && input.picDrafterId !== project.pic_drafter_id) await assertPic(input.picDrafterId, "drafter");
