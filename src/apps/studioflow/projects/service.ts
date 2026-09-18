@@ -8,7 +8,7 @@ import { normalizeText } from "@platform/utilities/normalization";
 
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
 import { formatProjectName, looksFormatted, parseProjectName } from "../domain/naming";
-import { PHASE_BLUEPRINT_SNAPSHOTS, type PhaseKey, type PhaseStatus, validateTemplateLegacyCompat } from "../domain/phase";
+import { PHASE_BLUEPRINT_SNAPSHOTS, phaseLabel, type PhaseKey, type PhaseStatus, validateTemplateLegacyCompat } from "../domain/phase";
 import {
   P,
   conflict,
@@ -318,7 +318,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         orderBy: [{ priority: "asc" }, { name: "desc" }],
         include: {
           client: { select: { id: true, name: true } },
-          phases: { orderBy: { order_index: "asc" }, select: { id: true, key: true, status: true, is_locked: true, status_changed_at: true } },
+          phases: { orderBy: { order_index: "asc" }, select: { id: true, key: true, status: true, is_locked: true, status_changed_at: true, name_snapshot: true } },
           _count: { select: { activities: { where: { status: "OPEN" } }, checklist_items: { where: { is_checked: false, parent_id: null } } } },
         },
       });
@@ -335,7 +335,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         updatedAt: row.updated_at,
         designer: people.get(row.pic_designer_id) ?? { id: row.pic_designer_id, displayName: "Unknown", active: false },
         drafter: people.get(row.pic_drafter_id) ?? { id: row.pic_drafter_id, displayName: "Unknown", active: false },
-        phases: row.phases.map((phase) => ({ id: phase.id, key: phase.key as PhaseKey, status: phase.status as PhaseStatus, isLocked: phase.is_locked, statusChangedAt: phase.status_changed_at })),
+        phases: row.phases.map((phase) => ({ id: phase.id, key: phase.key as PhaseKey, status: phase.status as PhaseStatus, isLocked: phase.is_locked, statusChangedAt: phase.status_changed_at, label: phase.name_snapshot || phaseLabel(phase.key as PhaseKey) })),
         openItems: row._count.activities + row._count.checklist_items,
       }));
     },

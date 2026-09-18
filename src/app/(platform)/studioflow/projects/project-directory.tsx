@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import { PHASE_BLUEPRINT, phaseStatusDisplay, type PhaseKey, type PhaseStatus } from "@/apps/studioflow/domain/phase";
+import { phaseStatusDisplay, type PhaseKey, type PhaseStatus } from "@/apps/studioflow/domain/phase";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import {
@@ -42,7 +42,7 @@ type ProjectRow = {
   updatedAt: Date;
   designer: Person;
   drafter: Person;
-  phases: Array<{ id: string; key: PhaseKey; status: PhaseStatus; isLocked: boolean }>;
+  phases: Array<{ id: string; key: PhaseKey; status: PhaseStatus; isLocked: boolean; label: string }>;
   openItems: number;
 };
 
@@ -55,7 +55,7 @@ function segment(status: PhaseStatus): SegmentState {
 
 function currentPhase(phases: ProjectRow["phases"]) {
   const active = phases.filter((p) => p.status !== "PENDING" && p.status !== "READY_FOR_NEXT" && p.status !== "COMPLETED");
-  if (active.length > 0) return active.map((p) => `${PHASE_BLUEPRINT.find((b) => b.key === p.key)?.label} · ${phaseStatusDisplay(p.status).label}`).join(", ");
+  if (active.length > 0) return active.map((p) => `${p.label} · ${phaseStatusDisplay(p.status).label}`).join(", ");
   if (phases.every((p) => p.status === "READY_FOR_NEXT" || p.status === "COMPLETED")) return "All phases finished";
   return "Waiting to start next phase";
 }
@@ -155,7 +155,7 @@ export function ProjectDirectory({
               </TableCell>
               <TableCell>
                 <div className="grid min-w-44 gap-1">
-                  <SegmentBar segments={project.phases.map((p) => segment(p.status))} label={project.phases.map((p) => `${p.key}: ${phaseStatusDisplay(p.status).label}`).join(", ")} />
+                  <SegmentBar segments={project.phases.map((p) => segment(p.status))} label={project.phases.map((p) => `${p.label}: ${phaseStatusDisplay(p.status).label}`).join(", ")} />
                   <Text size="sm" tone="secondary" className="truncate">{currentPhase(project.phases)}</Text>
                 </div>
               </TableCell>
