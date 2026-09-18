@@ -25,12 +25,13 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
     if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
     throw error;
   });
-  const [checklist, people, phaseRequirements, phaseDeliverables] = await Promise.all([
+  const [checklist, people, phaseRequirements, phaseDeliverablesResult] = await Promise.all([
     studioFlow.tasks.listChecklist({ grants, projectId, phaseId }),
     studioFlow.projects.listAssignablePeople({ grants }),
     studioFlow.phases.listRequirements({ grants, projectId, phaseId }),
     studioFlow.phases.listDeliverables({ grants, projectId, phaseId }),
   ]);
+  const { items: phaseDeliverables, status: deliverableStatus } = phaseDeliverablesResult;
   const seatPerson = (await studioFlow.projects.resolvePeople({ grants, userIds: [phase.seatUserId] }))[0];
   const caps = studioFlow.phases.capabilities(grants);
   const canWork = phase.modifiable && caps.work;
@@ -113,7 +114,7 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
           projectId={projectId}
           phaseId={phaseId}
           deliverables={phaseDeliverables}
-          activeRevisionId={phase.activeRevision?.id ?? null}
+          status={deliverableStatus}
           canWork={canWork}
           canManage={canManage}
         />

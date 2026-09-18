@@ -18,13 +18,6 @@ type Deliverable = {
 
 type DeliverableStatus = "MISSING" | "CURRENT" | "OUTDATED";
 
-function computeDeliverableStatus(deliverables: Deliverable[], activeRevisionId: string | null): DeliverableStatus {
-  if (deliverables.length === 0) return "MISSING";
-  if (!activeRevisionId) return "MISSING";
-  const hasCurrent = deliverables.some((d) => d.revisionId === activeRevisionId);
-  return hasCurrent ? "CURRENT" : "OUTDATED";
-}
-
 const STATUS_CONFIG: Record<DeliverableStatus, { label: string; tone: "success" | "warning" | "danger"; icon: typeof CheckCircle2 }> = {
   MISSING: { label: "No deliverable", tone: "danger", icon: AlertTriangle },
   CURRENT: { label: "Current", tone: "success", icon: CheckCircle2 },
@@ -42,14 +35,14 @@ export function DeliverablesPanel({
   projectId,
   phaseId,
   deliverables,
-  activeRevisionId,
+  status,
   canWork,
   canManage,
 }: {
   projectId: string;
   phaseId: string;
   deliverables: Deliverable[];
-  activeRevisionId: string | null;
+  status: DeliverableStatus;
   canWork: boolean;
   canManage: boolean;
 }) {
@@ -58,7 +51,6 @@ export function DeliverablesPanel({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const status = computeDeliverableStatus(deliverables, activeRevisionId);
   const statusConfig = STATUS_CONFIG[status];
   const StatusIcon = statusConfig.icon;
 

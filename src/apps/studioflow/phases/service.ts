@@ -586,6 +586,12 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       });
       const snap = phaseSnapshot(phase);
       const seatUserId = snap.seatSnapshot === "drafter" ? phase.project.pic_drafter_id : phase.project.pic_designer_id;
+      // R2.4E: Warning projection — non-blocking indicators for UI.
+      const [requirementsOpen, deliverables, refRevisionId] = await Promise.all([
+        db.sfRequirement.count({ where: { phase_id: phase.id, is_met: false } }),
+        db.sfDeliverable.findMany({ where: { phase_id: phase.id }, select: { revision_id: true } }),
+        referenceRevisionId(db, phase.id),
+      ]);
       return {
         id: phase.id,
         key: phase.key as PhaseKey,
@@ -603,6 +609,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         commands,
         blockers: fullBlockers(counts),
         todoBlockers: todoBlockers(counts),
+        warnings: { requirementsOpen, deliverableStatus: computeDeliverableStatus(deliverables, refRevisionId) },
         activeRevision: active ? { id: active.id, label: revisionLabel(active, snap.prefixSnapshot), createdAt: active.created_at, activities: active.activities.map(activityView) } : null,
         deferred: deferred.map(activityView),
         history: phase.revisions.filter((rev) => rev.status !== "ACTIVE").map((rev) => ({
@@ -905,6 +912,21 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
   };
   const DELIVERABLE_MAX_BYTES = 25 * 1024 * 1024; // 25 MB
 
+  /** R2.4C: Reference revision = active revision, or latest completed if no active. */
+  async function referenceRevisionId(tx: TxClient, phaseId: string): Promise<string | null> {
+    const active = await tx.sfRevision.findFirst({ where: { phase_id: phaseId, status: "ACTIVE" }, select: { id: true } });
+    if (active) return active.id;
+    const latest = await tx.sfRevision.findFirst({ where: { phase_id: phaseId, status: "COMPLETED" }, orderBy: [{ major: "desc" }, { minor: "desc" }], select: { id: true } });
+    return latest?.id ?? null;
+  }
+
+  /** R2.4D: Deliverable status computed in service, not UI. */
+  function computeDeliverableStatus(deliverables: { revision_id: string | null }[], refRevisionId: string | null): "MISSING" | "CURRENT" | "OUTDATED" {
+    if (deliverables.length === 0 || !refRevisionId) return "MISSING";
+    const hasCurrent = deliverables.some((d) => d.revision_id === refRevisionId);
+    return hasCurrent ? "CURRENT" : "OUTDATED";
+  }
+
   const deliverables = {
     async listDeliverables(input: ReadContext & { projectId: string; phaseId: string }) {
       requireRead(input.grants);
@@ -912,7 +934,9 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         where: { project_id: input.projectId, phase_id: input.phaseId },
         orderBy: { created_at: "asc" },
       });
-      return Promise.all(
+      const refId = await referenceRevisionId(db, input.phaseId);
+      const status = computeDeliverableStatus(rows, refId);
+      const items = await Promise.all(
         rows.map(async (d) => ({
           id: d.id,
           name: d.name,
@@ -923,6 +947,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           url: await ports.storage.createSignedReadUrl(d.storage_key, DELIVERABLE_SIGNED_URL_SECONDS),
         })),
       );
+      return { items, status, referenceRevisionId: refId };
     },
 
     async uploadDeliverable(input: CommandContext & { projectId: string; phaseId: string; name: string; file: { body: Uint8Array; contentType: string } }) {
