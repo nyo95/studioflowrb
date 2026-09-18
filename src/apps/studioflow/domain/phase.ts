@@ -2,6 +2,13 @@
  * Legacy phase workflow, ported as pure rules (contract §5).
  * Evidence: legacy `src/lib/domain/phase-policy.ts`, `phase-service.ts`,
  * project bootstrap in `project-service.ts` (pinned c4b0c466).
+ *
+ * V2 identity model:
+ *   - `SfPhase.id` is the canonical runtime identity.
+ *   - `definition_id`, `name_snapshot`, `prefix_snapshot`, `seat_snapshot`, `order_index`
+ *     form the V2 business snapshot, immutable after project creation.
+ *   - `key` (SfPhaseKey) is a temporary compatibility bridge until V2-E removes it.
+ *     Do not use `key` for naming, assignment, revision prefix, or UI labels.
  */
 
 export const PHASE_KEYS = ["MOODBOARD", "LAYOUT", "DESIGN_3D", "CD", "SUPERVISION"] as const;
@@ -19,6 +26,13 @@ export const PHASE_STATUSES = [
 export type PhaseStatus = (typeof PHASE_STATUSES)[number];
 
 export type PhaseBlueprint = { key: PhaseKey; orderIndex: number; allowParallel: boolean; label: string };
+
+/** V2 runtime identity — the canonical way to identify a phase at runtime. */
+export type PhaseRuntimeIdentity = {
+  id: string;
+  definitionId: string | null;
+  legacyKey: PhaseKey | null;
+};
 
 /** Snapshot fields stored on each project phase — immutable after project creation. */
 export type PhaseSnapshot = {
@@ -64,6 +78,49 @@ export function phaseAccentDotClass(key: PhaseKey | null | undefined): string {
 /** CD is the drafter's phase; every other phase belongs to the designer (RW-02). */
 export function phaseOwnerSeat(key: PhaseKey): "designer" | "drafter" {
   return key === "CD" ? "drafter" : "designer";
+}
+
+// ── V2 identity bridge ───────────────────────────────────────────────────
+
+/** Isolates legacy Supervision-specific behavior behind one explicit check. V2-E bridge debt. */
+export function isLegacySupervisionPhase(key: PhaseKey): boolean {
+  return key === "SUPERVISION";
+}
+
+/** Label→key lookup for mapping template definitions to legacy SfPhaseKey. */
+const LABEL_TO_KEY = new Map<string, PhaseKey>([
+  ...PHASE_BLUEPRINT.map((bp) => [bp.label.toLowerCase(), bp.key]),
+  // Migration seeds "Design 3D" while PHASE_BLUEPRINT uses "3D Design" — accept both.
+  ["design 3d", "DESIGN_3D"],
+]);
+
+/**
+ * Map a template definition name to a valid legacy SfPhaseKey.
+ * Returns null if the definition name has no legacy compatibility mapping.
+ * Used during project creation to validate template compatibility.
+ */
+export function mapDefinitionToLegacyKey(definitionName: string): PhaseKey | null {
+  return LABEL_TO_KEY.get(definitionName.toLowerCase()) ?? null;
+}
+
+/**
+ * Validate that a set of template definition names maps to exactly one key each,
+ * with no duplicates. Returns the mapped keys in definition order, or null if
+ * the template is not legacy-compatible.
+ */
+export function validateTemplateLegacyCompat(
+  definitions: { name: string; order_index: number }[],
+): PhaseKey[] | null {
+  const keys: PhaseKey[] = [];
+  const used = new Set<PhaseKey>();
+  for (const def of definitions) {
+    const key = mapDefinitionToLegacyKey(def.name);
+    if (!key) return null;
+    if (used.has(key)) return null;
+    used.add(key);
+    keys.push(key);
+  }
+  return keys;
 }
 
 // ── Simplified display (RW-01, contract §5.3) ──────────────────────────────
@@ -142,7 +199,7 @@ export function availablePhaseCommands(phase: PhaseState & { key: PhaseKey }): P
   const { status, isLocked, key } = phase;
   if (status === "PENDING") commands.push("activate", "bypass");
   if (!isLocked) {
-    if (status === "IN_PROGRESS" && key === "SUPERVISION") commands.push("completeSupervision");
+    if (status === "IN_PROGRESS" && isLegacySupervisionPhase(key)) commands.push("completeSupervision");
     else if (status === "IN_PROGRESS") commands.push("submitInternal", "submitClient");
     if (status === "ON_REVIEW_INTERNAL") commands.push("approveInternal", "rejectInternal", "submitClient");
     if (status === "APPROVED_INTERNAL") commands.push("submitClient");

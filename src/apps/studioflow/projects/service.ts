@@ -8,7 +8,7 @@ import { normalizeText } from "@platform/utilities/normalization";
 
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
 import { formatProjectName, looksFormatted, parseProjectName } from "../domain/naming";
-import { PHASE_BLUEPRINT, PHASE_BLUEPRINT_SNAPSHOTS, type PhaseKey, type PhaseStatus } from "../domain/phase";
+import { PHASE_BLUEPRINT_SNAPSHOTS, type PhaseKey, type PhaseStatus, validateTemplateLegacyCompat } from "../domain/phase";
 import {
   P,
   conflict,
@@ -410,13 +410,16 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         if (!defaultTemplate || defaultTemplate.definitions.length === 0) {
           throw conflict("PROJECT_PHASE_TEMPLATE_MISSING", "No active default phase template found. Create and set a default template before creating projects.");
         }
-        // Map definition name to legacy SfPhaseKey for backward compatibility
-        const nameToKey = new Map<string, SfPhaseKey>(PHASE_BLUEPRINT.map((bp) => [bp.label.toLowerCase(), bp.key as SfPhaseKey]));
+        // Validate template is legacy-compatible: each definition maps to exactly one SfPhaseKey, no duplicates.
+        const legacyKeys = validateTemplateLegacyCompat(defaultTemplate.definitions);
+        if (!legacyKeys) {
+          throw conflict("PHASE_TEMPLATE_NOT_LEGACY_COMPATIBLE", "The default template contains phase definitions that cannot be mapped to legacy phase identities. Rename definitions to match standard phase names (Moodboard, Layout Plan, Design 3D, Construction Drawing, Supervision).");
+        }
         for (let i = 0; i < defaultTemplate.definitions.length; i++) {
           const def = defaultTemplate.definitions[i];
           const id = randomUUID();
-          const key = nameToKey.get(def.name.toLowerCase()) ?? PHASE_BLUEPRINT[Math.min(i, PHASE_BLUEPRINT.length - 1)].key as SfPhaseKey;
-          phaseIds.set(key as PhaseKey, id);
+          const key = legacyKeys[i] as unknown as SfPhaseKey;
+          phaseIds.set(legacyKeys[i], id);
           const isFirst = i === 0;
           await tx.sfPhase.create({
             data: {

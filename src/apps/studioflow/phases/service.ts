@@ -10,6 +10,7 @@ import {
   PHASE_BLUEPRINT_SNAPSHOTS,
   availablePhaseCommands,
   canActivatePhase,
+  isLegacySupervisionPhase,
   isPhaseModifiable,
   nextRevision,
   phaseLabel,
@@ -289,7 +290,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       requireCommand(input, P.phaseReview);
       return runTransaction(async (tx) => {
         const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId);
-        if (phase.key !== "SUPERVISION" || phase.status !== "IN_PROGRESS" || phase.is_locked) throw invalidState("Only Supervision in progress can be finished.");
+        if (!isLegacySupervisionPhase(phase.key as PhaseKey) || phase.status !== "IN_PROGRESS" || phase.is_locked) throw invalidState("Only Supervision in progress can be finished.");
         await setPhase(tx, phase, { status: "COMPLETED", is_locked: true });
         const current = await activeRevision(tx, phase.id);
         if (current) await closeRevision(tx, current.id);
