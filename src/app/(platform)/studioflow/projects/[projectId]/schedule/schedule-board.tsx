@@ -96,7 +96,7 @@ const STATUS_LABEL: Record<string, { label: string; tone: "success" | "neutral" 
 type Command = ReturnType<typeof useCommand>;
 
 function specLine(option: Pick<ScheduleOptionView, "skuText" | "color" | "finishing" | "dimension">) {
-  return [option.skuText, option.color, option.finishing, option.dimension].filter(Boolean).join(" \u00b7 ");
+  return [option.skuText, option.color, option.finishing, option.dimension].filter(Boolean).join(" · ");
 }
 
 function finalOf(entry: ScheduleEntryView) {
@@ -139,6 +139,76 @@ function useIsDesktop() {
   return isDesktop;
 }
 
+// ── Board view ─────────────────────────────────────────────────────────────
+
+function BoardView({
+  groups,
+  command,
+  onOpen,
+  canEdit,
+  canManageTemplates,
+  onMoveCategory,
+  onDelete,
+}: {
+  groups: Array<{ category: string; rows: ScheduleEntryView[] }>;
+  command: Command;
+  onOpen: (id: string) => void;
+  canEdit: boolean;
+  canManageTemplates: boolean;
+  onMoveCategory: (entry: ScheduleEntryView) => void;
+  onDelete: (entry: ScheduleEntryView) => void;
+}) {
+  return (
+    <div className="grid gap-6 p-(--ui-section-px)">
+      {groups.map((group) => (
+        <section key={group.category}>
+          <div className="flex items-baseline gap-2 mb-3">
+            <h3 className="m-0 text-xs font-semibold uppercase tracking-[0.08em] text-ink-secondary">{group.category}</h3>
+            <Text size="sm" tone="tertiary">{group.rows.length}</Text>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {group.rows.map((entry) => {
+              const final = finalOf(entry);
+              const busy = command.pendingKeys.some((key) => key.startsWith(entry.id));
+              return (
+                <button
+                  key={entry.id}
+                  type="button"
+                  onClick={() => onOpen(entry.id)}
+                  className="group relative grid gap-2 rounded-lg border border-line-subtle bg-surface p-2 text-left transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  <span className="aspect-[4/5] w-full overflow-hidden rounded-[4px] bg-surface-muted">
+                    {final?.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={final.imageUrl} alt={final.productName} className="h-full w-full object-cover" draggable={false} />
+                    ) : (
+                      <span className="flex h-full items-center justify-center"><ImageIcon aria-hidden="true" className="h-6 w-6 text-ink-tertiary" /></span>
+                    )}
+                  </span>
+                  <span className="font-ui-mono text-[11px] font-semibold tabular-nums text-ink-secondary">{entry.code}</span>
+                  {final ? (
+                    <span className="grid gap-0.5">
+                      <span className="truncate text-sm font-medium text-ink leading-tight">{final.productName}</span>
+                      {final.brandName ? <span className="truncate text-xs text-ink-secondary">ex. {final.brandName}</span> : null}
+                      {specLine(final) ? <span className="truncate text-xs text-ink-tertiary">{specLine(final)}</span> : null}
+                    </span>
+                  ) : (
+                    <span className="text-xs italic text-ink-tertiary">No product</span>
+                  )}
+                  <span className="flex items-center gap-1.5">
+                    {final?.status === "APPROVED" ? <Badge tone="success">Final</Badge> : null}
+                    {entry.options.length > 1 ? <Badge>{entry.options.length}</Badge> : null}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 // ── Stat bar ──────────────────────────────────────────────────────────────────
 
 function StatBar({ entries, section }: { entries: readonly ScheduleEntryView[]; section: Section }) {
@@ -176,6 +246,7 @@ export function ScheduleBoard({
   const confirm = useConfirm();
   const isDesktop = useIsDesktop();
   const [section, setSection] = useState<Section>(() => (entries.some((e) => e.section === "MATERIAL") || !entries.length ? "MATERIAL" : "FIXTURE"));
+  const [viewMode, setViewMode] = useState<"list" | "board">("list");
   const [openId, setOpenId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<null | "add" | "import" | { move: ScheduleEntryView }>(null);
 
@@ -216,6 +287,9 @@ export function ScheduleBoard({
               {SECTION_LABEL[key]}
             </FilterChip>
           ))}
+          <span className="mx-1 h-5 w-px bg-line-subtle" aria-hidden="true" />
+          <button type="button" onClick={() => setViewMode("list")} className={`inline-flex min-h-[--ui-control-height-sm] items-center gap-1 rounded-control px-2 text-xs font-medium transition-colors ${viewMode === "list" ? "bg-surface-muted text-ink" : "text-ink-secondary hover:bg-surface-muted hover:text-ink"}`} aria-pressed={viewMode === "list"}>List</button>
+          <button type="button" onClick={() => setViewMode("board")} className={`inline-flex min-h-[--ui-control-height-sm] items-center gap-1 rounded-control px-2 text-xs font-medium transition-colors ${viewMode === "board" ? "bg-surface-muted text-ink" : "text-ink-secondary hover:bg-surface-muted hover:text-ink"}`} aria-pressed={viewMode === "board"}>Board</button>
         </div>
         {canEdit || canManageTemplates ? (
           <div className="flex flex-wrap gap-2">
@@ -276,12 +350,22 @@ export function ScheduleBoard({
                               <>
                                 <span className="truncate text-sm font-medium text-ink">
                                   {final.productName}
-                                  {final.brandName ? <span className="font-normal text-ink-secondary"> \u00b7 ex. {final.brandName}</span> : null}
+                                  {final.brandName ? <span className="font-normal text-ink-secondary"> · ex. {final.brandName}</span> : null}
                                 </span>
                                 {specLine(final) ? <span className="truncate text-xs text-ink-tertiary">{specLine(final)}</span> : null}
                               </>
-                            ) : (
-                              <span className="text-sm italic text-ink-tertiary">{entry.options.length ? "No final option yet" : "Reserved \u2014 no product yet"}</span>
+      ) : viewMode === "board" ? (
+        <BoardView
+          groups={groups}
+          command={command}
+          onOpen={setOpenId}
+          canEdit={canEdit}
+          canManageTemplates={canManageTemplates}
+          onMoveCategory={(entry) => setDialog({ move: entry })}
+          onDelete={removeEntry}
+        />
+      ) : (
+                              <span className="text-sm italic text-ink-tertiary">{entry.options.length ? "No final option yet" : "Reserved — no product yet"}</span>
                             )}
                           </span>
                           <span className="hidden w-28 shrink-0 truncate text-sm text-ink-secondary sm:block">{entry.location ?? ""}</span>
@@ -300,7 +384,7 @@ export function ScheduleBoard({
                               ...(canEdit ? [
                               { label: "Move up", icon: <ArrowUp className="h-3.5 w-3.5" />, disabled: index === 0, separatorBefore: true, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "up" })) },
                               { label: "Move down", icon: <ArrowDown className="h-3.5 w-3.5" />, disabled: index === group.rows.length - 1, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "down" })) },
-                              { label: "Move to category\u2026", onSelect: () => setDialog({ move: entry }) },
+                              { label: "Move to category…", onSelect: () => setDialog({ move: entry }) },
                               { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeEntry(entry) },
                               ] : []),
                             ]}
@@ -319,7 +403,7 @@ export function ScheduleBoard({
             <div className="hidden md:flex md:flex-col border-l border-line-subtle">
               <div className="flex shrink-0 items-start justify-between gap-2 border-b border-line-subtle px-4 py-3">
                 <div>
-                  <p className="text-sm font-semibold leading-tight text-ink">{open.code} \u00b7 {open.category}</p>
+                  <p className="text-sm font-semibold leading-tight text-ink">{open.code} · {open.category}</p>
                   <p className="text-xs text-ink-secondary">{SECTION_LABEL[open.section]}</p>
                 </div>
                 <button
@@ -436,7 +520,7 @@ function ProductFields({ value, onChange, brands, extraBrand }: { value: Product
       <Field label="SKU / code"><Input value={value.skuText} onChange={set("skuText")} maxLength={160} /></Field>
       <Field label="Color"><Input value={value.color} onChange={set("color")} maxLength={160} /></Field>
       <Field label="Finishing"><Input value={value.finishing} onChange={set("finishing")} maxLength={160} /></Field>
-      <Field label="Dimension"><Input value={value.dimension} onChange={set("dimension")} maxLength={160} placeholder="e.g. 60 \u00d7 60 cm" /></Field>
+      <Field label="Dimension"><Input value={value.dimension} onChange={set("dimension")} maxLength={160} placeholder="e.g. 60 × 60 cm" /></Field>
       <Field label="Notes" className="sm:col-span-2">
         <Textarea value={value.notes} onChange={set("notes")} maxLength={2000} rows={2} className="min-h-[60px]" />
       </Field>
@@ -661,7 +745,7 @@ function EntryPanelContent({
                       ) : null}
                     </div>
                     <div className="grid min-w-0 flex-1 gap-0.5">
-                      <span className="text-sm font-medium">{option.productName}{option.brandName ? <span className="font-normal text-ink-secondary"> \u00b7 ex. {option.brandName}</span> : null}</span>
+                      <span className="text-sm font-medium">{option.productName}{option.brandName ? <span className="font-normal text-ink-secondary"> · ex. {option.brandName}</span> : null}</span>
                       {specLine(option) ? <span className="text-xs text-ink-tertiary">{specLine(option)}</span> : null}
                       {option.notes ? <span className="whitespace-pre-wrap text-xs text-ink-secondary">{option.notes}</span> : null}
                       {/* Set final button on card face */}
@@ -715,7 +799,7 @@ function EntryPanelContent({
       <Dialog
         open={photoFor !== null}
         onOpenChange={(value) => { if (!value) setPhotoFor(null); }}
-        title={photoFor ? `Photo \u2014 ${entry.code} option ${photoFor.label}` : "Photo"}
+        title={photoFor ? `Photo — ${entry.code} option ${photoFor.label}` : "Photo"}
         description="Choose a photo and crop it to the 4:5 catalog frame."
         size="lg"
         dismissible={!isPending(`${entry.id}-photo`)}
@@ -751,7 +835,7 @@ function EntryDrawer({
   onClose: () => void;
 }) {
   return (
-    <Drawer open onOpenChange={(value) => { if (!value) onClose(); }} title={`${entry.code} \u00b7 ${entry.category}`} description={SECTION_LABEL[entry.section]} size="lg">
+    <Drawer open onOpenChange={(value) => { if (!value) onClose(); }} title={`${entry.code} · ${entry.category}`} description={SECTION_LABEL[entry.section]} size="lg">
       <EntryPanelContent
         projectId={projectId}
         entry={entry}
@@ -857,7 +941,7 @@ function ReuseDialog({ projectId, entry, command, onClose }: { projectId: string
     <Dialog open onOpenChange={(value) => { if (!value) onClose(); }} title="Copy from a past project" description={`Search products used in other projects and copy one into ${entry.code} as a new option.`} size="lg">
       <div className="grid gap-3">
         <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); void search(); }}>
-          <Input aria-label="Search products" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Brand, product, SKU, color\u2026" maxLength={120} />
+          <Input aria-label="Search products" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Brand, product, SKU, color…" maxLength={120} />
           <Button type="submit" variant="secondary" leadingIcon={<Search className="h-3.5 w-3.5" />} pending={searching} disabled={query.trim().length < 2}>Search</Button>
         </form>
         {searchError ? <InlineError>{searchError}</InlineError> : null}
@@ -868,8 +952,8 @@ function ReuseDialog({ projectId, entry, command, onClose }: { projectId: string
             {hits.map((hit) => (
               <li key={hit.optionId} className="flex items-center gap-3 rounded-control border border-line px-3 py-2">
                 <div className="grid min-w-0 flex-1 gap-0.5">
-                  <span className="truncate text-sm font-medium">{hit.productName}{hit.brandName ? <span className="font-normal text-ink-secondary"> \u00b7 ex. {hit.brandName}</span> : null}</span>
-                  <span className="truncate text-xs text-ink-tertiary">{[specLine(hit), `${hit.sourceProjectName} \u00b7 ${hit.category}`].filter(Boolean).join(" \u2014 ")}</span>
+                  <span className="truncate text-sm font-medium">{hit.productName}{hit.brandName ? <span className="font-normal text-ink-secondary"> · ex. {hit.brandName}</span> : null}</span>
+                  <span className="truncate text-xs text-ink-tertiary">{[specLine(hit), `${hit.sourceProjectName} · ${hit.category}`].filter(Boolean).join(" — ")}</span>
                 </div>
                 {hit.isFinal ? <Badge tone="success">Final there</Badge> : null}
                 <Button size="sm" variant="primary" pending={command.isPending(`${entry.id}-reuse-${hit.optionId}`)} onClick={() => void use(hit)}>Use</Button>
@@ -937,7 +1021,7 @@ function ImportDialog({ projectId, section, command, onClose }: { projectId: str
       open
       onOpenChange={(value) => { if (!value) onClose(); }}
       title="Import schedule CSV"
-      description="Use the Google Sheets export (File \u2192 Download \u2192 CSV). Rows whose code already exists update that item; new codes are added."
+      description="Use the Google Sheets export (File → Download → CSV). Rows whose code already exists update that item; new codes are added."
       size="lg"
       dismissible={!pending}
       footer={<Footer><Button variant="ghost" onClick={onClose} disabled={pending}>{result ? "Close" : "Cancel"}</Button><Button variant="primary" pending={pending} disabled={!csv.trim()} onClick={submit}>Import</Button></Footer>}

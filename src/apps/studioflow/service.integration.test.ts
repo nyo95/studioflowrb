@@ -562,6 +562,29 @@ describe("SF-R3 Product Schedule", () => {
     assert.notEqual(sourceEntry.entryId, targetEntry.entryId);
   });
 
+  it("roundtrips pattern field and uses PAINT → PT prefix fallback", async () => {
+    const { projectId } = await newProject();
+    const { entryId } = await sf.schedule.createEntry({
+      ...as(designer),
+      projectId,
+      section: "MATERIAL",
+      category: "Paint",
+      snapshot: { productName: "Dulux Easy Clean", brandName: "Dulux", color: "Warm White", pattern: "Solid", finishing: "Matt" },
+    });
+    const listed = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((r) => r.id === entryId)!;
+    assert.equal(listed.code, "PT-01", "Paint category defaults to PT prefix");
+    assert.equal(listed.options[0].pattern, "Solid", "pattern roundtrips through create and list");
+
+    const updated = await sf.schedule.updateOption({
+      ...as(designer),
+      projectId,
+      optionId: listed.options[0].id,
+      snapshot: { productName: "Dulux Easy Clean", brandName: "Dulux", color: "Warm White", pattern: "Woodgrain", finishing: "Satin" },
+    });
+    const listed2 = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((r) => r.id === entryId)!;
+    assert.equal(listed2.options[0].pattern, "Woodgrain", "pattern updates correctly");
+  });
+
   it("enforces permissions, project scope, and archive read-only", async () => {
     const { projectId } = await newProject();
     const other = await newProject("Other");

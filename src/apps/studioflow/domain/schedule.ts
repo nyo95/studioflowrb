@@ -12,6 +12,7 @@ export type ScheduleSnapshotInput = {
   productName: string;
   skuText?: string | null;
   color?: string | null;
+  pattern?: string | null;
   finishing?: string | null;
   dimension?: string | null;
 };
@@ -26,8 +27,15 @@ export function normalizeSchedulePrefix(value: string): string {
   return value.trim().replace(/[^A-Za-z0-9]/g, "").toLocaleUpperCase("id-ID").slice(0, 8);
 }
 
+/** Legacy-compatible prefix overrides (e.g. PAINT → PT). */
+const LEGACY_PREFIX_MAP: Record<string, string> = {
+  PAINT: "PT",
+};
+
 export function fallbackPrefix(category: string): string {
   const { key } = normalizeScheduleCategory(category);
+  const mapped = LEGACY_PREFIX_MAP[key];
+  if (mapped) return mapped;
   const alnum = key.replace(/[^A-Z0-9]/g, "");
   return (alnum.slice(0, 2) || "IT").padEnd(2, "X");
 }
@@ -75,7 +83,7 @@ export function parseScheduleCode(code: string): { prefix: string; increment: nu
 }
 
 export function scheduleSearchKey(input: ScheduleSnapshotInput): string {
-  return [input.brandName, input.productName, input.skuText, input.color, input.finishing, input.dimension]
+  return [input.brandName, input.productName, input.skuText, input.color, input.pattern, input.finishing, input.dimension]
     .map((part) => (part ?? "").trim().toLocaleLowerCase("id-ID"))
     .filter(Boolean)
     .join(" | ");

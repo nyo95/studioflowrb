@@ -5,8 +5,33 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.94**
-- Next local revision: **R8.95**
+- Current revision after this entry is committed: **R8.96**
+- Next local revision: **R8.97**
+
+## R8.96 | 2026-09-18 | feat(sf): Product Schedule parity — prefix, pattern, Board view, Unicode cleanup
+
+### Changed
+
+- **WO-SCHED-R2-01 Prefix parity:** Added `LEGACY_PREFIX_MAP` with `PAINT → PT` override to `fallbackPrefix()`. Paint categories now correctly use `PT-xx` codes instead of `PA-xx`.
+- **WO-SCHED-R2-02 Pattern field full-stack:** Added `pattern` column to `SfScheduleOption` and `SfScheduleTemplateItem` models. Updated `SnapshotInput`, `cleanSnapshot()`, `optionData()`, `templateItemData()`, CSV import (`pattern`/`motif`/`catalog_motif` column aliases), template save, copy reusable, and all option view mappings.
+- **WO-SCHED-R2-03 Unicode escape leakage:** Replaced literal `\u00b7` (·), `\u00d7` (×), `\u2014` (—), `\u2026` (…), `\u2192` (→) escape sequences with real Unicode characters in `schedule-board.tsx`.
+- **WO-SCHED-R2-04 Board presentation view:** Added `BoardView` component — card grid with 4:5 photo aspect ratio, grouped by category, showing code/product/brand/specs/status badges.
+- **WO-SCHED-R2-05 List preservation + toggle:** Added Board/List presentation toggle in the toolbar. List remains the default view; Board available via toggle button.
+- **WO-SCHED-R2-06 Visual hierarchy:** Already aligned via UI Engine typography consolidation (WO-R2-08/R2-09).
+- **WO-SCHED-R2-08 Search key parity:** `scheduleSearchKey()` now includes the `pattern` field in the searchable index.
+
+### Added
+
+- **Integration test:** Pattern field roundtrip (create → list → update → list) and `PAINT → PT` prefix fallback verification.
+- **Domain tests:** Legacy-compatible prefix for PAINT (3 cases), first-2-char fallback (4 cases), pattern in search key.
+
+### Verification
+
+- `npm test`: 415 passed, 0 failed.
+- `npx tsc --noEmit`: no new errors (pre-existing `phase.ts:91` error unrelated).
+- Migration applied to both `studioflow_rebuild` and `studioflow_rebuild_test` databases.
+
+---
 
 ## R8.95 | 2026-09-17 | feat(sf-v2): Logic Debt Closure — Phase Template V2 stabilization (WO-LDC-01–09)
 

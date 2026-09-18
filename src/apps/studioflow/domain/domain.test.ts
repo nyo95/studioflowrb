@@ -190,6 +190,21 @@ describe("schedule rules", () => {
     assert.equal(optionLabel(0), "A");
     assert.equal(optionLabel(26), "AA");
     assert.equal(scheduleSearchKey({ brandName: "TACO", productName: "TH 121", color: "Ivory" }), "taco | th 121 | ivory");
+    assert.equal(scheduleSearchKey({ brandName: "TACO", productName: "TH 121", color: "Ivory", pattern: "Woodgrain" }), "taco | th 121 | ivory | woodgrain");
+  });
+
+  it("uses legacy-compatible prefix for PAINT (PT not PA)", () => {
+    assert.equal(fallbackPrefix("Paint"), "PT", "Paint → PT");
+    assert.equal(fallbackPrefix("PAINT"), "PT", "PAINT → PT");
+    assert.equal(fallbackPrefix("paint"), "PT", "paint → PT");
+  });
+
+  it("falls back to first 2 chars for unknown categories", () => {
+    assert.equal(fallbackPrefix("Ceramic Tile"), "CE");
+    assert.equal(fallbackPrefix("Stone"), "ST");
+    assert.equal(fallbackPrefix("Wood"), "WO");
+    assert.equal(fallbackPrefix("A"), "AX", "single char padded with X");
+    assert.equal(fallbackPrefix(""), "IT", "empty category uses default");
   });
 
   it("parses legacy CSV quoting", () => {

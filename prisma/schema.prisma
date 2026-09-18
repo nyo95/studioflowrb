@@ -1645,6 +1645,7 @@ model SfScheduleTemplateItem {
   product_name         String
   sku_text             String?
   color                String?
+  pattern              String?
   finishing            String?
   dimension            String?
   notes                String?
@@ -1705,6 +1706,7 @@ model SfScheduleOption {
   product_name String
   sku_text     String?
   color        String?
+  pattern      String?
   finishing    String?
   dimension    String?
   notes        String?

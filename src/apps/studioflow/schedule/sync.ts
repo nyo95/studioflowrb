@@ -12,6 +12,7 @@ export type SnapshotInput = {
   productName: string;
   skuText?: string | null;
   color?: string | null;
+  pattern?: string | null;
   finishing?: string | null;
   dimension?: string | null;
   notes?: string | null;
@@ -23,6 +24,7 @@ export function cleanSnapshot(input: SnapshotInput) {
   const brandName = optionalText(input.brandName, 160);
   const skuText = optionalText(input.skuText, 160);
   const color = optionalText(input.color, 160);
+  const pattern = optionalText(input.pattern, 160);
   const finishing = optionalText(input.finishing, 160);
   const dimension = optionalText(input.dimension, 160);
   const notes = optionalText(input.notes, 2000);
@@ -33,11 +35,12 @@ export function cleanSnapshot(input: SnapshotInput) {
     productName,
     skuText,
     color,
+    pattern,
     finishing,
     dimension,
     notes,
     imageKey,
-    searchKey: scheduleSearchKey({ brandName, productName, skuText, color, finishing, dimension }),
+    searchKey: scheduleSearchKey({ brandName, productName, skuText, color, pattern, finishing, dimension }),
   };
 }
 
@@ -48,6 +51,7 @@ export function optionData(snapshot: ReturnType<typeof cleanSnapshot>) {
     product_name: snapshot.productName,
     sku_text: snapshot.skuText,
     color: snapshot.color,
+    pattern: snapshot.pattern,
     finishing: snapshot.finishing,
     dimension: snapshot.dimension,
     notes: snapshot.notes,
@@ -135,6 +139,7 @@ export async function seedScheduleFromTemplates(tx: TxClient, projectId: string)
         productName: item.product_name,
         skuText: item.sku_text,
         color: item.color,
+        pattern: item.pattern,
         finishing: item.finishing,
         dimension: item.dimension,
         notes: item.notes,
