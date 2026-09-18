@@ -18,6 +18,12 @@ export type TodayAddTarget = {
   targets: Array<{ phaseId: string | null; label: string; disabledReason: string | null }>;
 };
 
+/** Resolve the display label for a phase, preferring snapshot over legacy key. */
+function resolvePhaseName(phase: { key: string; name_snapshot?: string | null }): string {
+  if (phase.name_snapshot) return phase.name_snapshot;
+  return phaseLabel(phase.key as PhaseKey);
+}
+
 export function createTodayService(db: Db, ports: StudioFlowPorts) {
   return {
     /**
@@ -75,7 +81,7 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
         const targets: TodayAddTarget["targets"] = [{ phaseId: null, label: "General", disabledReason: null }];
         for (const phase of project.phases) {
           const phaseKey = phase.key as PhaseKey;
-          const label = phaseLabel(phaseKey);
+          const label = resolvePhaseName(phase);
           const active = (ACTIVE_PHASE_STATUSES as readonly string[]).includes(phase.status);
           const revision = phase.revisions[0];
           targets.push({ phaseId: phase.id, label, disabledReason: phase.is_locked ? "Approved" : !revision ? "Not started" : null });

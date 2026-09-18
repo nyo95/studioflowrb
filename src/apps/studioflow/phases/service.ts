@@ -51,7 +51,13 @@ function invalidState(message = "This action is not available in the phase's cur
 }
 
 function lockedError(): AppError {
-  return conflict("PHASE_LOCKED", "This phase is approved and locked. Reopen it first.");
+  return conflict("PHASE_LOCKED", "This project is approved and locked. Reopen it first.");
+}
+
+/** Resolve the display label for a phase, preferring snapshot over legacy key. */
+function resolvePhaseName(phase: { key: string; name_snapshot?: string | null }): string {
+  if (phase.name_snapshot) return phase.name_snapshot;
+  return phaseLabel(phase.key as PhaseKey);
 }
 
 export function createPhaseService(db: Db, ports: StudioFlowPorts) {
@@ -123,7 +129,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         if (project.status !== "ACTIVE") throw conflict("PROJECT_NOT_ACTIVE", "The project must be active to start a phase.");
         const previous = await tx.sfPhase.findFirst({ where: { project_id: project.id, order_index: phase.order_index - 1 } });
         if (!canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null)) {
-          throw conflict("PHASE_SEQUENTIAL", `${phaseLabel(phase.key as PhaseKey)} starts after ${phaseLabel(previous!.key as PhaseKey)} is approved.`);
+          throw conflict("PHASE_SEQUENTIAL", `${resolvePhaseName(phase)} starts after ${resolvePhaseName(previous!)} is approved.`);
         }
         const latest = await latestRevision(tx, phase.id);
         const number = latest ? nextRevision(latest, "CLIENT") : { major: 1, minor: 0 };
@@ -210,7 +216,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const number = nextRevision(current, input.type);
         const revision = await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phase.id, ...number } });
         const feedback = await tx.sfActivity.findMany({ where: { revision_id: current.id, mode: "FEEDBACK", status: "OPEN" }, orderBy: { created_at: "asc" } });
-        const fallbackAssignee = phaseOwnerSeat(phase.key as PhaseKey) === "drafter" ? project.pic_drafter_id : project.pic_designer_id;
+        const fallbackAssignee = phaseSnapshot(phase).seatSnapshot === "drafter" ? project.pic_drafter_id : project.pic_designer_id;
         const converted: string[] = [];
         for (const item of feedback) {
           // V2-D1: Feedback converts to SfChecklistItem (Todo SSOT) instead of a new SfActivity(TODO).
@@ -272,7 +278,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           if (project.status !== "ACTIVE") throw conflict("PROJECT_NOT_ACTIVE", "The project must be active to reopen a phase.");
           const previous = await tx.sfPhase.findFirst({ where: { project_id: project.id, order_index: phase.order_index - 1 } });
           if (!canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null)) {
-            throw conflict("PHASE_SEQUENTIAL", `${phaseLabel(phase.key as PhaseKey)} starts after ${phaseLabel(previous!.key as PhaseKey)} is approved.`);
+            throw conflict("PHASE_SEQUENTIAL", `${resolvePhaseName(phase)} starts after ${resolvePhaseName(previous!)} is approved.`);
           }
         }
         const current = await activeRevision(tx, phase.id);
@@ -540,7 +546,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           blockers: fullBlockers(counts),
           todoBlockers: todoBlockers(counts),
           commands,
-          startBlockedReason: status === "PENDING" && !canStart && previous ? `Starts after ${phaseLabel(previous.key as PhaseKey)} is approved.` : null,
+          startBlockedReason: status === "PENDING" && !canStart && previous ? `Starts after ${phaseSnapshot(previous).nameSnapshot} is approved.` : null,
         });
       }
       return results;
@@ -568,7 +574,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       const status = phase.status as PhaseStatus;
       const counts = await readBlockerCounts(db, phase.id);
       const deferred = await db.sfActivity.findMany({ where: { phase_id: phase.id, revision_id: null, status: "OPEN" }, orderBy: { created_at: "asc" } });
-      const previous = await db.sfPhase.findFirst({ where: { project_id: phase.project_id, order_index: phase.order_index - 1 } });
+      const previous = await db.sfPhase.findFirst({ where: { project_id: phase.project_id, order_index: phase.order_index - 1 }, select: { key: true, name_snapshot: true, status: true, order_index: true } });
       const canStart = canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null);
       const active = phase.revisions.find((rev) => rev.status === "ACTIVE") ?? null;
       const archived = phase.project.archived_at !== null;
@@ -593,7 +599,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         statusChangedAt: phase.status_changed_at,
         waitingDays: waitingDays(phase.status_changed_at, nowOf(ports)),
         modifiable: !archived && isPhaseModifiable({ status, isLocked: phase.is_locked }),
-        startBlockedReason: status === "PENDING" && !canStart && previous ? `Starts after ${phaseLabel(previous.key as PhaseKey)} is approved.` : phase.project.status !== "ACTIVE" && status === "PENDING" ? "The project is not active." : null,
+        startBlockedReason: status === "PENDING" && !canStart && previous ? `Starts after ${resolvePhaseName(previous)} is approved.` : phase.project.status !== "ACTIVE" && status === "PENDING" ? "The project is not active." : null,
         commands,
         blockers: fullBlockers(counts),
         todoBlockers: todoBlockers(counts),
