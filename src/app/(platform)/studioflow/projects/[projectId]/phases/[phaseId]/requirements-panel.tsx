@@ -73,7 +73,7 @@ export function RequirementsPanel({
     <SectionCard
       title="Requirements"
       count={requirements.length}
-      description="Items that must be addressed before this phase can be approved."
+      description="Items to verify for this phase. Unmet requirements are warnings and do not block approval."
     >
       {requirements.length === 0 && !canManage ? (
         <Text tone="secondary" size="sm">No requirements for this phase.</Text>

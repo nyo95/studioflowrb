@@ -1,38 +1,49 @@
 # Active Plan
 
-Plan ID: KB-033-SCHEDULE-PHOTO-ADD-FLOW
-Scope: Restore legacy-functional Product Schedule photo flow.
-Status: IMPLEMENTED — R8.86 committed; browser acceptance pending
+Plan ID: LDC-STABILIZATION
+Scope: StudioFlow Logic Debt Closure & Phase Engine V2 Stabilization
+Status: IN PROGRESS — WO-LDC-01 in progress
 Priority: P1
 Owner: Repository owner
-Last updated: 2026-09-16
-Lane: Planner + Executor (owner-combined), rumah
+Last updated: 2026-09-17
+Lane: Executor, rumah
 
 ## Evidence
 
-- Owner browser comment on `/studioflow/projects/.../schedule`: reserved row
-  opens `Add option`, but the dialog has no photo control; asking for the
-  overflow menu is a UX regression because the menu only exists after an option
-  is created.
-- Legacy evidence: `D:\Projects\studioflow` commit `102ff85`, branch `main`,
-  clean working tree, `src/extensions/sketchup/components/CatalogBoard.tsx`.
-  Legacy exposed `+ Add photo` / `Change photo` directly on catalog cards and
-  opened a 4:5 cropper.
+- Implementation plan: `docs/apps/studioflow/STUDIOFLOW-LDC-PLAN.md`
+- Functional floor: legacy `nyo95/studioflow` pinned behavior + SF-R1–SF-R3 rebuild behavior
+- Baseline: current `main` after `d934e8f`
 
 ## Locked decisions
 
-- Use existing rebuild storage and Schedule service commands: `createOption` /
-  `updateOption` for product details and `setOptionImage` for photo bytes.
-- No schema, dependency, permission, or storage-policy change.
-- A new option with a prepared photo is saved in two safe steps: create option,
-  then attach the photo to the returned `optionId`.
-- Keep overflow actions, but do not make photo upload dependent on discovering
-  an overflow menu.
+- Requirements remain warning-only (LDC-3A)
+- Phase templates snapshot into project phases (LDC-2A)
+- Projects bootstrap from default template, not PHASE_BLUEPRINT (LDC-2B)
+- Archive/phase mutability enforced at service level (LDC-1C, LDC-1D)
+- Feedback defer removed from UI (LDC-1A)
+- Quick Add requires taskManage, not phaseWork (LDC-1B)
 
 ## Non-goals
 
-Card-board redesign, full legacy CatalogBoard port, Google Drive, retention
-policy, Product Schedule settings IA, and cross-project reuse changes.
+- Master Data redesign, BQ redesign, MOM rewrite, Schedule rewrite
+- Generic repositories, Clean Architecture boilerplate
+- Upcoming, collaboration/chat, CD List, SketchUp integration
+- V2-E destructive migration
+- Per-project phase add/remove
+- Foundation RBAC vocabulary change
+
+## Work Orders
+
+WO-LDC-01: Runtime truth fixes
+WO-LDC-02: Phase snapshot schema + migration
+WO-LDC-03: Default Phase Template invariants + transactional CRUD
+WO-LDC-04: Project bootstrap from Phase Template
+WO-LDC-05: Remove project runtime dependency on PHASE_BLUEPRINT
+WO-LDC-06: Requirements warning semantics + Overview projection
+WO-LDC-07: Deliverable revision/status semantics
+WO-LDC-08: Override provenance + historical compatibility
+WO-LDC-09: UI/business consistency cleanup
+WO-LDC-10: Integration tests + contract reconciliation
 
 ## Verification
 
@@ -40,14 +51,7 @@ Executor: `npm test`, `npm run typecheck`, `npm run lint`,
 `npm run check:boundaries`, `npm run check:legacy-runtime`, `npm run build`,
 and `git diff --cached --check`.
 
-Reviewer/browser acceptance: on a reserved Schedule row, open Add option,
-prepare a photo, save, and confirm the new option displays the photo and the
-row thumbnail updates; also confirm an existing option exposes a visible
-`Change photo` action.
-
 ## Executor Prompt
 
 Executor lane, rumah. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this
-`PLAN.md`. Finish KB-033 by restoring the legacy-functional Schedule photo flow
-in the rebuild Product Schedule without schema/dependency changes, run the
-required checks, update ledgers, commit locally, and do not push.
+`PLAN.md`. Execute the LDC stabilization plan starting with WO-LDC-01.

@@ -100,3 +100,12 @@ export async function loadWritableProject(tx: TxClient, projectId: string) {
   if (project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
   return project;
 }
+
+/** Phase must exist, belong to a writable project, and be modifiable. */
+export async function loadWritablePhase(tx: TxClient, projectId: string, phaseId: string) {
+  const phase = await tx.sfPhase.findUnique({ where: { id: phaseId } });
+  if (!phase || phase.project_id !== projectId) throw notFound("phase");
+  await loadWritableProject(tx, projectId);
+  if (phase.is_locked) throw conflict("PHASE_LOCKED", "This phase is approved and locked. Reopen it first.");
+  return phase;
+}

@@ -159,7 +159,7 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
               {savedFilters.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}
             </Select></div>
           ) : null}
-          {canWork && addTargets.length > 0 ? (
+          {canManageTasks && addTargets.length > 0 ? (
             <Button variant="primary" leadingIcon={<Plus aria-hidden="true" />} onClick={() => setQuickAdd(true)}>Quick add</Button>
           ) : null}
         </div>

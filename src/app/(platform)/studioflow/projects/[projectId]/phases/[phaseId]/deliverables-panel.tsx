@@ -1,9 +1,9 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { FileDown, Trash2, Upload } from "lucide-react";
+import { FileDown, Trash2, Upload, AlertTriangle, CheckCircle2 } from "lucide-react";
 
-import { Button, SectionCard, Text } from "@/platform/ui_engine";
+import { Badge, Button, SectionCard, Text } from "@/platform/ui_engine";
 import { deleteDeliverableAction, uploadDeliverableAction } from "../../../../actions";
 
 type Deliverable = {
@@ -14,6 +14,21 @@ type Deliverable = {
   revisionId: string | null;
   createdAt: Date;
   url: string;
+};
+
+type DeliverableStatus = "MISSING" | "CURRENT" | "OUTDATED";
+
+function computeDeliverableStatus(deliverables: Deliverable[], activeRevisionId: string | null): DeliverableStatus {
+  if (deliverables.length === 0) return "MISSING";
+  if (!activeRevisionId) return "MISSING";
+  const hasCurrent = deliverables.some((d) => d.revisionId === activeRevisionId);
+  return hasCurrent ? "CURRENT" : "OUTDATED";
+}
+
+const STATUS_CONFIG: Record<DeliverableStatus, { label: string; tone: "success" | "warning" | "danger"; icon: typeof CheckCircle2 }> = {
+  MISSING: { label: "No deliverable", tone: "danger", icon: AlertTriangle },
+  CURRENT: { label: "Current", tone: "success", icon: CheckCircle2 },
+  OUTDATED: { label: "Outdated", tone: "warning", icon: AlertTriangle },
 };
 
 function formatBytes(bytes: number | null): string {
@@ -27,12 +42,14 @@ export function DeliverablesPanel({
   projectId,
   phaseId,
   deliverables,
+  activeRevisionId,
   canWork,
   canManage,
 }: {
   projectId: string;
   phaseId: string;
   deliverables: Deliverable[];
+  activeRevisionId: string | null;
   canWork: boolean;
   canManage: boolean;
 }) {
@@ -40,6 +57,10 @@ export function DeliverablesPanel({
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const status = computeDeliverableStatus(deliverables, activeRevisionId);
+  const statusConfig = STATUS_CONFIG[status];
+  const StatusIcon = statusConfig.icon;
 
   function remove(d: Deliverable) {
     setPendingId(d.id);
@@ -71,6 +92,10 @@ export function DeliverablesPanel({
       count={deliverables.length}
       description="Files produced and uploaded during this phase."
     >
+      <div className="mb-3 flex items-center gap-2">
+        <StatusIcon className={`size-4 ${status === "CURRENT" ? "text-success" : status === "OUTDATED" ? "text-warning" : "text-danger"}`} />
+        <Badge tone={statusConfig.tone}>{statusConfig.label}</Badge>
+      </div>
       {deliverables.length === 0 ? (
         <Text tone="secondary" size="sm">No deliverables uploaded yet.</Text>
       ) : (

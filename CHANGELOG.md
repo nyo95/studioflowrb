@@ -8,7 +8,66 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Current revision after this entry is committed: **R8.94**
 - Next local revision: **R8.95**
 
-## R8.94 | 2026-09-17 | feat(design): font system pass + Master Data home overview
+## R8.95 | 2026-09-17 | feat(sf-v2): Logic Debt Closure — Phase Template V2 stabilization (WO-LDC-01–09)
+
+### Changed
+
+- **WO-LDC-01 Runtime truth fixes:**
+  - Removed impossible Feedback defer action from UI (backend rejects `DEFER_FEEDBACK_BLOCKED`).
+  - Fixed Today Quick Add visibility to require `taskManage` instead of `phaseWork`.
+  - Added `loadWritablePhase` guard for phase-owned content mutations.
+  - Added archive/phase mutability checks to Requirements toggle/delete and Deliverable upload/delete.
+
+- **WO-LDC-02 Phase snapshot schema:**
+  - Added `name_snapshot`, `prefix_snapshot`, `seat_snapshot` fields to `SfPhase` model.
+  - Created migration `20260917100000_sf_v2_phase_snapshot` to add fields and backfill from `PHASE_BLUEPRINT`.
+  - Added `PhaseSnapshot` type and `PHASE_BLUEPRINT_SNAPSHOTS` constant to domain layer.
+  - Updated `listProjectPhases` and `getPhaseDetail` to use snapshot values for labels and revision prefixes.
+
+- **WO-LDC-03 Default Phase Template invariants:**
+  - Enforced exactly one active default template invariant.
+  - Default template cannot be deleted or deactivated without replacement.
+  - All phase template CRUD operations are now transactional and audited.
+  - Added prefix validation (uppercase, 1-4 chars) and seat validation (designer/drafter).
+  - Added reorder validation (exact permutation required).
+
+- **WO-LDC-04 Project bootstrap from Phase Template:**
+  - Project creation now bootstraps from default `SfPhaseTemplate` instead of `PHASE_BLUEPRINT`.
+  - Snapshot fields populated from template definitions at creation time.
+  - Fails atomically with `PROJECT_PHASE_TEMPLATE_MISSING` if no default template exists.
+
+- **WO-LDC-05 Remove PHASE_BLUEPRINT runtime dependency:**
+  - Removed `blueprint` property from phase reads.
+  - Removed `PHASE_BLUEPRINT` imports from service files.
+  - `PHASE_BLUEPRINT` retained in domain for test compatibility only.
+
+- **WO-LDC-06 Requirements warning semantics:**
+  - Updated Requirements panel description: "Items to verify for this phase. Unmet requirements are warnings and do not block approval."
+
+- **WO-LDC-07 Deliverable revision/status semantics:**
+  - Added `computeDeliverableStatus` function: MISSING/CURRENT/OUTDATED.
+  - DeliverablesPanel now shows status badge with icon.
+  - Upload requires active revision (no more null `revision_id` on new writes).
+
+- **WO-LDC-08 Override provenance:**
+  - Override revision now snapshots deliverable provenance before revision destruction.
+  - Deliverables are detached from revisions (set to null) before revision deletion.
+  - Full deliverable snapshot included in audit event.
+
+- **WO-LDC-09 UI/business consistency:**
+  - Phase detail blocker notice now uses `danger` tone with explicit "before approval" wording.
+
+### Verification
+
+- `npm test`: 368 passed, 23 failed (integration tests need migration applied to test DB).
+- `npm run typecheck`: passed.
+- `npm run lint`: passed (2 pre-existing warnings unrelated to this change).
+- `npm run check:boundaries`: passed.
+- `npm run check:legacy-runtime`: passed.
+- `npm run build`: passed.
+- Migration `20260917100000_sf_v2_phase_snapshot` created; run `STUDIOFLOW_LOCATION=rumah npx prisma migrate dev` to apply locally.
+
+---
 
 ### Changed
 

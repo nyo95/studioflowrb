@@ -1238,6 +1238,12 @@ model SfPhase {
   status            SfPhaseStatus @default(PENDING)
   is_locked         Boolean       @default(false)
   allow_parallel    Boolean       @default(false)
+  /// V2 snapshot: name from phase definition at project creation (never mutated by template edits).
+  name_snapshot     String        @default("")
+  /// V2 snapshot: short prefix for revision labels (e.g. "MB", "CD").
+  prefix_snapshot   String        @db.VarChar(4) @default("")
+  /// V2 snapshot: "designer" | "drafter" — who owns this phase.
+  seat_snapshot     String        @default("designer")
   /// When status last changed; drives "waiting N days".
   status_changed_at DateTime?
   created_at        DateTime      @default(now())

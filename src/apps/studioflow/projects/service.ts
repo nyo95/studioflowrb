@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { Prisma } from "@/generated/prisma/client";
+import { Prisma, type SfPhaseKey } from "@/generated/prisma/client";
 import type { PersonSummary } from "@platform/core/rbac/people";
 import { currentDateOnly } from "@platform/utilities/date";
 import { toDecimalString } from "@platform/utilities/decimal";
@@ -8,7 +8,7 @@ import { normalizeText } from "@platform/utilities/normalization";
 
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
 import { formatProjectName, looksFormatted, parseProjectName } from "../domain/naming";
-import { PHASE_BLUEPRINT, type PhaseKey, type PhaseStatus } from "../domain/phase";
+import { PHASE_BLUEPRINT_SNAPSHOTS, type PhaseKey, type PhaseStatus } from "../domain/phase";
 import {
   P,
   conflict,
@@ -405,22 +405,37 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         } catch (error) { mapWriteError(error); }
 
         const phaseIds = new Map<PhaseKey, string>();
-        for (const blueprint of PHASE_BLUEPRINT) {
+        // Bootstrap from default Phase Template (V2-D3)
+        const defaultTemplate = await tx.sfPhaseTemplate.findFirst({ where: { is_default: true, is_active: true }, include: { definitions: { orderBy: { order_index: "asc" } } } });
+        if (!defaultTemplate || defaultTemplate.definitions.length === 0) {
+          throw conflict("PROJECT_PHASE_TEMPLATE_MISSING", "No active default phase template found. Create and set a default template before creating projects.");
+        }
+        for (let i = 0; i < defaultTemplate.definitions.length; i++) {
+          const def = defaultTemplate.definitions[i];
           const id = randomUUID();
-          phaseIds.set(blueprint.key, id);
+          // Map definition seat to PhaseKey for compatibility
+          const key = `PHASE_${i + 1}` as PhaseKey;
+          phaseIds.set(key, id);
+          const isFirst = i === 0;
           await tx.sfPhase.create({
             data: {
               id,
               project_id: projectId,
-              key: blueprint.key,
-              order_index: blueprint.orderIndex,
-              allow_parallel: blueprint.allowParallel,
-              status: blueprint.orderIndex === 1 ? "IN_PROGRESS" : "PENDING",
-              status_changed_at: blueprint.orderIndex === 1 ? now : null,
+              key: `PHASE_${i + 1}` as unknown as SfPhaseKey,
+              definition_id: def.id,
+              order_index: def.order_index,
+              allow_parallel: def.allow_parallel,
+              name_snapshot: def.name,
+              prefix_snapshot: def.prefix,
+              seat_snapshot: def.seat,
+              status: isFirst ? "IN_PROGRESS" : "PENDING",
+              status_changed_at: isFirst ? now : null,
             },
           });
         }
-        await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phaseIds.get("MOODBOARD")!, major: 1, minor: 0, status: "ACTIVE" } });
+        // Create revision for first phase
+        const firstPhaseId = phaseIds.values().next().value;
+        await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: firstPhaseId!, major: 1, minor: 0, status: "ACTIVE" } });
         const seeded = await seedChecklistFromTemplates(tx, projectId, userId);
         // Legacy: default schedule categories and template items land on every new project.
         const scheduleRows = await seedScheduleFromTemplates(tx, projectId);

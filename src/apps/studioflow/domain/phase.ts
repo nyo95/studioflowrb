@@ -20,6 +20,22 @@ export type PhaseStatus = (typeof PHASE_STATUSES)[number];
 
 export type PhaseBlueprint = { key: PhaseKey; orderIndex: number; allowParallel: boolean; label: string };
 
+/** Snapshot fields stored on each project phase — immutable after project creation. */
+export type PhaseSnapshot = {
+  nameSnapshot: string;
+  prefixSnapshot: string;
+  seatSnapshot: "designer" | "drafter";
+};
+
+/** Default snapshot values for phases created from PHASE_BLUEPRINT (legacy compatibility). */
+export const PHASE_BLUEPRINT_SNAPSHOTS: Record<PhaseKey, PhaseSnapshot> = {
+  MOODBOARD: { nameSnapshot: "Moodboard", prefixSnapshot: "MB", seatSnapshot: "designer" },
+  LAYOUT: { nameSnapshot: "Layout Plan", prefixSnapshot: "L", seatSnapshot: "designer" },
+  DESIGN_3D: { nameSnapshot: "3D Design", prefixSnapshot: "3D", seatSnapshot: "designer" },
+  CD: { nameSnapshot: "Construction Drawing", prefixSnapshot: "CD", seatSnapshot: "drafter" },
+  SUPERVISION: { nameSnapshot: "Supervision", prefixSnapshot: "SV", seatSnapshot: "designer" },
+};
+
 /** Created for every project, in this order. Phase 1 starts IN_PROGRESS. */
 export const PHASE_BLUEPRINT: readonly PhaseBlueprint[] = [
   { key: "MOODBOARD", orderIndex: 1, allowParallel: false, label: "Moodboard" },

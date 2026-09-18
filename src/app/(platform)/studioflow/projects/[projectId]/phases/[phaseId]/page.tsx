@@ -67,7 +67,7 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
         </div>
         {phase.startBlockedReason ? <Notice className="mt-3" tone="neutral" title="Not yet">{phase.startBlockedReason}</Notice> : null}
         {phase.status !== "PENDING" && phase.blockers.total > 0 && !phase.isLocked ? (
-          <Notice className="mt-3" tone="warning" title="Before approval">Finish {phase.blockers.reasons.join(", ")}.</Notice>
+          <Notice className="mt-3" tone="danger" title="Blockers">Finish {phase.blockers.reasons.join(", ")} before this phase can be approved.</Notice>
         ) : null}
       </SectionCard>
 
@@ -83,7 +83,6 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
               items={phase.activeRevision.activities}
               people={people}
               canEdit={canWork}
-              allowDefer
               emptyText="Nothing recorded for this revision"
             />
           ) : (
@@ -92,7 +91,7 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
           {phase.deferred.length > 0 ? (
             <div className="mt-4 grid gap-2">
               <Text meta>Deferred — still blocks approval</Text>
-              <ActivityList projectId={projectId} phaseId={phaseId} items={phase.deferred} people={people} canEdit={canWork} allowDefer={false} emptyText="" />
+              <ActivityList projectId={projectId} phaseId={phaseId} items={phase.deferred} people={people} canEdit={canWork} emptyText="" />
             </div>
           ) : null}
         </SectionCard>
@@ -114,6 +113,7 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
           projectId={projectId}
           phaseId={phaseId}
           deliverables={phaseDeliverables}
+          activeRevisionId={phase.activeRevision?.id ?? null}
           canWork={canWork}
           canManage={canManage}
         />

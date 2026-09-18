@@ -7,7 +7,7 @@ import { createPrivateObjectKey } from "@platform/core/storage";
 import { fullBlockers, todoBlockers } from "../domain/blockers";
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
 import {
-  PHASE_BLUEPRINT,
+  PHASE_BLUEPRINT_SNAPSHOTS,
   availablePhaseCommands,
   canActivatePhase,
   isPhaseModifiable,
@@ -17,6 +17,7 @@ import {
   revisionLabel,
   waitingDays,
   type PhaseKey,
+  type PhaseSnapshot,
   type PhaseStatus,
 } from "../domain/phase";
 import {
@@ -24,6 +25,8 @@ import {
   conflict,
   hasPermission,
   invalid,
+  loadWritablePhase,
+  loadWritableProject,
   notFound,
   nowOf,
   requireCommand,
@@ -313,15 +316,21 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const revisions = await tx.sfRevision.findMany({
           where: { phase_id: phase.id },
           orderBy: [{ major: "asc" }, { minor: "asc" }],
-          include: { activities: { select: { content: true, mode: true, status: true } } },
+          select: { id: true, major: true, minor: true, status: true, created_at: true, activities: { select: { content: true, mode: true, status: true } } },
         });
+        // Snapshot deliverable provenance before revision destruction
+        const deliverables = await tx.sfDeliverable.findMany({ where: { phase_id: phase.id }, select: { id: true, name: true, revision_id: true, storage_key: true, created_at: true } });
+        const deliverableSnapshot = deliverables.map((d) => ({
+          id: d.id, name: d.name, revisionId: d.revision_id, storageKey: d.storage_key, createdAt: d.created_at.toISOString(),
+        }));
         const history = revisions.map((rev) => ({ version: revisionLabel(rev), status: rev.status, createdAt: rev.created_at.toISOString(), activities: rev.activities }));
-        // V2-D6: override is forward-only — target version must exceed the latest existing revision.
         if (input.mode === "HARD_RESET_ACTIVE" && revisions.length > 0) {
           const latest = revisions[revisions.length - 1]!;
           const isForward = input.major! > latest.major || (input.major! === latest.major && input.minor! > latest.minor);
           if (!isForward) throw invalid("OVERRIDE_VERSION_BACKWARD", `v${input.major}.${input.minor} must be higher than the latest v${latest.major}.${latest.minor}.`);
         }
+        // Detach deliverables from their revisions (set revision_id to null) before deleting revisions
+        await tx.sfDeliverable.updateMany({ where: { phase_id: phase.id, revision_id: { not: null } }, data: { revision_id: null } });
         await tx.sfRevision.deleteMany({ where: { phase_id: phase.id } });
         const from = phase.status as PhaseStatus;
         let target: PhaseStatus = "PENDING";
@@ -337,6 +346,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           note,
           targetRevision: input.mode === "HARD_RESET_ACTIVE" ? `v${input.major}.${input.minor}` : null,
           history,
+          deliverableSnapshot,
         });
         return { phaseId: phase.id, revisionId };
       });
@@ -475,6 +485,14 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     };
   }
 
+  function phaseSnapshot(phase: { key: string; name_snapshot?: string; prefix_snapshot?: string; seat_snapshot?: string }): PhaseSnapshot {
+    const key = phase.key as PhaseKey;
+    if (phase.name_snapshot && phase.prefix_snapshot) {
+      return { nameSnapshot: phase.name_snapshot, prefixSnapshot: phase.prefix_snapshot, seatSnapshot: (phase.seat_snapshot ?? "designer") as "designer" | "drafter" };
+    }
+    return PHASE_BLUEPRINT_SNAPSHOTS[key] ?? { nameSnapshot: phaseLabel(key), prefixSnapshot: key.slice(0, 4), seatSnapshot: phaseOwnerSeat(key) };
+  }
+
   const reads = {
     /** Phase strip + rail data for one project. */
     async listProjectPhases(input: ReadContext & { projectId: string }) {
@@ -483,7 +501,12 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       const phases = await db.sfPhase.findMany({
         where: { project_id: input.projectId },
         orderBy: { order_index: "asc" },
-        include: { revisions: { where: { status: "ACTIVE" }, take: 1 } },
+        select: {
+          id: true, project_id: true, key: true, order_index: true, status: true, is_locked: true,
+          allow_parallel: true, name_snapshot: true, prefix_snapshot: true, seat_snapshot: true,
+          status_changed_at: true,
+          revisions: { where: { status: "ACTIVE" }, take: 1, select: { major: true, minor: true } },
+        },
       });
       const project = await db.sfProject.findUnique({ where: { id: input.projectId }, select: { status: true, archived_at: true } });
       const results = [];
@@ -492,7 +515,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const status = phase.status as PhaseStatus;
         const previous = phases.find((p) => p.order_index === phase.order_index - 1) ?? null;
         const canStart = canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null);
-        // Compute available commands for inline Overview actions (V2-D9).
         const archived = project?.archived_at != null;
         const commands = archived ? [] : availablePhaseCommands({ key: phase.key as PhaseKey, status, isLocked: phase.is_locked }).filter((command) => {
           if (command === "activate") return canStart && project?.status === "ACTIVE";
@@ -500,18 +522,19 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           if (command === "reopen" && status === "PENDING") return canStart && project?.status === "ACTIVE" && phase.revisions.length > 0;
           return true;
         });
+        const snap = phaseSnapshot(phase);
         results.push({
           id: phase.id,
           key: phase.key as PhaseKey,
-          label: phaseLabel(phase.key as PhaseKey),
+          label: snap.nameSnapshot,
           orderIndex: phase.order_index,
           status,
           isLocked: phase.is_locked,
           allowParallel: phase.allow_parallel,
-          seat: phaseOwnerSeat(phase.key as PhaseKey),
+          seat: snap.seatSnapshot,
           waitingDays: status === "PENDING" || status === "COMPLETED" || status === "READY_FOR_NEXT" ? null : waitingDays(phase.status_changed_at, now),
           statusChangedAt: phase.status_changed_at,
-          activeRevision: phase.revisions[0] ? revisionLabel(phase.revisions[0]) : null,
+          activeRevision: phase.revisions[0] ? revisionLabel(phase.revisions[0], snap.prefixSnapshot) : null,
           openRootChecklist: counts.openRootChecklistItems,
           blockers: fullBlockers(counts),
           todoBlockers: todoBlockers(counts),
@@ -526,15 +549,23 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       requireRead(input.grants);
       const phase = await db.sfPhase.findUnique({
         where: { id: input.phaseId },
-        include: {
+        select: {
+          id: true, project_id: true, key: true, order_index: true, status: true, is_locked: true,
+          allow_parallel: true, name_snapshot: true, prefix_snapshot: true, seat_snapshot: true,
+          status_changed_at: true,
           project: { select: { id: true, name: true, archived_at: true, status: true, pic_designer_id: true, pic_drafter_id: true } },
-          revisions: { orderBy: [{ major: "desc" }, { minor: "desc" }], include: { activities: { orderBy: { created_at: "asc" } } } },
+          revisions: {
+            orderBy: [{ major: "desc" }, { minor: "desc" }],
+            select: {
+              id: true, major: true, minor: true, status: true, created_at: true, closed_at: true,
+              activities: { orderBy: { created_at: "asc" }, select: { id: true, content: true, mode: true, status: true, assigned_to_id: true, due_at: true, deferred_from_version: true, revision_id: true, phase_id: true, created_at: true } },
+            },
+          },
         },
       });
       if (!phase || phase.project_id !== input.projectId) throw notFound("phase");
       const status = phase.status as PhaseStatus;
       const counts = await readBlockerCounts(db, phase.id);
-      // Only open deferred items still block approval; finished ones are history.
       const deferred = await db.sfActivity.findMany({ where: { phase_id: phase.id, revision_id: null, status: "OPEN" }, orderBy: { created_at: "asc" } });
       const previous = await db.sfPhase.findFirst({ where: { project_id: phase.project_id, order_index: phase.order_index - 1 } });
       const canStart = canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null);
@@ -543,20 +574,21 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       const commands = archived ? [] : availablePhaseCommands({ key: phase.key as PhaseKey, status, isLocked: phase.is_locked }).filter((command) => {
         if (command === "activate") return canStart && phase.project.status === "ACTIVE";
         if (command === "bypass") return phase.project.status === "ACTIVE";
-        // Reopening a not-started phase only makes sense after earlier revisions, under the start rules.
         if (command === "reopen" && status === "PENDING") return canStart && phase.project.status === "ACTIVE" && phase.revisions.length > 0;
         return true;
       });
+      const snap = phaseSnapshot(phase);
+      const seatUserId = snap.seatSnapshot === "drafter" ? phase.project.pic_drafter_id : phase.project.pic_designer_id;
       return {
         id: phase.id,
         key: phase.key as PhaseKey,
-        label: phaseLabel(phase.key as PhaseKey),
+        label: snap.nameSnapshot,
         orderIndex: phase.order_index,
         status,
         isLocked: phase.is_locked,
         allowParallel: phase.allow_parallel,
-        seat: phaseOwnerSeat(phase.key as PhaseKey),
-        seatUserId: phaseOwnerSeat(phase.key as PhaseKey) === "drafter" ? phase.project.pic_drafter_id : phase.project.pic_designer_id,
+        seat: snap.seatSnapshot,
+        seatUserId,
         statusChangedAt: phase.status_changed_at,
         waitingDays: waitingDays(phase.status_changed_at, nowOf(ports)),
         modifiable: !archived && isPhaseModifiable({ status, isLocked: phase.is_locked }),
@@ -564,11 +596,11 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         commands,
         blockers: fullBlockers(counts),
         todoBlockers: todoBlockers(counts),
-        activeRevision: active ? { id: active.id, label: revisionLabel(active), createdAt: active.created_at, activities: active.activities.map(activityView) } : null,
+        activeRevision: active ? { id: active.id, label: revisionLabel(active, snap.prefixSnapshot), createdAt: active.created_at, activities: active.activities.map(activityView) } : null,
         deferred: deferred.map(activityView),
         history: phase.revisions.filter((rev) => rev.status !== "ACTIVE").map((rev) => ({
           id: rev.id,
-          label: revisionLabel(rev),
+          label: revisionLabel(rev, snap.prefixSnapshot),
           createdAt: rev.created_at,
           closedAt: rev.closed_at,
           activities: rev.activities.map(activityView),
@@ -589,8 +621,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         override: hasPermission(grants, P.phaseOverride),
       };
     },
-
-    blueprint: PHASE_BLUEPRINT,
   };
 
   const phaseTemplates = {
@@ -607,62 +637,144 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       requirePermission(input.grants, P.settingsManage);
       const name = requiredText(input.name, "TEMPLATE_NAME_REQUIRED", "Template name", 200);
       const isDefault = input.isDefault ?? false;
-      await db.sfPhaseTemplate.create({ data: { name, is_default: isDefault } });
+      return runTransaction(async (tx) => {
+        if (isDefault) {
+          await tx.sfPhaseTemplate.updateMany({ where: { is_default: true }, data: { is_default: false } });
+        }
+        const template = await tx.sfPhaseTemplate.create({ data: { name, is_default: isDefault } });
+        await writeAudit(ports, tx, { action: "studioflow.phase-template.created", entityType: "phase-template", entityId: template.id, actor: input.actor, metadata: { name, isDefault } });
+        return { templateId: template.id };
+      });
     },
 
     async updatePhaseTemplate(input: CommandContext & { templateId: string; name?: string; isActive?: boolean; isDefault?: boolean }) {
       requirePermission(input.grants, P.settingsManage);
-      const data: Record<string, unknown> = {};
-      if (input.name !== undefined) data.name = requiredText(input.name, "TEMPLATE_NAME_REQUIRED", "Template name", 200);
-      if (input.isActive !== undefined) data.is_active = input.isActive;
-      if (input.isDefault !== undefined) data.is_default = input.isDefault;
-      if (Object.keys(data).length === 0) return;
-      await db.sfPhaseTemplate.update({ where: { id: input.templateId }, data });
+      return runTransaction(async (tx) => {
+        const template = await tx.sfPhaseTemplate.findUnique({ where: { id: input.templateId } });
+        if (!template) throw notFound("phase template");
+
+        if (input.isActive === false && template.is_default) {
+          throw conflict("CANNOT_DEACTIVATE_DEFAULT", "Cannot deactivate the default template. Set another template as default first.");
+        }
+
+        if (input.isDefault === false && template.is_default) {
+          const otherActive = await tx.sfPhaseTemplate.findFirst({ where: { id: { not: input.templateId }, is_active: true } });
+          if (!otherActive) throw conflict("NEED_DEFAULT_TEMPLATE", "At least one template must be the default.");
+        }
+
+        const data: Record<string, unknown> = {};
+        if (input.name !== undefined) data.name = requiredText(input.name, "TEMPLATE_NAME_REQUIRED", "Template name", 200);
+        if (input.isActive !== undefined) data.is_active = input.isActive;
+        if (input.isDefault !== undefined) data.is_default = input.isDefault;
+
+        if (input.isDefault === true) {
+          await tx.sfPhaseTemplate.updateMany({ where: { is_default: true, id: { not: input.templateId } }, data: { is_default: false } });
+        }
+
+        if (Object.keys(data).length === 0) return { templateId: input.templateId };
+        await tx.sfPhaseTemplate.update({ where: { id: input.templateId }, data });
+        await writeAudit(ports, tx, { action: "studioflow.phase-template.updated", entityType: "phase-template", entityId: input.templateId, actor: input.actor, metadata: { ...data } });
+        return { templateId: input.templateId };
+      });
     },
 
     async deletePhaseTemplate(input: CommandContext & { templateId: string }) {
       requirePermission(input.grants, P.settingsManage);
-      await db.sfPhaseTemplate.delete({ where: { id: input.templateId } });
+      return runTransaction(async (tx) => {
+        const template = await tx.sfPhaseTemplate.findUnique({ where: { id: input.templateId } });
+        if (!template) throw notFound("phase template");
+        if (template.is_default) throw conflict("CANNOT_DELETE_DEFAULT", "Cannot delete the default template. Set another template as default first.");
+        await tx.sfPhaseDefinition.deleteMany({ where: { template_id: input.templateId } });
+        await tx.sfPhaseTemplate.delete({ where: { id: input.templateId } });
+        await writeAudit(ports, tx, { action: "studioflow.phase-template.deleted", entityType: "phase-template", entityId: input.templateId, actor: input.actor, metadata: { name: template.name } });
+        return { templateId: input.templateId };
+      });
     },
 
     async createPhaseDefinition(input: CommandContext & { templateId: string; name: string; prefix: string; seat?: string; allowParallel?: boolean }) {
       requirePermission(input.grants, P.settingsManage);
       const name = requiredText(input.name, "PHASE_DEF_NAME_REQUIRED", "Phase name", 200);
-      const prefix = requiredText(input.prefix, "PREFIX_REQUIRED", "Prefix", 4);
-      const lastDef = await db.sfPhaseDefinition.findFirst({ where: { template_id: input.templateId }, orderBy: { order_index: "desc" } });
-      const orderIndex = (lastDef?.order_index ?? -1) + 1;
-      await db.sfPhaseDefinition.create({
-        data: { template_id: input.templateId, name, prefix, order_index: orderIndex, seat: input.seat ?? "designer", allow_parallel: input.allowParallel ?? false },
+      const prefix = requiredText(input.prefix.toUpperCase(), "PREFIX_REQUIRED", "Prefix", 4);
+      if (prefix.length < 1 || prefix.length > 4) throw invalid("PREFIX_LENGTH", "Prefix must be 1-4 characters.");
+      const seat = input.seat ?? "designer";
+      if (seat !== "designer" && seat !== "drafter") throw invalid("INVALID_SEAT", "Seat must be 'designer' or 'drafter'.");
+      return runTransaction(async (tx) => {
+        const template = await tx.sfPhaseTemplate.findUnique({ where: { id: input.templateId } });
+        if (!template) throw notFound("phase template");
+        const existingDef = await tx.sfPhaseDefinition.findFirst({ where: { template_id: input.templateId, prefix } });
+        if (existingDef) throw conflict("PREFIX_DUPLICATE", `Prefix "${prefix}" is already used in this template.`);
+        const lastDef = await tx.sfPhaseDefinition.findFirst({ where: { template_id: input.templateId }, orderBy: { order_index: "desc" } });
+        const orderIndex = (lastDef?.order_index ?? -1) + 1;
+        const def = await tx.sfPhaseDefinition.create({
+          data: { template_id: input.templateId, name, prefix, order_index: orderIndex, seat, allow_parallel: input.allowParallel ?? false },
+        });
+        await writeAudit(ports, tx, { action: "studioflow.phase-definition.created", entityType: "phase-definition", entityId: def.id, actor: input.actor, metadata: { templateId: input.templateId, name, prefix, seat } });
+        return { definitionId: def.id };
       });
     },
 
     async updatePhaseDefinition(input: CommandContext & { definitionId: string; name?: string; prefix?: string; seat?: string; allowParallel?: boolean }) {
       requirePermission(input.grants, P.settingsManage);
-      const data: Record<string, unknown> = {};
-      if (input.name !== undefined) data.name = requiredText(input.name, "PHASE_DEF_NAME_REQUIRED", "Phase name", 200);
-      if (input.prefix !== undefined) data.prefix = requiredText(input.prefix, "PREFIX_REQUIRED", "Prefix", 4);
-      if (input.seat !== undefined) data.seat = input.seat;
-      if (input.allowParallel !== undefined) data.allow_parallel = input.allowParallel;
-      if (Object.keys(data).length === 0) return;
-      await db.sfPhaseDefinition.update({ where: { id: input.definitionId }, data });
+      return runTransaction(async (tx) => {
+        const def = await tx.sfPhaseDefinition.findUnique({ where: { id: input.definitionId } });
+        if (!def) throw notFound("phase definition");
+
+        const data: Record<string, unknown> = {};
+        if (input.name !== undefined) data.name = requiredText(input.name, "PHASE_DEF_NAME_REQUIRED", "Phase name", 200);
+        if (input.prefix !== undefined) {
+          const prefix = input.prefix.toUpperCase();
+          if (prefix.length < 1 || prefix.length > 4) throw invalid("PREFIX_LENGTH", "Prefix must be 1-4 characters.");
+          const existing = await tx.sfPhaseDefinition.findFirst({ where: { template_id: def.template_id, prefix, id: { not: input.definitionId } } });
+          if (existing) throw conflict("PREFIX_DUPLICATE", `Prefix "${prefix}" is already used in this template.`);
+          data.prefix = prefix;
+        }
+        if (input.seat !== undefined) {
+          if (input.seat !== "designer" && input.seat !== "drafter") throw invalid("INVALID_SEAT", "Seat must be 'designer' or 'drafter'.");
+          data.seat = input.seat;
+        }
+        if (input.allowParallel !== undefined) data.allow_parallel = input.allowParallel;
+
+        if (Object.keys(data).length === 0) return { definitionId: input.definitionId };
+        await tx.sfPhaseDefinition.update({ where: { id: input.definitionId }, data });
+        await writeAudit(ports, tx, { action: "studioflow.phase-definition.updated", entityType: "phase-definition", entityId: input.definitionId, actor: input.actor, metadata: { ...data } });
+        return { definitionId: input.definitionId };
+      });
     },
 
     async deletePhaseDefinition(input: CommandContext & { definitionId: string }) {
       requirePermission(input.grants, P.settingsManage);
-      const def = await db.sfPhaseDefinition.findUniqueOrThrow({ where: { id: input.definitionId } });
-      await db.sfPhaseDefinition.delete({ where: { id: input.definitionId } });
-      // Close gap in order_index for remaining defs
-      const siblings = await db.sfPhaseDefinition.findMany({ where: { template_id: def.template_id, order_index: { gt: def.order_index } }, orderBy: { order_index: "asc" } });
-      for (const sib of siblings) {
-        await db.sfPhaseDefinition.update({ where: { id: sib.id }, data: { order_index: sib.order_index - 1 } });
-      }
+      return runTransaction(async (tx) => {
+        const def = await tx.sfPhaseDefinition.findUnique({ where: { id: input.definitionId } });
+        if (!def) throw notFound("phase definition");
+        await tx.sfPhaseDefinition.delete({ where: { id: input.definitionId } });
+        const siblings = await tx.sfPhaseDefinition.findMany({ where: { template_id: def.template_id, order_index: { gt: def.order_index } }, orderBy: { order_index: "asc" } });
+        for (const sib of siblings) {
+          await tx.sfPhaseDefinition.update({ where: { id: sib.id }, data: { order_index: sib.order_index - 1 } });
+        }
+        await writeAudit(ports, tx, { action: "studioflow.phase-definition.deleted", entityType: "phase-definition", entityId: input.definitionId, actor: input.actor, metadata: { templateId: def.template_id, name: def.name, prefix: def.prefix } });
+        return { definitionId: input.definitionId };
+      });
     },
 
     async reorderPhaseDefinitions(input: CommandContext & { templateId: string; orderedIds: string[] }) {
       requirePermission(input.grants, P.settingsManage);
-      for (let i = 0; i < input.orderedIds.length; i++) {
-        await db.sfPhaseDefinition.update({ where: { id: input.orderedIds[i], template_id: input.templateId }, data: { order_index: i } });
-      }
+      return runTransaction(async (tx) => {
+        const template = await tx.sfPhaseTemplate.findUnique({ where: { id: input.templateId } });
+        if (!template) throw notFound("phase template");
+
+        const defs = await tx.sfPhaseDefinition.findMany({ where: { template_id: input.templateId } });
+        const defIds = new Set(defs.map((d) => d.id));
+        if (input.orderedIds.length !== defs.length) throw invalid("REORDER_MISMATCH", "Ordered IDs must include all template definitions exactly once.");
+        for (const id of input.orderedIds) {
+          if (!defIds.has(id)) throw invalid("REORDER_INVALID_ID", "Ordered IDs contain unknown definition IDs.");
+        }
+
+        for (let i = 0; i < input.orderedIds.length; i++) {
+          await tx.sfPhaseDefinition.update({ where: { id: input.orderedIds[i] }, data: { order_index: i } });
+        }
+        await writeAudit(ports, tx, { action: "studioflow.phase-definition.reordered", entityType: "phase-definition", entityId: input.templateId, actor: input.actor, metadata: { orderedIds: input.orderedIds } });
+        return { templateId: input.templateId };
+      });
     },
   };
 
@@ -709,8 +821,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       const title = requiredText(input.title, "REQUIREMENT_TITLE_REQUIRED", "Title", 400);
       const description = input.description?.trim() || null;
       await runTransaction(async (tx) => {
-        const phase = await tx.sfPhase.findUnique({ where: { id: input.phaseId }, select: { id: true, project_id: true } });
-        if (!phase || phase.project_id !== input.projectId) throw notFound("phase");
+        await loadWritablePhase(tx, input.projectId, input.phaseId);
         await tx.sfRequirement.create({ data: { project_id: input.projectId, phase_id: input.phaseId, title, description, created_by_id: input.actor.userId } });
       });
       return { phaseId: input.phaseId };
@@ -721,6 +832,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       await runTransaction(async (tx) => {
         const req = await tx.sfRequirement.findUnique({ where: { id: input.requirementId }, select: { id: true, project_id: true, is_met: true } });
         if (!req || req.project_id !== input.projectId) throw notFound("requirement");
+        await loadWritableProject(tx, input.projectId);
         await tx.sfRequirement.update({
           where: { id: req.id },
           data: { is_met: input.met, met_at: input.met ? new Date() : null, met_by_id: input.met ? input.actor.userId : null },
@@ -734,6 +846,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       await runTransaction(async (tx) => {
         const req = await tx.sfRequirement.findUnique({ where: { id: input.requirementId }, select: { id: true, project_id: true } });
         if (!req || req.project_id !== input.projectId) throw notFound("requirement");
+        await loadWritableProject(tx, input.projectId);
         await tx.sfRequirement.delete({ where: { id: req.id } });
       });
       return { requirementId: input.requirementId };
@@ -784,10 +897,10 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       await ports.storage.put({ key, contentType: input.file.contentType, bytes, body: input.file.body });
       try {
         await runTransaction(async (tx) => {
-          const phase = await tx.sfPhase.findUnique({ where: { id: input.phaseId }, select: { id: true, project_id: true, revisions: { where: { status: "ACTIVE" }, select: { id: true }, take: 1 } } });
-          if (!phase || phase.project_id !== input.projectId) throw notFound("phase");
-          const revisionId = phase.revisions[0]?.id ?? null;
-          await tx.sfDeliverable.create({ data: { project_id: input.projectId, phase_id: input.phaseId, revision_id: revisionId, name, storage_key: key, file_size_bytes: bytes, content_type: input.file.contentType, created_by_id: input.actor.userId } });
+          const phase = await loadWritablePhase(tx, input.projectId, input.phaseId);
+          const revision = await activeRevision(tx, phase.id);
+          if (!revision) throw invalid("ACTIVE_REVISION_REQUIRED", "Start this phase before uploading deliverables.");
+          await tx.sfDeliverable.create({ data: { project_id: input.projectId, phase_id: input.phaseId, revision_id: revision.id, name, storage_key: key, file_size_bytes: bytes, content_type: input.file.contentType, created_by_id: input.actor.userId } });
         });
       } catch (error) {
         await ports.storage.remove(key).catch(() => undefined);
@@ -801,6 +914,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       const key = await runTransaction(async (tx) => {
         const d = await tx.sfDeliverable.findUnique({ where: { id: input.deliverableId }, select: { id: true, project_id: true, storage_key: true } });
         if (!d || d.project_id !== input.projectId) throw notFound("deliverable");
+        await loadWritableProject(tx, input.projectId);
         await tx.sfDeliverable.delete({ where: { id: d.id } });
         return d.storage_key;
       });

@@ -24,7 +24,7 @@ export type ActivityView = {
 
 /**
  * Client / reviewer feedback on a revision. Mode is always FEEDBACK.
- * Pass allowDefer=true for the active-revision list (not for the deferred sub-list itself).
+ * V2-D1: Feedback cannot be deferred (DEFER_FEEDBACK_BLOCKED).
  */
 export function ActivityList({
   projectId,
@@ -32,7 +32,6 @@ export function ActivityList({
   items,
   people,
   canEdit,
-  allowDefer,
   emptyText,
 }: {
   projectId: string;
@@ -40,7 +39,6 @@ export function ActivityList({
   items: readonly ActivityView[];
   people: readonly Person[];
   canEdit: boolean;
-  allowDefer: boolean;
   emptyText: string;
 }) {
   const { run, pendingKey, error } = useCommand();
@@ -80,9 +78,6 @@ export function ActivityList({
                     pending={pendingKey === item.id}
                     items={[
                       { label: "Edit", onSelect: () => setEditing(item) },
-                      ...(allowDefer && !item.deferredFrom && !item.done
-                        ? [{ label: "Defer to later revision", onSelect: () => run(item.id, () => activityAction({ op: "defer", projectId, activityId: item.id })) }]
-                        : []),
                       { label: "Delete", danger: true, separatorBefore: true, onSelect: () => run(item.id, () => activityAction({ op: "delete", projectId, activityId: item.id })) },
                     ]}
                   />
