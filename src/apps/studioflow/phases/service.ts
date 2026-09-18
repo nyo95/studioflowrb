@@ -866,9 +866,11 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     async toggleRequirement(input: CommandContext & { projectId: string; requirementId: string; met: boolean }) {
       requireCommand(input, P.phaseWork);
       await runTransaction(async (tx) => {
-        const req = await tx.sfRequirement.findUnique({ where: { id: input.requirementId }, select: { id: true, project_id: true, is_met: true } });
+        const req = await tx.sfRequirement.findUnique({ where: { id: input.requirementId }, select: { id: true, project_id: true, phase_id: true, is_met: true } });
         if (!req || req.project_id !== input.projectId) throw notFound("requirement");
         await loadWritableProject(tx, input.projectId);
+        // R2.4A: Phase-scoped requirements must also obey phase writability.
+        if (req.phase_id) await loadWritablePhase(tx, input.projectId, req.phase_id);
         await tx.sfRequirement.update({
           where: { id: req.id },
           data: { is_met: input.met, met_at: input.met ? new Date() : null, met_by_id: input.met ? input.actor.userId : null },
@@ -880,9 +882,11 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     async deleteRequirement(input: CommandContext & { projectId: string; requirementId: string }) {
       requireCommand(input, P.projectManage);
       await runTransaction(async (tx) => {
-        const req = await tx.sfRequirement.findUnique({ where: { id: input.requirementId }, select: { id: true, project_id: true } });
+        const req = await tx.sfRequirement.findUnique({ where: { id: input.requirementId }, select: { id: true, project_id: true, phase_id: true } });
         if (!req || req.project_id !== input.projectId) throw notFound("requirement");
         await loadWritableProject(tx, input.projectId);
+        // R2.4A: Phase-scoped requirements must also obey phase writability.
+        if (req.phase_id) await loadWritablePhase(tx, input.projectId, req.phase_id);
         await tx.sfRequirement.delete({ where: { id: req.id } });
       });
       return { requirementId: input.requirementId };
