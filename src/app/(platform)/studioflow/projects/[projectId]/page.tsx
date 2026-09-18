@@ -13,6 +13,8 @@ import {
   Badge,
   DescriptionItem,
   DescriptionList,
+  Heading,
+  MetricValue,
   PipelineStrip,
   SectionCard,
   Text,
@@ -91,7 +93,7 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="grid gap-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-semibold text-ink leading-tight">{project.readableName}</h1>
+                <Heading level={3}>{project.readableName}</Heading>
                 <Badge>{project.code}</Badge>
                 <Badge tone={statusBadge.tone}>{statusBadge.label}</Badge>
                 {project.priority !== "NORMAL" ? <Badge tone={priorityBadge.tone}>{priorityBadge.label}</Badge> : null}
@@ -254,7 +256,7 @@ function StatCard({ label, value, muted = false }: { label: string; value: strin
   return (
     <div className="rounded-lg border border-line bg-surface-muted px-3 py-2.5">
       <p className="text-xs text-ink-tertiary leading-none mb-1">{label}</p>
-      <p className={`text-lg font-semibold leading-tight ${muted ? "text-ink-secondary" : "text-ink"}`}>{value}</p>
+      <MetricValue size="sm" className={muted ? "text-ink-secondary" : undefined}>{value}</MetricValue>
     </div>
   );
 }
