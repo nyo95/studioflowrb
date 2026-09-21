@@ -5,8 +5,43 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.97**
-- Next local revision: **R8.98**
+- Current revision after this entry is committed: **R8.98**
+- Next local revision: **R8.99**
+
+## R8.98 | 2026-09-21 | fix(sf): logic debt closure — REVIEW-ALIGNMENT P0/P1/P2 bugs (B1–B5, C1–C2, D1)
+
+Applies all verifiable logic bug fixes identified in `docs/apps/studioflow/REVIEW-ALIGNMENT.md`.
+No schema change; no new dependencies.
+
+### Fixed
+
+- **B1 (P0) `updatePhaseTemplate` default + inactive footgun:** Added guard `if (input.isDefault === true)` checks that the template will be active (accounting for a concurrent `isActive: false` in the same call) before setting it as default and clearing others. Prevents the sequence `create inactive → set as default → all project creation broken` (`phases/service.ts`).
+- **B2 (P1) `completeSupervision` premature project completion:** Replaced inline `sfProject.update` with `completeProjectIfLast(tx, phase, project, actor)`, which checks whether subsequent phases exist before marking the project COMPLETED. Prevents premature COMPLETED status when a V2 template places phases after SUPERVISION (`phases/service.ts`).
+- **B3 (P1) `waitingDays` inconsistency:** `getPhaseDetail` now applies the same null-for-terminal-statuses condition as `listProjectPhases` (`PENDING | COMPLETED | READY_FOR_NEXT → null`). Eliminates the Overview-card vs detail-page discrepancy (`phases/service.ts`).
+- **B4 (P2) `listGeneralActivities` dead query:** Removed. `addActivity` enforces `phaseId` required + FEEDBACK-only, so `phase_id: null` SfActivity rows cannot be created; the read always returned empty (`phases/service.ts`).
+- **B5 (P1) Dead deferral mesh purged (service + actions + UI):**
+  - Removed `deferActivity` command — all SfActivity are FEEDBACK-only (V2-D1), so the first guard always threw (`phases/service.ts`).
+  - Removed `openDeferredActivities` bucket from `readBlockerCounts` and `PhaseBlockerCounts` / `fullBlockers` — always 0, never contributed to any blocker (`phases/blocker-query.ts`, `domain/blockers.ts`).
+  - Removed `deferred` query and field from `getPhaseDetail` return — always empty (`phases/service.ts`).
+  - Removed deferred-activity include (`activities: { where: { revision_id: null } }`) and loop from `getToday` — same reason (`today/service.ts`).
+  - Removed `op: "defer"` variant from `ActivityOp` schema and handler — wired to the removed command (`actions.ts`).
+  - Removed "Deferred — still blocks approval" section from the phase workspace page — always empty (`phases/[phaseId]/page.tsx`).
+- **C1 (P0) `listFilterViews` trusted `ownerId` from caller:** Changed signature from `ReadContext & { ownerId }` to `CommandContext`; userId is now derived via `requireCommand(input, P.projectRead)`, matching `saveFilterView`/`deleteFilterView`. Users can only read their own filters (`tasks/service.ts`).
+- **C2 (P0) `getToday` "mine" trusted `userId` from caller:** Changed signature from `ReadContext & { userId }` to `CommandContext`; userId derived from actor. Added `actor` to `pageSession()` return so the server page passes a proper principal (`today/service.ts`, `_components/session.ts`, `page.tsx`).
+- **D1 (P2) `moveEntryToCategory` `siblings + 1` vs `nextGapless`:** Changed from `count()` + ad-hoc `+ 1` to `findMany(..., select: { increment })` + `nextGapless(siblings)`, aligning with the domain function used in `sync.ts`. If `nextGapless` is later made gap-tolerant, `moveEntryToCategory` automatically benefits (`schedule/service.ts`).
+
+### Changed
+
+- Domain test `"counts root checklist, revision and deferred items for approval"` updated to reflect removal of `openDeferredActivities`; expected total is now 5 (revision + checklist), reasons count 2 (`domain/domain.test.ts`).
+- Integration tests updated: `listFilterViews` now uses `as()` form; `getToday` calls use actor via `as()` and remove the redundant `userId` argument (`service.integration.test.ts`).
+
+### Verification
+
+- `npx tsc --noEmit`: only the pre-existing `phase.ts:91` error (present since R8.95).
+- `npm test`: 382 passed, 49 failed (all failures are the pre-existing `sf_deliverable` table not existing in the test database; 0 new failures introduced by this revision).
+- `npm run check:boundaries`: not run (no boundary files changed).
+
+---
 
 ## R8.97 | 2026-09-18 | fix(sf): close Product Schedule parity regressions — pattern round-trip, PT/PA codes, Board/List branching
 

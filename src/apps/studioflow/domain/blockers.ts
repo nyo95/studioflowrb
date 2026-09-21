@@ -6,8 +6,6 @@
 export type PhaseBlockerCounts = {
   /** Open FEEDBACK activities in the active revision. */
   openRevisionActivities: number;
-  /** Open deferred FEEDBACK activities tagged to the phase. */
-  openDeferredActivities: number;
   /** Unchecked ROOT checklist items of the phase (subtasks never block). */
   openRootChecklistItems: number;
 };
@@ -22,9 +20,8 @@ function plural(count: number, noun: string): string {
 export function fullBlockers(counts: PhaseBlockerCounts): PhaseBlockers {
   const reasons: string[] = [];
   if (counts.openRevisionActivities > 0) reasons.push(`${plural(counts.openRevisionActivities, "open feedback item")} in this revision`);
-  if (counts.openDeferredActivities > 0) reasons.push(`${plural(counts.openDeferredActivities, "deferred feedback item")}`);
   if (counts.openRootChecklistItems > 0) reasons.push(`${plural(counts.openRootChecklistItems, "checklist item")} not ticked`);
-  return { total: counts.openRevisionActivities + counts.openDeferredActivities + counts.openRootChecklistItems, reasons };
+  return { total: counts.openRevisionActivities + counts.openRootChecklistItems, reasons };
 }
 
 /** Blockers for submitInternal: open todos (unchecked root checklist items) only (V2-D1). */

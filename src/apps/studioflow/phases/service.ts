@@ -301,10 +301,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const current = await activeRevision(tx, phase.id);
         if (current) await closeRevision(tx, current.id);
         await audit(tx, input.actor, "supervision-completed", phase, "IN_PROGRESS", "COMPLETED");
-        if (project.status !== "COMPLETED") {
-          await tx.sfProject.update({ where: { id: project.id }, data: { status: "COMPLETED" } });
-          await writeAudit(ports, tx, { action: "studioflow.project.status-changed", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: project.status, to: "COMPLETED" } }, metadata: { projectId: project.id, reason: "supervision-completed" } });
-        }
+        await completeProjectIfLast(tx, phase, project, input.actor);
         return { phaseId: phase.id };
       });
     },
@@ -459,19 +456,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       });
     },
 
-    /** Legacy `executeDeferActivity`: TODO leaves the revision but keeps blocking the phase. */
-    async deferActivity(input: CommandContext & { projectId: string; activityId: string }) {
-      requireCommand(input, P.phaseWork);
-      return runTransaction(async (tx) => {
-        const activity = await loadActivity(tx, input.projectId, input.activityId);
-        if (activity.mode === "FEEDBACK") throw invalid("DEFER_FEEDBACK_BLOCKED", "Client feedback must be handled in this revision and cannot be deferred.");
-        if (!activity.revision) throw conflict("ALREADY_DEFERRED", "This item is not tied to a revision.");
-        const version = revisionLabel(activity.revision);
-        await tx.sfActivity.update({ where: { id: activity.id }, data: { revision_id: null, deferred_from_version: version } });
-        await writeAudit(ports, tx, { action: "studioflow.activity.deferred", entityType: "activity", entityId: activity.id, actor: input.actor, metadata: { projectId: activity.project_id, phaseId: activity.phase_id, fromRevision: version } });
-        return { activityId: activity.id };
-      });
-    },
   };
 
   // ── Reads ───────────────────────────────────────────────────────────────
@@ -573,7 +557,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       if (!phase || phase.project_id !== input.projectId) throw notFound("phase");
       const status = phase.status as PhaseStatus;
       const counts = await readBlockerCounts(db, phase.id);
-      const deferred = await db.sfActivity.findMany({ where: { phase_id: phase.id, revision_id: null, status: "OPEN" }, orderBy: { created_at: "asc" } });
       const previous = await db.sfPhase.findFirst({ where: { project_id: phase.project_id, order_index: phase.order_index - 1 }, select: { key: true, name_snapshot: true, status: true, order_index: true } });
       const canStart = canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null);
       const active = phase.revisions.find((rev) => rev.status === "ACTIVE") ?? null;
@@ -603,7 +586,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         seat: snap.seatSnapshot,
         seatUserId,
         statusChangedAt: phase.status_changed_at,
-        waitingDays: waitingDays(phase.status_changed_at, nowOf(ports)),
+        waitingDays: (status === "PENDING" || status === "COMPLETED" || status === "READY_FOR_NEXT") ? null : waitingDays(phase.status_changed_at, nowOf(ports)),
         modifiable: !archived && isPhaseModifiable({ status, isLocked: phase.is_locked }),
         startBlockedReason: status === "PENDING" && !canStart && previous ? `Starts after ${resolvePhaseName(previous)} is approved.` : phase.project.status !== "ACTIVE" && status === "PENDING" ? "The project is not active." : null,
         commands,
@@ -611,7 +594,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         todoBlockers: todoBlockers(counts),
         warnings: { requirementsOpen, deliverableStatus: computeDeliverableStatus(deliverables, refRevisionId) },
         activeRevision: active ? { id: active.id, label: revisionLabel(active, snap.prefixSnapshot), createdAt: active.created_at, activities: active.activities.map(activityView) } : null,
-        deferred: deferred.map(activityView),
         history: phase.revisions.filter((rev) => rev.status !== "ACTIVE").map((rev) => ({
           id: rev.id,
           label: revisionLabel(rev, snap.prefixSnapshot),
@@ -620,12 +602,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           activities: rev.activities.map(activityView),
         })),
       };
-    },
-
-    async listGeneralActivities(input: ReadContext & { projectId: string }) {
-      requireRead(input.grants);
-      const rows = await db.sfActivity.findMany({ where: { project_id: input.projectId, phase_id: null }, orderBy: [{ status: "asc" }, { created_at: "asc" }] });
-      return rows.map(activityView);
     },
 
     capabilities(grants: ReadContext["grants"]) {
@@ -692,6 +668,8 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         }
 
         if (input.isDefault === true) {
+          const willBeActive = input.isActive !== undefined ? input.isActive : template.is_active;
+          if (!willBeActive) throw conflict("CANNOT_DEFAULT_INACTIVE", "Cannot set an inactive template as the default.");
           await tx.sfPhaseTemplate.updateMany({ where: { is_default: true, id: { not: input.templateId } }, data: { is_default: false } });
         }
 

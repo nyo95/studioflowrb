@@ -89,12 +89,6 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
           ) : (
             <Text tone="secondary" size="sm">{phase.status === "PENDING" ? "Start the phase to open revision v1.0." : "This phase has no open revision."}</Text>
           )}
-          {phase.deferred.length > 0 ? (
-            <div className="mt-4 grid gap-2">
-              <Text meta>Deferred — still blocks approval</Text>
-              <ActivityList projectId={projectId} phaseId={phaseId} items={phase.deferred} people={people} canEdit={canWork} emptyText="" />
-            </div>
-          ) : null}
         </SectionCard>
 
         <SectionCard title="Phase checklist" description="Root items must be ticked before approval. Subtasks never block.">

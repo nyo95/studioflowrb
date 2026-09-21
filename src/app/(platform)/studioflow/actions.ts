@@ -256,7 +256,6 @@ const ActivityOp = z.discriminatedUnion("op", [
   z.strictObject({ op: z.literal("done"), projectId: Id, activityId: Id, done: z.boolean() }),
   z.strictObject({ op: z.literal("update"), projectId: Id, activityId: Id, content: z.string().max(2000).optional(), dueDate: DateOnly.optional(), assignedToId: Id.nullish() }),
   z.strictObject({ op: z.literal("delete"), projectId: Id, activityId: Id }),
-  z.strictObject({ op: z.literal("defer"), projectId: Id, activityId: Id }),
 ]);
 export async function activityAction(input: z.infer<typeof ActivityOp>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
@@ -267,7 +266,6 @@ export async function activityAction(input: z.infer<typeof ActivityOp>): Promise
     if (data.op === "done") result = await studioFlow.phases.setActivityDone({ ...base, done: data.done });
     if (data.op === "update") result = await studioFlow.phases.updateActivity({ ...base, content: data.content, dueDate: data.dueDate === "" ? null : data.dueDate, assignedToId: data.assignedToId });
     if (data.op === "delete") result = await studioFlow.phases.deleteActivity(base);
-    if (data.op === "defer") result = await studioFlow.phases.deferActivity(base);
     refresh(data.projectId);
     return result;
   });

@@ -285,13 +285,11 @@ describe("SF-R1 phase workflow (legacy parity)", () => {
     assert.equal(todo.assigned_to_id, drafter.id);
   });
 
-  it("blocks feedback deferral, reopens with a reason, and overrides with a history snapshot", async () => {
+  it("reopens with a reason and overrides with a history snapshot", async () => {
     const { projectId } = await newProject();
     const phase = await phaseOf(projectId, "MOODBOARD");
     const base = { ...as(designer), projectId, phaseId: phase.id };
-    // V2: only FEEDBACK activities exist; deferring feedback is blocked
     const fb = await sf.phases.addActivity({ ...base, content: "feedback", mode: "FEEDBACK" });
-    await rejectsWith(sf.phases.deferActivity({ ...base, activityId: fb.activityId }), "DEFER_FEEDBACK_BLOCKED");
     await sf.phases.deleteActivity({ ...base, activityId: fb.activityId });
     // Reach approved state: submit → approve internal → submit client → approve
     await sf.phases.submitForInternalReview(base);
@@ -345,7 +343,7 @@ describe("SF-R1 checklist and Today", () => {
     const moodboard = await phaseOf(one.projectId, "MOODBOARD");
     await sf.tasks.createItem({ ...as(designer), projectId: one.projectId, phaseId: moodboard.id, label: "Board", assignedToId: drafter.id });
 
-    const today = await sf.today.getToday({ grants: DRAFTER_GRANTS, userId: drafter.id, scope: "all" });
+    const today = await sf.today.getToday({ ...as(drafter, DRAFTER_GRANTS), scope: "all" });
     assert.equal(today.scope, "mine", "scope all needs manage grant");
     assert.deepEqual(today.groups.map((g) => [g.project.name, g.project.isUrgent, g.tasks.length]), [["2026-001 One", true, 2], ["2026-002 Two", false, 0]]);
     assert.deepEqual(today.groups[0].tasks.map((t) => t.label), ["Call client", "Board"], "layout items stay quiet until the phase starts");
@@ -353,17 +351,17 @@ describe("SF-R1 checklist and Today", () => {
     assert.equal(layoutTarget?.disabledReason, "Not started");
 
     const outsider = await seedUser("Other", ALL);
-    const empty = await sf.today.getToday({ grants: ALL, userId: outsider.id });
+    const empty = await sf.today.getToday({ ...as(outsider) });
     assert.equal(empty.groups.length, 0);
-    const all = await sf.today.getToday({ grants: ALL, userId: outsider.id, scope: "all" });
+    const all = await sf.today.getToday({ ...as(outsider), scope: "all" });
     assert.equal(all.groups.length, 2);
   });
 
   it("stores saved filters per user", async () => {
     await sf.tasks.saveFilterView({ ...as(designer), name: "My P1", query: { status: "OPEN", priority: "P1", assignee: "ME", due: null } });
     await rejectsWith(sf.tasks.saveFilterView({ ...as(designer), name: "Bad", query: { status: "X" } as never }), "FILTER_QUERY_INVALID");
-    assert.equal((await sf.tasks.listFilterViews({ grants: ALL, ownerId: designer.id })).length, 1);
-    assert.equal((await sf.tasks.listFilterViews({ grants: ALL, ownerId: drafter.id })).length, 0);
+    assert.equal((await sf.tasks.listFilterViews({ ...as(designer) })).length, 1);
+    assert.equal((await sf.tasks.listFilterViews({ ...as(drafter) })).length, 0);
   });
 });
 
@@ -922,7 +920,7 @@ describe("Snapshot runtime truth", () => {
 
   it("today feed uses snapshot phase names", async () => {
     const { projectId } = await newProject();
-    const result = await sf.today.getToday({ ...as(designer), userId: designer.id });
+    const result = await sf.today.getToday({ ...as(designer) });
     const project = result.addTargets.find((t) => t.projectId === projectId);
     assert.ok(project, "project in today targets");
     const moodboardTarget = project.targets.find((t) => t.label === "Moodboard");

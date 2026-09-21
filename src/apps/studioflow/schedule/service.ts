@@ -584,8 +584,9 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         if (prefix === entry.prefix) {
           await tx.sfScheduleEntry.update({ where: { id: entry.id }, data: { category: category.label, category_key: category.key } });
         } else {
-          const siblings = await tx.sfScheduleEntry.count({ where: { project_id: input.projectId, section: entry.section, prefix } });
-          await tx.sfScheduleEntry.update({ where: { id: entry.id }, data: { category: category.label, category_key: category.key, prefix, increment: siblings + 1, sort_order: siblings + 1 } });
+          const siblings = await tx.sfScheduleEntry.findMany({ where: { project_id: input.projectId, section: entry.section, prefix }, select: { increment: true }, orderBy: { increment: "asc" } });
+          const increment = nextGapless(siblings);
+          await tx.sfScheduleEntry.update({ where: { id: entry.id }, data: { category: category.label, category_key: category.key, prefix, increment, sort_order: increment } });
           await renumber(tx, input.projectId, entry.section, entry.prefix);
         }
         const moved = await tx.sfScheduleEntry.findUniqueOrThrow({ where: { id: entry.id } });

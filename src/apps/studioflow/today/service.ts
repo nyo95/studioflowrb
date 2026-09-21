@@ -3,7 +3,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { dateToDateOnly } from "../domain/dates";
 import { groupFeed, nestFeed, type FeedGroup, type FeedTask } from "../domain/feed";
 import { phaseLabel, type PhaseKey } from "../domain/phase";
-import { P, hasPermission, nowOf, requireRead, type Db, type ReadContext, type StudioFlowPorts } from "../shared";
+import { P, hasPermission, nowOf, requireCommand, type CommandContext, type Db, type StudioFlowPorts } from "../shared";
 import { ITEM_ORDER, ITEM_SELECT, toItemView } from "../tasks/service";
 
 /** Checked checklist rows older than this drop out of Today (legacy retention). */
@@ -30,14 +30,14 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
      * Legacy Today feed: every non-completed project the user holds as PIC,
      * or all live projects when `scope = "all"` (managers only).
      */
-    async getToday(input: ReadContext & { userId: string; scope?: "mine" | "all" }): Promise<{ groups: FeedGroup[]; addTargets: TodayAddTarget[]; scope: "mine" | "all" }> {
-      requireRead(input.grants);
+    async getToday(input: CommandContext & { scope?: "mine" | "all" }): Promise<{ groups: FeedGroup[]; addTargets: TodayAddTarget[]; scope: "mine" | "all" }> {
+      const userId = requireCommand(input, P.projectRead);
       const scope = input.scope === "all" && hasPermission(input.grants, P.projectManage) ? "all" : "mine";
       const retention = new Date(nowOf(ports).getTime() - DONE_RETENTION_DAYS * 86_400_000);
       const where: Prisma.SfProjectWhereInput = {
         archived_at: null,
         status: { not: "COMPLETED" },
-        ...(scope === "mine" ? { OR: [{ pic_designer_id: input.userId }, { pic_drafter_id: input.userId }] } : {}),
+        ...(scope === "mine" ? { OR: [{ pic_designer_id: userId }, { pic_drafter_id: userId }] } : {}),
       };
       const notStale: Prisma.SfChecklistItemWhereInput = { NOT: { is_checked: true, checked_at: { lt: retention } } };
       const projects = await db.sfProject.findMany({
@@ -48,7 +48,6 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
             orderBy: { order_index: "asc" },
             include: {
               revisions: { where: { status: "ACTIVE" }, take: 1, include: { activities: { orderBy: { created_at: "asc" } } } },
-              activities: { where: { revision_id: null }, orderBy: { created_at: "asc" } },
               checklist_items: { where: notStale, select: ITEM_SELECT, orderBy: ITEM_ORDER },
             },
           },
@@ -87,7 +86,6 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
           targets.push({ phaseId: phase.id, label, disabledReason: phase.is_locked ? "Approved" : !revision ? "Not started" : null });
           if (!active) continue;
           for (const a of revision?.activities ?? []) rows.push(activityRow(project.id, phase.id, phaseKey, label, a));
-          for (const a of phase.activities) rows.push(activityRow(project.id, phase.id, phaseKey, label, a));
           for (const item of phase.checklist_items) rows.push(itemRow(project.id, phaseKey, label, item));
         }
         addTargets.push({ projectId: project.id, projectName: project.name, targets });

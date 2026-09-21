@@ -91,11 +91,11 @@ describe("phase policy (legacy parity)", () => {
 });
 
 describe("blockers", () => {
-  const counts = { openRevisionActivities: 2, openDeferredActivities: 1, openRootChecklistItems: 3 };
-  it("counts root checklist, revision and deferred items for approval", () => {
+  const counts = { openRevisionActivities: 2, openRootChecklistItems: 3 };
+  it("counts root checklist and revision activities for approval", () => {
     const result = fullBlockers(counts);
-    assert.equal(result.total, 6);
-    assert.equal(result.reasons.length, 3);
+    assert.equal(result.total, 5);
+    assert.equal(result.reasons.length, 2);
   });
   it("counts only checklist items for internal submission", () => {
     assert.equal(todoBlockers(counts).total, 3);

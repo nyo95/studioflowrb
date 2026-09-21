@@ -349,9 +349,9 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
     },
 
     // ── Saved filters (per user) ──────────────────────────────────────────
-    async listFilterViews(input: ReadContext & { ownerId: string }) {
-      requireRead(input.grants);
-      const rows = await db.sfChecklistFilterView.findMany({ where: { owner_id: input.ownerId }, orderBy: { created_at: "asc" } });
+    async listFilterViews(input: CommandContext) {
+      const userId = requireCommand(input, P.projectRead);
+      const rows = await db.sfChecklistFilterView.findMany({ where: { owner_id: userId }, orderBy: { created_at: "asc" } });
       return rows.flatMap((row) => {
         const parsed = FilterQuerySchema.safeParse(row.query_json);
         return parsed.success ? [{ id: row.id, name: row.name, query: parsed.data as ChecklistFilterQuery }] : [];

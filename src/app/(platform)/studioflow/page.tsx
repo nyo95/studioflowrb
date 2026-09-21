@@ -11,14 +11,14 @@ import { TodayView } from "./today-view";
 export const dynamic = "force-dynamic";
 
 export default async function TodayPage({ searchParams }: { searchParams: Promise<{ scope?: string }> }) {
-  const { userId, displayName, grants } = await pageSession();
+  const { userId, displayName, grants, actor } = await pageSession();
   const { scope: rawScope } = await searchParams;
   const canSeeAll = hasPermission(grants, P.projectManage);
   const [today, people, labels, filters] = await Promise.all([
-    studioFlow.today.getToday({ grants, userId, scope: rawScope === "all" ? "all" : "mine" }),
+    studioFlow.today.getToday({ grants, actor, scope: rawScope === "all" ? "all" : "mine" }),
     studioFlow.projects.listAssignablePeople({ grants }),
     studioFlow.tasks.listLabels({ grants }),
-    studioFlow.tasks.listFilterViews({ grants, ownerId: userId }),
+    studioFlow.tasks.listFilterViews({ grants, actor }),
   ]);
   const firstName = displayName.split(" ")[0] ?? displayName;
 
