@@ -5,8 +5,20 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.103**
-- Next local revision: **R8.104**
+- Current revision after this entry is committed: **R8.104**
+- Next local revision: **R8.105**
+
+## R8.104 | 2026-09-22 | fix(ui): keep section card titles at 16px on the R8.102 scale
+
+No schema change.
+
+### Review of R8.102 (concurrent agent commit)
+
+- Checked against the current repo: kept as an improvement (stronger H1/H2 hierarchy, Lora retained, `tsc` and eslint clean). Nothing reverted.
+
+### Fixed
+
+- `SectionCard` titles used H4, which R8.102 reduced to 14px semibold — the same weight and size as button labels. They now use H3 (16px semibold), matching the Master Data card titles (`components/sections.tsx`).
 
 ## R8.103 | 2026-09-22 | fix(sf): Product Schedule board follows the legacy photo-first catalog
 

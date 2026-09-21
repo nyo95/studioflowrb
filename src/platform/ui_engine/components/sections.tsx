@@ -44,7 +44,7 @@ export function SectionCard({
           <div className="grid min-w-0 gap-[2px]">
             {title ? (
               <div className="flex min-w-0 items-baseline gap-2">
-                <Heading level={4} className="truncate">{title}</Heading>
+                <Heading level={3} className="truncate">{title}</Heading>
                 {count !== undefined && count !== null ? <CountBadge>{count}</CountBadge> : null}
               </div>
             ) : null}
