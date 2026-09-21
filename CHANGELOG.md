@@ -5,8 +5,20 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.100**
-- Next local revision: **R8.101**
+- Current revision after this entry is committed: **R8.101**
+- Next local revision: **R8.102**
+
+## R8.101 | 2026-09-22 | fix(ui): image annotation crashed on first pointer-down
+
+No schema change.
+
+### Fixed
+
+- `ImageWorkspace` (MOM photo dialog) threw `Cannot read properties of null (reading 'getBoundingClientRect')` when drawing an annotation: `pointFromEvent(event)` ran inside the `setPaths` updater, after the handler returned and `event.currentTarget` was already null. The point is now computed before `setPaths` (`patterns/image-workspace.tsx`). Pre-existing since the workspace was introduced.
+
+### Verification
+
+- `npx tsc --noEmit` clean; eslint clean on the file. Not exercised in a browser (needs a file upload).
 
 ## R8.100 | 2026-09-22 | feat(sf): MOM revision history and title-first creation
 
