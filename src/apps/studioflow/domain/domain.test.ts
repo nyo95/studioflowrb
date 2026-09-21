@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { fullBlockers, todoBlockers } from "./blockers";
-import { isPermutation, moveId, pointMarkers } from "./mom";
+import { buildMomSnapshot, isPermutation, momSnapshotImageKeys, momSnapshotsEqual, moveId, parseMomSnapshot, pointMarkers } from "./mom";
+import { REVISION_RETENTION, nextRevisionNumber, revisionsToPrune, versionLabel } from "./revisions";
 import { compareOptionLabels, fallbackPrefix, nextOptionLabel, normalizeScheduleCategory, optionLabel, optionLabelIndex, parseLegacyScheduleCsv, parseLegacyScheduleSheet, parseScheduleCode, scheduleCode, scheduleSearchKey } from "./schedule";
 import {
   applyChecklistFilter,
@@ -253,5 +254,55 @@ describe("schedule labels and legacy sheet", () => {
 
   it("normalizes pattern in search key with empty and whitespace", () => {
     assert.equal(scheduleSearchKey({ productName: "x", pattern: "  " }), "x");
+  });
+});
+
+describe("revision history policy", () => {
+  it("numbers upwards and never reuses a pruned number", () => {
+    assert.equal(nextRevisionNumber([]), 1);
+    assert.equal(nextRevisionNumber([6, 5, 4]), 7);
+    assert.equal(versionLabel(3), "v3");
+  });
+
+  it("keeps the newest revisions and prunes the oldest", () => {
+    assert.equal(REVISION_RETENTION, 5);
+    assert.deepEqual(revisionsToPrune([1, 2, 3, 4, 5]), []);
+    assert.deepEqual(revisionsToPrune([1, 2, 3, 4, 5, 6]), [1]);
+    assert.deepEqual(revisionsToPrune([9, 3, 8, 5, 7, 4, 6], 3), [6, 5, 4, 3]);
+  });
+});
+
+describe("MOM snapshots", () => {
+  const source = {
+    topic: "Weekly meeting",
+    meetingDate: "2026-09-15",
+    venue: null,
+    attendees: "Client",
+    preparedByName: "Dina",
+    items: [{
+      isTextOnly: false,
+      listStyle: "DECIMAL",
+      points: [{ text: "A", style: "DEFAULT" }],
+      images: [{ slot: 0, storageKey: "k/1", contentType: "image/png", bytes: 12 }],
+    }],
+  };
+
+  it("compares by content and lists referenced photos", () => {
+    const a = buildMomSnapshot(source);
+    const b = buildMomSnapshot({ ...source, items: [{ ...source.items[0], points: [{ text: "B", style: "DEFAULT" }] }] });
+    assert.equal(momSnapshotsEqual(a, buildMomSnapshot(source)), true);
+    assert.equal(momSnapshotsEqual(a, b), false);
+    const reordered = JSON.parse('{"items":[{"images":[{"bytes":12,"contentType":"image/png","slot":0,"storageKey":"k/1"}],"points":[{"style":"DEFAULT","text":"A"}],"listStyle":"DECIMAL","isTextOnly":false}],"preparedByName":"Dina","attendees":"Client","venue":null,"meetingDate":"2026-09-15","topic":"Weekly meeting"}');
+    assert.equal(momSnapshotsEqual(a, reordered), true, "key order from a JSONB round trip must not matter");
+    assert.deepEqual(momSnapshotImageKeys(a), ["k/1"]);
+  });
+
+  it("only reads snapshots that have our shape", () => {
+    const a = buildMomSnapshot(source);
+    assert.deepEqual(parseMomSnapshot(JSON.parse(JSON.stringify(a))), a);
+    assert.equal(parseMomSnapshot(null), null);
+    assert.equal(parseMomSnapshot({ ...a, items: "nope" }), null);
+    assert.equal(parseMomSnapshot({ ...a, items: [{ ...a.items[0], listStyle: "ROMAN" }] }), null);
+    assert.equal(parseMomSnapshot({ ...a, items: [{ ...a.items[0], images: [{ slot: 2, storageKey: "k", contentType: "image/png", bytes: 1 }] }] }), null);
   });
 });

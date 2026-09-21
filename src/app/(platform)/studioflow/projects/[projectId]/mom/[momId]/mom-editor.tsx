@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, ArrowLeftRight, ImagePlus, Plus, Printer, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowLeftRight, History, ImagePlus, Plus, Printer, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -15,11 +15,15 @@ import {
   type MomListStyle,
   type MomPointStyle,
 } from "@/apps/studioflow/domain/mom";
+import { versionLabel } from "@/apps/studioflow/domain/revisions";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
+import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import {
+  Badge,
   Button,
   Dialog,
   Field,
+  FormattedInstant,
   IconButton,
   ImageWorkspace,
   InlineError,
@@ -41,6 +45,8 @@ import {
   deleteMomPointAction,
   moveMomItemAction,
   moveMomPointAction,
+  restoreMomRevisionAction,
+  saveMomRevisionAction,
   setMomImageAction,
   swapMomImagesAction,
   updateMomDocumentAction,
@@ -60,6 +66,9 @@ export type MomDocumentView = {
   attendees: string | null;
   preparedByName: string;
   items: MomItem[];
+  revisions: Array<{ id: string; number: number; note: string | null; createdByName: string; createdAt: Date }>;
+  hasUnsavedChanges: boolean;
+  revisionRetention: number;
 };
 
 type Command = ReturnType<typeof useCommand>;
@@ -124,6 +133,8 @@ export function MomEditor({ projectId, document, canEdit }: { projectId: string;
       {command.error && !upload ? <InlineError>{command.error}</InlineError> : null}
 
       <HeaderCard projectId={projectId} document={document} canEdit={canEdit} command={command} />
+
+      <RevisionsCard projectId={projectId} document={document} canEdit={canEdit} command={command} confirm={confirm.confirm} />
 
       {document.items.map((item, index) => (
         <SectionEditor
@@ -206,6 +217,96 @@ function HeaderCard({ projectId, document, canEdit, command }: { projectId: stri
           <Textarea value={draft.attendees} onChange={set("attendees")} maxLength={5000} disabled={!canEdit} rows={2} placeholder="One name per line" className="min-h-[64px]" />
         </Field>
       </div>
+    </SectionCard>
+  );
+}
+
+function RevisionsCard({ projectId, document, canEdit, command, confirm }: {
+  projectId: string;
+  document: MomDocumentView;
+  canEdit: boolean;
+  command: Command;
+  confirm: ReturnType<typeof useConfirm>["confirm"];
+}) {
+  const { locale, timezone } = useDisplaySettings();
+  const [naming, setNaming] = useState(false);
+  const [note, setNote] = useState("");
+  const latest = document.revisions[0] ?? null;
+  const status = latest === null
+    ? "No revision saved yet."
+    : document.hasUnsavedChanges
+      ? `Edits since ${versionLabel(latest.number)} are not saved as a revision.`
+      : `Everything is saved as ${versionLabel(latest.number)}.`;
+
+  const save = () =>
+    command.run("save-revision", () => saveMomRevisionAction({ projectId, documentId: document.id, note: note.trim() || undefined }), () => setNaming(false));
+
+  const restore = async (revision: MomDocumentView["revisions"][number]) => {
+    const ok = await confirm({
+      title: `Restore ${versionLabel(revision.number)}?`,
+      description: document.hasUnsavedChanges
+        ? `The MOM goes back to ${versionLabel(revision.number)}. Your current edits are saved as a new revision first, so nothing is lost.`
+        : `The MOM goes back to ${versionLabel(revision.number)}. The current version stays available in the history.`,
+      confirmLabel: "Restore",
+    });
+    if (ok) await command.run(`restore-${revision.id}`, () => restoreMomRevisionAction({ projectId, documentId: document.id, revisionId: revision.id }));
+  };
+
+  return (
+    <SectionCard
+      title="Revisions"
+      count={document.revisions.length}
+      description={`The latest ${document.revisionRetention} are kept; saving another replaces the oldest.`}
+      action={canEdit ? (
+        <Button size="sm" variant="primary" leadingIcon={<History className="h-3.5 w-3.5" />} disabled={latest !== null && !document.hasUnsavedChanges} onClick={() => { setNote(""); setNaming(true); }}>
+          Save revision
+        </Button>
+      ) : undefined}
+      padded={false}
+    >
+      <p className="m-0 border-b border-line-subtle px-(--ui-section-px) py-2.5 text-sm text-ink-secondary">{status}</p>
+      {document.revisions.length === 0 ? null : (
+        <ul className="m-0 list-none divide-y divide-line-subtle p-0">
+          {document.revisions.map((revision, index) => (
+            <li key={revision.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-(--ui-section-px) py-2.5">
+              <Badge tone={index === 0 ? "success" : "neutral"} className="shrink-0">{versionLabel(revision.number)}</Badge>
+              <div className="grid min-w-0 flex-1 gap-0.5">
+                <span className="truncate text-sm text-ink">{revision.note ?? "Saved revision"}</span>
+                <Text tone="tertiary" size="sm" className="truncate">
+                  {revision.createdByName}{" · "}
+                  <FormattedInstant value={revision.createdAt} locale={locale} timeZone={timezone} style="datetime" />
+                </Text>
+              </div>
+              {canEdit ? (
+                <Button size="sm" variant="ghost" leadingIcon={<RotateCcw className="h-3.5 w-3.5" />} pending={command.pendingKey === `restore-${revision.id}`} onClick={() => void restore(revision)}>
+                  Restore
+                </Button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      <Dialog
+        open={naming}
+        onOpenChange={setNaming}
+        title="Save revision"
+        description={`Freezes the MOM as ${versionLabel((latest?.number ?? 0) + 1)}. You can keep editing afterwards.`}
+        size="sm"
+        dismissible={command.pendingKey !== "save-revision"}
+        footer={(
+          <>
+            <Button variant="ghost" onClick={() => setNaming(false)} disabled={command.pendingKey === "save-revision"}>Cancel</Button>
+            <Button variant="primary" type="submit" form="save-revision-form" pending={command.pendingKey === "save-revision"}>Save revision</Button>
+          </>
+        )}
+      >
+        <form id="save-revision-form" className="grid gap-3" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+          <Field label="Note">
+            <Input id="save-revision-note" value={note} onChange={(event) => setNote(event.target.value)} maxLength={200} autoFocus placeholder="Optional, e.g. Sent to client" />
+          </Field>
+          {command.error ? <InlineError>{command.error}</InlineError> : null}
+        </form>
+      </Dialog>
     </SectionCard>
   );
 }

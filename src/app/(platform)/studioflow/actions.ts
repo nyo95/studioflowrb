@@ -361,11 +361,35 @@ function refreshMom(projectId: string) {
   revalidatePath(`/studioflow/print/projects/${projectId}`, "layout");
 }
 
-export async function createMomDocumentAction(projectId: string): Promise<ActionResult<{ documentId: string }>> {
+const MomCreate = z.strictObject({ projectId: Id, topic: z.string().max(400) });
+export async function createMomDocumentAction(input: z.infer<typeof MomCreate>): Promise<ActionResult<{ documentId: string }>> {
   return runSafeAction(async () => {
     const ctx = await context();
-    const result = await studioFlow.mom.createDocument({ ...ctx, projectId: parse(Id, projectId) });
-    refreshMom(projectId);
+    const data = parse(MomCreate, input);
+    const result = await studioFlow.mom.createDocument({ ...ctx, ...data });
+    refreshMom(data.projectId);
+    return result;
+  });
+}
+
+const MomRevisionSave = z.strictObject({ projectId: Id, documentId: Id, note: z.string().max(400).optional() });
+export async function saveMomRevisionAction(input: z.infer<typeof MomRevisionSave>): Promise<ActionResult<{ number: number }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(MomRevisionSave, input);
+    const result = await studioFlow.mom.saveRevision({ ...ctx, ...data });
+    refreshMom(data.projectId);
+    return result;
+  });
+}
+
+const MomRevisionRestore = z.strictObject({ projectId: Id, documentId: Id, revisionId: Id });
+export async function restoreMomRevisionAction(input: z.infer<typeof MomRevisionRestore>): Promise<ActionResult<{ number: number }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(MomRevisionRestore, input);
+    const result = await studioFlow.mom.restoreRevision({ ...ctx, ...data });
+    refreshMom(data.projectId);
     return result;
   });
 }

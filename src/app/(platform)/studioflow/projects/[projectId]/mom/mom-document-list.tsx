@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FilePlus2, Printer } from "lucide-react";
+import { useState } from "react";
 
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { formatDateOnly } from "@platform/utilities/date";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
-import { Button, EmptyState, FormattedInstant, InlineError, RowActionMenu, Text, useConfirm } from "@/platform/ui_engine";
+import { Badge, Button, Dialog, EmptyState, Field, FormattedInstant, InlineError, Input, RowActionMenu, Text, useConfirm } from "@/platform/ui_engine";
+import { MOM_LIMITS } from "@/apps/studioflow/domain/mom";
+import { versionLabel } from "@/apps/studioflow/domain/revisions";
 
 import { createMomDocumentAction, deleteMomDocumentAction } from "../../../actions";
 import { useCommand } from "../../../_components/use-command";
@@ -19,6 +22,7 @@ type MomSummary = {
   venue: string | null;
   preparedByName: string;
   sectionCount: number;
+  latestRevision: number | null;
   updatedAt: Date;
 };
 
@@ -28,8 +32,12 @@ export function MomDocumentList({ projectId, documents, canEdit }: { projectId: 
   const confirm = useConfirm();
   const { locale, timezone } = useDisplaySettings();
 
+  const [naming, setNaming] = useState(false);
+  const [topic, setTopic] = useState("");
+
   const create = () =>
-    run("create", () => createMomDocumentAction(projectId), (data) => {
+    run("create", () => createMomDocumentAction({ projectId, topic }), (data) => {
+      setNaming(false);
       router.push(STUDIOFLOW_ROUTES.projectMomDocument(projectId, (data as { documentId: string }).documentId));
     });
 
@@ -47,13 +55,13 @@ export function MomDocumentList({ projectId, documents, canEdit }: { projectId: 
     <div className="grid">
       {canEdit ? (
         <div className="flex items-center justify-between gap-3 border-b border-line-subtle px-(--ui-section-px) py-2.5">
-          <Text tone="secondary" size="sm">Each MOM starts as a site inspection report with one section.</Text>
-          <Button variant="primary" size="sm" leadingIcon={<FilePlus2 className="h-3.5 w-3.5" />} pending={pendingKey === "create"} onClick={create}>
+          <Text tone="secondary" size="sm">A project can hold any number of MOM. Each one keeps its own revision history.</Text>
+          <Button variant="primary" size="sm" leadingIcon={<FilePlus2 className="h-3.5 w-3.5" />} onClick={() => { setTopic(""); setNaming(true); }}>
             New MOM
           </Button>
         </div>
       ) : null}
-      {error ? <InlineError className="px-(--ui-section-px) pt-2">{error}</InlineError> : null}
+      {error && !naming ? <InlineError className="px-(--ui-section-px) pt-2">{error}</InlineError> : null}
       {documents.length === 0 ? (
         <EmptyState title="No MOM yet" description={canEdit ? "Create the first meeting or site report for this project." : "Nobody has written a MOM for this project yet."} className="py-10" />
       ) : (
@@ -62,9 +70,12 @@ export function MomDocumentList({ projectId, documents, canEdit }: { projectId: 
             <li key={doc.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-(--ui-section-px) py-3 hover:bg-surface-muted">
               <div className="w-24 shrink-0 text-sm font-medium tabular-nums text-ink">{formatDateOnly(doc.meetingDate)}</div>
               <div className="grid min-w-0 flex-1 gap-0.5">
-                <Link prefetch={false} href={STUDIOFLOW_ROUTES.projectMomDocument(projectId, doc.id)} className="truncate font-medium text-ink hover:underline">
-                  {doc.topic}
-                </Link>
+                <div className="flex min-w-0 items-center gap-2">
+                  <Link prefetch={false} href={STUDIOFLOW_ROUTES.projectMomDocument(projectId, doc.id)} className="truncate font-medium text-ink hover:underline">
+                    {doc.topic}
+                  </Link>
+                  <Badge className="shrink-0">{doc.latestRevision === null ? "Draft" : versionLabel(doc.latestRevision)}</Badge>
+                </div>
                 <Text tone="tertiary" size="sm" className="truncate">
                   {[doc.venue ?? "No venue", `${doc.sectionCount} section${doc.sectionCount === 1 ? "" : "s"}`, `by ${doc.preparedByName}`].join(" · ")}
                   {" · updated "}
@@ -94,6 +105,27 @@ export function MomDocumentList({ projectId, documents, canEdit }: { projectId: 
           ))}
         </ul>
       )}
+      <Dialog
+        open={naming}
+        onOpenChange={setNaming}
+        title="New MOM"
+        description="Give it a title you will recognise in the list, for example “Site inspection – Level 2”."
+        size="sm"
+        dismissible={pendingKey !== "create"}
+        footer={(
+          <>
+            <Button variant="ghost" onClick={() => setNaming(false)} disabled={pendingKey === "create"}>Cancel</Button>
+            <Button variant="primary" type="submit" form="new-mom-form" pending={pendingKey === "create"} disabled={topic.trim().length === 0}>Create MOM</Button>
+          </>
+        )}
+      >
+        <form id="new-mom-form" className="grid gap-3" onSubmit={(event) => { event.preventDefault(); if (topic.trim().length > 0) void create(); }}>
+          <Field label="Title" required>
+            <Input id="new-mom-title" value={topic} onChange={(event) => setTopic(event.target.value)} maxLength={MOM_LIMITS.topic} autoFocus placeholder="Weekly meeting, site inspection…" />
+          </Field>
+          {error && naming ? <InlineError>{error}</InlineError> : null}
+        </form>
+      </Dialog>
       {confirm.dialog}
     </div>
   );

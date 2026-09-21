@@ -373,12 +373,124 @@ async function momShape(projectId: string, documentId: string) {
   return doc.items.map((item) => ({ points: item.points.map((p) => p.text), slots: item.images.map((i) => i.slot) }));
 }
 
+describe("SF-R2 MOM revisions", () => {
+  const editFirstPoint = async (projectId: string, documentId: string, text: string) => {
+    const point = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0].points[0];
+    await sf.mom.updatePoint({ ...as(designer), projectId, pointId: point.id, text, style: "DEFAULT" });
+  };
+  const firstText = async (projectId: string, documentId: string) =>
+    (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0].points[0].text;
+
+  it("saves numbered revisions, detects unsaved edits, and restores without losing work", async () => {
+    const { projectId } = await newProject();
+    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId, topic: "Weekly meeting" });
+    await editFirstPoint(projectId, documentId, "A");
+
+    assert.deepEqual(await sf.mom.saveRevision({ ...as(designer), projectId, documentId }), { number: 1 });
+    let doc = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+    assert.equal(doc.hasUnsavedChanges, false);
+    assert.equal((await sf.mom.listDocuments({ grants: ALL, projectId }))[0].latestRevision, 1);
+    await rejectsWith(sf.mom.saveRevision({ ...as(designer), projectId, documentId }), "MOM_REVISION_NO_CHANGES");
+
+    await editFirstPoint(projectId, documentId, "B");
+    assert.equal((await sf.mom.getDocument({ grants: ALL, projectId, documentId })).hasUnsavedChanges, true);
+    assert.deepEqual(await sf.mom.saveRevision({ ...as(designer), projectId, documentId, note: " Sent to client " }), { number: 2 });
+
+    await editFirstPoint(projectId, documentId, "C");
+    doc = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+    const v1 = doc.revisions.find((revision) => revision.number === 1)!;
+    assert.deepEqual(doc.revisions.map((revision) => [revision.number, revision.note]), [[2, "Sent to client"], [1, null]]);
+
+    await sf.mom.restoreRevision({ ...as(designer), projectId, documentId, revisionId: v1.id });
+    assert.equal(await firstText(projectId, documentId), "A");
+    doc = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+    assert.deepEqual(doc.revisions.map((revision) => [revision.number, revision.note]), [[3, "Before restoring v1"], [2, "Sent to client"], [1, null]]);
+    assert.equal(doc.hasUnsavedChanges, true, "restored content differs from the newest revision until it is saved");
+
+    const backup = doc.revisions[0];
+    await sf.mom.restoreRevision({ ...as(designer), projectId, documentId, revisionId: backup.id });
+    assert.equal(await firstText(projectId, documentId), "C", "the pre-restore state is recoverable");
+    await rejectsWith(sf.mom.restoreRevision({ ...as(designer), projectId, documentId, revisionId: backup.id }), "MOM_REVISION_ALREADY_CURRENT");
+
+    const audit = await testDb.prisma.auditEvent.findMany({ where: { entity_id: documentId, action: { startsWith: "studioflow.mom.revision" } }, orderBy: { occurred_at: "asc" } });
+    assert.deepEqual(audit.map((entry) => entry.action), [
+      "studioflow.mom.revision-saved", "studioflow.mom.revision-saved", "studioflow.mom.revision-restored", "studioflow.mom.revision-restored",
+    ]);
+  });
+
+  it("keeps only the newest revisions and never reuses a number", async () => {
+    const { projectId } = await newProject();
+    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId, topic: "Weekly meeting" });
+    for (let round = 1; round <= 7; round += 1) {
+      await editFirstPoint(projectId, documentId, `text ${round}`);
+      await sf.mom.saveRevision({ ...as(designer), projectId, documentId });
+    }
+    const doc = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+    assert.equal(doc.revisionRetention, 5);
+    assert.deepEqual(doc.revisions.map((revision) => revision.number), [7, 6, 5, 4, 3]);
+  });
+
+  it("keeps photos alive while a revision needs them and frees them afterwards", async () => {
+    const { projectId } = await newProject();
+    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId, topic: "Weekly meeting" });
+    const itemId = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0].id;
+    await sf.mom.setImage({ ...as(designer), projectId, itemId, slot: 0, file: png() });
+    await sf.mom.saveRevision({ ...as(designer), projectId, documentId });
+
+    const imageId = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0].images[0].id;
+    await sf.mom.deleteImage({ ...as(designer), projectId, imageId });
+    assert.equal(storage.objects.size, 1, "v1 still references the photo");
+
+    const v1 = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).revisions[0];
+    await sf.mom.restoreRevision({ ...as(designer), projectId, documentId, revisionId: v1.id });
+    const restored = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
+    assert.equal(restored.items[0].images.length, 1, "the photo comes back with the restore");
+    assert.ok(restored.items[0].images[0].url);
+
+    await sf.mom.deleteDocument({ ...as(designer), projectId, documentId });
+    assert.equal(storage.objects.size, 0, "deleting the MOM frees every photo, including revision-only ones");
+  });
+
+  it("frees a photo when the last revision holding it is overwritten", async () => {
+    const { projectId } = await newProject();
+    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId, topic: "Weekly meeting" });
+    const itemId = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0].id;
+    await sf.mom.setImage({ ...as(designer), projectId, itemId, slot: 0, file: png() });
+    await sf.mom.saveRevision({ ...as(designer), projectId, documentId });
+    const imageId = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0].images[0].id;
+    await sf.mom.deleteImage({ ...as(designer), projectId, imageId });
+    for (let round = 1; round <= 5; round += 1) {
+      await editFirstPoint(projectId, documentId, `text ${round}`);
+      await sf.mom.saveRevision({ ...as(designer), projectId, documentId });
+    }
+    assert.equal(storage.objects.size, 0, "v1 was overwritten and nothing else referenced its photo");
+  });
+
+  it("requires MOM permission and a writable project", async () => {
+    const { projectId } = await newProject();
+    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId, topic: "Weekly meeting" });
+    await editFirstPoint(projectId, documentId, "A");
+    await sf.mom.saveRevision({ ...as(designer), projectId, documentId });
+    const v1 = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).revisions[0];
+    await assert.rejects(sf.mom.saveRevision({ ...as(drafter, DRAFTER_GRANTS), projectId, documentId }), (e: unknown) => e instanceof AppError && e.kind === "FORBIDDEN");
+    await assert.rejects(sf.mom.restoreRevision({ ...as(drafter, DRAFTER_GRANTS), projectId, documentId, revisionId: v1.id }), (e: unknown) => e instanceof AppError && e.kind === "FORBIDDEN");
+
+    const other = await newProject("Other project");
+    await rejectsWith(sf.mom.restoreRevision({ ...as(designer), projectId: other.projectId, documentId, revisionId: v1.id }), "MOM_RECORD_NOT_FOUND");
+
+    await sf.projects.archiveProject({ ...as(designer), projectId, reason: "Done" });
+    await rejectsWith(sf.mom.saveRevision({ ...as(designer), projectId, documentId }), "PROJECT_ARCHIVED");
+  });
+});
+
 describe("SF-R2 MOM", () => {
   it("creates a legacy-shaped document and edits its header", async () => {
     const { projectId } = await newProject();
-    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId });
+    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId, topic: "Weekly meeting" });
     const doc = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
-    assert.equal(doc.topic, "SITE INSPECTION REPORT");
+    assert.equal(doc.topic, "Weekly meeting");
+    assert.equal(doc.hasUnsavedChanges, true, "a new MOM is a draft until its first revision");
+    await rejectsWith(sf.mom.createDocument({ ...as(designer), projectId, topic: "  " }), "MOM_TOPIC_REQUIRED");
     assert.equal(doc.meetingDate, "2026-09-15");
     assert.equal(doc.preparedByName, "Dina Designer");
     assert.deepEqual(await momShape(projectId, documentId), [{ points: [""], slots: [] }]);
@@ -394,7 +506,7 @@ describe("SF-R2 MOM", () => {
 
   it("orders sections and points, and keeps one point per section", async () => {
     const { projectId } = await newProject();
-    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId });
+    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId, topic: "Weekly meeting" });
     const first = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0];
     await sf.mom.updatePoint({ ...as(designer), projectId, pointId: first.points[0].id, text: "A", style: "DEFAULT" });
     const b = await sf.mom.addPoint({ ...as(designer), projectId, itemId: first.id, text: "B" });
@@ -421,7 +533,7 @@ describe("SF-R2 MOM", () => {
 
   it("stores at most two images per section and cleans storage", async () => {
     const { projectId } = await newProject();
-    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId });
+    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId, topic: "Weekly meeting" });
     const itemId = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0].id;
 
     const placed = await sf.mom.setImage({ ...as(designer), projectId, itemId, slot: 1, file: png() });
@@ -458,10 +570,10 @@ describe("SF-R2 MOM", () => {
   it("enforces permission, project scope, and archive read-only", async () => {
     const { projectId } = await newProject();
     const other = await newProject("Other project");
-    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId });
+    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId, topic: "Weekly meeting" });
     const itemId = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0].id;
 
-    await assert.rejects(sf.mom.createDocument({ ...as(drafter, DRAFTER_GRANTS), projectId }), (e: unknown) => e instanceof AppError && e.kind === "FORBIDDEN");
+    await assert.rejects(sf.mom.createDocument({ ...as(drafter, DRAFTER_GRANTS), projectId, topic: "Weekly meeting" }), (e: unknown) => e instanceof AppError && e.kind === "FORBIDDEN");
     assert.equal(sf.mom.canManage(DRAFTER_GRANTS), false);
     await rejectsWith(sf.mom.getDocument({ grants: ALL, projectId: other.projectId, documentId }), "MOM_RECORD_NOT_FOUND");
     await rejectsWith(sf.mom.addItem({ ...as(designer), projectId: other.projectId, documentId }), "MOM_RECORD_NOT_FOUND");

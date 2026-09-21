@@ -5,8 +5,34 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.99**
-- Next local revision: **R8.100**
+- Current revision after this entry is committed: **R8.100**
+- Next local revision: **R8.101**
+
+## R8.100 | 2026-09-22 | feat(sf): MOM revision history and title-first creation
+
+Additive migration `20260919000000_sf_mom_revision`.
+
+### Added
+
+- **Revision history for MOM.** A MOM keeps its working copy plus frozen snapshots (`SfMomRevision`, JSONB). "Save revision" freezes the next `vN`; numbers only increase and are never reused. Only the newest 5 are kept (`REVISION_RETENTION`); saving another overwrites the oldest. Saving with no change since the latest revision is refused (`MOM_REVISION_NO_CHANGES`).
+- **Restore.** Replaces the working copy with a kept revision. The state being replaced is frozen first as "Before restoring vN", so a restore never loses work; restoring content that already matches is refused (`MOM_REVISION_ALREADY_CURRENT`).
+- **Edit conflicts** are covered by the history: last write wins, and the previous state is always recoverable from a revision.
+- **Photo lifetime.** Snapshots reference photos by storage key. A photo is deleted from storage only when neither the working copy nor any kept revision references it (`unreferenced()` in `mom/service.ts`); deleting a MOM frees every photo, including revision-only ones.
+- **Reusable policy.** `domain/revisions.ts` (`REVISION_RETENTION`, `nextRevisionNumber`, `revisionsToPrune`, `versionLabel`) is document-agnostic so Product Schedule can adopt the same history.
+- UI: Revisions card in the MOM editor (status line, Save revision with optional note, Restore) and a version/Draft badge per row in the MOM list.
+
+### Changed
+
+- **Creating a MOM asks for its title first** (`createDocument` now requires `topic`; the fixed default "SITE INSPECTION REPORT" is gone). The list shows a title dialog instead of creating immediately.
+
+### Fixed
+
+- Snapshot comparison is canonical (sorted keys) because PostgreSQL JSONB does not preserve key order; a plain `JSON.stringify` comparison reported unsaved changes forever.
+
+### Verification
+
+- `npx tsc --noEmit` clean; `npm run check:boundaries` OK.
+- `domain.test.ts` + `service.integration.test.ts`: 85/85 pass on `masterdata_test` (new: retention policy, snapshot equality/parse, save/restore/no-change, retention cap, photo lifetime, permission/scope/archive).
 
 ## R8.99 | 2026-09-22 | refactor(ui): shell consistency, dark theme tokens, curated type scale
 

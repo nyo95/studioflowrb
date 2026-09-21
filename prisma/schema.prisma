@@ -1522,11 +1522,31 @@ model SfMomDocument {
   created_at       DateTime  @default(now())
   updated_at       DateTime  @updatedAt
 
-  project SfProject   @relation(fields: [project_id], references: [id], onDelete: Cascade)
-  items   SfMomItem[]
+  project   SfProject       @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  items     SfMomItem[]
+  revisions SfMomRevision[]
 
   @@index([project_id, meeting_date])
   @@map("sf_mom_document")
+  @@schema("studioflow")
+}
+
+/// Frozen copy of a MOM (see domain/revisions.ts). Only the newest few are kept;
+/// `number` keeps counting so a label is never reused after pruning.
+model SfMomRevision {
+  id              String   @id @default(uuid())
+  document_id     String
+  number          Int
+  note            String?
+  snapshot        Json
+  created_by_id   String
+  created_by_name String
+  created_at      DateTime @default(now())
+
+  document SfMomDocument @relation(fields: [document_id], references: [id], onDelete: Cascade)
+
+  @@unique([document_id, number])
+  @@map("sf_mom_revision")
   @@schema("studioflow")
 }
 

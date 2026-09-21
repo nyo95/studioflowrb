@@ -1,21 +1,27 @@
+import type { Prisma } from "@/generated/prisma/client";
 import { createPrivateObjectKey } from "@platform/core/storage";
 import { currentDateOnly, isDateOnlyString } from "@platform/utilities/date";
 
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
 import { sniffImage } from "../domain/images";
 import {
-  MOM_DEFAULT_TOPIC,
   MOM_IMAGE_TYPES,
   MOM_LIMITS,
   MOM_LIST_STYLES,
   MOM_POINT_STYLES,
   isImageSlot,
+  buildMomSnapshot,
   isPermutation,
+  momSnapshotImageKeys,
+  momSnapshotsEqual,
   moveId,
+  parseMomSnapshot,
   type MomImageSlot,
   type MomListStyle,
   type MomPointStyle,
+  type MomSnapshot,
 } from "../domain/mom";
+import { REVISION_RETENTION, nextRevisionNumber, versionLabel, revisionsToPrune } from "../domain/revisions";
 import {
   P,
   conflict,
@@ -59,6 +65,46 @@ function pointText(value: string | null | undefined): string {
   const text = (value ?? "").replace(/\r\n/g, "\n");
   if (text.length > MOM_LIMITS.pointText) throw invalid("MOM_POINT_TOO_LONG", "This note is too long.");
   return text;
+}
+
+const DOCUMENT_TREE = {
+  items: {
+    orderBy: [{ sort_order: "asc" }, { created_at: "asc" }],
+    include: {
+      points: { orderBy: [{ sort_order: "asc" }, { created_at: "asc" }] },
+      images: { orderBy: { slot: "asc" } },
+    },
+  },
+} satisfies Prisma.SfMomDocumentInclude;
+
+type DocumentTree = {
+  topic: string;
+  meeting_date: Date;
+  venue: string | null;
+  attendees: string | null;
+  prepared_by_name: string;
+  items: Array<{
+    is_text_only: boolean;
+    list_style: string;
+    points: Array<{ text: string; style: string }>;
+    images: Array<{ slot: number; storage_key: string; content_type: string; bytes: number }>;
+  }>;
+};
+
+function snapshotOf(row: DocumentTree): MomSnapshot {
+  return buildMomSnapshot({
+    topic: row.topic,
+    meetingDate: dateToDateOnly(row.meeting_date)!,
+    venue: row.venue,
+    attendees: row.attendees,
+    preparedByName: row.prepared_by_name,
+    items: row.items.map((item) => ({
+      isTextOnly: item.is_text_only,
+      listStyle: item.list_style,
+      points: item.points,
+      images: item.images.map((image) => ({ slot: image.slot, storageKey: image.storage_key, contentType: image.content_type, bytes: image.bytes })),
+    })),
+  });
 }
 
 export function createMomService(db: Db, ports: StudioFlowPorts) {
@@ -115,6 +161,56 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
     await Promise.all(keys.map((key) => storage.remove(key).catch(() => undefined)));
   }
 
+  async function readSnapshot(tx: TxClient, documentId: string): Promise<MomSnapshot> {
+    const row = await tx.sfMomDocument.findUniqueOrThrow({ where: { id: documentId }, include: DOCUMENT_TREE });
+    return snapshotOf(row);
+  }
+
+  /** Objects still needed by the working copy or any kept revision must survive a delete. */
+  async function unreferenced(tx: TxClient, documentId: string, candidates: readonly string[]): Promise<string[]> {
+    if (candidates.length === 0) return [];
+    const [working, revisions] = await Promise.all([
+      tx.sfMomImage.findMany({ where: { item: { document_id: documentId } }, select: { storage_key: true } }),
+      tx.sfMomRevision.findMany({ where: { document_id: documentId }, select: { snapshot: true } }),
+    ]);
+    const live = new Set(working.map((image) => image.storage_key));
+    for (const revision of revisions) {
+      const snapshot = parseMomSnapshot(revision.snapshot);
+      if (snapshot) for (const key of momSnapshotImageKeys(snapshot)) live.add(key);
+    }
+    return [...new Set(candidates)].filter((key) => !live.has(key));
+  }
+
+  /**
+   * Freeze the working copy as the next revision and drop the oldest beyond the
+   * retention limit. Returns null when nothing changed since the latest one.
+   */
+  async function freezeRevision(tx: TxClient, documentId: string, actor: { userId: string; label: string }, note: string | null) {
+    const snapshot = await readSnapshot(tx, documentId);
+    const kept = await tx.sfMomRevision.findMany({ where: { document_id: documentId }, orderBy: { number: "desc" } });
+    const latest = kept[0] ? parseMomSnapshot(kept[0].snapshot) : null;
+    if (latest && momSnapshotsEqual(latest, snapshot)) return null;
+    const number = nextRevisionNumber(kept.map((revision) => revision.number));
+    await tx.sfMomRevision.create({
+      data: {
+        document_id: documentId,
+        number,
+        note,
+        snapshot: snapshot as unknown as Prisma.InputJsonValue,
+        created_by_id: actor.userId,
+        created_by_name: actor.label.slice(0, MOM_LIMITS.preparedBy),
+      },
+    });
+    const dropNumbers = revisionsToPrune([...kept.map((revision) => revision.number), number]);
+    const dropped = kept.filter((revision) => dropNumbers.includes(revision.number));
+    if (dropped.length > 0) await tx.sfMomRevision.deleteMany({ where: { id: { in: dropped.map((revision) => revision.id) } } });
+    const droppedKeys = dropped.flatMap((revision) => {
+      const parsed = parseMomSnapshot(revision.snapshot);
+      return parsed ? momSnapshotImageKeys(parsed) : [];
+    });
+    return { number, droppedKeys };
+  }
+
   async function signedUrl(key: string): Promise<string | null> {
     try {
       return await storage.createSignedReadUrl(key, SIGNED_URL_SECONDS);
@@ -134,7 +230,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
       const rows = await db.sfMomDocument.findMany({
         where: { project_id: input.projectId },
         orderBy: [{ meeting_date: "desc" }, { updated_at: "desc" }],
-        include: { _count: { select: { items: true } } },
+        include: { _count: { select: { items: true } }, revisions: { orderBy: { number: "desc" }, take: 1, select: { number: true } } },
       });
       return rows.map((row) => ({
         id: row.id,
@@ -143,6 +239,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
         venue: row.venue,
         preparedByName: row.prepared_by_name,
         sectionCount: row._count.items,
+        latestRevision: row.revisions[0]?.number ?? null,
         updatedAt: row.updated_at,
       }));
     },
@@ -152,16 +249,16 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
       const row = await db.sfMomDocument.findUnique({
         where: { id: input.documentId },
         include: {
-          items: {
-            orderBy: [{ sort_order: "asc" }, { created_at: "asc" }],
-            include: {
-              points: { orderBy: [{ sort_order: "asc" }, { created_at: "asc" }] },
-              images: { orderBy: { slot: "asc" } },
-            },
-          },
+          ...DOCUMENT_TREE,
+          revisions: { orderBy: { number: "desc" }, select: { id: true, number: true, note: true, created_by_name: true, created_at: true } },
         },
       });
       if (!row || row.project_id !== input.projectId) throw scopeError();
+      const latest = row.revisions[0]
+        ? await db.sfMomRevision.findFirst({ where: { document_id: row.id }, orderBy: { number: "desc" }, select: { snapshot: true } })
+        : null;
+      const latestSnapshot = latest ? parseMomSnapshot(latest.snapshot) : null;
+      const hasUnsavedChanges = !latestSnapshot || !momSnapshotsEqual(latestSnapshot, snapshotOf(row));
       const items = await Promise.all(row.items.map(async (item) => ({
         id: item.id,
         isTextOnly: item.is_text_only,
@@ -184,19 +281,29 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         items,
+        revisions: row.revisions.map((revision) => ({
+          id: revision.id,
+          number: revision.number,
+          note: revision.note,
+          createdByName: revision.created_by_name,
+          createdAt: revision.created_at,
+        })),
+        hasUnsavedChanges,
+        revisionRetention: REVISION_RETENTION,
       };
     },
 
     // ── Document ───────────────────────────────────────────────────────────
-    async createDocument(input: CommandContext & { projectId: string; timeZone?: string }) {
+    async createDocument(input: CommandContext & { projectId: string; topic: string; timeZone?: string }) {
       const userId = requireCommand(input, P.momManage);
+      const topic = requiredText(input.topic, "MOM_TOPIC_REQUIRED", "Title", MOM_LIMITS.topic);
       return runTransaction(async (tx) => {
         await loadWritableProject(tx, input.projectId);
         const today = currentDateOnly({ now: nowOf(ports), timeZone: input.timeZone });
         const document = await tx.sfMomDocument.create({
           data: {
             project_id: input.projectId,
-            topic: MOM_DEFAULT_TOPIC,
+            topic,
             meeting_date: dateOnlyToDate(today),
             prepared_by_name: input.actor.label.slice(0, MOM_LIMITS.preparedBy),
             created_by_id: userId,
@@ -253,16 +360,21 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
       const keys = await runTransaction(async (tx) => {
         const existing = await loadDocument(tx, input.projectId, input.documentId, true);
         const images = await tx.sfMomImage.findMany({ where: { item: { document_id: existing.id } }, select: { storage_key: true } });
+        const revisions = await tx.sfMomRevision.findMany({ where: { document_id: existing.id }, select: { snapshot: true } });
+        const revisionKeys = revisions.flatMap((revision) => {
+          const parsed = parseMomSnapshot(revision.snapshot);
+          return parsed ? momSnapshotImageKeys(parsed) : [];
+        });
         const sections = await tx.sfMomItem.count({ where: { document_id: existing.id } });
         await tx.sfMomDocument.delete({ where: { id: existing.id } });
         await writeAudit(ports, tx, {
           action: "studioflow.mom.deleted", entityType: MOM_ENTITY, entityId: existing.id, actor: input.actor,
           metadata: {
             projectId: input.projectId,
-            snapshot: { topic: existing.topic, meetingDate: dateToDateOnly(existing.meeting_date), venue: existing.venue, preparedByName: existing.prepared_by_name, sections, images: images.length },
+            snapshot: { topic: existing.topic, meetingDate: dateToDateOnly(existing.meeting_date), venue: existing.venue, preparedByName: existing.prepared_by_name, sections, images: images.length, revisions: revisions.length },
           },
         });
-        return images.map((image) => image.storage_key);
+        return [...new Set([...images.map((image) => image.storage_key), ...revisionKeys])];
       });
       await removeObjects(keys);
       return { documentId: input.documentId };
@@ -304,7 +416,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
           action: "studioflow.mom.section-deleted", entityType: MOM_ENTITY, entityId: item.document_id, actor: input.actor,
           metadata: { projectId: input.projectId, itemId: item.id, images: images.length },
         });
-        return images.map((image) => image.storage_key);
+        return unreferenced(tx, item.document_id, images.map((image) => image.storage_key));
       });
       await removeObjects(keys);
       return { itemId: input.itemId };
@@ -417,7 +529,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
       const key = createPrivateObjectKey(`studioflow/mom/${input.projectId}`, extension);
       await storage.put({ key, contentType: input.file.contentType, bytes, body: input.file.body });
 
-      let previousKey: string | null = null;
+      let orphaned: string[] = [];
       try {
         const result = await runTransaction(async (tx) => {
           const item = await loadItem(tx, input.projectId, input.itemId);
@@ -425,8 +537,8 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
           const existing = images.find((image) => image.slot === input.slot);
           let slot = input.slot as MomImageSlot;
           if (existing) {
-            previousKey = existing.storage_key;
             await tx.sfMomImage.update({ where: { id: existing.id }, data: { storage_key: key, content_type: input.file.contentType, bytes } });
+            orphaned = await unreferenced(tx, item.document_id, [existing.storage_key]);
           } else {
             if (slot === 1 && !images.some((image) => image.slot === 0)) slot = 0;
             await tx.sfMomImage.create({ data: { item_id: item.id, slot, storage_key: key, content_type: input.file.contentType, bytes } });
@@ -439,7 +551,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
           });
           return { itemId: item.id, slot };
         });
-        if (previousKey) await removeObjects([previousKey]);
+        await removeObjects(orphaned);
         return result;
       } catch (error) {
         await removeObjects([key]);
@@ -460,10 +572,81 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
           action: "studioflow.mom.image-removed", entityType: MOM_ENTITY, entityId: image.item.document_id, actor: input.actor,
           metadata: { projectId: input.projectId, itemId: image.item_id, slot: image.slot },
         });
-        return image.storage_key;
+        return unreferenced(tx, image.item.document_id, [image.storage_key]);
       });
-      await removeObjects([key]);
+      await removeObjects(key);
       return { imageId: input.imageId };
+    },
+
+    // ── Revisions ──────────────────────────────────────────────────────────
+    /** Freeze the working copy as the next version; the oldest beyond the limit is overwritten. */
+    async saveRevision(input: CommandContext & { projectId: string; documentId: string; note?: string | null }) {
+      const userId = requireCommand(input, P.momManage);
+      const note = optionalText(input.note, MOM_LIMITS.revisionNote);
+      const { number, dropped } = await runTransaction(async (tx) => {
+        const document = await loadDocument(tx, input.projectId, input.documentId, true);
+        const frozen = await freezeRevision(tx, document.id, { userId, label: input.actor.label }, note);
+        if (!frozen) throw conflict("MOM_REVISION_NO_CHANGES", "Nothing has changed since the latest revision.");
+        await writeAudit(ports, tx, {
+          action: "studioflow.mom.revision-saved", entityType: MOM_ENTITY, entityId: document.id, actor: input.actor,
+          metadata: { projectId: input.projectId, revision: versionLabel(frozen.number), note },
+        });
+        return { number: frozen.number, dropped: await unreferenced(tx, document.id, frozen.droppedKeys) };
+      });
+      await removeObjects(dropped);
+      return { number };
+    },
+
+    /**
+     * Replace the working copy with a kept revision. The state being replaced is
+     * frozen as a new revision first, so a restore never loses work.
+     */
+    async restoreRevision(input: CommandContext & { projectId: string; documentId: string; revisionId: string }) {
+      const userId = requireCommand(input, P.momManage);
+      const { number, orphaned } = await runTransaction(async (tx) => {
+        const document = await loadDocument(tx, input.projectId, input.documentId, true);
+        const target = await tx.sfMomRevision.findUnique({ where: { id: input.revisionId } });
+        if (!target || target.document_id !== document.id) throw scopeError();
+        const snapshot = parseMomSnapshot(target.snapshot);
+        if (!snapshot) throw conflict("MOM_REVISION_UNREADABLE", "This revision can no longer be read.");
+        const current = await readSnapshot(tx, document.id);
+        if (momSnapshotsEqual(current, snapshot)) throw conflict("MOM_REVISION_ALREADY_CURRENT", "The MOM already matches " + versionLabel(target.number) + ".");
+
+        const before = await tx.sfMomImage.findMany({ where: { item: { document_id: document.id } }, select: { storage_key: true } });
+        const frozen = await freezeRevision(tx, document.id, { userId, label: input.actor.label }, "Before restoring " + versionLabel(target.number));
+
+        await tx.sfMomItem.deleteMany({ where: { document_id: document.id } });
+        await tx.sfMomDocument.update({
+          where: { id: document.id },
+          data: {
+            topic: snapshot.topic,
+            meeting_date: dateOnlyToDate(snapshot.meetingDate),
+            venue: snapshot.venue,
+            attendees: snapshot.attendees,
+            prepared_by_name: snapshot.preparedByName,
+          },
+        });
+        for (const [index, item] of snapshot.items.entries()) {
+          await tx.sfMomItem.create({
+            data: {
+              document_id: document.id,
+              sort_order: index,
+              is_text_only: item.isTextOnly,
+              list_style: item.listStyle,
+              points: { create: item.points.map((point, order) => ({ sort_order: order, text: point.text, style: point.style })) },
+              images: { create: item.images.map((image) => ({ slot: image.slot, storage_key: image.storageKey, content_type: image.contentType, bytes: image.bytes })) },
+            },
+          });
+        }
+        await writeAudit(ports, tx, {
+          action: "studioflow.mom.revision-restored", entityType: MOM_ENTITY, entityId: document.id, actor: input.actor,
+          metadata: { projectId: input.projectId, restored: versionLabel(target.number), backup: frozen ? versionLabel(frozen.number) : null },
+        });
+        const candidates = [...before.map((image) => image.storage_key), ...(frozen?.droppedKeys ?? [])];
+        return { number: target.number, orphaned: await unreferenced(tx, document.id, candidates) };
+      });
+      await removeObjects(orphaned);
+      return { number };
     },
 
     async swapImages(input: CommandContext & { projectId: string; itemId: string }) {
