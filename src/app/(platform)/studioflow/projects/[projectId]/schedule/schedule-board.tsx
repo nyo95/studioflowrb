@@ -113,7 +113,7 @@ function templateSourceOf(entry: ScheduleEntryView) {
 /** Legacy catalog photos are portrait 4:5. */
 const PHOTO_ASPECT = 4 / 5;
 
-function Thumb({ url, alt, className = "h-10 w-8" }: { url: string | null; alt: string; className?: string }) {
+function Thumb({ url, alt, className = "h-14 w-11" }: { url: string | null; alt: string; className?: string }) {
   return (
     <span className={`grid shrink-0 place-items-center overflow-hidden rounded-[4px] border border-line-subtle bg-surface-muted ${className}`}>
       {url ? (
@@ -162,45 +162,64 @@ function BoardView({
   onDelete: (entry: ScheduleEntryView) => void;
 }) {
   return (
-    <div className="grid gap-6 p-(--ui-section-px)">
+    <div className="@container grid gap-10 p-(--ui-section-px)">
       {groups.map((group) => (
-        <section key={group.category}>
-          <div className="flex items-baseline gap-2 mb-3">
-            <h3 className="m-0 text-label text-ink-secondary">{group.category}</h3>
-            <Text size="sm" tone="tertiary">{group.rows.length}</Text>
+        <section key={group.category} className="flex gap-4" aria-label={group.category}>
+          {/* Legacy catalog: the category runs up a ruled rail beside its cards. */}
+          <div className="flex w-6 shrink-0 justify-center border-l border-ink">
+            <h3 className="m-0 whitespace-nowrap text-label text-ink [writing-mode:vertical-rl] rotate-180">
+              {group.category}
+              <span className="ml-2 font-normal text-ink-tertiary">{group.rows.length}</span>
+            </h3>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+          <div className="grid min-w-0 flex-1 grid-cols-2 items-start gap-x-5 gap-y-8 @2xl:grid-cols-3 @4xl:grid-cols-4">
             {group.rows.map((entry) => {
               const final = finalOf(entry);
-              const busy = command.pendingKeys.some((key) => key.startsWith(entry.id));
+              const quantity = entry.qty ? `${entry.qty}${entry.unit ? ` ${entry.unit}` : ""}` : null;
+              const details: Array<[string, string | null | undefined]> = [
+                ["Brand", final?.brandName],
+                ["Item no", final?.skuText],
+                ["Color", final?.color],
+                ["Pattern", final?.pattern],
+                ["Finishing", final?.finishing],
+                ["Size", final?.dimension],
+                ["Location", entry.location],
+                ["Qty", quantity],
+              ];
               return (
                 <button
                   key={entry.id}
                   type="button"
                   onClick={() => onOpen(entry.id)}
-                  className="group relative grid gap-2 rounded-lg border border-line-subtle bg-surface p-2 text-left transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  className="group grid min-w-0 content-start text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-line-focus"
                 >
-                  <span className="aspect-[4/5] w-full overflow-hidden rounded-[4px] bg-surface-muted">
+                  <span className="relative mb-2.5 block aspect-[4/5] w-full overflow-hidden bg-surface-muted">
                     {final?.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={final.imageUrl} alt={final.productName} className="h-full w-full object-cover" draggable={false} />
+                      <img src={final.imageUrl} alt={final.productName} className="h-full w-full object-cover transition-opacity group-hover:opacity-90" draggable={false} />
                     ) : (
-                      <span className="flex h-full items-center justify-center"><ImageIcon aria-hidden="true" className="h-6 w-6 text-ink-tertiary" /></span>
+                      <span className="absolute inset-0 grid place-items-center text-micro tracking-[0.18em] text-ink-tertiary">NO IMAGE</span>
                     )}
+                    <span className="absolute right-2 top-2 rounded-action bg-surface/90 px-1.5 py-0.5 font-ui-mono text-micro font-bold tabular-nums text-ink">{entry.code}</span>
+                    {final?.status === "APPROVED" || entry.options.length > 1 ? (
+                      <span className="absolute bottom-2 left-2 flex gap-1">
+                        {final?.status === "APPROVED" ? <Badge tone="success">Final</Badge> : null}
+                        {entry.options.length > 1 ? <Badge>{entry.options.length} options</Badge> : null}
+                      </span>
+                    ) : null}
                   </span>
-                  <span className="font-ui-mono text-micro font-semibold tabular-nums text-ink-secondary">{entry.code}</span>
                   {final ? (
-                    <span className="grid gap-0.5">
-                      <span className="truncate text-sm font-medium text-ink leading-tight">{final.productName}</span>
-                      {final.brandName ? <span className="truncate text-xs text-ink-secondary">ex. {final.brandName}</span> : null}
-                      {specLine(final) ? <span className="truncate text-xs text-ink-tertiary">{specLine(final)}</span> : null}
-                    </span>
+                    <span className="font-display text-sm font-semibold uppercase leading-tight text-ink">{final.productName}</span>
                   ) : (
-                    <span className="text-xs italic text-ink-tertiary">No product</span>
+                    <span className="text-sm italic text-ink-tertiary">{entry.options.length ? "No final option yet" : "Reserved — no product yet"}</span>
                   )}
-                  <span className="flex items-center gap-1.5">
-                    {final?.status === "APPROVED" ? <Badge tone="success">Final</Badge> : null}
-                    {entry.options.length > 1 ? <Badge>{entry.options.length}</Badge> : null}
+                  <span className="mt-2 grid">
+                    {details.map(([label, value]) => value ? (
+                      <span key={label} className="flex items-start justify-between gap-3 border-t border-line py-1">
+                        <span className="text-micro uppercase tracking-[0.06em] text-ink-tertiary">{label}</span>
+                        <span className="max-w-[70%] text-right text-xs text-ink [overflow-wrap:anywhere]">{value}</span>
+                      </span>
+                    ) : null)}
                   </span>
                 </button>
               );
@@ -249,7 +268,7 @@ export function ScheduleBoard({
   const confirm = useConfirm();
   const isDesktop = useIsDesktop();
   const [section, setSection] = useState<Section>(() => (entries.some((e) => e.section === "MATERIAL") || !entries.length ? "MATERIAL" : "FIXTURE"));
-  const [viewMode, setViewMode] = useState<"list" | "board">("list");
+  const [viewMode, setViewMode] = useState<"list" | "board">("board");
   const [openId, setOpenId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<null | "add" | "import" | { move: ScheduleEntryView }>(null);
 
@@ -345,6 +364,14 @@ export function ScheduleBoard({
               />
             ) : (
               <div className="grid">
+                <div className="hidden items-center gap-3 border-b border-line px-(--ui-section-px) py-1.5 text-micro uppercase tracking-[0.06em] text-ink-tertiary sm:flex" aria-hidden="true">
+                  <span className="w-11 shrink-0" />
+                  <span className="w-14 shrink-0">Code</span>
+                  <span className="min-w-0 flex-1">Product</span>
+                  <span className="w-28 shrink-0">Location</span>
+                  <span className="w-20 shrink-0 text-right">Qty</span>
+                  <span className="w-8 shrink-0" />
+                </div>
                 {groups.map((group) => (
                   <section key={group.category} className="border-b border-line-subtle last:border-b-0">
                     <div className="flex items-baseline gap-2 bg-surface-muted px-(--ui-section-px) py-1.5">
@@ -356,7 +383,7 @@ export function ScheduleBoard({
                         const final = finalOf(entry);
                         const busy = command.pendingKeys.some((key) => key.startsWith(entry.id));
                         return (
-                          <li key={entry.id} className={`flex items-center gap-3 px-(--ui-section-px) py-2 ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"}`}>
+                          <li key={entry.id} className={`flex items-center gap-3 px-(--ui-section-px) py-2.5 ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"}`}>
                             <button type="button" onClick={() => setOpenId(entry.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                               <Thumb url={final?.imageUrl ?? null} alt={final ? final.productName : `${entry.code} has no photo`} />
                               <span className="w-14 shrink-0 font-ui-mono text-sm font-semibold tabular-nums text-ink">{entry.code}</span>

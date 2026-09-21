@@ -5,8 +5,27 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.102**
-- Next local revision: **R8.103**
+- Current revision after this entry is committed: **R8.103**
+- Next local revision: **R8.104**
+
+## R8.103 | 2026-09-22 | fix(sf): Product Schedule board follows the legacy photo-first catalog
+
+No schema change.
+
+### Evidence (legacy, read-only Git)
+
+- Path `D:\Projects\studioflow`, branch `main`, HEAD `102ff85de203ad9eaa261d1517cf7a2515ef1cfa`; working tree dirty (`next.config.ts` modified, `Claude outputs/` untracked) — neither used. The baseline `c4b0c466…` named in `AGENTS.md` does not exist in that repository, so HEAD was read instead.
+- `src/extensions/sketchup/components/CatalogBoard.tsx` (committed): a printable catalog board — 4-column card grid, portrait 4:5 photo with the code chip top-right and a "NO IMAGE" placeholder, serif uppercase bold card title, hairline detail rows (uppercase label left, value right), and each category running up a ruled vertical rail beside its cards.
+
+### Changed
+
+- **Board is the default view** and now follows that layout: category rail, 4:5 photos, code chip on the photo, Final / option-count badges on the photo, serif uppercase title, and detail rows (Brand, Item no, Color, Pattern, Finishing, Size, Location, Qty — only those with a value). Columns adapt to the available width (2 / 3 / 4) so the side panel does not squeeze the cards (`schedule/schedule-board.tsx`).
+- **List view** gets column headers (Code, Product, Location, Qty) and larger thumbnails (44×56px, was 32×40px).
+
+### Limitations
+
+- Legacy let each card choose which detail fields to show (project default Type + Brand). This revision shows every field that has a value; per-card field toggles, the running page header and one-row-per-page print sheets are not implemented.
+- Verified on the one existing (reserved, photo-less) entry only; a card with a photo and full details was not viewed in a browser.
 
 ## R8.102 | 2026-09-21 | fix(ui): restore legacy type face and heading hierarchy
 
