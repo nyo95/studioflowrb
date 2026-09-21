@@ -508,7 +508,7 @@ function PhaseTemplatesSection({
             <ol className="m-0 grid list-none gap-px px-(--ui-section-px) pb-3 p-0">
               {template.definitions.map((def, index) => (
                 <li key={def.id} className="flex items-center gap-2 rounded-control px-1.5 py-1.5 hover:bg-surface-muted">
-                  <span className="w-5 shrink-0 text-right font-ui-mono text-[0.6875rem] text-ink-tertiary">{index + 1}</span>
+                  <span className="w-5 shrink-0 text-right font-ui-mono text-micro text-ink-tertiary">{index + 1}</span>
                   <span className="flex-1 text-sm">{def.name}</span>
                   <span className="font-ui-mono text-xs text-ink-tertiary">{def.prefix}</span>
                   <Badge>{def.seat}</Badge>
@@ -589,7 +589,7 @@ function TemplateGroup({
         <ol className="m-0 grid list-none gap-px p-0">
           {templates.map((template, index) => (
             <li key={template.id} className="flex items-center gap-2 rounded-control px-1.5 py-1.5 hover:bg-surface-muted">
-              <span className="w-5 shrink-0 text-right font-ui-mono text-[0.6875rem] text-ink-tertiary">{index + 1}</span>
+              <span className="w-5 shrink-0 text-right font-ui-mono text-micro text-ink-tertiary">{index + 1}</span>
               {editing === template.id ? (
                 <form className="flex flex-1 gap-2" onSubmit={async (e) => { e.preventDefault(); if (await run(template.id, () => updateTemplateAction({ templateId: template.id, label: editText }))) setEditing(null); }}>
                   <Input aria-label="Checklist item" density="compact" autoFocus value={editText} maxLength={200} onChange={(e) => setEditText(e.target.value)} />

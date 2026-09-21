@@ -159,9 +159,9 @@ export function ProjectEditor({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface px-4 py-3">
         <div className="grid gap-0.5">
           <Text tone="secondary" size="sm">Grand total</Text>
-          <span className="text-[1.5rem] font-semibold tabular-nums text-ink">
+          <span className="text-2xl font-semibold tabular-nums text-ink">
             {project.grandTotal === null
-              ? <span className="text-[1rem] font-normal text-ink-tertiary">Belum lengkap — ada item tanpa harga</span>
+              ? <span className="text-base font-normal text-ink-tertiary">Belum lengkap — ada item tanpa harga</span>
               : formatMoney(createMoney(project.grandTotal, "IDR"))}
           </span>
         </div>

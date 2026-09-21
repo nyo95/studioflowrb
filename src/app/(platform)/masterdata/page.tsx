@@ -56,8 +56,8 @@ export default async function MasterDataPage() {
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
       <div className="flex items-end justify-between gap-5 max-[560px]:flex-col max-[560px]:items-start">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-tertiary">Operational catalog</p>
-          <h1 className="mt-2 font-display italic text-[2rem] font-normal leading-[1.05] tracking-[-0.01em] text-ink">
+          <p className="text-label text-ink-tertiary">Operational catalog</p>
+          <h1 className="mt-2 font-display text-display font-medium tracking-[-0.015em] text-ink">
             What the studio specifies
           </h1>
         </div>
@@ -92,14 +92,14 @@ export default async function MasterDataPage() {
                 <Icon size={16} aria-hidden="true" />
               </span>
               {delta > 0 && (
-                <span className="flex items-center gap-0.5 text-[11px] font-semibold text-ink-secondary">
+                <span className="flex items-center gap-0.5 text-micro font-semibold text-ink-secondary">
                   <Plus size={10} aria-hidden="true" />
                   {delta}
                 </span>
               )}
             </div>
             <div>
-              <p className="text-[1.75rem] font-semibold leading-none tabular-nums text-ink">{formatCount(count)}</p>
+              <p className="text-2xl font-semibold leading-none tabular-nums text-ink">{formatCount(count)}</p>
               <p className="mt-1 flex items-center gap-1 text-sm text-ink-secondary">
                 {label}
                 <ArrowUpRight size={13} aria-hidden="true" className="text-ink-tertiary transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
@@ -136,7 +136,7 @@ export default async function MasterDataPage() {
                       <p className="truncate text-sm font-medium text-ink">{item.label}</p>
                       <p className="text-xs text-ink-tertiary">{meta.label}</p>
                     </div>
-                    <span className="shrink-0 rounded-action border px-1.5 py-0.5 text-[11px] font-medium text-ink-tertiary"
+                    <span className="shrink-0 rounded-action border px-1.5 py-0.5 text-micro font-medium text-ink-tertiary"
                       style={{ borderColor: "var(--ui-border-subtle)" }}
                     >
                       {item.isNew ? "Added" : "Updated"}
@@ -197,7 +197,7 @@ export default async function MasterDataPage() {
                   className="flex flex-col items-center gap-1.5 px-3 py-5 transition-colors hover:bg-surface-muted"
                 >
                   <Icon size={16} className="text-ink-tertiary" aria-hidden="true" />
-                  <span className="text-lg font-semibold tabular-nums text-ink">{count}</span>
+                  <span className="text-base font-semibold tabular-nums text-ink">{count}</span>
                   <span className="text-center text-xs text-ink-tertiary">{label}</span>
                 </Link>
               ))}

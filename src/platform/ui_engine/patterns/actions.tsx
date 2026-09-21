@@ -52,7 +52,7 @@ export function RowActionMenu({
                 <DropdownMenu.Separator className="-mx-px my-1 h-px bg-line" />
               ) : null}
               <DropdownMenu.Item
-                className="flex min-h-8 cursor-pointer items-center gap-2 rounded-action px-2 py-1.5 text-[0.8125rem] text-ink outline-0 [&_svg]:h-[15px] [&_svg]:w-[15px] [&_svg]:text-ink-tertiary data-[danger=true]:text-danger data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-surface-muted"
+                className="flex min-h-8 cursor-pointer items-center gap-2 rounded-action px-2 py-1.5 text-sm text-ink outline-0 [&_svg]:h-[15px] [&_svg]:w-[15px] [&_svg]:text-ink-tertiary data-[danger=true]:text-danger data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-surface-muted"
                 data-danger={item.danger || undefined}
                 disabled={item.disabled}
                 onSelect={item.onSelect}
@@ -108,7 +108,7 @@ export function ButtonMenu({
             <DropdownMenu.Item
               key={item.label}
               className={cx(
-                "grid cursor-pointer rounded-action px-2 py-[7px] text-[0.8125rem] text-ink outline-0",
+                "grid cursor-pointer rounded-action px-2 py-[7px] text-sm text-ink outline-0",
                 "data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-surface-muted",
                 item.description ? "gap-0.5" : "min-h-8 items-center",
               )}

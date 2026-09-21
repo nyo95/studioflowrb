@@ -44,7 +44,7 @@ export function SectionCard({
           <div className="grid min-w-0 gap-[2px]">
             {title ? (
               <div className="flex min-w-0 items-baseline gap-2">
-                <Heading level={5} className="truncate">{title}</Heading>
+                <Heading level={4} className="truncate">{title}</Heading>
                 {count !== undefined && count !== null ? <CountBadge>{count}</CountBadge> : null}
               </div>
             ) : null}
@@ -181,12 +181,12 @@ export function PipelineStrip({
           <>
             <div className="flex items-center gap-1.5">
               <span aria-hidden="true" className={cx("h-2 w-2 shrink-0 rounded-pill", step.accentClass ?? PIPELINE_STATE_DOT_CLASSES[state])} />
-              <span className={cx("truncate text-[0.8125rem] font-semibold", PIPELINE_STATE_LABEL_CLASSES[state])}>
+              <span className={cx("truncate text-sm font-semibold", PIPELINE_STATE_LABEL_CLASSES[state])}>
                 {step.label}
               </span>
             </div>
             {step.note ? <span className="truncate text-xs text-ink-tertiary">{step.note}</span> : null}
-            {step.detail ? <span className="font-ui-mono text-[0.6875rem] text-ink-tertiary">{step.detail}</span> : null}
+            {step.detail ? <span className="font-ui-mono text-micro text-ink-tertiary">{step.detail}</span> : null}
           </>
         );
         return (

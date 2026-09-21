@@ -22,7 +22,7 @@ export function AccountMenu({ name, logoutAction, showAdministration, showGenera
       <DropdownMenu.Item asChild><Link href="/account" className={itemClass}><UserRound size={16} aria-hidden="true" />Account</Link></DropdownMenu.Item>
       {showAdministration ? <>
         <DropdownMenu.Separator className="my-1 h-px bg-line" />
-        <DropdownMenu.Label className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-ink-tertiary">Administration</DropdownMenu.Label>
+        <DropdownMenu.Label className="px-3 py-1.5 text-label text-ink-tertiary">Administration</DropdownMenu.Label>
         {showGeneralSettings ? <DropdownMenu.Item asChild><Link href="/settings/general" className={itemClass}><Settings size={16} aria-hidden="true" />General Settings</Link></DropdownMenu.Item> : null}
         {showUsers ? <DropdownMenu.Item asChild><Link href="/settings/access/users" className={itemClass}><Users size={16} aria-hidden="true" />Users</Link></DropdownMenu.Item> : null}
         {showRoles ? <DropdownMenu.Item asChild><Link href="/settings/access/roles" className={itemClass}><ShieldCheck size={16} aria-hidden="true" />Roles &amp; Access</Link></DropdownMenu.Item> : null}

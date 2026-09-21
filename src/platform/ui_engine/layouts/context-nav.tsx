@@ -37,11 +37,11 @@ export function ContextNavLink({ href, active = false, marker, detail, children,
     >
       {marker ? <span aria-hidden="true" className="inline-flex shrink-0">{marker}</span> : null}
       <span className="min-w-0 flex-1 truncate">{children}</span>
-      {detail !== undefined && detail !== null ? <span className="shrink-0 font-ui-mono text-[0.6875rem] text-ink-tertiary tabular-nums">{detail}</span> : null}
+      {detail !== undefined && detail !== null ? <span className="shrink-0 font-ui-mono text-micro text-ink-tertiary tabular-nums">{detail}</span> : null}
     </Anchor>
   );
 }
 
 export function ContextNavHeading({ children, className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cx("px-2.5 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-ink-tertiary first:pt-0.5", className)} {...props}>{children}</div>;
+  return <div className={cx("px-2.5 pb-1 pt-3 text-label text-ink-tertiary first:pt-0.5", className)} {...props}>{children}</div>;
 }

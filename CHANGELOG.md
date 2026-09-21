@@ -5,8 +5,25 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.98**
-- Next local revision: **R8.99**
+- Current revision after this entry is committed: **R8.99**
+- Next local revision: **R8.100**
+
+## R8.99 | 2026-09-22 | refactor(ui): shell consistency, dark theme tokens, curated type scale
+
+No schema change.
+
+### Changed
+
+- **Shell.** The top bar is one fixed line: brand column, app switcher, and account never depend on rail state. Rail is 200px (was 232px) and 56px collapsed. Rail width tokens: `--ui-rail-width`, `--ui-header-brand-width`, `--ui-rail-collapsed-width`. Viewport heights use `dvh`.
+- **Dark theme.** Every `--ui-*` token has a dark value under `prefers-color-scheme` and `[data-theme="dark"]`.
+- **Type scale.** One scale — 11 · 12 · 14 · 16 · 20 · 24 · 32 — with named utilities (`text-micro`, `text-display`); all arbitrary `text-[...]` sizes replaced. One `text-label` utility (11px, 600, 0.08em, uppercase) replaces four hand-rolled label styles.
+- **Headings.** H1/H2 use Lora (upright, 500) via `--font-serif`; H3–H6 stay Instrument Sans. Metric sizes are 16/20/24 so numbers never outrank the page title. `SectionCard` titles are H4 (16px); buttons are weight 500.
+
+### Fixed
+
+- `Text meta` never rendered as intended (`text-xs`/`font-semibold` overrode the meta classes).
+- `EmptyState` title faked bold on a single-weight serif.
+- Pre-existing `domain/phase.ts:91` tuple typing error.
 
 ## R8.98 | 2026-09-21 | fix(sf): logic debt closure — REVIEW-ALIGNMENT P0/P1/P2 bugs (B1–B5, C1–C2, D1)
 

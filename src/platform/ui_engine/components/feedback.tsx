@@ -54,7 +54,7 @@ export function StatusBadge({
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-[7px] text-ink text-[0.8125rem] leading-[1.3] whitespace-nowrap before:h-[7px] before:w-[7px] before:shrink-0 before:content-[''] before:rounded-[2px]",
+        "inline-flex items-center gap-[7px] text-ink text-sm leading-[1.3] whitespace-nowrap before:h-[7px] before:w-[7px] before:shrink-0 before:content-[''] before:rounded-[2px]",
         STATUS_TONE_MARKER_CLASSES[tone],
         className,
       )}
@@ -80,7 +80,7 @@ export function Notice({ tone = "neutral", title, children, className, ...props 
   return (
     <div
       className={cx(
-        "flex items-start gap-1.5 rounded-control border px-[11px] py-[9px] text-[0.8125rem] [&_strong]:text-inherit",
+        "flex items-start gap-1.5 rounded-control border px-[11px] py-[9px] text-sm [&_strong]:text-inherit",
         NOTICE_TONE_CLASSES[tone],
         className,
       )}
@@ -139,10 +139,10 @@ function State({
           <Icon className="h-[18px] w-[18px]" />
         </span>
       ) : null}
-      {title ? <Heading level={3} className="font-display font-[650]">{title}</Heading> : null}
+      {title ? <Heading level={3}>{title}</Heading> : null}
       {description ? <Text as="p" tone="secondary" className="max-w-100 text-pretty leading-relaxed">{description}</Text> : null}
       {action ? <div className="mt-1 flex flex-wrap items-center justify-center gap-2">{action}</div> : null}
-      {code ? <span className="font-ui-mono text-[0.6875rem] text-ink-tertiary">{code}</span> : null}
+      {code ? <span className="font-ui-mono text-micro text-ink-tertiary">{code}</span> : null}
     </div>
   );
 }

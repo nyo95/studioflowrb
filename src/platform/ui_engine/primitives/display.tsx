@@ -10,12 +10,12 @@ export type HeadingProps = HTMLAttributes<HTMLHeadingElement> & {
 
 /* H1–H2 carry the serif product identity; H3–H6 are sans operational heads. */
 const HEADING_LEVEL_CLASSES: Record<HeadingLevel, string> = {
-  1: "font-display italic font-normal tracking-[-0.01em] text-[2rem] leading-[1.05]",
-  2: "font-display font-normal tracking-[-0.01em] text-[1.5rem] leading-[1.08]",
-  3: "text-[1.125rem] font-semibold leading-[1.2]",
-  4: "text-base font-semibold leading-[1.25]",
-  5: "text-sm font-semibold leading-[1.3]",
-  6: "text-xs font-semibold leading-[1.3]",
+  1: "font-display font-medium tracking-[-0.015em] text-display text-balance",
+  2: "font-display font-medium tracking-[-0.01em] text-2xl leading-[1.2] text-balance",
+  3: "text-xl font-semibold leading-[1.25] text-balance",
+  4: "text-base font-semibold leading-[1.3]",
+  5: "text-sm font-semibold leading-[1.35]",
+  6: "text-xs font-semibold leading-[1.35]",
 };
 
 export function Heading({ level = 2, className, ...props }: HeadingProps) {
@@ -62,9 +62,7 @@ export function Text({
       className={cx(
         "m-0",
         TEXT_TONE_CLASSES[tone],
-        TEXT_SIZE_CLASSES[size],
-        TEXT_WEIGHT_CLASSES[weight],
-        meta && "text-[0.6875rem] font-bold tracking-[0.1em] uppercase",
+        meta ? "text-label" : cx(TEXT_SIZE_CLASSES[size], TEXT_WEIGHT_CLASSES[weight]),
         className,
       )}
       {...props}
@@ -144,9 +142,9 @@ export function Surface({
 export type AvatarSize = "sm" | "md" | "lg";
 
 const AVATAR_SIZE_CLASSES: Record<AvatarSize, string> = {
-  sm: "h-[22px] w-[22px] text-[0.6875rem]",
-  md: "h-6 w-6 text-[0.6875rem]",
-  lg: "h-[26px] w-[26px] text-[0.6875rem]",
+  sm: "h-[22px] w-[22px] text-micro",
+  md: "h-6 w-6 text-micro",
+  lg: "h-[26px] w-[26px] text-micro",
 };
 
 /** Initials derived from a display name: at most two leading letters. */
@@ -185,7 +183,7 @@ export function Avatar({
 export function CountBadge({ className, ...props }: HTMLAttributes<HTMLSpanElement>) {
   return (
     <span
-      className={cx("font-ui-mono text-[0.6875rem] font-medium text-ink-tertiary tabular-nums", className)}
+      className={cx("font-ui-mono text-micro font-medium text-ink-tertiary tabular-nums", className)}
       {...props}
     />
   );
@@ -195,9 +193,9 @@ export function CountBadge({ className, ...props }: HTMLAttributes<HTMLSpanEleme
 export type MetricSize = "sm" | "md" | "lg";
 
 const METRIC_SIZE_CLASSES: Record<MetricSize, string> = {
-  sm: "text-lg font-semibold tabular-nums",
-  md: "text-[1.5rem] font-semibold tabular-nums",
-  lg: "text-[1.75rem] font-semibold tabular-nums",
+  sm: "text-base font-semibold tabular-nums",
+  md: "text-xl font-semibold tabular-nums",
+  lg: "text-2xl font-semibold tabular-nums",
 };
 
 export function MetricValue({ size = "md", className, ...props }: HTMLAttributes<HTMLElement> & { size?: MetricSize }) {
@@ -219,7 +217,7 @@ export function MetaList({
   if (visible.length === 0) return null;
   return (
     <div
-      className={cx("flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.8125rem] text-ink-secondary", className)}
+      className={cx("flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-ink-secondary", className)}
       {...props}
     >
       {visible.map((item, index) => (

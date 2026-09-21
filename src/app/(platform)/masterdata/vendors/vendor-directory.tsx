@@ -153,7 +153,7 @@ function SupplierLinksEditor({ links, snapshot, onLinksChange, onSnapshotChange,
           <div className="grid gap-1">
             {links.map((link, idx) => (
               <div key={link.url} className="flex items-center gap-2 text-sm">
-                <span className="text-ink-tertiary text-xs uppercase shrink-0">{link.kind}</span>
+                <span className="text-label text-ink-tertiary shrink-0">{link.kind}</span>
                 <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-action underline wrap-anywhere flex-1 min-w-0">{link.label || link.url}</a>
                 {canManage ? <IconButton label="Remove link" icon={<X size={12} />} size="sm" className="!h-5 !w-5 !min-h-5 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!text-ink-danger shrink-0" onClick={() => handleRemove(idx)} /> : null}
               </div>
@@ -194,7 +194,7 @@ function SupplierLinksEditor({ links, snapshot, onLinksChange, onSnapshotChange,
                     setAcceptedIdxs(prev => { const next = new Set(prev); if (checked === true) next.add(idx); else next.delete(idx); return next; });
                   }}
                 />
-                <span className="text-ink-tertiary text-xs uppercase shrink-0">{item.kind}</span>
+                <span className="text-label text-ink-tertiary shrink-0">{item.kind}</span>
                 <span className="wrap-anywhere flex-1 min-w-0">{item.label ? `${item.label} — ` : ""}{item.url}</span>
                 {!LINK_KINDS.includes(item.kind as typeof LINK_KINDS[number]) ? <Select aria-label={`Information kind for ${item.url}`} value={reviewKinds[idx] ?? ""} onChange={(event) => setReviewKinds((previous) => ({ ...previous, [idx]: event.target.value }))} className="w-36 shrink-0"><option value="">Reclassify…</option>{LINK_KINDS.map((kind) => <option key={kind} value={kind}>{kind}</option>)}</Select> : null}
               </div>

@@ -5,6 +5,15 @@
 @import "../platform/ui_engine/tokens/tokens.css";
 @import "../platform/ui_engine/styles/base.css";
 
+/* The one uppercase label style (eyebrows, group headings, dropdown section labels). */
+@utility text-label {
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 /*
  * Tailwind 4 token bridge (UI_ENGINE.md §5). Engine-owned: tokens/tokens.css
  * stays the single runtime source of token values; this mapping only binds
@@ -45,6 +54,13 @@
   --radius-pill: var(--ui-radius-pill);
 
   --shadow-elevated: var(--ui-shadow-elevated);
+
+  /* Type scale — the only sizes the product uses:
+     micro 11 · xs 12 · sm 14 (body/UI) · base 16 · xl 20 · 2xl 24 · display 32. */
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1rem;
+  --text-display: 2rem;
+  --text-display--line-height: 1.15;
 
   --font-display: var(--font-serif), serif;
   --font-ui-mono: var(--ui-font-mono);

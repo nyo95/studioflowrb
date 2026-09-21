@@ -82,47 +82,33 @@ export function AppShell({
   };
 
   const railBrand = railPresentation === "compact" ? brand : isCollapsed ? (collapsedBrand ?? brand) : brand;
-  const topbarBrand = brand;
 
   return (
     <RailContext.Provider value={{ collapsed: isCollapsed }}>
-      <div
-        className={cx(
-          "min-h-screen overflow-x-clip",
-          className,
-        )}
-        data-collapsed={isCollapsed || undefined}
-      >
+      <div className={cx("min-h-dvh overflow-x-clip", className)} data-collapsed={isCollapsed || undefined}>
+        {/* The top bar is one fixed line: its width and content never depend on the rail state. */}
         {topbar ? (
-          <header className="sticky top-0 z-20 flex min-h-16 items-stretch border-b border-line bg-surface/94 backdrop-blur-[12px]">
-            <div
-              className={cx(
-                "absolute inset-y-0 left-0 z-10 flex h-16 min-w-0 items-center justify-between gap-2 px-4 py-2 transition-[width] duration-[160ms] motion-reduce:transition-none max-[840px]:static max-[840px]:shrink-0",
-                "w-[var(--ui-header-brand-width,232px)]",
-                "max-[840px]:w-auto max-[840px]:px-3",
-              )}
-            >
-              <div className={cx("min-w-0 overflow-hidden", isCollapsed && "grid place-items-center")}>
-                {topbarBrand}
-              </div>
+          <header className="sticky top-0 z-20 flex h-16 items-center border-b border-line bg-surface/94 backdrop-blur-[12px]">
+            <div className="flex h-full w-(--ui-header-brand-width) min-w-0 shrink-0 items-center px-4 max-[840px]:w-auto max-[840px]:px-3">
+              <div className="min-w-0 overflow-hidden">{brand}</div>
             </div>
-            <div className="flex min-w-0 flex-1 items-center pl-[var(--ui-header-brand-width,232px)] max-[840px]:pl-0">{topbar}</div>
+            <div className="flex min-w-0 flex-1 items-center">{topbar}</div>
           </header>
         ) : null}
         <div
           className={cx(
             "grid overflow-x-clip transition-[grid-template-columns] duration-[160ms] motion-reduce:transition-none",
             railVisible
-              ? "grid-cols-[var(--ui-rail-width,232px)_minmax(0,1fr)] max-[840px]:grid-cols-1 max-[840px]:block"
+              ? "grid-cols-[var(--ui-rail-width)_minmax(0,1fr)] max-[840px]:grid-cols-1 max-[840px]:block"
               : "grid-cols-1",
-            isCollapsed && "[--ui-rail-width:60px]",
-            topbar ? "min-h-[calc(100vh-4rem)]" : "min-h-screen",
+            isCollapsed && "[--ui-rail-width:var(--ui-rail-collapsed-width)]",
+            topbar ? "min-h-[calc(100dvh-4rem)]" : "min-h-dvh",
           )}
         >
           {/* Warm chrome and a drawn rule separate navigation from the work area. */}
           {railVisible ? <aside
             className={cx(
-              "group relative sticky top-16 flex h-[calc(100vh-4rem)] max-w-screen min-w-0 flex-col overflow-hidden border-r border-line",
+              "group relative sticky top-16 flex h-[calc(100dvh-4rem)] max-w-screen min-w-0 flex-col overflow-hidden border-r border-line",
               "bg-[color-mix(in_srgb,var(--ui-surface-muted)_52%,var(--ui-surface))]",
               !topbar && "top-0 h-screen",
               "max-[840px]:static max-[840px]:h-auto max-[840px]:border-b max-[840px]:border-r-0",
@@ -165,7 +151,7 @@ export function AppShell({
             </nav>
             {utility ?? null}
           </aside> : null}
-          <main className="flex h-[calc(100vh-4rem)] min-h-0 min-w-0 flex-col overflow-auto max-[840px]:h-auto max-[840px]:overflow-visible">{children}</main>
+          <main className="flex h-[calc(100dvh-4rem)] min-h-0 min-w-0 flex-col overflow-auto max-[840px]:h-auto max-[840px]:overflow-visible">{children}</main>
         </div>
       </div>
     </RailContext.Provider>
@@ -176,7 +162,7 @@ export function NavGroup({ label, heading, children }: { label: string; heading?
   return (
     <div role="group" aria-label={label} className="grid gap-1 max-[840px]:contents">
       {heading ? (
-        <p className="mt-1.5 mb-0.5 px-2.5 text-[0.6875rem] font-bold uppercase tracking-[0.1em] text-ink-tertiary group-data-collapsed:hidden max-[840px]:hidden">
+        <p className="mt-1.5 mb-0.5 px-2.5 text-label text-ink-tertiary group-data-collapsed:hidden max-[840px]:hidden">
           {heading}
         </p>
       ) : null}
@@ -212,7 +198,7 @@ export type NavItemProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "childr
 };
 
 const NAV_ITEM_BASE_CLASSES =
-  "relative flex w-full min-h-[38px] items-center gap-2.5 rounded-control border border-transparent bg-transparent px-2.5 py-2 text-[0.8125rem] text-left font-[inherit] text-ink-secondary no-underline max-[840px]:w-auto max-[840px]:shrink-0 max-[840px]:min-h-[34px]";
+  "relative flex w-full min-h-[38px] items-center gap-2.5 rounded-control border border-transparent bg-transparent px-2.5 py-2 text-sm text-left font-[inherit] text-ink-secondary no-underline max-[840px]:w-auto max-[840px]:shrink-0 max-[840px]:min-h-[34px]";
 
 const NAV_ITEM_STATE_CLASSES = {
   idle: "hover:border-line-subtle hover:bg-surface-muted hover:text-ink",
@@ -308,7 +294,7 @@ export function NavSubmenu({
   if (!collapsed) {
     return (
       <div className="mt-3 max-[840px]:mt-0 max-[840px]:contents" role="group" aria-label={label}>
-        <p className="flex min-h-7 items-center gap-2 px-2.5 text-[0.6875rem] font-bold uppercase tracking-[0.1em] text-ink-tertiary max-[840px]:hidden">
+        <p className="flex min-h-7 items-center gap-2 px-2.5 text-label text-ink-tertiary max-[840px]:hidden">
           <span className="inline-flex shrink-0 [&_svg]:h-4 [&_svg]:w-4" aria-hidden="true">{icon}</span>
           {label}
         </p>
@@ -345,7 +331,7 @@ export function NavSubmenu({
           align="start"
           sideOffset={0}
         >
-          <DropdownMenu.Label className="px-2 py-1.5 text-[0.6875rem] font-bold uppercase tracking-[0.1em] text-ink-tertiary">
+          <DropdownMenu.Label className="px-2 py-1.5 text-label text-ink-tertiary">
             {label}
           </DropdownMenu.Label>
           {items.map((item) => (
@@ -353,7 +339,7 @@ export function NavSubmenu({
               <a
                 href={item.href}
                 className={cx(
-                  "flex min-h-9 items-center gap-2 rounded-action px-2 py-1.5 text-[0.8125rem] text-ink outline-0 data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-surface-muted",
+                  "flex min-h-9 items-center gap-2 rounded-action px-2 py-1.5 text-sm text-ink outline-0 data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-surface-muted",
                   item.active && "bg-surface-muted font-semibold",
                 )}
               >
@@ -436,7 +422,7 @@ export function PageHeader({
  */
 export function UtilitySection({ children }: { children: ReactNode }) {
   return (
-    <div className="grid gap-1 border-t border-line px-3 pt-2.5 pb-3.5 max-[840px]:hidden group-data-[collapsed]:px-1.5">
+    <div className="grid gap-1 border-t border-line px-3 pt-2.5 pb-3.5 max-[840px]:hidden group-data-collapsed:px-1.5">
       {children}
     </div>
   );

@@ -166,7 +166,7 @@ function BoardView({
       {groups.map((group) => (
         <section key={group.category}>
           <div className="flex items-baseline gap-2 mb-3">
-            <h3 className="m-0 text-xs font-semibold uppercase tracking-[0.08em] text-ink-secondary">{group.category}</h3>
+            <h3 className="m-0 text-label text-ink-secondary">{group.category}</h3>
             <Text size="sm" tone="tertiary">{group.rows.length}</Text>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
@@ -188,7 +188,7 @@ function BoardView({
                       <span className="flex h-full items-center justify-center"><ImageIcon aria-hidden="true" className="h-6 w-6 text-ink-tertiary" /></span>
                     )}
                   </span>
-                  <span className="font-ui-mono text-[11px] font-semibold tabular-nums text-ink-secondary">{entry.code}</span>
+                  <span className="font-ui-mono text-micro font-semibold tabular-nums text-ink-secondary">{entry.code}</span>
                   {final ? (
                     <span className="grid gap-0.5">
                       <span className="truncate text-sm font-medium text-ink leading-tight">{final.productName}</span>
@@ -348,7 +348,7 @@ export function ScheduleBoard({
                 {groups.map((group) => (
                   <section key={group.category} className="border-b border-line-subtle last:border-b-0">
                     <div className="flex items-baseline gap-2 bg-surface-muted px-(--ui-section-px) py-1.5">
-                      <h3 className="m-0 text-xs font-semibold uppercase tracking-[0.08em] text-ink-secondary">{group.category}</h3>
+                      <h3 className="m-0 text-label text-ink-secondary">{group.category}</h3>
                       <Text size="sm" tone="tertiary">{group.rows.length}</Text>
                     </div>
                     <ul className="m-0 list-none divide-y divide-line-subtle p-0">

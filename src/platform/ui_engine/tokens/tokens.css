@@ -1,18 +1,27 @@
 :root {
+  /* ── Surfaces ────────────────────────────────────────────────── */
   --ui-canvas: #fbfbfb;
   --ui-surface: #ffffff;
   --ui-surface-raised: #ffffff;
   --ui-surface-muted: #edece9;
+
+  /* ── Borders ─────────────────────────────────────────────────── */
   --ui-border-subtle: #eeedeb;
   --ui-border-default: #e0dfdc;
   --ui-border-strong: #c2c0bc;
   --ui-border-focus: #57534e;
+
+  /* ── Text ────────────────────────────────────────────────────── */
   --ui-text-primary: #1c1a18;
   --ui-text-secondary: #55524d;
   --ui-text-tertiary: #6e6a65;
   --ui-text-inverse: #ffffff;
+
+  /* ── Actions ─────────────────────────────────────────────────── */
   --ui-action-primary: #1c1a18;
   --ui-action-primary-hover: #332f2b;
+
+  /* ── Semantic ────────────────────────────────────────────────── */
   --ui-danger-fg: #b91c1c;
   --ui-danger-bg: #fef2f2;
   --ui-danger-border: #fecaca;
@@ -22,31 +31,128 @@
   --ui-warning-fg: #b45309;
   --ui-warning-bg: #fffbeb;
   --ui-warning-border: #fde68a;
+
+  /* ── Phase colours (StudioFlow) ──────────────────────────────── */
   --ui-phase-moodboard: #6f7d45;
   --ui-phase-layout: #b6782f;
   --ui-phase-design-3d: #9b5f55;
   --ui-phase-cd: #466f88;
   --ui-phase-supervision: #695b8a;
+
+  /* ── Data table ──────────────────────────────────────────────── */
   --ui-table-header-bg: #f5f4f2;
   --ui-table-header-fg: #55524d;
+
+  /* ── Typography ──────────────────────────────────────────────── */
   --ui-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* ── Radii ───────────────────────────────────────────────────── */
   --ui-radius-card: 8px;
   --ui-radius-control: 6px;
   --ui-radius-action: 4px;
   --ui-radius-pill: 3px;
+
+  /* ── Spacing ─────────────────────────────────────────────────── */
   --ui-section-px: 16px;
   --ui-section-py: 16px;
   --ui-section-gap: 16px;
   --ui-page-padding: clamp(20px, 2.5vw, 24px);
   --ui-page-max: 1440px;
   --ui-page-wide-max: 1920px;
+
+  /* ── Shell layout ────────────────────────────────────────────── */
+  --ui-rail-width: 200px;
+  --ui-header-brand-width: var(--ui-rail-width);
+  --ui-rail-collapsed-width: 56px;
+
+  /* ── Controls ────────────────────────────────────────────────── */
   --ui-control-height-sm: 32px;
   --ui-control-height-md: 36px;
+
+  /* ── Dialogs ─────────────────────────────────────────────────── */
   --ui-dialog-sm: 420px;
   --ui-dialog-md: 560px;
   --ui-dialog-lg: 760px;
   --ui-dialog-xl: 980px;
   --ui-dialog-full: 1180px;
-  --ui-dialog-max-height: 90vh;
+  --ui-dialog-max-height: 90dvh;
+
+  /* ── Elevation ───────────────────────────────────────────────── */
   --ui-shadow-elevated: 0 18px 48px rgb(28 26 24 / 0.13), 0 3px 12px rgb(28 26 24 / 0.06);
+}
+
+/* ── Dark theme ─────────────────────────────────────────────────────────────
+   Defined in both the media query (for "system" viewers, the common case) and
+   under the explicit stamp so the toggle overrides in either direction.
+   Every token defined in :root is redefined here — a token with no dark
+   override silently shows the light value on a dark ground (the classic bug). */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ui-canvas: #111110;
+    --ui-surface: #1a1917;
+    --ui-surface-raised: #222120;
+    --ui-surface-muted: #2c2a27;
+    --ui-border-subtle: #2a2826;
+    --ui-border-default: #38352f;
+    --ui-border-strong: #514d47;
+    --ui-border-focus: #a8a4a0;
+    --ui-text-primary: #f2f1ef;
+    --ui-text-secondary: #9e9a95;
+    --ui-text-tertiary: #7e7a75;
+    --ui-text-inverse: #1c1a18;
+    --ui-action-primary: #f2f1ef;
+    --ui-action-primary-hover: #e5e2de;
+    --ui-danger-fg: #f87171;
+    --ui-danger-bg: #200f0f;
+    --ui-danger-border: #7f1d1d;
+    --ui-success-fg: #34d399;
+    --ui-success-bg: #0c1e15;
+    --ui-success-border: #065f46;
+    --ui-warning-fg: #fbbf24;
+    --ui-warning-bg: #1e1800;
+    --ui-warning-border: #78350f;
+    --ui-phase-moodboard: #a3b367;
+    --ui-phase-layout: #d4954a;
+    --ui-phase-design-3d: #c28078;
+    --ui-phase-cd: #6b96b0;
+    --ui-phase-supervision: #9380bc;
+    --ui-table-header-bg: #222120;
+    --ui-table-header-fg: #9e9a95;
+    --ui-shadow-elevated: 0 18px 48px rgb(0 0 0 / 0.5), 0 4px 16px rgb(0 0 0 / 0.25);
+  }
+}
+
+:root[data-theme="dark"] {
+  --ui-canvas: #111110;
+  --ui-surface: #1a1917;
+  --ui-surface-raised: #222120;
+  --ui-surface-muted: #2c2a27;
+  --ui-border-subtle: #2a2826;
+  --ui-border-default: #38352f;
+  --ui-border-strong: #514d47;
+  --ui-border-focus: #a8a4a0;
+  --ui-text-primary: #f2f1ef;
+  --ui-text-secondary: #9e9a95;
+  --ui-text-tertiary: #7e7a75;
+  --ui-text-inverse: #1c1a18;
+  --ui-action-primary: #f2f1ef;
+  --ui-action-primary-hover: #e5e2de;
+  --ui-danger-fg: #f87171;
+  --ui-danger-bg: #200f0f;
+  --ui-danger-border: #7f1d1d;
+  --ui-success-fg: #34d399;
+  --ui-success-bg: #0c1e15;
+  --ui-success-border: #065f46;
+  --ui-warning-fg: #fbbf24;
+  --ui-warning-bg: #1e1800;
+  --ui-warning-border: #78350f;
+  --ui-phase-moodboard: #a3b367;
+  --ui-phase-layout: #d4954a;
+  --ui-phase-design-3d: #c28078;
+  --ui-phase-cd: #6b96b0;
+  --ui-phase-supervision: #9380bc;
+  --ui-table-header-bg: #222120;
+  --ui-table-header-fg: #9e9a95;
+  --ui-shadow-elevated: 0 18px 48px rgb(0 0 0 / 0.5), 0 4px 16px rgb(0 0 0 / 0.25);
 }

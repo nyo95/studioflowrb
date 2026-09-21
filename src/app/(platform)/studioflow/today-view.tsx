@@ -147,7 +147,7 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
               {labels.map((label) => <option key={label.id} value={label.id}>#{label.name}</option>)}
             </Select></div>
           ) : null}
-          <Checkbox checked={showCompleted} onCheckedChange={(c) => setShowCompleted(c === true)} label="Show done" className="ml-1 text-[0.8125rem]" />
+          <Checkbox checked={showCompleted} onCheckedChange={(c) => setShowCompleted(c === true)} label="Show done" className="ml-1 text-sm" />
         </div>
         <div className="flex items-center gap-2">
           {savedFilters.length > 0 ? (

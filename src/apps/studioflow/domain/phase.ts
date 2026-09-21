@@ -89,7 +89,7 @@ export function isLegacySupervisionPhase(key: PhaseKey): boolean {
 
 /** Label→key lookup for mapping template definitions to legacy SfPhaseKey. */
 const LABEL_TO_KEY = new Map<string, PhaseKey>([
-  ...PHASE_BLUEPRINT.map((bp) => [bp.label.toLowerCase(), bp.key]),
+  ...PHASE_BLUEPRINT.map((bp): [string, PhaseKey] => [bp.label.toLowerCase(), bp.key]),
   // Migration seeds "Design 3D" while PHASE_BLUEPRINT uses "3D Design" — accept both.
   ["design 3d", "DESIGN_3D"],
 ]);

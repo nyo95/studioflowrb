@@ -137,7 +137,7 @@ const TABLE_ALIGN_CLASSES: Record<"start" | "center" | "end", string> = {
   end: "text-right tabular-nums",
 };
 
-const IDENTIFIER_CLASSES = "text-ink-secondary font-ui-mono text-[0.8125rem] tracking-[-0.01em]";
+const IDENTIFIER_CLASSES = "text-ink-secondary font-ui-mono text-sm tracking-[-0.01em]";
 
 function isIdentifierColumn(props: Record<string, unknown>): boolean {
   return props["data-column"] === "identifier";
@@ -171,7 +171,7 @@ export function TableHead({
   const identifier = isIdentifierColumn(props as Record<string, unknown>);
   const headClasses = cx(
     "h-(--ui-th-height,36px) border-b border-line-strong bg-thead-surface px-3 py-(--ui-th-py,8px) align-middle font-semibold uppercase",
-    identifier ? IDENTIFIER_CLASSES + " uppercase" : "text-thead text-[0.6875rem] tracking-[0.08em]",
+    identifier ? IDENTIFIER_CLASSES + " uppercase" : "text-thead text-micro tracking-[0.08em]",
     TABLE_ALIGN_CLASSES[align],
     stickyEnd && "sticky right-0 z-[2] border-l border-l-line",
     className,
