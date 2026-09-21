@@ -56,10 +56,16 @@
   --shadow-elevated: var(--ui-shadow-elevated);
 
   /* Type scale — the only sizes the product uses:
-     micro 11 · xs 12 · sm 14 (body/UI) · base 16 · xl 20 · 2xl 24 · display 32. */
+     micro 11 · xs 12 · meta 13 · sm 14 (body/UI) · base 16 · xl 20 ·
+     title 22 (serif H2) · 2xl 24 · display 30 (serif H1).
+     Meta sits one step below body so identity lines never compete with it. */
   --text-micro: 0.6875rem;
   --text-micro--line-height: 1rem;
-  --text-display: 2rem;
+  --text-meta: 0.8125rem;
+  --text-meta--line-height: 1.25rem;
+  --text-title: 1.375rem;
+  --text-title--line-height: 1.25;
+  --text-display: 1.875rem;
   --text-display--line-height: 1.15;
 
   --font-display: var(--font-serif), serif;

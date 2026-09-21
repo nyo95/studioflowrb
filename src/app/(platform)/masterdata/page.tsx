@@ -57,7 +57,7 @@ export default async function MasterDataPage() {
       <div className="flex items-end justify-between gap-5 max-[560px]:flex-col max-[560px]:items-start">
         <div>
           <p className="text-label text-ink-tertiary">Operational catalog</p>
-          <h1 className="mt-2 font-display text-display font-medium tracking-[-0.015em] text-ink">
+          <h1 className="mt-2 font-display text-display font-bold tracking-[-0.02em] text-ink">
             What the studio specifies
           </h1>
         </div>

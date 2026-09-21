@@ -5,8 +5,31 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.101**
-- Next local revision: **R8.102**
+- Current revision after this entry is committed: **R8.102**
+- Next local revision: **R8.103**
+
+## R8.102 | 2026-09-21 | fix(ui): restore legacy type face and heading hierarchy
+
+Owner feedback on R8.99: text read condensed ("gepeng") and the visual
+hierarchy flattened. Cause: Instrument Sans is a narrow grotesk with tight
+spacing, and R8.99 dropped serif heads to medium weight and raised meta lines
+to body size, so title, section, meta and body sat too close together.
+
+### Changed
+
+- Sans face Instrument Sans → **Inter** (legacy body face); Lora stays for H1/H2.
+- H1 Lora **bold** 30 px (`text-display`), H2 Lora **bold** 22 px (new
+  `text-title`), H3 Inter semibold 16 px, H4 Inter semibold 14 px.
+- New `text-meta` (13 px) — `MetaList` identity lines sit one step below the
+  14 px body again.
+- Master Data home hand-rolled H1 follows the H1 style.
+- Type scale comment in `globals.css` updated (11/12/13/14/16/20/22/24/30).
+
+### Verification
+
+- `tsc --noEmit`: passed. Side-by-side render (current vs legacy vs fix)
+  reviewed before the change. Browser acceptance pending.
+- No migration, no dependency change.
 
 ## R8.101 | 2026-09-22 | fix(ui): image annotation crashed on first pointer-down
 

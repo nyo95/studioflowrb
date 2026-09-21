@@ -10,10 +10,10 @@ export type HeadingProps = HTMLAttributes<HTMLHeadingElement> & {
 
 /* H1–H2 carry the serif product identity; H3–H6 are sans operational heads. */
 const HEADING_LEVEL_CLASSES: Record<HeadingLevel, string> = {
-  1: "font-display font-medium tracking-[-0.015em] text-display text-balance",
-  2: "font-display font-medium tracking-[-0.01em] text-2xl leading-[1.2] text-balance",
-  3: "text-xl font-semibold leading-[1.25] text-balance",
-  4: "text-base font-semibold leading-[1.3]",
+  1: "font-display font-bold tracking-[-0.02em] text-display text-balance",
+  2: "font-display font-bold tracking-[-0.015em] text-title text-balance",
+  3: "text-base font-semibold tracking-[-0.01em] leading-[1.3] text-balance",
+  4: "text-sm font-semibold leading-[1.35]",
   5: "text-sm font-semibold leading-[1.35]",
   6: "text-xs font-semibold leading-[1.35]",
 };
@@ -217,7 +217,7 @@ export function MetaList({
   if (visible.length === 0) return null;
   return (
     <div
-      className={cx("flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-ink-secondary", className)}
+      className={cx("flex flex-wrap items-center gap-x-2.5 gap-y-1 text-meta text-ink-secondary", className)}
       {...props}
     >
       {visible.map((item, index) => (
