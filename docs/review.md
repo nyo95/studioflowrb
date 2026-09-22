@@ -1,6 +1,6 @@
 # Ready for Review
 
-Status: active verification ledger, reconciled through R8.81 on 2026-09-16.
+Status: active verification ledger, reconciled through R8.105 on 2026-09-22.
 New file, split out of `roadmap.md`/`knownbug.md` on 2026-09-10 at owner
 request, so status is visible at a glance:
 
@@ -252,6 +252,14 @@ No item currently ready for review.
 
 - **Built:** `Add option` / `Edit option` dialogs include the 4:5 `ImageWorkspace` photo flow. A new option with a prepared photo creates the option first, then saves the photo onto that `optionId`. Existing option cards show a visible `Add photo` / `Change photo` text action under the thumbnail (matching legacy CatalogBoard behavior).
 - **To check:** Browser walk of the Schedule page on a reserved row: open `Add option`, prepare a photo, save, confirm the new option shows the photo and the row thumbnail updates. Also confirm an existing option exposes a visible `Change photo` action. Drafter read-only and archived-project read-only remain unchanged.
+
+### V2-E — full enum-to-definition phase migration (R8.105)
+
+- **Built:** `SfPhaseKey` enum and `SfPhase.key`/`SfChecklistTemplate.phase_key` columns dropped; `SfPhase.definition_id` and `SfChecklistTemplate.definition_id` are the sole runtime phase identity (required, FK `RESTRICT`/`CASCADE`). Migration `20260920000000_sf_v2e_definition_migration` backfills the five legacy phases onto fixed definition ids (`LEGACY_PHASE_DEFINITION_IDS` in `domain/phase.ts`) — re-keying the existing default template in place when it already matches the legacy five-phase shape, or seeding a separate inactive "Legacy phases (migrated)" template otherwise — so no project's phase identity, ordering, revisions, checklist, requirements, or deliverables move. `isLegacySupervisionDefinition(definitionId)` replaces the old `key === "SUPERVISION"` check, so the special completion command follows the migrated Supervision identity, never a name match. Project bootstrap creates one `SfPhase` per active default template's `SfPhaseDefinition` directly — no legacy-name validation, so an arbitrary template (e.g. Concept/Planning/Visualization/Documentation/Site Works/Handover) is a valid default. Revision labels use each phase's own `prefix_snapshot` throughout (`activatePhase`, `rejectPhase`, `reopenPhase`, `overrideRevision`), not a hardcoded `"v"`.
+- **Verified (automated):** `npm test` 447/447 (masterdata_test, including new suites: five-phase legacy bootstrap with fixed definition ids, six-phase arbitrary-name bootstrap, a custom phase run through the full state machine with its own prefix, legacy-Supervision-only completion vs. a custom phase merely named "Supervision", project completion on the last custom phase, template-edit-does-not-mutate-project-snapshots, and definition/template deletion guards while in use). `npx tsc --noEmit` clean. `npm run lint` clean except the pre-existing, unrelated KB-034. `npm run check:boundaries` and `npm run check:legacy-runtime` OK (zero references to `SfPhaseKey`/`PhaseKey`/`PHASE_BLUEPRINT`/`phaseLabel`/`phaseOwnerSeat` remain outside `git history`). `npm run build` succeeds.
+- **Verified (browser, dev database, owner account):** Project Overview (phase cards, accent colors via `phaseAccentDotClass(definitionId)`, revision labels `MB1.0`/`L1.0`/`3D1.0`), Today feed, phase detail page (revision label, "Sequential" seat), Studio Settings → checklist templates (create + delete round-trips through `definitionId`) and the Phase Templates (V2) admin panel, and History (phase name resolves through both the new `phaseName` audit field and, for older events, the retained `HISTORICAL_PHASE_KEY_NAMES` lookup) — all with zero console errors on the existing "2026-506 Sociolla SG Funan" project.
+- **Not verified this pass:** the pre-existing V2-A–V2-D browser checklist below (Requirements panel, Deliverables panel, Schedule P0 split-view, and the full 375px pass) — unchanged by V2-E and still open.
+- **Limitation:** `sf_phase_definition.allow_parallel` for the dev database's migrated Supervision definition was observed as `true` (expected `false` from the original seed); this predates V2-E (the migration only re-keys `id`) and was not changed or investigated further — flagged for the owner, not filed as a KB entry since its origin is unknown.
 
 ### Phase Engine v2 — V2-A through V2-D (R8.87–R8.93)
 

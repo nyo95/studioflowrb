@@ -2,7 +2,6 @@
 
 import { useState, type ReactNode } from "react";
 
-import type { PhaseKey } from "@/apps/studioflow/domain/phase";
 import {
   Badge,
   Button,
@@ -48,7 +47,7 @@ import {
 } from "../actions";
 import { useCommand } from "../_components/use-command";
 
-type Template = { id: string; phaseKey: PhaseKey | null; label: string; isActive: boolean; sortOrder: number; usedBy: number };
+type Template = { id: string; definitionId: string | null; label: string; isActive: boolean; sortOrder: number; usedBy: number };
 type PhaseDefinitionDraft = { id: string; name: string; prefix: string; orderIndex: number; allowParallel: boolean; seat: "designer" | "drafter" };
 type PhaseTemplateDraft = { id: string; name: string; isDefault: boolean; isActive: boolean; definitions: PhaseDefinitionDraft[] };
 type ScheduleTemplate = {
@@ -93,14 +92,14 @@ export function StudioSettingsView({
   scheduleTemplates: ScheduleTemplate[];
   schedulePrefixes: SchedulePrefix[];
   brands: BrandChoice[];
-  phases: Array<{ key: PhaseKey; label: string }>;
+  phases: Array<{ id: string; label: string }>;
   phaseTemplates: PhaseTemplateDraft[];
   canManage: boolean;
 }) {
   const { run, pendingKey, error } = useCommand();
-  const groups: Array<{ key: PhaseKey | null; label: string; description: string }> = [
+  const groups: Array<{ key: string | null; label: string; description: string }> = [
     { key: null, label: "General", description: "Added to every project's general checklist." },
-    ...phases.map((p) => ({ key: p.key, label: p.label, description: `Must be ticked before ${p.label} can be approved.` })),
+    ...phases.map((p) => ({ key: p.id, label: p.label, description: `Must be ticked before ${p.label} can be approved.` })),
   ];
 
   return (
@@ -121,7 +120,7 @@ export function StudioSettingsView({
 
       <div className="grid grid-cols-2 gap-4 max-[1100px]:grid-cols-1">
         {groups.map((group) => (
-          <TemplateGroup key={group.key ?? "general"} group={group} templates={templates.filter((t) => t.phaseKey === group.key)} canManage={canManage} run={run} pendingKey={pendingKey} />
+          <TemplateGroup key={group.key ?? "general"} group={group} templates={templates.filter((t) => t.definitionId === group.key)} canManage={canManage} run={run} pendingKey={pendingKey} />
         ))}
       </div>
       <PhaseTemplatesSection phaseTemplates={phaseTemplates} canManage={canManage} run={run} pendingKey={pendingKey} />
@@ -564,7 +563,7 @@ function TemplateGroup({
   run,
   pendingKey,
 }: {
-  group: { key: PhaseKey | null; label: string; description: string };
+  group: { key: string | null; label: string; description: string };
   templates: Template[];
   canManage: boolean;
   run: ReturnType<typeof useCommand>["run"];
@@ -580,7 +579,7 @@ function TemplateGroup({
     const target = index + delta;
     if (target < 0 || target >= ids.length) return;
     [ids[index], ids[target]] = [ids[target], ids[index]];
-    void run(ids[target], () => reorderTemplatesAction({ phaseKey: group.key, orderedIds: ids }));
+    void run(ids[target], () => reorderTemplatesAction({ definitionId: group.key, orderedIds: ids }));
   };
 
   return (
@@ -615,7 +614,7 @@ function TemplateGroup({
         </ol>
       )}
       {canManage ? (
-        <form className="mt-2 flex gap-2" onSubmit={async (e) => { e.preventDefault(); if (await run(addKey, () => createTemplateAction({ phaseKey: group.key, label: draft }))) setDraft(""); }}>
+        <form className="mt-2 flex gap-2" onSubmit={async (e) => { e.preventDefault(); if (await run(addKey, () => createTemplateAction({ definitionId: group.key, label: draft }))) setDraft(""); }}>
           <Input aria-label={`New ${group.label} checklist item`} density="compact" className="flex-1" placeholder="Add checklist item…" value={draft} maxLength={200} onChange={(e) => setDraft(e.target.value)} />
           <Button type="submit" size="sm" pending={pendingKey === addKey} disabled={!draft.trim()}>Add</Button>
         </form>

@@ -7,17 +7,14 @@ import { createPrivateObjectKey } from "@platform/core/storage";
 import { fullBlockers, todoBlockers } from "../domain/blockers";
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
 import {
-  PHASE_BLUEPRINT_SNAPSHOTS,
   availablePhaseCommands,
   canActivatePhase,
-  isLegacySupervisionPhase,
+  isLegacySupervisionDefinition,
   isPhaseModifiable,
   nextRevision,
-  phaseLabel,
-  phaseOwnerSeat,
   revisionLabel,
   waitingDays,
-  type PhaseKey,
+  type PhaseSeat,
   type PhaseSnapshot,
   type PhaseStatus,
 } from "../domain/phase";
@@ -54,10 +51,8 @@ function lockedError(): AppError {
   return conflict("PHASE_LOCKED", "This project is approved and locked. Reopen it first.");
 }
 
-/** Resolve the display label for a phase, preferring snapshot over legacy key. */
-function resolvePhaseName(phase: { key: string; name_snapshot?: string | null }): string {
-  if (phase.name_snapshot) return phase.name_snapshot;
-  return phaseLabel(phase.key as PhaseKey);
+function resolvePhaseName(phase: { name_snapshot: string }): string {
+  return phase.name_snapshot;
 }
 
 export function createPhaseService(db: Db, ports: StudioFlowPorts) {
@@ -114,7 +109,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       entityId: phase.id,
       actor,
       changes: from === to ? undefined : { status: { from, to } },
-      metadata: { projectId: phase.project_id, phaseKey: phase.key, ...metadata },
+      metadata: { projectId: phase.project_id, phaseName: phase.name_snapshot, definitionId: phase.definition_id, ...metadata },
     });
   }
 
@@ -135,7 +130,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const number = latest ? nextRevision(latest, "CLIENT") : { major: 1, minor: 0 };
         await setPhase(tx, phase, { status: "IN_PROGRESS", is_locked: false });
         const revision = await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phase.id, ...number } });
-        await audit(tx, input.actor, "activated", phase, "PENDING", "IN_PROGRESS", { revisionId: revision.id, revision: revisionLabel(number) });
+        await audit(tx, input.actor, "activated", phase, "PENDING", "IN_PROGRESS", { revisionId: revision.id, revision: revisionLabel(number, phase.prefix_snapshot) });
         return { phaseId: phase.id };
       });
     },
@@ -241,12 +236,12 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         }
         await setPhase(tx, phase, { status: "IN_PROGRESS" });
         await audit(tx, input.actor, input.type === "CLIENT" ? "rejected-client" : "rejected-internal", phase, from, "IN_PROGRESS", {
-          previousRevision: revisionLabel(current),
-          revision: revisionLabel(number),
+          previousRevision: revisionLabel(current, phase.prefix_snapshot),
+          revision: revisionLabel(number, phase.prefix_snapshot),
           revisionId: revision.id,
           feedbackConverted: converted.length,
         });
-        return { phaseId: phase.id, revision: revisionLabel(number), converted: converted.length };
+        return { phaseId: phase.id, revision: revisionLabel(number, phase.prefix_snapshot), converted: converted.length };
       });
     },
 
@@ -260,7 +255,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         await setPhase(tx, phase, { status: "READY_FOR_NEXT", is_locked: true });
         const current = await activeRevision(tx, phase.id);
         if (current) await closeRevision(tx, current.id);
-        await audit(tx, input.actor, "approved-client", phase, "ON_REVIEW_CLIENT", "READY_FOR_NEXT", { revision: current ? revisionLabel(current) : null });
+        await audit(tx, input.actor, "approved-client", phase, "ON_REVIEW_CLIENT", "READY_FOR_NEXT", { revision: current ? revisionLabel(current, phase.prefix_snapshot) : null });
         const projectCompleted = await completeProjectIfLast(tx, phase, project, input.actor);
         return { phaseId: phase.id, projectCompleted };
       });
@@ -287,8 +282,8 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const number = nextRevision(base, input.intent);
         const revision = await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phase.id, ...number } });
         await setPhase(tx, phase, { status: "IN_PROGRESS", is_locked: false });
-        await audit(tx, input.actor, "reopened", phase, from, "IN_PROGRESS", { reason, intent: input.intent, revision: revisionLabel(number), revisionId: revision.id });
-        return { phaseId: phase.id, revision: revisionLabel(number) };
+        await audit(tx, input.actor, "reopened", phase, from, "IN_PROGRESS", { reason, intent: input.intent, revision: revisionLabel(number, phase.prefix_snapshot), revisionId: revision.id });
+        return { phaseId: phase.id, revision: revisionLabel(number, phase.prefix_snapshot) };
       });
     },
 
@@ -296,7 +291,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       requireCommand(input, P.phaseReview);
       return runTransaction(async (tx) => {
         const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId);
-        if (!isLegacySupervisionPhase(phase.key as PhaseKey) || phase.status !== "IN_PROGRESS" || phase.is_locked) throw invalidState("Only Supervision in progress can be finished.");
+        if (!isLegacySupervisionDefinition(phase.definition_id) || phase.status !== "IN_PROGRESS" || phase.is_locked) throw invalidState("Only Supervision in progress can be finished.");
         await setPhase(tx, phase, { status: "COMPLETED", is_locked: true });
         const current = await activeRevision(tx, phase.id);
         if (current) await closeRevision(tx, current.id);
@@ -327,7 +322,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const deliverableSnapshot = deliverables.map((d) => ({
           id: d.id, name: d.name, revisionId: d.revision_id, storageKey: d.storage_key, createdAt: d.created_at.toISOString(),
         }));
-        const history = revisions.map((rev) => ({ version: revisionLabel(rev), status: rev.status, createdAt: rev.created_at.toISOString(), activities: rev.activities }));
+        const history = revisions.map((rev) => ({ version: revisionLabel(rev, phase.prefix_snapshot), status: rev.status, createdAt: rev.created_at.toISOString(), activities: rev.activities }));
         if (input.mode === "HARD_RESET_ACTIVE" && revisions.length > 0) {
           const latest = revisions[revisions.length - 1]!;
           const isForward = input.major! > latest.major || (input.major! === latest.major && input.minor! > latest.minor);
@@ -476,12 +471,8 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     };
   }
 
-  function phaseSnapshot(phase: { key: string; name_snapshot?: string; prefix_snapshot?: string; seat_snapshot?: string }): PhaseSnapshot {
-    const key = phase.key as PhaseKey;
-    if (phase.name_snapshot && phase.prefix_snapshot) {
-      return { nameSnapshot: phase.name_snapshot, prefixSnapshot: phase.prefix_snapshot, seatSnapshot: (phase.seat_snapshot ?? "designer") as "designer" | "drafter" };
-    }
-    return PHASE_BLUEPRINT_SNAPSHOTS[key] ?? { nameSnapshot: phaseLabel(key), prefixSnapshot: key.slice(0, 4), seatSnapshot: phaseOwnerSeat(key) };
+  function phaseSnapshot(phase: { name_snapshot: string; prefix_snapshot: string; seat_snapshot: string }): PhaseSnapshot {
+    return { nameSnapshot: phase.name_snapshot, prefixSnapshot: phase.prefix_snapshot, seatSnapshot: phase.seat_snapshot as PhaseSeat };
   }
 
   const reads = {
@@ -493,7 +484,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         where: { project_id: input.projectId },
         orderBy: { order_index: "asc" },
         select: {
-          id: true, project_id: true, key: true, order_index: true, status: true, is_locked: true,
+          id: true, project_id: true, definition_id: true, order_index: true, status: true, is_locked: true,
           allow_parallel: true, name_snapshot: true, prefix_snapshot: true, seat_snapshot: true,
           status_changed_at: true,
           revisions: { where: { status: "ACTIVE" }, take: 1, select: { major: true, minor: true } },
@@ -507,7 +498,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const previous = phases.find((p) => p.order_index === phase.order_index - 1) ?? null;
         const canStart = canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null);
         const archived = project?.archived_at != null;
-        const commands = archived ? [] : availablePhaseCommands({ key: phase.key as PhaseKey, status, isLocked: phase.is_locked }).filter((command) => {
+        const commands = archived ? [] : availablePhaseCommands({ status, isLocked: phase.is_locked, legacySupervision: isLegacySupervisionDefinition(phase.definition_id) }).filter((command) => {
           if (command === "activate") return canStart && project?.status === "ACTIVE";
           if (command === "bypass") return project?.status === "ACTIVE";
           if (command === "reopen" && status === "PENDING") return canStart && project?.status === "ACTIVE" && phase.revisions.length > 0;
@@ -516,7 +507,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const snap = phaseSnapshot(phase);
         results.push({
           id: phase.id,
-          key: phase.key as PhaseKey,
+          definitionId: phase.definition_id,
           label: snap.nameSnapshot,
           orderIndex: phase.order_index,
           status,
@@ -541,7 +532,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       const phase = await db.sfPhase.findUnique({
         where: { id: input.phaseId },
         select: {
-          id: true, project_id: true, key: true, order_index: true, status: true, is_locked: true,
+          id: true, project_id: true, definition_id: true, order_index: true, status: true, is_locked: true,
           allow_parallel: true, name_snapshot: true, prefix_snapshot: true, seat_snapshot: true,
           status_changed_at: true,
           project: { select: { id: true, name: true, archived_at: true, status: true, pic_designer_id: true, pic_drafter_id: true } },
@@ -557,11 +548,11 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       if (!phase || phase.project_id !== input.projectId) throw notFound("phase");
       const status = phase.status as PhaseStatus;
       const counts = await readBlockerCounts(db, phase.id);
-      const previous = await db.sfPhase.findFirst({ where: { project_id: phase.project_id, order_index: phase.order_index - 1 }, select: { key: true, name_snapshot: true, status: true, order_index: true } });
+      const previous = await db.sfPhase.findFirst({ where: { project_id: phase.project_id, order_index: phase.order_index - 1 }, select: { name_snapshot: true, prefix_snapshot: true, seat_snapshot: true, status: true, order_index: true } });
       const canStart = canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null);
       const active = phase.revisions.find((rev) => rev.status === "ACTIVE") ?? null;
       const archived = phase.project.archived_at !== null;
-      const commands = archived ? [] : availablePhaseCommands({ key: phase.key as PhaseKey, status, isLocked: phase.is_locked }).filter((command) => {
+      const commands = archived ? [] : availablePhaseCommands({ status, isLocked: phase.is_locked, legacySupervision: isLegacySupervisionDefinition(phase.definition_id) }).filter((command) => {
         if (command === "activate") return canStart && phase.project.status === "ACTIVE";
         if (command === "bypass") return phase.project.status === "ACTIVE";
         if (command === "reopen" && status === "PENDING") return canStart && phase.project.status === "ACTIVE" && phase.revisions.length > 0;
@@ -577,7 +568,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       ]);
       return {
         id: phase.id,
-        key: phase.key as PhaseKey,
+        definitionId: phase.definition_id,
         label: snap.nameSnapshot,
         orderIndex: phase.order_index,
         status,
@@ -686,6 +677,8 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const template = await tx.sfPhaseTemplate.findUnique({ where: { id: input.templateId } });
         if (!template) throw notFound("phase template");
         if (template.is_default) throw conflict("CANNOT_DELETE_DEFAULT", "Cannot delete the default template. Set another template as default first.");
+        const usedBy = await tx.sfProject.count({ where: { phases: { some: { definition: { template_id: input.templateId } } } } });
+        if (usedBy > 0) throw conflict("PHASE_TEMPLATE_IN_USE", `${usedBy} project${usedBy === 1 ? "" : "s"} ${usedBy === 1 ? "was" : "were"} created from this template. Deactivate it instead of deleting it.`);
         await tx.sfPhaseDefinition.deleteMany({ where: { template_id: input.templateId } });
         await tx.sfPhaseTemplate.delete({ where: { id: input.templateId } });
         await writeAudit(ports, tx, { action: "studioflow.phase-template.deleted", entityType: "phase-template", entityId: input.templateId, actor: input.actor, metadata: { name: template.name } });
@@ -760,12 +753,15 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           const count = await tx.sfPhaseDefinition.count({ where: { template_id: def.template_id } });
           if (count <= 1) throw conflict("DEFAULT_TEMPLATE_REQUIRES_PHASE", "Cannot delete the last phase from the default template. Add another phase first, or set a different default.");
         }
+        const usedBy = await tx.sfPhase.count({ where: { definition_id: input.definitionId } });
+        if (usedBy > 0) throw conflict("PHASE_DEFINITION_IN_USE", `${usedBy} project phase${usedBy === 1 ? "" : "s"} ${usedBy === 1 ? "was" : "were"} created from this phase, so it cannot be deleted.`);
+        const checklistTemplates = await tx.sfChecklistTemplate.count({ where: { definition_id: input.definitionId } });
         await tx.sfPhaseDefinition.delete({ where: { id: input.definitionId } });
         const siblings = await tx.sfPhaseDefinition.findMany({ where: { template_id: def.template_id, order_index: { gt: def.order_index } }, orderBy: { order_index: "asc" } });
         for (const sib of siblings) {
           await tx.sfPhaseDefinition.update({ where: { id: sib.id }, data: { order_index: sib.order_index - 1 } });
         }
-        await writeAudit(ports, tx, { action: "studioflow.phase-definition.deleted", entityType: "phase-definition", entityId: input.definitionId, actor: input.actor, metadata: { templateId: def.template_id, name: def.name, prefix: def.prefix } });
+        await writeAudit(ports, tx, { action: "studioflow.phase-definition.deleted", entityType: "phase-definition", entityId: input.definitionId, actor: input.actor, metadata: { templateId: def.template_id, name: def.name, prefix: def.prefix, removedChecklistTemplates: checklistTemplates } });
         return { definitionId: input.definitionId };
       });
     },

@@ -1,5 +1,4 @@
 import { hasPermission } from "@platform/core/rbac";
-import { PHASE_BLUEPRINT } from "@/apps/studioflow/domain/phase";
 import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { PageHeader } from "@/platform/ui_engine";
@@ -19,6 +18,7 @@ export default async function StudioSettingsPage() {
     studioFlow.schedule.listBrandChoices({ grants }),
     studioFlow.phases.listPhaseTemplates({ grants }),
   ]);
+  const defaultTemplate = phaseTemplates.find((template) => template.isDefault && template.isActive);
   return (
     <>
       <PageHeader eyebrow="StudioFlow" title="Studio Settings" description="How projects are named and which checklist every project gets." divider />
@@ -28,7 +28,7 @@ export default async function StudioSettingsPage() {
         scheduleTemplates={scheduleTemplates}
         schedulePrefixes={schedulePrefixes}
         brands={brands}
-        phases={PHASE_BLUEPRINT.map((p) => ({ key: p.key, label: p.label }))}
+        phases={(defaultTemplate?.definitions ?? []).map((definition) => ({ id: definition.id, label: definition.name }))}
         phaseTemplates={phaseTemplates}
         canManage={hasPermission(grants, P.settingsManage)}
       />

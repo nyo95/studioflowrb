@@ -1102,18 +1102,6 @@ enum SfProjectPriority {
   @@schema("studioflow")
 }
 
-/// Fixed legacy phase set (contract §5.1). App code, not an administered template.
-enum SfPhaseKey {
-  MOODBOARD
-  LAYOUT
-  DESIGN_3D
-  CD
-  SUPERVISION
-
-  @@map("sf_phase_key")
-  @@schema("studioflow")
-}
-
 enum SfPhaseStatus {
   PENDING
   IN_PROGRESS
@@ -1231,33 +1219,31 @@ model SfProject {
 model SfPhase {
   id                String        @id @default(uuid())
   project_id        String
-  key               SfPhaseKey
-  /// V2-D3: FK to SfPhaseDefinition; null for phases created before v2. Replaces key in V2-E.
-  definition_id     String?
+  /// V2-D3/V2-E: the phase definition this phase was created from. Required; a definition that projects use cannot be deleted.
+  definition_id     String
   order_index       Int
   status            SfPhaseStatus @default(PENDING)
   is_locked         Boolean       @default(false)
   allow_parallel    Boolean       @default(false)
   /// V2 snapshot: name from phase definition at project creation (never mutated by template edits).
-  name_snapshot     String        @default("")
+  name_snapshot     String
   /// V2 snapshot: short prefix for revision labels (e.g. "MB", "CD").
-  prefix_snapshot   String        @db.VarChar(4) @default("")
+  prefix_snapshot   String        @db.VarChar(4)
   /// V2 snapshot: "designer" | "drafter" — who owns this phase.
-  seat_snapshot     String        @default("designer")
+  seat_snapshot     String
   /// When status last changed; drives "waiting N days".
   status_changed_at DateTime?
   created_at        DateTime      @default(now())
   updated_at        DateTime      @updatedAt
 
   project         SfProject         @relation(fields: [project_id], references: [id], onDelete: Cascade)
-  definition      SfPhaseDefinition? @relation(fields: [definition_id], references: [id], onDelete: SetNull)
+  definition      SfPhaseDefinition @relation(fields: [definition_id], references: [id], onDelete: Restrict)
   revisions       SfRevision[]
   activities      SfActivity[]
   checklist_items SfChecklistItem[]
   requirements    SfRequirement[]
   deliverables    SfDeliverable[]
 
-  @@unique([project_id, key])
   @@unique([project_id, order_index])
   @@map("sf_phase")
   @@schema("studioflow")
@@ -1314,17 +1300,18 @@ model SfActivity {
 
 model SfChecklistTemplate {
   id         String      @id @default(uuid())
-  /// Null = general (project-level) template.
-  phase_key  SfPhaseKey?
-  label      String
-  is_active  Boolean     @default(true)
-  sort_order Int         @default(0)
-  created_at DateTime    @default(now())
-  updated_at DateTime    @updatedAt
+  /// Null = general (project-level) template; otherwise it seeds phases created from this definition.
+  definition_id String?
+  label         String
+  is_active     Boolean  @default(true)
+  sort_order    Int      @default(0)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 
+  definition      SfPhaseDefinition? @relation(fields: [definition_id], references: [id], onDelete: Cascade)
   generated_items SfChecklistItem[]
 
-  @@index([phase_key, is_active, sort_order])
+  @@index([definition_id, is_active, sort_order])
   @@map("sf_checklist_template")
   @@schema("studioflow")
 }
@@ -1436,6 +1423,8 @@ model SfPhaseDefinition {
   template SfPhaseTemplate @relation(fields: [template_id], references: [id], onDelete: Cascade)
   /// Phases that were created from this definition.
   phases   SfPhase[]
+  /// Checklist templates that seed phases created from this definition.
+  checklist_templates SfChecklistTemplate[]
 
   @@unique([template_id, order_index])
   @@map("sf_phase_definition")

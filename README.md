@@ -3,16 +3,11 @@
 A reusable platform with implemented Master Data, BQ, and StudioFlow project
 workflow slices, rebuilt under explicit contracts.
 
-Current delivery state through R7.55:
-
-1. retain the implemented login/session, persisted RBAC, Platform General
-   Settings, Core, Utilities, Design, and UI Engine foundation;
-2. Master Data and BQ are implemented applications protected against regression;
-3. StudioFlow project/client, phases, tasks, My Activity, file metadata, and
-   Library slices are implemented;
-4. remaining product work and defects are tracked by application in
-   [`docs/roadmap.md`](docs/roadmap.md) and
-   [`docs/knownbug.md`](docs/knownbug.md).
+Current state, evidence, and remaining work are tracked in
+[`docs/README.md`](docs/README.md) (the documentation hub) and
+[`CHANGELOG.md`](CHANGELOG.md) (the revision ledger). Remaining product work
+and defects are tracked by application in [`docs/roadmap.md`](docs/roadmap.md)
+and [`docs/knownbug.md`](docs/knownbug.md).
 
 ## Start here
 

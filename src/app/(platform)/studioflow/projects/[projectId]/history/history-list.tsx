@@ -67,12 +67,14 @@ const PHRASES: Record<string, string> = {
   "studioflow.schedule.csv-imported": "imported the schedule CSV",
 };
 
-const PHASE_NAMES: Record<string, string> = { MOODBOARD: "Moodboard", LAYOUT: "Layout Plan", DESIGN_3D: "3D Design", CD: "Construction Drawing", SUPERVISION: "Supervision" };
+// Read-only: audit events written before V2-E carried `phaseKey`; newer events carry `phaseName`.
+const HISTORICAL_PHASE_KEY_NAMES: Record<string, string> = { MOODBOARD: "Moodboard", LAYOUT: "Layout Plan", DESIGN_3D: "3D Design", CD: "Construction Drawing", SUPERVISION: "Supervision" };
 
 function detail(event: Event): string | null {
   const meta = event.metadata ?? {};
   const parts: string[] = [];
-  if (typeof meta.phaseKey === "string") parts.push(PHASE_NAMES[meta.phaseKey] ?? meta.phaseKey);
+  if (typeof meta.phaseName === "string") parts.push(meta.phaseName);
+  else if (typeof meta.phaseKey === "string") parts.push(HISTORICAL_PHASE_KEY_NAMES[meta.phaseKey] ?? meta.phaseKey);
   if (typeof meta.revision === "string") parts.push(meta.revision);
   if (typeof meta.reason === "string" && meta.reason) parts.push(`“${meta.reason}”`);
   if (typeof meta.note === "string" && meta.note) parts.push(`“${meta.note}”`);

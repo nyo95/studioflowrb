@@ -1,6 +1,6 @@
 # Documentation Hub
 
-Status: reconciled through **R8.75** on 2026-09-15. Contracts under `docs/apps/`
+Status: reconciled through **R8.105** on 2026-09-22. Contracts under `docs/apps/`
 were reorganized into one subfolder per application on 2026-09-10 at owner
 request; content is unchanged except for corrected cross-links.
 
@@ -88,7 +88,7 @@ contracts sit outside any app folder because every app depends on them.
 | Contract | Owns |
 |---|---|
 | [`apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md`](apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md) | **active StudioFlow authority (R8.70):** legacy behavior on the Foundation — disposition matrix, permissions, Project/Phase/Revision/Task/Today, MOM, Schedule, centralization map, UI/UX direction. Read alongside the V2 contract. |
-| [`apps/studioflow/STUDIOFLOW-PHASE-ENGINE-V2-CONTRACT.md`](apps/studioflow/STUDIOFLOW-PHASE-ENGINE-V2-CONTRACT.md) | **co-equal authority (R8.87, active):** supersedes listed clauses of the rework contract — phase state machine, Todo SSOT (SfChecklistItem), phase definition schema (SfPhaseTemplate/SfPhaseDefinition), SfRequirement, SfDeliverable, Overview as main workspace |
+| [`apps/studioflow/STUDIOFLOW-PHASE-ENGINE-V2-CONTRACT.md`](apps/studioflow/STUDIOFLOW-PHASE-ENGINE-V2-CONTRACT.md) | **co-equal authority (R8.87–R8.105, active, fully implemented):** supersedes listed clauses of the rework contract — phase state machine, Todo SSOT (SfChecklistItem), phase definition schema (SfPhaseTemplate/SfPhaseDefinition), SfRequirement, SfDeliverable, Overview as main workspace. §4.3's migration bridge (`SfPhaseKey`) was removed in R8.105 (V2-E) — `definition_id` is now the sole runtime identity. |
 | [`apps/studioflow/PHASE-ENGINE-V2-BASELINE-AUDIT.md`](apps/studioflow/PHASE-ENGINE-V2-BASELINE-AUDIT.md) | Planner evidence: baseline audit of V2 draft vs codebase at R8.86 — confirms V2 contract does not conflict with stored state |
 | [`apps/studioflow/D-SF-RECOVERY-DISCOVERY.md`](apps/studioflow/D-SF-RECOVERY-DISCOVERY.md) | R8.48 pinned legacy evidence; D-SF decisions apply except where the rework contract §9 or V2 contract overrides them |
 | [`archive/studioflow-rb/`](archive/studioflow-rb/) | **superseded** rebuild StudioFlow contracts and R7 work orders (moved in R8.71); history only |
@@ -145,10 +145,11 @@ Forbidden: `platform -> app`, cross-app internal imports, implicit cross-app wri
 
 ## Active sequence
 
-Status: **Phase Engine v2 (R8.87–R8.93) implemented 2026-09-16/17.** Foundation
+Status: **Phase Engine v2 (R8.87–R8.105) fully implemented.** Foundation
 sequence (1–5 below) is complete. StudioFlow wave-1 rework is complete. Phase
-Engine v2 (V2-A through V2-D) is implemented; V2-E (destructive migration) is
-pending a separate owner decision. Wave 2 features not covered by V2 remain in
+Engine v2 (V2-A through V2-E) is implemented — V2-E (R8.105) removed the
+`SfPhaseKey` migration bridge entirely; `SfPhase.definition_id` is now the sole
+runtime phase identity. Wave 2 features not covered by V2 remain in
 `roadmap.md`.
 
 1. **Platform Foundation — routing first.** ✓ Accepted R8.34–R8.61.
@@ -156,6 +157,6 @@ pending a separate owner decision. Wave 2 features not covered by V2 remain in
 3. **BQ.** Implemented; browser acceptance in `review.md`.
 4. **AI file-organization exploration is parked**, not pursued for now.
 5. **StudioFlow wave-1 rework (SF-R1–SF-RF).** ✓ Accepted R8.71–R8.75.
-6. **StudioFlow Phase Engine v2 (V2-A–V2-D).** Implemented R8.87–R8.93; browser acceptance in `review.md`.
+6. **StudioFlow Phase Engine v2 (V2-A–V2-E).** Implemented R8.87–R8.105; V2-E (full enum-to-definition migration) browser-verified in R8.105. V2-A–V2-D's remaining Requirements/Deliverables/Schedule-P0 browser acceptance is still tracked in `review.md`.
 
 Documented deferred capabilities are routing memory, not implementation scope. Do not create code, folders, dependencies, or placeholder exports until a stage/consumer activates them.

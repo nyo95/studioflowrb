@@ -1,6 +1,6 @@
 # Product Roadmap by Application
 
-Status: active planning ledger, reconciled through R8.80 on 2026-09-16.
+Status: active planning ledger, reconciled through R8.105 on 2026-09-22.
 
 This file answers **what remains to be built**. It does not activate work by
 itself. Completed items are struck through or removed only after verification
@@ -174,9 +174,9 @@ Supersedes listed clauses of the rework contract.
 - [x] ~~**V2-D** — Phase template admin UI (CRUD + reorder for SfPhaseTemplate/SfPhaseDefinition in Studio Settings).~~ R8.90.
 - [x] ~~**Schedule P0** — split-view desktop layout, stat bar, option chip nav, Set final on card face.~~ R8.89.
 - [x] ~~**Requirements + Deliverables panels** — phase workspace panels; SfRequirement create/toggle/delete; SfDeliverable upload/download/delete via ObjectStorage.~~ R8.91.
-- [ ] **V2-E** — Full enum-to-definition migration: drop `SfPhaseKey`, make `definition_id` required. **Destructive — separate owner migration decision required.**
+- [x] ~~**V2-E** — Full enum-to-definition migration: drop `SfPhaseKey`, make `definition_id` required.~~ Implemented and browser-verified R8.105 (migration `20260920000000_sf_v2e_definition_migration`); see `CHANGELOG.md` and `review.md`.
 
-Browser acceptance for R8.87–R8.93 is pending in `review.md`.
+Browser acceptance for R8.87–R8.93 (Requirements panel, Deliverables panel, Schedule P0 split-view, 375px pass) is still pending in `review.md`. V2-E itself (this document's line above) is implemented and browser-verified.
 
 ### Wave 2 (remaining — not activated)
 

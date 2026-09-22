@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { Prisma, type SfPhaseKey } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import type { PersonSummary } from "@platform/core/rbac/people";
 import { currentDateOnly } from "@platform/utilities/date";
 import { toDecimalString } from "@platform/utilities/decimal";
@@ -8,7 +8,7 @@ import { normalizeText } from "@platform/utilities/normalization";
 
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
 import { formatProjectName, looksFormatted, parseProjectName } from "../domain/naming";
-import { PHASE_BLUEPRINT_SNAPSHOTS, phaseLabel, type PhaseKey, type PhaseStatus, validateTemplateLegacyCompat } from "../domain/phase";
+import type { PhaseStatus } from "../domain/phase";
 import {
   P,
   conflict,
@@ -318,7 +318,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         orderBy: [{ priority: "asc" }, { name: "desc" }],
         include: {
           client: { select: { id: true, name: true } },
-          phases: { orderBy: { order_index: "asc" }, select: { id: true, key: true, status: true, is_locked: true, status_changed_at: true, name_snapshot: true } },
+          phases: { orderBy: { order_index: "asc" }, select: { id: true, definition_id: true, status: true, is_locked: true, status_changed_at: true, name_snapshot: true } },
           _count: { select: { activities: { where: { status: "OPEN" } }, checklist_items: { where: { is_checked: false, parent_id: null } } } },
         },
       });
@@ -335,7 +335,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         updatedAt: row.updated_at,
         designer: people.get(row.pic_designer_id) ?? { id: row.pic_designer_id, displayName: "Unknown", active: false },
         drafter: people.get(row.pic_drafter_id) ?? { id: row.pic_drafter_id, displayName: "Unknown", active: false },
-        phases: row.phases.map((phase) => ({ id: phase.id, key: phase.key as PhaseKey, status: phase.status as PhaseStatus, isLocked: phase.is_locked, statusChangedAt: phase.status_changed_at, label: phase.name_snapshot || phaseLabel(phase.key as PhaseKey) })),
+        phases: row.phases.map((phase) => ({ id: phase.id, definitionId: phase.definition_id, status: phase.status as PhaseStatus, isLocked: phase.is_locked, statusChangedAt: phase.status_changed_at, label: phase.name_snapshot })),
         openItems: row._count.activities + row._count.checklist_items,
       }));
     },
@@ -404,28 +404,20 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           });
         } catch (error) { mapWriteError(error); }
 
-        const phaseIds = new Map<PhaseKey, string>();
-        // Bootstrap from default Phase Template (V2-D3)
+        // Bootstrap from the active default phase template: one phase per definition, snapshotted (V2-D3).
         const defaultTemplate = await tx.sfPhaseTemplate.findFirst({ where: { is_default: true, is_active: true }, include: { definitions: { orderBy: { order_index: "asc" } } } });
         if (!defaultTemplate || defaultTemplate.definitions.length === 0) {
           throw conflict("PROJECT_PHASE_TEMPLATE_MISSING", "No active default phase template found. Create and set a default template before creating projects.");
         }
-        // Validate template is legacy-compatible: each definition maps to exactly one SfPhaseKey, no duplicates.
-        const legacyKeys = validateTemplateLegacyCompat(defaultTemplate.definitions);
-        if (!legacyKeys) {
-          throw conflict("PHASE_TEMPLATE_NOT_LEGACY_COMPATIBLE", "The default template contains phase definitions that cannot be mapped to legacy phase identities. Rename definitions to match standard phase names (Moodboard, Layout Plan, Design 3D, Construction Drawing, Supervision).");
-        }
-        for (let i = 0; i < defaultTemplate.definitions.length; i++) {
-          const def = defaultTemplate.definitions[i];
+        const phaseIds: string[] = [];
+        for (const [index, def] of defaultTemplate.definitions.entries()) {
           const id = randomUUID();
-          const key = legacyKeys[i] as unknown as SfPhaseKey;
-          phaseIds.set(legacyKeys[i], id);
-          const isFirst = i === 0;
+          phaseIds.push(id);
+          const isFirst = index === 0;
           await tx.sfPhase.create({
             data: {
               id,
               project_id: projectId,
-              key,
               definition_id: def.id,
               order_index: def.order_index,
               allow_parallel: def.allow_parallel,
@@ -437,9 +429,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
             },
           });
         }
-        // Create revision for first phase
-        const firstPhaseId = phaseIds.values().next().value;
-        await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: firstPhaseId!, major: 1, minor: 0, status: "ACTIVE" } });
+        await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phaseIds[0]!, major: 1, minor: 0, status: "ACTIVE" } });
         const seeded = await seedChecklistFromTemplates(tx, projectId, userId);
         // Legacy: default schedule categories and template items land on every new project.
         const scheduleRows = await seedScheduleFromTemplates(tx, projectId);

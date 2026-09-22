@@ -13,7 +13,7 @@ import {
   type ChecklistFilterQuery,
 } from "@/apps/studioflow/domain/checklist";
 import { countOpen, type FeedGroup, type FeedTask } from "@/apps/studioflow/domain/feed";
-import { phaseAccentDotClass, type PhaseKey } from "@/apps/studioflow/domain/phase";
+import { phaseAccentDotClass } from "@/apps/studioflow/domain/phase";
 import type { TodayAddTarget } from "@/apps/studioflow/today/service";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
 import { currentDateOnly } from "@platform/utilities/date";
@@ -109,7 +109,7 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             {task.phaseLabel ? (
               <span className="inline-flex items-center gap-1.5">
-                <span aria-hidden="true" className={`h-2 w-2 rounded-pill ${phaseAccentDotClass(task.phaseKey as PhaseKey | null)}`} />
+                <span aria-hidden="true" className={`h-2 w-2 rounded-pill ${phaseAccentDotClass(task.phaseDefinitionId)}`} />
                 <Link className="text-xs text-ink-secondary hover:underline" prefetch={false} href={task.phaseId ? STUDIOFLOW_ROUTES.projectPhase(task.projectId, task.phaseId) : STUDIOFLOW_ROUTES.project(task.projectId)}>
                   {task.phaseLabel}
                 </Link>
@@ -215,11 +215,11 @@ function QuickAddDialog({ targets, people, onClose }: { targets: TodayAddTarget[
   const { run, pending, error } = useCommand();
   const [projectId, setProjectId] = useState(targets[0]?.projectId ?? "");
   const project = targets.find((t) => t.projectId === projectId);
-  const [phaseKey, setPhaseKey] = useState<string>("general");
+  const [phaseChoice, setPhaseChoice] = useState<string>("general");
   const [content, setContent] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [assignee, setAssignee] = useState<string | null>(null);
-  const phaseId = phaseKey === "general" ? null : phaseKey;
+  const phaseId = phaseChoice === "general" ? null : phaseChoice;
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open && !pending) onClose(); }} title="Quick add to-do" dismissible={!pending}>
@@ -233,12 +233,12 @@ function QuickAddDialog({ targets, people, onClose }: { targets: TodayAddTarget[
         </Field>
         <div className="grid grid-cols-2 gap-3 max-[560px]:grid-cols-1">
           <Field label="Project" required>
-            <Select value={projectId} onChange={(e) => { setProjectId(e.target.value); setPhaseKey("general"); }}>
+            <Select value={projectId} onChange={(e) => { setProjectId(e.target.value); setPhaseChoice("general"); }}>
               {targets.map((t) => <option key={t.projectId} value={t.projectId}>{t.projectName}</option>)}
             </Select>
           </Field>
           <Field label="Where">
-            <Select value={phaseKey} onChange={(e) => setPhaseKey(e.target.value)}>
+            <Select value={phaseChoice} onChange={(e) => setPhaseChoice(e.target.value)}>
               {project?.targets.map((t) => (
                 <option key={t.phaseId ?? "general"} value={t.phaseId ?? "general"} disabled={t.disabledReason !== null}>
                   {t.label}{t.disabledReason ? ` — ${t.disabledReason}` : ""}

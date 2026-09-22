@@ -14,7 +14,7 @@ import {
   type ChecklistFilterQuery,
 } from "../domain/checklist";
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
-import { PHASE_KEYS, isPhaseModifiable, type PhaseKey, type PhaseStatus } from "../domain/phase";
+import { isPhaseModifiable, type PhaseStatus } from "../domain/phase";
 import {
   P,
   conflict,
@@ -385,18 +385,21 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
         orderBy: [{ sort_order: "asc" }, { created_at: "asc" }, { id: "asc" }],
         include: { _count: { select: { generated_items: true } } },
       });
-      return rows.map((row) => ({ id: row.id, phaseKey: row.phase_key as PhaseKey | null, label: row.label, isActive: row.is_active, sortOrder: row.sort_order, usedBy: row._count.generated_items }));
+      return rows.map((row) => ({ id: row.id, definitionId: row.definition_id, label: row.label, isActive: row.is_active, sortOrder: row.sort_order, usedBy: row._count.generated_items }));
     },
 
-    async createTemplate(input: CommandContext & { phaseKey: PhaseKey | null; label: string }) {
+    /** `definitionId` null = general (project-level); otherwise the template seeds phases created from that definition. */
+    async createTemplate(input: CommandContext & { definitionId: string | null; label: string }) {
       requireCommand(input, P.settingsManage);
-      if (input.phaseKey !== null && !(PHASE_KEYS as readonly string[]).includes(input.phaseKey)) throw invalid("PHASE_KEY_INVALID", "Unknown phase.");
       const label = requiredText(input.label, "TEMPLATE_LABEL_REQUIRED", "Checklist item", CHECKLIST_LABEL_MAX_LENGTH);
       return runTransaction(async (tx) => {
-        const last = await tx.sfChecklistTemplate.findFirst({ where: { phase_key: input.phaseKey }, orderBy: { sort_order: "desc" }, select: { sort_order: true } });
+        if (input.definitionId !== null && !(await tx.sfPhaseDefinition.findUnique({ where: { id: input.definitionId }, select: { id: true } }))) {
+          throw invalid("PHASE_DEFINITION_INVALID", "Unknown phase.");
+        }
+        const last = await tx.sfChecklistTemplate.findFirst({ where: { definition_id: input.definitionId }, orderBy: { sort_order: "desc" }, select: { sort_order: true } });
         const id = randomUUID();
-        await tx.sfChecklistTemplate.create({ data: { id, phase_key: input.phaseKey, label, sort_order: (last?.sort_order ?? 0) + CHECKLIST_SORT_STEP } });
-        await writeAudit(ports, tx, { action: "studioflow.checklist-template.created", entityType: "checklist-template", entityId: id, actor: input.actor, metadata: { phaseKey: input.phaseKey, label } });
+        await tx.sfChecklistTemplate.create({ data: { id, definition_id: input.definitionId, label, sort_order: (last?.sort_order ?? 0) + CHECKLIST_SORT_STEP } });
+        await writeAudit(ports, tx, { action: "studioflow.checklist-template.created", entityType: "checklist-template", entityId: id, actor: input.actor, metadata: { definitionId: input.definitionId, label } });
         return { templateId: id };
       });
     },
@@ -428,19 +431,19 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
         const template = await tx.sfChecklistTemplate.findUnique({ where: { id: input.templateId }, include: { _count: { select: { generated_items: true } } } });
         if (!template) throw notFound("checklist template");
         await tx.sfChecklistTemplate.delete({ where: { id: template.id } });
-        await writeAudit(ports, tx, { action: "studioflow.checklist-template.deleted", entityType: "checklist-template", entityId: template.id, actor: input.actor, metadata: { label: template.label, phaseKey: template.phase_key, detachedRows: template._count.generated_items } });
+        await writeAudit(ports, tx, { action: "studioflow.checklist-template.deleted", entityType: "checklist-template", entityId: template.id, actor: input.actor, metadata: { label: template.label, definitionId: template.definition_id, detachedRows: template._count.generated_items } });
         return { templateId: template.id, detachedRows: template._count.generated_items };
       });
     },
 
-    async reorderTemplates(input: CommandContext & { phaseKey: PhaseKey | null; orderedIds: string[] }) {
+    async reorderTemplates(input: CommandContext & { definitionId: string | null; orderedIds: string[] }) {
       requireCommand(input, P.settingsManage);
       return runTransaction(async (tx) => {
-        const rows = await tx.sfChecklistTemplate.findMany({ where: { phase_key: input.phaseKey }, select: { id: true } });
+        const rows = await tx.sfChecklistTemplate.findMany({ where: { definition_id: input.definitionId }, select: { id: true } });
         const ids = new Set(rows.map((row) => row.id));
         if (rows.length !== input.orderedIds.length || input.orderedIds.some((id) => !ids.has(id))) throw invalid("REORDER_SCOPE", "Reorder must include exactly the items of one list.");
         for (const { id, sortOrder } of steppedSortOrders(input.orderedIds)) await tx.sfChecklistTemplate.update({ where: { id }, data: { sort_order: sortOrder } });
-        await writeAudit(ports, tx, { action: "studioflow.checklist-template.reordered", entityType: "checklist-template", entityId: input.phaseKey ?? "GENERAL", actor: input.actor, metadata: { phaseKey: input.phaseKey, count: input.orderedIds.length } });
+        await writeAudit(ports, tx, { action: "studioflow.checklist-template.reordered", entityType: "checklist-template", entityId: input.definitionId ?? "GENERAL", actor: input.actor, metadata: { definitionId: input.definitionId, count: input.orderedIds.length } });
         return { count: input.orderedIds.length };
       });
     },

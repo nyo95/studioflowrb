@@ -17,26 +17,31 @@ import {
 import { countOpen, groupFeed, nestFeed, sortFeed, type FeedTask } from "./feed";
 import { formatProjectName, looksFormatted, parseProjectName } from "./naming";
 import {
-  PHASE_BLUEPRINT,
+  LEGACY_PHASE_DEFINITION_IDS,
   PHASE_STATUSES,
   availablePhaseCommands,
   canActivatePhase,
+  isLegacySupervisionDefinition,
   isPhaseModifiable,
   isValidPhaseTransition,
   nextRevision,
-  phaseOwnerSeat,
+  phaseAccentDotClass,
   phaseStatusDisplay,
   revisionLabel,
   waitingDays,
 } from "./phase";
 
 describe("phase policy (legacy parity)", () => {
-  it("creates the five legacy phases with Layout/3D/CD parallel", () => {
-    assert.deepEqual(PHASE_BLUEPRINT.map((p) => [p.key, p.orderIndex, p.allowParallel]), [
-      ["MOODBOARD", 1, false], ["LAYOUT", 2, true], ["DESIGN_3D", 3, true], ["CD", 4, true], ["SUPERVISION", 5, false],
-    ]);
-    assert.equal(phaseOwnerSeat("CD"), "drafter");
-    assert.equal(phaseOwnerSeat("LAYOUT"), "designer");
+  it("knows the five legacy definitions by id, never by name", () => {
+    const ids = Object.values(LEGACY_PHASE_DEFINITION_IDS);
+    assert.equal(new Set(ids).size, 5);
+    assert.equal(isLegacySupervisionDefinition(LEGACY_PHASE_DEFINITION_IDS.supervision), true);
+    assert.equal(isLegacySupervisionDefinition(LEGACY_PHASE_DEFINITION_IDS.cd), false);
+    assert.equal(isLegacySupervisionDefinition("a-custom-phase-named-Supervision"), false);
+    assert.equal(isLegacySupervisionDefinition(null), false);
+    assert.match(phaseAccentDotClass(LEGACY_PHASE_DEFINITION_IDS.moodboard), /--ui-phase-moodboard/);
+    assert.equal(phaseAccentDotClass("any-custom-definition"), "bg-line-strong");
+    assert.equal(phaseAccentDotClass(undefined), "bg-line-strong");
   });
 
   it("never shows a raw enum and maps to five simplified groups", () => {
@@ -69,10 +74,11 @@ describe("phase policy (legacy parity)", () => {
   });
 
   it("offers the right commands per state", () => {
-    assert.deepEqual(availablePhaseCommands({ key: "LAYOUT", status: "PENDING", isLocked: false }), ["activate", "bypass", "reopen"]);
-    assert.deepEqual(availablePhaseCommands({ key: "LAYOUT", status: "IN_PROGRESS", isLocked: false }), ["submitInternal", "submitClient"]);
-    assert.deepEqual(availablePhaseCommands({ key: "SUPERVISION", status: "IN_PROGRESS", isLocked: false }), ["completeSupervision"]);
-    assert.deepEqual(availablePhaseCommands({ key: "CD", status: "READY_FOR_NEXT", isLocked: true }), ["reopen"]);
+    assert.deepEqual(availablePhaseCommands({ status: "PENDING", isLocked: false }), ["activate", "bypass", "reopen"]);
+    assert.deepEqual(availablePhaseCommands({ status: "IN_PROGRESS", isLocked: false }), ["submitInternal", "submitClient"]);
+    assert.deepEqual(availablePhaseCommands({ status: "IN_PROGRESS", isLocked: false, legacySupervision: true }), ["completeSupervision"]);
+    assert.deepEqual(availablePhaseCommands({ status: "ON_REVIEW_CLIENT", isLocked: false }), ["approveClient", "rejectClient"]);
+    assert.deepEqual(availablePhaseCommands({ status: "READY_FOR_NEXT", isLocked: true }), ["reopen"]);
   });
 
   it("numbers revisions like legacy", () => {
@@ -148,7 +154,7 @@ describe("checklist rules", () => {
 });
 
 describe("today feed", () => {
-  const base = { projectId: "p1", phaseId: null, phaseKey: null, phaseLabel: null, assigneeId: null, labels: [], templateId: null, children: [] };
+  const base = { projectId: "p1", phaseId: null, phaseDefinitionId: null, phaseLabel: null, assigneeId: null, labels: [], templateId: null, children: [] };
   const rows: FeedTask[] = [
     { ...base, key: "checklist:c", id: "c", source: "checklist", label: "child", isChecked: false, priority: 4, dueDate: null, mode: null, parentId: "r" },
     { ...base, key: "checklist:r", id: "r", source: "checklist", label: "root", isChecked: false, priority: 2, dueDate: null, mode: null, parentId: null },

@@ -1,18 +1,12 @@
 /**
- * Legacy phase workflow, ported as pure rules (contract §5).
- * Evidence: legacy `src/lib/domain/phase-policy.ts`, `phase-service.ts`,
- * project bootstrap in `project-service.ts` (pinned c4b0c466).
+ * Phase workflow as pure rules (contract §5, Phase Engine V2 contract §2/§4).
  *
- * V2 identity model:
- *   - `SfPhase.id` is the canonical runtime identity.
- *   - `definition_id`, `name_snapshot`, `prefix_snapshot`, `seat_snapshot`, `order_index`
- *     form the V2 business snapshot, immutable after project creation.
- *   - `key` (SfPhaseKey) is a temporary compatibility bridge until V2-E removes it.
- *     Do not use `key` for naming, assignment, revision prefix, or UI labels.
+ * Identity model (V2-E): `SfPhase.id` is the runtime identity. Name, prefix, seat,
+ * order and parallelism come from the snapshot stored on the phase when the project
+ * was created; nothing here derives behaviour from a phase's name.
  */
 
-export const PHASE_KEYS = ["MOODBOARD", "LAYOUT", "DESIGN_3D", "CD", "SUPERVISION"] as const;
-export type PhaseKey = (typeof PHASE_KEYS)[number];
+export type PhaseSeat = "designer" | "drafter";
 
 export const PHASE_STATUSES = [
   "PENDING",
@@ -25,102 +19,43 @@ export const PHASE_STATUSES = [
 ] as const;
 export type PhaseStatus = (typeof PHASE_STATUSES)[number];
 
-export type PhaseBlueprint = { key: PhaseKey; orderIndex: number; allowParallel: boolean; label: string };
-
-/** V2 runtime identity — the canonical way to identify a phase at runtime. */
-export type PhaseRuntimeIdentity = {
-  id: string;
-  definitionId: string | null;
-  legacyKey: PhaseKey | null;
-};
-
 /** Snapshot fields stored on each project phase — immutable after project creation. */
 export type PhaseSnapshot = {
   nameSnapshot: string;
   prefixSnapshot: string;
-  seatSnapshot: "designer" | "drafter";
+  seatSnapshot: PhaseSeat;
 };
-
-/** Default snapshot values for phases created from PHASE_BLUEPRINT (legacy compatibility). */
-export const PHASE_BLUEPRINT_SNAPSHOTS: Record<PhaseKey, PhaseSnapshot> = {
-  MOODBOARD: { nameSnapshot: "Moodboard", prefixSnapshot: "MB", seatSnapshot: "designer" },
-  LAYOUT: { nameSnapshot: "Layout Plan", prefixSnapshot: "L", seatSnapshot: "designer" },
-  DESIGN_3D: { nameSnapshot: "3D Design", prefixSnapshot: "3D", seatSnapshot: "designer" },
-  CD: { nameSnapshot: "Construction Drawing", prefixSnapshot: "CD", seatSnapshot: "drafter" },
-  SUPERVISION: { nameSnapshot: "Supervision", prefixSnapshot: "SV", seatSnapshot: "designer" },
-};
-
-/** Created for every project, in this order. Phase 1 starts IN_PROGRESS. */
-export const PHASE_BLUEPRINT: readonly PhaseBlueprint[] = [
-  { key: "MOODBOARD", orderIndex: 1, allowParallel: false, label: "Moodboard" },
-  { key: "LAYOUT", orderIndex: 2, allowParallel: true, label: "Layout Plan" },
-  { key: "DESIGN_3D", orderIndex: 3, allowParallel: true, label: "3D Design" },
-  { key: "CD", orderIndex: 4, allowParallel: true, label: "Construction Drawing" },
-  { key: "SUPERVISION", orderIndex: 5, allowParallel: false, label: "Supervision" },
-];
-
-export function phaseLabel(key: PhaseKey): string {
-  return PHASE_BLUEPRINT.find((phase) => phase.key === key)?.label ?? key;
-}
-
-export const PHASE_ACCENT_DOT_CLASSES: Record<PhaseKey, string> = {
-  MOODBOARD: "bg-[var(--ui-phase-moodboard)]",
-  LAYOUT: "bg-[var(--ui-phase-layout)]",
-  DESIGN_3D: "bg-[var(--ui-phase-design-3d)]",
-  CD: "bg-[var(--ui-phase-cd)]",
-  SUPERVISION: "bg-[var(--ui-phase-supervision)]",
-};
-
-export function phaseAccentDotClass(key: PhaseKey | null | undefined): string {
-  return key ? PHASE_ACCENT_DOT_CLASSES[key] : "bg-line-strong";
-}
-
-/** CD is the drafter's phase; every other phase belongs to the designer (RW-02). */
-export function phaseOwnerSeat(key: PhaseKey): "designer" | "drafter" {
-  return key === "CD" ? "drafter" : "designer";
-}
-
-// ── V2 identity bridge ───────────────────────────────────────────────────
-
-/** Isolates legacy Supervision-specific behavior behind one explicit check. V2-E bridge debt. */
-export function isLegacySupervisionPhase(key: PhaseKey): boolean {
-  return key === "SUPERVISION";
-}
-
-/** Label→key lookup for mapping template definitions to legacy SfPhaseKey. */
-const LABEL_TO_KEY = new Map<string, PhaseKey>([
-  ...PHASE_BLUEPRINT.map((bp): [string, PhaseKey] => [bp.label.toLowerCase(), bp.key]),
-  // Migration seeds "Design 3D" while PHASE_BLUEPRINT uses "3D Design" — accept both.
-  ["design 3d", "DESIGN_3D"],
-]);
 
 /**
- * Map a template definition name to a valid legacy SfPhaseKey.
- * Returns null if the definition name has no legacy compatibility mapping.
- * Used during project creation to validate template compatibility.
+ * Fixed definition ids of the five pre-V2 phases, seeded/backfilled by migration
+ * `20260920000000_sf_v2e_definition_migration`. Only these ids carry legacy
+ * behaviour: the Supervision completion command and the known accent colours.
+ * A custom phase never becomes one of them by name.
  */
-export function mapDefinitionToLegacyKey(definitionName: string): PhaseKey | null {
-  return LABEL_TO_KEY.get(definitionName.toLowerCase()) ?? null;
+export const LEGACY_PHASE_DEFINITION_IDS = {
+  moodboard: "00000000-0000-4000-8000-000000000101",
+  layout: "00000000-0000-4000-8000-000000000102",
+  design3d: "00000000-0000-4000-8000-000000000103",
+  cd: "00000000-0000-4000-8000-000000000104",
+  supervision: "00000000-0000-4000-8000-000000000105",
+} as const;
+
+const LEGACY_ACCENT_DOT_CLASSES: Readonly<Record<string, string>> = {
+  [LEGACY_PHASE_DEFINITION_IDS.moodboard]: "bg-[var(--ui-phase-moodboard)]",
+  [LEGACY_PHASE_DEFINITION_IDS.layout]: "bg-[var(--ui-phase-layout)]",
+  [LEGACY_PHASE_DEFINITION_IDS.design3d]: "bg-[var(--ui-phase-design-3d)]",
+  [LEGACY_PHASE_DEFINITION_IDS.cd]: "bg-[var(--ui-phase-cd)]",
+  [LEGACY_PHASE_DEFINITION_IDS.supervision]: "bg-[var(--ui-phase-supervision)]",
+};
+
+/** Accent for the known legacy definitions; every other phase uses the neutral fallback. */
+export function phaseAccentDotClass(definitionId: string | null | undefined): string {
+  return (definitionId ? LEGACY_ACCENT_DOT_CLASSES[definitionId] : undefined) ?? "bg-line-strong";
 }
 
-/**
- * Validate that a set of template definition names maps to exactly one key each,
- * with no duplicates. Returns the mapped keys in definition order, or null if
- * the template is not legacy-compatible.
- */
-export function validateTemplateLegacyCompat(
-  definitions: { name: string; order_index: number }[],
-): PhaseKey[] | null {
-  const keys: PhaseKey[] = [];
-  const used = new Set<PhaseKey>();
-  for (const def of definitions) {
-    const key = mapDefinitionToLegacyKey(def.name);
-    if (!key) return null;
-    if (used.has(key)) return null;
-    used.add(key);
-    keys.push(key);
-  }
-  return keys;
+/** The only phase with the special "Finish supervision" completion (legacy behaviour). */
+export function isLegacySupervisionDefinition(definitionId: string | null | undefined): boolean {
+  return definitionId === LEGACY_PHASE_DEFINITION_IDS.supervision;
 }
 
 // ── Simplified display (RW-01, contract §5.3) ──────────────────────────────
@@ -194,12 +129,12 @@ export type PhaseCommand =
   | "reopen"
   | "completeSupervision";
 
-export function availablePhaseCommands(phase: PhaseState & { key: PhaseKey }): PhaseCommand[] {
+export function availablePhaseCommands(phase: PhaseState & { legacySupervision?: boolean }): PhaseCommand[] {
   const commands: PhaseCommand[] = [];
-  const { status, isLocked, key } = phase;
+  const { status, isLocked, legacySupervision = false } = phase;
   if (status === "PENDING") commands.push("activate", "bypass");
   if (!isLocked) {
-    if (status === "IN_PROGRESS" && isLegacySupervisionPhase(key)) commands.push("completeSupervision");
+    if (status === "IN_PROGRESS" && legacySupervision) commands.push("completeSupervision");
     else if (status === "IN_PROGRESS") commands.push("submitInternal", "submitClient");
     if (status === "ON_REVIEW_INTERNAL") commands.push("approveInternal", "rejectInternal", "submitClient");
     if (status === "APPROVED_INTERNAL") commands.push("submitClient");

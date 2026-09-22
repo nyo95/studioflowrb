@@ -217,7 +217,7 @@ describe("UI Engine foundation", () => {
     assert.match(css, /--ui-radius-action:\s*4px/);
     assert.match(css, /--ui-dialog-sm:\s*420px/);
     assert.match(css, /--ui-dialog-full:\s*1180px/);
-    assert.match(css, /--ui-dialog-max-height:\s*90vh/);
+    assert.match(css, /--ui-dialog-max-height:\s*90dvh/);
     const table = renderToStaticMarkup(createElement(ui.DataTable, { minWidth: "900px" }));
     assert.match(table, /data-table-overflow="horizontal"/);
     assert.match(table, /min-width:900px/);

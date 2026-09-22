@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import { phaseStatusDisplay, type PhaseKey, type PhaseStatus } from "@/apps/studioflow/domain/phase";
+import { phaseStatusDisplay, type PhaseStatus } from "@/apps/studioflow/domain/phase";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import {
@@ -42,7 +42,7 @@ type ProjectRow = {
   updatedAt: Date;
   designer: Person;
   drafter: Person;
-  phases: Array<{ id: string; key: PhaseKey; status: PhaseStatus; isLocked: boolean; label: string }>;
+  phases: Array<{ id: string; definitionId: string; status: PhaseStatus; isLocked: boolean; label: string }>;
   openItems: number;
 };
 

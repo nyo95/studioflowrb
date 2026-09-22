@@ -76,7 +76,7 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
       note: display.label,
       detail: phase.activeRevision ?? undefined,
       state: pipelineState as "done" | "current" | "upcoming" | "blocked",
-      accentClass: phaseAccentDotClass(phase.key),
+      accentClass: phaseAccentDotClass(phase.definitionId),
       href: STUDIOFLOW_ROUTES.projectPhase(projectId, phase.id),
     };
   });
@@ -142,7 +142,7 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
         {phases.map((phase) => {
           const primaryCommand = phase.commands[0] ?? null;
           const isBlocked = phase.blockers.total > 0 && !phase.isLocked;
-          const accentClass = phaseAccentDotClass(phase.key);
+          const accentClass = phaseAccentDotClass(phase.definitionId);
 
           return (
             <SectionCard key={phase.id} padded={false}>

@@ -17,7 +17,6 @@ import { studioFlow } from "@/apps/studioflow/runtime";
 const Id = z.uuid();
 const OptionalText = z.string().max(2000).nullish();
 const DateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish().or(z.literal(""));
-const PhaseKey = z.enum(["MOODBOARD", "LAYOUT", "DESIGN_3D", "CD", "SUPERVISION"]);
 
 async function context() {
   const { principal, grants } = await requirePrincipalGrants();
@@ -46,7 +45,7 @@ export async function setAutoNamingAction(enabled: boolean): Promise<ActionResul
   });
 }
 
-const TemplateInput = z.strictObject({ phaseKey: PhaseKey.nullable(), label: z.string().min(1).max(200) });
+const TemplateInput = z.strictObject({ definitionId: Id.nullable(), label: z.string().min(1).max(200) });
 export async function createTemplateAction(input: z.infer<typeof TemplateInput>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
@@ -75,7 +74,7 @@ export async function deleteTemplateAction(templateId: string): Promise<ActionRe
   });
 }
 
-const TemplateReorder = z.strictObject({ phaseKey: PhaseKey.nullable(), orderedIds: z.array(Id).min(1).max(500) });
+const TemplateReorder = z.strictObject({ definitionId: Id.nullable(), orderedIds: z.array(Id).min(1).max(500) });
 export async function reorderTemplatesAction(input: z.infer<typeof TemplateReorder>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();

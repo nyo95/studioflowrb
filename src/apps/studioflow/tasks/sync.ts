@@ -13,17 +13,17 @@ import type { TxClient } from "../shared";
 export async function seedChecklistFromTemplates(tx: TxClient, projectId: string, userId: string | null): Promise<number> {
   const [phases, templates, existing, roots] = await Promise.all([
     // Approved/finished phases are locked (contract §5.2); templates never add work to them.
-    tx.sfPhase.findMany({ where: { project_id: projectId, is_locked: false }, select: { id: true, key: true } }),
+    tx.sfPhase.findMany({ where: { project_id: projectId, is_locked: false }, select: { id: true, definition_id: true } }),
     tx.sfChecklistTemplate.findMany({ where: { is_active: true }, orderBy: [{ sort_order: "asc" }, { created_at: "asc" }, { id: "asc" }] }),
     tx.sfChecklistItem.findMany({ where: { project_id: projectId, template_id: { not: null } }, select: { phase_id: true, template_id: true } }),
     tx.sfChecklistItem.groupBy({ by: ["phase_id"], where: { project_id: projectId, parent_id: null }, _max: { sort_order: true } }),
   ]);
   const have = new Set(existing.map((row) => `${row.phase_id ?? "GENERAL"}::${row.template_id}`));
   const nextSort = new Map<string, number>(roots.map((row) => [row.phase_id ?? "GENERAL", row._max.sort_order ?? 0]));
-  const phaseByKey = new Map(phases.map((phase) => [phase.key, phase.id]));
+  const phaseByDefinition = new Map(phases.map((phase) => [phase.definition_id, phase.id]));
   const rows: Array<{ id: string; project_id: string; phase_id: string | null; label: string; template_id: string; sort_order: number; created_by_id: string | null }> = [];
   for (const template of templates) {
-    const phaseId = template.phase_key ? phaseByKey.get(template.phase_key) ?? undefined : null;
+    const phaseId = template.definition_id ? phaseByDefinition.get(template.definition_id) ?? undefined : null;
     if (phaseId === undefined) continue;
     const bucket = phaseId ?? "GENERAL";
     const key = `${bucket}::${template.id}`;

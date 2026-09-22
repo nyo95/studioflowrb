@@ -5,8 +5,105 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.104**
-- Next local revision: **R8.105**
+- Current revision after this entry is committed: **R8.105**
+- Next local revision: **R8.106**
+
+## R8.105 | 2026-09-22 | feat(sf): V2-E full enum-to-definition phase migration + documentation reconciliation
+
+Destructive migration `20260920000000_sf_v2e_definition_migration` (data-preserving; drops the
+`SfPhaseKey` enum and `key`/`phase_key` columns after backfilling every row).
+
+### Changed — schema
+
+- `SfPhase.key` (`SfPhaseKey` enum) removed. `SfPhase.definition_id` is now required (was nullable,
+  the V2-D3 bridge), FK `ON DELETE RESTRICT` (was `SET NULL`) — a definition in use by any project
+  can no longer be deleted out from under it. `name_snapshot`/`prefix_snapshot`/`seat_snapshot` lost
+  their empty-string/"designer" defaults and gained a `CHECK` that all three are populated.
+- `SfChecklistTemplate.phase_key` replaced by `SfChecklistTemplate.definition_id` (FK to
+  `SfPhaseDefinition`, `ON DELETE CASCADE`), so a checklist template now targets the phase it seeds
+  by identity, not by a name-shaped enum value.
+- `SfPhaseKey` enum dropped entirely.
+
+### Changed — runtime identity
+
+- The five legacy phases (Moodboard/Layout Plan/Design 3D/Construction Drawing/Supervision) are
+  identified only by fixed definition ids, `LEGACY_PHASE_DEFINITION_IDS` in
+  `src/apps/studioflow/domain/phase.ts` — never by name, never by a `key` column. `phaseAccentDotClass`
+  and the new `isLegacySupervisionDefinition` key off these ids; a custom phase named "Supervision" is
+  an ordinary phase with no special completion command (verified by a new integration test).
+- `createProject` bootstraps one `SfPhase` per `SfPhaseDefinition` of the active default
+  `SfPhaseTemplate` directly. There is no legacy-name validation step (`validateTemplateLegacyCompat`
+  and `mapDefinitionToLegacyKey` are deleted) — any template, including one with entirely custom
+  phase names (e.g. Concept/Planning/Visualization/Documentation/Site Works/Handover), is a valid
+  default. This removes the `PHASE_TEMPLATE_NOT_LEGACY_COMPATIBLE` refusal entirely.
+- `availablePhaseCommands` no longer takes a `key`; it takes an explicit `legacySupervision` boolean.
+  `phaseSnapshot`/`resolvePhaseName` read only the stored snapshot columns — no enum fallback.
+- Revision labels (`activatePhase`, `rejectPhase`, `reopenPhase`, `overrideRevision`, phase-detail
+  history) use each phase's own `prefix_snapshot` throughout; a custom "Concept" phase with prefix
+  `CN` gets `CN1.0`, `CN2.0`, etc., the same as the legacy phases always did.
+- `deletePhaseTemplate` and `deletePhaseDefinition` now refuse (`PHASE_TEMPLATE_IN_USE` /
+  `PHASE_DEFINITION_IN_USE`) when a project's phases still reference them, instead of relying on the
+  database FK to throw — the FK is `RESTRICT` specifically so this can never silently orphan a phase.
+- Checklist template admin (`createTemplate`/`reorderTemplates`/`syncProjectChecklist`) and its
+  actions/UI (`Studio Settings`) target `definitionId` instead of `phaseKey`.
+- Today feed (`domain/feed.ts`, `today/service.ts`) carries `phaseDefinitionId` instead of `phaseKey`.
+- `history-list.tsx` reads the new `phaseName` audit metadata field first, falling back to the old
+  `phaseKey` (mapped through a name table kept only for reading historical audit rows) — old audit
+  events remain readable without a data migration.
+
+### Fixed
+
+- Revision labels produced by `rejectPhase`, `reopenPhase`, and `overrideRevision`'s history view
+  never carried the phase's prefix (always `v1.1`, `v2.0`, …, even for a phase whose active-revision
+  label elsewhere correctly showed `MB1.0`). They now use `prefix_snapshot` like every other label.
+- KB-034 (new, Open, P3): `projects/[projectId]/page.tsx` computes `daysOpen` with `Date.now()`
+  inside the render body — pre-existing, unrelated to this migration, now the only remaining
+  `npm run lint` failure.
+
+### Documentation reconciliation (Part B)
+
+- `docs/knownbug.md`: moved 14 StudioFlow entries (KB-003, KB-005, KB-006, KB-007, KB-012 through
+  KB-018, KB-021 through KB-023) from the **Open** section to **Closed** — every one already read
+  "Status: Closed in R8.7x" in its own body but had been left above the `## Closed` heading, making
+  fixed defects look active. The StudioFlow Open section now shows only the four genuinely open
+  items (KB-002, KB-031, KB-032, KB-033). Added KB-034 (see Fixed).
+- `docs/roadmap.md`: V2-E checked off with this revision; the R8.87–R8.93 browser-acceptance note
+  narrowed to name exactly what remains (Requirements/Deliverables/Schedule-P0/375px), since V2-E's
+  own scope is now verified.
+- `docs/review.md`: added the V2-E verification entry (this revision) with full automated and
+  browser evidence; left the pre-existing V2-A–V2-D checklist entry untouched since this pass did not
+  re-walk it.
+- `docs/README.md`: reconciliation date/revision bumped; Active sequence and the V2 contract table
+  row updated to say V2-E is implemented.
+- `docs/apps/studioflow/STUDIOFLOW-PHASE-ENGINE-V2-CONTRACT.md`: §4.3 annotated as closed by this
+  revision (the clause itself is left in place as a record of the bridge that existed R8.87–R8.105);
+  the §10 wave table's V2-E row now names this migration.
+- `docs/apps/studioflow/PHASE-ENGINE-V2-BASELINE-AUDIT.md`: left untouched — historical evidence of
+  the pre-V2 baseline, not rewritten to look like it predicted this migration.
+- `README.md`: removed the stale "Current delivery state through R7.55" section; points to
+  `docs/README.md` and `CHANGELOG.md` instead of maintaining a second status summary.
+- Reconciliation dates in `docs/knownbug.md`, `docs/roadmap.md`, `docs/review.md`, `docs/README.md`
+  all bumped to R8.105 / 2026-09-22.
+
+### Verification
+
+- `npm test`: 447/447 (`masterdata_test`) — includes 8 new integration tests under "SF-V2-E phase
+  definitions" (five-phase legacy bootstrap, six-phase arbitrary-name bootstrap, full state machine
+  on a custom phase with its own prefix, legacy-Supervision-only completion, project completion on
+  the last custom phase, template-edit snapshot immutability, template/definition deletion guards,
+  checklist templates seeded by definition). Also fixed a pre-existing stale assertion in
+  `ui-engine.test.ts` (`--ui-dialog-max-height: 90vh` → `90dvh`, matching R8.99's `dvh` migration).
+- `npx tsc --noEmit`: clean (previously had one pre-existing tuple-typing error in `phase.ts:91`,
+  fixed incidentally by this rewrite).
+- `npm run lint`: clean except KB-034 (documented above, pre-existing, unrelated).
+- `npm run check:boundaries`, `npm run check:legacy-runtime`: OK.
+- `npm run build`: succeeds.
+- Migration dry-run against a rolled-back transaction on the dev database confirmed zero data loss
+  before applying for real; applied to both `masterdata_test` and `masterdata` (dev). Dev project
+  "2026-506 Sociolla SG Funan" verified unchanged post-migration (phase ids, snapshots, revisions).
+- Browser-verified against the dev database (see `review.md` for the full list): Overview, Today,
+  phase detail, Studio Settings (checklist templates + Phase Templates V2 panel), History — zero
+  console errors.
 
 ## R8.104 | 2026-09-22 | fix(ui): keep section card titles at 16px on the R8.102 scale
 

@@ -1,6 +1,6 @@
 # Known Bugs by Application
 
-Status: active defect ledger, reconciled through R8.81 on 2026-09-16.
+Status: active defect ledger, reconciled through R8.105 on 2026-09-22.
 
 Planned features belong in [`roadmap.md`](roadmap.md). When a bug is fixed, move
 it to Closed, name the revision, and record the fix in `CHANGELOG.md`.
@@ -135,13 +135,94 @@ No open BQ bug is currently recorded.
 
 The R7.55 audit read the whole StudioFlow surface against
 [`docs/archive/studioflow-rb/studioflow-project-contract.md`](archive/studioflow-rb/studioflow-project-contract.md) and
-opened KB-012 … KB-018 below (KB-019 was closed in R8.05; KB-021 … KB-023 were added by the owner audit).
+opened KB-012 … KB-018 (KB-019 was closed in R8.05; KB-021 … KB-023 were added by the owner audit). All were closed by the StudioFlow rework and are recorded in the Closed section below.
 KB-013, KB-014 and KB-015 are one gap seen from
 three sides: the client answer is persisted as a single immutable `SfResponse`
 with no state, no replacement link and no reason, so the contract's whole §6.5
 / §6.6 correction and draft behaviour has nowhere to live. They are listed apart
 because each has its own observable symptom, but they must be fixed by one
 migration and one slice.
+
+### KB-002 — Stored-file retention policy is not finalized
+
+- **Observed (updated R8.74):** SF-R2 implements legacy MOM (editable document/section/note/photo model, no DRAFT→ISSUED lifecycle). MOM section photos are stored via `LocalFilesystemStorage`. There is no approved policy for cleaning up photos removed from a MOM document, or for purging documents from archived projects.
+- **Expected:** A per-project retention window is approved and enforced: photos removed from a section are reaped after the window; archived-project files are purged or preserved under a documented policy.
+- **Mitigation:** No automatic cleanup runs today; files accumulate. The storage root is bounded by the kantor rebuild root and does not affect legacy data.
+- **Status:** Open; deferred by owner decision (2026-09-15). Google Drive activation deferred; local-only storage in use. Retention policy TBD when Google Drive is activated.
+
+### KB-031 — Users and Roles & Access are split out of the General Settings canvas
+
+- **Observed (owner UI review, 2026-09-16):** The account dropdown exposes
+  **General Settings**, **Users**, and **Roles & Access** as separate destinations.
+  The StudioFlow settings page also labels the active area as **Studio
+  Settings**, which makes the foundation/general settings boundary feel split
+  instead of centralized.
+- **Expected:** Users and Roles & Access are part of Foundation/General
+  Settings. The default settings experience should keep one central settings
+  canvas with one shared sidebar, where Users and Roles & Access are sections
+  within the general settings structure rather than sibling account-menu
+  entries.
+- **Required correction:** Rework the settings information architecture so the
+  account menu points to the centralized General/Foundation Settings surface.
+  Move Users and Roles & Access into that settings shell/sidebar, preserve the
+  existing access checks, and keep StudioFlow-specific settings scoped inside
+  the same coherent settings experience instead of presenting a competing
+  standalone settings label.
+- **Priority:** P2 — settings IA and ownership clarity.
+- **Status:** Open; needs a focused Foundation Settings plan before execution.
+
+### KB-032 — Product Schedule settings form does not show its dictionaries as tables
+
+- **Observed (owner UI review, 2026-09-16):** On `/studioflow/settings`, the
+  Product Schedule area renders prefix dictionary, default categories, and
+  template items as stacked form sections. The visual grouping makes the
+  difference between schedule section, default category, and default row/item
+  unclear.
+- **Expected:** Product Schedule settings should read like configuration data,
+  not a long free-form editor. Prefixes, default categories, and template items
+  should each use a table/grid presentation with explicit columns, visible
+  existing rows, inline row actions, and compact add-row controls.
+- **Required correction:** Redesign the Product Schedule settings surface into
+  clear tables:
+  **Prefix dictionary** (`Section`, `Category`, `Prefix`, actions),
+  **Default categories** (`Section`, `Category`, `Create empty entry`, order,
+  actions), and **Template items** (`Section`, `Category`, `Brand`, `Product`,
+  `SKU`, `Qty`, `Unit`, `Location`, active/order, actions). Preserve existing
+  permissions and behavior; the change is mainly information architecture and
+  table ergonomics.
+- **Priority:** P2 — settings usability and configuration clarity.
+- **Status:** Corrected in R8.81 — the three dictionaries are tables with
+  inline add rows and row actions; template items gained an edit dialog and
+  the schedule page links to the settings. Awaiting browser acceptance
+  (`review.md`); close after it passes. The centralized settings canvas
+  remains KB-031.
+
+### KB-034 — Project overview reads the clock during render
+
+- **Observed (R8.105 lint sweep):** `src/app/(platform)/studioflow/projects/[projectId]/page.tsx` computes `daysOpen` with `Date.now()` directly inside the page component body. `eslint`'s `react-hooks/purity` rule flags this as an impure render read; it is unrelated to the V2-E phase-definition migration and predates it.
+- **Expected:** A page/server component derives "now" from a single request-scoped value (e.g. the existing `ports.now()` pattern used by StudioFlow services) rather than calling `Date.now()` inline, so the render is pure and consistent within one request.
+- **Impact:** Cosmetic only in practice (`daysOpen` is a display-only day count), but it is the sole remaining `npm run lint` failure in the repository.
+- **Priority:** P3 — lint hygiene, no observed behavioral defect.
+- **Status:** Open.
+
+### KB-033 — Product Schedule add-option flow hides photo upload
+
+- **Observed (browser comment, 2026-09-16):** On a reserved Schedule row,
+  opening `Add option` shows product fields only. There is no photo control in
+  the dialog, and the option-level overflow menu that contains `Add photo`
+  does not exist until after the option has already been created.
+- **Legacy evidence:** `D:\Projects\studioflow` commit `102ff85`,
+  `src/extensions/sketchup/components/CatalogBoard.tsx` exposed photo editing
+  as a visible card action (`+ Add photo` / `Change photo`) with a 4:5 cropper.
+- **Expected:** Adding or editing a schedule option should allow adding the
+  catalog photo in the same flow, and existing options should expose the photo
+  action visibly instead of requiring hidden overflow discovery.
+- **Priority:** P1 — owner-observed workflow regression.
+- **Status:** Corrected in R8.86 — `Add option` / `Edit option` include the
+  4:5 image workspace and existing option cards show visible photo actions.
+  Awaiting browser acceptance of the upload/crop/save path.
+
+## Closed
 
 > **StudioFlow Rework note (R8.70/R8.71, 2026-09-15).** The rebuild
 > StudioFlow was archived (tag `archive/studioflow-rb-r8.69`) and replaced by
@@ -304,13 +385,6 @@ migration and one slice.
 - **Mitigation:** Navigate to the individual project to see its `GeneralTaskBlock`.
 - **Status:** Closed in R8.71 — SF-R1 implements the Today view (`/studioflow`) showing general to-dos grouped by project, with filters, quick-add, and saved filter views. Confirmed parity with owner expectation.
 
-### KB-002 — Stored-file retention policy is not finalized
-
-- **Observed (updated R8.74):** SF-R2 implements legacy MOM (editable document/section/note/photo model, no DRAFT→ISSUED lifecycle). MOM section photos are stored via `LocalFilesystemStorage`. There is no approved policy for cleaning up photos removed from a MOM document, or for purging documents from archived projects.
-- **Expected:** A per-project retention window is approved and enforced: photos removed from a section are reaped after the window; archived-project files are purged or preserved under a documented policy.
-- **Mitigation:** No automatic cleanup runs today; files accumulate. The storage root is bounded by the kantor rebuild root and does not affect legacy data.
-- **Status:** Open; deferred by owner decision (2026-09-15). Google Drive activation deferred; local-only storage in use. Retention policy TBD when Google Drive is activated.
-
 ### KB-003 — Project Schedule/FFNI remains absent from project detail
 
 - **Observed:** MOM and Product Catalogue are implemented in R7.52/R7.53;
@@ -352,72 +426,6 @@ migration and one slice.
   Clients and Account/Profile surfaces alongside phase and naming settings.
   Database Settings remains intentionally deferred because its backend contract
   does not exist.
-
-### KB-031 — Users and Roles & Access are split out of the General Settings canvas
-
-- **Observed (owner UI review, 2026-09-16):** The account dropdown exposes
-  **General Settings**, **Users**, and **Roles & Access** as separate destinations.
-  The StudioFlow settings page also labels the active area as **Studio
-  Settings**, which makes the foundation/general settings boundary feel split
-  instead of centralized.
-- **Expected:** Users and Roles & Access are part of Foundation/General
-  Settings. The default settings experience should keep one central settings
-  canvas with one shared sidebar, where Users and Roles & Access are sections
-  within the general settings structure rather than sibling account-menu
-  entries.
-- **Required correction:** Rework the settings information architecture so the
-  account menu points to the centralized General/Foundation Settings surface.
-  Move Users and Roles & Access into that settings shell/sidebar, preserve the
-  existing access checks, and keep StudioFlow-specific settings scoped inside
-  the same coherent settings experience instead of presenting a competing
-  standalone settings label.
-- **Priority:** P2 — settings IA and ownership clarity.
-- **Status:** Open; needs a focused Foundation Settings plan before execution.
-
-### KB-032 — Product Schedule settings form does not show its dictionaries as tables
-
-- **Observed (owner UI review, 2026-09-16):** On `/studioflow/settings`, the
-  Product Schedule area renders prefix dictionary, default categories, and
-  template items as stacked form sections. The visual grouping makes the
-  difference between schedule section, default category, and default row/item
-  unclear.
-- **Expected:** Product Schedule settings should read like configuration data,
-  not a long free-form editor. Prefixes, default categories, and template items
-  should each use a table/grid presentation with explicit columns, visible
-  existing rows, inline row actions, and compact add-row controls.
-- **Required correction:** Redesign the Product Schedule settings surface into
-  clear tables:
-  **Prefix dictionary** (`Section`, `Category`, `Prefix`, actions),
-  **Default categories** (`Section`, `Category`, `Create empty entry`, order,
-  actions), and **Template items** (`Section`, `Category`, `Brand`, `Product`,
-  `SKU`, `Qty`, `Unit`, `Location`, active/order, actions). Preserve existing
-  permissions and behavior; the change is mainly information architecture and
-  table ergonomics.
-- **Priority:** P2 — settings usability and configuration clarity.
-- **Status:** Corrected in R8.81 — the three dictionaries are tables with
-  inline add rows and row actions; template items gained an edit dialog and
-  the schedule page links to the settings. Awaiting browser acceptance
-  (`review.md`); close after it passes. The centralized settings canvas
-  remains KB-031.
-
-### KB-033 — Product Schedule add-option flow hides photo upload
-
-- **Observed (browser comment, 2026-09-16):** On a reserved Schedule row,
-  opening `Add option` shows product fields only. There is no photo control in
-  the dialog, and the option-level overflow menu that contains `Add photo`
-  does not exist until after the option has already been created.
-- **Legacy evidence:** `D:\Projects\studioflow` commit `102ff85`,
-  `src/extensions/sketchup/components/CatalogBoard.tsx` exposed photo editing
-  as a visible card action (`+ Add photo` / `Change photo`) with a 4:5 cropper.
-- **Expected:** Adding or editing a schedule option should allow adding the
-  catalog photo in the same flow, and existing options should expose the photo
-  action visibly instead of requiring hidden overflow discovery.
-- **Priority:** P1 — owner-observed workflow regression.
-- **Status:** Corrected in R8.86 — `Add option` / `Edit option` include the
-  4:5 image workspace and existing option cards show visible photo actions.
-  Awaiting browser acceptance of the upload/crop/save path.
-
-## Closed
 
 ### KB-030 — Valid local private storage keys fail signed-read verification on Windows
 

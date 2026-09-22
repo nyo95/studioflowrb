@@ -2,8 +2,6 @@
  * Today feed projection (legacy `task-feed.ts`): activities and checklist
  * items unified in the view only; each row keeps its own write path.
  */
-import type { PhaseKey } from "./phase";
-
 export type FeedSource = "activity" | "checklist";
 
 export type FeedLabel = { id: string; name: string; color: string };
@@ -16,7 +14,7 @@ export type FeedTask = {
   isChecked: boolean;
   projectId: string;
   phaseId: string | null;
-  phaseKey: PhaseKey | null;
+  phaseDefinitionId: string | null;
   phaseLabel: string | null;
   priority: number;
   dueDate: string | null;

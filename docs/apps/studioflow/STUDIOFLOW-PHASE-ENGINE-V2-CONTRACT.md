@@ -1,6 +1,7 @@
 # StudioFlow Phase Engine v2 — Contract
 
-Status: ACTIVE — ratified by owner implementation (R8.87–R8.93, 2026-09-16/17)
+Status: ACTIVE — ratified by owner implementation (R8.87–R8.93, 2026-09-16/17);
+fully implemented through V2-E in R8.105 (2026-09-22)
 Revision: R8.87
 Date: 2026-09-16
 Author: berkah.rad@gmail.com
@@ -90,12 +91,15 @@ one `SfPhase` per `SfPhaseDefinition` row, storing `definition_id` as FK.
 The phase inherits `name/prefix/order_index/allow_parallel/seat` from the definition at creation time.
 **After creation, the project's phases are immutable** (V2-D3 decision: no per-project add/remove).
 
-### 4.3 Migration bridge
+### 4.3 Migration bridge — closed by V2-E (R8.105)
 
-`SfPhaseKey` enum and the `key` column on `SfPhase` are **retained** until a dedicated migration
-(V2-E) replaces them with `definition_id`. During the bridge period:
-- New phases created from a template set `definition_id`; existing phases keep their `key`.
-- Code that reads `phase.key` remains valid for existing rows.
+`SfPhaseKey` enum and the `key` column on `SfPhase` were **retained** until a dedicated migration
+(V2-E) replaced them with `definition_id`. That migration shipped in R8.105: `SfPhaseKey` and the
+`key`/`phase_key` columns no longer exist; `SfPhase.definition_id` (required) and
+`SfChecklistTemplate.definition_id` are the sole runtime phase identity. The five legacy phases are
+identified only by the fixed definition ids in `LEGACY_PHASE_DEFINITION_IDS`
+(`src/apps/studioflow/domain/phase.ts`), never by name or by a `key` column. This section is kept as
+a record of the bridge that existed between R8.87 and R8.105.
 
 ---
 
@@ -172,5 +176,5 @@ The phase detail page (`/projects/[projectId]/phases/[phaseId]`) becomes a detai
 | V2-B | Prisma schema additions: SfPhaseTemplate, SfPhaseDefinition, SfRequirement, SfDeliverable; migration | Yes |
 | V2-C | Overview v2 page rewrite (V2-D9); phase cards with inline actions | No (uses existing data + new schema from V2-B) |
 | V2-D | Admin UI: phase template editor (SfPhaseTemplate/SfPhaseDefinition CRUD) | Depends on V2-B |
-| V2-E | Full enum-to-definition migration: drop SfPhaseKey, make definition_id required | Yes (destructive) |
+| V2-E | Full enum-to-definition migration: drop SfPhaseKey, make definition_id required | Yes (destructive) — **implemented R8.105**, migration `20260920000000_sf_v2e_definition_migration` |
 

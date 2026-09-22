@@ -37,7 +37,7 @@ export default async function ProjectLayout({ children, params }: { children: Re
   const phaseNav = phases.map((phase) => ({
       href: STUDIOFLOW_ROUTES.projectPhase(projectId, phase.id),
       label: phase.label,
-      marker: phaseAccentDotClass(phase.key),
+      marker: phaseAccentDotClass(phase.definitionId),
       detail: phase.openRootChecklist > 0 ? String(phase.openRootChecklist) : null,
       title: `${phase.label}: ${phaseStatusDisplay(phase.status).label}${phase.openRootChecklist ? ` · ${phase.openRootChecklist} checklist item(s) open` : ""}`,
   }));
