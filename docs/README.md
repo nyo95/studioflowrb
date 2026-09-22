@@ -40,6 +40,7 @@ tests, and migrations prove implemented state.
 | Document | Purpose |
 |---|---|
 | [`apps/platform/GLOBAL-MENU-DESIGN-BRIEF.md`](apps/platform/GLOBAL-MENU-DESIGN-BRIEF.md) | Owner feedback (2026-09-16) on the global app menu/settings entry points; informs the still-open "redesign top-header/sidebar boundary" item in `BACKLOG.md`, not itself a locked decision |
+| [`UIUX-CRITIQUE-2026-09-23.md`](UIUX-CRITIQUE-2026-09-23.md) | Owner feedback (2026-09-23) on Product Schedule/MOM UX, global nav/settings, visual tone/tooltip usage, and a business-logic + UX critique of Master Data's Add Brand/Supplier/Price flow; cross-checked against current code and every governing contract for doc/codebase drift, not itself a locked decision |
 
 
 A work order marked *implemented* above is evidence of what was built, never an
