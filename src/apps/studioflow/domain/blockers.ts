@@ -6,7 +6,7 @@
 export type PhaseBlockerCounts = {
   /** Open FEEDBACK activities in the active revision. */
   openRevisionActivities: number;
-  /** Unchecked ROOT checklist items of the phase (subtasks never block). */
+  /** Unchecked, blocking ROOT checklist items (subtasks never block; `is_blocking = false` only warns). */
   openRootChecklistItems: number;
 };
 

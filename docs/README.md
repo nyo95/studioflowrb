@@ -1,8 +1,18 @@
 # Documentation Hub
 
-Status: reconciled through **R8.105** on 2026-09-22. Contracts under `docs/apps/`
+Status: reconciled through **R8.107** on 2026-09-22. Contracts under `docs/apps/`
 were reorganized into one subfolder per application on 2026-09-10 at owner
 request; content is unchanged except for corrected cross-links.
+
+**2026-09-22 consolidation:** `roadmap.md`, `review.md`, and `knownbug.md`
+were merged into one worklist, [`BACKLOG.md`](BACKLOG.md), at owner request —
+the three-way "not built / not verified / confirmed defect" distinction now
+lives as a `[PLANNED]`/`[UNVERIFIED]`/`[BUG]`/`[CLEANUP]` tag on each entry
+inside that single file instead of three separate files. The originals are
+preserved with their full historical/closed record in `archive/` (see table
+below). Two ad-hoc audit documents from this same pass
+(`CODEBASE_LOGIC_REVIEW.md`, `apps/studioflow/REVIEW-ALIGNMENT.md`) were also
+archived after their real findings were fixed or folded into `BACKLOG.md`.
 
 This directory contains active contracts, operational trackers, architecture
 roadmaps, and retained historical evidence. Current owner instruction remains
@@ -15,15 +25,21 @@ tests, and migrations prove implemented state.
 |---|---|
 | ~~[`alignment.md`](archive/studioflow-rb/alignment.md)~~ | **Superseded** — R7.xx rebuild alignment artifact; moved to `archive/studioflow-rb/` in R8.75. The active StudioFlow authority is the rework contract. |
 | [`UTILITY-INVENTORY.md`](UTILITY-INVENTORY.md) | Evidence-backed disposition ledger (REUSE/EXTEND/ADD/APP-OWNED/PURGE) for shared utilities and their duplicates; enforced by `scripts/check-boundaries.mjs` |
-| [`roadmap.md`](roadmap.md) | Remaining planned work, grouped by Platform, UI Engine, Master Data, BQ, and StudioFlow |
-| [`knownbug.md`](knownbug.md) | Open and closed defects grouped by application |
-| [`review.md`](review.md) | Implemented-but-unverified work, grouped by application — distinct from `roadmap.md` (not built) and `knownbug.md` (confirmed defect) |
+| [`BACKLOG.md`](BACKLOG.md) | Consolidated worklist — every open `[PLANNED]`/`[UNVERIFIED]`/`[BUG]`/`[CLEANUP]` item across every app, in one file. Replaces `roadmap.md`/`review.md`/`knownbug.md` (archived 2026-09-22). |
+| ~~`roadmap.md`~~ / ~~`review.md`~~ / ~~`knownbug.md`~~ | **Superseded 2026-09-22** — merged into `BACKLOG.md`; full historical record at [`archive/roadmap-2026-09-22.md`](archive/roadmap-2026-09-22.md), [`archive/review-2026-09-22.md`](archive/review-2026-09-22.md), [`archive/knownbug-2026-09-22.md`](archive/knownbug-2026-09-22.md). |
 | [`REVISION-LEDGER-NOTES.md`](REVISION-LEDGER-NOTES.md) | Historical missing/skipped revision labels and how to interpret them |
 | [`SESSION-HANDOFF-PROMPT.md`](SESSION-HANDOFF-PROMPT.md) | Compact continuation prompts for Planner/Reviewer and Executor sessions |
 | [`agent/README.md`](agent/README.md) | Two-lane AI harness: coherent work sizing, handoff loop, context, and revision rules |
 | [`agent/PLANNER.md`](agent/PLANNER.md) | Planning half of the Planner/Reviewer Navigator lane |
 | [`agent/EXECUTOR.md`](agent/EXECUTOR.md) | Autonomous implementation within a READY plan's locked boundaries |
 | [`agent/REVIEWER.md`](agent/REVIEWER.md) | Risk-shaped verification and next-plan preparation |
+| [`agent/BROWSER-ACCEPTANCE-BACKLOG.md`](agent/BROWSER-ACCEPTANCE-BACKLOG.md) | Reviewer-run browser acceptance queue, batched at phase gate close |
+
+## Design inputs (not yet locked contracts)
+
+| Document | Purpose |
+|---|---|
+| [`apps/platform/GLOBAL-MENU-DESIGN-BRIEF.md`](apps/platform/GLOBAL-MENU-DESIGN-BRIEF.md) | Owner feedback (2026-09-16) on the global app menu/settings entry points; informs the still-open "redesign top-header/sidebar boundary" item in `BACKLOG.md`, not itself a locked decision |
 
 
 A work order marked *implemented* above is evidence of what was built, never an
@@ -102,8 +118,8 @@ marked active in the table above.
 Master Data, BQ, and the implemented StudioFlow project workflow are active
 applications. Their current contracts, schema, migrations, services, public
 boundaries, tests, and browser behavior are implementation evidence. Remaining
-features and defects are listed only in `roadmap.md` and `knownbug.md`;
-implemented-but-unverified work is listed in `review.md`.
+features, defects, and implemented-but-unverified work are listed only in
+`BACKLOG.md`, tagged `[PLANNED]`, `[BUG]`, or `[UNVERIFIED]` respectively.
 
 ## Authority order
 
@@ -150,13 +166,13 @@ sequence (1–5 below) is complete. StudioFlow wave-1 rework is complete. Phase
 Engine v2 (V2-A through V2-E) is implemented — V2-E (R8.105) removed the
 `SfPhaseKey` migration bridge entirely; `SfPhase.definition_id` is now the sole
 runtime phase identity. Wave 2 features not covered by V2 remain in
-`roadmap.md`.
+`BACKLOG.md`.
 
 1. **Platform Foundation — routing first.** ✓ Accepted R8.34–R8.61.
 2. **UI Engine and Shared Utilities.** ✓ Accepted R8.56–R8.59.
-3. **BQ.** Implemented; browser acceptance in `review.md`.
+3. **BQ.** Implemented; browser acceptance tracked as `[UNVERIFIED]` in `BACKLOG.md`.
 4. **AI file-organization exploration is parked**, not pursued for now.
 5. **StudioFlow wave-1 rework (SF-R1–SF-RF).** ✓ Accepted R8.71–R8.75.
-6. **StudioFlow Phase Engine v2 (V2-A–V2-E).** Implemented R8.87–R8.105; V2-E (full enum-to-definition migration) browser-verified in R8.105. V2-A–V2-D's remaining Requirements/Deliverables/Schedule-P0 browser acceptance is still tracked in `review.md`.
+6. **StudioFlow Phase Engine v2 (V2-A–V2-E).** Implemented R8.87–R8.105; V2-E (full enum-to-definition migration) browser-verified in R8.105. V2-A–V2-D's remaining Deliverables/Schedule-P0 browser acceptance is tracked as `[UNVERIFIED]` in `BACKLOG.md` (the Requirements-panel checklist item was removed — that panel no longer exists, merged into the phase checklist in R8.106).
 
 Documented deferred capabilities are routing memory, not implementation scope. Do not create code, folders, dependencies, or placeholder exports until a stage/consumer activates them.

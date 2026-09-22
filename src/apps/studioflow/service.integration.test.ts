@@ -68,7 +68,7 @@ async function reset() {
     "sf_schedule_option", "sf_schedule_entry", "sf_schedule_template_item", "sf_schedule_template_category", "sf_schedule_prefix",
     "sf_mom_image", "sf_mom_point", "sf_mom_item", "sf_mom_document",
     "sf_checklist_item_label", "sf_checklist_label", "sf_checklist_filter_view", "sf_checklist_item", "sf_checklist_template",
-    "sf_deliverable", "sf_requirement",
+    "sf_deliverable",
     "sf_activity", "sf_revision", "sf_phase",
     "sf_phase_definition", "sf_phase_template",
     "sf_project", "sf_client", "sf_project_sequence", "sf_settings",
@@ -130,6 +130,23 @@ describe("SF-R1 bootstrap and naming", () => {
     const clients = await sf.projects.listClients({ grants: ALL });
     assert.equal(clients.length, 1);
     assert.equal(clients[0].activeProjects, 2);
+  });
+
+  it("SF-05: a concurrent client-name race surfaces a friendly conflict, never a raw write error", async () => {
+    const clientName = `Concurrent Client ${randomUUID().slice(0, 6)}`;
+    const results = await Promise.allSettled([
+      sf.projects.createProject({ ...as(designer), name: "Race A", newClientName: clientName, picDesignerId: designer.id, picDrafterId: drafter.id }),
+      sf.projects.createProject({ ...as(designer), name: "Race B", newClientName: clientName, picDesignerId: designer.id, picDrafterId: drafter.id }),
+    ]);
+    assert.ok(results.some((r) => r.status === "fulfilled"), "at least one concurrent create wins the race");
+    for (const result of results) {
+      if (result.status === "rejected") {
+        assert.ok(result.reason instanceof AppError, `race loser must surface an AppError, got ${result.reason?.constructor?.name}`);
+        assert.equal(code(result.reason), "P2002");
+      }
+    }
+    const clients = await sf.projects.listClients({ grants: ALL });
+    assert.equal(clients.filter((c) => c.name === clientName).length, 1, "only one client row is ever created for the race");
   });
 
   it("rejects prefixed names in auto mode and validates manual format", async () => {
@@ -960,6 +977,18 @@ describe("Phase Template V2 invariants", () => {
     if (original) await sf.phases.updatePhaseTemplate({ ...as(designer), templateId: original.id, isDefault: true });
   });
 
+  it("SF-02: deleting a phase definition with checklist templates is rejected instead of silently cascading", async () => {
+    const { templateId } = await sf.phases.createPhaseTemplate({ ...as(designer), name: `WithChecklist ${randomUUID().slice(0, 4)}` });
+    const { definitionId } = await sf.phases.createPhaseDefinition({ ...as(designer), templateId, name: "Checklist Phase", prefix: "CK" });
+    const { templateId: checklistTemplateId } = await sf.tasks.createTemplate({ ...as(designer), definitionId, label: "Pre-flight check" });
+    await rejectsWith(sf.phases.deletePhaseDefinition({ ...as(designer), definitionId }), "PHASE_DEFINITION_HAS_CHECKLIST_TEMPLATES");
+    // Definition and its checklist template both survive the rejected delete.
+    assert.ok(await testDb.prisma.sfPhaseDefinition.findUnique({ where: { id: definitionId } }));
+    assert.ok(await testDb.prisma.sfChecklistTemplate.findUnique({ where: { id: checklistTemplateId } }));
+    await sf.tasks.deleteTemplate({ ...as(designer), templateId: checklistTemplateId });
+    await sf.phases.deletePhaseDefinition({ ...as(designer), definitionId });
+  });
+
   it("default template cannot become empty — deleting the last definition is rejected", async () => {
     const { templateId } = await sf.phases.createPhaseTemplate({ ...as(designer), name: `Single ${randomUUID().slice(0, 4)}` });
     const { definitionId } = await sf.phases.createPhaseDefinition({ ...as(designer), templateId, name: "Solo Phase", prefix: "SP", seat: "designer" });
@@ -1016,12 +1045,12 @@ describe("Snapshot runtime truth", () => {
     assert.equal(todo.assigned_to_id, drafter.id, "CD fallback assignee is drafter from snapshot");
   });
 
-  it("getPhaseDetail returns warnings with deliverable status and open requirement count", async () => {
+  it("getPhaseDetail returns warnings with deliverable status and open optional count", async () => {
     const { projectId } = await newProject();
     const phase = await phaseOf(projectId, "moodboard");
     const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: phase.id });
     assert.ok(detail.warnings, "warnings field present");
-    assert.equal(typeof detail.warnings.requirementsOpen, "number");
+    assert.equal(typeof detail.warnings.optionalOpen, "number");
     assert.ok(["MISSING", "CURRENT", "OUTDATED"].includes(detail.warnings.deliverableStatus), "deliverableStatus is a valid enum value");
     assert.equal(detail.warnings.deliverableStatus, "MISSING", "no deliverables yet");
   });
@@ -1054,25 +1083,51 @@ describe("Snapshot runtime truth", () => {
   });
 });
 
-describe("Requirement phase lock enforcement", () => {
-  it("locked phase blocks toggle", async () => {
+/**
+ * Requirements merged into the checklist (2026-09-22): a warning-only item is an
+ * ordinary checklist item with `is_blocking = false`, so it inherits phase-lock
+ * enforcement and must stay out of the approval gate.
+ */
+describe("Optional (warning-only) checklist items", () => {
+  async function optionalItem(projectId: string, phaseId: string) {
+    const { itemId } = await sf.tasks.createItem({ ...as(designer), projectId, phaseId, label: "Verify site access", isBlocking: false });
+    return itemId;
+  }
+
+  it("does not block approval but is reported as a warning", async () => {
     const { projectId } = await newProject();
     const phase = await phaseOf(projectId, "moodboard");
-    const base = { ...as(designer), projectId, phaseId: phase.id };
-    await sf.phases.createRequirement({ ...base, title: "Test" });
-    const req = await testDb.prisma.sfRequirement.findFirstOrThrow({ where: { phase_id: phase.id } });
-    await testDb.prisma.sfPhase.update({ where: { id: phase.id }, data: { is_locked: true } });
-    await rejectsWith(sf.phases.toggleRequirement({ ...as(designer), projectId, requirementId: req.id, met: true }), "PHASE_LOCKED");
+    await optionalItem(projectId, phase.id);
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: phase.id });
+    assert.equal(detail.blockers.total, 0, "an optional item never gates approval");
+    assert.equal(detail.warnings.optionalOpen, 1, "it surfaces as a warning instead");
   });
 
-  it("locked phase blocks delete", async () => {
+  it("blocks approval once made blocking", async () => {
     const { projectId } = await newProject();
     const phase = await phaseOf(projectId, "moodboard");
-    const base = { ...as(designer), projectId, phaseId: phase.id };
-    await sf.phases.createRequirement({ ...base, title: "Test" });
-    const req = await testDb.prisma.sfRequirement.findFirstOrThrow({ where: { phase_id: phase.id } });
+    const itemId = await optionalItem(projectId, phase.id);
+    await sf.tasks.updateItem({ ...as(designer), projectId, itemId, isBlocking: true });
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: phase.id });
+    assert.equal(detail.blockers.total, 1, "flipping the flag moves it into the gate");
+    assert.equal(detail.warnings.optionalOpen, 0);
+  });
+
+  it("locked phase blocks tick and delete", async () => {
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "moodboard");
+    const itemId = await optionalItem(projectId, phase.id);
     await testDb.prisma.sfPhase.update({ where: { id: phase.id }, data: { is_locked: true } });
-    await rejectsWith(sf.phases.deleteRequirement({ ...as(designer), projectId, requirementId: req.id }), "PHASE_LOCKED");
+    await rejectsWith(sf.tasks.setItemChecked({ ...as(designer), projectId, itemId, checked: true }), "PHASE_LOCKED");
+    await rejectsWith(sf.tasks.deleteItem({ ...as(designer), projectId, itemId }), "PHASE_LOCKED");
+  });
+
+  it("refuses to make a subtask blocking", async () => {
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "moodboard");
+    const parentId = await optionalItem(projectId, phase.id);
+    const { itemId: subtaskId } = await sf.tasks.createSubtask({ ...as(designer), projectId, parentId, label: "Call the building manager" });
+    await rejectsWith(sf.tasks.updateItem({ ...as(designer), projectId, itemId: subtaskId, isBlocking: true }), "CHECKLIST_SUBTASK_NEVER_BLOCKS");
   });
 });
 

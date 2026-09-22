@@ -47,7 +47,7 @@ import {
 } from "../actions";
 import { useCommand } from "../_components/use-command";
 
-type Template = { id: string; definitionId: string | null; label: string; isActive: boolean; sortOrder: number; usedBy: number };
+type Template = { id: string; definitionId: string | null; label: string; isBlocking: boolean; isActive: boolean; sortOrder: number; usedBy: number };
 type PhaseDefinitionDraft = { id: string; name: string; prefix: string; orderIndex: number; allowParallel: boolean; seat: "designer" | "drafter" };
 type PhaseTemplateDraft = { id: string; name: string; isDefault: boolean; isActive: boolean; definitions: PhaseDefinitionDraft[] };
 type ScheduleTemplate = {
@@ -104,7 +104,7 @@ export function StudioSettingsView({
 
   return (
     <div className="grid gap-4">
-      <SectionCard title="Project naming" padded>
+      <SectionCard id="project-naming" className="scroll-mt-20" title="Project naming" padded>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="grid gap-1">
             <Text>Automatic numbering</Text>
@@ -118,7 +118,7 @@ export function StudioSettingsView({
 
       {error ? <InlineError>{error}</InlineError> : null}
 
-      <div className="grid grid-cols-2 gap-4 max-[1100px]:grid-cols-1">
+      <div id="checklist-templates" className="grid scroll-mt-20 grid-cols-2 gap-4 max-[1100px]:grid-cols-1">
         {groups.map((group) => (
           <TemplateGroup key={group.key ?? "general"} group={group} templates={templates.filter((t) => t.definitionId === group.key)} canManage={canManage} run={run} pendingKey={pendingKey} />
         ))}
@@ -177,7 +177,7 @@ function ScheduleSettings({
   const orderOf = (template: ScheduleTemplate) => scheduleTemplates.filter((t) => t.section === template.section).indexOf(template) + 1;
 
   return (
-    <SectionCard id="product-schedule" title="Product Schedule" description="Prefix dictionary, default categories, and template items for new or existing projects." padded={false}>
+    <SectionCard id="product-schedule" className="scroll-mt-20" title="Product Schedule" description="Prefix dictionary, default categories, and template items for new or existing projects." padded={false}>
       <datalist id="schedule-settings-categories">{categoryNames.map((name) => <option key={name} value={name} />)}</datalist>
 
       <TableTitle title="Prefix dictionary" count={schedulePrefixes.length} />
@@ -477,7 +477,7 @@ function PhaseTemplatesSection({
   };
 
   return (
-    <SectionCard id="phase-templates" title="Phase Templates (V2)" description="Templates define the phases a project gets on creation. The default template is applied automatically." padded={false}>
+    <SectionCard id="phase-templates" className="scroll-mt-20" title="Phase Templates (V2)" description="Templates define the phases a project gets on creation. The default template is applied automatically." padded={false}>
       {phaseTemplates.length === 0 ? (
         <div className="px-(--ui-section-px) py-4"><Text tone="tertiary" size="sm">No phase templates yet. {canManage ? "Add one below." : ""}</Text></div>
       ) : phaseTemplates.map((template) => (
@@ -570,6 +570,7 @@ function TemplateGroup({
   pendingKey: string | null;
 }) {
   const [draft, setDraft] = useState("");
+  const [draftOptional, setDraftOptional] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const addKey = `add-${group.key ?? "general"}`;
@@ -583,7 +584,7 @@ function TemplateGroup({
   };
 
   return (
-    <SectionCard title={group.label} description={group.description} count={templates.filter((t) => t.isActive).length} padded>
+    <SectionCard title={group.label} hint={group.description} count={templates.filter((t) => t.isActive).length} padded>
       {templates.length === 0 ? <Text size="sm" tone="tertiary">No items.</Text> : (
         <ol className="m-0 grid list-none gap-px p-0">
           {templates.map((template, index) => (
@@ -598,12 +599,14 @@ function TemplateGroup({
               ) : (
                 <span className={`min-w-0 flex-1 ${template.isActive ? "" : "text-ink-tertiary line-through"}`}>{template.label}</span>
               )}
+              {!template.isBlocking ? <Badge title="Warning only — does not block approval">Optional</Badge> : null}
               {!template.isActive ? <Badge>Inactive</Badge> : null}
               {template.usedBy > 0 ? <Text size="sm" tone="tertiary" title="Project rows generated from this item">{template.usedBy} project row(s)</Text> : null}
               {canManage && editing !== template.id ? (
                 <RowActionMenu pending={pendingKey === template.id} items={[
                   { label: "Rename", onSelect: () => { setEditing(template.id); setEditText(template.label); } },
-                  { label: template.isActive ? "Deactivate" : "Activate", onSelect: () => run(template.id, () => updateTemplateAction({ templateId: template.id, isActive: !template.isActive })) },
+                  { label: template.isBlocking ? "Make optional (won't block approval)" : "Make it block approval", onSelect: () => run(template.id, () => updateTemplateAction({ templateId: template.id, isBlocking: !template.isBlocking })) },
+                  { label: template.isActive ? "Deactivate" : "Activate", separatorBefore: true, onSelect: () => run(template.id, () => updateTemplateAction({ templateId: template.id, isActive: !template.isActive })) },
                   { label: "Move up", disabled: index === 0, separatorBefore: true, onSelect: () => move(index, -1) },
                   { label: "Move down", disabled: index === templates.length - 1, onSelect: () => move(index, 1) },
                   { label: "Delete", danger: true, separatorBefore: true, onSelect: () => run(template.id, () => deleteTemplateAction(template.id)) },
@@ -614,9 +617,24 @@ function TemplateGroup({
         </ol>
       )}
       {canManage ? (
-        <form className="mt-2 flex gap-2" onSubmit={async (e) => { e.preventDefault(); if (await run(addKey, () => createTemplateAction({ definitionId: group.key, label: draft }))) setDraft(""); }}>
-          <Input aria-label={`New ${group.label} checklist item`} density="compact" className="flex-1" placeholder="Add checklist item…" value={draft} maxLength={200} onChange={(e) => setDraft(e.target.value)} />
-          <Button type="submit" size="sm" pending={pendingKey === addKey} disabled={!draft.trim()}>Add</Button>
+        <form
+          className="mt-2 flex flex-col gap-1.5"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (await run(addKey, () => createTemplateAction({ definitionId: group.key, label: draft, isBlocking: !draftOptional }))) {
+              setDraft("");
+              setDraftOptional(false);
+            }
+          }}
+        >
+          <div className="flex gap-2">
+            <Input aria-label={`New ${group.label} checklist item`} density="compact" className="flex-1" placeholder="Add checklist item…" value={draft} maxLength={200} onChange={(e) => setDraft(e.target.value)} />
+            <Button type="submit" size="sm" pending={pendingKey === addKey} disabled={!draft.trim()}>Add</Button>
+          </div>
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-ink-secondary select-none">
+            <input type="checkbox" className="accent-primary" checked={draftOptional} onChange={(e) => setDraftOptional(e.target.checked)} />
+            Optional (warning only, won&apos;t block approval)
+          </label>
         </form>
       ) : null}
     </SectionCard>

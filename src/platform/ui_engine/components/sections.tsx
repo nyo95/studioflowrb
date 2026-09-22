@@ -1,6 +1,8 @@
 import type { HTMLAttributes, ReactNode } from "react";
+import { CircleHelp } from "lucide-react";
 
 import { cx } from "../internal/cx";
+import { Tooltip } from "../layouts/overlays";
 import { CountBadge, Heading, type SemanticTone, Surface, Text } from "../primitives";
 
 export type SectionCardProps = Omit<HTMLAttributes<HTMLElement>, "title"> & {
@@ -8,6 +10,8 @@ export type SectionCardProps = Omit<HTMLAttributes<HTMLElement>, "title"> & {
   title?: ReactNode;
   /** One-line qualifier under the title, inside the same header bar. */
   description?: ReactNode;
+  /** Tooltip content shown on the (?) icon beside the title — same pattern as Field. */
+  hint?: ReactNode;
   /** Monospace count rendered beside the title. */
   count?: ReactNode;
   /** Right-aligned affordance in the header bar, typically a link or button. */
@@ -29,6 +33,7 @@ export type SectionCardProps = Omit<HTMLAttributes<HTMLElement>, "title"> & {
 export function SectionCard({
   title,
   description,
+  hint,
   count,
   action,
   padded = true,
@@ -36,7 +41,7 @@ export function SectionCard({
   className,
   ...props
 }: SectionCardProps) {
-  const hasHeader = Boolean(title || description || action);
+  const hasHeader = Boolean(title || description || hint || action);
   return (
     <Surface as="section" className={cx("min-w-0 overflow-hidden", className)} {...props}>
       {hasHeader ? (
@@ -46,6 +51,13 @@ export function SectionCard({
               <div className="flex min-w-0 items-baseline gap-2">
                 <Heading level={3} className="truncate">{title}</Heading>
                 {count !== undefined && count !== null ? <CountBadge>{count}</CountBadge> : null}
+                {hint ? (
+                  <Tooltip content={hint}>
+                    <button type="button" aria-label="More information" className="inline-flex h-4 w-4 shrink-0 translate-y-[2px] items-center justify-center rounded-full text-ink-tertiary hover:text-ink">
+                      <CircleHelp size={14} aria-hidden="true" />
+                    </button>
+                  </Tooltip>
+                ) : null}
               </div>
             ) : null}
             {description ? <Text as="p" tone="secondary" size="sm">{description}</Text> : null}
@@ -139,6 +151,8 @@ export type PipelineStep = {
   /** Optional domain accent for the leading marker; state remains available through label/note. */
   accentClass?: string;
   href?: string;
+  /** Marks this step as the currently viewed tab — renders a bottom border indicator. */
+  selected?: boolean;
 };
 
 const PIPELINE_STATE_DOT_CLASSES: Record<PipelineStepState, string> = {
@@ -181,7 +195,7 @@ export function PipelineStrip({
           <>
             <div className="flex items-center gap-1.5">
               <span aria-hidden="true" className={cx("h-2 w-2 shrink-0 rounded-pill", step.accentClass ?? PIPELINE_STATE_DOT_CLASSES[state])} />
-              <span className={cx("truncate text-sm font-semibold", PIPELINE_STATE_LABEL_CLASSES[state])}>
+              <span className={cx("truncate text-sm font-semibold", step.selected ? "text-ink" : PIPELINE_STATE_LABEL_CLASSES[state])}>
                 {step.label}
               </span>
             </div>
@@ -194,8 +208,10 @@ export function PipelineStrip({
             key={step.id}
             aria-current={state === "current" ? "step" : undefined}
             className={cx(
-              "grid min-w-0 content-start gap-[5px] px-3 py-2.5",
-              state === "current" ? "bg-surface-muted" : "bg-surface",
+              "grid min-w-0 content-start gap-[5px] px-3 py-2.5 transition-colors",
+              step.selected
+                ? "bg-surface shadow-[inset_0_-3px_0_0_theme(colors.ink.DEFAULT)]"
+                : state === "current" ? "bg-surface-muted" : "bg-surface",
             )}
           >
             {step.href ? (

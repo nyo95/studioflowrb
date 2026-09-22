@@ -185,6 +185,8 @@ export async function assertWorkPriceRestorable(tx: TxClient, table: "material-l
 }
 
 export async function createDeletionRequest(tx: TxClient, input: { targetType: string; targetId: string; actor: AuditActor; reason?: string; notes?: string }): Promise<string> {
+  const existing = await tx.deletionRequest.findFirst({ where: { target_type: input.targetType, target_id: input.targetId, status: "PENDING" } });
+  if (existing) return existing.id;
   const req = await tx.deletionRequest.create({ data: { id: randomUUID(), target_type: input.targetType, target_id: input.targetId, status: "PENDING", requester_user_id: input.actor.userId!, requester_label: input.actor.label, reason: input.reason ?? null, notes: input.notes ?? null } });
   return req.id;
 }

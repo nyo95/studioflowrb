@@ -2,8 +2,10 @@
 
 import { ArrowDown, ArrowUp, FileUp, History, ImageIcon, Plus, Search, Settings2, X } from "lucide-react";
 import Link from "next/link";
+import { Popover } from "radix-ui";
 import { useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 
+import { SCHEDULE_CARD_FIELD_KEYS, type ScheduleCardFieldKey } from "@/apps/studioflow/domain/schedule";
 import {
   Badge,
   Button,
@@ -34,10 +36,12 @@ import {
   moveScheduleEntryAction,
   moveScheduleEntryToCategoryAction,
   removeScheduleOptionImageAction,
+  reorderScheduleEntriesAction,
   saveScheduleEntryAsTemplateAction,
   searchReusableScheduleOptionsAction,
   setScheduleOptionImageAction,
   updateScheduleEntryAction,
+  updateScheduleEntryCardFieldsAction,
   updateScheduleOptionAction,
 } from "../../../actions";
 import { useCommand } from "../../../_components/use-command";
@@ -71,6 +75,7 @@ export type ScheduleEntryView = {
   qty: string | null;
   unit: string | null;
   location: string | null;
+  cardFields: string[];
   options: ScheduleOptionView[];
 };
 
@@ -113,6 +118,136 @@ function templateSourceOf(entry: ScheduleEntryView) {
 /** Legacy catalog photos are portrait 4:5. */
 const PHOTO_ASPECT = 4 / 5;
 
+/**
+ * Photo crop/upload dialog for one option. Shared by the board card's direct
+ * "Add photo" overlay and the entry panel's per-option control, so a photo
+ * can be set without first opening the panel — matching legacy, where the
+ * card's own photo area is the upload trigger.
+ */
+function SchedulePhotoDialog({
+  projectId,
+  entryCode,
+  option,
+  command,
+  onClose,
+}: {
+  projectId: string;
+  entryCode: string;
+  option: ScheduleOptionView;
+  command: Command;
+  onClose: () => void;
+}) {
+  const { run, isPending } = command;
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const pendingKey = `${option.id}-photo`;
+
+  const onPrepared = async (file: File) => {
+    setPhotoError(null);
+    const form = new FormData();
+    form.set("projectId", projectId);
+    form.set("optionId", option.id);
+    form.set("file", file);
+    const ok = await run(pendingKey, async () => {
+      const result = await setScheduleOptionImageAction(form);
+      if (!result.ok) setPhotoError(result.error.safeMessage);
+      return result;
+    });
+    if (ok) onClose();
+  };
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(value) => { if (!value) onClose(); }}
+      title={`Photo — ${entryCode} option ${option.label}`}
+      description="Choose a photo and crop it to the 4:5 catalog frame."
+      size="lg"
+      dismissible={!isPending(pendingKey)}
+    >
+      <div className="grid gap-2">
+        <ImageWorkspace label="Schedule photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" onPrepared={onPrepared} disabled={isPending(pendingKey)} />
+        {photoError ? <InlineError>{photoError}</InlineError> : null}
+      </div>
+    </Dialog>
+  );
+}
+
+const CARD_FIELD_LABEL: Record<ScheduleCardFieldKey, string> = {
+  brand: "Brand",
+  sku: "Item No",
+  color: "Color",
+  pattern: "Pattern",
+  finishing: "Finishing",
+  dimension: "Size",
+  location: "Location",
+  qty: "Qty",
+};
+
+/**
+ * Which fields show as captions on a board card. `entry.cardFields` empty
+ * means "no override, show everything populated" (today's behavior and the
+ * default here too); a non-empty list is an explicit, ordered choice.
+ * Matches legacy's per-card "Card fields" popover and its "Use project
+ * default" reset.
+ */
+function CardFieldsMenu({ projectId, entry, command }: { projectId: string; entry: ScheduleEntryView; command: Command }) {
+  const [open, setOpen] = useState(false);
+  const key = `${entry.id}-card-fields`;
+  const pending = command.isPending(key);
+  const effective = entry.cardFields.length > 0 ? entry.cardFields : SCHEDULE_CARD_FIELD_KEYS;
+
+  const save = (fields: readonly string[]) =>
+    void command.run(key, () => updateScheduleEntryCardFieldsAction({ projectId, entryId: entry.id, fields: [...fields] }));
+
+  const toggle = (field: ScheduleCardFieldKey) => {
+    const next = effective.includes(field) ? effective.filter((f) => f !== field) : [...effective, field];
+    save(next);
+  };
+
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        {/* A card's whole face is already a <button> (opens the entry panel); this must not be
+            a nested <button> — invalid HTML that breaks hydration. A span with role="button"
+            gives the same semantics and keyboard support without nesting interactive elements. */}
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") event.stopPropagation(); }}
+          aria-label={`Choose fields for ${entry.code}`}
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-action bg-surface/90 text-ink-secondary opacity-0 transition-opacity hover:bg-surface hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
+        >
+          <Settings2 size={13} aria-hidden="true" />
+        </span>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="end"
+          sideOffset={6}
+          onClick={(event) => event.stopPropagation()}
+          className="z-[65] w-48 rounded-control border border-line bg-surface-raised p-2.5 shadow-elevated"
+        >
+          <p className="mb-1.5 text-label text-ink-tertiary">Card fields</p>
+          <div className="grid gap-1">
+            {SCHEDULE_CARD_FIELD_KEYS.map((fieldKey) => (
+              <label key={fieldKey} className="flex items-center gap-2 rounded-action px-1 py-1 text-sm hover:bg-surface-muted">
+                <input type="checkbox" checked={effective.includes(fieldKey)} disabled={pending} onChange={() => toggle(fieldKey)} />
+                {CARD_FIELD_LABEL[fieldKey]}
+              </label>
+            ))}
+          </div>
+          {entry.cardFields.length > 0 ? (
+            <button type="button" disabled={pending} onClick={() => save([])} className="mt-1.5 text-xs font-medium text-ink-secondary hover:text-ink hover:underline">
+              Use default
+            </button>
+          ) : null}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
 function Thumb({ url, alt, className = "h-14 w-11" }: { url: string | null; alt: string; className?: string }) {
   return (
     <span className={`grid shrink-0 place-items-center overflow-hidden rounded-[4px] border border-line-subtle bg-surface-muted ${className}`}>
@@ -145,6 +280,7 @@ function useIsDesktop() {
 // ── Board view ─────────────────────────────────────────────────────────────
 
 function BoardView({
+  projectId,
   groups,
   command,
   onOpen,
@@ -152,7 +288,10 @@ function BoardView({
   canManageTemplates,
   onMoveCategory,
   onDelete,
+  onReorder,
+  onQuickPhoto,
 }: {
+  projectId: string;
   groups: Array<{ category: string; rows: ScheduleEntryView[] }>;
   command: Command;
   onOpen: (id: string) => void;
@@ -160,7 +299,11 @@ function BoardView({
   canManageTemplates: boolean;
   onMoveCategory: (entry: ScheduleEntryView) => void;
   onDelete: (entry: ScheduleEntryView) => void;
+  onReorder: (rows: ScheduleEntryView[], draggedId: string, targetId: string) => void;
+  onQuickPhoto: (entry: ScheduleEntryView, option: ScheduleOptionView) => void;
 }) {
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
   return (
     <div className="@container grid gap-10 p-(--ui-section-px)">
       {groups.map((group) => (
@@ -176,22 +319,36 @@ function BoardView({
             {group.rows.map((entry) => {
               const final = finalOf(entry);
               const quantity = entry.qty ? `${entry.qty}${entry.unit ? ` ${entry.unit}` : ""}` : null;
-              const details: Array<[string, string | null | undefined]> = [
-                ["Brand", final?.brandName],
-                ["Item no", final?.skuText],
-                ["Color", final?.color],
-                ["Pattern", final?.pattern],
-                ["Finishing", final?.finishing],
-                ["Size", final?.dimension],
-                ["Location", entry.location],
-                ["Qty", quantity],
-              ];
+              const fieldValue: Record<ScheduleCardFieldKey, string | null | undefined> = {
+                brand: final?.brandName,
+                sku: final?.skuText,
+                color: final?.color,
+                pattern: final?.pattern,
+                finishing: final?.finishing,
+                dimension: final?.dimension,
+                location: entry.location,
+                qty: quantity,
+              };
+              const fieldKeys = entry.cardFields.length > 0 ? (entry.cardFields as ScheduleCardFieldKey[]) : SCHEDULE_CARD_FIELD_KEYS;
+              const details: Array<[string, string | null | undefined]> = fieldKeys.map((key) => [CARD_FIELD_LABEL[key], fieldValue[key]]);
+              const photoTarget = templateSourceOf(entry);
               return (
                 <button
                   key={entry.id}
                   type="button"
+                  draggable={canEdit}
+                  onDragStart={(event) => { setDraggingId(entry.id); event.dataTransfer.effectAllowed = "move"; }}
+                  onDragEnd={() => { setDraggingId(null); setDragOverId(null); }}
+                  onDragOver={(event) => { if (!canEdit || !draggingId) return; event.preventDefault(); setDragOverId(entry.id); }}
+                  onDragLeave={() => setDragOverId((current) => (current === entry.id ? null : current))}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    if (draggingId) onReorder(group.rows, draggingId, entry.id);
+                    setDraggingId(null);
+                    setDragOverId(null);
+                  }}
                   onClick={() => onOpen(entry.id)}
-                  className="group grid min-w-0 content-start text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-line-focus"
+                  className={`group grid min-w-0 content-start text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-line-focus ${canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${draggingId === entry.id ? "opacity-40" : ""} ${dragOverId === entry.id && draggingId && draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-2 outline-line-focus" : ""}`}
                 >
                   <span className="relative mb-2.5 block aspect-[4/5] w-full overflow-hidden bg-surface-muted">
                     {final?.imageUrl ? (
@@ -205,6 +362,26 @@ function BoardView({
                       <span className="absolute bottom-2 left-2 flex gap-1">
                         {final?.status === "APPROVED" ? <Badge tone="success">Final</Badge> : null}
                         {entry.options.length > 1 ? <Badge>{entry.options.length} options</Badge> : null}
+                      </span>
+                    ) : null}
+                    {canEdit && photoTarget ? (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        aria-label={photoTarget.imageUrl ? `Change photo of ${entry.code}` : `Add photo to ${entry.code}`}
+                        title={photoTarget.imageUrl ? "Change photo" : "Add photo"}
+                        onClick={(event) => { event.stopPropagation(); onQuickPhoto(entry, photoTarget); }}
+                        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); onQuickPhoto(entry, photoTarget); } }}
+                        className="absolute inset-0 grid place-items-center opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                      >
+                        <span className="rounded-action bg-ink/70 px-2 py-1 text-micro font-semibold uppercase tracking-[0.1em] text-surface">
+                          {photoTarget.imageUrl ? "Change photo" : "+ Add photo"}
+                        </span>
+                      </span>
+                    ) : null}
+                    {canEdit ? (
+                      <span className="absolute left-2 top-2 z-[1]">
+                        <CardFieldsMenu projectId={projectId} entry={entry} command={command} />
                       </span>
                     ) : null}
                   </span>
@@ -271,6 +448,9 @@ export function ScheduleBoard({
   const [viewMode, setViewMode] = useState<"list" | "board">("board");
   const [openId, setOpenId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<null | "add" | "import" | { move: ScheduleEntryView }>(null);
+  const [quickPhoto, setQuickPhoto] = useState<{ entry: ScheduleEntryView; option: ScheduleOptionView } | null>(null);
+  const [listDraggingId, setListDraggingId] = useState<string | null>(null);
+  const [listDragOverId, setListDragOverId] = useState<string | null>(null);
 
   const counts = useMemo(() => ({
     MATERIAL: entries.filter((e) => e.section === "MATERIAL").length,
@@ -298,6 +478,20 @@ export function ScheduleBoard({
     });
     if (!ok) return;
     if (await run(`${entry.id}-delete`, () => deleteScheduleEntryAction({ projectId, entryId: entry.id }))) setOpenId(null);
+  };
+
+  /** Reorder within one category group (one code prefix); drag targets never span groups. */
+  const reorderGroup = (rows: ScheduleEntryView[], draggedId: string, targetId: string) => {
+    if (draggedId === targetId) return;
+    const ids = rows.map((row) => row.id);
+    const from = ids.indexOf(draggedId);
+    const to = ids.indexOf(targetId);
+    if (from === -1 || to === -1) return;
+    ids.splice(from, 1);
+    ids.splice(to, 0, draggedId);
+    const prefix = rows[0]?.code.split("-")[0];
+    if (!prefix) return;
+    void run(`reorder-${prefix}`, () => reorderScheduleEntriesAction({ projectId, section, prefix, orderedIds: ids }));
   };
 
   return (
@@ -354,6 +548,7 @@ export function ScheduleBoard({
           <div className="min-w-0">
             {viewMode === "board" ? (
               <BoardView
+                projectId={projectId}
                 groups={groups}
                 command={command}
                 onOpen={setOpenId}
@@ -361,6 +556,8 @@ export function ScheduleBoard({
                 canManageTemplates={canManageTemplates}
                 onMoveCategory={(entry) => setDialog({ move: entry })}
                 onDelete={removeEntry}
+                onReorder={reorderGroup}
+                onQuickPhoto={(entry, option) => setQuickPhoto({ entry, option })}
               />
             ) : (
               <div className="grid">
@@ -383,7 +580,21 @@ export function ScheduleBoard({
                         const final = finalOf(entry);
                         const busy = command.pendingKeys.some((key) => key.startsWith(entry.id));
                         return (
-                          <li key={entry.id} className={`flex items-center gap-3 px-(--ui-section-px) py-2.5 ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"}`}>
+                          <li
+                            key={entry.id}
+                            draggable={canEdit}
+                            onDragStart={(event) => { setListDraggingId(entry.id); event.dataTransfer.effectAllowed = "move"; }}
+                            onDragEnd={() => { setListDraggingId(null); setListDragOverId(null); }}
+                            onDragOver={(event) => { if (!canEdit || !listDraggingId) return; event.preventDefault(); setListDragOverId(entry.id); }}
+                            onDragLeave={() => setListDragOverId((current) => (current === entry.id ? null : current))}
+                            onDrop={(event) => {
+                              event.preventDefault();
+                              if (listDraggingId) reorderGroup(group.rows, listDraggingId, entry.id);
+                              setListDraggingId(null);
+                              setListDragOverId(null);
+                            }}
+                            className={`flex items-center gap-3 px-(--ui-section-px) py-2.5 ${canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"} ${listDraggingId === entry.id ? "opacity-40" : ""} ${listDragOverId === entry.id && listDraggingId && listDraggingId !== entry.id ? "outline-2 outline-dashed outline-offset-[-2px] outline-line-focus" : ""}`}
+                          >
                             <button type="button" onClick={() => setOpenId(entry.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                               <Thumb url={final?.imageUrl ?? null} alt={final ? final.productName : `${entry.code} has no photo`} />
                               <span className="w-14 shrink-0 font-ui-mono text-sm font-semibold tabular-nums text-ink">{entry.code}</span>
@@ -487,6 +698,9 @@ export function ScheduleBoard({
       {dialog && typeof dialog === "object" ? (
         <MoveDialog projectId={projectId} entry={dialog.move} categories={categories} command={command} onClose={() => setDialog(null)} />
       ) : null}
+      {quickPhoto ? (
+        <SchedulePhotoDialog projectId={projectId} entryCode={quickPhoto.entry.code} option={quickPhoto.option} command={command} onClose={() => setQuickPhoto(null)} />
+      ) : null}
       {confirm.dialog}
     </div>
   );
@@ -568,6 +782,35 @@ function ProductFields({ value, onChange, brands, extraBrand }: { value: Product
 
 function Footer({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap justify-end gap-2">{children}</div>;
+}
+
+/**
+ * Edit an existing option's fields in place, no dialog. Legacy edits product
+ * fields by clicking straight into them on the card; this keeps that "no
+ * navigation, no modal" property while editing every field in one save
+ * (rather than one commit per keystroke-field), since these fields are
+ * naturally edited together as one product record.
+ */
+function OptionInlineForm({ projectId, option, brands, command, onClose }: { projectId: string; option: ScheduleOptionView; brands: readonly Brand[]; command: Command; onClose: () => void }) {
+  const [product, setProduct] = useState<ProductDraft>(productFromOption(option));
+  const key = `${option.id}-inline`;
+  const pending = command.isPending(key);
+
+  const save = async () => {
+    const ok = await command.run(key, () => updateScheduleOptionAction({ projectId, optionId: option.id, snapshot: toSnapshot(product) }));
+    if (ok) onClose();
+  };
+
+  return (
+    <div className="grid gap-3">
+      <ProductFields value={product} onChange={setProduct} brands={brands} extraBrand={option.brandId ? { id: option.brandId, name: option.brandName ?? "Brand" } : null} />
+      {command.error ? <InlineError>{command.error}</InlineError> : null}
+      <Footer>
+        <Button type="button" onClick={onClose} disabled={pending}>Cancel</Button>
+        <Button type="button" variant="primary" pending={pending} disabled={!product.productName.trim()} onClick={() => void save()}>Save option</Button>
+      </Footer>
+    </div>
+  );
 }
 
 // ── Add item ─────────────────────────────────────────────────────────────────
@@ -658,7 +901,7 @@ function EntryPanelContent({
   const [editing, setEditing] = useState<ScheduleOptionView | "new" | null>(null);
   const [reuse, setReuse] = useState(false);
   const [photoFor, setPhotoFor] = useState<ScheduleOptionView | null>(null);
-  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [inlineEdit, setInlineEdit] = useState<string | null>(null);
   const dirty = fields.qty !== initial.qty || fields.unit !== initial.unit || fields.location !== initial.location;
 
   const saveFields = () => run(`${entry.id}-fields`, () => updateScheduleEntryAction({
@@ -668,21 +911,6 @@ function EntryPanelContent({
     unit: fields.unit.trim() || null,
     location: fields.location.trim() || null,
   }));
-
-  const onPhotoPrepared = async (file: File) => {
-    if (!photoFor) return;
-    setPhotoError(null);
-    const form = new FormData();
-    form.set("projectId", projectId);
-    form.set("optionId", photoFor.id);
-    form.set("file", file);
-    const ok = await run(`${entry.id}-photo`, async () => {
-      const result = await setScheduleOptionImageAction(form);
-      if (!result.ok) setPhotoError(result.error.safeMessage);
-      return result;
-    });
-    if (ok) setPhotoFor(null);
-  };
 
   const removePhoto = async (option: ScheduleOptionView) => {
     const ok = await confirm({
@@ -754,6 +982,13 @@ function EntryPanelContent({
           <ul className="m-0 grid list-none gap-2 p-0">
             {entry.options.map((option) => {
               const status = STATUS_LABEL[option.status] ?? STATUS_LABEL.DRAFT;
+              if (inlineEdit === option.id) {
+                return (
+                  <li id={`opt-${option.id}`} key={option.id} className="rounded-control border border-line-focus bg-surface px-3 py-2.5">
+                    <OptionInlineForm projectId={projectId} option={option} brands={brands} command={command} onClose={() => setInlineEdit(null)} />
+                  </li>
+                );
+              }
               return (
                 <li id={`opt-${option.id}`} key={option.id} className={`rounded-control border px-3 py-2 ${option.isFinal ? "border-success-line bg-success-surface/40" : "border-line"}`}>
                   <div className="flex items-start gap-2">
@@ -762,7 +997,7 @@ function EntryPanelContent({
                       {canEdit ? (
                         <button
                           type="button"
-                          onClick={() => { setPhotoError(null); setPhotoFor(option); }}
+                          onClick={() => { setPhotoFor(option); }}
                           aria-label={option.imageUrl ? `Change photo of option ${option.label}` : `Add photo to option ${option.label}`}
                           title={option.imageUrl ? "Change photo" : "Add photo"}
                           className="rounded-[4px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus"
@@ -775,7 +1010,7 @@ function EntryPanelContent({
                       {canEdit ? (
                         <button
                           type="button"
-                          onClick={() => { setPhotoError(null); setPhotoFor(option); }}
+                          onClick={() => { setPhotoFor(option); }}
                           className="text-xs font-medium text-ink-secondary hover:text-ink hover:underline"
                         >
                           {option.imageUrl ? "Change photo" : "Add photo"}
@@ -783,7 +1018,13 @@ function EntryPanelContent({
                       ) : null}
                     </div>
                     <div className="grid min-w-0 flex-1 gap-0.5">
-                      <span className="text-sm font-medium">{option.productName}{option.brandName ? <span className="font-normal text-ink-secondary"> · ex. {option.brandName}</span> : null}</span>
+                      {canEdit ? (
+                        <button type="button" onClick={() => setInlineEdit(option.id)} className="w-fit text-left hover:underline" title="Click to edit product details">
+                          <span className="text-sm font-medium">{option.productName}{option.brandName ? <span className="font-normal text-ink-secondary"> · ex. {option.brandName}</span> : null}</span>
+                        </button>
+                      ) : (
+                        <span className="text-sm font-medium">{option.productName}{option.brandName ? <span className="font-normal text-ink-secondary"> · ex. {option.brandName}</span> : null}</span>
+                      )}
                       {specLine(option) ? <span className="text-xs text-ink-tertiary">{specLine(option)}</span> : null}
                       {option.notes ? <span className="whitespace-pre-wrap text-xs text-ink-secondary">{option.notes}</span> : null}
                       {/* Set final button on card face */}
@@ -807,8 +1048,8 @@ function EntryPanelContent({
                         pending={isPending(`${entry.id}-opt-${option.id}`)}
                         items={[
                           ...(option.isFinal ? [] : [{ label: "Set as final", onSelect: () => void run(`${entry.id}-opt-${option.id}`, () => markScheduleFinalAction({ projectId, optionId: option.id })) }]),
-                          { label: "Edit", onSelect: () => setEditing(option) },
-                          { label: option.imageUrl ? "Change photo" : "Add photo", onSelect: () => { setPhotoError(null); setPhotoFor(option); } },
+                          { label: "Edit", onSelect: () => setInlineEdit(option.id) },
+                          { label: option.imageUrl ? "Change photo" : "Add photo", onSelect: () => { setPhotoFor(option); } },
                           ...(option.imageUrl ? [{ label: "Remove photo", onSelect: () => void removePhoto(option) }] : []),
                           { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeOption(option) },
                         ]}
@@ -821,7 +1062,7 @@ function EntryPanelContent({
           </ul>
         )}
       </div>
-      {command.error && !editing && !reuse && !photoFor ? <InlineError>{command.error}</InlineError> : null}
+      {command.error && !editing && !reuse && !photoFor && !inlineEdit ? <InlineError>{command.error}</InlineError> : null}
 
       {editing ? (
         <OptionDialog
@@ -834,21 +1075,9 @@ function EntryPanelContent({
         />
       ) : null}
       {reuse ? <ReuseDialog projectId={projectId} entry={entry} command={command} onClose={() => setReuse(false)} /> : null}
-      <Dialog
-        open={photoFor !== null}
-        onOpenChange={(value) => { if (!value) setPhotoFor(null); }}
-        title={photoFor ? `Photo — ${entry.code} option ${photoFor.label}` : "Photo"}
-        description="Choose a photo and crop it to the 4:5 catalog frame."
-        size="lg"
-        dismissible={!isPending(`${entry.id}-photo`)}
-      >
-        {photoFor ? (
-          <div className="grid gap-2">
-            <ImageWorkspace label="Schedule photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" onPrepared={onPhotoPrepared} disabled={isPending(`${entry.id}-photo`)} />
-            {photoError ? <InlineError>{photoError}</InlineError> : null}
-          </div>
-        ) : null}
-      </Dialog>
+      {photoFor ? (
+        <SchedulePhotoDialog projectId={projectId} entryCode={entry.code} option={photoFor} command={command} onClose={() => setPhotoFor(null)} />
+      ) : null}
     </div>
   );
 }

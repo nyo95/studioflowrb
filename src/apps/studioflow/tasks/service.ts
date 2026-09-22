@@ -52,6 +52,7 @@ const ITEM_SELECT = {
   label: true,
   is_checked: true,
   checked_at: true,
+  is_blocking: true,
   sort_order: true,
   priority: true,
   due_at: true,
@@ -73,6 +74,8 @@ export type ChecklistItemView = {
   label: string;
   isChecked: boolean;
   checkedAt: Date | null;
+  /** False = warning-only; it never gates approval. */
+  isBlocking: boolean;
   sortOrder: number;
   priority: number;
   dueDate: string | null;
@@ -90,6 +93,7 @@ export function toItemView(row: ItemRow): ChecklistItemView {
     label: row.label,
     isChecked: row.is_checked,
     checkedAt: row.checked_at,
+    isBlocking: row.is_blocking,
     sortOrder: row.sort_order,
     priority: row.priority,
     dueDate: dateToDateOnly(row.due_at),
@@ -164,7 +168,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
      * V2-D1: Create a freestanding root checklist item (Todo).
      * phaseId = null → general project todo; phaseId set → phase-scoped todo.
      */
-    async createItem(input: CommandContext & { projectId: string; phaseId: string | null; label: string; priority?: number; dueDate?: string | null; assignedToId?: string | null }) {
+    async createItem(input: CommandContext & { projectId: string; phaseId: string | null; label: string; priority?: number; dueDate?: string | null; assignedToId?: string | null; isBlocking?: boolean }) {
       const userId = requireCommand(input, P.taskManage);
       const label = requiredText(input.label, "CHECKLIST_LABEL_REQUIRED", "Task", CHECKLIST_LABEL_MAX_LENGTH);
       const priority = parsePriority(input.priority) ?? CHECKLIST_PRIORITY_NONE;
@@ -197,6 +201,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
             priority,
             due_at: due,
             assigned_to_id: input.assignedToId ?? null,
+            is_blocking: input.isBlocking ?? true,
             sort_order: (last?.sort_order ?? 0) + CHECKLIST_SORT_STEP,
             created_by_id: userId,
           },
@@ -232,6 +237,9 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
             priority,
             due_at: due,
             assigned_to_id: input.assignedToId ?? null,
+            // A subtask never gates approval, so it is stored as non-blocking rather
+            // than relying on readers to remember the depth rule.
+            is_blocking: false,
             sort_order: (last?.sort_order ?? 0) + CHECKLIST_SORT_STEP,
             created_by_id: userId,
           },
@@ -241,7 +249,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
       });
     },
 
-    async updateItem(input: CommandContext & { projectId: string; itemId: string; label?: string; priority?: number; dueDate?: string | null; assignedToId?: string | null }) {
+    async updateItem(input: CommandContext & { projectId: string; itemId: string; label?: string; priority?: number; dueDate?: string | null; assignedToId?: string | null; isBlocking?: boolean }) {
       requireCommand(input, P.taskManage);
       const priority = parsePriority(input.priority);
       const due = parseDue(input.dueDate);
@@ -258,6 +266,12 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
         if (priority !== undefined && priority !== item.priority) { data.priority = priority; changes.priority = { from: item.priority, to: priority }; }
         if (due !== undefined && dateToDateOnly(due) !== dateToDateOnly(item.due_at)) { data.due_at = due; changes.dueDate = { from: dateToDateOnly(item.due_at), to: dateToDateOnly(due) }; }
         if (input.assignedToId !== undefined && (input.assignedToId ?? null) !== item.assigned_to_id) { data.assigned_to_id = input.assignedToId ?? null; changes.assignedToId = { from: item.assigned_to_id, to: input.assignedToId ?? null }; }
+        // Only a root item can gate approval, so flipping the flag on a subtask would be a silent no-op.
+        if (input.isBlocking !== undefined && input.isBlocking !== item.is_blocking) {
+          if (item.parent_id !== null) throw invalid("CHECKLIST_SUBTASK_NEVER_BLOCKS", "Subtasks never block approval, so they cannot be made blocking.");
+          data.is_blocking = input.isBlocking;
+          changes.isBlocking = { from: item.is_blocking, to: input.isBlocking };
+        }
         if (Object.keys(changes).length === 0) return { itemId: item.id };
         await tx.sfChecklistItem.update({ where: { id: item.id }, data });
         await writeAudit(ports, tx, { action: "studioflow.checklist.updated", entityType: "checklist-item", entityId: item.id, actor: input.actor, changes, metadata: meta(item) });
@@ -385,11 +399,11 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
         orderBy: [{ sort_order: "asc" }, { created_at: "asc" }, { id: "asc" }],
         include: { _count: { select: { generated_items: true } } },
       });
-      return rows.map((row) => ({ id: row.id, definitionId: row.definition_id, label: row.label, isActive: row.is_active, sortOrder: row.sort_order, usedBy: row._count.generated_items }));
+      return rows.map((row) => ({ id: row.id, definitionId: row.definition_id, label: row.label, isBlocking: row.is_blocking, isActive: row.is_active, sortOrder: row.sort_order, usedBy: row._count.generated_items }));
     },
 
     /** `definitionId` null = general (project-level); otherwise the template seeds phases created from that definition. */
-    async createTemplate(input: CommandContext & { definitionId: string | null; label: string }) {
+    async createTemplate(input: CommandContext & { definitionId: string | null; label: string; isBlocking?: boolean }) {
       requireCommand(input, P.settingsManage);
       const label = requiredText(input.label, "TEMPLATE_LABEL_REQUIRED", "Checklist item", CHECKLIST_LABEL_MAX_LENGTH);
       return runTransaction(async (tx) => {
@@ -398,25 +412,26 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
         }
         const last = await tx.sfChecklistTemplate.findFirst({ where: { definition_id: input.definitionId }, orderBy: { sort_order: "desc" }, select: { sort_order: true } });
         const id = randomUUID();
-        await tx.sfChecklistTemplate.create({ data: { id, definition_id: input.definitionId, label, sort_order: (last?.sort_order ?? 0) + CHECKLIST_SORT_STEP } });
-        await writeAudit(ports, tx, { action: "studioflow.checklist-template.created", entityType: "checklist-template", entityId: id, actor: input.actor, metadata: { definitionId: input.definitionId, label } });
+        await tx.sfChecklistTemplate.create({ data: { id, definition_id: input.definitionId, label, is_blocking: input.isBlocking ?? true, sort_order: (last?.sort_order ?? 0) + CHECKLIST_SORT_STEP } });
+        await writeAudit(ports, tx, { action: "studioflow.checklist-template.created", entityType: "checklist-template", entityId: id, actor: input.actor, metadata: { definitionId: input.definitionId, label, isBlocking: input.isBlocking ?? true } });
         return { templateId: id };
       });
     },
 
-    /** Renaming a template never rewrites existing project rows. */
-    async updateTemplate(input: CommandContext & { templateId: string; label?: string; isActive?: boolean }) {
+    /** Renaming a template never rewrites existing project rows. Changing is_blocking does not rewrite existing generated items. */
+    async updateTemplate(input: CommandContext & { templateId: string; label?: string; isActive?: boolean; isBlocking?: boolean }) {
       requireCommand(input, P.settingsManage);
       return runTransaction(async (tx) => {
         const template = await tx.sfChecklistTemplate.findUnique({ where: { id: input.templateId } });
         if (!template) throw notFound("checklist template");
-        const data: { label?: string; is_active?: boolean } = {};
+        const data: { label?: string; is_active?: boolean; is_blocking?: boolean } = {};
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (input.label !== undefined) {
           const label = requiredText(input.label, "TEMPLATE_LABEL_REQUIRED", "Checklist item", CHECKLIST_LABEL_MAX_LENGTH);
           if (label !== template.label) { data.label = label; changes.label = { from: template.label, to: label }; }
         }
         if (input.isActive !== undefined && input.isActive !== template.is_active) { data.is_active = input.isActive; changes.isActive = { from: template.is_active, to: input.isActive }; }
+        if (input.isBlocking !== undefined && input.isBlocking !== template.is_blocking) { data.is_blocking = input.isBlocking; changes.isBlocking = { from: template.is_blocking, to: input.isBlocking }; }
         if (Object.keys(changes).length === 0) return { templateId: template.id };
         await tx.sfChecklistTemplate.update({ where: { id: template.id }, data });
         await writeAudit(ports, tx, { action: "studioflow.checklist-template.updated", entityType: "checklist-template", entityId: template.id, actor: input.actor, changes });

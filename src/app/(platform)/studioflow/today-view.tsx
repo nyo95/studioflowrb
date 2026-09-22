@@ -1,7 +1,8 @@
 "use client";
 
-import { AlertTriangle, CalendarCheck2, MessageSquareText, Plus } from "lucide-react";
+import { AlertTriangle, CalendarCheck2, MessageSquareText, MoreHorizontal, Plus } from "lucide-react";
 import Link from "next/link";
+import { Popover } from "radix-ui";
 import { useMemo, useState } from "react";
 
 import {
@@ -97,7 +98,7 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
     const editable = task.source === "activity" ? canWork : canManageTasks;
     return (
       <li key={task.key} className={`grid gap-px ${nested ? "ml-7" : ""}`}>
-        <div className="flex items-start gap-2.5 rounded-control px-1.5 py-1.5 hover:bg-surface-muted">
+        <div className="group flex items-start gap-2.5 rounded-control px-1.5 py-1.5 hover:bg-surface-muted">
           {task.mode === "FEEDBACK" ? <MessageSquareText aria-label="Feedback" className="mt-0.5 h-4 w-4 shrink-0 text-warning" /> : null}
           <Checkbox
             checked={task.isChecked}
@@ -119,6 +120,7 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
             {task.labels.map((label) => <Badge key={label.id}>#{label.name}</Badge>)}
             <DueLabel date={task.dueDate} done={task.isChecked} />
             <PersonChip person={task.assigneeId ? personById.get(task.assigneeId) : null} />
+            {editable && !task.isChecked ? <TaskQuickEdit task={task} people={people} labels={labels} /> : null}
             {task.source === "activity" && canWork ? (
               <RowActionMenu items={[{ label: "Delete", danger: true, onSelect: () => run(task.key, () => activityAction({ op: "delete", projectId: task.projectId, activityId: task.id })) }]} />
             ) : null}
@@ -202,12 +204,227 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
             ) : (
               <ul className="m-0 grid list-none gap-px p-0">{group.tasks.map((task) => renderTask(task))}</ul>
             )}
+            {canManageTasks ? (
+              <InlineAddRow projectId={group.project.id} targets={addTargets.find((t) => t.projectId === group.project.id)?.targets ?? null} />
+            ) : null}
           </SectionCard>
         ))
       )}
 
       {quickAdd ? <QuickAddDialog targets={addTargets} people={people} onClose={() => setQuickAdd(false)} /> : null}
     </div>
+  );
+}
+
+const PRIORITY_STYLE: Record<number, string> = {
+  1: "border-danger/40 text-danger",
+  2: "border-warning/40 text-warning",
+  3: "border-line text-ink-secondary",
+  4: "border-line text-ink-secondary",
+};
+
+/**
+ * Per-row quick edit: priority, due date, assignee, labels — each commits
+ * immediately (no shared Save step), matching legacy's dropdown-embedded
+ * controls. Built on Popover rather than a menu primitive: a Menu role
+ * forces focus onto its content on open, which fights embedded inputs
+ * (see the app-switcher fix in navigation.tsx for the same class of bug).
+ */
+function TaskQuickEdit({ task, people, labels }: { task: FeedTask; people: Person[]; labels: Array<{ id: string; name: string; color: string }> }) {
+  const { run, pending } = useCommand();
+  const [open, setOpen] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const isChecklist = task.source !== "activity";
+
+  const updateDue = (value: string) =>
+    void run(
+      `due-${task.key}`,
+      () =>
+        task.source === "activity"
+          ? activityAction({ op: "update", projectId: task.projectId, activityId: task.id, dueDate: value })
+          : checklistAction({ op: "update", projectId: task.projectId, itemId: task.id, dueDate: value }),
+    );
+  const updatePriority = (priority: number) =>
+    void run(`pr-${task.key}`, () => checklistAction({ op: "update", projectId: task.projectId, itemId: task.id, priority }));
+  const updateAssignee = (assignedToId: string | null) =>
+    void run(`as-${task.key}`, () => checklistAction({ op: "update", projectId: task.projectId, itemId: task.id, assignedToId }));
+  const attachLabel = (name: string) =>
+    void run(`lb-${task.key}`, () => checklistAction({ op: "label", projectId: task.projectId, itemId: task.id, name }));
+  const detachLabel = (labelId: string) =>
+    void run(`ul-${task.key}`, () => checklistAction({ op: "unlabel", projectId: task.projectId, itemId: task.id, labelId }));
+
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          aria-label="Edit task"
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-action text-ink-tertiary hover:bg-surface-muted hover:text-ink data-[state=open]:bg-surface-muted data-[state=open]:text-ink"
+        >
+          <MoreHorizontal size={14} aria-hidden="true" />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content align="end" sideOffset={6} className="z-[65] w-60 overflow-hidden rounded-control border border-line bg-surface-raised p-2.5 shadow-elevated">
+          <div className="grid gap-3">
+            {isChecklist ? (
+              <div className="grid gap-1">
+                <p className="text-label text-ink-tertiary">Priority</p>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4].map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      disabled={pending}
+                      onClick={() => updatePriority(level)}
+                      className={`flex-1 rounded-action border py-1 text-xs font-semibold ${PRIORITY_STYLE[level]} ${task.priority === level ? "ring-1 ring-action" : ""}`}
+                    >
+                      P{level}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <div className="grid gap-1">
+              <p className="text-label text-ink-tertiary">Due date</p>
+              <div className="flex items-center gap-1.5">
+                <Input type="date" density="compact" value={task.dueDate ?? ""} disabled={pending} onChange={(event) => updateDue(event.target.value)} className="flex-1" />
+                {task.dueDate ? <Button type="button" size="sm" variant="ghost" onClick={() => updateDue("")}>Clear</Button> : null}
+              </div>
+            </div>
+            {isChecklist ? (
+              <div className="grid gap-1">
+                <p className="text-label text-ink-tertiary">Assignee</p>
+                <PersonSelect people={people} value={task.assigneeId} onChange={updateAssignee} />
+              </div>
+            ) : null}
+            {isChecklist ? (
+              <div className="grid gap-1">
+                <p className="text-label text-ink-tertiary">Labels</p>
+                {labels.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {labels.map((label) => {
+                      const attached = task.labels.some((l) => l.id === label.id);
+                      return (
+                        <button
+                          key={label.id}
+                          type="button"
+                          disabled={pending}
+                          onClick={() => (attached ? detachLabel(label.id) : attachLabel(label.name))}
+                          className={`rounded-pill border px-2 py-0.5 text-xs ${attached ? "border-action bg-action/10 text-ink" : "border-line text-ink-secondary hover:bg-surface-muted"}`}
+                        >
+                          #{label.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+                <Input
+                  density="compact"
+                  placeholder="New label…"
+                  value={newLabel}
+                  disabled={pending}
+                  onChange={(event) => setNewLabel(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter") return;
+                    event.preventDefault();
+                    const trimmed = newLabel.trim();
+                    if (!trimmed) return;
+                    setNewLabel("");
+                    attachLabel(trimmed);
+                  }}
+                />
+              </div>
+            ) : null}
+          </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+/**
+ * Per-project inline quick-add: click to reveal an inline input, Enter to
+ * add, blur-when-empty to collapse. Ports legacy `today-inline-add.tsx`'s
+ * ergonomics (no modal for the common case) without its `#phase` hashtag
+ * autocomplete, which targeted legacy's now-removed Activity-as-Todo model.
+ */
+function InlineAddRow({ projectId, targets }: { projectId: string; targets: TodayAddTarget["targets"] | null }) {
+  const { run, pending, error } = useCommand();
+  const [editing, setEditing] = useState(false);
+  const [label, setLabel] = useState("");
+  const [phaseId, setPhaseId] = useState("");
+
+  if (!targets || targets.length === 0) return null;
+
+  const submit = async () => {
+    const trimmed = label.trim();
+    if (!trimmed) {
+      setEditing(false);
+      return;
+    }
+    const ok = await run("add", () => addChecklistItemAction({ projectId, phaseId: phaseId || null, label: trimmed }));
+    if (ok) {
+      setLabel("");
+      setPhaseId("");
+      setEditing(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="mt-1 flex min-h-7 items-center gap-1.5 rounded-control px-1.5 text-sm text-ink-tertiary hover:bg-surface-muted hover:text-ink-secondary"
+      >
+        <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+        Add to-do…
+      </button>
+    );
+  }
+
+  return (
+    <form
+      className="mt-1 flex flex-wrap items-center gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void submit();
+      }}
+    >
+      <Input
+        autoFocus
+        density="compact"
+        className="min-w-[180px] flex-1"
+        placeholder="What needs doing?"
+        value={label}
+        disabled={pending}
+        maxLength={200}
+        onChange={(event) => setLabel(event.target.value)}
+        onBlur={() => {
+          if (!label.trim() && !pending) setEditing(false);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            setLabel("");
+            setEditing(false);
+          }
+        }}
+      />
+      {targets.length > 1 ? (
+        <div className="w-40 shrink-0">
+          <Select aria-label="Phase" density="compact" value={phaseId} disabled={pending} onChange={(event) => setPhaseId(event.target.value)}>
+            {targets.map((t) => (
+              <option key={t.phaseId ?? "general"} value={t.phaseId ?? ""} disabled={t.disabledReason !== null}>
+                {t.label}{t.disabledReason ? ` — ${t.disabledReason}` : ""}
+              </option>
+            ))}
+          </Select>
+        </div>
+      ) : null}
+      <Button type="submit" size="sm" pending={pending} disabled={!label.trim()}>Add</Button>
+      {error ? <InlineError>{error}</InlineError> : null}
+    </form>
   );
 }
 

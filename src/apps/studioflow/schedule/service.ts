@@ -2,6 +2,7 @@ import { createPrivateObjectKey } from "@platform/core/storage";
 
 import { STUDIOFLOW_IMAGE_TYPES, sniffImage } from "../domain/images";
 import {
+  SCHEDULE_CARD_FIELD_KEYS,
   SCHEDULE_IMAGE_BYTES,
   SCHEDULE_SECTIONS,
   compareOptionLabels,
@@ -254,6 +255,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         qty: entry.qty?.toString() ?? null,
         unit: entry.unit,
         location: entry.location,
+        cardFields: entry.card_fields,
         versionLocked: entry.version_locked,
         templateItemId: entry.template_item_id,
         options: [...entry.options].sort((a, b) => compareOptionLabels(a.label, b.label)).map((option) => ({
@@ -520,6 +522,18 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         if (Object.keys(changes).length === 0) return { entryId: entry.id };
         await tx.sfScheduleEntry.update({ where: { id: entry.id }, data });
         await writeAudit(ports, tx, { action: "studioflow.schedule.entry-updated", entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor, changes, metadata: { projectId: input.projectId, code: scheduleCode(entry.prefix, entry.increment) } });
+        return { entryId: entry.id };
+      });
+    },
+
+    /** Board-card field selection; `fields: []` resets to the default (show every populated field). */
+    async updateEntryCardFields(input: CommandContext & { projectId: string; entryId: string; fields: string[] }) {
+      requireCommand(input, P.scheduleManage);
+      const fields = [...new Set(input.fields)].filter((key): key is (typeof SCHEDULE_CARD_FIELD_KEYS)[number] => (SCHEDULE_CARD_FIELD_KEYS as readonly string[]).includes(key));
+      return runTransaction(async (tx) => {
+        const entry = await loadEntry(tx, input.projectId, input.entryId, true);
+        await tx.sfScheduleEntry.update({ where: { id: entry.id }, data: { card_fields: fields } });
+        await writeAudit(ports, tx, { action: "studioflow.schedule.entry-card-fields-updated", entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor, metadata: { projectId: input.projectId, code: scheduleCode(entry.prefix, entry.increment), fields } });
         return { entryId: entry.id };
       });
     },

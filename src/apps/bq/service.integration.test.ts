@@ -82,6 +82,26 @@ describe("BQ R6.1 invariants", () => {
     await assert.rejects(() => service.addLineItem({ grants: GRANTS, actor: ACTOR, itemId: item.id, subObjectId: group.id, sourceType: "CUSTOM", titleSnapshot: "Invalid", purchaseUnitSnapshot: "PCS", hargaSnapshot: "0", kategori: "ALAT", qty: "1" }), (error: unknown) => error instanceof AppError && error.code === "bq.line-item.dual-parent");
   });
 
+  it("carries a non-CUSTOM assembly line's source price forward as the applied item's revert baseline", async () => {
+    const { item } = await projectTree();
+    const assembly = await service.createAssemblyTemplate({ grants: GRANTS, actor: ACTOR, name: "Cabinet kit" });
+    // The only public write path (addAssemblyCustomLine) always sets source_type CUSTOM;
+    // insert a Master-Data-sourced line directly to exercise the schema's full source_type
+    // range, since BqAssemblyLine.source_type is not restricted to CUSTOM at the DB level.
+    await testDb.prisma.bqAssemblyLine.create({
+      data: { assembly_template_id: assembly.id, source_type: "MASTERDATA", source_ref_id: "md-price-9", title_snapshot: "Hinge", purchase_unit_snapshot: "PCS", harga_snapshot: "15000", currency_snapshot: "IDR", kategori: "MATERIAL", qty: "4", koefisien: "1", sort_order: 0 },
+    });
+
+    const subObject = await service.applyAssemblyTemplate({ grants: GRANTS, actor: ACTOR, itemId: item.id, assemblyId: assembly.id });
+    const created = await testDb.prisma.bqLineItem.findFirstOrThrow({ where: { sub_object_id: subObject.id } });
+    assert.equal(created.source_price_snapshot?.toString(), "15000", "assembly-applied non-CUSTOM line must carry its source price forward, matching the direct addLineItem path");
+
+    await service.updateLineItem({ grants: GRANTS, actor: ACTOR, id: created.id, hargaSnapshot: "18000" });
+    await service.revertLineItemPrice({ grants: GRANTS, actor: ACTOR, id: created.id });
+    const reverted = await testDb.prisma.bqLineItem.findUniqueOrThrow({ where: { id: created.id } });
+    assert.equal(reverted.harga_snapshot.toString(), "15000", "Revert must be available for assembly-applied non-CUSTOM lines, not just directly-added ones");
+  });
+
   it("derives Library category and defaults coefficient to one", async () => {
     const material = await service.createLibMaterial({ grants: GRANTS, actor: ACTOR, name: "Board", purchaseUnit: "SHEET", harga: "100", currency: "IDR" });
     const labor = await service.createLibLabor({ grants: GRANTS, actor: ACTOR, name: "Install", purchaseUnit: "M2", harga: "50", currency: "IDR" });
@@ -142,6 +162,30 @@ describe("BQ R6.1 invariants", () => {
       (await testDb.prisma.auditEvent.findMany({ where: { entity_id: material.id }, orderBy: { occurred_at: "asc" }, select: { action: true } }))
         .map((event) => event.action),
       ["bq.lib-material.created", "bq.promotion.requested", "bq.promotion.approved"],
+    );
+  });
+
+  it("guards concurrent promotion approvals against a lost-update race", async () => {
+    const material = await service.createLibMaterial({ grants: GRANTS, actor: ACTOR, name: "Racy board", purchaseUnit: "SHEET", harga: "100", currency: "IDR" });
+    const masterDataGrants = [MASTERDATA_PERMISSIONS.promotionApprove];
+    await service.requestPromotion({ grants: GRANTS, actor: ACTOR, type: "material", libItemId: material.id });
+
+    const results = await Promise.allSettled([
+      service.approvePromotion({ grants: masterDataGrants, actor: ACTOR, type: "material", libItemId: material.id, masterdataRefId: "ref-a" }),
+      service.approvePromotion({ grants: masterDataGrants, actor: ACTOR, type: "material", libItemId: material.id, masterdataRefId: "ref-b" }),
+    ]);
+
+    assert.equal(results.filter((r) => r.status === "fulfilled").length, 1, "exactly one concurrent approval wins the race");
+    const loser = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+    assert.ok(loser.reason instanceof AppError && loser.reason.code === "bq.promotion.invalid-status", "the losing approval must surface a conflict, not silently overwrite the winner");
+
+    const final = await testDb.prisma.bqLibMaterial.findUniqueOrThrow({ where: { id: material.id } });
+    assert.equal(final.promotion_status, "APPROVED");
+    assert.ok(final.masterdata_ref_id === "ref-a" || final.masterdata_ref_id === "ref-b", "the winner's ref is preserved, not blended or cleared");
+    assert.equal(
+      (await testDb.prisma.auditEvent.count({ where: { entity_id: material.id, action: "bq.promotion.approved" } })),
+      1,
+      "only the winning transition is audited",
     );
   });
 

@@ -519,7 +519,7 @@ yang lain (K-05).
 | **BQ-F5** | Promotion flow (Library → Master Data) | Estimator ajukan, Admin/staff MD approve/reject di Master Data | selesai; reconciled R8.80 |
 
 F1-F5 punya bukti kode dan integration coverage per R8.80. Browser acceptance
-khusus BQ tetap dicatat di `docs/review.md` sampai ada walkthrough user-facing
+khusus BQ tetap dicatat sebagai `[UNVERIFIED]` di `docs/BACKLOG.md` sampai ada walkthrough user-facing
 yang eksplisit direkam.
 
 ---

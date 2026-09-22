@@ -7,7 +7,9 @@ export async function readBlockerCounts(client: Db | TxClient, phaseId: string):
   const [openRevisionActivities, openRootChecklistItems] = await Promise.all([
     // V2-D1: SfActivity is FEEDBACK-only; mode filter removed
     active ? client.sfActivity.count({ where: { revision_id: active.id, status: "OPEN" } }) : 0,
-    client.sfChecklistItem.count({ where: { phase_id: phaseId, parent_id: null, is_checked: false } }),
+    // Only blocking root items gate approval; warning-only items (the former requirements)
+    // are counted separately as warnings.
+    client.sfChecklistItem.count({ where: { phase_id: phaseId, parent_id: null, is_checked: false, is_blocking: true } }),
   ]);
   return { openRevisionActivities, openRootChecklistItems };
 }

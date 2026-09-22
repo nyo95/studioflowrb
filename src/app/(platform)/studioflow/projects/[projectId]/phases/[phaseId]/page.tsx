@@ -12,7 +12,6 @@ import { PhaseStatusBadge } from "../../../../_components/phase-status";
 import { PersonChip } from "../../../../_components/people";
 import { pageSession } from "../../../../_components/session";
 import { PhaseActions } from "./phase-actions";
-import { RequirementsPanel } from "./requirements-panel";
 import { DeliverablesPanel } from "./deliverables-panel";
 import { RevisionHistory } from "./revision-history";
 
@@ -25,10 +24,9 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
     if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
     throw error;
   });
-  const [checklist, people, phaseRequirements, phaseDeliverablesResult] = await Promise.all([
+  const [checklist, people, phaseDeliverablesResult] = await Promise.all([
     studioFlow.tasks.listChecklist({ grants, projectId, phaseId }),
     studioFlow.projects.listAssignablePeople({ grants }),
-    studioFlow.phases.listRequirements({ grants, projectId, phaseId }),
     studioFlow.phases.listDeliverables({ grants, projectId, phaseId }),
   ]);
   const { items: phaseDeliverables, status: deliverableStatus } = phaseDeliverablesResult;
@@ -91,19 +89,15 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
           )}
         </SectionCard>
 
-        <SectionCard title="Phase checklist" description="Root items must be ticked before approval. Subtasks never block.">
-          <ChecklistTree projectId={projectId} nodes={checklist} people={people} canEdit={phase.modifiable && hasPermission(grants, P.taskManage)} emptyText="No checklist for this phase" />
+        <SectionCard
+          title="Phase checklist"
+          description="Ticked items gate approval. Items marked Optional are warnings only. Subtasks never block."
+        >
+          <ChecklistTree projectId={projectId} phaseId={phaseId} nodes={checklist} people={people} canEdit={phase.modifiable && hasPermission(grants, P.taskManage)} emptyText="No checklist for this phase" />
         </SectionCard>
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 max-[900px]:grid-cols-1">
-        <RequirementsPanel
-          projectId={projectId}
-          phaseId={phaseId}
-          requirements={phaseRequirements}
-          canWork={canWork}
-          canManage={canManage}
-        />
+      <div className="grid gap-4">
         <DeliverablesPanel
           projectId={projectId}
           phaseId={phaseId}

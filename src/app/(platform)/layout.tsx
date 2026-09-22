@@ -9,6 +9,7 @@ import { readPlatformGeneralSettings } from "@platform/core/settings";
 import { brandMarkStorage } from "@platform/runtime";
 import { logoutAction } from "./logout-action";
 import { BqNav } from "./bq/nav";
+import { StudioFlowHeaderSearch } from "./studioflow/header-search";
 import { StudioFlowNav, StudioFlowUtilityNav } from "./studioflow/nav";
 import { MasterDataNav } from "./masterdata/nav";
 
@@ -33,7 +34,9 @@ export default async function PlatformLayout({ children }: { children: ReactNode
     ? <StudioFlowUtilityNav />
     : null;
 
-  return <AuthenticatedShell principal={principal} grants={grants} settings={settings} apps={apps} logoutAction={logoutAction} domainNavigation={domainNavigation} domainUtilityNavigation={domainUtilityNavigation}>
+  const contextSlot = apps.some((app) => app.appId === "studioflow") ? <StudioFlowHeaderSearch /> : null;
+
+  return <AuthenticatedShell principal={principal} grants={grants} settings={settings} apps={apps} logoutAction={logoutAction} domainNavigation={domainNavigation} domainUtilityNavigation={domainUtilityNavigation} contextSlot={contextSlot}>
     {children}
   </AuthenticatedShell>;
 }

@@ -90,8 +90,9 @@ the full batch.
 
 Report the outcome, revision/commit, material files or areas changed, checks
 passed/failed/skipped, browser backlog additions if any, limitations, and
-unrelated dirty files. Add `docs/review.md` only when review is actually being
-deferred; otherwise the Planner/Reviewer can inspect the commit directly.
+unrelated dirty files. Add a `[UNVERIFIED]` entry to `docs/BACKLOG.md` only
+when review is actually being deferred; otherwise the Planner/Reviewer can
+inspect the commit directly.
 
 For a separate-session handoff, the final response contains only one
 copy-ready `Planner/Reviewer Prompt`. It names the active plan, revision and

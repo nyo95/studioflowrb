@@ -61,7 +61,7 @@ export function AppShell({
   collapsible = false,
   railPresentation = "expanded",
   collapsed,
-  defaultCollapsed = false,
+  defaultCollapsed = true,
   onCollapsedChange,
   collapsedBrand,
   expandLabel = "Expand navigation",

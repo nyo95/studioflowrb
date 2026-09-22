@@ -776,6 +776,30 @@ describe("Master Data service", () => {
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "unit.deleted", entity_id: created.unitId } }), 1);
   });
 
+  it("reuses an existing pending deletion request instead of creating a duplicate for the same target", async () => {
+    const created = await service.createUnit({ grants: GRANTS, actor: ACTOR, code: "DUP_REQUEST", name: "Duplicate Request" });
+    await service.archiveUnit({ grants: GRANTS, actor: ACTOR, unitId: created.unitId });
+
+    const first = await service.requestUnitDeletion({ grants: GRANTS, actor: ACTOR, unitId: created.unitId, reason: "First request" });
+    const second = await service.requestUnitDeletion({ grants: GRANTS, actor: ACTOR, unitId: created.unitId, reason: "Second request" });
+
+    assert.equal(second.requestId, first.requestId);
+    assert.equal(await testDb.prisma.deletionRequest.count({ where: { target_id: created.unitId, status: "PENDING" } }), 1);
+  });
+
+  it("direct hard-delete resolves a pre-existing pending request instead of stranding it", async () => {
+    const created = await service.createUnit({ grants: GRANTS, actor: ACTOR, code: "DIRECT_RESOLVES", name: "Direct Resolves Pending" });
+    await service.archiveUnit({ grants: GRANTS, actor: ACTOR, unitId: created.unitId });
+    const request = await service.requestUnitDeletion({ grants: GRANTS, actor: ACTOR, unitId: created.unitId });
+
+    const result = await service.hardDeleteArchived({ grants: GRANTS, actor: ACTOR, targetType: "unit", targetId: created.unitId });
+
+    assert.equal(result?.direct, true);
+    assert.equal(await testDb.prisma.unit.findUnique({ where: { id: created.unitId } }), null);
+    const decision = await testDb.prisma.deletionRequest.findUniqueOrThrow({ where: { id: request.requestId } });
+    assert.equal(decision.status, "APPROVED", "the pending request must be resolved, not left stuck pointing at a deleted target");
+  });
+
   it("keeps a deletion request pending when its archived target is restored before approval", async () => {
     const created = await service.createUnit({ grants: GRANTS, actor: ACTOR, code: "RESTORE_GUARD", name: "Restore Guard" });
     await service.archiveUnit({ grants: GRANTS, actor: ACTOR, unitId: created.unitId });

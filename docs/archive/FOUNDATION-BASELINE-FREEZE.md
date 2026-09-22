@@ -1,5 +1,11 @@
 # Foundation Baseline and Continuation Freeze
 
+> **Moved to `docs/archive/` on 2026-09-22** during documentation
+> consolidation — Foundation is fully closed and this was historical
+> governance evidence not indexed by `docs/README.md`'s active contract
+> table. Content unchanged; still referenced by `docs/archive/knownbug-2026-09-22.md`
+> KB-026.
+
 **Status:** PF-0 accepted in R8.21 after the R8.20 reference correction passed
 independent review.
 **Scope:** Project Rebuild Foundation governance record only. This record does

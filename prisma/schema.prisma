@@ -1205,7 +1205,6 @@ model SfProject {
   checklist_items  SfChecklistItem[]
   mom_documents    SfMomDocument[]
   schedule_entries SfScheduleEntry[]
-  requirements     SfRequirement[]
   deliverables     SfDeliverable[]
 
   @@index([status, archived_at])
@@ -1241,7 +1240,6 @@ model SfPhase {
   revisions       SfRevision[]
   activities      SfActivity[]
   checklist_items SfChecklistItem[]
-  requirements    SfRequirement[]
   deliverables    SfDeliverable[]
 
   @@unique([project_id, order_index])
@@ -1303,6 +1301,7 @@ model SfChecklistTemplate {
   /// Null = general (project-level) template; otherwise it seeds phases created from this definition.
   definition_id String?
   label         String
+  is_blocking   Boolean  @default(true)
   is_active     Boolean  @default(true)
   sort_order    Int      @default(0)
   created_at    DateTime @default(now())
@@ -1326,6 +1325,8 @@ model SfChecklistItem {
   label          String
   is_checked     Boolean   @default(false)
   checked_at     DateTime?
+  /// False = warning-only (the former SfRequirement); an unticked root item blocks approval only when true.
+  is_blocking    Boolean   @default(true)
   sort_order     Int       @default(0)
   /// 1 = P1 (highest) … 4 = none.
   priority       Int       @default(4)
@@ -1346,6 +1347,7 @@ model SfChecklistItem {
 
   @@index([project_id, phase_id, parent_id])
   @@index([phase_id, is_checked])
+  @@index([phase_id, is_blocking, is_checked])
   @@index([assigned_to_id, is_checked])
   @@map("sf_checklist_item")
   @@schema("studioflow")
@@ -1428,29 +1430,6 @@ model SfPhaseDefinition {
 
   @@unique([template_id, order_index])
   @@map("sf_phase_definition")
-  @@schema("studioflow")
-}
-
-/// Lightweight project/phase requirement — warning-only, never blocks approval (V2-D2).
-model SfRequirement {
-  id            String    @id @default(uuid())
-  project_id    String
-  /// Null = project-wide requirement.
-  phase_id      String?
-  title         String
-  description   String?
-  is_met        Boolean   @default(false)
-  met_at        DateTime?
-  met_by_id     String?
-  created_by_id String?
-  created_at    DateTime  @default(now())
-  updated_at    DateTime  @updatedAt
-
-  project SfProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
-  phase   SfPhase?  @relation(fields: [phase_id], references: [id], onDelete: Cascade)
-
-  @@index([project_id, phase_id])
-  @@map("sf_requirement")
   @@schema("studioflow")
 }
 
@@ -1687,6 +1666,8 @@ model SfScheduleEntry {
   qty             Decimal?          @db.Decimal(12, 2)
   unit            String?
   location        String?
+  /** Per-card field selection for the board view; empty = show every populated field (default). */
+  card_fields     String[]          @default([])
   active_index    Int               @default(0)
   version_locked  Boolean           @default(false)
   template_item_id String?

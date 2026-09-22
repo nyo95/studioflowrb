@@ -5,9 +5,9 @@ workflow slices, rebuilt under explicit contracts.
 
 Current state, evidence, and remaining work are tracked in
 [`docs/README.md`](docs/README.md) (the documentation hub) and
-[`CHANGELOG.md`](CHANGELOG.md) (the revision ledger). Remaining product work
-and defects are tracked by application in [`docs/roadmap.md`](docs/roadmap.md)
-and [`docs/knownbug.md`](docs/knownbug.md).
+[`CHANGELOG.md`](CHANGELOG.md) (the revision ledger). Remaining product work,
+unverified work, and defects are tracked by application in one consolidated
+worklist, [`docs/BACKLOG.md`](docs/BACKLOG.md).
 
 ## Start here
 

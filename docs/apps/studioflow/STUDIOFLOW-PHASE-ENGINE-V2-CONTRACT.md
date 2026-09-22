@@ -28,7 +28,7 @@ with this document taking precedence where conflicts exist.
 | §5.4 "Label vMAJOR.MINOR" | revisionLabel → `vM.m` | Replaced by `{PREFIX}{major}.{minor}` where PREFIX comes from SfPhaseDefinition (§6) |
 | §6.1 "Activity = revision work" | SfActivity owns revision work (TODO) | SfActivity restricted to FEEDBACK only; SfChecklistItem is the sole Todo SSOT (§3) |
 | §8 "Phase page is the main workspace" | Phase page has all actions; project rail lists phases | Overview is the main workspace; phase page becomes detail/deep-link (§7) |
-| §9 "Requirements are checklist templates" | SfChecklistTemplate with phase_key | SfRequirement is a first-class lightweight model, separate from Todo (§5) |
+| §9 "Requirements are checklist templates" | SfChecklistTemplate with phase_key | Requirements are checklist items carrying `is_blocking = false` (§5, owner decision 2026-09-22; supersedes the V2-D2 separate model) |
 | RW-01 "vMAJOR.MINOR format everywhere" | All labels use v prefix | Phase prefix from definition (§6) |
 | RW-04 "Deliverables = wave 2" | Deliverables deferred | SfDeliverable is on the critical path, warning-only (§8) |
 | §2 PURGE item: "Requirement templates/project requirements/evidence" | Purged with evidence | Re-introduced without evidence; lightweight warning model only (§5) |
@@ -103,20 +103,32 @@ a record of the bridge that existed between R8.87 and R8.105.
 
 ---
 
-## 5. Requirements (V2-D2) — lightweight, warning-only
+## 5. Requirements — merged into the checklist (owner decision 2026-09-22)
 
-`SfRequirement` is a new first-class model.
+**This section supersedes V2-D2.** `SfRequirement` no longer exists at runtime.
 
-Fields: `project_id`, `phase_id` (nullable), `title`, `description` (nullable), `is_met`, `met_at`, `met_by_id`.
+A requirement was structurally a subset of a checklist item — `title`/`label`, `is_met`/`is_checked`,
+`met_at`/`checked_at` — and the only real difference was one policy bit: a root checklist item blocks
+approval, a requirement only warns. Keeping a second model, table, service and panel to carry one
+boolean cost more than it explained, and made requirements *less* visible than ordinary to-dos (no
+assignee, no due date, absent from Today) despite being the thing a phase is supposed to satisfy.
+
+That bit now lives on the item: `SfChecklistItem.is_blocking`.
 
 Rules:
-- Requirements **never block approval** (warning-only; §6.4 blocker logic is not extended).
-- Requirements are **separate from SfChecklistItem** — no template-generated todos for requirements.
-- Requirements have **no evidence links** (kept out of scope; may be added later).
-- A requirement may be project-wide (`phase_id IS NULL`) or phase-specific.
+- `is_blocking = true` (default) — an unticked **root** item blocks approval (§6.4 unchanged in spirit).
+- `is_blocking = false` — warning-only. It is counted in `warnings.optionalOpen` and never in `blockers`.
+- **Subtasks never block.** They are stored with `is_blocking = false`, and making a subtask blocking
+  is refused (`CHECKLIST_SUBTASK_NEVER_BLOCKS`) rather than silently ignored.
+- A warning-only item may be project-wide (`phase_id IS NULL`) or phase-specific, exactly as a
+  requirement could.
+- Warning-only items are ordinary checklist items in every other respect: assignee, due date,
+  priority, labels, subtasks, Today visibility, template seeding.
 
-The old SfChecklistTemplate-generated "requirements" (checklist items that came from templates with `phase_key`)
-continue to function as ordinary checklist items. No data migration required for the bridge period.
+Migration `20260922010000_sf_checklist_blocking_merge` copies every `sf_requirement` row into
+`sf_checklist_item` with `is_blocking = false`, keeping the original id; `description` folds into the
+label. `sf_requirement` is retained as a rollback copy and read by nothing — it is dropped in a
+separate migration once this merge is accepted.
 
 ---
 

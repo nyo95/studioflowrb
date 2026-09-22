@@ -21,7 +21,7 @@ export async function seedChecklistFromTemplates(tx: TxClient, projectId: string
   const have = new Set(existing.map((row) => `${row.phase_id ?? "GENERAL"}::${row.template_id}`));
   const nextSort = new Map<string, number>(roots.map((row) => [row.phase_id ?? "GENERAL", row._max.sort_order ?? 0]));
   const phaseByDefinition = new Map(phases.map((phase) => [phase.definition_id, phase.id]));
-  const rows: Array<{ id: string; project_id: string; phase_id: string | null; label: string; template_id: string; sort_order: number; created_by_id: string | null }> = [];
+  const rows: Array<{ id: string; project_id: string; phase_id: string | null; label: string; is_blocking: boolean; template_id: string; sort_order: number; created_by_id: string | null }> = [];
   for (const template of templates) {
     const phaseId = template.definition_id ? phaseByDefinition.get(template.definition_id) ?? undefined : null;
     if (phaseId === undefined) continue;
@@ -31,7 +31,7 @@ export async function seedChecklistFromTemplates(tx: TxClient, projectId: string
     have.add(key);
     const sort = (nextSort.get(bucket) ?? 0) + CHECKLIST_SORT_STEP;
     nextSort.set(bucket, sort);
-    rows.push({ id: randomUUID(), project_id: projectId, phase_id: phaseId, label: template.label, template_id: template.id, sort_order: sort, created_by_id: userId });
+    rows.push({ id: randomUUID(), project_id: projectId, phase_id: phaseId, label: template.label, is_blocking: template.is_blocking, template_id: template.id, sort_order: sort, created_by_id: userId });
   }
   if (rows.length > 0) await tx.sfChecklistItem.createMany({ data: rows });
   return rows.length;

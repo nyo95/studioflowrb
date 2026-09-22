@@ -12,8 +12,15 @@ export function createDeletionService(db: PrismaClient, ports: MasterDataService
     if (!hasPermission(input.grants, MASTERDATA_PERMISSIONS.deletionApprove)) return null;
     actorIsUsable(input.actor);
     return runTransaction(async (tx: any) => {
+      const pending = await tx.deletionRequest.findMany({ where: { target_type: input.targetType, target_id: input.targetId, status: "PENDING" } });
       const targetType = await hardDeleteMasterDataTarget(tx, input.targetType, input.targetId);
-      await writeAudit(ports, tx, { action: `${targetType.replace(/_/g, "-")}.deleted`, entityType: targetType, entityId: input.targetId, actor: input.actor, metadata: { deletion_mode: "direct", approver_user_id: input.actor.userId, approver_label: input.actor.label } });
+      if (pending.length > 0) {
+        await tx.deletionRequest.updateMany({
+          where: { id: { in: pending.map((r: any) => r.id) } },
+          data: { status: "APPROVED", approver_user_id: input.actor.userId, approver_label: input.actor.label, decided_at: new Date() },
+        });
+      }
+      await writeAudit(ports, tx, { action: `${targetType.replace(/_/g, "-")}.deleted`, entityType: targetType, entityId: input.targetId, actor: input.actor, metadata: { deletion_mode: "direct", approver_user_id: input.actor.userId, approver_label: input.actor.label, ...(pending.length > 0 ? { resolved_pending_request_ids: pending.map((r: any) => r.id) } : {}) } });
       return { targetType, targetId: input.targetId, direct: true as const };
     });
   }

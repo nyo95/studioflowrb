@@ -5,8 +5,177 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.105**
-- Next local revision: **R8.106**
+- Current revision after this entry is committed: **R8.107**
+- Next local revision: **R8.108**
+
+## R8.107 | 2026-09-22 | fix(masterdata,bq,sf): logic-defect sweep + docs consolidation
+
+Full-repo logic audit across Master Data, BQ, and StudioFlow backend services
+plus their UI/UX flow, run against two ad-hoc audit documents
+(`docs/CODEBASE_LOGIC_REVIEW.md`) and a Planner/Reviewer draft
+(`docs/apps/studioflow/REVIEW-ALIGNMENT.md`) — both re-verified against
+current source rather than trusted at face value, since most of their claims
+turned out stale (already fixed in R8.98) or mischaracterized (the
+`studioflow -> masterdata/public` import is AGENTS.md-sanctioned
+`app -> other-app/public`, not a boundary violation). Six real, verified
+defects survived and were fixed with regression tests; several lower-priority
+findings were recorded in the new consolidated backlog instead of rushed.
+
+### Fixed — Master Data
+
+- **Deletion-request duplicate/stuck-pending bug:** `createDeletionRequest`
+  (`services/shared.ts`) inserted unconditionally with no check for an
+  existing `PENDING` row for the same target, and the direct-hard-delete path
+  (`hardDeleteArchived` → `directDeleteOrNull`, `deletion.service.ts`) never
+  resolved a pending request on that target before deleting it — so a later
+  `approveDeletion` on the orphaned request threw P2025, rolled back, and left
+  the request permanently stuck `PENDING`. Contradicted `masterdata.md` §4.2
+  ("at most one pending request may exist for the same target"). Fixed:
+  `createDeletionRequest` now reuses an existing pending row instead of
+  duplicating it; `directDeleteOrNull` now auto-resolves (`APPROVED`) any
+  pending request for the same target in the same transaction as the hard
+  delete.
+
+### Fixed — BQ
+
+- **Assembly-applied Cost Components lost their price-revert baseline:**
+  `applyAssemblyTemplate` (`services/assemblies.ts`) never set
+  `source_price_snapshot` on the `BqLineItem` rows it creates, so the "Harga
+  diubah" override badge could never appear and `revertLineItemPrice` always
+  threw `bq.line-item.no-snapshot` for assembly-applied items. Fixed by
+  applying the same rule the canonical `addLineItem` path uses:
+  `source_price_snapshot: sourceType === "CUSTOM" ? null : hargaSnapshot`.
+  Currently dormant in production (the only write path for assembly lines,
+  `addAssemblyCustomLine`, always sets `CUSTOM`) but guards the schema's full
+  `source_type` range.
+- **Promotion approve/reject lost-update race:** `approvePromotion` and
+  `rejectPromotion` (`services/promotions.ts`) read status with a plain
+  `findUnique` then wrote with a plain `update` — two concurrent Master Data
+  admins approving the same `REQUESTED` item with different
+  `masterdataRefId`s could both pass validation and both write, silently
+  overwriting one approval despite both being audited. Fixed by replacing the
+  write with `transitionPromotionStatus`, which guards the write itself
+  (`updateMany({ where: { id, promotion_status: { in: expected } } })`) and
+  throws `bq.promotion.invalid-status` when zero rows match — check and act
+  are now one atomic statement.
+
+### Fixed — StudioFlow
+
+- **SF-02 orphan-delete guard gap:** `deletePhaseDefinition`
+  (`phases/service.ts`) counted `sfChecklistTemplate` rows referencing the
+  definition but never blocked on them; the FK is `onDelete: Cascade`, so
+  deleting silently destroyed checklist templates. Now throws
+  `PHASE_DEFINITION_HAS_CHECKLIST_TEMPLATES` when the count is nonzero,
+  mirroring the existing `usedBy` guard.
+- **SF-05 client-name race leaking a raw write error:** `upsertClientByName`
+  (`projects/service.ts`) had a TOCTOU race (`findUnique` then `create` with
+  no `mapWriteError`), so a concurrent duplicate-name create surfaced a raw
+  `PrismaClientKnownRequestError` instead of a friendly `AppError`. Fixed by
+  wrapping the create in the same `mapWriteError` pattern
+  `createClient` already uses.
+- **`header-search.tsx` synchronous setState in effect:** the debounced
+  header search called `setLoading(true)`/`setResult(EMPTY)` synchronously
+  inside its effect body (`react-hooks/set-state-in-effect`, the one
+  remaining `npm run lint` failure). Refactored `loading` from a state
+  variable the effect sets into a value derived at render time
+  (`trimmed !== searchedQuery`, where `searchedQuery` is only set inside the
+  already-async `.then()` callback). Verified in the browser: empty,
+  debounced-loading, results, and no-match states all render correctly.
+  KB-034 (a similar `Date.now()`-in-render-body lint issue) was checked while
+  here and found already resolved in the current tree.
+
+### Tests
+
+- `src/apps/masterdata/service.integration.test.ts`: "reuses an existing
+  pending deletion request…", "direct hard-delete resolves a pre-existing
+  pending request…".
+- `src/apps/bq/service.integration.test.ts`: "carries a non-CUSTOM assembly
+  line's source price forward…", "guards concurrent promotion approvals
+  against a lost-update race".
+- `src/apps/studioflow/service.integration.test.ts`: "SF-02: deleting a phase
+  definition with checklist templates is rejected…", "SF-05: a concurrent
+  client-name race surfaces a friendly conflict…".
+
+### Documentation consolidation (owner request)
+
+- `docs/roadmap.md`, `docs/review.md`, and `docs/knownbug.md` merged into one
+  worklist, `docs/BACKLOG.md`, tagging each item `[PLANNED]`/`[UNVERIFIED]`/
+  `[BUG]`/`[CLEANUP]` instead of splitting them across three files. Originals
+  preserved with their full historical/closed record at
+  `docs/archive/roadmap-2026-09-22.md`, `review-2026-09-22.md`,
+  `knownbug-2026-09-22.md`.
+- `docs/CODEBASE_LOGIC_REVIEW.md` and `docs/apps/studioflow/REVIEW-ALIGNMENT.md`
+  (ad-hoc audit artifacts, not part of the indexed contract/tracker set)
+  archived after their real findings were fixed (this entry, R8.98) or folded
+  into `BACKLOG.md`'s Cleanup section (contract-text drift, the archived
+  `_legacy_project_id` branch).
+- `docs/FOUNDATION-ACCEPTANCE-PF8.md` and `docs/FOUNDATION-BASELINE-FREEZE.md`
+  (historical Foundation-phase acceptance evidence, Foundation fully closed,
+  not indexed by `docs/README.md`'s active contract table) moved to
+  `docs/archive/` unchanged.
+- `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md` had its Pending/Completed queues
+  cleared — every item described the `/requirements` routes removed in
+  R8.106.
+- `docs/README.md`, `README.md`, `AGENTS.md`, `docs/agent/{README,EXECUTOR,
+  REVIEWER}.md`, and `docs/apps/bq/bq-contract.md` updated to point at
+  `docs/BACKLOG.md` instead of the three retired files.
+
+### Verification
+
+- `npm test`: 455/455 passed (6 new regression tests across this revision's
+  three apps: 2 StudioFlow, 2 Master Data, 2 BQ; 0 pre-existing failures).
+- `npx tsc --noEmit`: clean.
+- `npm run lint`: clean (0 errors — the `header-search.tsx` fix above closed
+  the only remaining failure).
+- `npm run check:boundaries`: OK.
+- `npm run check:legacy-runtime`: OK.
+- Browser: header search (empty/loading/results/no-match) walked manually
+  against the dev server at `/studioflow`.
+
+## R8.106 | 2026-09-22 | refactor(sf): merge Requirements into the phase checklist as `is_blocking`
+
+Owner design decision from the 2026-09-22 UX review. Supersedes V2 contract §5 (V2-D2).
+
+### Why
+
+`SfRequirement` was structurally a subset of `SfChecklistItem` (`title`/`label`, `is_met`/`is_checked`,
+`met_at`/`checked_at`). The only real difference was one policy bit — a root checklist item blocks
+approval, a requirement only warns — yet it carried a second model, table, service, action set and
+UI panel. The split also made requirements *less* visible than ordinary to-dos: no assignee, no due
+date, and absent from Today, despite being what a phase must satisfy. Two visually identical
+"tick a list" widgets sat side by side on the phase page with an invisible semantic difference.
+
+### Changed — schema
+
+- `SfChecklistItem.is_blocking` (Boolean, default `true`) decides whether an unticked **root** item
+  gates approval. Indexed as `(phase_id, is_blocking, is_checked)`.
+- Subtasks are now stored with `is_blocking = false` — "subtasks never block" becomes stored data
+  instead of a rule readers must re-derive from depth. Existing subtasks backfilled.
+- `SfRequirement` is **deprecated, not dropped**: its rows are copied into `sf_checklist_item`
+  (same id, `is_blocking = false`, `description` folded into the label) and the table is kept as a
+  rollback copy that nothing reads. Dropping it is a separate migration pending owner sign-off.
+
+### Changed — behaviour
+
+- Approval gate counts only unticked, blocking, root items. `warnings.requirementsOpen` becomes
+  `warnings.optionalOpen` (unticked, non-blocking, root items).
+- Making a subtask blocking is refused with `CHECKLIST_SUBTASK_NEVER_BLOCKS` instead of being a
+  silent no-op.
+- Removed: `listRequirements`, `createRequirement`, `toggleRequirement`, `deleteRequirement` and
+  their server actions; `RequirementsPanel`.
+
+### Changed — UI
+
+- One list on the phase page. Blocking is the default, so only the exception is badged **Optional**
+  ("Warning only — does not block approval"); the row menu toggles it.
+- `ChecklistTree` gains an inline "Add item…" row with an **Optional** checkbox. This closes a real
+  gap: the tree previously had no way to add a *root* item at all, so "Add requirement" had been the
+  only way to add an ad-hoc phase item — and General to-dos could only be added from Today.
+
+### Migrations
+
+- `20260922010000_sf_checklist_blocking_merge`
+- `20260922020000_sf_subtasks_never_block`
 
 ## R8.105 | 2026-09-22 | feat(sf): V2-E full enum-to-definition phase migration + documentation reconciliation
 

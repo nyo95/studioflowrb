@@ -7,6 +7,10 @@ export const SCHEDULE_IMAGE_BYTES = 3 * 1024 * 1024;
 export const SCHEDULE_OPTION_STATUSES = ["DRAFT", "APPROVED", "NOT_USED"] as const;
 export type ScheduleOptionStatus = (typeof SCHEDULE_OPTION_STATUSES)[number];
 
+/** Board card fields a user may choose to show; empty selection means "show every populated field" (default). */
+export const SCHEDULE_CARD_FIELD_KEYS = ["brand", "sku", "color", "pattern", "finishing", "dimension", "location", "qty"] as const;
+export type ScheduleCardFieldKey = (typeof SCHEDULE_CARD_FIELD_KEYS)[number];
+
 export type ScheduleSnapshotInput = {
   brandName?: string | null;
   productName: string;

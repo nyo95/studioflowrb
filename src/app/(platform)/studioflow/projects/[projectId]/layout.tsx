@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 
 import { AppError } from "@platform/core/errors";
 import { hasPermission } from "@platform/core/rbac";
-import { phaseAccentDotClass, phaseStatusDisplay } from "@/apps/studioflow/domain/phase";
 import { STUDIOFLOW_PERMISSIONS as P, STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { Badge, Breadcrumb, ContextNavHeading, MetaList, Notice, PageHeader, SettingsShell } from "@/platform/ui_engine";
@@ -23,8 +22,7 @@ export default async function ProjectLayout({ children, params }: { children: Re
     if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
     throw error;
   });
-  const [phases, people, clients, momDocuments, scheduleEntries] = await Promise.all([
-    studioFlow.phases.listProjectPhases({ grants, projectId }),
+  const [people, clients, momDocuments, scheduleEntries] = await Promise.all([
     studioFlow.projects.listAssignablePeople({ grants }),
     studioFlow.projects.listClients({ grants }),
     studioFlow.mom.listDocuments({ grants, projectId }),
@@ -33,14 +31,6 @@ export default async function ProjectLayout({ children, params }: { children: Re
   const momCount = momDocuments.length;
   const scheduleCount = scheduleEntries.length;
   const canManage = hasPermission(grants, P.projectManage);
-
-  const phaseNav = phases.map((phase) => ({
-      href: STUDIOFLOW_ROUTES.projectPhase(projectId, phase.id),
-      label: phase.label,
-      marker: phaseAccentDotClass(phase.definitionId),
-      detail: phase.openRootChecklist > 0 ? String(phase.openRootChecklist) : null,
-      title: `${phase.label}: ${phaseStatusDisplay(phase.status).label}${phase.openRootChecklist ? ` · ${phase.openRootChecklist} checklist item(s) open` : ""}`,
-  }));
 
   return (
     <div className="grid gap-4">
@@ -75,8 +65,6 @@ export default async function ProjectLayout({ children, params }: { children: Re
           <>
             <ContextNavHeading>Project</ContextNavHeading>
             <ProjectNavLinks items={[{ href: STUDIOFLOW_ROUTES.project(projectId), label: "Overview", exact: true, marker: null, detail: null }]} />
-            <ContextNavHeading>Phases</ContextNavHeading>
-            <ProjectNavLinks items={phaseNav} />
             <ContextNavHeading>Records</ContextNavHeading>
             <ProjectNavLinks items={[
               { href: STUDIOFLOW_ROUTES.projectMom(projectId), label: "MOM", marker: null, detail: momCount > 0 ? String(momCount) : null },

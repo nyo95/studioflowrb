@@ -92,17 +92,19 @@ No raw legacy `ui-*` class may bypass an available UI Engine component. A real e
 ## Evidence, ledgers, revision, and remote safety
 
 `PLAN.md` is the temporary active implementation contract and ends with a
-copy-ready Executor prompt. `docs/roadmap.md` is approved work not yet built;
-`docs/review.md` is only a queue for work whose review must be deferred;
-`docs/knownbug.md` is a reproducible verified defect; `CHANGELOG.md` is the
-revision ledger. Do not churn every ledger at every handoff. Detailed rules are
-in `docs/agent/README.md`.
+copy-ready Executor prompt. `docs/BACKLOG.md` is the single consolidated
+worklist (merged from the former `roadmap.md`/`review.md`/`knownbug.md` on
+2026-09-22): an item tagged `[PLANNED]` is approved work not yet built,
+`[UNVERIFIED]` is a queue for work whose review must be deferred, `[BUG]` is a
+reproducible verified defect, and `[CLEANUP]` is dead code or doc drift, not a
+behavioral defect. `CHANGELOG.md` is the revision ledger. Do not churn every
+ledger at every handoff. Detailed rules are in `docs/agent/README.md`.
 
 Before editing, record HEAD, branch, remote/published baseline, existing revision entries, and the complete dirty-file list. Determine the next unused revision from `CHANGELOG.md`; never infer it from memory. Preserve unrelated owner changes, stage only owned files, inspect staged diff and whitespace, and make exactly one local revision commit for each cohesive completed change set. Run proportionate checks; a skipped, unavailable, or cancelled mandatory check is not a pass and must be reported. Do not call work complete without the required changelog, validation, and local commit.
 
 The exact revision format and required ledger fields are mandatory in `docs/agent/README.md#revision-and-commit-protocol` for every role that edits, approves, or reviews a change.
 
-When an audit proves a defect not fixed in its scoped change, record it in `docs/knownbug.md`; do not discard it. Remove/strike roadmap work only after actual end-to-end verification. Review corrections always use the next local revision; never silently amend an accepted commit.
+When an audit proves a defect not fixed in its scoped change, record it in `docs/BACKLOG.md` as `[BUG]`; do not discard it. Remove a `[PLANNED]` entry only after actual end-to-end verification. Review corrections always use the next local revision; never silently amend an accepted commit.
 
 A request to change, build, commit, or finish authorizes local commits only. It never authorizes push, remote tag, pull request, merge, deployment, publication, or release. Those require separate explicit owner instruction.
 

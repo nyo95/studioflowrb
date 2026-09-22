@@ -1,11 +1,11 @@
 "use client";
 
-import { Link2 } from "lucide-react";
+import { Link2, Plus } from "lucide-react";
 import { useState } from "react";
 
 import { Badge, Button, Checkbox, EmptyState, InlineError, Input, RowActionMenu, type RowActionItem } from "@/platform/ui_engine";
 
-import { checklistAction } from "../actions";
+import { addChecklistItemAction, checklistAction } from "../actions";
 import { DueLabel } from "./due-label";
 import { ItemEditDialog } from "./item-edit-dialog";
 import { PersonChip, type Person } from "./people";
@@ -16,6 +16,8 @@ export type ChecklistNode = {
   parentId: string | null;
   label: string;
   isChecked: boolean;
+  /** False = warning-only (the merged requirement); it never gates approval. */
+  isBlocking: boolean;
   priority: number;
   dueDate: string | null;
   assigneeId: string | null;
@@ -32,12 +34,15 @@ const PRIORITY_TONE: Record<number, "danger" | "warning" | "neutral"> = { 1: "da
  */
 export function ChecklistTree({
   projectId,
+  phaseId,
   nodes,
   people,
   canEdit,
   emptyText,
 }: {
   projectId: string;
+  /** Null = the project-wide list (General to-dos). */
+  phaseId: string | null;
   nodes: readonly ChecklistNode[];
   people: readonly Person[];
   canEdit: boolean;
@@ -49,7 +54,17 @@ export function ChecklistTree({
   const [draft, setDraft] = useState("");
   const [labelFor, setLabelFor] = useState<string | null>(null);
   const [labelDraft, setLabelDraft] = useState("");
+  const [addingRoot, setAddingRoot] = useState(false);
+  const [rootDraft, setRootDraft] = useState("");
+  const [rootOptional, setRootOptional] = useState(false);
   const personById = new Map(people.map((p) => [p.id, p]));
+
+  const addRoot = async () => {
+    const label = rootDraft.trim();
+    if (!label) { setAddingRoot(false); return; }
+    const ok = await run("add-root", () => addChecklistItemAction({ projectId, phaseId, label, isBlocking: !rootOptional }));
+    if (ok) { setRootDraft(""); setRootOptional(false); }
+  };
 
   const move = (siblings: readonly ChecklistNode[], index: number, delta: number) => {
     const ids = siblings.map((s) => s.id);
@@ -64,6 +79,13 @@ export function ChecklistTree({
       { label: "Edit", onSelect: () => setEditing(node) },
       ...(depth === 0 ? [{ label: "Add subtask", onSelect: () => { setAddingTo(node.id); setDraft(""); } }] : []),
       { label: "Add label", onSelect: () => { setLabelFor(node.id); setLabelDraft(""); } },
+      // Only a root item can gate approval; a subtask never blocks, so the choice is meaningless there.
+      ...(depth === 0
+        ? [{
+            label: node.isBlocking ? "Make optional (won’t block approval)" : "Make it block approval",
+            onSelect: () => run(node.id, () => checklistAction({ op: "update", projectId, itemId: node.id, isBlocking: !node.isBlocking })),
+          }]
+        : []),
       ...node.labels.map((label) => ({ label: `Remove label “${label.name}”`, onSelect: () => run(node.id, () => checklistAction({ op: "unlabel", projectId, itemId: node.id, labelId: label.id })) })),
       { label: "Move up", disabled: index === 0, separatorBefore: true, onSelect: () => move(siblings, index, -1) },
       { label: "Move down", disabled: index === siblings.length - 1, onSelect: () => move(siblings, index, 1) },
@@ -83,6 +105,8 @@ export function ChecklistTree({
           />
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             {node.templateId ? <Link2 aria-label="From a Studio template" className="h-3.5 w-3.5 text-ink-tertiary" /> : null}
+            {/* Blocking is the default, so only the exception is badged. */}
+            {!node.isBlocking && depth === 0 ? <Badge title="Warning only — does not block approval">Optional</Badge> : null}
             {node.priority < 4 ? <Badge tone={PRIORITY_TONE[node.priority] ?? "neutral"}>P{node.priority}</Badge> : null}
             {node.labels.map((label) => <Badge key={label.id} tone={(label.color as "neutral") ?? "neutral"}>#{label.name}</Badge>)}
             <DueLabel date={node.dueDate} done={node.isChecked} />
@@ -119,9 +143,46 @@ export function ChecklistTree({
 
   return (
     <div className="grid gap-2">
-      {nodes.length === 0 ? <EmptyState title={emptyText} description="Checklist items come from Studio Settings templates." className="py-6" /> : (
+      {nodes.length === 0 ? <EmptyState title={emptyText} description="Seeded from Studio Settings templates; you can add your own below." className="py-6" /> : (
         <ul className="m-0 grid list-none gap-px p-0">{nodes.map((node, i) => renderRow(node, nodes, i, 0))}</ul>
       )}
+      {canEdit ? (
+        addingRoot ? (
+          <form
+            className="flex flex-wrap items-center gap-2"
+            onSubmit={(event) => { event.preventDefault(); void addRoot(); }}
+          >
+            <Input
+              aria-label="New checklist item"
+              density="compact"
+              autoFocus
+              className="min-w-[180px] flex-1"
+              placeholder="What has to be done?"
+              value={rootDraft}
+              maxLength={200}
+              onChange={(e) => setRootDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Escape") { setRootDraft(""); setAddingRoot(false); } }}
+            />
+            <Checkbox
+              checked={rootOptional}
+              onCheckedChange={(checked) => setRootOptional(checked === true)}
+              label={<span title="Warning only — does not block approval">Optional</span>}
+              className="text-sm"
+            />
+            <Button type="submit" size="sm" pending={pendingKey === "add-root"} disabled={!rootDraft.trim()}>Add</Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => { setRootDraft(""); setAddingRoot(false); }}>Done</Button>
+          </form>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAddingRoot(true)}
+            className="flex min-h-7 w-fit items-center gap-1.5 rounded-control px-1.5 text-sm text-ink-tertiary hover:bg-surface-muted hover:text-ink-secondary"
+          >
+            <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+            Add item…
+          </button>
+        )
+      ) : null}
       {error ? <InlineError>{error}</InlineError> : null}
       {editing ? (
         <ItemEditDialog

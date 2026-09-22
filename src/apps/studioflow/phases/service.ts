@@ -561,8 +561,9 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       const snap = phaseSnapshot(phase);
       const seatUserId = snap.seatSnapshot === "drafter" ? phase.project.pic_drafter_id : phase.project.pic_designer_id;
       // R2.4E: Warning projection — non-blocking indicators for UI.
-      const [requirementsOpen, deliverables, refRevisionId] = await Promise.all([
-        db.sfRequirement.count({ where: { phase_id: phase.id, is_met: false } }),
+      // Warning-only checklist items (the merged requirements) count here, never in blockers.
+      const [optionalOpen, deliverables, refRevisionId] = await Promise.all([
+        db.sfChecklistItem.count({ where: { phase_id: phase.id, parent_id: null, is_checked: false, is_blocking: false } }),
         db.sfDeliverable.findMany({ where: { phase_id: phase.id }, select: { revision_id: true } }),
         referenceRevisionId(db, phase.id),
       ]);
@@ -583,7 +584,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         commands,
         blockers: fullBlockers(counts),
         todoBlockers: todoBlockers(counts),
-        warnings: { requirementsOpen, deliverableStatus: computeDeliverableStatus(deliverables, refRevisionId) },
+        warnings: { optionalOpen, deliverableStatus: computeDeliverableStatus(deliverables, refRevisionId) },
         activeRevision: active ? { id: active.id, label: revisionLabel(active, snap.prefixSnapshot), createdAt: active.created_at, activities: active.activities.map(activityView) } : null,
         history: phase.revisions.filter((rev) => rev.status !== "ACTIVE").map((rev) => ({
           id: rev.id,
@@ -756,12 +757,13 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const usedBy = await tx.sfPhase.count({ where: { definition_id: input.definitionId } });
         if (usedBy > 0) throw conflict("PHASE_DEFINITION_IN_USE", `${usedBy} project phase${usedBy === 1 ? "" : "s"} ${usedBy === 1 ? "was" : "were"} created from this phase, so it cannot be deleted.`);
         const checklistTemplates = await tx.sfChecklistTemplate.count({ where: { definition_id: input.definitionId } });
+        if (checklistTemplates > 0) throw conflict("PHASE_DEFINITION_HAS_CHECKLIST_TEMPLATES", `${checklistTemplates} checklist template${checklistTemplates === 1 ? "" : "s"} still reference this phase. Remove or reassign ${checklistTemplates === 1 ? "it" : "them"} first.`);
         await tx.sfPhaseDefinition.delete({ where: { id: input.definitionId } });
         const siblings = await tx.sfPhaseDefinition.findMany({ where: { template_id: def.template_id, order_index: { gt: def.order_index } }, orderBy: { order_index: "asc" } });
         for (const sib of siblings) {
           await tx.sfPhaseDefinition.update({ where: { id: sib.id }, data: { order_index: sib.order_index - 1 } });
         }
-        await writeAudit(ports, tx, { action: "studioflow.phase-definition.deleted", entityType: "phase-definition", entityId: input.definitionId, actor: input.actor, metadata: { templateId: def.template_id, name: def.name, prefix: def.prefix, removedChecklistTemplates: checklistTemplates } });
+        await writeAudit(ports, tx, { action: "studioflow.phase-definition.deleted", entityType: "phase-definition", entityId: input.definitionId, actor: input.actor, metadata: { templateId: def.template_id, name: def.name, prefix: def.prefix } });
         return { definitionId: input.definitionId };
       });
     },
@@ -811,68 +813,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       })),
     };
   }
-
-  // ── Requirements ────────────────────────────────────────────────────────
-
-  const requirements = {
-    async listRequirements(input: ReadContext & { projectId: string; phaseId: string }) {
-      requireRead(input.grants);
-      const rows = await db.sfRequirement.findMany({
-        where: { project_id: input.projectId, OR: [{ phase_id: input.phaseId }, { phase_id: null }] },
-        orderBy: [{ phase_id: "desc" }, { created_at: "asc" }],
-      });
-      return rows.map((r) => ({
-        id: r.id,
-        phaseId: r.phase_id,
-        title: r.title,
-        description: r.description,
-        isMet: r.is_met,
-        metAt: r.met_at,
-        metById: r.met_by_id,
-        createdAt: r.created_at,
-      }));
-    },
-
-    async createRequirement(input: CommandContext & { projectId: string; phaseId: string; title: string; description?: string | null }) {
-      requireCommand(input, P.projectManage);
-      const title = requiredText(input.title, "REQUIREMENT_TITLE_REQUIRED", "Title", 400);
-      const description = input.description?.trim() || null;
-      await runTransaction(async (tx) => {
-        await loadWritablePhase(tx, input.projectId, input.phaseId);
-        await tx.sfRequirement.create({ data: { project_id: input.projectId, phase_id: input.phaseId, title, description, created_by_id: input.actor.userId } });
-      });
-      return { phaseId: input.phaseId };
-    },
-
-    async toggleRequirement(input: CommandContext & { projectId: string; requirementId: string; met: boolean }) {
-      requireCommand(input, P.phaseWork);
-      await runTransaction(async (tx) => {
-        const req = await tx.sfRequirement.findUnique({ where: { id: input.requirementId }, select: { id: true, project_id: true, phase_id: true, is_met: true } });
-        if (!req || req.project_id !== input.projectId) throw notFound("requirement");
-        await loadWritableProject(tx, input.projectId);
-        // R2.4A: Phase-scoped requirements must also obey phase writability.
-        if (req.phase_id) await loadWritablePhase(tx, input.projectId, req.phase_id);
-        await tx.sfRequirement.update({
-          where: { id: req.id },
-          data: { is_met: input.met, met_at: input.met ? new Date() : null, met_by_id: input.met ? input.actor.userId : null },
-        });
-      });
-      return { requirementId: input.requirementId };
-    },
-
-    async deleteRequirement(input: CommandContext & { projectId: string; requirementId: string }) {
-      requireCommand(input, P.projectManage);
-      await runTransaction(async (tx) => {
-        const req = await tx.sfRequirement.findUnique({ where: { id: input.requirementId }, select: { id: true, project_id: true, phase_id: true } });
-        if (!req || req.project_id !== input.projectId) throw notFound("requirement");
-        await loadWritableProject(tx, input.projectId);
-        // R2.4A: Phase-scoped requirements must also obey phase writability.
-        if (req.phase_id) await loadWritablePhase(tx, input.projectId, req.phase_id);
-        await tx.sfRequirement.delete({ where: { id: req.id } });
-      });
-      return { requirementId: input.requirementId };
-    },
-  };
 
   // ── Deliverables ─────────────────────────────────────────────────────────
 
@@ -962,5 +902,5 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     },
   };
 
-  return { ...commands, ...activities, ...reads, ...phaseTemplates, ...requirements, ...deliverables };
+  return { ...commands, ...activities, ...reads, ...phaseTemplates, ...deliverables };
 }

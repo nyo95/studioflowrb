@@ -32,11 +32,12 @@ decisions needed to begin are resolved; it does not mean every implementation
 choice is prescribed. After PASS, replace it with the next active plan.
 
 The Executor updates `CHANGELOG.md` and commits the coherent implementation.
-The Planner/Reviewer may review that commit immediately; `review.md` is used
-only when verification must actually be deferred. Add a `knownbug.md` entry
-only for a reproduced defect intentionally left open, not for a finding that is
-being returned immediately for correction. Update `roadmap.md` only when the
-real backlog or completion state changes.
+The Planner/Reviewer may review that commit immediately; a `[UNVERIFIED]`
+entry in `docs/BACKLOG.md` is added only when verification must actually be
+deferred. Add a `[BUG]` entry only for a reproduced defect intentionally left
+open, not for a finding that is being returned immediately for correction.
+Update a `[PLANNED]` entry only when the real backlog or completion state
+changes.
 
 The prompt loop is the session interface. Each sending role includes enough
 revision and evidence context for the receiving role to start, but points to
@@ -53,8 +54,8 @@ user-facing gate before PASS.
 
 | Lane | Always after bootstrap | Add only when relevant | Do not load automatically |
 |---|---|---|---|
-| Planner/Reviewer | `PLANNER.md`, `REVIEWER.md`, `PLAN.md` when present | targeted ledger/contract, current code/tests, allowed legacy evidence | all app internals/contracts |
-| Executor | `EXECUTOR.md`, READY `PLAN.md` | named authority, affected code/tests/migrations, nearby consumers needed for safe completion | all roadmap/knownbug/legacy material |
+| Planner/Reviewer | `PLANNER.md`, `REVIEWER.md`, `PLAN.md` when present | targeted `BACKLOG.md` section/contract, current code/tests, allowed legacy evidence | all app internals/contracts |
+| Executor | `EXECUTOR.md`, READY `PLAN.md` | named authority, affected code/tests/migrations, nearby consumers needed for safe completion | all of `BACKLOG.md`/legacy material |
 
 ## Priority
 
@@ -110,9 +111,11 @@ files, inspect `git diff --cached` and `git diff --cached --check`, then make
 one local commit. Report revision, commit, checks, and unrelated dirty files;
 never claim a clean tree when owner changes remain.
 
-Roadmap work closes only after end-to-end verification. A known bug moves to
-Closed only with its revision and changelog evidence. An implemented but
-insufficiently verified item enters or stays in `review.md`. A blocked
-incoherent outcome is not given a misleading completion commit. An immediate
-PASS needs no temporary `review.md` round-trip; record review evidence in the
-next planning/review revision only when repository documents actually change.
+A `[PLANNED]` entry closes only after end-to-end verification, by deleting it
+from `docs/BACKLOG.md` with its revision and changelog evidence recorded in
+`CHANGELOG.md` — the same closing discipline applies to `[BUG]` entries. An
+implemented but insufficiently verified item enters or stays tagged
+`[UNVERIFIED]`. A blocked incoherent outcome is not given a misleading
+completion commit. An immediate PASS needs no temporary `[UNVERIFIED]`
+round-trip; record review evidence in the next planning/review revision only
+when repository documents actually change.

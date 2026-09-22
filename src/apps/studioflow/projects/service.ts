@@ -104,7 +104,12 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       if (existing.archived_at) throw conflict("CLIENT_ARCHIVED", "That client is archived. Restore it first.");
       return existing;
     }
-    const created = await tx.sfClient.create({ data: { id: randomUUID(), name: clean, name_key: clientKey(clean) } });
+    let created;
+    try {
+      created = await tx.sfClient.create({ data: { id: randomUUID(), name: clean, name_key: clientKey(clean) } });
+    } catch (error) {
+      mapWriteError(error);
+    }
     await writeAudit(ports, tx, { action: "studioflow.client.created", entityType: "client", entityId: created.id, actor, metadata: { name: clean } });
     return created;
   }

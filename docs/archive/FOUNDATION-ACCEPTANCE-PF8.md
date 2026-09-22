@@ -1,5 +1,11 @@
 # PF-8 Foundation Acceptance Candidate
 
+> **Moved to `docs/archive/` on 2026-09-22** during documentation
+> consolidation — Foundation is fully closed (all F-A…F-E slices accepted;
+> see `docs/README.md` Active sequence) and this was historical acceptance
+> evidence not indexed by `docs/README.md`'s active contract table. Content
+> unchanged.
+
 Status: **ACCEPTED — R8.61 Reviewer PASS**
 
 Date: 2026-09-14

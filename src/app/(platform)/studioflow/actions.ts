@@ -45,7 +45,7 @@ export async function setAutoNamingAction(enabled: boolean): Promise<ActionResul
   });
 }
 
-const TemplateInput = z.strictObject({ definitionId: Id.nullable(), label: z.string().min(1).max(200) });
+const TemplateInput = z.strictObject({ definitionId: Id.nullable(), label: z.string().min(1).max(200), isBlocking: z.boolean().optional() });
 export async function createTemplateAction(input: z.infer<typeof TemplateInput>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
@@ -55,7 +55,7 @@ export async function createTemplateAction(input: z.infer<typeof TemplateInput>)
   });
 }
 
-const TemplateUpdate = z.strictObject({ templateId: Id, label: z.string().min(1).max(200).optional(), isActive: z.boolean().optional() });
+const TemplateUpdate = z.strictObject({ templateId: Id, label: z.string().min(1).max(200).optional(), isActive: z.boolean().optional(), isBlocking: z.boolean().optional() });
 export async function updateTemplateAction(input: z.infer<typeof TemplateUpdate>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
@@ -280,6 +280,8 @@ const ChecklistCreate = z.strictObject({
   priority: z.number().int().optional(),
   dueDate: DateOnly.optional(),
   assignedToId: Id.nullish(),
+  /** False = warning-only item (the merged requirement); omitted means it gates approval. */
+  isBlocking: z.boolean().optional(),
 });
 export async function addChecklistItemAction(input: z.infer<typeof ChecklistCreate>): Promise<ActionResult<{ itemId: string }>> {
   return runSafeAction(async () => {
@@ -293,6 +295,7 @@ export async function addChecklistItemAction(input: z.infer<typeof ChecklistCrea
       priority: data.priority,
       dueDate: data.dueDate,
       assignedToId: data.assignedToId,
+      isBlocking: data.isBlocking,
     });
     refresh(data.projectId);
     return result;
@@ -302,7 +305,7 @@ export async function addChecklistItemAction(input: z.infer<typeof ChecklistCrea
 const ChecklistOp = z.discriminatedUnion("op", [
   z.strictObject({ op: z.literal("check"), projectId: Id, itemId: Id, checked: z.boolean() }),
   z.strictObject({ op: z.literal("subtask"), projectId: Id, itemId: Id, label: z.string().min(1).max(200) }),
-  z.strictObject({ op: z.literal("update"), projectId: Id, itemId: Id, label: z.string().max(200).optional(), priority: z.number().int().optional(), dueDate: DateOnly.optional(), assignedToId: Id.nullish() }),
+  z.strictObject({ op: z.literal("update"), projectId: Id, itemId: Id, label: z.string().max(200).optional(), priority: z.number().int().optional(), dueDate: DateOnly.optional(), assignedToId: Id.nullish(), isBlocking: z.boolean().optional() }),
   z.strictObject({ op: z.literal("delete"), projectId: Id, itemId: Id }),
   z.strictObject({ op: z.literal("detach"), projectId: Id, itemId: Id }),
   z.strictObject({ op: z.literal("label"), projectId: Id, itemId: Id, name: z.string().min(1).max(40) }),
@@ -319,7 +322,7 @@ export async function checklistAction(input: z.infer<typeof ChecklistOp>): Promi
     switch (data.op) {
       case "check": result = await tasks.setItemChecked({ ...base, checked: data.checked }); break;
       case "subtask": result = await tasks.createSubtask({ ...ctx, projectId: data.projectId, parentId: data.itemId, label: data.label }); break;
-      case "update": result = await tasks.updateItem({ ...base, label: data.label, priority: data.priority, dueDate: data.dueDate === "" ? null : data.dueDate, assignedToId: data.assignedToId }); break;
+      case "update": result = await tasks.updateItem({ ...base, label: data.label, priority: data.priority, dueDate: data.dueDate === "" ? null : data.dueDate, assignedToId: data.assignedToId, isBlocking: data.isBlocking }); break;
       case "delete": result = await tasks.deleteItem(base); break;
       case "detach": result = await tasks.detachFromTemplate(base); break;
       case "label": result = await tasks.attachLabel({ ...base, name: data.name }); break;
@@ -595,6 +598,17 @@ export async function updateScheduleEntryAction(input: z.infer<typeof ScheduleEn
   });
 }
 
+const ScheduleEntryCardFields = z.strictObject({ projectId: Id, entryId: Id, fields: z.array(z.string().max(40)).max(20) });
+export async function updateScheduleEntryCardFieldsAction(input: z.infer<typeof ScheduleEntryCardFields>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleEntryCardFields, input);
+    const result = await studioFlow.schedule.updateEntryCardFields({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
 const ScheduleEntryRef = z.strictObject({ projectId: Id, entryId: Id });
 export async function deleteScheduleEntryAction(input: z.infer<typeof ScheduleEntryRef>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
@@ -770,6 +784,17 @@ export async function moveScheduleEntryAction(input: z.infer<typeof ScheduleEntr
   });
 }
 
+const ScheduleEntryReorder = z.strictObject({ projectId: Id, section: ScheduleSection, prefix: z.string().min(1).max(12), orderedIds: z.array(Id).min(1).max(500) });
+export async function reorderScheduleEntriesAction(input: z.infer<typeof ScheduleEntryReorder>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleEntryReorder, input);
+    const result = await studioFlow.schedule.reorderEntries({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
 const ScheduleEntryRecategorize = z.strictObject({ projectId: Id, entryId: Id, category: z.string().min(1).max(80) });
 export async function moveScheduleEntryToCategoryAction(input: z.infer<typeof ScheduleEntryRecategorize>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
@@ -909,41 +934,6 @@ export async function reorderPhaseDefinitionsAction(input: z.infer<typeof PhaseD
   });
 }
 
-// ── Requirements ──────────────────────────────────────────────────────────
-
-const RequirementCreate = z.strictObject({ projectId: Id, phaseId: Id, title: z.string().min(1).max(400), description: z.string().max(2000).nullish() });
-export async function createRequirementAction(input: z.infer<typeof RequirementCreate>): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => {
-    const ctx = await context();
-    const data = parse(RequirementCreate, input);
-    const result = await studioFlow.phases.createRequirement({ ...ctx, ...data });
-    refresh(data.projectId);
-    return result;
-  });
-}
-
-const RequirementToggle = z.strictObject({ projectId: Id, requirementId: Id, met: z.boolean() });
-export async function toggleRequirementAction(input: z.infer<typeof RequirementToggle>): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => {
-    const ctx = await context();
-    const data = parse(RequirementToggle, input);
-    const result = await studioFlow.phases.toggleRequirement({ ...ctx, ...data });
-    refresh(data.projectId);
-    return result;
-  });
-}
-
-const RequirementDelete = z.strictObject({ projectId: Id, requirementId: Id });
-export async function deleteRequirementAction(input: z.infer<typeof RequirementDelete>): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => {
-    const ctx = await context();
-    const data = parse(RequirementDelete, input);
-    const result = await studioFlow.phases.deleteRequirement({ ...ctx, ...data });
-    refresh(data.projectId);
-    return result;
-  });
-}
-
 // ── Deliverables ──────────────────────────────────────────────────────────
 
 const DeliverableRef = z.strictObject({ projectId: Id, deliverableId: Id });
@@ -968,5 +958,30 @@ export async function uploadDeliverableAction(formData: FormData): Promise<Actio
     const result = await studioFlow.phases.uploadDeliverable({ ...ctx, ...data, file: { body: new Uint8Array(await file.arrayBuffer()), contentType: file.type } });
     refresh(data.projectId);
     return result;
+  });
+}
+
+// ── Global search ─────────────────────────────────────────────────────────
+
+const SearchQuery = z.string().trim().min(1).max(200);
+
+export type GlobalSearchResult = {
+  projects: Array<{ id: string; name: string; clientName: string | null }>;
+  clients: Array<{ id: string; name: string }>;
+};
+
+/** Header quick-search: top project and client matches by name (client name also matches on projects). */
+export async function globalSearchAction(query: string): Promise<ActionResult<GlobalSearchResult>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const q = parse(SearchQuery, query);
+    const [projects, clients] = await Promise.all([
+      studioFlow.projects.listProjects({ ...ctx, search: q }),
+      studioFlow.projects.listClients({ ...ctx, search: q }),
+    ]);
+    return {
+      projects: projects.slice(0, 6).map((p) => ({ id: p.id, name: p.name, clientName: p.client?.name ?? null })),
+      clients: clients.slice(0, 6).map((c) => ({ id: c.id, name: c.name })),
+    };
   });
 }

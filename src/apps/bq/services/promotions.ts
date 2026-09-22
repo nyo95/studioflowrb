@@ -44,15 +44,32 @@ async function loadPromotable(
   return item;
 }
 
-async function setPromotionStatus(
+/**
+ * Atomic guarded transition: the WHERE clause re-checks `promotion_status`
+ * in the same statement as the write, so two concurrent callers racing past
+ * `loadPromotable`'s plain read can never both apply their transition — the
+ * loser's `updateMany` matches zero rows once the winner has committed.
+ */
+async function transitionPromotionStatus(
   type: PromotableType,
   libItemId: string,
+  expected: readonly PromotionStatus[],
   data: PromotionUpdate,
 ): Promise<void> {
-  const where = { id: libItemId };
-  if (type === "material") await db.bqLibMaterial.update({ where, data });
-  else if (type === "labor") await db.bqLibLabor.update({ where, data });
-  else await db.bqLibMaterialLabor.update({ where, data });
+  const where = { id: libItemId, promotion_status: { in: expected as PromotionStatus[] } };
+  const result =
+    type === "material"
+      ? await db.bqLibMaterial.updateMany({ where, data })
+      : type === "labor"
+        ? await db.bqLibLabor.updateMany({ where, data })
+        : await db.bqLibMaterialLabor.updateMany({ where, data });
+  if (result.count === 0) {
+    throw new AppError(
+      "CONFLICT",
+      "bq.promotion.invalid-status",
+      "This item's promotion status changed before this action completed. Refresh and try again.",
+    );
+  }
 }
 
 async function requestPromotion(input: {
@@ -63,7 +80,7 @@ async function requestPromotion(input: {
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.libraryPromote);
   await loadPromotable(input.type, input.libItemId, ["DRAFT", "REJECTED"]);
-  await setPromotionStatus(input.type, input.libItemId, { promotion_status: "REQUESTED" });
+  await transitionPromotionStatus(input.type, input.libItemId, ["DRAFT", "REJECTED"], { promotion_status: "REQUESTED" });
 
   await auditWriter({
     appId: "bq",
@@ -126,7 +143,7 @@ async function approvePromotion(input: {
     );
   }
   await loadPromotable(input.type, input.libItemId, ["REQUESTED"]);
-  await setPromotionStatus(input.type, input.libItemId, {
+  await transitionPromotionStatus(input.type, input.libItemId, ["REQUESTED"], {
     promotion_status: "APPROVED",
     masterdata_ref_id: masterdataRefId,
   });
@@ -156,7 +173,7 @@ async function rejectPromotion(input: {
   await loadPromotable(input.type, input.libItemId, ["REQUESTED"]);
   // bq-contract §8.2: a rejected request stays REJECTED until it is revised
   // and resubmitted. Resetting it to DRAFT erased the decision.
-  await setPromotionStatus(input.type, input.libItemId, { promotion_status: "REJECTED" });
+  await transitionPromotionStatus(input.type, input.libItemId, ["REQUESTED"], { promotion_status: "REJECTED" });
 
   await auditWriter({
     appId: "bq",

@@ -45,9 +45,10 @@ Reviewer and Executor roles.
 
 On PASS, update only ledgers whose truth changed, then replace `PLAN.md` with
 the next coherent plan and its copy-ready prompt when the next priority is
-known. If review can be completed immediately, no temporary `review.md` entry
-is required. If evidence is unavailable, keep the item in `review.md` and name
-the exact missing verification rather than claiming PASS.
+known. If review can be completed immediately, no temporary `[UNVERIFIED]`
+entry in `docs/BACKLOG.md` is required. If evidence is unavailable, keep the
+item tagged `[UNVERIFIED]` there and name the exact missing verification
+rather than claiming PASS.
 
 After recording the verdict and next plan, a separate-session final response
 contains only the copy-ready Executor prompt for the consolidated correction or
