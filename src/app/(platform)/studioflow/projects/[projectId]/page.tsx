@@ -50,7 +50,7 @@ export default async function ProjectOverviewPage({
     p.status === "IN_PROGRESS" || p.status === "ON_REVIEW_INTERNAL" ||
     p.status === "APPROVED_INTERNAL" || p.status === "ON_REVIEW_CLIENT"
   ) ?? null;
-  const selectedPhaseId = sp.phase ?? activePhase?.id ?? phases[0]?.id ?? null;
+  const selectedPhaseId = (sp.phase || null) ?? activePhase?.id ?? phases[0]?.id ?? null;
 
   const pipelineSteps = phases.map((phase) => {
     const display = phaseStatusDisplay(phase.status);
@@ -191,6 +191,7 @@ async function PhaseCanvas({
             nodes={checklist}
             people={people}
             canEdit={phaseDetail.modifiable && hasPermission(grants, P.taskManage)}
+            canToggleOptional={phaseDetail.modifiable && caps.work}
             emptyText="No checklist for this phase"
           />
         </SectionCard>

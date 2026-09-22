@@ -93,7 +93,7 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
           title="Phase checklist"
           description="Ticked items gate approval. Items marked Optional are warnings only. Subtasks never block."
         >
-          <ChecklistTree projectId={projectId} phaseId={phaseId} nodes={checklist} people={people} canEdit={phase.modifiable && hasPermission(grants, P.taskManage)} emptyText="No checklist for this phase" />
+          <ChecklistTree projectId={projectId} phaseId={phaseId} nodes={checklist} people={people} canEdit={phase.modifiable && hasPermission(grants, P.taskManage)} canToggleOptional={canWork} emptyText="No checklist for this phase" />
         </SectionCard>
       </div>
 

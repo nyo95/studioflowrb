@@ -5,8 +5,111 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.107**
-- Next local revision: **R8.108**
+- Current revision after this entry is committed: **R8.108**
+- Next local revision: **R8.109**
+
+## R8.108 | 2026-09-23 | fix(sf): R8.107 regression sweep — schedule board, checklist permissions, client-name race
+
+An 8-angle review of R8.107 (drag-reorder, removed-behavior, cross-file,
+reuse, simplification, efficiency, altitude, conventions) surfaced 8 real
+issues the commit introduced beyond its own stated scope — 6 correctness
+bugs (2 of them narrower/plausible rather than clear-cut) and 2 cleanup
+items. All fixed here; R8.107 itself is kept, not reverted, since its own 6
+fixes and docs consolidation verified out independently.
+
+### Fixed — correctness
+
+- **Schedule drag-reorder off-by-one:** `reorderGroup`
+  (`schedule/schedule-board.tsx`) computed the drop target's array index
+  before removing the dragged item, so a forward drag (dragging an item to a
+  later position) landed one slot past the intended target and persisted the
+  wrong order via `reorderScheduleEntriesAction`. Fixed by recomputing the
+  target's index after the removal.
+- **Card fields: unchecking the last field silently reset to "show
+  everything":** `CardFieldsMenu` (`schedule-board.tsx`) uses an empty
+  `cardFields` array as the "no override" sentinel, but `toggle` let a user
+  uncheck every box, saving `[]` and instantly reinterpreting it as "no
+  override" — the card showed all fields again while every checkbox in the
+  still-open popover looked unchecked. Fixed by keeping at least one field
+  checked via the checkboxes; "Use default" (shown once there's an override)
+  remains the only way back to the empty/no-override state. Also factored
+  the duplicated `cardFields.length > 0 ? cardFields : SCHEDULE_CARD_FIELD_KEYS`
+  fallback (present at both the menu and the board card render) into one
+  `effectiveCardFields` helper.
+- **Card fields popover unreachable by keyboard:** its trigger is a
+  `<span role="button">` (can't be a nested `<button>` inside the card's own
+  button), whose `onKeyDown` only called `stopPropagation` on Enter/Space
+  and never opened it — Radix's `Popover.Trigger` only wires `onClick`, and
+  a `<span>` doesn't synthesize a click from the keyboard the way a native
+  button does. Fixed by toggling `open` state directly from `onKeyDown`.
+- **Checklist toggle permission narrowed for the merged "requirement"
+  item:** the deleted `RequirementsPanel`'s toggle required only
+  `studioflow.phase.work`; after R8.106 merged requirements into the
+  checklist tree as non-blocking root items, toggling them now falls under
+  `ChecklistTree`'s single `canEdit` gate, which requires
+  `studioflow.task.manage` — silently narrowing who could clear a
+  warning-only item, with no docs/changelog note. Fixed server-side
+  (`tasks/service.ts` `setItemChecked`) by allowing the toggle when the
+  actor has `taskManage`, or has `phaseWork` **and** the target is a
+  non-blocking root item; and client-side (`checklist-tree.tsx`) with a new
+  `canToggleOptional` prop (defaults to `canEdit`) wired from `phaseWork` in
+  both `page.tsx` call sites. Everything else (add/delete/edit, blocking
+  items, subtasks) still needs `taskManage`.
+- **`upsertClientByName` raced instead of converging:** its own R8.107 fix
+  wrapped the `create` in `mapWriteError`, so the losing side of a
+  concurrent same-name create now threw a clean but still-fatal `CONFLICT`
+  — breaking the function's own upsert (create-or-return-existing) contract
+  and failing the loser's entire `createProject` call even though the
+  client it wanted now existed. Fixed by re-querying `name_key` on a P2002
+  and returning the winner's row, the same way the pre-existing `existing`
+  branch above it already does.
+- **Empty `?phase=` query param showed a false empty-state:**
+  `projects/[projectId]/page.tsx`'s `selectedPhaseId` used
+  `sp.phase ?? activePhase?.id ?? phases[0]?.id ?? null`, which only falls
+  through on `null`/`undefined` — an empty-string `phase` param (e.g. a
+  manually edited URL) stayed `""`, which is falsy, so the page rendered
+  "No phases found" even with phases present. Fixed with `sp.phase || null`
+  ahead of the `??` chain.
+- **Deletion-request dedup dropped a second requester's input:**
+  `createDeletionRequest` (`masterdata/services/shared.ts`) silently
+  returned the existing `PENDING` row's id when a different actor requested
+  deletion of the same target, discarding their reason/notes with no trace
+  in the stored request (only the audit log showed the second actor).
+  Fixed by folding a different actor's reason/notes into the existing
+  request's `notes` instead of dropping them, without reassigning the
+  original requester.
+
+### Cleanup
+
+- **Duplicated drag-reorder state machine:** the schedule board's grid view
+  and list view each declared their own `draggingId`/`dragOverId` state and
+  near-identical drag handlers. Extracted a shared `useRowDrag` hook used by
+  both.
+- **Header search reimplemented the shared debounce hook:** `header-search.tsx`
+  hand-rolled a 250ms `setTimeout`/`clearTimeout` debounce instead of using
+  the existing `useDebouncedValue` hook (`@/platform/ui_engine`, already used
+  elsewhere). Swapped in the shared hook; the request-ordering guard
+  (`requestId` ref) stays, since that's a separate concern from debounce
+  timing.
+- **Nav hover-close timer not cleared on unmount:**
+  `HeaderApplicationNavigation`'s `closeSoon` (`authenticated-shell/navigation.tsx`)
+  only cleared the *previous* timer before scheduling a new one, with no
+  unmount cleanup. Added the missing `useEffect` cleanup.
+
+### Tests
+
+- `src/apps/studioflow/service.integration.test.ts`: "SF-05" rewritten —
+  asserts both concurrent creates now succeed and converge on one client row
+  (previously asserted the loser must reject with `P2002`, which was the bug).
+
+### Verification
+
+`npm test` 455/455, `tsc --noEmit` clean, `npm run lint` clean, `check:boundaries`
+OK, `check:legacy-runtime` OK. Verified live in the browser: keyboard-only
+popover open, the last-card-field guard, and the checklist add/toggle/delete
+flow, against the dev DB after applying R8.107's pending migrations there
+(only the test DB had been migrated so far) and restarting `next dev` to
+pick up the regenerated Prisma client.
 
 ## R8.107 | 2026-09-22 | fix(masterdata,bq,sf): logic-defect sweep + docs consolidation
 

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client";
+import { AppError } from "@platform/core/errors";
 import { normalizeText } from "@platform/utilities/normalization";
 import { z } from "zod";
 
@@ -23,6 +24,7 @@ import {
   notFound,
   nowOf,
   requireCommand,
+  requirePermission,
   requireRead,
   requiredText,
   writeAudit,
@@ -281,9 +283,19 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
 
     /** Legacy cascade: a parent pushes its state to all children; children never roll up. */
     async setItemChecked(input: CommandContext & { projectId: string; itemId: string; checked: boolean }) {
-      requireCommand(input, P.taskManage);
+      requirePermission(input.grants, P.access);
+      if (input.actor.kind !== "USER" || !input.actor.userId) {
+        throw new AppError("UNAUTHENTICATED", "ACTOR_REQUIRED", "An authenticated staff member is required.");
+      }
       return runTransaction(async (tx) => {
         const item = await loadItem(tx, input.projectId, input.itemId);
+        // A non-blocking root item is the merged "requirement" (warning-only, from the
+        // deleted RequirementsPanel): toggling it only needs phase-work access, matching
+        // that panel's own permission. Everything else still needs task-manage access.
+        const isMergedRequirement = item.parent_id === null && !item.is_blocking;
+        if (!hasPermission(input.grants, P.taskManage) && !(isMergedRequirement && hasPermission(input.grants, P.phaseWork))) {
+          requirePermission(input.grants, P.taskManage);
+        }
         const children = item.parent_id === null ? await tx.sfChecklistItem.findMany({ where: { parent_id: item.id }, select: { id: true } }) : [];
         const ids = cascadeTargets({ id: item.id, parentId: item.parent_id }, children.map((child) => child.id));
         await tx.sfChecklistItem.updateMany({ where: { id: { in: ids } }, data: { is_checked: input.checked, checked_at: input.checked ? nowOf(ports) : null } });

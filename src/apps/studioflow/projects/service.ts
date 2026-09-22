@@ -99,15 +99,26 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
 
   async function upsertClientByName(tx: TxClient, name: string, actor: CommandContext["actor"]) {
     const clean = requiredText(name, "CLIENT_NAME_REQUIRED", "Client name", 200);
-    const existing = await tx.sfClient.findUnique({ where: { name_key: clientKey(clean) } });
+    const nameKey = clientKey(clean);
+    const existing = await tx.sfClient.findUnique({ where: { name_key: nameKey } });
     if (existing) {
       if (existing.archived_at) throw conflict("CLIENT_ARCHIVED", "That client is archived. Restore it first.");
       return existing;
     }
     let created;
     try {
-      created = await tx.sfClient.create({ data: { id: randomUUID(), name: clean, name_key: clientKey(clean) } });
+      created = await tx.sfClient.create({ data: { id: randomUUID(), name: clean, name_key: nameKey } });
     } catch (error) {
+      // A concurrent call may have just created the same client (name uniqueness race).
+      // Converge on that row instead of failing the caller — this is an upsert, so the
+      // loser should return what the winner created, the same as the `existing` branch above.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        const winner = await tx.sfClient.findUnique({ where: { name_key: nameKey } });
+        if (winner) {
+          if (winner.archived_at) throw conflict("CLIENT_ARCHIVED", "That client is archived. Restore it first.");
+          return winner;
+        }
+      }
       mapWriteError(error);
     }
     await writeAudit(ports, tx, { action: "studioflow.client.created", entityType: "client", entityId: created.id, actor, metadata: { name: clean } });

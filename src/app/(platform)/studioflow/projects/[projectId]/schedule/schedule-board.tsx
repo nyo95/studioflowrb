@@ -3,7 +3,7 @@
 import { ArrowDown, ArrowUp, FileUp, History, ImageIcon, Plus, Search, Settings2, X } from "lucide-react";
 import Link from "next/link";
 import { Popover } from "radix-ui";
-import { useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore, type DragEvent, type ReactNode } from "react";
 
 import { SCHEDULE_CARD_FIELD_KEYS, type ScheduleCardFieldKey } from "@/apps/studioflow/domain/schedule";
 import {
@@ -190,17 +190,26 @@ const CARD_FIELD_LABEL: Record<ScheduleCardFieldKey, string> = {
  * Matches legacy's per-card "Card fields" popover and its "Use project
  * default" reset.
  */
+function effectiveCardFields(entry: Pick<ScheduleEntryView, "cardFields">): ScheduleCardFieldKey[] {
+  return entry.cardFields.length > 0 ? (entry.cardFields as ScheduleCardFieldKey[]) : [...SCHEDULE_CARD_FIELD_KEYS];
+}
+
 function CardFieldsMenu({ projectId, entry, command }: { projectId: string; entry: ScheduleEntryView; command: Command }) {
   const [open, setOpen] = useState(false);
   const key = `${entry.id}-card-fields`;
   const pending = command.isPending(key);
-  const effective = entry.cardFields.length > 0 ? entry.cardFields : SCHEDULE_CARD_FIELD_KEYS;
+  const effective = effectiveCardFields(entry);
 
   const save = (fields: readonly string[]) =>
     void command.run(key, () => updateScheduleEntryCardFieldsAction({ projectId, entryId: entry.id, fields: [...fields] }));
 
   const toggle = (field: ScheduleCardFieldKey) => {
-    const next = effective.includes(field) ? effective.filter((f) => f !== field) : [...effective, field];
+    const isChecked = effective.includes(field);
+    // Unchecking the last field would produce `[]`, which is the "no override" sentinel —
+    // that would silently show every field again instead of none. Keep at least one checked;
+    // "Use default" below is the sanctioned way back to the empty/override-cleared state.
+    if (isChecked && effective.length === 1) return;
+    const next = isChecked ? effective.filter((f) => f !== field) : [...effective, field];
     save(next);
   };
 
@@ -214,7 +223,13 @@ function CardFieldsMenu({ projectId, entry, command }: { projectId: string; entr
           role="button"
           tabIndex={0}
           onClick={(event) => event.stopPropagation()}
-          onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") event.stopPropagation(); }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              event.stopPropagation();
+              setOpen((current) => !current);
+            }
+          }}
           aria-label={`Choose fields for ${entry.code}`}
           className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-action bg-surface/90 text-ink-secondary opacity-0 transition-opacity hover:bg-surface hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
         >
@@ -277,6 +292,18 @@ function useIsDesktop() {
   return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }
 
+// ── Drag-reorder state (shared by the board grid and the list rows) ──────────
+
+function useRowDrag() {
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const start = (id: string) => (event: DragEvent) => { setDraggingId(id); event.dataTransfer.effectAllowed = "move"; };
+  const end = () => { setDraggingId(null); setDragOverId(null); };
+  const over = (id: string, canEdit: boolean) => (event: DragEvent) => { if (!canEdit || !draggingId) return; event.preventDefault(); setDragOverId(id); };
+  const leave = (id: string) => () => setDragOverId((current) => (current === id ? null : current));
+  return { draggingId, dragOverId, start, end, over, leave };
+}
+
 // ── Board view ─────────────────────────────────────────────────────────────
 
 function BoardView({
@@ -302,8 +329,7 @@ function BoardView({
   onReorder: (rows: ScheduleEntryView[], draggedId: string, targetId: string) => void;
   onQuickPhoto: (entry: ScheduleEntryView, option: ScheduleOptionView) => void;
 }) {
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const { draggingId, dragOverId, start, end, over, leave } = useRowDrag();
   return (
     <div className="@container grid gap-10 p-(--ui-section-px)">
       {groups.map((group) => (
@@ -329,7 +355,7 @@ function BoardView({
                 location: entry.location,
                 qty: quantity,
               };
-              const fieldKeys = entry.cardFields.length > 0 ? (entry.cardFields as ScheduleCardFieldKey[]) : SCHEDULE_CARD_FIELD_KEYS;
+              const fieldKeys = effectiveCardFields(entry);
               const details: Array<[string, string | null | undefined]> = fieldKeys.map((key) => [CARD_FIELD_LABEL[key], fieldValue[key]]);
               const photoTarget = templateSourceOf(entry);
               return (
@@ -337,15 +363,14 @@ function BoardView({
                   key={entry.id}
                   type="button"
                   draggable={canEdit}
-                  onDragStart={(event) => { setDraggingId(entry.id); event.dataTransfer.effectAllowed = "move"; }}
-                  onDragEnd={() => { setDraggingId(null); setDragOverId(null); }}
-                  onDragOver={(event) => { if (!canEdit || !draggingId) return; event.preventDefault(); setDragOverId(entry.id); }}
-                  onDragLeave={() => setDragOverId((current) => (current === entry.id ? null : current))}
+                  onDragStart={start(entry.id)}
+                  onDragEnd={end}
+                  onDragOver={over(entry.id, canEdit)}
+                  onDragLeave={leave(entry.id)}
                   onDrop={(event) => {
                     event.preventDefault();
                     if (draggingId) onReorder(group.rows, draggingId, entry.id);
-                    setDraggingId(null);
-                    setDragOverId(null);
+                    end();
                   }}
                   onClick={() => onOpen(entry.id)}
                   className={`group grid min-w-0 content-start text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-line-focus ${canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${draggingId === entry.id ? "opacity-40" : ""} ${dragOverId === entry.id && draggingId && draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-2 outline-line-focus" : ""}`}
@@ -449,8 +474,7 @@ export function ScheduleBoard({
   const [openId, setOpenId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<null | "add" | "import" | { move: ScheduleEntryView }>(null);
   const [quickPhoto, setQuickPhoto] = useState<{ entry: ScheduleEntryView; option: ScheduleOptionView } | null>(null);
-  const [listDraggingId, setListDraggingId] = useState<string | null>(null);
-  const [listDragOverId, setListDragOverId] = useState<string | null>(null);
+  const listDrag = useRowDrag();
 
   const counts = useMemo(() => ({
     MATERIAL: entries.filter((e) => e.section === "MATERIAL").length,
@@ -485,9 +509,13 @@ export function ScheduleBoard({
     if (draggedId === targetId) return;
     const ids = rows.map((row) => row.id);
     const from = ids.indexOf(draggedId);
-    const to = ids.indexOf(targetId);
-    if (from === -1 || to === -1) return;
+    if (from === -1 || !ids.includes(targetId)) return;
     ids.splice(from, 1);
+    // Recompute the target's index after removing the dragged item — its position
+    // shifted left by one for a forward drag, so reusing the pre-removal index here
+    // would insert one slot past the intended drop target.
+    const to = ids.indexOf(targetId);
+    if (to === -1) return;
     ids.splice(to, 0, draggedId);
     const prefix = rows[0]?.code.split("-")[0];
     if (!prefix) return;
@@ -583,17 +611,16 @@ export function ScheduleBoard({
                           <li
                             key={entry.id}
                             draggable={canEdit}
-                            onDragStart={(event) => { setListDraggingId(entry.id); event.dataTransfer.effectAllowed = "move"; }}
-                            onDragEnd={() => { setListDraggingId(null); setListDragOverId(null); }}
-                            onDragOver={(event) => { if (!canEdit || !listDraggingId) return; event.preventDefault(); setListDragOverId(entry.id); }}
-                            onDragLeave={() => setListDragOverId((current) => (current === entry.id ? null : current))}
+                            onDragStart={listDrag.start(entry.id)}
+                            onDragEnd={listDrag.end}
+                            onDragOver={listDrag.over(entry.id, canEdit)}
+                            onDragLeave={listDrag.leave(entry.id)}
                             onDrop={(event) => {
                               event.preventDefault();
-                              if (listDraggingId) reorderGroup(group.rows, listDraggingId, entry.id);
-                              setListDraggingId(null);
-                              setListDragOverId(null);
+                              if (listDrag.draggingId) reorderGroup(group.rows, listDrag.draggingId, entry.id);
+                              listDrag.end();
                             }}
-                            className={`flex items-center gap-3 px-(--ui-section-px) py-2.5 ${canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"} ${listDraggingId === entry.id ? "opacity-40" : ""} ${listDragOverId === entry.id && listDraggingId && listDraggingId !== entry.id ? "outline-2 outline-dashed outline-offset-[-2px] outline-line-focus" : ""}`}
+                            className={`flex items-center gap-3 px-(--ui-section-px) py-2.5 ${canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"} ${listDrag.draggingId === entry.id ? "opacity-40" : ""} ${listDrag.dragOverId === entry.id && listDrag.draggingId && listDrag.draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-[-2px] outline-line-focus" : ""}`}
                           >
                             <button type="button" onClick={() => setOpenId(entry.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                               <Thumb url={final?.imageUrl ?? null} alt={final ? final.productName : `${entry.code} has no photo`} />

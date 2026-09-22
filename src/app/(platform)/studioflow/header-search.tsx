@@ -7,7 +7,7 @@ import { Popover } from "radix-ui";
 import { useEffect, useRef, useState } from "react";
 
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
-import { Input, Text } from "@/platform/ui_engine";
+import { Input, Text, useDebouncedValue } from "@/platform/ui_engine";
 
 import { globalSearchAction, type GlobalSearchResult } from "./actions";
 
@@ -28,20 +28,18 @@ export function StudioFlowHeaderSearch() {
   // synchronously from the effect (react-hooks/set-state-in-effect).
   const [searchedQuery, setSearchedQuery] = useState("");
   const requestId = useRef(0);
+  const debouncedQuery = useDebouncedValue(query, 250);
 
   useEffect(() => {
-    const term = query.trim();
+    const term = debouncedQuery.trim();
     if (!term) return;
     const id = ++requestId.current;
-    const timer = setTimeout(() => {
-      void globalSearchAction(term).then((response) => {
-        if (id !== requestId.current) return;
-        setSearchedQuery(term);
-        setResult(response.ok ? response.data : EMPTY);
-      });
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [query]);
+    void globalSearchAction(term).then((response) => {
+      if (id !== requestId.current) return;
+      setSearchedQuery(term);
+      setResult(response.ok ? response.data : EMPTY);
+    });
+  }, [debouncedQuery]);
 
   if (!pathname.startsWith("/studioflow")) return null;
 

@@ -4,7 +4,7 @@ import { Menu } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Popover } from "radix-ui";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type ShellAppLink = { appId: string; name: string; rootPath: string };
 
@@ -40,6 +40,8 @@ export function HeaderApplicationNavigation({ apps }: { apps: readonly ShellAppL
     if (closeTimer.current) clearTimeout(closeTimer.current);
     closeTimer.current = setTimeout(() => setOpen(false), 150);
   };
+
+  useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
 
   if (apps.length === 0) return null;
 

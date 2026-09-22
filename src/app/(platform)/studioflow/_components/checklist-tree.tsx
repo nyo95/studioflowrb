@@ -38,6 +38,13 @@ export function ChecklistTree({
   nodes,
   people,
   canEdit,
+  /**
+   * Toggling a non-blocking root item (the merged "requirement" — warning-only,
+   * never gates approval) only needs phase-work access, matching the permission
+   * the deleted RequirementsPanel's own toggle used to require. Defaults to
+   * `canEdit` so callers that don't pass it keep today's behavior.
+   */
+  canToggleOptional = canEdit,
   emptyText,
 }: {
   projectId: string;
@@ -46,6 +53,7 @@ export function ChecklistTree({
   nodes: readonly ChecklistNode[];
   people: readonly Person[];
   canEdit: boolean;
+  canToggleOptional?: boolean;
   emptyText: string;
 }) {
   const { run, pendingKey, error } = useCommand();
@@ -98,7 +106,7 @@ export function ChecklistTree({
         <div className={`flex items-start gap-2.5 rounded-control px-1.5 py-1.5 hover:bg-surface-muted ${depth > 0 ? "ml-7" : ""}`}>
           <Checkbox
             checked={node.isChecked}
-            disabled={!canEdit || pendingKey === node.id}
+            disabled={!(canEdit || (depth === 0 && !node.isBlocking && canToggleOptional)) || pendingKey === node.id}
             onCheckedChange={(checked) => run(node.id, () => checklistAction({ op: "check", projectId, itemId: node.id, checked: checked === true }))}
             label={<span className={node.isChecked ? "text-ink-tertiary line-through" : depth === 0 ? "font-medium" : ""}>{node.label}</span>}
             className="min-w-0 flex-1"

@@ -132,21 +132,17 @@ describe("SF-R1 bootstrap and naming", () => {
     assert.equal(clients[0].activeProjects, 2);
   });
 
-  it("SF-05: a concurrent client-name race surfaces a friendly conflict, never a raw write error", async () => {
+  it("SF-05: a concurrent client-name race converges on one client row instead of failing the loser", async () => {
     const clientName = `Concurrent Client ${randomUUID().slice(0, 6)}`;
-    const results = await Promise.allSettled([
+    const results = await Promise.all([
       sf.projects.createProject({ ...as(designer), name: "Race A", newClientName: clientName, picDesignerId: designer.id, picDrafterId: drafter.id }),
       sf.projects.createProject({ ...as(designer), name: "Race B", newClientName: clientName, picDesignerId: designer.id, picDrafterId: drafter.id }),
     ]);
-    assert.ok(results.some((r) => r.status === "fulfilled"), "at least one concurrent create wins the race");
-    for (const result of results) {
-      if (result.status === "rejected") {
-        assert.ok(result.reason instanceof AppError, `race loser must surface an AppError, got ${result.reason?.constructor?.name}`);
-        assert.equal(code(result.reason), "P2002");
-      }
-    }
+    assert.equal(results.length, 2, "upsertClientByName re-fetches on a name-uniqueness conflict instead of erroring, so both concurrent creates succeed");
     const clients = await sf.projects.listClients({ grants: ALL });
-    assert.equal(clients.filter((c) => c.name === clientName).length, 1, "only one client row is ever created for the race");
+    const matching = clients.filter((c) => c.name === clientName);
+    assert.equal(matching.length, 1, "only one client row is ever created for the race");
+    assert.equal(matching[0].activeProjects, 2, "both projects resolved to the same client row");
   });
 
   it("rejects prefixed names in auto mode and validates manual format", async () => {

@@ -186,7 +186,17 @@ export async function assertWorkPriceRestorable(tx: TxClient, table: "material-l
 
 export async function createDeletionRequest(tx: TxClient, input: { targetType: string; targetId: string; actor: AuditActor; reason?: string; notes?: string }): Promise<string> {
   const existing = await tx.deletionRequest.findFirst({ where: { target_type: input.targetType, target_id: input.targetId, status: "PENDING" } });
-  if (existing) return existing.id;
+  if (existing) {
+    // A different actor's reason/notes would otherwise be silently discarded — the row still
+    // shows only the first requester. Fold the new input into notes instead of losing it,
+    // without reassigning who the original requester was.
+    if (existing.requester_user_id !== input.actor.userId && (input.reason || input.notes)) {
+      const addition = [input.reason, input.notes].filter(Boolean).join(" — ");
+      const notes = [existing.notes, `Also requested by ${input.actor.label}: ${addition}`].filter(Boolean).join("\n");
+      await tx.deletionRequest.update({ where: { id: existing.id }, data: { notes } });
+    }
+    return existing.id;
+  }
   const req = await tx.deletionRequest.create({ data: { id: randomUUID(), target_type: input.targetType, target_id: input.targetId, status: "PENDING", requester_user_id: input.actor.userId!, requester_label: input.actor.label, reason: input.reason ?? null, notes: input.notes ?? null } });
   return req.id;
 }
