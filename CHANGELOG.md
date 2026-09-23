@@ -5,8 +5,35 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.120**
-- Next local revision: **R8.121**
+- Current revision after this entry is committed: **R8.121**
+- Next local revision: **R8.122**
+
+## R8.121 | 2026-09-23 | fix(platform): move the app switcher next to the brand/logo (GLOBAL-MENU-DESIGN-BRIEF Option B)
+
+Turned out most of "Option B" was already built in R8.107 — a single
+Popover-based control (`HeaderApplicationNavigation`) showing the current
+app's name that opens a menu to switch apps, not the per-app text links the
+brief's "Observed UI" section describes (that section predates R8.107). The
+only real gap against the locked decision was placement: `ml-auto` on the
+nav pushed it to the far right of the topbar, past `contextSlot`, instead of
+sitting next to the brand/logo on the left.
+
+- `authenticated-shell/navigation.tsx`: dropped `ml-auto` from
+  `HeaderApplicationNavigation`'s `<nav>`; added a comment documenting the
+  locked placement decision.
+- `authenticated-shell/index.tsx`: `HeaderApplicationNavigation` now renders
+  first in the topbar row (immediately after the brand column); `contextSlot`
+  and `AccountMenu` moved into a new `ml-auto` wrapper so they stay pinned
+  right.
+
+Mobile/narrow-viewport treatment beyond generic truncation and per-app icons
+remain open questions (no icon field in the apps registry today) — not
+blocking, recorded in `docs/BACKLOG.md`.
+
+Verification: `tsc`, `check:boundaries`, `check:legacy-runtime` clean. `npm
+test`: 491 passed (no existing test exercises topbar layout directly).
+Browser acceptance intentionally deferred — owner asked to test manually.
+
 
 ## R8.120 | 2026-09-23 | feat(sf): move project-info editing from the detail page onto the Projects list
 

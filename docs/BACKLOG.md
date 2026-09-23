@@ -59,9 +59,15 @@ Rules carried over unchanged from the prior trackers:
   2026-09-23 (R8.110):** logo shrunk, account menu slimmed to
   `Account / Settings / Sign out` (brief line 138-140), and the "one settings
   sidebar" direction (brief line 133) is now fully built (closes KB-031, see
-  StudioFlow section). **App switcher placement locked 2026-09-23: Option B**
-  (brief line 58) — current app name near the brand/logo, opening a
-  dropdown/command menu to switch apps, top bar stays clean. Not yet built.
+  StudioFlow section). **App switcher — Option B built 2026-09-23 (R8.121):**
+  turned out to already be ~90% built since R8.107 (a single Popover-based
+  control showing the current app name, opening a menu to switch apps — not
+  per-app text links as the brief's "Observed UI" section describes, which
+  predates that commit); the only real gap was placement (`ml-auto` pushed it
+  to the far right instead of next to the brand/logo) — fixed in
+  `authenticated-shell/navigation.tsx`/`index.tsx`. Mobile/narrow-viewport
+  treatment beyond generic truncation, and per-app icons, remain undecided —
+  not blocking, no icon field exists in the apps registry yet.
 - [ ] [BUG][P3] KB-020 — Office rebuild migration history contains an
   untracked migration (`20260904153201_add_updated_by_label_vendor_brand`, no
   matching file in repository history). Pre-existing environment/history gap,

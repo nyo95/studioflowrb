@@ -69,12 +69,14 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
       utility={domainUtilityNavigation}
       topbar={<div className="flex w-full items-center gap-3 px-(--ui-page-padding)">
         <HeaderApplicationNavigation apps={apps} />
-        {contextSlot}
-        <AccountMenu
-          name={principal.displayName}
-          logoutAction={logoutAction}
-          showSettings={showSettings}
-        />
+        <div className="ml-auto flex min-w-0 items-center gap-3">
+          {contextSlot}
+          <AccountMenu
+            name={principal.displayName}
+            logoutAction={logoutAction}
+            showSettings={showSettings}
+          />
+        </div>
       </div>}
     >
       {children}

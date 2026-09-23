@@ -19,6 +19,11 @@ function activePath(pathname: string, href: string, includeChildren = true): boo
  * fully keyboard- and touch-operable) and also on hover, with a short close
  * delay so moving the pointer from trigger to menu doesn't flicker it shut.
  *
+ * Placement is locked to right next to the brand/logo (GLOBAL-MENU-DESIGN-
+ * BRIEF.md "Option B", owner decision 2026-09-23) — this component renders
+ * first in the topbar row (authenticated-shell/index.tsx), with no `ml-auto`
+ * of its own; the account menu/context slot are pinned right instead.
+ *
  * Built on Popover, not DropdownMenu: DropdownMenu implements the ARIA `menu`
  * pattern, which moves focus onto the first item the instant it opens. That
  * focus jump (and Radix's pointer/highlight tracking that comes with the
@@ -46,7 +51,7 @@ export function HeaderApplicationNavigation({ apps }: { apps: readonly ShellAppL
   if (apps.length === 0) return null;
 
   return (
-    <nav className="ml-auto flex min-w-0 items-center" aria-label="Applications">
+    <nav className="flex min-w-0 items-center" aria-label="Applications">
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
