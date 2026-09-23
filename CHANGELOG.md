@@ -5,8 +5,16 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.121**
-- Next local revision: **R8.122**
+- Current revision after this entry is committed: **R8.122**
+- Next local revision: **R8.123**
+
+## R8.122 | 2026-09-23 | docs(masterdata): scope the workbook import/export backlog item
+
+Owner-scoped, doc-only: "workbook import/export" means bulk SKU + pricing
+import/export via Excel/CSV, similar to the existing vendor-catalog import.
+Error-reporting policy (partial-failure behavior, per-row error surfacing)
+is still undesigned — recorded in `docs/BACKLOG.md`, no code yet.
+
 
 ## R8.121 | 2026-09-23 | fix(platform): move the app switcher next to the brand/logo (GLOBAL-MENU-DESIGN-BRIEF Option B)
 

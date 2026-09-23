@@ -100,7 +100,10 @@ Rules carried over unchanged from the prior trackers:
   StudioFlow-owned data, not a live reference into Master Data's `Sku` table
   (matches how `brand_id` already works: copied at pick-time, no FK, so a
   later Master Data edit/delete never touches a Schedule option).
-- [ ] [PLANNED] Define workbook import/export policy and error reporting.
+- [ ] [PLANNED] Workbook import/export. Owner-scoped 2026-09-23: bulk
+  import/export of SKU + pricing via Excel/CSV, similar in spirit to the
+  existing vendor-catalog import. Error-reporting policy (partial-failure
+  behavior, per-row error surfacing) still needs to be designed — not started.
 - [ ] [CLEANUP][P2] KB-025 — `src/apps/masterdata/services/index.ts` exports
   many internal-implementation helpers with no external consumer found. Not a
   current coupling problem; narrow the barrel when consumers and the public
