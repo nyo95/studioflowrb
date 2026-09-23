@@ -5,7 +5,6 @@ import { notFound } from "next/navigation";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { AppError } from "@platform/core/errors";
 import { formatDateOnly } from "@platform/utilities/date";
-import { pointMarkers } from "@/apps/studioflow/domain/mom";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { DocumentBlock, DocumentSheet, PrintButton } from "@/platform/ui_engine";
@@ -64,7 +63,6 @@ export default async function MomPrintPage({ params }: { params: Promise<{ proje
 
         <div className="mt-5 grid gap-5">
           {doc.items.map((item, index) => {
-            const markers = pointMarkers(item.listStyle, item.points.map((p) => p.style));
             const images = item.isTextOnly ? [] : item.images;
             const columns = item.isTextOnly ? "grid-cols-1" : images.length >= 2 ? "grid-cols-[1fr_1fr_1.3fr]" : "grid-cols-[1fr_1.6fr]";
             return (
@@ -83,14 +81,7 @@ export default async function MomPrintPage({ params }: { params: Promise<{ proje
                   ) : null}
                   <div className="min-w-0">
                     <p className={`${LABEL} mb-2`}>Section {String(index + 1).padStart(2, "0")}</p>
-                    <div className="grid gap-1.5">
-                      {item.points.map((point, pointIndex) => (
-                        <div key={point.id} className="flex gap-2 text-sm leading-6">
-                          {item.listStyle !== "NONE" ? <span className="w-6 shrink-0 font-semibold text-neutral-700">{markers[pointIndex]}</span> : null}
-                          <p className="m-0 min-w-0 whitespace-pre-wrap">{point.text || "—"}</p>
-                        </div>
-                      ))}
-                    </div>
+                    <p className="m-0 min-w-0 whitespace-pre-wrap text-sm leading-6">{item.content || "—"}</p>
                   </div>
                 </div>
               </DocumentBlock>

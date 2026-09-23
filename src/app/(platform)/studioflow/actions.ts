@@ -436,8 +436,7 @@ export async function addMomItemAction(input: z.infer<typeof MomDocRef>): Promis
   });
 }
 
-const MomListStyle = z.enum(["DECIMAL", "DISC", "DASH", "NONE"]);
-const MomItemUpdate = z.strictObject({ projectId: Id, itemId: Id, isTextOnly: z.boolean(), listStyle: MomListStyle });
+const MomItemUpdate = z.strictObject({ projectId: Id, itemId: Id, isTextOnly: z.boolean() });
 export async function updateMomItemAction(input: z.infer<typeof MomItemUpdate>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
@@ -471,45 +470,12 @@ export async function moveMomItemAction(input: z.infer<typeof MomItemMove>): Pro
   });
 }
 
-const MomPointAdd = z.strictObject({ projectId: Id, itemId: Id, text: z.string().max(5000).optional() });
-export async function addMomPointAction(input: z.infer<typeof MomPointAdd>): Promise<ActionResult<{ pointId: string }>> {
+const MomItemContentUpdate = z.strictObject({ projectId: Id, itemId: Id, content: z.string().max(20000) });
+export async function updateMomItemContentAction(input: z.infer<typeof MomItemContentUpdate>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
-    const data = parse(MomPointAdd, input);
-    const result = await studioFlow.mom.addPoint({ ...ctx, ...data });
-    refreshMom(data.projectId);
-    return result;
-  });
-}
-
-const MomPointUpdate = z.strictObject({ projectId: Id, pointId: Id, text: z.string().max(5000), style: z.enum(["DEFAULT", "PLAIN"]) });
-export async function updateMomPointAction(input: z.infer<typeof MomPointUpdate>): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => {
-    const ctx = await context();
-    const data = parse(MomPointUpdate, input);
-    const result = await studioFlow.mom.updatePoint({ ...ctx, ...data });
-    refreshMom(data.projectId);
-    return result;
-  });
-}
-
-const MomPointRef = z.strictObject({ projectId: Id, pointId: Id });
-export async function deleteMomPointAction(input: z.infer<typeof MomPointRef>): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => {
-    const ctx = await context();
-    const data = parse(MomPointRef, input);
-    const result = await studioFlow.mom.deletePoint({ ...ctx, ...data });
-    refreshMom(data.projectId);
-    return result;
-  });
-}
-
-const MomPointMove = z.strictObject({ projectId: Id, pointId: Id, direction: Direction });
-export async function moveMomPointAction(input: z.infer<typeof MomPointMove>): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => {
-    const ctx = await context();
-    const data = parse(MomPointMove, input);
-    const result = await studioFlow.mom.movePoint({ ...ctx, ...data });
+    const data = parse(MomItemContentUpdate, input);
+    const result = await studioFlow.mom.updateItemContent({ ...ctx, ...data });
     refreshMom(data.projectId);
     return result;
   });

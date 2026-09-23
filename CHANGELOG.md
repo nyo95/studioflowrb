@@ -5,8 +5,62 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.116**
-- Next local revision: **R8.117**
+- Current revision after this entry is committed: **R8.117**
+- Next local revision: **R8.118**
+
+## R8.117 | 2026-09-23 | feat(sf): MOM sections merge to one free-typed WYSIWYG-lite content field, replacing per-point rows
+
+Owner request on the MOM editor, after first trying a straight `SimpleTextEditor`
+swap on the existing per-point rows and rejecting it live: *"ini ga usah gini,
+lgsg bentuk text area aja, disimplifikasi jadinya"*. Discussed as
+planner/reviewer before touching schema (three options laid out: UI-only
+simplify, full merge, or a hybrid that diffs lines back into rows); owner
+picked the full merge — *"B lebih optimal, di whatsapp aja bullet/numberingnya
+bisa otomatis kan? jadi ga ada issue tinggal nulis diatas -> enter beres"*.
+
+- **Schema:** `SfMomItem` drops `list_style` and its `points SfMomPoint[]`
+  relation, gains one `content String @default("")`. `SfMomPoint` table and
+  the `sf_mom_list_style`/`sf_mom_point_style` enums are dropped.
+  Migration `20260923010000_sf_mom_point_content_merge` backfills `content`
+  by joining each item's existing points (ordered) with the exact marker each
+  one used to render, so existing MOMs read the same after migrating as
+  before. Applied to both the local dev and test databases.
+- **Domain (`src/apps/studioflow/domain/mom.ts`):** `MomSnapshot.items[]` is
+  now `{ isTextOnly, content, images }`. `parseMomSnapshot` stays backward
+  compatible: a historical revision snapshot still shaped as
+  `{ listStyle, points }` is normalized into `content` on read (recomputing
+  the same legacy marker), so old revisions keep restoring correctly and
+  their images stay protected from the reachability sweep. `pointMarkers`,
+  the list/point-style constants, and `MOM_LIMITS.pointText` are gone;
+  `MOM_LIMITS.itemContent` (20000 chars) replaces it for one section's whole
+  note field.
+- **Service (`src/apps/studioflow/mom/service.ts`):** `addPoint`/`updatePoint`/
+  `deletePoint`/`reorderPoints`/`movePoint` are gone, replaced by one
+  `updateItemContent`. `updateItem` drops its `listStyle` argument.
+- **Actions:** `addMomPointAction`/`updateMomPointAction`/`deleteMomPointAction`/
+  `moveMomPointAction` are gone, replaced by `updateMomItemContentAction`.
+- **Editor (`mom-editor.tsx`):** `SectionEditor` no longer renders a per-point
+  list, a "List style" selector, or an "Add note" button. Each section is one
+  `SimpleTextEditor` box (bold/italic/bullet-list toolbar, same as Master
+  Data's Notes field), with the existing "1."/"-"/"•" auto-continue-on-Enter
+  behavior now applying unconditionally instead of only when the section's
+  list style was `NONE`. `SimpleTextEditor`
+  (`src/platform/ui_engine/patterns/simple-text-editor.tsx`) gained
+  `forwardRef` support so the editor can still restore cursor position after
+  an auto-continued list line.
+- **Print view:** renders `item.content` as one pre-wrapped block instead of
+  a per-point marker/text loop.
+- **Contract:** `STUDIOFLOW-REWORK-CONTRACT.md` §10 rewritten for the new
+  shape, with an explicit note that this overrides the legacy-parity "ordered
+  document/block/point/image hierarchy… is the minimum" floor recorded in the
+  archived `studioflow-mom-contract.md`.
+
+Verification: `tsc`, `npm run check:boundaries`, `npm run check:legacy-runtime`
+all clean. `npm test`: 490 passed, 0 failed (includes the real-Postgres MOM
+integration suite against both migrated databases). Domain tests cover the
+legacy-snapshot-normalization path directly (DECIMAL/DISC/NONE list styles,
+mixed DEFAULT/PLAIN points). Browser acceptance intentionally deferred — owner
+asked to test manually before any further browser-driven verification pass.
 
 ## R8.116 | 2026-09-23 | feat(platform): group the Roles & Access permissions list into a matrix by app and resource
 

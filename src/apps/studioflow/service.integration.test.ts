@@ -66,7 +66,7 @@ async function seedDefaultTemplate() {
 async function reset() {
   await testDb.pool.query(`TRUNCATE TABLE ${[
     "sf_schedule_option", "sf_schedule_entry", "sf_schedule_template_item", "sf_schedule_template_category", "sf_schedule_prefix",
-    "sf_mom_image", "sf_mom_point", "sf_mom_item", "sf_mom_document",
+    "sf_mom_image", "sf_mom_item", "sf_mom_document",
     "sf_checklist_item_label", "sf_checklist_label", "sf_checklist_filter_view", "sf_checklist_item", "sf_checklist_template",
     "sf_deliverable",
     "sf_activity", "sf_revision", "sf_phase",
@@ -384,16 +384,16 @@ const png = () => ({ body: PNG, contentType: "image/png" });
 
 async function momShape(projectId: string, documentId: string) {
   const doc = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
-  return doc.items.map((item) => ({ points: item.points.map((p) => p.text), slots: item.images.map((i) => i.slot) }));
+  return doc.items.map((item) => ({ content: item.content, slots: item.images.map((i) => i.slot) }));
 }
 
 describe("SF-R2 MOM revisions", () => {
   const editFirstPoint = async (projectId: string, documentId: string, text: string) => {
-    const point = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0].points[0];
-    await sf.mom.updatePoint({ ...as(designer), projectId, pointId: point.id, text, style: "DEFAULT" });
+    const item = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0];
+    await sf.mom.updateItemContent({ ...as(designer), projectId, itemId: item.id, content: text });
   };
   const firstText = async (projectId: string, documentId: string) =>
-    (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0].points[0].text;
+    (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0].content;
 
   it("saves numbered revisions, detects unsaved edits, and restores without losing work", async () => {
     const { projectId } = await newProject();
@@ -507,7 +507,7 @@ describe("SF-R2 MOM", () => {
     await rejectsWith(sf.mom.createDocument({ ...as(designer), projectId, topic: "  " }), "MOM_TOPIC_REQUIRED");
     assert.equal(doc.meetingDate, "2026-09-15");
     assert.equal(doc.preparedByName, "Dina Designer");
-    assert.deepEqual(await momShape(projectId, documentId), [{ points: [""], slots: [] }]);
+    assert.deepEqual(await momShape(projectId, documentId), [{ content: "", slots: [] }]);
 
     await sf.mom.updateDocument({ ...as(designer), projectId, documentId, topic: "Weekly meeting", meetingDate: "2026-09-20", venue: " Site ", attendees: "Client\nContractor", preparedByName: "Dina" });
     const list = await sf.mom.listDocuments({ grants: DRAFTER_GRANTS, projectId });
@@ -518,31 +518,22 @@ describe("SF-R2 MOM", () => {
     assert.deepEqual(audit.map((a) => a.action), ["studioflow.mom.created", "studioflow.mom.updated"]);
   });
 
-  it("orders sections and points, and keeps one point per section", async () => {
+  it("orders sections and edits a section's free-typed content", async () => {
     const { projectId } = await newProject();
     const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId, topic: "Weekly meeting" });
     const first = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[0];
-    await sf.mom.updatePoint({ ...as(designer), projectId, pointId: first.points[0].id, text: "A", style: "DEFAULT" });
-    const b = await sf.mom.addPoint({ ...as(designer), projectId, itemId: first.id, text: "B" });
-    await sf.mom.movePoint({ ...as(designer), projectId, pointId: b.pointId, direction: "up" });
+    await sf.mom.updateItemContent({ ...as(designer), projectId, itemId: first.id, content: "1. A\n2. B" });
     const second = await sf.mom.addItem({ ...as(designer), projectId, documentId });
     await sf.mom.moveItem({ ...as(designer), projectId, itemId: second.itemId, direction: "up" });
-    assert.deepEqual(await momShape(projectId, documentId), [{ points: [""], slots: [] }, { points: ["B", "A"], slots: [] }]);
+    assert.deepEqual(await momShape(projectId, documentId), [{ content: "", slots: [] }, { content: "1. A\n2. B", slots: [] }]);
 
     await rejectsWith(sf.mom.reorderItems({ ...as(designer), projectId, documentId, itemIds: [second.itemId] }), "MOM_REORDER_INVALID");
     await sf.mom.reorderItems({ ...as(designer), projectId, documentId, itemIds: [first.id, second.itemId] });
-    const onlyPoint = (await sf.mom.getDocument({ grants: ALL, projectId, documentId })).items[1].points[0];
-    await sf.mom.deletePoint({ ...as(designer), projectId, pointId: onlyPoint.id });
-    const after = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
-    assert.equal(after.items[1].points.length, 1);
-    assert.equal(after.items[1].points[0].text, "");
-    assert.notEqual(after.items[1].points[0].id, onlyPoint.id);
 
-    await sf.mom.updateItem({ ...as(designer), projectId, itemId: first.id, isTextOnly: true, listStyle: "DASH" });
-    await rejectsWith(sf.mom.updateItem({ ...as(designer), projectId, itemId: first.id, isTextOnly: true, listStyle: "ROMAN" }), "MOM_LIST_STYLE_INVALID");
+    await sf.mom.updateItem({ ...as(designer), projectId, itemId: first.id, isTextOnly: true });
     await sf.mom.deleteItem({ ...as(designer), projectId, itemId: second.itemId });
     const final = await sf.mom.getDocument({ grants: ALL, projectId, documentId });
-    assert.deepEqual(final.items.map((i) => [i.isTextOnly, i.listStyle, i.points.map((p) => p.text)]), [[true, "DASH", ["B", "A"]]]);
+    assert.deepEqual(final.items.map((i) => [i.isTextOnly, i.content]), [[true, "1. A\n2. B"]]);
   });
 
   it("stores at most two images per section and cleans storage", async () => {

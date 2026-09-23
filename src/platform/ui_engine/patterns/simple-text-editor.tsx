@@ -1,7 +1,7 @@
 "use client";
 
 import { Bold, Italic, List } from "lucide-react";
-import { useRef, type TextareaHTMLAttributes } from "react";
+import { forwardRef, useRef, type TextareaHTMLAttributes } from "react";
 
 import { IconButton, Textarea } from "../primitives";
 
@@ -14,8 +14,16 @@ function notifyInput(textarea: HTMLTextAreaElement) {
   textarea.focus();
 }
 
-export function SimpleTextEditor({ toolbarLabel = "Formatting tools", ...props }: SimpleTextEditorProps) {
+export const SimpleTextEditor = forwardRef<HTMLTextAreaElement, SimpleTextEditorProps>(function SimpleTextEditor(
+  { toolbarLabel = "Formatting tools", ...props },
+  forwardedRef,
+) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const setRefs = (node: HTMLTextAreaElement | null) => {
+    textareaRef.current = node;
+    if (typeof forwardedRef === "function") forwardedRef(node);
+    else if (forwardedRef) forwardedRef.current = node;
+  };
 
   const wrapSelection = (before: string, after = before) => {
     const textarea = textareaRef.current;
@@ -51,7 +59,7 @@ export function SimpleTextEditor({ toolbarLabel = "Formatting tools", ...props }
         <IconButton size="sm" variant="ghost" label="Italic" icon={<Italic aria-hidden="true" size={15} />} onClick={() => wrapSelection("*")} />
         <IconButton size="sm" variant="ghost" label="Bullet list" icon={<List aria-hidden="true" size={15} />} onClick={toggleBullets} />
       </div>
-      <Textarea ref={textareaRef} className="min-h-[116px] rounded-none border-0 shadow-none focus:border-0 focus:shadow-none" {...props} />
+      <Textarea ref={setRefs} className="min-h-[116px] rounded-none border-0 shadow-none focus:border-0 focus:shadow-none" {...props} />
     </div>
   );
-}
+});

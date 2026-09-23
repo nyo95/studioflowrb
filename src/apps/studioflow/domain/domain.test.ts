@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { fullBlockers, todoBlockers } from "./blockers";
-import { buildMomSnapshot, isPermutation, momSnapshotImageKeys, momSnapshotsEqual, moveId, parseMomSnapshot, pointMarkers } from "./mom";
+import { buildMomSnapshot, isPermutation, momSnapshotImageKeys, momSnapshotsEqual, moveId, parseMomSnapshot } from "./mom";
 import { REVISION_RETENTION, nextRevisionNumber, revisionsToPrune, versionLabel } from "./revisions";
 import { compareOptionLabels, fallbackPrefix, nextOptionLabel, normalizeScheduleCategory, optionLabel, optionLabelIndex, parseLegacyScheduleCsv, parseLegacyScheduleSheet, parseScheduleCode, scheduleCode, scheduleSearchKey } from "./schedule";
 import {
@@ -172,13 +172,6 @@ describe("today feed", () => {
 });
 
 describe("MOM rules", () => {
-  it("numbers only normal points and honours list style", () => {
-    assert.deepEqual(pointMarkers("DECIMAL", ["DEFAULT", "PLAIN", "DEFAULT"]), ["1.", "", "2."]);
-    assert.deepEqual(pointMarkers("DISC", ["DEFAULT", "DEFAULT"]), ["•", "•"]);
-    assert.deepEqual(pointMarkers("DASH", ["PLAIN", "DEFAULT"]), ["", "–"]);
-    assert.deepEqual(pointMarkers("NONE", ["DEFAULT"]), [""]);
-  });
-
   it("validates reorder payloads and moves", () => {
     assert.equal(isPermutation(["a", "b"], ["b", "a"]), true);
     assert.equal(isPermutation(["a", "b"], ["a", "a"]), false);
@@ -287,18 +280,17 @@ describe("MOM snapshots", () => {
     preparedByName: "Dina",
     items: [{
       isTextOnly: false,
-      listStyle: "DECIMAL",
-      points: [{ text: "A", style: "DEFAULT" }],
+      content: "1. A",
       images: [{ slot: 0, storageKey: "k/1", contentType: "image/png", bytes: 12 }],
     }],
   };
 
   it("compares by content and lists referenced photos", () => {
     const a = buildMomSnapshot(source);
-    const b = buildMomSnapshot({ ...source, items: [{ ...source.items[0], points: [{ text: "B", style: "DEFAULT" }] }] });
+    const b = buildMomSnapshot({ ...source, items: [{ ...source.items[0], content: "1. B" }] });
     assert.equal(momSnapshotsEqual(a, buildMomSnapshot(source)), true);
     assert.equal(momSnapshotsEqual(a, b), false);
-    const reordered = JSON.parse('{"items":[{"images":[{"bytes":12,"contentType":"image/png","slot":0,"storageKey":"k/1"}],"points":[{"style":"DEFAULT","text":"A"}],"listStyle":"DECIMAL","isTextOnly":false}],"preparedByName":"Dina","attendees":"Client","venue":null,"meetingDate":"2026-09-15","topic":"Weekly meeting"}');
+    const reordered = JSON.parse('{"items":[{"images":[{"bytes":12,"contentType":"image/png","slot":0,"storageKey":"k/1"}],"content":"1. A","isTextOnly":false}],"preparedByName":"Dina","attendees":"Client","venue":null,"meetingDate":"2026-09-15","topic":"Weekly meeting"}');
     assert.equal(momSnapshotsEqual(a, reordered), true, "key order from a JSONB round trip must not matter");
     assert.deepEqual(momSnapshotImageKeys(a), ["k/1"]);
   });
@@ -308,7 +300,33 @@ describe("MOM snapshots", () => {
     assert.deepEqual(parseMomSnapshot(JSON.parse(JSON.stringify(a))), a);
     assert.equal(parseMomSnapshot(null), null);
     assert.equal(parseMomSnapshot({ ...a, items: "nope" }), null);
-    assert.equal(parseMomSnapshot({ ...a, items: [{ ...a.items[0], listStyle: "ROMAN" }] }), null);
+    assert.equal(parseMomSnapshot({ ...a, items: [{ ...a.items[0], content: undefined }] }), null);
     assert.equal(parseMomSnapshot({ ...a, items: [{ ...a.items[0], images: [{ slot: 2, storageKey: "k", contentType: "image/png", bytes: 1 }] }] }), null);
+  });
+
+  it("normalizes a pre-2026-09-23 points/listStyle snapshot into content, preserving markers", () => {
+    const legacy = {
+      topic: "Weekly meeting",
+      meetingDate: "2026-09-15",
+      venue: null,
+      attendees: "Client",
+      preparedByName: "Dina",
+      items: [{
+        isTextOnly: false,
+        listStyle: "DECIMAL",
+        points: [{ text: "Wall", style: "DEFAULT" }, { text: "Aside", style: "PLAIN" }, { text: "Floor", style: "DEFAULT" }],
+        images: [],
+      }],
+    };
+    const parsed = parseMomSnapshot(legacy);
+    assert.equal(parsed?.items[0].content, "1. Wall\nAside\n2. Floor");
+
+    const discLegacy = { ...legacy, items: [{ ...legacy.items[0], listStyle: "DISC" }] };
+    assert.equal(parseMomSnapshot(discLegacy)?.items[0].content, "• Wall\nAside\n• Floor");
+
+    const noneLegacy = { ...legacy, items: [{ ...legacy.items[0], listStyle: "NONE" }] };
+    assert.equal(parseMomSnapshot(noneLegacy)?.items[0].content, "Wall\nAside\nFloor");
+
+    assert.equal(parseMomSnapshot({ ...legacy, items: [{ ...legacy.items[0], listStyle: "ROMAN" }] }), null);
   });
 });

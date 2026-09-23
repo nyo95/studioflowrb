@@ -6,14 +6,14 @@ const schema = readFileSync(new URL("../../../prisma/schema.prisma", import.meta
 const service = readFileSync(new URL("./mom/service.ts", import.meta.url), "utf8");
 const permissions = readFileSync(new URL("./permissions.ts", import.meta.url), "utf8");
 const editor = readFileSync(new URL("../../app/(platform)/studioflow/projects/[projectId]/mom/[momId]/mom-editor.tsx", import.meta.url), "utf8");
-const imagePolicy = readFileSync(new URL("./mom-images.ts", import.meta.url), "utf8");
+const imagePolicy = readFileSync(new URL("./domain/mom.ts", import.meta.url), "utf8");
 
 describe("StudioFlow MOM contract", () => {
   it("keeps MOM project-owned with the ordered legacy hierarchy", () => {
     assert.match(schema, /mom_documents\s+SfMomDocument\[\]/);
     assert.match(schema, /model SfMomDocument[\s\S]*project\s+SfProject/);
     assert.match(schema, /model SfMomDocument[\s\S]*items\s+SfMomItem\[\]/);
-    assert.match(schema, /model SfMomItem[\s\S]*points\s+SfMomPoint\[\]/);
+    assert.match(schema, /model SfMomItem[\s\S]*content\s+String/);
     assert.match(schema, /model SfMomItem[\s\S]*images\s+SfMomImage\[\]/);
     const hierarchy = schema.match(/model SfMomItem[\s\S]*?model SfProjectPhase/)?.[0] ?? "";
     assert.doesNotMatch(hierarchy, /@@unique\(\[(document_id|item_id), sort_order\]\)/);
@@ -34,7 +34,7 @@ describe("StudioFlow MOM contract", () => {
 
   it("uses the canonical image storage surface", () => {
     assert.match(editor, /ImageWorkspace/);
-    assert.match(imagePolicy, /MOM images must be non-empty and no larger than 10 MB/);
+    assert.match(imagePolicy, /imageBytes:\s*3 \* 1024 \* 1024/);
     assert.doesNotMatch(editor, /window\.confirm/);
   });
 });

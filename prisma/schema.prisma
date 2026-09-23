@@ -1460,24 +1460,6 @@ model SfDeliverable {
 
 // ── SF-R2 MOM (contract §10; legacy extensions/mom) ─────────────────────────
 
-enum SfMomListStyle {
-  DECIMAL
-  DISC
-  DASH
-  NONE
-
-  @@map("sf_mom_list_style")
-  @@schema("studioflow")
-}
-
-enum SfMomPointStyle {
-  DEFAULT
-  PLAIN
-
-  @@map("sf_mom_point_style")
-  @@schema("studioflow")
-}
-
 model SfMomDocument {
   id               String    @id @default(uuid())
   project_id       String
@@ -1519,36 +1501,21 @@ model SfMomRevision {
 }
 
 model SfMomItem {
-  id           String         @id @default(uuid())
+  id           String   @id @default(uuid())
   document_id  String
   sort_order   Int
-  is_text_only Boolean        @default(false)
-  list_style   SfMomListStyle @default(DECIMAL)
-  created_at   DateTime       @default(now())
-  updated_at   DateTime       @updatedAt
+  is_text_only Boolean  @default(false)
+  /// Free-typed notes for this section; list markers (`1.`, `-`, `•`) are
+  /// literal characters the user types, not a computed style (§10 rework).
+  content      String   @default("")
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
 
   document SfMomDocument @relation(fields: [document_id], references: [id], onDelete: Cascade)
-  points   SfMomPoint[]
   images   SfMomImage[]
 
   @@index([document_id, sort_order])
   @@map("sf_mom_item")
-  @@schema("studioflow")
-}
-
-model SfMomPoint {
-  id         String          @id @default(uuid())
-  item_id    String
-  sort_order Int
-  text       String          @default("")
-  style      SfMomPointStyle @default(DEFAULT)
-  created_at DateTime        @default(now())
-  updated_at DateTime        @updatedAt
-
-  item SfMomItem @relation(fields: [item_id], references: [id], onDelete: Cascade)
-
-  @@index([item_id, sort_order])
-  @@map("sf_mom_point")
   @@schema("studioflow")
 }
 

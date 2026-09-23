@@ -7,8 +7,6 @@ import { sniffImage } from "../domain/images";
 import {
   MOM_IMAGE_TYPES,
   MOM_LIMITS,
-  MOM_LIST_STYLES,
-  MOM_POINT_STYLES,
   isImageSlot,
   buildMomSnapshot,
   isPermutation,
@@ -17,8 +15,6 @@ import {
   moveId,
   parseMomSnapshot,
   type MomImageSlot,
-  type MomListStyle,
-  type MomPointStyle,
   type MomSnapshot,
 } from "../domain/mom";
 import { REVISION_RETENTION, nextRevisionNumber, versionLabel, revisionsToPrune } from "../domain/revisions";
@@ -51,19 +47,9 @@ function scopeError() {
   return notFound("MOM record");
 }
 
-function listStyleOf(value: string): MomListStyle {
-  if (!(MOM_LIST_STYLES as readonly string[]).includes(value)) throw invalid("MOM_LIST_STYLE_INVALID", "Choose a valid list style.");
-  return value as MomListStyle;
-}
-
-function pointStyleOf(value: string): MomPointStyle {
-  if (!(MOM_POINT_STYLES as readonly string[]).includes(value)) throw invalid("MOM_POINT_STYLE_INVALID", "Choose a valid point style.");
-  return value as MomPointStyle;
-}
-
-function pointText(value: string | null | undefined): string {
+function itemContentOf(value: string | null | undefined): string {
   const text = (value ?? "").replace(/\r\n/g, "\n");
-  if (text.length > MOM_LIMITS.pointText) throw invalid("MOM_POINT_TOO_LONG", "This note is too long.");
+  if (text.length > MOM_LIMITS.itemContent) throw invalid("MOM_CONTENT_TOO_LONG", "This section's notes are too long.");
   return text;
 }
 
@@ -71,7 +57,6 @@ const DOCUMENT_TREE = {
   items: {
     orderBy: [{ sort_order: "asc" }, { created_at: "asc" }],
     include: {
-      points: { orderBy: [{ sort_order: "asc" }, { created_at: "asc" }] },
       images: { orderBy: { slot: "asc" } },
     },
   },
@@ -85,8 +70,7 @@ type DocumentTree = {
   prepared_by_name: string;
   items: Array<{
     is_text_only: boolean;
-    list_style: string;
-    points: Array<{ text: string; style: string }>;
+    content: string;
     images: Array<{ slot: number; storage_key: string; content_type: string; bytes: number }>;
   }>;
 };
@@ -100,8 +84,7 @@ function snapshotOf(row: DocumentTree): MomSnapshot {
     preparedByName: row.prepared_by_name,
     items: row.items.map((item) => ({
       isTextOnly: item.is_text_only,
-      listStyle: item.list_style,
-      points: item.points,
+      content: item.content,
       images: item.images.map((image) => ({ slot: image.slot, storageKey: image.storage_key, contentType: image.content_type, bytes: image.bytes })),
     })),
   });
@@ -124,21 +107,13 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
     return item;
   }
 
-  async function loadPoint(tx: TxClient, projectId: string, pointId: string) {
-    const point = await tx.sfMomPoint.findUnique({ where: { id: pointId }, include: { item: { include: { document: true } } } });
-    if (!point || point.item.document.project_id !== projectId) throw scopeError();
-    await loadWritableProject(tx, projectId);
-    return point;
-  }
-
   async function touch(tx: TxClient, documentId: string) {
     await tx.sfMomDocument.update({ where: { id: documentId }, data: { updated_at: nowOf(ports) } });
   }
 
-  async function writeOrder(tx: TxClient, table: "item" | "point", ids: readonly string[]) {
+  async function writeOrder(tx: TxClient, table: "item", ids: readonly string[]) {
     for (const [index, id] of ids.entries()) {
-      if (table === "item") await tx.sfMomItem.update({ where: { id }, data: { sort_order: index } });
-      else await tx.sfMomPoint.update({ where: { id }, data: { sort_order: index } });
+      await tx.sfMomItem.update({ where: { id }, data: { sort_order: index } });
     }
   }
 
@@ -146,14 +121,8 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
     return (await tx.sfMomItem.findMany({ where: { document_id: documentId }, orderBy: [{ sort_order: "asc" }, { created_at: "asc" }], select: { id: true } })).map((row) => row.id);
   }
 
-  async function pointIds(tx: TxClient, itemId: string) {
-    return (await tx.sfMomPoint.findMany({ where: { item_id: itemId }, orderBy: [{ sort_order: "asc" }, { created_at: "asc" }], select: { id: true } })).map((row) => row.id);
-  }
-
   async function createItem(tx: TxClient, documentId: string, sortOrder: number) {
-    const item = await tx.sfMomItem.create({ data: { document_id: documentId, sort_order: sortOrder } });
-    await tx.sfMomPoint.create({ data: { item_id: item.id, sort_order: 0, text: "" } });
-    return item;
+    return tx.sfMomItem.create({ data: { document_id: documentId, sort_order: sortOrder } });
   }
 
   /** Storage cleanup runs after commit; a failure leaves an orphan object, never a broken row. */
@@ -262,8 +231,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
       const items = await Promise.all(row.items.map(async (item) => ({
         id: item.id,
         isTextOnly: item.is_text_only,
-        listStyle: item.list_style as MomListStyle,
-        points: item.points.map((point) => ({ id: point.id, text: point.text, style: point.style as MomPointStyle })),
+        content: item.content,
         images: await Promise.all(item.images.map(async (image) => ({
           id: image.id,
           slot: image.slot as MomImageSlot,
@@ -392,13 +360,12 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
       });
     },
 
-    async updateItem(input: CommandContext & { projectId: string; itemId: string; isTextOnly: boolean; listStyle: string }) {
+    async updateItem(input: CommandContext & { projectId: string; itemId: string; isTextOnly: boolean }) {
       requireCommand(input, P.momManage);
-      const listStyle = listStyleOf(input.listStyle);
       return runTransaction(async (tx) => {
         const item = await loadItem(tx, input.projectId, input.itemId);
-        if (item.is_text_only === input.isTextOnly && item.list_style === listStyle) return { itemId: item.id };
-        await tx.sfMomItem.update({ where: { id: item.id }, data: { is_text_only: input.isTextOnly, list_style: listStyle } });
+        if (item.is_text_only === input.isTextOnly) return { itemId: item.id };
+        await tx.sfMomItem.update({ where: { id: item.id }, data: { is_text_only: input.isTextOnly } });
         await touch(tx, item.document_id);
         return { itemId: item.id };
       });
@@ -445,66 +412,15 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
       });
     },
 
-    // ── Points ─────────────────────────────────────────────────────────────
-    async addPoint(input: CommandContext & { projectId: string; itemId: string; text?: string }) {
+    async updateItemContent(input: CommandContext & { projectId: string; itemId: string; content: string }) {
       requireCommand(input, P.momManage);
-      const text = pointText(input.text);
+      const content = itemContentOf(input.content);
       return runTransaction(async (tx) => {
         const item = await loadItem(tx, input.projectId, input.itemId);
-        const count = await tx.sfMomPoint.count({ where: { item_id: item.id } });
-        const point = await tx.sfMomPoint.create({ data: { item_id: item.id, sort_order: count, text } });
-        await touch(tx, item.document_id);
-        return { pointId: point.id };
-      });
-    },
-
-    async updatePoint(input: CommandContext & { projectId: string; pointId: string; text: string; style: string }) {
-      requireCommand(input, P.momManage);
-      const text = pointText(input.text);
-      const style = pointStyleOf(input.style);
-      return runTransaction(async (tx) => {
-        const point = await loadPoint(tx, input.projectId, input.pointId);
-        if (point.text === text && point.style === style) return { pointId: point.id };
-        await tx.sfMomPoint.update({ where: { id: point.id }, data: { text, style } });
-        await touch(tx, point.item.document_id);
-        return { pointId: point.id };
-      });
-    },
-
-    /** A section always keeps one (possibly empty) point, like legacy. */
-    async deletePoint(input: CommandContext & { projectId: string; pointId: string }) {
-      requireCommand(input, P.momManage);
-      return runTransaction(async (tx) => {
-        const point = await loadPoint(tx, input.projectId, input.pointId);
-        await tx.sfMomPoint.delete({ where: { id: point.id } });
-        const remaining = await pointIds(tx, point.item_id);
-        if (remaining.length === 0) await tx.sfMomPoint.create({ data: { item_id: point.item_id, sort_order: 0, text: "" } });
-        else await writeOrder(tx, "point", remaining);
-        await touch(tx, point.item.document_id);
-        return { pointId: point.id };
-      });
-    },
-
-    async reorderPoints(input: CommandContext & { projectId: string; itemId: string; pointIds: string[] }) {
-      requireCommand(input, P.momManage);
-      return runTransaction(async (tx) => {
-        const item = await loadItem(tx, input.projectId, input.itemId);
-        if (!isPermutation(await pointIds(tx, item.id), input.pointIds)) throw invalid("MOM_REORDER_INVALID", "The note list changed. Refresh and try again.");
-        await writeOrder(tx, "point", input.pointIds);
+        if (item.content === content) return { itemId: item.id };
+        await tx.sfMomItem.update({ where: { id: item.id }, data: { content } });
         await touch(tx, item.document_id);
         return { itemId: item.id };
-      });
-    },
-
-    async movePoint(input: CommandContext & { projectId: string; pointId: string; direction: "up" | "down" }) {
-      requireCommand(input, P.momManage);
-      return runTransaction(async (tx) => {
-        const point = await loadPoint(tx, input.projectId, input.pointId);
-        const next = moveId(await pointIds(tx, point.item_id), point.id, input.direction);
-        if (!next) return { pointId: point.id };
-        await writeOrder(tx, "point", next);
-        await touch(tx, point.item.document_id);
-        return { pointId: point.id };
       });
     },
 
@@ -632,8 +548,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
               document_id: document.id,
               sort_order: index,
               is_text_only: item.isTextOnly,
-              list_style: item.listStyle,
-              points: { create: item.points.map((point, order) => ({ sort_order: order, text: point.text, style: point.style })) },
+              content: item.content,
               images: { create: item.images.map((image) => ({ slot: image.slot, storage_key: image.storageKey, content_type: image.contentType, bytes: image.bytes })) },
             },
           });

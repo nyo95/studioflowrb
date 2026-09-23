@@ -4,17 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, ArrowLeftRight, History, ImagePlus, Plus, Printer, RotateCcw, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
-import {
-  MOM_LIST_STYLES,
-  MOM_LIST_STYLE_LABELS,
-  MOM_POINT_STYLES,
-  MOM_POINT_STYLE_LABELS,
-  pointMarkers,
-  type MomListStyle,
-  type MomPointStyle,
-} from "@/apps/studioflow/domain/mom";
 import { versionLabel } from "@/apps/studioflow/domain/revisions";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
@@ -30,7 +21,7 @@ import {
   Input,
   RowActionMenu,
   SectionCard,
-  Select,
+  SimpleTextEditor,
   Text,
   Textarea,
   useConfirm,
@@ -38,26 +29,22 @@ import {
 
 import {
   addMomItemAction,
-  addMomPointAction,
   deleteMomDocumentAction,
   deleteMomImageAction,
   deleteMomItemAction,
-  deleteMomPointAction,
   moveMomItemAction,
-  moveMomPointAction,
   restoreMomRevisionAction,
   saveMomRevisionAction,
   setMomImageAction,
   swapMomImagesAction,
   updateMomDocumentAction,
   updateMomItemAction,
-  updateMomPointAction,
+  updateMomItemContentAction,
 } from "../../../../actions";
 import { useCommand } from "../../../../_components/use-command";
 
 type MomImage = { id: string; slot: 0 | 1; url: string | null };
-type MomPoint = { id: string; text: string; style: MomPointStyle };
-type MomItem = { id: string; isTextOnly: boolean; listStyle: MomListStyle; points: MomPoint[]; images: MomImage[] };
+type MomItem = { id: string; isTextOnly: boolean; content: string; images: MomImage[] };
 export type MomDocumentView = {
   id: string;
   topic: string;
@@ -187,18 +174,43 @@ function HeaderCard({ projectId, document, canEdit, command }: { projectId: stri
     preparedByName: document.preparedByName,
   };
   const [draft, setDraft] = useState(initial);
+  // Topic/date/prepared-by are required at creation, so there's no genuine
+  // "never filled in" state to gate on — collapse by default and let the
+  // summary row expand it, rather than trying to infer completeness.
+  const [expanded, setExpanded] = useState(false);
   const dirty = (Object.keys(initial) as (keyof typeof initial)[]).some((key) => initial[key] !== draft[key]);
   const set = (key: keyof typeof initial) => (event: { target: { value: string } }) => setDraft((current) => ({ ...current, [key]: event.target.value }));
+  const summary = [document.topic, document.meetingDate, document.venue].filter(Boolean).join(" · ");
+
+  if (!expanded) {
+    return (
+      <SectionCard title="Meeting details">
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="flex w-full items-center justify-between gap-3 rounded-action px-1 py-1.5 text-left hover:bg-surface-muted"
+        >
+          <Text weight="medium" className="truncate">{summary}</Text>
+          <Text tone="tertiary" size="sm" className="shrink-0">{canEdit ? "Edit" : "Show"}</Text>
+        </button>
+      </SectionCard>
+    );
+  }
 
   return (
     <SectionCard
       title="Meeting details"
       description="Project and client come from the project record."
-      action={canEdit ? (
-        <Button size="sm" variant="primary" disabled={!dirty} pending={command.pendingKey === "header"} onClick={() => command.run("header", () => updateMomDocumentAction({ projectId, documentId: document.id, ...draft }))}>
-          Save details
-        </Button>
-      ) : undefined}
+      action={
+        <div className="flex gap-2">
+          {canEdit ? (
+            <Button size="sm" variant="primary" disabled={!dirty} pending={command.pendingKey === "header"} onClick={() => command.run("header", () => updateMomDocumentAction({ projectId, documentId: document.id, ...draft }))}>
+              Save details
+            </Button>
+          ) : null}
+          <Button size="sm" variant="ghost" onClick={() => setExpanded(false)}>Collapse</Button>
+        </div>
+      }
     >
       <div className="grid gap-3 md:grid-cols-2">
         <Field label="Topic" required>
@@ -330,12 +342,11 @@ function SectionEditor({
   onPickImage: (slot: 0 | 1) => void;
   confirm: ReturnType<typeof useConfirm>["confirm"];
 }) {
-  const { run, pendingKey, pendingKeys } = command;
-  const markers = pointMarkers(item.listStyle, item.points.map((p) => p.style));
+  const { run, pendingKeys } = command;
   const busy = pendingKeys.some((key) => key.startsWith(item.id));
 
-  const updateItem = (patch: Partial<Pick<MomItem, "isTextOnly" | "listStyle">>) =>
-    run(`${item.id}-item`, () => updateMomItemAction({ projectId, itemId: item.id, isTextOnly: patch.isTextOnly ?? item.isTextOnly, listStyle: patch.listStyle ?? item.listStyle }));
+  const updateItem = (patch: Partial<Pick<MomItem, "isTextOnly">>) =>
+    run(`${item.id}-item`, () => updateMomItemAction({ projectId, itemId: item.id, isTextOnly: patch.isTextOnly ?? item.isTextOnly }));
 
   const removeSection = async () => {
     const ok = await confirm({
@@ -352,11 +363,6 @@ function SectionEditor({
       title={`Section ${String(index + 1).padStart(2, "0")}`}
       action={canEdit ? (
         <div className="flex items-center gap-2">
-          <div className="w-32">
-            <Select density="compact" aria-label="List style" value={item.listStyle} disabled={busy} onChange={(event) => updateItem({ listStyle: event.target.value as MomListStyle })}>
-              {MOM_LIST_STYLES.map((style) => <option key={style} value={style}>{MOM_LIST_STYLE_LABELS[style]}</option>)}
-            </Select>
-          </div>
           <RowActionMenu
             label={`Section ${index + 1} actions`}
             pending={busy}
@@ -396,29 +402,69 @@ function SectionEditor({
           </div>
         ) : null}
 
-        <div className="grid content-start gap-2">
-          {item.points.map((point, pointIndex) => (
-            <PointEditor
-              key={`${point.id}:${point.text}`}
-              projectId={projectId}
-              point={point}
-              marker={markers[pointIndex]}
-              first={pointIndex === 0}
-              last={pointIndex === item.points.length - 1}
-              canEdit={canEdit}
-              command={command}
-            />
-          ))}
-          {canEdit ? (
-            <div>
-              <Button size="sm" variant="ghost" leadingIcon={<Plus className="h-3.5 w-3.5" />} pending={pendingKey === `${item.id}-add-point`} onClick={() => run(`${item.id}-add-point`, () => addMomPointAction({ projectId, itemId: item.id }))}>
-                Add note
-              </Button>
-            </div>
-          ) : null}
-        </div>
+        <ItemContentEditor projectId={projectId} item={item} canEdit={canEdit} command={command} />
       </div>
     </SectionCard>
+  );
+}
+
+function ItemContentEditor({ projectId, item, canEdit, command }: { projectId: string; item: MomItem; canEdit: boolean; command: Command }) {
+  const { run } = command;
+  const [text, setText] = useState(item.content);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const pendingCursor = useRef<number | null>(null);
+  const save = () => {
+    if (text === item.content) return;
+    void run(`${item.id}-content`, () => updateMomItemContentAction({ projectId, itemId: item.id, content: text }));
+  };
+
+  useEffect(() => {
+    if (pendingCursor.current === null || !textareaRef.current) return;
+    textareaRef.current.setSelectionRange(pendingCursor.current, pendingCursor.current);
+    pendingCursor.current = null;
+  }, [text]);
+
+  // Auto-continues a typed "1." / "-" / "•" list on Enter, the way any modern
+  // editor (or WhatsApp) does — the marker is a literal typed character here,
+  // not a computed style, so this always applies.
+  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    const cursor = event.currentTarget.selectionStart;
+    const before = text.slice(0, cursor);
+    const lineStart = before.lastIndexOf("\n") + 1;
+    const currentLine = before.slice(lineStart);
+    const numbered = currentLine.match(/^(\d+)\.\s/);
+    const bulleted = currentLine.match(/^([-•])\s/);
+    if (!numbered && !bulleted) return;
+    event.preventDefault();
+    const prefix = numbered ? numbered[0] : bulleted![0];
+    if (currentLine.slice(prefix.length).trim() === "") {
+      // Enter on an empty marker line ends the list instead of repeating it forever.
+      setText(text.slice(0, lineStart) + text.slice(cursor));
+      pendingCursor.current = lineStart;
+      return;
+    }
+    const insertion = `\n${numbered ? `${Number(numbered[1]) + 1}. ` : bulleted![0] + " "}`;
+    setText(text.slice(0, cursor) + insertion + text.slice(cursor));
+    pendingCursor.current = cursor + insertion.length;
+  };
+
+  if (!canEdit) {
+    return <p className="m-0 whitespace-pre-wrap text-sm text-ink">{item.content || "—"}</p>;
+  }
+
+  return (
+    <SimpleTextEditor
+      ref={textareaRef}
+      aria-label="Section notes"
+      value={text}
+      rows={4}
+      maxLength={20000}
+      placeholder="Describe the observations or decisions for this section…"
+      onChange={(event) => setText(event.target.value)}
+      onKeyDown={onKeyDown}
+      onBlur={save}
+    />
   );
 }
 
@@ -461,49 +507,3 @@ function PhotoSlot({ slot, image, canEdit, busy, onPick, onRemove }: { slot: 0 |
   );
 }
 
-function PointEditor({ projectId, point, marker, first, last, canEdit, command }: { projectId: string; point: MomPoint; marker: string; first: boolean; last: boolean; canEdit: boolean; command: Command }) {
-  const { run, pendingKeys } = command;
-  const [text, setText] = useState(point.text);
-  const save = (style: MomPointStyle = point.style) => {
-    if (text === point.text && style === point.style) return;
-    void run(`${point.id}-save`, () => updateMomPointAction({ projectId, pointId: point.id, text, style }));
-  };
-  const busy = pendingKeys.some((key) => key.startsWith(point.id));
-
-  if (!canEdit) {
-    return (
-      <div className="flex gap-2 text-sm">
-        <span className="w-6 shrink-0 font-medium text-ink-secondary">{marker}</span>
-        <p className="m-0 whitespace-pre-wrap text-ink">{point.text || "—"}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="group flex items-start gap-2">
-      <span className="mt-2 w-6 shrink-0 text-right text-sm font-medium tabular-nums text-ink-secondary" aria-hidden="true">{marker}</span>
-      <Textarea
-        aria-label="Note"
-        value={text}
-        rows={2}
-        maxLength={5000}
-        className="min-h-[60px] flex-1"
-        placeholder="Describe the observation or decision…"
-        onChange={(event) => setText(event.target.value)}
-        onBlur={() => save()}
-      />
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        <div className="w-24">
-          <Select density="compact" aria-label="Note style" value={point.style} disabled={busy} onChange={(event) => save(event.target.value as MomPointStyle)}>
-            {MOM_POINT_STYLES.map((style) => <option key={style} value={style}>{MOM_POINT_STYLE_LABELS[style]}</option>)}
-          </Select>
-        </div>
-        <div className="flex gap-0.5 opacity-70 group-focus-within:opacity-100 group-hover:opacity-100">
-          <IconButton size="sm" variant="ghost" label="Move note up" icon={<ArrowUp className="h-3.5 w-3.5" />} disabled={first || busy} onClick={() => run(`${point.id}-move`, () => moveMomPointAction({ projectId, pointId: point.id, direction: "up" }))} />
-          <IconButton size="sm" variant="ghost" label="Move note down" icon={<ArrowDown className="h-3.5 w-3.5" />} disabled={last || busy} onClick={() => run(`${point.id}-move`, () => moveMomPointAction({ projectId, pointId: point.id, direction: "down" }))} />
-          <IconButton size="sm" variant="ghost" label="Delete note" icon={<Trash2 className="h-3.5 w-3.5" />} disabled={busy} onClick={() => run(`${point.id}-delete`, () => deleteMomPointAction({ projectId, pointId: point.id }))} />
-        </div>
-      </div>
-    </div>
-  );
-}

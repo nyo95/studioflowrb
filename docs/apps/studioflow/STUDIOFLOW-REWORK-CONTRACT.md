@@ -330,15 +330,35 @@ count), MOM, Schedule, History. Mobile: drawer.
 Document: `topic` (caller-required at creation, no default — the "New MOM"
 dialog prompts for it before the row exists), `meeting_date`, `venue?`,
 `attendees?`, `prepared_by_name`, `created_by`. Items ordered, with
-`is_text_only` and list style (`decimal`, `disc`, `dash`, `none`); points
-ordered with style (`default`, `none`); images ordered per item through `ObjectStorage` and the UI Engine
-image workspace (crop, freehand pen + arrow/box/circle annotation, and a Pan
-tool for repositioning — same shared workspace as Schedule photos, §11.7).
-Commands: create/update/delete document; create/update/
-delete/reorder items, points, images. Parent-chain project scope assertion
-kept. Print view kept (UI_ENGINE §13). No issue/supersede state. Delete is a
-real delete of a MOM document with confirmation (legacy behavior) and an audit
-snapshot.
+`is_text_only` and one free-typed `content` field per section; images ordered
+per item through `ObjectStorage` and the UI Engine image workspace (crop,
+freehand pen + arrow/box/circle annotation, and a Pan tool for repositioning —
+same shared workspace as Schedule photos, §11.7). Commands: create/update/
+delete document; create/update(content)/delete/reorder items, images.
+Parent-chain project scope assertion kept. Print view kept (UI_ENGINE §13). No
+issue/supersede state. Delete is a real delete of a MOM document with
+confirmation (legacy behavior) and an audit snapshot.
+
+**MOM point-per-row → single free-text content (owner decision, 2026-09-23).**
+The `SfMomPoint` table and per-item `list_style`/per-point `style` enums are
+gone. Each section (`SfMomItem`) now holds one `content` string edited as a
+single `SimpleTextEditor` box (the same bold/italic/bullet-list "WYSIWYG-lite"
+control as Master Data's Notes field, §9), instead of a list of independently
+add/reorder/delete-able point rows. List markers (`1.`, `-`, `•`) are literal
+characters the user types and the editor auto-continues on Enter — the same
+convention as WhatsApp/Notion — not a value chosen from a list-style dropdown
+or rendered outside the box. This intentionally overrides the "ordered
+document/block/point/image hierarchy… is the minimum" legacy-parity floor
+recorded in the archived `studioflow-mom-contract.md` §4.3/§14: the owner
+judged the per-note reorder/delete UI and the Normal/Plain per-note style
+toggle not worth the interaction cost for a repeating list of short site notes
+(owner: *"sistem add note dan add point2 yg independen di ganti jadi sebuah
+text area yg bisa wysiwyg... di whatsapp aja bullet/numberingnya bisa
+otomatis"*). Historical revisions saved before this change keep their old
+`points`/`listStyle` shape inside the stored JSON snapshot; `parseMomSnapshot`
+(`src/apps/studioflow/domain/mom.ts`) normalizes them into the current
+`content` shape on read, recomputing the same marker each point used to
+render, so restoring an old revision looks the same as it did before.
 
 **Revision snapshots.** Independent of the "no issue/supersede state" rule
 above (that's about document *lifecycle*, not this): a document carries a
@@ -353,30 +373,24 @@ Phase `SfRevision` (§5.4) — a different, project-phase-scoped concept.
 
 The Meeting Details header (topic/date/venue/prepared-by/attendees) renders
 collapsed to a `Topic · Date · Venue` summary by default and expands to the
-full form on click, since it's metadata set once and rarely revisited.
-Point text areas recognize a typed `1.`/`-`/`•` list prefix and auto-continue
-it on Enter, but only when the section's list style is `NONE` — when a style
-is set, `pointMarkers()` already renders the marker outside the textarea, so
-auto-continuing inside it too would duplicate it.
+full form on click, since it's metadata set once and rarely revisited. A
+section's content box recognizes a typed `1.`/`-`/`•` list prefix and
+auto-continues it on Enter unconditionally (there is no per-item list style
+to conflict with anymore).
 
-Implementation notes (R8.72, SF-R2):
+Implementation notes (R8.72, SF-R2; content merge R8.117):
 
-- Enum values are stored upper-case (`DECIMAL|DISC|DASH|NONE`,
-  `DEFAULT|PLAIN`); UI labels: Numbered, Bullets, Dashes, No markers; Normal,
-  Plain.
-- **UX change vs legacy (proposal, confirm at acceptance):** a `PLAIN` note
-  shows no marker and does not advance numbering. Legacy stored the style but
-  never rendered it.
 - Photos: at most two per section in `slot` 0/1; filling slot 1 while slot 0
   is empty lands in slot 0, removing photo 1 moves photo 2 up, swap exchanges
   them. Browser crop is fixed 4:3 (legacy cropper), output JPEG ≤ 1600 px,
   server accepts PNG/JPEG/WebP ≤ 3 MB (under the 4 MB server-action body limit) with a magic-byte check. Objects are
   written before the row and removed after commit on replace/delete.
-- A section always keeps one note (deleting the last one leaves an empty
-  note). The last section cannot be deleted from the UI.
+- A section's `content` defaults to `""` (no "always keep one note" row to
+  maintain now that there is nothing to delete down to). The last section
+  cannot be deleted from the UI.
 - Every child change bumps the document `updated_at`. Audited: created,
   header updated (field diff), deleted (snapshot), section deleted, photo
-  added/replaced/removed; note edits and reorders are not audited (legacy).
+  added/replaced/removed; content edits and reorders are not audited (legacy).
 - Routes: `/studioflow/projects/[projectId]/mom`, `…/mom/[momId]`, print at
   `/studioflow/print/projects/[projectId]/mom/[momId]` (no app shell).
 - Read: `studioflow.project.read`; write: `studioflow.mom.manage`.
