@@ -12,6 +12,7 @@ import { createMasterDataPublicRead } from "@/apps/masterdata/public";
 import type { PrismaClient } from "@/generated/prisma/client";
 
 import { APP_REGISTRATIONS } from "../../app/app-registrations";
+import { dateToDateOnly } from "./domain/dates";
 import { LEGACY_PHASE_DEFINITION_IDS as LEGACY } from "./domain/phase";
 import { STUDIOFLOW_PERMISSIONS as P } from "./permissions";
 import { createStudioFlowService, type StudioFlowService } from "./service";
@@ -1227,6 +1228,23 @@ describe("Project code immutability", () => {
     await sf.projects.updateProject({ ...as(designer), projectId, name: "Renamed Project" });
     const after = await sf.projects.getProject({ grants: ALL, projectId });
     assert.equal(after.code, originalCode, "project code preserved after rename");
+  });
+});
+
+describe("Project timeline start (Gantt, owner 2026-09-23)", () => {
+  it("defaults to createdAt's date, accepts an override, and resets on clear", async () => {
+    const { projectId } = await newProject();
+    const created = await sf.projects.getProject({ grants: ALL, projectId });
+    assert.equal(created.timelineStartDate, dateToDateOnly(created.createdAt), "defaults to the createdAt date when never overridden");
+
+    await sf.projects.updateProject({ ...as(designer), projectId, timelineStartDate: "2026-01-15" });
+    let updated = await sf.projects.getProject({ grants: ALL, projectId });
+    assert.equal(updated.timelineStartDate, "2026-01-15");
+    assert.deepEqual((await sf.projects.listProjects({ grants: ALL, status: "ALL" })).find((p) => p.id === projectId)?.timelineStartDate, "2026-01-15", "listProjects reflects the override too");
+
+    await sf.projects.updateProject({ ...as(designer), projectId, timelineStartDate: null });
+    updated = await sf.projects.getProject({ grants: ALL, projectId });
+    assert.equal(updated.timelineStartDate, dateToDateOnly(created.createdAt), "clearing the override resets to the createdAt fallback");
   });
 });
 

@@ -44,6 +44,7 @@ type ProjectRow = {
   priority: "URGENT" | "NORMAL" | "LOW";
   projectType: string;
   openingDate: string | null;
+  timelineStartDate: string;
   clientContact: string | null;
   address: string | null;
   area: string | null;

@@ -346,7 +346,25 @@ service/action layer is unchanged: `updateProjectAction` still covers
 name/client/designer/drafter/opening-date/type/contact/address/area, and
 `setProjectPriorityAction`/`setProjectStatusAction`/`archiveProjectAction`/
 `restoreProjectAction`/`syncChecklistAction` remain their own calls — only the
-caller moved.
+caller moved. `timelineStartDate` (see below) also joined `updateProjectAction`.
+
+**Timeline / Gantt (owner, 2026-09-23 — shipped ahead of wave 2).** The
+Overview page (`/studioflow/projects/[projectId]`) renders a `ProjectTimeline`
+bar between the phase-tab strip and the phase canvas: a span from
+`timelineStartDate` (an overridable date, `SfProject.timeline_start_date`,
+falling back to the project's `created_at` date when unset — "starts when the
+project is added, unless overridden") to `openingDate` (falls back to "today
++30 days, ongoing" when no opening date is set yet), broken into one
+equal-width segment per phase, colored by `phaseAccentDotClass` and dimmed
+while `PENDING`, with a vertical "today" marker. **This is a sequence
+breakdown, not calendar-accurate per phase** — no schema exists for an
+independently-dated phase start/end (`SfPhase` only has `order_index` and the
+single latest `status_changed_at`, not a full transition history), so segment
+width shows *where in the overall span the project sits, split by phase*,
+not "phase 2 took 12 days." A true per-phase-dated Gantt would need new
+schema and is future work if the owner wants it. `timelineStartDate` is
+editable in the same `EditProjectDialog` as the other administrative fields
+above (§ above), defaulting to blank meaning "use the created-at fallback."
 
 ## 9. Overrides of earlier ratified decisions
 
@@ -733,7 +751,9 @@ Implementation notes recorded in R8.71:
 ## 14. Non-goals for wave 1
 
 CD drawing list, deliverables/files and uploads, SketchUp, render boards,
-product requests/vendor follow-up, comments/chat/presence, Upcoming/Gantt,
-Google Drive, legacy data migration, undo. (Library/Brand discovery page
-shipped 2026-09-23, ahead of schedule — see §7a — once the owner confirmed
-its scope; it is no longer a non-goal.)
+product requests/vendor follow-up, comments/chat/presence, "Upcoming" as a
+distinct legacy nav surface, Google Drive, legacy data migration, undo.
+(Library/Brand discovery page and a per-project sequence-breakdown Gantt both
+shipped 2026-09-23, ahead of schedule — see §7a and §8 — once the owner
+confirmed scope; a true calendar-accurate per-phase-dated Gantt remains
+future work, as does a portfolio-wide "Upcoming" view across projects.)

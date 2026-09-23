@@ -45,6 +45,8 @@ export type ProjectInput = {
   picDesignerId: string;
   picDrafterId: string;
   openingDate?: string | null;
+  /** Gantt/timeline start override; null clears it back to the `createdAt`-date fallback. */
+  timelineStartDate?: string | null;
   projectType?: string | null;
   priority?: ProjectPriority;
   clientContact?: string | null;
@@ -349,6 +351,8 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         priority: row.priority as ProjectPriority,
         projectType: row.project_type,
         openingDate: dateToDateOnly(row.opening_date),
+        /** Gantt/timeline start; falls back to `createdAt`'s date when the owner hasn't overridden it. */
+        timelineStartDate: dateToDateOnly(row.timeline_start_date) ?? dateToDateOnly(row.created_at)!,
         clientContact: row.client_contact,
         address: row.address,
         area: row.area ? row.area.toString() : null,
@@ -376,6 +380,8 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         priority: row.priority as ProjectPriority,
         projectType: row.project_type,
         openingDate: dateToDateOnly(row.opening_date),
+        /** Gantt/timeline start; falls back to `createdAt`'s date when the owner hasn't overridden it. */
+        timelineStartDate: dateToDateOnly(row.timeline_start_date) ?? dateToDateOnly(row.created_at)!,
         clientContact: row.client_contact,
         address: row.address,
         area: row.area ? row.area.toString() : null,
@@ -463,6 +469,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       requireCommand(input, P.projectManage);
       const area = input.area === undefined ? undefined : parseArea(input.area);
       const openingDate = input.openingDate === undefined ? undefined : parseOpeningDate(input.openingDate);
+      const timelineStartDate = input.timelineStartDate === undefined ? undefined : parseOpeningDate(input.timelineStartDate);
       return runTransaction(async (tx) => {
         const project = await loadWritableProject(tx, input.projectId);
         const data: Prisma.SfProjectUncheckedUpdateInput = {};
@@ -493,6 +500,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           track("clientId", project.client_id, clientId, () => { data.client_id = clientId; });
         }
         track("openingDate", project.opening_date, openingDate, () => { data.opening_date = openingDate; });
+        track("timelineStartDate", project.timeline_start_date, timelineStartDate, () => { data.timeline_start_date = timelineStartDate; });
         if (input.projectType !== undefined) {
           const type = optionalText(input.projectType, 60) ?? "RETAIL";
           track("projectType", project.project_type, type, () => { data.project_type = type; });

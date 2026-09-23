@@ -118,6 +118,7 @@ const ProjectFields = {
   picDesignerId: Id,
   picDrafterId: Id,
   openingDate: DateOnly,
+  timelineStartDate: DateOnly,
   projectType: z.string().max(60).nullish(),
   clientContact: z.string().max(200).nullish(),
   address: OptionalText,

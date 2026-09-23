@@ -5,8 +5,42 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.124**
-- Next local revision: **R8.125**
+- Current revision after this entry is committed: **R8.125**
+- Next local revision: **R8.126**
+
+## R8.125 | 2026-09-23 | feat(sf): per-project timeline/Gantt bar on the Overview page
+
+Owner-scoped: *"butuh timeline (ganttchart utk proyek yg punya opening [end]
+- dan start saat proyek di tambahkan / di override startnya, dan bisa di
+breakdown per fase)"*. Shipped as a sequence breakdown, not a
+calendar-accurate one — flagged explicitly rather than overclaiming, since
+no schema exists for an independently-dated phase start/end.
+
+- Schema: `SfProject.timeline_start_date` (nullable `DATE`, additive
+  migration `20260923030000_sf_project_timeline_start`, applied to local dev
+  and test databases). `getProject`/`listProjects` resolve it as
+  `timelineStartDate`, falling back to `created_at`'s date when unset.
+  `updateProject`/`ProjectEditInput`/`updateProjectAction` gained the field;
+  `EditProjectDialog` gained a "Timeline start" field (clearing it resets to
+  the fallback).
+- New `ProjectTimeline` (`project-timeline.tsx`), rendered on the project
+  Overview page between the phase-tab strip and the phase canvas: a bar from
+  `timelineStartDate` to `openingDate` (falls back to "today +30 days,
+  ongoing" when unset), split into one equal-width segment per phase
+  (colored via the existing `phaseAccentDotClass`, dimmed while `PENDING`),
+  plus a "today" marker and a phase-color legend. Segments are equal-width
+  by sequence, not independently dated — `SfPhase` only has `order_index`
+  and a single latest `status_changed_at`, not a full transition history, so
+  this shows *where in the overall span the project sits, by phase*, not
+  literal per-phase durations. A true per-phase-dated Gantt is future work.
+- `STUDIOFLOW-REWORK-CONTRACT.md` §8 documents the feature and its
+  limitation; §14 non-goals updated (Gantt/Library both shipped early).
+
+Verification: `tsc`, `check:boundaries`, `check:legacy-runtime` clean. `npm
+test`: 494 passed (493 + one new integration test: default/override/clear
+round-trip for `timelineStartDate` on both `getProject` and `listProjects`).
+Browser acceptance intentionally deferred — owner asked to test manually.
+
 
 ## R8.124 | 2026-09-23 | feat(sf): StudioFlow Library — read-only Brand discovery
 

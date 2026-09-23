@@ -222,15 +222,15 @@ read-only Brand discovery over Master Data's existing `listBrandLibraryReads`
 public read port (no new Master Data code needed; it already returned
 everything the page shows). See `CHANGELOG.md` R8.124,
 `STUDIOFLOW-REWORK-CONTRACT.md` §7a.
-- [ ] [PLANNED] **Project timeline / Gantt chart.** Per-project Gantt with an
-  "opening" end date and a start date (default: when the project is added,
-  overridable) and a breakdown per phase. No schema exists for this today —
-  `SfPhase` has no start/end date field (only `order_index` and the
-  retrospective `status_changed_at`); `SfProject.opening_date` is the only
-  related field and covers just one end of the range. Was an explicit non-goal
-  for wave 1 (`STUDIOFLOW-REWORK-CONTRACT.md` §14); scope now owner-confirmed
-  but deprioritized behind the two items above (owner: *"boleh di kerjakan
-  setelah ini"*).
+**Fixed 2026-09-23 (R8.125):** Project timeline / Gantt — a `ProjectTimeline`
+bar on the project Overview page, spanning `timelineStartDate` (new
+`SfProject.timeline_start_date`, overridable, defaults to `created_at`'s
+date) to `openingDate`, broken into one segment per phase. **Not** a
+calendar-accurate per-phase Gantt — no schema exists for independently-dated
+phase start/end, so segments are equal-width by sequence, not by real
+duration; recorded as a known simplification, not silently claimed as more
+than it is. See `CHANGELOG.md` R8.125, `STUDIOFLOW-REWORK-CONTRACT.md` §8.
+A true per-phase-dated Gantt remains future work if the owner wants it.
 
 ### Verification backlog (code done, needs a browser walk to close)
 

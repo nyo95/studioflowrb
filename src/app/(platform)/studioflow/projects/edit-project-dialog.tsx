@@ -17,6 +17,8 @@ export type EditableProject = {
   priority: "URGENT" | "NORMAL" | "LOW";
   projectType: string;
   openingDate: string | null;
+  /** Gantt/timeline start; always a resolved date (falls back to createdAt server-side), never null on read. */
+  timelineStartDate: string;
   clientContact: string | null;
   address: string | null;
   area: string | null;
@@ -35,6 +37,7 @@ export function EditProjectDialog({ project, people, clients, onClose }: { proje
     picDesignerId: project.designer.id,
     picDrafterId: project.drafter.id,
     openingDate: project.openingDate ?? "",
+    timelineStartDate: project.timelineStartDate,
     projectType: project.projectType,
     priority: project.priority,
     status: project.status,
@@ -54,6 +57,7 @@ export function EditProjectDialog({ project, people, clients, onClose }: { proje
       picDesignerId: form.picDesignerId,
       picDrafterId: form.picDrafterId,
       openingDate: form.openingDate || null,
+      timelineStartDate: form.timelineStartDate || null,
       projectType: form.projectType,
       clientContact: form.clientContact || null,
       address: form.address || null,
@@ -82,6 +86,9 @@ export function EditProjectDialog({ project, people, clients, onClose }: { proje
           <Field label="Designer (PIC)" required><PersonSelect required people={people} value={form.picDesignerId} onChange={(v) => set("picDesignerId", v ?? "")} /></Field>
           <Field label="Drafter (PIC)" required><PersonSelect required people={people} value={form.picDrafterId} onChange={(v) => set("picDrafterId", v ?? "")} /></Field>
           <Field label="Opening date"><Input type="date" value={form.openingDate} onChange={(e) => set("openingDate", e.target.value)} /></Field>
+          <Field label="Timeline start" description="Defaults to when the project was added; clear to reset it.">
+            <Input type="date" value={form.timelineStartDate} onChange={(e) => set("timelineStartDate", e.target.value)} />
+          </Field>
           <Field label="Project type"><Input list="sf-project-types" value={form.projectType} maxLength={60} onChange={(e) => set("projectType", e.target.value)} /></Field>
           <Field label="Priority">
             <Select value={form.priority} onChange={(e) => set("priority", e.target.value as typeof form.priority)}>
