@@ -949,6 +949,36 @@ describe("SF-R3 Product Schedule", () => {
   });
 });
 
+describe("StudioFlow Library", () => {
+  it("reads Master Data's Brand catalog read-only, filterable by name/category/hashtag", async () => {
+    const tag = randomUUID().slice(0, 8);
+    const category = await testDb.prisma.category.create({ data: { id: randomUUID(), name: `Sanitary ${tag}`, slug: `sanitary-${tag}`, kind: "PRODUCT", status: "ACTIVE" } });
+    const brand = await testDb.prisma.brand.create({
+      data: {
+        id: randomUUID(),
+        name: `TOTO ${tag}`,
+        slug: `toto-${tag}`,
+        notes: "Premium sanitaryware",
+        categories: { create: [{ id: randomUUID(), category_id: category.id }] },
+        hashtags: { create: [{ id: randomUUID(), label: "Bathroom", normalized: "bathroom" }] },
+      },
+    });
+
+    const all = await sf.library.listBrands({ grants: ALL });
+    const found = all.find((row) => row.id === brand.id)!;
+    assert.ok(found, "the seeded brand is readable through the Library service");
+    assert.equal(found.notes, "Premium sanitaryware");
+    assert.deepEqual(found.categories.map((c) => c.name), [`Sanitary ${tag}`]);
+    assert.deepEqual(found.hashtags.map((h) => h.label), ["Bathroom"]);
+
+    const searched = await sf.library.listBrands({ grants: ALL, search: `TOTO ${tag}` });
+    assert.deepEqual(searched.map((row) => row.id), [brand.id]);
+
+    const noMatch = await sf.library.listBrands({ grants: ALL, search: `nonexistent-${tag}` });
+    assert.deepEqual(noMatch, []);
+  });
+});
+
 // ── R2.7: Phase Template V2 integration tests ──────────────────────────────
 
 describe("Phase Template V2 invariants", () => {

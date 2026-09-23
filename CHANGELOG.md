@@ -5,8 +5,36 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.123**
-- Next local revision: **R8.124**
+- Current revision after this entry is committed: **R8.124**
+- Next local revision: **R8.125**
+
+## R8.124 | 2026-09-23 | feat(sf): StudioFlow Library — read-only Brand discovery
+
+The "wave 2+" Library the contract already named, shipped early once the
+owner confirmed scope: *"rebuild dari studioflow 'library' dengan kemampuan
+search dari masterdata utk brand"*. Turned out cheap to build — Master
+Data's public read port already had everything needed (`listBrandLibraryReads`/
+`getBrandLibraryRead`, built for exactly this consumer but never called from
+a StudioFlow page until now).
+
+- New `src/apps/studioflow/library/service.ts`: `createLibraryService(ports)`
+  — a thin passthrough (`requireRead` then `ports.masterData.listBrandLibraryReads`),
+  no local StudioFlow table. Wired into `service.ts` as `studioFlow.library`.
+- New route `/studioflow/library` (`page.tsx` + `library-directory.tsx`):
+  one table, search box filtering client-side by name/category/vendor/
+  hashtag (small catalog, no server round trip needed, matching the Clients
+  directory's own client-side filter). Read-only — no create/edit/archive,
+  nothing writes back to Master Data.
+  `STUDIOFLOW_ROUTES.library`/`STUDIOFLOW_NAV_LINKS` gained the new route;
+  `nav.tsx` gained a `BookMarked` icon.
+- `STUDIOFLOW-REWORK-CONTRACT.md` §7a documents the feature; §0 RW-04 and
+  §14 updated to note Library shipped ahead of the rest of wave 2.
+
+Verification: `tsc`, `check:boundaries`, `check:legacy-runtime` clean. `npm
+test`: 493 passed (492 + one new integration test: seeded brand readable
+with categories/hashtags, search matches by name, no-match returns empty).
+Browser acceptance intentionally deferred — owner asked to test manually.
+
 
 ## R8.123 | 2026-09-23 | feat(sf): physical sample request tracking on Product Schedule options
 

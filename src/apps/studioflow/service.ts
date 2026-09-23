@@ -1,3 +1,4 @@
+import { createLibraryService } from "./library/service";
 import { createMomService } from "./mom/service";
 import { STUDIOFLOW_PERMISSIONS } from "./permissions";
 import { createPhaseService } from "./phases/service";
@@ -16,6 +17,7 @@ export function createStudioFlowService(db: Db, ports: StudioFlowPorts) {
     today: createTodayService(db, ports),
     mom: createMomService(db, ports),
     schedule: createScheduleService(db, ports),
+    library: createLibraryService(ports),
   };
 }
 

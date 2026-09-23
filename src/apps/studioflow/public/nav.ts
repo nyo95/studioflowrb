@@ -13,6 +13,7 @@ export const STUDIOFLOW_ROUTES = {
   projectMomPrint: (projectId: string, documentId: string) => `/studioflow/print/projects/${projectId}/mom/${documentId}`,
   clients: "/studioflow/clients",
   client: (clientId: string) => `/studioflow/clients/${clientId}`,
+  library: "/studioflow/library",
   settings: "/studioflow/settings",
 } as const;
 
@@ -26,6 +27,7 @@ export const STUDIOFLOW_NAV_LINKS: {
     { href: "/studioflow", label: "Today", exact: true },
     { href: "/studioflow/projects", label: "Projects" },
     { href: "/studioflow/clients", label: "Clients" },
+    { href: "/studioflow/library", label: "Library" },
   ],
   utility: [{ href: "/studioflow/settings", label: "Studio Settings" }],
 };

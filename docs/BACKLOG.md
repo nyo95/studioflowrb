@@ -217,14 +217,11 @@ priority, status) moved off the project detail page and onto a row-action
 pages now show client/designer/drafter/status/priority as read-only header
 text only — no edit affordance. See `CHANGELOG.md` R8.120.
 
-- [ ] [PLANNED] **StudioFlow Library.** Rebuild of the legacy read-only
-  Library page: search/discover Master Data's Brand catalog from inside
-  StudioFlow (owner: *"rebuild dari studioflow 'library' dengan kemampuan
-  search dari masterdata utk brand"*). This is the "wave 2+" Library the
-  contract already named (`STUDIOFLOW-REWORK-CONTRACT.md` §0 RW-04, §14) —
-  scope is now owner-confirmed, but explicitly deprioritized behind the two
-  items above (owner: *"boleh di cicil setelah ini"*). No route/service exists
-  yet; distinct from the unrelated BQ app's own "BQ Library" feature.
+**Fixed 2026-09-23 (R8.124):** StudioFlow Library — `/studioflow/library`,
+read-only Brand discovery over Master Data's existing `listBrandLibraryReads`
+public read port (no new Master Data code needed; it already returned
+everything the page shows). See `CHANGELOG.md` R8.124,
+`STUDIOFLOW-REWORK-CONTRACT.md` §7a.
 - [ ] [PLANNED] **Project timeline / Gantt chart.** Per-project Gantt with an
   "opening" end date and a start date (default: when the project is added,
   overridable) and a breakdown per phase. No schema exists for this today —

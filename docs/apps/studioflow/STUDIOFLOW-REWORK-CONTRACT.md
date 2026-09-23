@@ -37,7 +37,7 @@ Decisions taken in the same session:
 | RW-01 | Phase workflow is the **legacy phase state machine** with revisions `vMAJOR.MINOR` and FEEDBACK→TODO conversion. The screen shows **simplified labels** (§5.3). |
 | RW-02 | Project keeps **PIC Designer** and **PIC Drafter** as assignment fields. Authorization comes only from platform RBAC grants. The CD phase is presented as the drafter's phase in the UI. No role enum. |
 | RW-03 | Archive = local git tag on the last pre-rework commit, then delete the rebuild StudioFlow code, routes, tests, and `sf_*` schema from the working branch. |
-| RW-04 | First rework wave: Project + Client + Phase + Revision; Task/Checklist + Today; MOM; Product Schedule. CD List, Deliverables/files, SketchUp, collaboration, Upcoming, Library are wave 2+. |
+| RW-04 | First rework wave: Project + Client + Phase + Revision; Task/Checklist + Today; MOM; Product Schedule. CD List, Deliverables/files, SketchUp, collaboration, Upcoming are wave 2+. Library shipped 2026-09-23 (§7a) once the owner confirmed scope, ahead of the rest of wave 2. |
 
 ## 1. Authority and how legacy is used
 
@@ -294,6 +294,23 @@ phase commands and shown in the UI before the button is pressed:
 - Filter tabs, due, priority, assignee, labels, saved filters, inline add,
   quick-add dialog (project + phase target).
 - Legacy KB-023 (general todos on the home page) is satisfied by this page.
+
+## 7a. Library (owner, 2026-09-23 — shipped ahead of wave 2)
+
+`/studioflow/library`. A **read-only** discovery page over Master Data's
+Brand catalog — never writes to Master Data, matching how Schedule's own
+Brand combobox already never writes to it (§11.10). `createLibraryService`
+(`src/apps/studioflow/library/service.ts`) is a thin passthrough onto Master
+Data's existing public read port, `listBrandLibraryReads` — the same method
+`STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md`'s "Library" concept already named, just
+never consumed by a StudioFlow page until now. One list call returns
+everything the page shows per brand: name, slug, notes, owner vendor,
+categories, hashtags, links — no separate detail route. Gated by the same
+`requireRead` (access + `studioflow.project.read`) every other StudioFlow
+read uses; no new permission was added. Search filters client-side by name,
+category, vendor, or hashtag (the catalog is small enough not to need a
+server round trip per keystroke, matching the Clients directory's own
+client-side filter).
 
 ## 8. Project workspace
 
@@ -717,4 +734,6 @@ Implementation notes recorded in R8.71:
 
 CD drawing list, deliverables/files and uploads, SketchUp, render boards,
 product requests/vendor follow-up, comments/chat/presence, Upcoming/Gantt,
-Library/Brand discovery page, Google Drive, legacy data migration, undo.
+Google Drive, legacy data migration, undo. (Library/Brand discovery page
+shipped 2026-09-23, ahead of schedule — see §7a — once the owner confirmed
+its scope; it is no longer a non-goal.)
