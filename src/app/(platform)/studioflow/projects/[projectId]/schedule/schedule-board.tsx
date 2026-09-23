@@ -15,6 +15,7 @@ import {
 import {
   Badge,
   Button,
+  CreatableSearch,
   Dialog,
   EmptyState,
   Field,
@@ -24,9 +25,11 @@ import {
   Input,
   RowActionMenu,
   Select,
+  SimpleTextEditor,
   Text,
   Textarea,
   useConfirm,
+  type CreatableSearchOption,
 } from "@/platform/ui_engine";
 
 import {
@@ -204,8 +207,8 @@ const CARD_FIELD_LABEL: Record<ScheduleCardFieldKey, string> = {
   notes: "Notes",
 };
 
-/** The simple single-input option fields in the checklist; Brand and Notes get their own row shape. */
-const SIMPLE_OPTION_FIELD_KEYS = ["color", "pattern", "finishing", "dimension"] as const;
+/** Simple single-input option fields between Type and Location in the checklist; Brand, Size and Notes get their own row shape. */
+const SIMPLE_OPTION_FIELD_KEYS = ["color", "pattern", "finishing"] as const;
 
 /** The free-form spec lines a card can caption, in the order they sit on the option. */
 function extraChoicesOf(entry: ScheduleEntryView): Array<{ key: string; label: string }> {
@@ -927,6 +930,25 @@ function EntryPanelContent({
   const brandOptions = shown?.brandId && !brands.some((b) => b.id === shown.brandId)
     ? [{ id: shown.brandId, name: shown.brandName ?? "Brand" }, ...brands]
     : brands;
+  // One combobox instead of a select-plus-fallback-input pair: search Master
+  // Data, or type a name that is not in it — no Master Data write happens
+  // either way (StudioFlow never writes Master Data; brand text with no
+  // catalogued id is the documented, ordinary case, §11.3). The typed name
+  // itself doubles as its own option id so the trigger still shows it.
+  const isKnownBrandId = (id: string) => brandOptions.some((b) => b.id === id);
+  const brandSearchOptions: CreatableSearchOption[] = [
+    ...brandOptions.map((b) => ({ id: b.id, label: b.name })),
+    ...(!optionDraft.brandId && optionDraft.brandName.trim()
+      ? [{ id: optionDraft.brandName, label: optionDraft.brandName, description: "Typed — not in Master Data" }]
+      : []),
+  ];
+  const handleBrandChange = (next: string) => {
+    const draft = isKnownBrandId(next)
+      ? { ...optionDraft, brandId: next, brandName: "" }
+      : { ...optionDraft, brandId: "", brandName: next };
+    setOptionDraft(draft);
+    saveOptionDraft(draft);
+  };
 
   const cardFieldsKey = `${entry.id}-card-fields`;
   const extraChoices = extraChoicesOf(entry);
@@ -971,24 +993,6 @@ function EntryPanelContent({
           the card; Type and the photo always show. Unticking hides it without losing what you typed.
         </Text>
         <div className="grid gap-1.5 sm:grid-cols-2">
-          <ChecklistRow label="Location" checked={effectiveFields.includes("location")} disabled={!canEdit || isPending(cardFieldsKey)} onToggle={() => toggleCardField("location")}>
-            <Input
-              autoFocus
-              value={fields.location}
-              onChange={(e) => setFields({ ...fields, location: e.target.value })}
-              onBlur={saveLocation}
-              disabled={!canEdit || isPending(entryFieldsKey)}
-              maxLength={160}
-            />
-          </ChecklistRow>
-
-          <ChecklistRow label="Qty" checked={effectiveFields.includes("qty")} disabled={!canEdit || isPending(cardFieldsKey)} onToggle={() => toggleCardField("qty")}>
-            <div className="grid grid-cols-[1fr_5.5rem] gap-1.5">
-              <Input autoFocus inputMode="decimal" placeholder="Amount" value={fields.qty} onChange={(e) => setFields({ ...fields, qty: e.target.value })} onBlur={saveQty} disabled={!canEdit || isPending(entryFieldsKey)} maxLength={20} />
-              <Input placeholder="Unit" value={fields.unit} onChange={(e) => setFields({ ...fields, unit: e.target.value })} onBlur={saveQty} disabled={!canEdit || isPending(entryFieldsKey)} maxLength={40} />
-            </div>
-          </ChecklistRow>
-
           <ChecklistRow
             label="Brand"
             checked={effectiveFields.includes("brand")}
@@ -996,29 +1000,41 @@ function EntryPanelContent({
             disabledHint={!shown ? "Add an option below first." : undefined}
             onToggle={() => toggleCardField("brand")}
           >
-            <div className="grid grid-cols-2 gap-1.5">
-              <Select
-                value={optionDraft.brandId}
-                disabled={!canEdit || isPending(optionFieldsKey)}
-                onChange={(e) => {
-                  const next = { ...optionDraft, brandId: e.target.value, brandName: e.target.value ? "" : optionDraft.brandName };
-                  setOptionDraft(next);
-                  saveOptionDraft(next);
-                }}
-              >
-                <option value="">Other (type the name)</option>
-                {brandOptions.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
-              </Select>
+            <CreatableSearch
+              label="Brand"
+              options={brandSearchOptions}
+              value={optionDraft.brandId || optionDraft.brandName}
+              onValueChange={handleBrandChange}
+              onCreate={(text) => text}
+              createLabel={(text) => `Use "${text}" (not in Master Data)`}
+              placeholder="Search or type a brand"
+              searchPlaceholder="Search brands…"
+              emptyLabel="No brands found"
+              allowClear
+              disabled={!canEdit || isPending(optionFieldsKey)}
+              className="w-full"
+            />
+          </ChecklistRow>
+
+          {/* Type has no checkbox — it is the card title and always shows (§11.3). */}
+          <div className="rounded-control border border-line-subtle">
+            <div
+              title={!shown ? "Add an option below first." : undefined}
+              className={`flex items-center gap-2 rounded-control px-1.5 py-1.5 text-sm ${!shown ? "text-ink-tertiary" : ""}`}
+            >
+              Type <span className="text-xs font-normal text-ink-tertiary">always shown</span>
+            </div>
+            <div className="px-1.5 pb-2 pt-0.5">
               <Input
-                placeholder="Brand name"
-                value={optionDraft.brandId ? brandOptions.find((b) => b.id === optionDraft.brandId)?.name ?? "" : optionDraft.brandName}
-                onChange={setOptionField("brandName")}
+                value={optionDraft.productName}
+                onChange={setOptionField("productName")}
                 onBlur={() => saveOptionDraft(optionDraft)}
-                disabled={!canEdit || isPending(optionFieldsKey) || !!optionDraft.brandId}
-                maxLength={160}
+                disabled={!canEdit || isPending(optionFieldsKey) || !shown}
+                maxLength={200}
+                placeholder="e.g. Nude Pro - ATS 1132 M"
               />
             </div>
-          </ChecklistRow>
+          </div>
 
           {SIMPLE_OPTION_FIELD_KEYS.map((key) => (
             <ChecklistRow
@@ -1036,10 +1052,48 @@ function EntryPanelContent({
                 onBlur={() => saveOptionDraft(optionDraft)}
                 disabled={!canEdit || isPending(optionFieldsKey)}
                 maxLength={160}
-                placeholder={key === "dimension" ? "e.g. 60 × 60 cm" : undefined}
               />
             </ChecklistRow>
           ))}
+
+          <ChecklistRow label="Location" checked={effectiveFields.includes("location")} disabled={!canEdit || isPending(cardFieldsKey)} onToggle={() => toggleCardField("location")}>
+            <Input
+              autoFocus
+              value={fields.location}
+              onChange={(e) => setFields({ ...fields, location: e.target.value })}
+              onBlur={saveLocation}
+              disabled={!canEdit || isPending(entryFieldsKey)}
+              maxLength={160}
+            />
+          </ChecklistRow>
+
+          {/* Qty only for Fixture — a Material line is specified, not counted; legacy's own sheet import already discards Qty on Material (owner decision 2026-09-23). */}
+          {entry.section === "FIXTURE" ? (
+            <ChecklistRow label="Qty" checked={effectiveFields.includes("qty")} disabled={!canEdit || isPending(cardFieldsKey)} onToggle={() => toggleCardField("qty")}>
+              <div className="grid grid-cols-[1fr_5.5rem] gap-1.5">
+                <Input autoFocus inputMode="decimal" value={fields.qty} onChange={(e) => setFields({ ...fields, qty: e.target.value })} onBlur={saveQty} disabled={!canEdit || isPending(entryFieldsKey)} maxLength={20} />
+                <Input placeholder="Unit" value={fields.unit} onChange={(e) => setFields({ ...fields, unit: e.target.value })} onBlur={saveQty} disabled={!canEdit || isPending(entryFieldsKey)} maxLength={40} />
+              </div>
+            </ChecklistRow>
+          ) : null}
+
+          <ChecklistRow
+            label="Size"
+            checked={effectiveFields.includes("dimension")}
+            disabled={!canEdit || isPending(cardFieldsKey) || !shown}
+            disabledHint={!shown ? "Add an option below first." : undefined}
+            onToggle={() => toggleCardField("dimension")}
+          >
+            <Input
+              autoFocus
+              value={optionDraft.dimension}
+              onChange={setOptionField("dimension")}
+              onBlur={() => saveOptionDraft(optionDraft)}
+              disabled={!canEdit || isPending(optionFieldsKey)}
+              maxLength={160}
+              placeholder="e.g. 60 × 60 cm"
+            />
+          </ChecklistRow>
 
           <ChecklistRow
             className="sm:col-span-2"
@@ -1049,7 +1103,7 @@ function EntryPanelContent({
             disabledHint={!shown ? "Add an option below first." : undefined}
             onToggle={() => toggleCardField("notes")}
           >
-            <Textarea autoFocus value={optionDraft.notes} onChange={setOptionField("notes")} onBlur={() => saveOptionDraft(optionDraft)} disabled={!canEdit || isPending(optionFieldsKey)} maxLength={2000} rows={2} className="min-h-[60px]" />
+            <SimpleTextEditor autoFocus value={optionDraft.notes} onChange={setOptionField("notes")} onBlur={() => saveOptionDraft(optionDraft)} disabled={!canEdit || isPending(optionFieldsKey)} maxLength={2000} rows={2} />
           </ChecklistRow>
 
           {extraChoices.map((extra) => (

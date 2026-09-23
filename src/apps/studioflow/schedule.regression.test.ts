@@ -125,9 +125,48 @@ describe("R8.113: Item details and card fields merged into one tick-to-fill-in c
     assert.match(scheduleBoard, /onBlur=\{saveQty\}/);
   });
 
-  it("Brand keeps its Master Data select + free-text fallback inline in the checklist row", () => {
+  it("Brand is one row in the checklist, not a floating select+input pair", () => {
     const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"));
     assert.match(panelBody, /label="Brand"/);
-    assert.match(panelBody, /Other \(type the name\)/);
+  });
+});
+
+describe("R8.113: Brand as one creatable search, Type in the checklist, Qty fixture-only, WYSIWYG Notes", () => {
+  it("Brand is a single CreatableSearch — the old two-control select+input pair is gone", () => {
+    const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"));
+    assert.match(panelBody, /<CreatableSearch\b/);
+    assert.match(panelBody, /onCreate=\{\(text\) => text\}/, "typing an unlisted brand must not create a Master Data record — it is free text, same as before");
+    assert.doesNotMatch(panelBody, /Other \(type the name\)/, "the old dropdown-plus-fallback-input pair must not come back");
+  });
+
+  it("never writes Master Data from the schedule side (no create/insert call reachable from the brand row)", () => {
+    assert.doesNotMatch(scheduleBoard, /masterData\.(create|insert|upsert)/i);
+  });
+
+  it("Type is in the checklist, right after Brand, with no checkbox — it always shows", () => {
+    const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"));
+    const brandIndex = panelBody.indexOf('label="Brand"');
+    const typeIndex = panelBody.indexOf("Type <span");
+    const colorIndex = panelBody.indexOf('label={CARD_FIELD_LABEL[key]}');
+    assert.ok(brandIndex > -1 && typeIndex > brandIndex && colorIndex > typeIndex, "order is Brand, then Type, then the simple option fields");
+    assert.doesNotMatch(panelBody.slice(typeIndex - 40, typeIndex + 400), /type="checkbox"/, "Type has no checkbox");
+    assert.match(panelBody, /value=\{optionDraft\.productName\}/);
+  });
+
+  it("Qty only renders for Fixture entries", () => {
+    assert.match(scheduleBoard, /\{entry\.section === "FIXTURE" \? \(\s*<ChecklistRow label="Qty"/);
+  });
+
+  it("field order is Brand, Type, Color, Pattern, Finishing, Location, [Qty], Size, Notes", () => {
+    const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"));
+    const order = ['label="Brand"', "Type <span", "SIMPLE_OPTION_FIELD_KEYS.map", 'label="Location"', 'ChecklistRow label="Qty"', 'label="Size"', 'label="Notes"']
+      .map((needle) => panelBody.indexOf(needle));
+    assert.ok(order.every((index) => index > -1), "every row is present");
+    assert.ok(order.every((index, position) => position === 0 || index > order[position - 1]), "rows appear in the requested order");
+  });
+
+  it("Notes uses the shared SimpleTextEditor (masterdata's WYSIWYG-lite), not a plain Textarea", () => {
+    const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"));
+    assert.match(panelBody, /<SimpleTextEditor autoFocus value=\{optionDraft\.notes\}/);
   });
 });

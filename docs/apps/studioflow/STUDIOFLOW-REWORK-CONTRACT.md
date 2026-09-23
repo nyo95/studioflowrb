@@ -390,6 +390,13 @@ Implementation notes (R8.72, SF-R2):
 `active_index`, `version_locked`, `template_item_id?`. Unique
 `(project_id, section, prefix, increment)`. Code shown `PREFIX-NN`.
 
+**Qty/Unit are Fixture-only in the editor** (R8.113, owner decision
+2026-09-23: "material harusnya ga perlu keluarin qty" — a Material line is a
+specification, not a count, matching legacy's own CSV import, which already
+discards Qty on Material sheets). The columns stay on the entry for both
+sections — nothing is dropped from the schema — but the checklist only
+offers the Qty row when `section = FIXTURE`.
+
 ### 11.2 Numbering
 
 Legacy renumbering via negative temporary values is replaced by one
@@ -562,11 +569,33 @@ this file (Add item, Import CSV, …).
 **Item details and card fields share one checklist**, row per field
 (`ChecklistRow`): a checkbox, and — only once ticked — the input(s) that fill
 that field in, in the same row. Location and Qty(+Unit) write to the entry;
-Brand (Master Data select + free-text fallback), Color, Pattern, Finishing,
-Size and Notes write to the option the card speaks for (§11.3's "the final
-option, else the first"), auto-saving the full option snapshot on blur.
-Unticking a field only stops it captioning the card; it never discards what
-was typed.
+Brand, Color, Pattern, Finishing, Size and Notes write to the option the card
+speaks for (§11.3's "the final option, else the first"), auto-saving the full
+option snapshot on blur. Unticking a field only stops it captioning the card;
+it never discards what was typed. Row order (R8.113, owner-specified):
+**Brand, Type, Color, Pattern, Finishing, Location, Qty (Fixture only,
+§11.1), Size, Notes**, then any extra spec lines (§11.9).
+
+**Type sits in the checklist too, right after Brand, with no checkbox**
+(R8.113) — it edits `product_name` directly, but since Type always shows
+(this section, above) it is never optional, so there is nothing to tick.
+
+**Brand is one `CreatableSearch` combobox, not a select-plus-fallback-input
+pair** (R8.113, owner: *"knp brand perlu 2? kasi aja pakai creatable
+search?"*). Search Master Data brands, pick one, or type a name that is not
+in it — both live in the same control, and no Master Data write happens
+either way: an unmatched typed name becomes `brand_name` on the option with
+`brand_id` left null, exactly the "not required, stays searchable by its
+Type" rule already in §11.3. Nothing is created in Master Data from a
+Schedule option; the combobox's own "create" affordance is repurposed to mean
+"use this typed text", never a real insert (verified: no `masterData.create`/
+`insert`/`upsert` call is reachable from the schedule app).
+
+**Notes uses `SimpleTextEditor`** (R8.113, owner: *"pakai wysiwyg seperti
+pada notes pada masterdata"*) — the same bold/italic/bullet-list toolbar over
+a plain-text field already used for Notes on Brand, Vendor and Pricing in
+Master Data, so schedule notes look and behave the same way elsewhere in the
+app. It stores plain marked-up text (`**bold**`, `- bullet`), not HTML.
 
 **Ticking is never refused for a field being empty.** An earlier pass greyed
 out and disabled the checkbox for a field with nothing to show, reasoning

@@ -5,8 +5,108 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.112**
-- Next local revision: **R8.113**
+- Current revision after this entry is committed: **R8.113**
+- Next local revision: **R8.114**
+
+## R8.113 | 2026-09-23 | feat(sf): Brand as one creatable search, Type in the checklist, Qty fixture-only, WYSIWYG Notes
+
+Third owner review pass on the same R8.111/R8.112 screen, from using the
+tick-to-fill checklist live.
+
+- **Brand is one `CreatableSearch` combobox**, replacing the select-plus-
+  fallback-input pair. Owner: *"knp brand perlu 2? kasi aja pakai creatable
+  search?"* Search Master Data, pick one, or type a name it does not have —
+  the combobox's own "create" affordance is repurposed to mean "use this
+  typed text" (`onCreate: (text) => text`), never a real Master Data insert;
+  StudioFlow still never writes Master Data (§11.3 already documented free
+  text as the ordinary case — this just puts it in one control instead of
+  two). Verified: no `masterData.create`/`insert`/`upsert` call is reachable
+  from the schedule app, and a live test typing an unlisted brand left no row
+  in Master Data's `Brand` table.
+- **Type joins the checklist**, right after Brand — it previously could only
+  be edited via the Spec options list below, which was the one field the
+  new checklist didn't cover. It carries no checkbox, since Type always
+  shows on the card and was never optional.
+- **Qty/Unit are Fixture-only.** Owner: *"qty ga butuh amount; lagi pula
+  material harusnya ga perlu keluarin qty"* — a Material line is a
+  specification, not a count (matches legacy's own sheet import, which
+  already discards Qty on Material). The row is hidden entirely for
+  `section = MATERIAL`, not just off by default; the "Amount" placeholder
+  is also dropped as redundant with the row's own "Qty" label.
+- **Row order, owner-specified:** Brand, Type, Color, Pattern, Finishing,
+  Location, Qty (Fixture only), Size, Notes, then extra spec lines.
+- **Notes uses `SimpleTextEditor`** — the same bold/italic/bullet-list
+  toolbar already used for Notes on Brand, Vendor and Pricing in Master
+  Data, so schedule notes match the rest of the app (owner: *"pakai wysiwyg
+  seperti pada notes pada masterdata"*). It stores lightly marked-up plain
+  text, not HTML.
+
+Verification: `tsc`, `eslint`, `npm test` (472 passed) all clean. Browser-
+verified: Brand combobox search/select/free-text-create round-trip (confirmed
+against Master Data directly — no row created), Type edit saves, Qty row
+present for a Fixture item and absent for Material, field order matches.
+
+## R8.112 | 2026-09-23 | feat(sf): Product Schedule editor — dialog panel, tick-to-fill checklist
+
+Two more owner review passes on the same screen, both from using the R8.111
+board live in the browser.
+
+### Pass 1: a real editor, not a sidebar
+
+The entry panel was a slim 22rem (~350px) sidebar squeezed beside the board on
+desktop and a separate `Drawer` on mobile — with the card-content section,
+its checkboxes, and every option's edit form all fighting for that width. It
+is now one `Dialog` (`size="lg"`, 760px), used on both breakpoints, replacing
+`EntryDrawer`/the desktop-panel branch/`useIsDesktop` entirely — the same
+dialog pattern already used by "Add item" and every other schedule dialog in
+this file.
+
+While rebuilding the panel, `card_fields = []` (R8.111's "explicit, nothing
+selected" state) was found colliding with `card_fields = null` ("no
+override") in the UI's own greyed-out-checkbox styling; both are now handled
+without conflating them.
+
+### Pass 2: ticking a field is how you say "I don't know it yet"
+
+Live testing surfaced a real usability bug in the pass-1 UI: a field with no
+value on the shown option was greyed out and **un-tickable**, on the reasoning
+that ticking an empty field would not change the card. But that made "I don't
+know the brand yet, but note that it belongs on this card" impossible to
+express — the exact case that comes up on nearly every unfinalized spec.
+Owner: *"kalau brandnya masih belum tau gmn? better legacy sih sebenernya
+ya?"* Legacy never separated "show this field" from "edit this field" in the
+first place — its checklist was a plain visibility toggle, and the value was
+typed directly on the card face.
+
+**Item details and What-shows-on-the-card are merged into one checklist**
+(`ChecklistRow`): each field is one row, a checkbox, and — only once ticked —
+the input(s) that fill it in, right there. Unticking never discards what was
+typed, it only stops that field from captioning the card. This closes the
+gap pass 1 opened:
+
+- Location and Qty (+Unit) write straight to the entry, per row, on blur —
+  the old batched "Save details" button is gone.
+- Brand (Master Data select + free-text fallback), Color, Pattern, Finishing,
+  Size and Notes write to the option the card already speaks for
+  (`shownOptionOf`: the final option, else the first) — the full option
+  snapshot re-saves on any of their blurs, since the write path takes a whole
+  snapshot, not a per-field patch.
+- A row backed by an option (everything except Location/Qty) disables only
+  when there is no option yet to attach a value to ("Add an option below
+  first"), never because the value happens to be blank.
+- Extra spec lines keep a plain checkbox (no reveal needed — by construction
+  an extra field never exists with an empty label or value).
+- The card itself is unchanged: an empty field, ticked or not, still does not
+  render a row (owner decision, this pass) — only the *editing* side changed.
+
+### Verification
+
+`tsc`, `eslint`, and `npm test` (466 passed, including the disposable
+`studioflow_rebuild_test` database) all clean. Browser-verified: the dialog
+opens at both desktop and 375px with the same content; ticking Brand reveals
+the select/input and saves on blur (confirmed against the option row below);
+ticking and unticking Qty toggles its two inputs without disturbing the other
+rows' state.
 
 ## R8.111 | 2026-09-23 | feat(sf): Product Schedule spec model — one vocabulary, legacy-faithful card fields
 
@@ -94,68 +194,6 @@ of the schedule board and template settings.
 Printing the board as a client/contractor catalogue sheet — the reason legacy
 had card fields at all — is recorded in `docs/BACKLOG.md` as a parity gap, at
 the owner's instruction to land the data and UI consistency first.
-
-## R8.112 | 2026-09-23 | feat(sf): Product Schedule editor — dialog panel, tick-to-fill checklist
-
-Two more owner review passes on the same screen, both from using the R8.111
-board live in the browser.
-
-### Pass 1: a real editor, not a sidebar
-
-The entry panel was a slim 22rem (~350px) sidebar squeezed beside the board on
-desktop and a separate `Drawer` on mobile — with the card-content section,
-its checkboxes, and every option's edit form all fighting for that width. It
-is now one `Dialog` (`size="lg"`, 760px), used on both breakpoints, replacing
-`EntryDrawer`/the desktop-panel branch/`useIsDesktop` entirely — the same
-dialog pattern already used by "Add item" and every other schedule dialog in
-this file.
-
-While rebuilding the panel, `card_fields = []` (R8.111's "explicit, nothing
-selected" state) was found colliding with `card_fields = null` ("no
-override") in the UI's own greyed-out-checkbox styling; both are now handled
-without conflating them.
-
-### Pass 2: ticking a field is how you say "I don't know it yet"
-
-Live testing surfaced a real usability bug in the pass-1 UI: a field with no
-value on the shown option was greyed out and **un-tickable**, on the reasoning
-that ticking an empty field would not change the card. But that made "I don't
-know the brand yet, but note that it belongs on this card" impossible to
-express — the exact case that comes up on nearly every unfinalized spec.
-Owner: *"kalau brandnya masih belum tau gmn? better legacy sih sebenernya
-ya?"* Legacy never separated "show this field" from "edit this field" in the
-first place — its checklist was a plain visibility toggle, and the value was
-typed directly on the card face.
-
-**Item details and What-shows-on-the-card are merged into one checklist**
-(`ChecklistRow`): each field is one row, a checkbox, and — only once ticked —
-the input(s) that fill it in, right there. Unticking never discards what was
-typed, it only stops that field from captioning the card. This closes the
-gap pass 1 opened:
-
-- Location and Qty (+Unit) write straight to the entry, per row, on blur —
-  the old batched "Save details" button is gone.
-- Brand (Master Data select + free-text fallback), Color, Pattern, Finishing,
-  Size and Notes write to the option the card already speaks for
-  (`shownOptionOf`: the final option, else the first) — the full option
-  snapshot re-saves on any of their blurs, since the write path takes a whole
-  snapshot, not a per-field patch.
-- A row backed by an option (everything except Location/Qty) disables only
-  when there is no option yet to attach a value to ("Add an option below
-  first"), never because the value happens to be blank.
-- Extra spec lines keep a plain checkbox (no reveal needed — by construction
-  an extra field never exists with an empty label or value).
-- The card itself is unchanged: an empty field, ticked or not, still does not
-  render a row (owner decision, this pass) — only the *editing* side changed.
-
-### Verification
-
-`tsc`, `eslint`, and `npm test` (466 passed, including the disposable
-`studioflow_rebuild_test` database) all clean. Browser-verified: the dialog
-opens at both desktop and 375px with the same content; ticking Brand reveals
-the select/input and saves on blur (confirmed against the option row below);
-ticking and unticking Qty toggles its two inputs without disturbing the other
-rows' state.
 
 ## R8.110 | 2026-09-23 | feat(sf,masterdata,ui-engine): execute UIUX-CRITIQUE-2026-09-23.md §1–§5
 
