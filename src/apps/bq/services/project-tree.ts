@@ -25,6 +25,13 @@ export function createProjectTreeService(ctx: BqServiceContext) {
     requireEditableProjectForSubObject,
   } = ctx;
 
+  // Every sibling under the same parent otherwise defaults to sort_order 0,
+  // making same-parent display order unstable across reads (bq-contract §13.2).
+  async function nextSortOrder(aggregate: () => Promise<{ _max: { sort_order: number | null } }>): Promise<number> {
+    const result = await aggregate();
+    return (result._max.sort_order ?? -1) + 1;
+  }
+
 async function addSection(input: {
   grants: PermissionGrants;
   actor: { kind: string; userId?: string; label: string };
@@ -34,11 +41,15 @@ async function addSection(input: {
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
   await requireEditableProject(input.projectId);
+  const sortOrder = input.sortOrder ?? (await nextSortOrder(() => db.bqSection.aggregate({
+    where: { project_id: input.projectId },
+    _max: { sort_order: true },
+  })));
   const section = await db.bqSection.create({
     data: {
       project_id: input.projectId,
       name: input.name,
-      sort_order: input.sortOrder ?? 0,
+      sort_order: sortOrder,
     },
   });
   await auditWriter({
@@ -60,11 +71,15 @@ async function addSubsection(input: {
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
   await requireEditableProjectForSection(input.sectionId);
+  const sortOrder = input.sortOrder ?? (await nextSortOrder(() => db.bqSubsection.aggregate({
+    where: { section_id: input.sectionId },
+    _max: { sort_order: true },
+  })));
   const subsection = await db.bqSubsection.create({
     data: {
       section_id: input.sectionId,
       name: input.name,
-      sort_order: input.sortOrder ?? 0,
+      sort_order: sortOrder,
     },
   });
   await auditWriter({
@@ -147,6 +162,11 @@ async function updateSubsection(input: {
   if (input.sectionId) await requireEditableProjectForSection(input.sectionId);
   else await requireEditableProjectForSubsection(input.subsectionId!);
 
+  const sortOrder = input.sortOrder ?? (await nextSortOrder(() => db.bqItem.aggregate({
+    where: input.sectionId ? { section_id: input.sectionId } : { subsection_id: input.subsectionId },
+    _max: { sort_order: true },
+  })));
+
   const item = await db.bqItem.create({
     data: {
       section_id: input.sectionId ?? null,
@@ -157,7 +177,7 @@ async function updateSubsection(input: {
       harga_snapshot: input.hargaSnapshot ?? null,
       koefisien: requirePositiveCoefficient(input.koefisien ?? "1"),
       markup_l1_pct: input.markupL1Pct ?? "0",
-      sort_order: input.sortOrder ?? 0,
+      sort_order: sortOrder,
       notes: input.notes ?? null,
     },
   });
@@ -256,13 +276,18 @@ async function addSubObject(input: {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
   await requireEditableProjectForItem(input.itemId);
 
+  const sortOrder = input.sortOrder ?? (await nextSortOrder(() => db.bqSubObject.aggregate({
+    where: { item_id: input.itemId },
+    _max: { sort_order: true },
+  })));
+
   const subObject = await db.bqSubObject.create({
     data: {
       item_id: input.itemId,
       name: input.name,
       qty_per_l1: input.qtyPerL1,
       markup_l2_pct: input.markupL2Pct ?? "0",
-      sort_order: input.sortOrder ?? 0,
+      sort_order: sortOrder,
       notes: input.notes ?? null,
     },
   });
@@ -373,6 +398,11 @@ async function addLineItem(input: {
   if (input.subObjectId) await requireEditableProjectForSubObject(input.subObjectId);
   else await requireEditableProjectForItem(input.itemId!);
 
+  const sortOrder = input.sortOrder ?? (await nextSortOrder(() => db.bqLineItem.aggregate({
+    where: input.subObjectId ? { sub_object_id: input.subObjectId } : { item_id: input.itemId },
+    _max: { sort_order: true },
+  })));
+
   const lineItem = await db.bqLineItem.create({
     data: {
       sub_object_id: input.subObjectId ?? null,
@@ -390,7 +420,7 @@ async function addLineItem(input: {
       kategori: requireKategori(input.kategori),
       qty: input.qty,
       koefisien: requirePositiveCoefficient(input.koefisien ?? "1"),
-      sort_order: input.sortOrder ?? 0,
+      sort_order: sortOrder,
       notes: input.notes ?? null,
     },
   });

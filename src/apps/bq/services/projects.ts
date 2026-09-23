@@ -1,11 +1,37 @@
 import type { PermissionGrants } from "@platform/core/rbac";
 import { requirePermission } from "@platform/core/rbac";
 import { AppError } from "@platform/core/errors";
+import type { BqProjectStatus } from "@/generated/prisma/client";
 
 import { BQ_PERMISSIONS, fieldUnchanged, type BqServiceContext } from "./context";
 
 export function createProjectLifecycleService(ctx: BqServiceContext) {
   const { db, runTransaction, auditWriter, requireEditableProject } = ctx;
+
+  /**
+   * Atomic guarded transition: the WHERE clause re-checks `status` in the
+   * same statement as the write, so a check-then-act race between two calls
+   * (e.g. a double-click) can never both apply their transition — the loser's
+   * `updateMany` matches zero rows once the winner has committed. Mirrors
+   * `transitionPromotionStatus` in `promotions.ts`.
+   */
+  async function transitionProjectStatus(
+    id: string,
+    expected: readonly BqProjectStatus[],
+    status: BqProjectStatus,
+  ): Promise<void> {
+    const result = await db.bqProject.updateMany({
+      where: { id, status: { in: expected as BqProjectStatus[] } },
+      data: { status },
+    });
+    if (result.count === 0) {
+      throw new AppError(
+        "CONFLICT",
+        "bq.project.status-changed",
+        "This project's status changed before this action completed. Refresh and try again.",
+      );
+    }
+  }
 
 async function createProject(input: {
   grants: PermissionGrants;
@@ -148,10 +174,8 @@ async function lockProject(input: {
   if (existing.status === "ARCHIVED") {
     throw new AppError("CONFLICT", "bq.project.archived", "Cannot lock an archived project");
   }
-  const project = await db.bqProject.update({
-    where: { id: input.id },
-    data: { status: "LOCKED" },
-  });
+  await transitionProjectStatus(input.id, ["ACTIVE"], "LOCKED");
+  const project = await db.bqProject.findUniqueOrThrow({ where: { id: input.id } });
   await auditWriter({
     appId: "bq",
     action: "bq.project.locked",
@@ -173,10 +197,8 @@ async function unlockProject(input: {
   if (existing.status !== "LOCKED") {
     throw new AppError("CONFLICT", "bq.project.not-locked", "Project is not locked");
   }
-  const project = await db.bqProject.update({
-    where: { id: input.id },
-    data: { status: "ACTIVE" },
-  });
+  await transitionProjectStatus(input.id, ["LOCKED"], "ACTIVE");
+  const project = await db.bqProject.findUniqueOrThrow({ where: { id: input.id } });
   await auditWriter({
     appId: "bq",
     action: "bq.project.unlocked",
@@ -202,10 +224,8 @@ async function archiveProject(input: {
       existing.status === "LOCKED" ? "Unlock the project before archiving it" : "Project is already archived",
     );
   }
-  const project = await db.bqProject.update({
-    where: { id: input.id },
-    data: { status: "ARCHIVED" },
-  });
+  await transitionProjectStatus(input.id, ["ACTIVE"], "ARCHIVED");
+  const project = await db.bqProject.findUniqueOrThrow({ where: { id: input.id } });
   await auditWriter({
     appId: "bq",
     action: "bq.project.archived",
@@ -227,10 +247,8 @@ async function restoreProject(input: {
   if (existing.status !== "ARCHIVED") {
     throw new AppError("CONFLICT", "bq.project.not-archived", "Project is not archived");
   }
-  const project = await db.bqProject.update({
-    where: { id: input.id },
-    data: { status: "ACTIVE" },
-  });
+  await transitionProjectStatus(input.id, ["ARCHIVED"], "ACTIVE");
+  const project = await db.bqProject.findUniqueOrThrow({ where: { id: input.id } });
   await auditWriter({
     appId: "bq",
     action: "bq.project.restored",
@@ -302,9 +320,8 @@ async function approveProjectDeletion(input: {
   if (project.status !== "ARCHIVED") {
     throw new AppError("CONFLICT", "bq.project.not-archived", "Only an archived project can be permanently deleted");
   }
-  await db.bqProject.delete({ where: { id: project.id } });
-  await db.bqProjectDeletionRequest.update({
-    where: { id: request.id },
+  const requestTransition = await db.bqProjectDeletionRequest.updateMany({
+    where: { id: request.id, status: "PENDING" },
     data: {
       status: "APPROVED",
       approver_user_id: input.actor.userId ?? "system",
@@ -312,6 +329,13 @@ async function approveProjectDeletion(input: {
       decided_at: new Date(),
     },
   });
+  if (requestTransition.count === 0) {
+    throw new AppError("CONFLICT", "bq.project.deletion-not-pending", "Deletion request is no longer pending");
+  }
+  const deleted = await db.bqProject.deleteMany({ where: { id: project.id, status: "ARCHIVED" } });
+  if (deleted.count === 0) {
+    throw new AppError("CONFLICT", "bq.project.not-archived", "Only an archived project can be permanently deleted");
+  }
   await auditWriter({
     appId: "bq",
     action: "bq.project.deleted",
@@ -335,8 +359,8 @@ async function rejectProjectDeletion(input: {
   if (!request || request.status !== "PENDING") {
     throw new AppError("CONFLICT", "bq.project.deletion-not-pending", "Deletion request is no longer pending");
   }
-  await db.bqProjectDeletionRequest.update({
-    where: { id: request.id },
+  const requestTransition = await db.bqProjectDeletionRequest.updateMany({
+    where: { id: request.id, status: "PENDING" },
     data: {
       status: "REJECTED",
       approver_user_id: input.actor.userId ?? "system",
@@ -345,6 +369,9 @@ async function rejectProjectDeletion(input: {
       reason,
     },
   });
+  if (requestTransition.count === 0) {
+    throw new AppError("CONFLICT", "bq.project.deletion-not-pending", "Deletion request is no longer pending");
+  }
   await auditWriter({
     appId: "bq",
     action: "bq.project.deletion-rejected",

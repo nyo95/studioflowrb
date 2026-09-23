@@ -16,7 +16,7 @@ Authority in force: `STUDIOFLOW-REWORK-CONTRACT.md` (ACTIVE, owner-ratified 2026
 | 7 stored statuses | `PHASE_STATUSES`; `enum SfPhaseStatus` | ✅ |
 | Revision `{major,minor}`, label `vM.m` | `revisionLabel()`, `nextRevision()`, `model SfRevision` | ✅ |
 | Internal reject → minor+1, client reject → major+1.0 | contract §5.2, `nextRevision()` | ✅ |
-| FEEDBACK → TODO on reject | contract §5.2, `SfActivityMode` | ✅ |
+| FEEDBACK → TODO on reject | contract §5.2, `SfActivityMode` | ✅ *(superseded: V2-D1 later changed the reject-conversion target to `SfChecklistItem`, not an `SfActivity` TODO — this claim was accurate only at the R8.86 baseline this audit is pinned to)* |
 | Approval blocked by open work/checklist | contract §6.4, `domain/blockers.ts`, `phases/blocker-query.ts` | ✅ |
 | CD = drafter seat | `phaseOwnerSeat()` | ✅ |
 

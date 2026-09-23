@@ -173,7 +173,7 @@ The project Overview page (`/projects/[projectId]`) becomes the primary workspac
 
 The phase detail page (`/projects/[projectId]/phases/[phaseId]`) becomes a detail/deep-link view:
 - Full `PhaseActions` block.
-- Revision work (SfActivity FEEDBACK + deferred items).
+- Revision work (SfActivity FEEDBACK only — no deferred bucket; the deferral mesh was purged in R8.98).
 - Phase checklist (SfChecklistItem).
 - Revision history.
 

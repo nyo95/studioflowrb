@@ -334,4 +334,69 @@ describe("BQ R6.1 invariants", () => {
       1,
     );
   });
+
+  it("assigns sequential sort_order to siblings inserted without an explicit order", async () => {
+    const { project, section, item } = await projectTree();
+    const section2 = await service.addSection({ grants: GRANTS, actor: ACTOR, projectId: project.id, name: "Exterior" });
+    assert.equal(section.sort_order, 0);
+    assert.equal(section2.sort_order, 1);
+
+    const item2 = await service.addItem({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Shelf", qty: "1", unit: "PCS" });
+    assert.equal(item.sort_order, 0);
+    assert.equal(item2.sort_order, 1, "a second sibling must not collide at sort_order 0");
+
+    const group1 = await service.addSubObject({ grants: GRANTS, actor: ACTOR, itemId: item.id, name: "Frame", qtyPerL1: "1" });
+    const group2 = await service.addSubObject({ grants: GRANTS, actor: ACTOR, itemId: item.id, name: "Door", qtyPerL1: "1" });
+    assert.equal(group1.sort_order, 0);
+    assert.equal(group2.sort_order, 1);
+
+    const line1 = await service.addLineItem({ grants: GRANTS, actor: ACTOR, subObjectId: group1.id, sourceType: "CUSTOM", titleSnapshot: "Hinge", purchaseUnitSnapshot: "PCS", hargaSnapshot: "1", kategori: "ALAT", qty: "1" });
+    const line2 = await service.addLineItem({ grants: GRANTS, actor: ACTOR, subObjectId: group1.id, sourceType: "CUSTOM", titleSnapshot: "Screw", purchaseUnitSnapshot: "PCS", hargaSnapshot: "1", kategori: "ALAT", qty: "1" });
+    assert.equal(line1.sort_order, 0);
+    assert.equal(line2.sort_order, 1);
+
+    // A sibling scope under a different parent restarts at 0 rather than continuing a global counter.
+    const subsection = await service.addSubsection({ grants: GRANTS, actor: ACTOR, sectionId: section2.id, name: "Wing A" });
+    assert.equal(subsection.sort_order, 0);
+
+    // An explicit sortOrder from the caller is still honored, not overridden.
+    const item3 = await service.addItem({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Explicit", qty: "1", unit: "PCS", sortOrder: 9 });
+    assert.equal(item3.sort_order, 9);
+  });
+
+  it("guards concurrent project archive attempts against a lost-update race", async () => {
+    const { project } = await projectTree();
+    const results = await Promise.allSettled([
+      service.archiveProject({ grants: GRANTS, actor: ACTOR, id: project.id }),
+      service.archiveProject({ grants: GRANTS, actor: ACTOR, id: project.id }),
+    ]);
+    assert.equal(results.filter((r) => r.status === "fulfilled").length, 1, "exactly one concurrent archive wins the race");
+    const loser = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+    assert.ok(loser.reason instanceof AppError, "the losing archive must surface an error, not silently double-apply");
+    assert.equal((await testDb.prisma.bqProject.findUniqueOrThrow({ where: { id: project.id } })).status, "ARCHIVED");
+    assert.equal(
+      await testDb.prisma.auditEvent.count({ where: { action: "bq.project.archived", entity_id: project.id } }),
+      1,
+      "only the winning transition is audited",
+    );
+  });
+
+  it("guards concurrent deletion approvals from deleting the same project twice", async () => {
+    const { project } = await projectTree();
+    await service.archiveProject({ grants: GRANTS, actor: ACTOR, id: project.id });
+    const request = await service.requestProjectDeletion({ grants: GRANTS, actor: ACTOR, id: project.id, reason: "Duplicate approval race" });
+
+    const results = await Promise.allSettled([
+      service.approveProjectDeletion({ grants: GRANTS, actor: ACTOR, requestId: request.id }),
+      service.approveProjectDeletion({ grants: GRANTS, actor: ACTOR, requestId: request.id }),
+    ]);
+    assert.equal(results.filter((r) => r.status === "fulfilled").length, 1, "exactly one concurrent approval wins the race");
+    const loser = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+    assert.ok(loser.reason instanceof AppError && loser.reason.code === "bq.project.deletion-not-pending", "the losing approval must surface a conflict, not attempt a second delete");
+    assert.equal(await testDb.prisma.bqProject.findUnique({ where: { id: project.id } }), null);
+    assert.equal(
+      (await testDb.prisma.bqProjectDeletionRequest.findUniqueOrThrow({ where: { id: request.id } })).status,
+      "APPROVED",
+    );
+  });
 });
