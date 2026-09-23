@@ -644,6 +644,28 @@ export async function removeScheduleOptionImageAction(input: z.infer<typeof Sche
   });
 }
 
+const ScheduleSampleRequest = z.strictObject({ projectId: Id, optionId: Id, requestedFrom: z.string().min(1).max(200), note: OptionalText });
+export async function requestScheduleSampleAction(input: z.infer<typeof ScheduleSampleRequest>): Promise<ActionResult<{ requestId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleSampleRequest, input);
+    const result = await studioFlow.schedule.requestSample({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
+const ScheduleSampleReceive = z.strictObject({ projectId: Id, requestId: Id, note: OptionalText });
+export async function receiveScheduleSampleAction(input: z.infer<typeof ScheduleSampleReceive>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleSampleReceive, input);
+    const result = await studioFlow.schedule.receiveSample({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
 export async function saveScheduleEntryAsTemplateAction(input: z.infer<typeof ScheduleEntryRef>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();

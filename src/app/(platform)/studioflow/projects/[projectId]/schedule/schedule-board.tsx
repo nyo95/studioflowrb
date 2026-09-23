@@ -20,6 +20,7 @@ import {
   EmptyState,
   Field,
   FilterChip,
+  FormActions,
   ImageWorkspace,
   InlineError,
   Input,
@@ -44,7 +45,9 @@ import {
   moveScheduleEntryAction,
   moveScheduleEntryToCategoryAction,
   removeScheduleOptionImageAction,
+  receiveScheduleSampleAction,
   reorderScheduleEntriesAction,
+  requestScheduleSampleAction,
   saveScheduleEntryAsTemplateAction,
   searchReusableScheduleOptionsAction,
   setScheduleOptionImageAction,
@@ -75,6 +78,20 @@ export type ScheduleOptionView = {
   extra: ScheduleExtraField[];
   /** Short-lived signed URL of the option photo. */
   imageUrl: string | null;
+  /** Latest physical sample request against this option, if any. */
+  sampleRequest: ScheduleSampleRequestView | null;
+};
+
+export type ScheduleSampleRequestView = {
+  id: string;
+  status: "REQUESTED" | "RECEIVED";
+  requestedFrom: string;
+  note: string | null;
+  requestedByName: string;
+  requestedAt: Date;
+  receivedByName: string | null;
+  receivedAt: Date | null;
+  receivedNote: string | null;
 };
 
 export type ScheduleEntryView = {
@@ -187,6 +204,51 @@ function SchedulePhotoDialog({
         <ImageWorkspace label="Schedule photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" onPrepared={onPrepared} disabled={isPending(pendingKey)} />
         {photoError ? <InlineError>{photoError}</InlineError> : null}
       </div>
+    </Dialog>
+  );
+}
+
+/** Physical sample request (owner, 2026-09-23): stays entirely inside StudioFlow — never writes to Master Data. */
+function SampleRequestDialog({
+  projectId,
+  option,
+  command,
+  onClose,
+}: {
+  projectId: string;
+  option: ScheduleOptionView;
+  command: Command;
+  onClose: () => void;
+}) {
+  const { run, isPending, error } = command;
+  const pendingKey = `${option.id}-sample`;
+  const [requestedFrom, setRequestedFrom] = useState("");
+  const [note, setNote] = useState("");
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(value) => { if (!value) onClose(); }}
+      title={`Request sample — ${option.productName}`}
+      description="Tracked in StudioFlow only; adding the SKU and price to Master Data once the sample arrives is a separate, manual step."
+      size="sm"
+      dismissible={!isPending(pendingKey)}
+    >
+      <form className="grid gap-3" onSubmit={async (e) => {
+        e.preventDefault();
+        const ok = await run(pendingKey, () => requestScheduleSampleAction({ projectId, optionId: option.id, requestedFrom, note: note || undefined }));
+        if (ok) onClose();
+      }}>
+        <Field label="Requested from" required description="Vendor or supplier name">
+          <Input autoFocus value={requestedFrom} maxLength={200} onChange={(e) => setRequestedFrom(e.target.value)} />
+        </Field>
+        <Field label="Note (optional)"><Textarea rows={2} value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} /></Field>
+        {error ? <InlineError>{error}</InlineError> : null}
+        <FormActions>
+          <Button type="button" onClick={onClose} disabled={isPending(pendingKey)}>Cancel</Button>
+          <Button type="submit" variant="primary" pending={isPending(pendingKey)} disabled={!requestedFrom.trim()}>Request sample</Button>
+        </FormActions>
+      </form>
     </Dialog>
   );
 }
@@ -894,6 +956,7 @@ function EntryPanelContent({
   const [reuse, setReuse] = useState(false);
   const [photoFor, setPhotoFor] = useState<ScheduleOptionView | null>(null);
   const [inlineEdit, setInlineEdit] = useState<string | null>(null);
+  const [sampleFor, setSampleFor] = useState<ScheduleOptionView | null>(null);
 
   // The checklist edits the option the card itself speaks for — same rule as
   // the card face (shownOptionOf). Local draft mirrors it and resyncs if a
@@ -1218,6 +1281,14 @@ function EntryPanelContent({
                           </Button>
                         </div>
                       ) : null}
+                      {option.sampleRequest ? (
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          <Badge tone={option.sampleRequest.status === "RECEIVED" ? "success" : "warning"}>
+                            {option.sampleRequest.status === "RECEIVED" ? "Sample received" : "Sample requested"}
+                          </Badge>
+                          <Text tone="tertiary" size="sm">from {option.sampleRequest.requestedFrom}</Text>
+                        </div>
+                      ) : null}
                     </div>
                     <Badge tone={status.tone}>{status.label}</Badge>
                     {canEdit ? (
@@ -1229,6 +1300,9 @@ function EntryPanelContent({
                           { label: "Edit", onSelect: () => setInlineEdit(option.id) },
                           { label: option.imageUrl ? "Change photo" : "Add photo", onSelect: () => { setPhotoFor(option); } },
                           ...(option.imageUrl ? [{ label: "Remove photo", onSelect: () => void removePhoto(option) }] : []),
+                          option.sampleRequest?.status === "REQUESTED"
+                            ? { label: "Mark sample received", separatorBefore: true, onSelect: () => void run(`${entry.id}-opt-${option.id}`, () => receiveScheduleSampleAction({ projectId, requestId: option.sampleRequest!.id })) }
+                            : { label: "Request sample", separatorBefore: true, onSelect: () => setSampleFor(option) },
                           { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeOption(option) },
                         ]}
                       />
@@ -1240,7 +1314,7 @@ function EntryPanelContent({
           </ul>
         )}
       </div>
-      {command.error && !editing && !reuse && !photoFor && !inlineEdit ? <InlineError>{command.error}</InlineError> : null}
+      {command.error && !editing && !reuse && !photoFor && !inlineEdit && !sampleFor ? <InlineError>{command.error}</InlineError> : null}
 
       {editing ? (
         <OptionDialog
@@ -1255,6 +1329,9 @@ function EntryPanelContent({
       {reuse ? <ReuseDialog projectId={projectId} entry={entry} command={command} onClose={() => setReuse(false)} /> : null}
       {photoFor ? (
         <SchedulePhotoDialog projectId={projectId} entryCode={entry.code} option={photoFor} command={command} onClose={() => setPhotoFor(null)} />
+      ) : null}
+      {sampleFor ? (
+        <SampleRequestDialog projectId={projectId} option={sampleFor} command={command} onClose={() => setSampleFor(null)} />
       ) : null}
     </div>
   );

@@ -641,6 +641,24 @@ different, legitimate reason from the field being blank, which is not a
 reason to disable at all. Extra spec lines keep a plain checkbox with no
 reveal, since one cannot exist with a blank label or value (§11.9).
 
+**§11.11 Physical sample requests (owner, 2026-09-23).** A schedule option
+can carry a physical sample request: `requestedFrom` (vendor/supplier, free
+text — no live reference into Master Data, same reasoning as `brand_name`
+in §11.10) and an optional note. Status is `REQUESTED` → `RECEIVED`; an
+option can have only one open (`REQUESTED`) request at a time, but a new one
+may be started once the previous is `RECEIVED` (`SfScheduleSampleRequest`,
+`option_id` FK, cascades with the option). Receiving a sample **never writes
+to Master Data** — Master Data's public contract is read-only by design
+(masterdata `pricing-contract.md` §12), so adding the resulting SKU/price is
+a separate, manual step a Master Data user does themselves; StudioFlow only
+records that a sample arrived (`receivedNote`, `receivedByName`). The
+designer sees this as a `Badge` on the option card ("Sample requested" /
+"Sample received") plus a "Requested from …" line — not a notification bell,
+which per `CORE.md`'s own classification is a much larger, currently
+`DEFER`red Core-level port, out of scope here. Actions: `Request sample` /
+`Mark sample received` in the option's row-action menu
+(`requestScheduleSampleAction`/`receiveScheduleSampleAction`).
+
 ## 12. Foundation centralization map
 
 | Need | Classification | Canonical home |

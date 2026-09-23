@@ -627,6 +627,37 @@ describe("SF-R3 Product Schedule", () => {
     assert.equal(second.entryId.length > 0, true);
   });
 
+  it("tracks a physical sample request through to received, blocking a second pending request but allowing a re-request after", async () => {
+    const { projectId } = await newProject();
+    const { entryId } = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "Dulux Easy Clean - DX-01", brandName: "Dulux" } });
+    const entry = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((e) => e.id === entryId)!;
+    const optionId = entry.options[0].id;
+    assert.equal(entry.options[0].sampleRequest, null);
+
+    const { requestId } = await sf.schedule.requestSample({ ...as(designer), projectId, optionId, requestedFrom: "PT Sumber Jaya", note: "Ask for the matte finish" });
+    let updated = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((e) => e.id === entry.id)!;
+    assert.deepEqual(
+      [updated.options[0].sampleRequest?.status, updated.options[0].sampleRequest?.requestedFrom, updated.options[0].sampleRequest?.note],
+      ["REQUESTED", "PT Sumber Jaya", "Ask for the matte finish"],
+    );
+
+    await rejectsWith(sf.schedule.requestSample({ ...as(designer), projectId, optionId, requestedFrom: "Another vendor" }), "SAMPLE_ALREADY_REQUESTED");
+
+    await sf.schedule.receiveSample({ ...as(designer), projectId, requestId, note: "Arrived slightly darker than swatch" });
+    updated = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((e) => e.id === entry.id)!;
+    assert.deepEqual(
+      [updated.options[0].sampleRequest?.status, updated.options[0].sampleRequest?.receivedNote, updated.options[0].sampleRequest?.receivedByName],
+      ["RECEIVED", "Arrived slightly darker than swatch", "Dina Designer"],
+    );
+
+    await rejectsWith(sf.schedule.receiveSample({ ...as(designer), projectId, requestId, note: null }), "SAMPLE_NOT_PENDING");
+
+    // A new request is allowed once the previous one is resolved.
+    await sf.schedule.requestSample({ ...as(designer), projectId, optionId, requestedFrom: "PT Sumber Jaya (again)" });
+    updated = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((e) => e.id === entry.id)!;
+    assert.equal(updated.options[0].sampleRequest?.requestedFrom, "PT Sumber Jaya (again)");
+  });
+
   it("applies templates idempotently and snapshots Master Data Brand through the public port", async () => {
     const tag = randomUUID().slice(0, 8);
     const brand = await testDb.prisma.brand.create({ data: { id: randomUUID(), name: `TACO ${tag}`, slug: `taco-${tag}` } });

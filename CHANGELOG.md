@@ -5,8 +5,40 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.122**
-- Next local revision: **R8.123**
+- Current revision after this entry is committed: **R8.123**
+- Next local revision: **R8.124**
+
+## R8.123 | 2026-09-23 | feat(sf): physical sample request tracking on Product Schedule options
+
+Owner-scoped feature (§ discussion this session): from a Product Schedule
+option, staff can request a physical sample from a vendor/supplier and mark
+it received; the designer sees a badge, and nothing is written to Master
+Data (its public contract is read-only by design).
+
+- Schema: new `SfScheduleSampleRequest` (`option_id` FK cascade,
+  `requested_from` free text, `note`, `status` REQUESTED|RECEIVED,
+  `requested_by_id`/`requested_by_name`, `received_by_id`/`received_by_name`/
+  `received_at`/`received_note`). Migration
+  `20260923020000_sf_schedule_sample_request`, purely additive, applied to
+  both local dev and test databases. `requested_from` is free text — no FK
+  into Master Data's Vendor table, matching how `brand_name` already works.
+- `schedule/service.ts`: `requestSample` (rejects a second open request per
+  option, `SAMPLE_ALREADY_REQUESTED`) and `receiveSample` (rejects resolving
+  a non-pending request, `SAMPLE_NOT_PENDING`); `listSchedule` now includes
+  each option's latest sample request.
+- Two new actions: `requestScheduleSampleAction`/`receiveScheduleSampleAction`.
+- `schedule-board.tsx`: option card shows a "Sample requested"/"Sample
+  received" `Badge` + "from {vendor}" line; row-action menu gained "Request
+  sample"/"Mark sample received"; new `SampleRequestDialog`.
+- `STUDIOFLOW-REWORK-CONTRACT.md` §11.11 documents the feature, including
+  why there's no notification bell and no Master Data write.
+
+Verification: `tsc`, `check:boundaries`, `check:legacy-runtime` clean. `npm
+test`: 492 passed (491 + one new integration test covering request → duplicate
+rejection → receive → re-request-after-resolved, against the real-Postgres
+schedule suite). Browser acceptance intentionally deferred — owner asked to
+test manually.
+
 
 ## R8.122 | 2026-09-23 | docs(masterdata): scope the workbook import/export backlog item
 

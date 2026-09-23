@@ -85,21 +85,16 @@ Rules carried over unchanged from the prior trackers:
 ## Master Data
 
 - [ ] [PLANNED] Define media/file behavior after shared storage exists.
-- [ ] [PLANNED] **Physical Samples workflow**, scoped by the owner 2026-09-23:
-  from a Product Schedule entry, staff can request a physical sample from a
-  vendor/supplier; when the sample is received, the designer sees a badge/
-  indicator (on Product Schedule or Today — not a global notification bell;
-  that's a separate, much larger Core-level capability, currently `DEFER`ed
-  per `CORE.md`, and out of scope here). A received sample does **not**
-  auto-create a SKU/price row in Master Data — Master Data's public contract
-  is read-only by design (`pricing-contract.md` §12) and StudioFlow has no
-  sanctioned write path into it. Instead, StudioFlow records a request that a
-  Master Data user reviews and enters themselves. Also needs a genuine SKU
-  concept inside Product Schedule (there isn't one today — `sku_text` was
-  purged in R8.111 and folded into `product_name`), kept as its own
-  StudioFlow-owned data, not a live reference into Master Data's `Sku` table
-  (matches how `brand_id` already works: copied at pick-time, no FK, so a
-  later Master Data edit/delete never touches a Schedule option).
+
+**Fixed 2026-09-23 (R8.123):** Physical Samples workflow — from a Product
+Schedule option, staff can request a physical sample from a vendor/supplier
+(`SfScheduleSampleRequest`, free-text `requestedFrom`, no live Master Data
+reference, same pattern as `brand_name`); when received, the designer sees a
+`Badge` on the option card, not a notification bell (that stays a separate,
+`DEFER`red Core-level capability per `CORE.md`). Receiving a sample never
+writes to Master Data — its public contract is read-only by design — a
+Master Data user adds the SKU/price themselves. See `CHANGELOG.md` R8.123,
+`STUDIOFLOW-REWORK-CONTRACT.md` §11.11.
 - [ ] [PLANNED] Workbook import/export. Owner-scoped 2026-09-23: bulk
   import/export of SKU + pricing via Excel/CSV, similar in spirit to the
   existing vendor-catalog import. Error-reporting policy (partial-failure

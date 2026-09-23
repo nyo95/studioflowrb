@@ -1677,9 +1677,45 @@ model SfScheduleOption {
   updated_at   DateTime               @updatedAt
 
   entry SfScheduleEntry @relation(fields: [entry_id], references: [id], onDelete: Cascade)
+  sample_requests SfScheduleSampleRequest[]
 
   @@unique([entry_id, label])
   @@index([search_key])
   @@map("sf_schedule_option")
+  @@schema("studioflow")
+}
+
+enum SfSampleRequestStatus {
+  REQUESTED
+  RECEIVED
+
+  @@map("sf_sample_request_status")
+  @@schema("studioflow")
+}
+
+/// Physical sample request against a Product Schedule option (owner, 2026-09-23).
+/// Stays entirely inside StudioFlow — no reference into Master Data's Sku/Vendor
+/// tables; `requested_from` is free text, matching how a Schedule option already
+/// copies `brand_name` rather than living behind a cross-app foreign key.
+model SfScheduleSampleRequest {
+  id                String                @id @default(uuid())
+  option_id         String
+  requested_from    String
+  note              String?
+  status            SfSampleRequestStatus @default(REQUESTED)
+  requested_by_id   String
+  requested_by_name String
+  requested_at      DateTime              @default(now())
+  received_by_id    String?
+  received_by_name  String?
+  received_at       DateTime?
+  received_note     String?
+  created_at        DateTime              @default(now())
+  updated_at        DateTime              @updatedAt
+
+  option SfScheduleOption @relation(fields: [option_id], references: [id], onDelete: Cascade)
+
+  @@index([option_id, created_at])
+  @@map("sf_schedule_sample_request")
   @@schema("studioflow")
 }

@@ -218,6 +218,13 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     return option;
   }
 
+  async function loadSampleRequest(tx: TxClient, projectId: string, requestId: string, write: boolean) {
+    const request = await tx.sfScheduleSampleRequest.findUnique({ where: { id: requestId }, include: { option: { include: { entry: true } } } });
+    if (!request || request.option.entry.project_id !== projectId) throw scopeError();
+    if (write) await loadWritableProject(tx, projectId);
+    return request;
+  }
+
   async function nextLabel(tx: TxClient, entryId: string) {
     const rows = await tx.sfScheduleOption.findMany({ where: { entry_id: entryId }, select: { label: true } });
     return nextOptionLabel(rows.map((row) => row.label));
@@ -252,7 +259,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       const rows = await db.sfScheduleEntry.findMany({
         where: { project_id: input.projectId, ...(section ? { section } : {}) },
         orderBy: [{ section: "asc" }, { category_key: "asc" }, { increment: "asc" }],
-        include: { options: true },
+        include: { options: { include: { sample_requests: { orderBy: { created_at: "desc" }, take: 1 } } } },
       });
       const keys = [...new Set(rows.flatMap((entry) => entry.options.map((option) => option.image_key)).filter((key): key is string => !!key))];
       const urls = new Map(await Promise.all(keys.map(async (key) => [key, await signedUrl(key)] as const)));
@@ -285,6 +292,17 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
           notes: option.notes,
           extra: normalizeExtraFields(option.extra),
           imageUrl: option.image_key ? urls.get(option.image_key) ?? null : null,
+          sampleRequest: option.sample_requests[0] ? {
+            id: option.sample_requests[0].id,
+            status: option.sample_requests[0].status,
+            requestedFrom: option.sample_requests[0].requested_from,
+            note: option.sample_requests[0].note,
+            requestedByName: option.sample_requests[0].requested_by_name,
+            requestedAt: option.sample_requests[0].requested_at,
+            receivedByName: option.sample_requests[0].received_by_name,
+            receivedAt: option.sample_requests[0].received_at,
+            receivedNote: option.sample_requests[0].received_note,
+          } : null,
         })),
       }));
     },
@@ -735,6 +753,39 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       });
       await removeUnreferenced([result.previousKey]);
       return { optionId: result.optionId };
+    },
+
+    /** A childless-of-vendor-data option can have at most one open (REQUESTED) sample request at a time. */
+    async requestSample(input: CommandContext & { projectId: string; optionId: string; requestedFrom: string; note?: string | null }) {
+      const userId = requireCommand(input, P.scheduleManage);
+      const requestedFrom = requiredText(input.requestedFrom, "SAMPLE_VENDOR_REQUIRED", "Requested from", 200);
+      const note = optionalText(input.note, 500);
+      return runTransaction(async (tx) => {
+        const option = await loadOption(tx, input.projectId, input.optionId, true);
+        const pending = await tx.sfScheduleSampleRequest.findFirst({ where: { option_id: option.id, status: "REQUESTED" } });
+        if (pending) throw conflict("SAMPLE_ALREADY_REQUESTED", "A sample is already requested for this option.");
+        const request = await tx.sfScheduleSampleRequest.create({
+          data: { option_id: option.id, requested_from: requestedFrom, note, requested_by_id: userId, requested_by_name: input.actor.label },
+        });
+        await writeAudit(ports, tx, { action: "studioflow.schedule.sample-requested", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, metadata: { projectId: input.projectId, entryId: option.entry_id, label: option.label, requestedFrom } });
+        return { requestId: request.id };
+      });
+    },
+
+    /** Marks the sample received; does not touch Master Data — a Master Data user enters the SKU/price themselves. */
+    async receiveSample(input: CommandContext & { projectId: string; requestId: string; note?: string | null }) {
+      const userId = requireCommand(input, P.scheduleManage);
+      const receivedNote = optionalText(input.note, 500);
+      return runTransaction(async (tx) => {
+        const request = await loadSampleRequest(tx, input.projectId, input.requestId, true);
+        if (request.status !== "REQUESTED") throw conflict("SAMPLE_NOT_PENDING", "This sample request was already resolved.");
+        await tx.sfScheduleSampleRequest.update({
+          where: { id: request.id },
+          data: { status: "RECEIVED", received_by_id: userId, received_by_name: input.actor.label, received_at: new Date(), received_note: receivedNote },
+        });
+        await writeAudit(ports, tx, { action: "studioflow.schedule.sample-received", entityType: OPTION_ENTITY, entityId: request.option_id, actor: input.actor, metadata: { projectId: input.projectId, entryId: request.option.entry_id, label: request.option.label } });
+        return { requestId: request.id };
+      });
     },
 
     async searchReusableOptions(input: ReadContext & { projectId: string; query: string; section?: string; limit?: number }) {
