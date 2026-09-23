@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { ErrorState, PageHeader, PageShell, SectionCard } from "@/platform/ui_engine";
+import { ErrorState, PageHeader, PageShell, SectionCard, SettingsShell } from "@/platform/ui_engine";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasAllPermissions } from "@platform/core/rbac";
 import { getPermissionRegistry } from "@platform/core/rbac/registry";
@@ -8,6 +8,7 @@ import { toSafeErrorPayload, type SafeErrorPayload } from "@platform/core/errors
 import { platformAccess } from "@platform/runtime";
 import { listGrantIntegrityIssues } from "@platform/core/rbac/services";
 import { prisma } from "@platform/core/db";
+import { SettingsNavigation } from "../../settings-navigation";
 import { groupPermissionsByApp } from "./permission-grouping";
 import { RolesDirectory } from "./roles-directory";
 
@@ -49,21 +50,23 @@ export default async function RolesPage() {
         description="Roles compose the registered permissions their members hold."
         divider
       />
-      {failure || !directory || !integrityIssues ? (
-        <SectionCard>
-          <ErrorState title="Unable to load roles" description={failure?.safeMessage ?? "The role directory is unavailable."} />
-        </SectionCard>
-      ) : (
-        <RolesDirectory
-          roles={directory.roles.map((role) => ({
-            ...role,
-            archivedAt: role.archivedAt ? role.archivedAt.toISOString() : null,
-          }))}
-          permissionGroups={groupPermissionsByApp(getPermissionRegistry().permissions, getPermissionRegistry())}
-          canManage={grants.includes("platform.role.manage")}
-          integrityIssues={integrityIssues}
-        />
-      )}
+      <SettingsShell fill navigation={<SettingsNavigation grants={grants} active="roles" />}>
+        {failure || !directory || !integrityIssues ? (
+          <SectionCard>
+            <ErrorState title="Unable to load roles" description={failure?.safeMessage ?? "The role directory is unavailable."} />
+          </SectionCard>
+        ) : (
+          <RolesDirectory
+            roles={directory.roles.map((role) => ({
+              ...role,
+              archivedAt: role.archivedAt ? role.archivedAt.toISOString() : null,
+            }))}
+            permissionGroups={groupPermissionsByApp(getPermissionRegistry().permissions, getPermissionRegistry())}
+            canManage={grants.includes("platform.role.manage")}
+            integrityIssues={integrityIssues}
+          />
+        )}
+      </SettingsShell>
     </PageShell>
   );
 }

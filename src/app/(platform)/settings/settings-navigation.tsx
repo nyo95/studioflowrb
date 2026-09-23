@@ -3,7 +3,7 @@ import Link from "next/link";
 import { hasPermission, type PermissionGrants } from "@platform/core/rbac";
 import { ContextNavHeading, ContextNavLink } from "@/platform/ui_engine";
 
-export type SettingsNavActive = "general" | "users" | "roles";
+export type SettingsNavActive = "general" | "users" | "roles" | "masterdata";
 
 const PLATFORM_ITEMS = [
   { key: "general", href: "/settings/general", label: "General Settings" },
@@ -12,11 +12,13 @@ const PLATFORM_ITEMS = [
 ] as const;
 
 /**
- * Platform settings navigation. Platform-owned settings (General, Users,
- * Roles) come from the admin menu; the tied rows below make the ratified
- * D-SF ownership boundary visible by listing app-owned settings surfaces:
- * Master Data and StudioFlow workflow settings remain theirs, never the
- * platform's.
+ * The single settings sidebar (`SettingsShell`'s `navigation` slot),
+ * rendered by every settings destination — General, Users, Roles & Access,
+ * and Master Data Settings — so there's one canvas instead of some
+ * destinations having a sidebar and others being flat pages. The tied rows
+ * below make the ratified D-SF ownership boundary visible by listing
+ * app-owned settings surfaces: Master Data and StudioFlow workflow settings
+ * remain theirs, never the platform's.
  */
 export function SettingsNavigation({
   grants,
@@ -39,7 +41,7 @@ export function SettingsNavigation({
         <>
           <ContextNavHeading>Applications</ContextNavHeading>
           {showMasterData ? (
-            <ContextNavLink component={Link} href="/settings/general/masterdata">Master Data Settings</ContextNavLink>
+            <ContextNavLink component={Link} href="/settings/general/masterdata" active={active === "masterdata"}>Master Data Settings</ContextNavLink>
           ) : null}
           {showStudioFlow ? (
             <ContextNavLink component={Link} href="/studioflow/settings">StudioFlow Settings</ContextNavLink>

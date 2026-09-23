@@ -28,7 +28,10 @@ export function StudioFlowHeaderSearch() {
   // synchronously from the effect (react-hooks/set-state-in-effect).
   const [searchedQuery, setSearchedQuery] = useState("");
   const requestId = useRef(0);
+  const inputRef = useRef<HTMLInputElement>(null);
   const debouncedQuery = useDebouncedValue(query, 250);
+
+  useEffect(() => { if (open) inputRef.current?.focus(); }, [open]);
 
   useEffect(() => {
     const term = debouncedQuery.trim();
@@ -54,32 +57,40 @@ export function StudioFlowHeaderSearch() {
 
   return (
     <Popover.Root open={open} onOpenChange={(next) => { setOpen(next); if (!next) reset(); }}>
-      <Popover.Trigger asChild>
-        <button
-          type="button"
-          aria-label="Search projects and clients"
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-action text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink"
-        >
-          <Search size={16} aria-hidden="true" />
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          align="start"
-          sideOffset={6}
-          className="z-[65] w-[min(360px,calc(100vw-24px))] overflow-hidden rounded-control border border-line bg-surface-raised shadow-elevated"
-        >
-          <div className="relative border-b border-line-subtle p-[7px] [&>svg]:absolute [&>svg]:left-[17px] [&>svg]:top-1/2 [&>svg]:z-[1] [&>svg]:h-[15px] [&>svg]:w-[15px] [&>svg]:-translate-y-1/2 [&>svg]:text-ink-tertiary">
-            <Search aria-hidden="true" />
+      {/* Anchor spans the icon + expanding input so the results panel below
+          lines up with the whole row, while Trigger stays just the icon —
+          it's the only element that opens/closes on click. */}
+      <Popover.Anchor asChild>
+        <div className="flex items-center">
+          <Popover.Trigger asChild>
+            <button
+              type="button"
+              aria-label={open ? "Close search" : "Search projects and clients"}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-action text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink"
+            >
+              <Search size={16} aria-hidden="true" />
+            </button>
+          </Popover.Trigger>
+          <div className={open ? "ml-1 w-40 max-w-[45vw] overflow-hidden opacity-100 transition-[width,opacity] duration-200 ease-out sm:w-64" : "ml-0 w-0 overflow-hidden opacity-0 transition-[width,opacity] duration-150 ease-in"}>
             <Input
+              ref={inputRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search projects or clients…"
               aria-label="Search projects or clients"
-              autoFocus
-              className="pl-[31px]"
+              tabIndex={open ? 0 : -1}
+              className="h-8"
             />
           </div>
+        </div>
+      </Popover.Anchor>
+      <Popover.Portal>
+        <Popover.Content
+          align="start"
+          sideOffset={6}
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          className="z-[65] w-[min(360px,calc(100vw-24px))] overflow-hidden rounded-control border border-line bg-surface-raised shadow-elevated"
+        >
           <div className="max-h-[320px] overflow-auto p-[5px]">
             {!trimmed ? (
               <Text as="p" size="sm" tone="tertiary" className="px-2.5 py-[18px] text-center">Start typing to search projects or clients.</Text>

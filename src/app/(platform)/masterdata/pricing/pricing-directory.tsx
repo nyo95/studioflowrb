@@ -2,9 +2,9 @@
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { UpdatedCell } from "../updated-cell";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
-import { DirectoryShell,DraftDialog,RowActionMenu,RowActionsCell,RowActionsHead } from "@/platform/ui_engine";
+import { DirectoryShell,RowActionMenu,RowActionsCell,RowActionsHead } from "@/platform/ui_engine";
 
-import { Button,ButtonMenu,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,Text,Tooltip,useFormDraftGuard,useOptionOverlay,type SortDirection } from "@/platform/ui_engine";
+import { Button,ButtonMenu,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,Text,Tooltip,useFormDraftGuard,useOptionOverlay,VendorQuickCreateDialog,type SortDirection } from "@/platform/ui_engine";
 import { compareDecimals,formatDecimal,type DecimalString } from "@platform/utilities/decimal";
 import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurement";
 import { createMoney,formatMoney } from "@platform/utilities/money";
@@ -408,14 +408,18 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
       <Field label="Amount" description={`${currency} default currency`} required><div className="relative"><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-3 flex items-center font-ui-mono text-sm font-semibold text-ink-secondary">{currency}</span><Input aria-label="Amount" value={amountDisplay} onChange={(event) => updateAmount(event.target.value)} onBlur={() => setAmountDisplay(amount ? formatDecimal(amount) : "")} inputMode="decimal" placeholder="15.000" className="pl-14 tabular-nums" required /></div></Field><Field label="Notes"><SimpleTextEditor name="notes" defaultValue={row?.notes ?? ""} placeholder="Additional pricing context..." maxLength={1000} rows={3} /></Field><FormActions><Button type="button" variant="ghost" disabled={pending} onClick={() => void draftGuard.requestDiscard(onCancel)}>Cancel</Button><Button type="submit" variant="primary" pending={pending}>{edit ? "Save changes" : "Create price"}</Button></FormActions>
     </form></Dialog>
     {draftGuard.confirmDialog}
-    {quickOpen && <DraftDialog open pending={quickPending} onOpenChange={(open) => !open && setQuickOpen(false)} title="Add supplier" description={`Create a supplier for this ${needsMaterial ? "material" : "labor"} price.`}>
-      <div className="grid gap-4">
-        {quickError && <div role="alert" className="text-sm text-danger">{quickError}</div>}
-        <Field label="Supplier name" required><Input value={quickName} onChange={(event) => setQuickName(event.target.value)} required autoFocus /></Field>
-        <Field label="Supplier type" required><Select value={quickVendorTypeId} onChange={(event) => setQuickVendorTypeId(event.target.value)} required><option value="">Select supplier type</option>{eligibleTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}</Select></Field>
-        {eligibleTypes.length === 0 && <div role="alert" className="text-sm text-danger">No active Supplier Type has the required capability. Configure it in Master Data settings first.</div>}
-        <FormActions><Button data-dialog-cancel type="button" variant="ghost" onClick={() => setQuickOpen(false)}>Cancel</Button><Button type="button" variant="primary" disabled={quickPending || !quickName.trim() || !quickVendorTypeId || eligibleTypes.length === 0} onClick={() => void addVendor()}>{quickPending ? "Adding…" : "Add supplier"}</Button></FormActions>
-      </div>
-    </DraftDialog>}
+    <VendorQuickCreateDialog
+      open={quickOpen}
+      pending={quickPending}
+      error={quickError}
+      name={quickName}
+      onNameChange={setQuickName}
+      vendorTypeId={quickVendorTypeId}
+      onVendorTypeIdChange={setQuickVendorTypeId}
+      vendorTypes={eligibleTypes}
+      onSubmit={() => void addVendor()}
+      onCancel={() => setQuickOpen(false)}
+      description={`Create a supplier for this ${needsMaterial ? "material" : "labor"} price.`}
+    />
   </>;
 }

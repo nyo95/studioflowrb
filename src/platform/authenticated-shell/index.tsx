@@ -18,7 +18,7 @@ import type { PlatformGeneralSettings } from "@platform/core/settings";
 
 import { AuthenticatedPlatformNavigation,HeaderApplicationNavigation,type ShellAppLink } from "./navigation";
 import { RouteAwareAppShell } from "./route-aware-app-shell";
-import { getAdministrationMenuVisibility } from "./shell-rules";
+import { getSettingsMenuVisibility } from "./shell-rules";
 
 
 export function AuthenticatedShell({ principal, grants, settings, apps, logoutAction, appName, appAbbreviation, domainNavigation, domainUtilityNavigation, contextSlot, children }: {
@@ -36,13 +36,13 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
 }) {
   const productMark = settings.appTitle.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "SF";
   const subtitle = appName ?? settings.organizationName;
-  const administration = getAdministrationMenuVisibility(grants);
+  const { showSettings } = getSettingsMenuVisibility(grants);
   return (
     <DisplaySettingsProvider value={{ locale: settings.locale, timezone: settings.timezone }}><RouteAwareAppShell
       appRootPaths={apps.map((app) => app.rootPath)}
       brand={settings.brandMarkUrl ? (
         <Link href="/" aria-label={`Open ${settings.appTitle} home`} className="flex min-w-0 items-center rounded-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
-          <img src={settings.brandMarkUrl} alt={settings.appTitle} className="h-[38px] max-w-[190px] shrink-0 object-contain object-left" />
+          <img src={settings.brandMarkUrl} alt={settings.appTitle} className="h-7 max-w-[150px] shrink-0 object-contain object-left" />
         </Link>
       ) : (
         <Link href="/" aria-label={`Open ${settings.appTitle} home`} className="flex min-w-0 items-center gap-2.5 rounded-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
@@ -73,10 +73,7 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
         <AccountMenu
           name={principal.displayName}
           logoutAction={logoutAction}
-          showAdministration={administration.showAdministration}
-          showGeneralSettings={administration.showGeneralSettings}
-          showUsers={administration.showUsers}
-          showRoles={administration.showRoles}
+          showSettings={showSettings}
         />
       </div>}
     >

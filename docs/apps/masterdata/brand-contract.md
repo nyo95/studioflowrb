@@ -108,8 +108,14 @@ belongs to the future SKU contract.
 `owner_company` entity is created.
 
 - a Brand may have no owner Vendor;
-- ownership does not mean authorized distributor or seller;
-- an owner-only Vendor needs no material/labor capability merely to own a Brand;
+- ownership is a plain label — it does not mean authorized distributor or
+  seller, and never implies a price-picker capability;
+- a Vendor may be created with zero Vendor Types purely to hold this label,
+  whether through the full Vendor directory form or through the Brand
+  dialog's owner quick-create path (`vendor-contract.md` §11) — **the
+  Suppliers field's quick-create path is stricter**: it always requires at
+  least one Supplier Type, so a Brand screen can never leave behind a
+  Suppliers-field Vendor that's invisible to every price picker;
 - a Vendor may own many Brands;
 - archiving either side does not archive the other.
 

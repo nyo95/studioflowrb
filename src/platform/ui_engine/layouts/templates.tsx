@@ -57,16 +57,17 @@ export function SettingsShell({
   navigation,
   children,
   navigationLabel = "Settings navigation",
+  fill = false,
   className,
   ...props
-}: HTMLAttributes<HTMLDivElement> & { navigation: ReactNode; navigationLabel?: string }) {
+}: HTMLAttributes<HTMLDivElement> & { navigation: ReactNode; navigationLabel?: string; /** Propagates a `PageShell fill` ancestor's flex-fill sizing to the content column, for a `DirectoryShell fill` table to reach viewport height inside this shell. */ fill?: boolean }) {
   return (
     <div
-      className={cx("grid grid-cols-[minmax(180px,220px)_minmax(0,1fr)] gap-6 max-[840px]:grid-cols-1", className)}
+      className={cx("grid grid-cols-[minmax(180px,220px)_minmax(0,1fr)] gap-6 max-[840px]:grid-cols-1", fill && "min-h-0 flex-1", className)}
       {...props}
     >
       <nav className="grid content-start gap-1" aria-label={navigationLabel}>{navigation}</nav>
-      <div className="grid min-w-0 gap-5">{children}</div>
+      <div className={cx("min-w-0 gap-5", fill ? "flex min-h-0 flex-1 flex-col" : "grid")}>{children}</div>
     </div>
   );
 }

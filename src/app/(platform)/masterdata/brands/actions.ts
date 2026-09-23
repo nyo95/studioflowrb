@@ -42,16 +42,30 @@ function parseId(value: string): string {
   return parsed.data;
 }
 
-export async function createOwnerVendorQuickAction(name: string): Promise<ActionResult<{ vendorId: string }>> {
+const OwnerVendorQuickSchema = z
+  .object({
+    name: z.string().min(1, "Supplier name is required").max(64, "Supplier name is too long"),
+    vendorTypeId: z.union([z.string().uuid(), z.literal("")]).optional(),
+    role: z.enum(["owner", "supplier"]),
+  })
+  .refine((data) => data.role !== "supplier" || !!data.vendorTypeId, { message: "Select a Supplier Type", path: ["vendorTypeId"] });
+
+/** Quick-create a Vendor from Brand's Owner-supplier or Suppliers field.
+ * Owner is a plain label — it never implies capability — so it may be created
+ * with zero Supplier Types. The Suppliers field feeds price pickers, so it
+ * always requires one: a type-less quick-created vendor there would be
+ * invisible to every price picker until someone manually assigns one later. */
+export async function createBrandVendorQuickAction(name: string, vendorTypeId: string, role: "owner" | "supplier"): Promise<ActionResult<{ vendorId: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
-    const parsed = z.string().min(1, "Supplier name is required").max(64, "Supplier name is too long").safeParse(name);
+    const parsed = OwnerVendorQuickSchema.safeParse({ name, vendorTypeId, role });
     if (!parsed.success) throw validationError(parsed.error);
 
     const result = await masterDataService.createVendor({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      name: parsed.data,
+      name: parsed.data.name,
+      vendorTypeIds: parsed.data.vendorTypeId ? [parsed.data.vendorTypeId] : [],
     });
     revalidateBrands();
     revalidatePath("/masterdata/vendors");

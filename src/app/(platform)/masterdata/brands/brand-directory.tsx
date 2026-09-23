@@ -9,12 +9,12 @@ import { DirectoryShell,DraftDialog,Pagination,RowActionMenu,RowActionsCell,RowA
 import { Plus } from "lucide-react";
 import { useRef,useState,useTransition } from "react";
 
-import { Button,ConfirmDialog,CreatableMultiSelect,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,InlineError,Input,Notice,SearchField,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,useFormDraftGuard,useOptionOverlay } from "@/platform/ui_engine";
+import { Button,ConfirmDialog,CreatableMultiSelect,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,InlineError,Input,Notice,SearchField,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,useFormDraftGuard,useOptionOverlay,VendorQuickCreateDialog } from "@/platform/ui_engine";
 import { createCategoryAction } from "../categories/actions";
 import {
 archiveBrandAction,
 createBrandAction,
-createOwnerVendorQuickAction,
+createBrandVendorQuickAction,
 requestBrandDeletionAction,
 restoreBrandAction,
 updateBrandAction,
@@ -52,6 +52,7 @@ export function BrandDirectory({
   productCategories,
   ownerVendors,
   materialVendors,
+  vendorTypes,
   canManage,
   canManageVendors,
   canManageCategories,
@@ -60,6 +61,7 @@ export function BrandDirectory({
   productCategories: Option[];
   ownerVendors: Option[];
   materialVendors: Option[];
+  vendorTypes: Option[];
   canManage: boolean;
   canManageVendors: boolean;
   canManageCategories: boolean;
@@ -98,7 +100,11 @@ export function BrandDirectory({
   const [createNameWarning, setCreateNameWarning] = useState<string | null>(null);
   const [editNameWarning, setEditNameWarning] = useState<string | null>(null);
   const { options: ownerVendorOptions, upsertOverlayOption } = useOptionOverlay(ownerVendors);
+  const { options: materialVendorOptions, upsertOverlayOption: upsertMaterialVendorOption } = useOptionOverlay(materialVendors);
   const { options: categoryOptions, upsertOverlayOption: upsertCategoryOption } = useOptionOverlay(productCategories);
+  const [vendorQuick, setVendorQuick] = useState<{ target: "createOwner" | "editOwner" | "createSupplier" | "editSupplier"; name: string; vendorTypeId: string } | null>(null);
+  const [vendorQuickPending, setVendorQuickPending] = useState(false);
+  const [vendorQuickError, setVendorQuickError] = useState<string | null>(null);
   const hashtagSuggestions = brands.flatMap((brand) => brand.hashtags);
   const createFormRef = useRef<HTMLFormElement>(null);
   const editFormRef = useRef<HTMLFormElement>(null);
@@ -222,16 +228,36 @@ export function BrandDirectory({
     setLinksList(linksList.filter((_, i) => i !== index));
   };
 
-  const createOwnerVendor = async (name: string, setError: (error: string | null) => void) => {
-    setError(null);
-    const result = await createOwnerVendorQuickAction(name);
-    if (result.ok === false) {
-      setError(result.error.safeMessage);
-      return;
+  const openVendorQuick = (target: NonNullable<typeof vendorQuick>["target"], name: string) => {
+    setVendorQuickError(null);
+    setVendorQuick({ target, name, vendorTypeId: "" });
+  };
+
+  const submitVendorQuick = async () => {
+    if (!vendorQuick) return;
+    setVendorQuickError(null);
+    setVendorQuickPending(true);
+    try {
+      const isOwnerTarget = vendorQuick.target === "createOwner" || vendorQuick.target === "editOwner";
+      const result = await createBrandVendorQuickAction(vendorQuick.name, vendorQuick.vendorTypeId, isOwnerTarget ? "owner" : "supplier");
+      if (result.ok === false) {
+        setVendorQuickError(result.error.safeMessage);
+        return;
+      }
+      const option = { id: result.data.vendorId, name: vendorQuick.name.trim() };
+      upsertOverlayOption(option);
+      // A type-less owner vendor has no material capability, so it must not
+      // surface as a Suppliers option — only list it there when it actually
+      // got a Supplier Type (always true for the Suppliers-field path).
+      if (vendorQuick.vendorTypeId) upsertMaterialVendorOption(option);
+      if (vendorQuick.target === "createOwner") setCreateOwnerVendorId(option.id);
+      else if (vendorQuick.target === "editOwner") setEditOwnerVendorId(option.id);
+      else if (vendorQuick.target === "createSupplier") setCreateSupplierIds((current) => [...current, option.id]);
+      else setEditSupplierIds((current) => [...current, option.id]);
+      setVendorQuick(null);
+    } finally {
+      setVendorQuickPending(false);
     }
-    const option = { id: result.data.vendorId, name: name.trim() };
-    upsertOverlayOption(option);
-    return option.id;
   };
 
   const createProductCategory = async (name: string, setError: (error: string | null) => void) => {
@@ -363,7 +389,7 @@ export function BrandDirectory({
               value={createOwnerVendorId}
               onValueChange={setCreateOwnerVendorId}
               placeholder="Select an owner supplier"
-              onCreate={canManageVendors ? (name) => createOwnerVendor(name, setCreateError) : undefined}
+              onCreate={canManageVendors ? (name) => { openVendorQuick("createOwner", name); return ""; } : undefined}
               createLabel={(name) => `Create owner supplier "${name}"`}
             />
           </Field>
@@ -374,7 +400,10 @@ export function BrandDirectory({
             <CreatableMultiSelect label="Product categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))} value={createCategoryIds} onValueChange={setCreateCategoryIds} onCreate={canManageCategories ? (name) => createProductCategory(name, setCreateError) : undefined} createLabel={(name) => `Create product category "${name}"`} />
           </Field>
           <Field label="Suppliers" description="Organizations that supply this Brand. Managed here and shown read-only on Supplier.">
-            <CreatableMultiSelect label="Suppliers" options={materialVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))} value={createSupplierIds} onValueChange={setCreateSupplierIds} placeholder="Select suppliers" />
+            <div className="grid gap-1.5">
+              <CreatableMultiSelect label="Suppliers" options={materialVendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))} value={createSupplierIds} onValueChange={setCreateSupplierIds} placeholder="Select suppliers" />
+              {canManageVendors ? <Button type="button" size="sm" variant="ghost" className="justify-self-start" onClick={() => openVendorQuick("createSupplier", "")}>+ Create new supplier for this brand</Button> : null}
+            </div>
           </Field>
           {/* Links builder */}
           <div className="grid gap-2 border-t border-line pt-3">
@@ -474,7 +503,7 @@ export function BrandDirectory({
                 value={editOwnerVendorId}
                 onValueChange={setEditOwnerVendorId}
                 placeholder="Select an owner supplier"
-                onCreate={canManageVendors ? (name) => createOwnerVendor(name, setEditError) : undefined}
+                onCreate={canManageVendors ? (name) => { openVendorQuick("editOwner", name); return ""; } : undefined}
                 createLabel={(name) => `Create owner supplier "${name}"`}
               />
             </Field>
@@ -485,7 +514,10 @@ export function BrandDirectory({
               <CreatableMultiSelect label="Product categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))} value={editCategoryIds} onValueChange={setEditCategoryIds} onCreate={canManageCategories ? (name) => createProductCategory(name, setEditError) : undefined} createLabel={(name) => `Create product category "${name}"`} />
             </Field>
             <Field label="Suppliers" description="Organizations that supply this Brand. Changes are reflected read-only on Supplier.">
-              <CreatableMultiSelect label="Suppliers" options={materialVendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))} value={editSupplierIds} onValueChange={setEditSupplierIds} placeholder="Select suppliers" />
+              <div className="grid gap-1.5">
+                <CreatableMultiSelect label="Suppliers" options={materialVendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))} value={editSupplierIds} onValueChange={setEditSupplierIds} placeholder="Select suppliers" />
+                {canManageVendors ? <Button type="button" size="sm" variant="ghost" className="justify-self-start" onClick={() => openVendorQuick("editSupplier", "")}>+ Create new supplier for this brand</Button> : null}
+              </div>
             </Field>
             {/* Links builder */}
             <div className="grid gap-2 border-t border-line pt-3">
@@ -583,6 +615,21 @@ export function BrandDirectory({
                   runRowAction(target.id, () => requestBrandDeletionAction(target.id, reason), () => { setDeleteTarget(null); setDeleteReason(""); });
                 }} />
       ) : null}
+
+      <VendorQuickCreateDialog
+        open={vendorQuick !== null}
+        pending={vendorQuickPending}
+        error={vendorQuickError}
+        name={vendorQuick?.name ?? ""}
+        onNameChange={(name) => setVendorQuick((current) => current && { ...current, name })}
+        vendorTypeId={vendorQuick?.vendorTypeId ?? ""}
+        onVendorTypeIdChange={(vendorTypeId) => setVendorQuick((current) => current && { ...current, vendorTypeId })}
+        vendorTypes={vendorTypes}
+        onSubmit={() => void submitVendorQuick()}
+        onCancel={() => setVendorQuick(null)}
+        requireVendorType={vendorQuick?.target !== "createOwner" && vendorQuick?.target !== "editOwner"}
+        description={vendorQuick?.target === "createOwner" || vendorQuick?.target === "editOwner" ? "Create the registered manufacturer or brand owner. Ownership is a label — no Supplier Type is required." : "Create a supplier and link it to this brand."}
+      />
     </DirectoryShell>
   );
 }

@@ -46,12 +46,13 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
 
     async listBrandDirectoryRefs(input: { grants: PermissionGrants }) {
       requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.brandRead, MASTERDATA_PERMISSIONS.brandManage], "You do not have permission to view brand references.");
-      const [productCategories, ownerVendors, materialVendors] = await Promise.all([
+      const [productCategories, ownerVendors, materialVendors, vendorTypes] = await Promise.all([
         db.category.findMany({ where: { status: "ACTIVE", kind: "PRODUCT" }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
         db.vendor.findMany({ where: { deleted_at: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
         db.vendor.findMany({ where: { deleted_at: null, types: { some: { vendor_type: { can_supply_material: true, deleted_at: null } } } }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+        db.vendorType.findMany({ where: { deleted_at: null, can_supply_material: true }, orderBy: { sort_order: "asc" }, select: { id: true, name: true } }),
       ]);
-      return { productCategories, ownerVendors, materialVendors };
+      return { productCategories, ownerVendors, materialVendors, vendorTypes };
     },
 
     async getBrand(input: { grants: PermissionGrants; brandId: string }) {

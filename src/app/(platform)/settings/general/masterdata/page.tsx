@@ -3,13 +3,14 @@ import { redirect } from "next/navigation";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
-import { ErrorState, PageHeader, PageShell, SectionCard, Tabs } from "@/platform/ui_engine";
+import { ErrorState, PageHeader, PageShell, SectionCard, SettingsShell, Tabs } from "@/platform/ui_engine";
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
 import { masterDataService } from "@/apps/masterdata/runtime";
 import { promotionCoordinator } from "@/app/promotion-runtime";
 import { UnitDirectory } from "@/app/(platform)/masterdata/units/unit-directory";
 import { CategoryDirectory } from "@/app/(platform)/masterdata/categories/category-directory";
 import { DeletionDirectory } from "@/app/(platform)/masterdata/deletions/deletion-directory";
+import { SettingsNavigation } from "../../settings-navigation";
 import { VendorTypeDirectory } from "./vendor-type-directory";
 import { SupplierCategoryDirectory } from "./supplier-category-directory";
 import { PromotionReview } from "./promotion-review";
@@ -37,14 +38,16 @@ export default async function MasterDataSettingsPage() {
   const promotionRequests = canApprovePromotion ? await promotionCoordinator.listRequests({ grants }) : [];
   const promotionReferences = canApprovePromotion ? await promotionCoordinator.listReferences({ grants }) : [];
   return <PageShell size="wide"><PageHeader eyebrow="Settings" title="Master Data Settings" description="Controlled vocabularies, pricing approval, and protected deletion review." divider />
-    <Tabs label="Master Data Settings" items={[
-      { value: "units", label: "Units", content: <UnitDirectory units={units} canManage={canManage} /> },
-      { value: "categories", label: "Categories", content: <CategoryDirectory categories={categories} canManage={canManage} /> },
-      { value: "vendor-types", label: "Supplier types", content: <VendorTypeDirectory rows={vendorTypes} canManage={canManage} /> },
-      { value: "supplier-categories", label: "Supplier categories", content: <SupplierCategoryDirectory rows={supplierCategories} canManage={canManage} /> },
-      { value: "deletions", label: "Deletion review", disabled: !canApprove, content: <DeletionDirectory pendingRequests={deletions} canApprove={canApprove} /> },
-      { value: "promotions", label: "BQ approvals", disabled: !canApprovePromotion, content: <PromotionReview requests={promotionRequests} references={promotionReferences} /> },
-    ]} />
-    <p className="text-sm text-ink-secondary">Need catalog work? Return to <Link className="text-action underline" href="/masterdata">Master Data</Link>.</p>
+    <SettingsShell navigation={<SettingsNavigation grants={grants} active="masterdata" />}>
+      <Tabs label="Master Data Settings" items={[
+        { value: "units", label: "Units", content: <UnitDirectory units={units} canManage={canManage} /> },
+        { value: "categories", label: "Categories", content: <CategoryDirectory categories={categories} canManage={canManage} /> },
+        { value: "vendor-types", label: "Supplier types", content: <VendorTypeDirectory rows={vendorTypes} canManage={canManage} /> },
+        { value: "supplier-categories", label: "Supplier categories", content: <SupplierCategoryDirectory rows={supplierCategories} canManage={canManage} /> },
+        { value: "deletions", label: "Deletion review", disabled: !canApprove, content: <DeletionDirectory pendingRequests={deletions} canApprove={canApprove} /> },
+        { value: "promotions", label: "BQ approvals", disabled: !canApprovePromotion, content: <PromotionReview requests={promotionRequests} references={promotionReferences} /> },
+      ]} />
+      <p className="text-sm text-ink-secondary">Need catalog work? Return to <Link className="text-action underline" href="/masterdata">Master Data</Link>.</p>
+    </SettingsShell>
   </PageShell>;
 }

@@ -352,9 +352,23 @@ capability required by that picker. PriceMaterial requires
 `can_supply_material`; PriceMaterialLabor/PriceLabor require
 `can_supply_labor`. New VendorTypes cannot be created inline.
 
-The full Vendor directory may create an owner-only or otherwise unclassified
-Vendor with zero VendorTypes. Such a Vendor is ineligible for every price picker
-until an authorized assignment grants a capability.
+**Brand's quick-create paths share one dialog, but not one rule.** The Brand
+dialog's Owner-supplier field and its Suppliers field can each spawn a Vendor
+inline (shared `VendorQuickCreateDialog`, `platform/ui_engine/patterns`), and
+the bar depends on what the new Vendor is for:
+
+- **Suppliers field** (and Pricing's quick entry): requires name + at least
+  one material-capable VendorType, for the same reason as Pricing's quick
+  entry — a Vendor with zero VendorTypes is invisible to every price picker,
+  and a Brand screen should never be the place that leaves one behind
+  silently.
+- **Owner-supplier field**: requires only a name. Ownership is a plain label
+  (`brand-contract.md` §4.1) that never implies a price-picker capability, so
+  a VendorType may optionally be picked but is never required.
+
+The full Vendor directory may likewise create an owner-only or otherwise
+unclassified Vendor with zero VendorTypes. Such a Vendor is ineligible for
+every price picker until an authorized assignment grants a capability.
 
 Other fields (legal_name, address, contacts, links, brand relations) can be completed later from the Vendor directory.
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { getAdministrationMenuVisibility, isApplicationPath } from "./shell-rules";
+import { getSettingsMenuVisibility, isApplicationPath } from "./shell-rules";
 
 describe("authenticated shell rules", () => {
   it("shows the rail only within an accessible application root", () => {
@@ -14,24 +14,10 @@ describe("authenticated shell rules", () => {
     assert.equal(isApplicationPath("/account", roots), false);
   });
 
-  it("uses read permissions for each administration destination", () => {
-    assert.deepEqual(getAdministrationMenuVisibility(["platform.settings.read"]), {
-      showAdministration: true,
-      showGeneralSettings: true,
-      showUsers: false,
-      showRoles: false,
-    });
-    assert.deepEqual(getAdministrationMenuVisibility(["platform.user.read"]), {
-      showAdministration: true,
-      showGeneralSettings: false,
-      showUsers: true,
-      showRoles: false,
-    });
-    assert.deepEqual(getAdministrationMenuVisibility([]), {
-      showAdministration: false,
-      showGeneralSettings: false,
-      showUsers: false,
-      showRoles: false,
-    });
+  it("shows the account menu's Settings entry for any settings-canvas read permission", () => {
+    assert.deepEqual(getSettingsMenuVisibility(["platform.settings.read"]), { showSettings: true });
+    assert.deepEqual(getSettingsMenuVisibility(["platform.user.read"]), { showSettings: true });
+    assert.deepEqual(getSettingsMenuVisibility(["platform.role.read"]), { showSettings: true });
+    assert.deepEqual(getSettingsMenuVisibility([]), { showSettings: false });
   });
 });

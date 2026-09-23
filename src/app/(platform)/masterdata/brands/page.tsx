@@ -58,6 +58,7 @@ export default async function BrandsPage() {
         productCategories={refs.productCategories}
         ownerVendors={refs.ownerVendors}
         materialVendors={refs.materialVendors}
+        vendorTypes={refs.vendorTypes}
         canManage={canManage}
         canManageVendors={canManageVendors}
         canManageCategories={canManageCategories}
