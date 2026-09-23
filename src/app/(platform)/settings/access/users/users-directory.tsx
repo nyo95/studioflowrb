@@ -8,7 +8,7 @@ import { DirectoryShell,DraftDialog,Pagination,Text,usePagination } from "@/plat
 import { UserPlus } from "lucide-react";
 import { useActionState,useState,useTransition } from "react";
 
-import { Button,ConfirmDialog,DataTable,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Select,Spinner,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar } from "@/platform/ui_engine";
+import { Button,Checkbox,ConfirmDialog,DataTable,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Select,Spinner,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar } from "@/platform/ui_engine";
 import {
 assignRoleAction,
 createUserAction,
@@ -27,7 +27,7 @@ type UserRow = {
   roles: { id: string; code: string; name: string; archived: boolean }[];
 };
 
-type RoleOption = { id: string; code: string; name: string };
+type RoleOption = { id: string; code: string; name: string; appGroup: string };
 
 export function UsersDirectory({
   users,
@@ -165,13 +165,7 @@ return (
             <Input id="create-password" name="password" type="password" required autoComplete="new-password" />
           </Field>
           <Field id="create-roles" label="Roles">
-            <Select id="create-roles" name="roleIds" multiple size={Math.min(4, Math.max(2, roles.length))}>
-              {roles.map((role) => (
-                <option key={role.id} value={role.id}>
-                  {role.name}
-                </option>
-              ))}
-            </Select>
+            <RoleCheckboxGroups name="roleIds" roles={roles} />
           </Field>
           {createState?.ok === false ? (
             <InlineError>{createState.error.safeMessage}</InlineError>
@@ -271,6 +265,74 @@ return (
         }}
       />
     </DirectoryShell>
+  );
+}
+
+/**
+ * Replaces the old native `<select multiple>` (a scrolling box with no
+ * grouping, no search, and no visible "this is checked" state until you
+ * scroll to it) with a plain checkbox list grouped under the app(s) each
+ * role actually grants access to — computed server-side from real grants,
+ * not guessed from the role's name. A role spanning more than one app (e.g.
+ * "Platform Owner") sits under "Multiple apps" rather than being force-fit
+ * under one.
+ */
+function RoleCheckboxGroups({
+  name,
+  roles,
+  checkedIds = [],
+}: {
+  name: string;
+  roles: readonly RoleOption[];
+  checkedIds?: readonly string[];
+}) {
+  const [query, setQuery] = useState("");
+  const trimmed = query.trim().toLowerCase();
+  const filtered = trimmed
+    ? roles.filter((role) => role.name.toLowerCase().includes(trimmed) || role.code.toLowerCase().includes(trimmed))
+    : roles;
+
+  const groups: Array<{ label: string; roles: RoleOption[] }> = [];
+  for (const role of filtered) {
+    const group = groups.find((g) => g.label === role.appGroup);
+    if (group) group.roles.push(role);
+    else groups.push({ label: role.appGroup, roles: [role] });
+  }
+
+  return (
+    <div className="grid gap-2">
+      {roles.length > 6 ? (
+        <Input
+          type="search"
+          aria-label="Search roles"
+          placeholder="Search roles…"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      ) : null}
+      <div className="grid max-h-[280px] gap-3 overflow-auto rounded-control border border-line p-2.5">
+        {groups.length === 0 ? (
+          <Text tone="secondary" size="sm">No roles match &ldquo;{query}&rdquo;.</Text>
+        ) : (
+          groups.map((group) => (
+            <div key={group.label} className="grid gap-1">
+              <Text as="span" meta tone="tertiary">{group.label}</Text>
+              <div className="grid gap-1">
+                {group.roles.map((role) => (
+                  <Checkbox
+                    key={role.id}
+                    name={name}
+                    value={role.id}
+                    defaultChecked={checkedIds.includes(role.id)}
+                    label={role.name}
+                  />
+                ))}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
   );
 }
 

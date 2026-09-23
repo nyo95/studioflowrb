@@ -5,8 +5,55 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.114**
-- Next local revision: **R8.115**
+- Current revision after this entry is committed: **R8.115**
+- Next local revision: **R8.116**
+
+## R8.115 | 2026-09-23 | feat(platform): group the New User Roles picker by app, checkboxes instead of a native multi-select
+
+Owner request, from the Create User dialog itself: the Roles field was a
+native `<select multiple>` (a cramped scrolling box, no grouping, no visible
+checked state without scrolling to it). Owner: *"roles ui nya dibuat pakai
+checkbox (bentuk matrix by app dan nama role nya) agar lebih user friendly"*.
+
+Investigated two different screens before touching anything, since they sit
+at different levels: **Users → Create** assigns *Roles* (named bundles,
+e.g. "Platform Owner") to a user; **Roles & Access → Permissions** assigns
+*Permissions* (`app.resource.action`, ~39 of them across 4 apps) to a role.
+A Role is not 1:1 with an app — "Platform Owner" spans several — so an
+app × role matrix would leave most cells meaningless there; a true
+app-grouped grid fits the *Permissions* screen instead, where IDs already
+decompose that way. Scoped this pass to the Users screen (confirmed with the
+owner); the Roles & Access permissions list stays flat for a follow-up.
+
+- `platformAccess.listAssignableRoles` now returns each role's granted
+  `permissionIds`, not just id/code/name.
+- New `role-grouping.ts`: `appGroupOf` derives a role's group from what it
+  **actually grants** — the permission IDs' `app.…` prefix against the
+  registered app list — never from the role's name text. A role holding
+  permissions in more than one app groups under "Multiple apps" rather than
+  being force-fit into one; a role with no grants yet reads "No permissions
+  yet" instead of silently vanishing from every group.
+- Create User's Roles field is now a checkbox list grouped under those app
+  headings (Platform first, then each registered app in registry order,
+  then Multiple apps, then ungranted), with a search box once there are more
+  than 6 roles to page through.
+- Existing users' role assignment (`RoleAssignControl`, the per-row
+  dropdown + remove-chip control) was already a reasonable pattern and is
+  unchanged — only the Create dialog had the native multi-select.
+
+Verification: `tsc`, `eslint`, `check:boundaries`, `check:legacy-runtime`,
+`npm test` (482 passed — 8 new unit tests for the grouping logic plus 1 new
+integration test proving `listAssignableRoles` returns `permissionIds`) all
+clean. Browser-verified: opened Create User, confirmed "SF-RF Owner
+Acceptance" sits under **Multiple apps** rather than StudioFlow — proof the
+grouping is reading real grants, not pattern-matching the role's "SF-RF"
+name prefix — created a real user by checkbox, confirmed the assigned role
+landed correctly, then disabled the test account.
+
+Note: `page.tsx` already carried an unrelated uncommitted `SettingsShell`/
+`SettingsNavigation` wrapper (part of a broader settings-sidebar rollout)
+when this session started; only this revision's own two edits were staged
+from that file, leaving the wrapper exactly as it was, still uncommitted.
 
 ## R8.114 | 2026-09-23 | feat(masterdata): relate a Brand at Supplier creation (amends the R5.05 Brand-only-mutation rule)
 

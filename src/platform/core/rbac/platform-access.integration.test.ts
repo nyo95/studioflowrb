@@ -274,6 +274,28 @@ describe("role commands and grants", () => {
     );
   });
 
+  it("lists assignable roles with their granted permission IDs (Users' role picker groups by these, not by role name)", async () => {
+    await service.createRole({
+      grants: ["platform.role.manage"],
+      actor: ACTOR,
+      code: "grouping-check",
+      name: "Grouping Check",
+      permissionIds: ["masterdata.access", "masterdata.price.read"],
+    });
+    const noGrantsRole = await service.createRole({
+      grants: ["platform.role.manage"],
+      actor: ACTOR,
+      code: "grouping-check-empty",
+      name: "Grouping Check Empty",
+      permissionIds: [],
+    });
+    const assignable = await service.listAssignableRoles({ grants: ["platform.user.read"] });
+    const found = assignable.find((role) => role.code === "grouping-check");
+    assert.deepEqual(found?.permissionIds.slice().sort(), ["masterdata.access", "masterdata.price.read"]);
+    const empty = assignable.find((role) => role.id === noGrantsRole.roleId);
+    assert.deepEqual(empty?.permissionIds, []);
+  });
+
   it("refuses archiving system roles and roles with active assignments", async () => {
     const { role } = await seedAdmin("archive-admin@example.com", "Archive Admin");
     await assert.rejects(

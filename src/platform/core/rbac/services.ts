@@ -362,15 +362,26 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
       };
     },
 
-    /** List of assignable (live, non-system-any) roles for the user editor. */
+    /**
+     * List of assignable (live, non-system-any) roles for the user editor.
+     * Includes each role's granted permission IDs so the caller can group
+     * roles by the app(s) they actually grant access to (a Role is not
+     * inherently scoped to one app — e.g. "Platform Owner" spans several —
+     * so this is derived from real grants, not guessed from the role name).
+     */
     async listAssignableRoles(input: { grants: PermissionGrants }) {
       requirePermission(input.grants, "platform.user.read");
       const rows = await db.role.findMany({
         where: { archived_at: null },
-        select: { id: true, code: true, name: true },
+        select: { id: true, code: true, name: true, role_permissions: { select: { permission_id: true } } },
         orderBy: { code: "asc" },
       });
-      return rows;
+      return rows.map((row) => ({
+        id: row.id,
+        code: row.code,
+        name: row.name,
+        permissionIds: row.role_permissions.map((grant) => grant.permission_id),
+      }));
     },
 
     // ── User commands ────────────────────────────────────────────────────

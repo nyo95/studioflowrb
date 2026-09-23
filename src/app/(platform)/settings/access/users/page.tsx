@@ -3,8 +3,10 @@ import { redirect } from "next/navigation";
 import { ErrorState, PageHeader, PageShell, SectionCard } from "@/platform/ui_engine";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasAllPermissions } from "@platform/core/rbac";
+import { getPermissionRegistry } from "@platform/core/rbac/registry";
 import { toSafeErrorPayload, type SafeErrorPayload } from "@platform/core/errors";
 import { platformAccess } from "@platform/runtime";
+import { groupAndOrderRoles } from "./role-grouping";
 import { UsersDirectory } from "./users-directory";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +52,7 @@ export default async function UsersPage() {
       ) : (
         <UsersDirectory
           users={directory.users}
-          roles={roles}
+          roles={groupAndOrderRoles(roles, getPermissionRegistry())}
           canManage={grants.includes("platform.user.manage")}
           canAssignRoles={grants.includes("platform.role.manage")}
         />
