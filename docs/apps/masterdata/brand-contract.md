@@ -4,6 +4,13 @@
 > catalog and external product resources. `BrandSupplier` is edited only from
 > Brand; the Supplier route presents the relationship read-only. UI says
 > **Supplier**, while the persisted and route vocabulary remains `Vendor`.
+>
+> **R8.114 owner amendment — 2026-09-23 (narrows the rule above).** *Editing*
+> an existing relation is still Brand-only. The Supplier **Create** dialog may
+> now set an optional initial `BrandSupplier` relation for existing Brands at
+> creation time (no inline Brand creation from that field) — see
+> `vendor-contract.md`'s own R8.114 note for the full rule and the capability
+> guard it shares with this screen's Suppliers field.
 
 Status: **OWNER-APPROVED LOGIC CONTRACT — not yet an executable work order**
 

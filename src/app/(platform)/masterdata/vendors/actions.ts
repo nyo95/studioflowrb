@@ -25,6 +25,7 @@ const VendorInputSchema = z.object({
   notes: z.string().max(1000).optional().nullable().or(z.literal("")),
   vendorTypeIds: z.array(z.string().uuid()).optional(),
   supplierCategoryIds: z.array(z.string().uuid()).optional(),
+  brandIds: z.array(z.string().uuid()).optional(),
   contacts: z.array(z.object({
     id: z.string().uuid().optional(),
     personName: z.string().min(1, "Contact name is required"),
@@ -61,6 +62,7 @@ export async function createVendorAction(
 
     const vendorTypeIds = formData.getAll("vendorTypeIds").map(String).filter(Boolean);
     const supplierCategoryIds = formData.getAll("supplierCategoryIds").map(String).filter(Boolean);
+    const brandIds = formData.getAll("brandIds").map(String).filter(Boolean);
 
     const parsed = VendorInputSchema.safeParse({
       name: String(formData.get("name") ?? ""),
@@ -69,6 +71,7 @@ export async function createVendorAction(
       notes: formData.get("notes") ? String(formData.get("notes")) : null,
       vendorTypeIds,
       supplierCategoryIds,
+      brandIds,
       contacts,
     });
     if (!parsed.success) throw validationError(parsed.error);
@@ -82,6 +85,7 @@ export async function createVendorAction(
       notes: parsed.data.notes || undefined,
       vendorTypeIds: parsed.data.vendorTypeIds,
       supplierCategoryIds: parsed.data.supplierCategoryIds,
+      brandIds: parsed.data.brandIds,
       contacts: parsed.data.contacts?.map((c) => ({
         personName: c.personName,
         jobTitle: c.jobTitle || undefined,

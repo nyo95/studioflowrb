@@ -78,7 +78,7 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
       });
     },
 
-    async createVendor(input: { grants: PermissionGrants; actor: AuditActor; name: string; legalName?: string; address?: string; notes?: string; vendorTypeIds?: string[]; supplierCategoryIds?: string[]; contacts?: Array<{ personName: string; jobTitle?: string; email?: string; phone?: string; isPrimary?: boolean; notes?: string; brandId?: string }> }) {
+    async createVendor(input: { grants: PermissionGrants; actor: AuditActor; name: string; legalName?: string; address?: string; notes?: string; vendorTypeIds?: string[]; supplierCategoryIds?: string[]; brandIds?: string[]; contacts?: Array<{ personName: string; jobTitle?: string; email?: string; phone?: string; isPrimary?: boolean; notes?: string; brandId?: string }> }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
       actorIsUsable(input.actor);
       const name = requiredName(input.name, "VENDOR_NAME_REQUIRED");
@@ -97,6 +97,18 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
           if (supplierCategories.length !== new Set(input.supplierCategoryIds).size) throw new AppError("VALIDATION", "SUPPLIER_CATEGORY_INVALID", "Every selected Supplier Category must be active.");
           await tx.vendorSupplierCategory.createMany({ data: input.supplierCategoryIds.map((supplierCategoryId) => ({ id: randomUUID(), vendor_id: vendorId, supplier_category_id: supplierCategoryId })) });
         }
+        // Brand relation is optional at creation — most suppliers are added
+        // before anyone has decided which Brand they carry. Same constraint
+        // as Brand's own Suppliers field (brand.service.ts createBrand): a
+        // Vendor must already be material-capable to be recorded as a
+        // Brand's supplier, or it would be invisible to every price picker.
+        if (input.brandIds && input.brandIds.length > 0) {
+          const uniqueBrandIds = [...new Set(input.brandIds)];
+          const brands = await tx.brand.findMany({ where: { id: { in: uniqueBrandIds }, deleted_at: null }, select: { id: true } });
+          if (brands.length !== uniqueBrandIds.length) throw new AppError("VALIDATION", "BRAND_INVALID", "Every selected Brand must be active.");
+          await assertVendorMaterialCapable(tx, vendorId);
+          await tx.brandSupplier.createMany({ data: uniqueBrandIds.map((brandId) => ({ id: randomUUID(), brand_id: brandId, vendor_id: vendorId, is_authorized: false, notes: null })) });
+        }
         if (input.contacts && input.contacts.length > 0) {
           for (const c of input.contacts) {
             if (c.brandId) {
@@ -108,7 +120,7 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
             await tx.vendorContact.create({ data: { id: randomUUID(), vendor_id: vendorId, person_name: requiredName(c.personName, "CONTACT_NAME_REQUIRED"), job_title: c.jobTitle?.trim() || null, email: c.email?.trim() || null, phone: c.phone?.trim() || null, is_primary: c.isPrimary ?? false, notes: c.notes?.trim() || null, brand_id: c.brandId || null } });
           }
         }
-        await writeAudit(ports, tx, { action: "vendor.created", entityType: "vendor", entityId: vendorId, actor: input.actor, metadata: { slug } });
+        await writeAudit(ports, tx, { action: "vendor.created", entityType: "vendor", entityId: vendorId, actor: input.actor, metadata: { slug, brand_ids: input.brandIds ?? [] } });
         return { vendorId };
       });
     },

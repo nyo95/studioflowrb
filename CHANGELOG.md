@@ -5,8 +5,46 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.113**
-- Next local revision: **R8.114**
+- Current revision after this entry is committed: **R8.114**
+- Next local revision: **R8.115**
+
+## R8.114 | 2026-09-23 | feat(masterdata): relate a Brand at Supplier creation (amends the R5.05 Brand-only-mutation rule)
+
+Owner request, prompted by the Create Supplier dialog itself: *"bisa ga di
+permudah uiux nya utk menambahkan relasi 'brand' saat buat supplier. kalau
+sudah tau brandnya [pilih], kalau belum tau ya input aja juga gpp (opsional),
+nanti tetep bisa di edit kan"*.
+
+**This amends a locked decision (flagged and confirmed with the owner before
+committing).** `vendor-contract.md`/`brand-contract.md`'s R5.05 amendment and
+Locked Decision Q9 state `BrandSupplier` mutation is Brand-only; the Vendor
+Create dialog's field list didn't include brand relations at all. The
+amendment is narrow: **only Create gains the field; Edit's "Brand Suppliers"
+tab stays exactly as documented — read-only, "managed from the Brand
+workflow".** Ongoing changes to the relation still only happen from Brand;
+this just lets it be set once, optionally, in the same step as creating the
+Supplier, instead of never at Supplier-creation time at all.
+
+- **`vendor.service.ts` `createVendor`** gains `brandIds?: string[]`, written
+  after `VendorType` assignment (so material capability can be checked) and
+  before contacts (so a brand-scoped contact can validate against a
+  same-transaction relation — previously impossible for a brand-new Vendor).
+  Same guard as Brand's own Suppliers field: `assertVendorMaterialCapable`
+  before any `BrandSupplier` row is created; every Brand id must be live.
+- **Create Supplier dialog** gains "Brands supplied" — `CreatableMultiSelect`
+  over the existing Brand list, no inline Brand creation. Disabled with an
+  explanatory description until the draft has at least one material-capable
+  Supplier type selected; a selection made and then invalidated (last
+  material-capable type removed) is cleared automatically rather than left to
+  fail silently on submit.
+- Audit: `vendor.created` metadata now includes `brand_ids`.
+
+Verification: `tsc`, `eslint`, `check:boundaries`, `check:legacy-runtime`,
+`npm test` (473 passed, including a new integration test covering the happy
+path, the missing-capability rejection, an archived-Brand rejection, and that
+`brandIds` stays fully optional) all clean. Browser-verified end to end:
+created a Brand, created a Supplier with it checked, confirmed the Brand's
+own Suppliers count incremented — then archived both test records.
 
 ## R8.113 | 2026-09-23 | feat(sf): Brand as one creatable search, Type in the checklist, Qty fixture-only, WYSIWYG Notes
 

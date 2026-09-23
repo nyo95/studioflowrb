@@ -10,6 +10,18 @@
 > catalog. Existing purged data cannot be reconstructed without a rebuild backup.
 > `BrandSupplier` remains, but mutation is owned only by Brand; Supplier displays
 > supplied Brands as an explicit read-only projection.
+>
+> **R8.114 owner amendment — 2026-09-23 (narrows the R5.05 rule above).**
+> Ongoing mutation is still Brand-only — the Edit dialog's Brand Suppliers tab
+> stays read-only, unchanged. The one exception: the **Create** dialog gains
+> an optional "Brands supplied" field (`CreatableMultiSelect`, existing Brands
+> only, no inline Brand creation), because most suppliers are added before
+> anyone has decided which Brand they carry, and there was previously no way
+> to record that relation in the same step at all — not even once. Same
+> capability guard as Brand's own Suppliers field: disabled until the new
+> Vendor has at least one material-capable Supplier Type
+> (`assertVendorMaterialCapable`), since an ineligible relation would be
+> invisible to every price picker. See `vendor.service.ts` `createVendor`.
 
 Status: **OWNER-APPROVED LOGIC CONTRACT — not yet an executable work order**
 
@@ -391,7 +403,7 @@ Quick entry validates:
 
 **Pattern:** Same as Brand — popup modal.
 
-**Create dialog** — single form, no tabs: Vendor trade name (required), Legal entity name, Vendor types, Address, Notes, and an optional Contacts section (same fields as the edit dialog's Contacts tab: name, job title, phone, email, brand scope, primary toggle) so a vendor can be created with its first contacts in one step. Links are still added after creation via the edit dialog.
+**Create dialog** — single form, no tabs: Vendor trade name (required), Legal entity name, Vendor types, **Brands supplied** (optional, R8.114 — §"BrandSupplier relations" below), Supplier categories, Address, Notes, and an optional Contacts section (same fields as the edit dialog's Contacts tab: name, job title, phone, email, brand scope, primary toggle) so a vendor can be created with its first contacts in one step. Links are still added after creation via the edit dialog.
 
 **Edit dialog — Tabs (3 + read-only Brand Suppliers view):**
 
@@ -401,8 +413,10 @@ Quick entry validates:
 4. **Brand Suppliers** (read-only, edit dialog only) — Displays BrandSupplier relationships for visibility. Management of these relations belongs to the Brand workflow.
 
 BrandSupplier relations are managed from the Brand workflow, not from Vendor
-create/edit. The Vendor form must not silently replace those relations when it
-saves profile, contact, or link changes.
+edit (R8.114 narrows this to *edit*: the Create dialog may add relations at
+creation, per the R8.114 amendment above, but never removes or replaces one
+that already exists). The Vendor form must not silently replace those
+relations when it saves profile, contact, or link changes.
 
 **No Prices tab** — prices are managed from the SKU/Work side, not from Vendor detail.
 
@@ -540,7 +554,7 @@ them.
 | Q6 | UI label | Suppliers & Vendors |
 | Q7 | ORGANIZATION/INDIVIDUAL distinction | Removed |
 | Q8 | Contact structure | Retained as-is (renamed to VendorContact) |
-| Q9 | Brand relations | Both owner + BrandSupplier retained |
+| Q9 | Brand relations | Both owner + BrandSupplier retained; BrandSupplier mutation is Brand-only for editing, plus an optional relation at Vendor creation (R8.114) |
 | Q10 | Lifecycle | Same pattern as Brand — independent root with provenance-safe cascade archive/restore |
 | Q11 | Archive impact on prices | **Cascade** — prices terikat ikut archived |
 | Q12 | VendorLink structure | Purged — replaced by `Vendor.info_links` JSON (R6.20) |

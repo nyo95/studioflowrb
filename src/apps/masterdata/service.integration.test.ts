@@ -99,6 +99,52 @@ describe("Master Data service", () => {
     assert.deepEqual(refs.materialVendors.map((vendor) => vendor.id), [materialSupplier.vendorId]);
   });
 
+  it("relates a new Vendor to Brands at creation, requiring material capability first", async () => {
+    const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    const brandA = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Dulux" });
+    const brandB = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Nippon" });
+
+    // No Supplier Type at all — brandIds must be refused, not silently dropped.
+    await assert.rejects(
+      service.createVendor({ grants: GRANTS, actor: ACTOR, name: "No Type Yet", brandIds: [brandA.brandId] }),
+      (error: unknown) => error instanceof AppError && error.code === "VENDOR_NOT_MATERIAL_CAPABLE",
+    );
+
+    // A Supplier Type that cannot supply material is the same as none for this purpose.
+    const laborOnlyType = await testDb.prisma.vendorType.create({
+      data: { id: crypto.randomUUID(), code: "LABOR_ONLY_TEST", name: "Labor Only", can_supply_material: false, can_supply_labor: true },
+    });
+    await assert.rejects(
+      service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Labor Only Vendor", vendorTypeIds: [laborOnlyType.id], brandIds: [brandA.brandId] }),
+      (error: unknown) => error instanceof AppError && error.code === "VENDOR_NOT_MATERIAL_CAPABLE",
+    );
+
+    // Same request, but with a material-capable type included this time: succeeds,
+    // and both Brands are related in one creation — no separate step needed.
+    const vendor = await service.createVendor({
+      grants: GRANTS,
+      actor: ACTOR,
+      name: "Mitra Kayu Nusantara",
+      vendorTypeIds: [supplierType.id],
+      brandIds: [brandA.brandId, brandB.brandId],
+    });
+    const relations = await testDb.prisma.brandSupplier.findMany({ where: { vendor_id: vendor.vendorId }, select: { brand_id: true, is_authorized: true } });
+    assert.deepEqual(relations.map((r) => r.brand_id).sort(), [brandA.brandId, brandB.brandId].sort());
+    assert.equal(relations.every((r) => r.is_authorized === false), true);
+
+    // brandIds is genuinely optional — omitting it entirely still creates the Vendor.
+    const bare = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Brand Unknown Yet" });
+    assert.equal((await testDb.prisma.brandSupplier.count({ where: { vendor_id: bare.vendorId } })), 0);
+
+    // An archived Brand cannot be related, even with material capability.
+    const doomedBrand = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Discontinued Brand" });
+    await service.archiveBrand({ grants: GRANTS, actor: ACTOR, brandId: doomedBrand.brandId });
+    await assert.rejects(
+      service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Yet Another Vendor", vendorTypeIds: [supplierType.id], brandIds: [doomedBrand.brandId] }),
+      (error: unknown) => error instanceof AppError && error.code === "BRAND_INVALID",
+    );
+  });
+
   it("offers canonical promotion choices and rejects wrong-type, archived, or unauthorized selections", async () => {
     const context = await createMaterialContext();
     const { skuId } = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Promotion SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "120", currency: "IDR" }] });

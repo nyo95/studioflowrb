@@ -256,6 +256,11 @@ export function VendorDirectory({
   const [editVendorTypeIds, setEditVendorTypeIds] = useState<string[]>([]);
   const [createSupplierCategoryIds, setCreateSupplierCategoryIds] = useState<string[]>([]);
   const [editSupplierCategoryIds, setEditSupplierCategoryIds] = useState<string[]>([]);
+  // Optional at creation — most suppliers are added before anyone has decided
+  // which Brand they carry (owner: "kalau belum tau brandnya, input aja juga
+  // gpp"). The relation stays editable later from each Brand's own screen,
+  // same as it already is today.
+  const [createBrandIds, setCreateBrandIds] = useState<string[]>([]);
   // Staged link state — committed atomically with vendor profile on Save
   const [stagedLinks, setStagedLinks] = useState<LinkEntry[]>([]);
   const [stagedSnapshot, setStagedSnapshot] = useState<LinkEntry[]>([]);
@@ -279,7 +284,7 @@ export function VendorDirectory({
     formRef: createFormRef,
     resetKey: createDraftKey,
     active: createOpen,
-    watchedValue: JSON.stringify([createVendorTypeIds, createSupplierCategoryIds, contactsList]),
+    watchedValue: JSON.stringify([createVendorTypeIds, createSupplierCategoryIds, createBrandIds, contactsList]),
     title: "Discard supplier draft?",
     description: "Your changes are only in this browser and have not been saved.",
   });
@@ -368,10 +373,20 @@ export function VendorDirectory({
     return option.id;
   };
 
+  // Mirrors brand.service.ts's assertVendorMaterialCapable: a Brand relation
+  // can only be recorded once the Vendor is actually material-capable, so the
+  // field is disabled (not just server-validated) until that's true.
+  const createCanSupplyMaterial = createVendorTypeIds.some((id) => vendorTypes.find((type) => type.id === id)?.can_supply_material);
+  // Adjust state during render rather than in an effect: dropping the last
+  // material-capable type clears a selection that would otherwise fail on
+  // submit with no visible reason why.
+  if (!createCanSupplyMaterial && createBrandIds.length > 0) setCreateBrandIds([]);
+
   const openCreateDialog = () => {
     setContactsList([]);
     setCreateVendorTypeIds([]);
     setCreateSupplierCategoryIds([]);
+    setCreateBrandIds([]);
     setCreateNameWarning(null);
     setCreateDraftKey((key) => key + 1);
     setCreateOpen(true);
@@ -578,6 +593,7 @@ export function VendorDirectory({
         >
           {createVendorTypeIds.map((id) => <input key={id} type="hidden" name="vendorTypeIds" value={id} />)}
           {createSupplierCategoryIds.map((id) => <input key={id} type="hidden" name="supplierCategoryIds" value={id} />)}
+          {createBrandIds.map((id) => <input key={id} type="hidden" name="brandIds" value={id} />)}
           {createError ? <InlineError>{createError}</InlineError> : null}
 
           <Field label="Supplier name" required>
@@ -591,6 +607,24 @@ export function VendorDirectory({
           </Field>
           <Field label="Supplier types" description="Search the controlled type vocabulary; assign role dimensions to grant pricing capabilities.">
             <CreatableMultiSelect label="Supplier types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={createVendorTypeIds} onValueChange={setCreateVendorTypeIds} placeholder="Search supplier types" searchPlaceholder="Search supplier types…" />
+          </Field>
+          <Field
+            label="Brands supplied"
+            description={
+              createCanSupplyMaterial
+                ? "Optional. Leave it blank if you don't know yet — it can be set or changed later from each Brand."
+                : "Optional — needs a material-capable Supplier type above first (e.g. Material or Material & Labor)."
+            }
+          >
+            <CreatableMultiSelect
+              label="Brands supplied"
+              options={brands.map((brand) => ({ id: brand.id, label: brand.name }))}
+              value={createBrandIds}
+              onValueChange={setCreateBrandIds}
+              placeholder="Search brands"
+              searchPlaceholder="Search brands…"
+              disabled={!createCanSupplyMaterial}
+            />
           </Field>
           <Field label="Supplier categories" description="Classification labels such as fabric supplier or hardware supplier. A supplier may have more than one; a missing category is created and added for you.">
             <CreatableMultiSelect label="Supplier categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name, description: category.code }))} value={createSupplierCategoryIds} onValueChange={setCreateSupplierCategoryIds} onCreate={canManageCategories ? (name) => createSupplierCategory(name, setCreateError) : undefined} createLabel={(name) => `Create supplier category "${name}"`} placeholder="Search supplier categories" searchPlaceholder="Search supplier categories…" />
