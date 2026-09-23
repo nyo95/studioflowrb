@@ -5,8 +5,26 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.125**
-- Next local revision: **R8.126**
+- Current revision after this entry is committed: **R8.126**
+- Next local revision: **R8.127**
+
+## R8.126 | 2026-09-23 | docs(agent): record dev-DB migration discipline as a harness rule
+
+Owner-scoped: after pulling R8.109–R8.125 (16 commits, 4 new migrations),
+`prisma migrate deploy` was only run against `masterdata_test` — `next dev`
+then threw `ColumnNotFound`/P2022 on `sf_project.timeline_start_date` against
+the local dev DB (`masterdata`) even though `npm run check` and `npm test`
+were both green, since the two databases are migrated independently.
+
+- `docs/agent/README.md`: new "Local database sync after new migrations"
+  section — after a pull/rebase/cherry-pick or any local migration addition,
+  migrate every local database the session uses (dev `masterdata` and test
+  `masterdata_test`), not just whichever one the immediate task needed;
+  regenerate the Prisma client and restart `next dev` afterward. Framed as a
+  harness rule for any agent/model running this checkout, not a
+  StudioFlow-specific note.
+- No app code changed; `masterdata` (dev, localhost:5433) was migrated
+  locally as part of diagnosing this while verifying the R8.125 pull.
 
 ## R8.125 | 2026-09-23 | feat(sf): per-project timeline/Gantt bar on the Overview page
 

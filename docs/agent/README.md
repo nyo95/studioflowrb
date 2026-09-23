@@ -89,6 +89,24 @@ not create preparatory placeholder slices. A tiny typo or obvious local repair
 may go directly to Executor, but it still follows repository safety and review
 proportionate to risk.
 
+## Local database sync after new migrations
+
+Each location's isolated rebuild-only PostgreSQL instance holds two independent
+databases: the local dev database (`masterdata`) and the integration-test
+database (`masterdata_test`). Prisma migrations applied to one never reach the
+other. After a `git pull`, rebase, cherry-pick, or any local change that adds
+migration files, migrate **every local database this session actually uses**
+before treating the checkout as caught up — normally that means running
+`prisma migrate deploy` once with the dev URL (from the selected
+`.env.rumah`/`.env.kantor`) and once with the test URL override, not just
+whichever one the immediate task needed. Skipping the dev-DB pass still lets
+`prisma generate` and typecheck succeed, but `next dev` throws
+`ColumnNotFound`/`P2022` on the first query touching a new column even though
+the test suite is green — the two checks do not cover each other. Regenerate
+the Prisma client and restart `next dev` afterward so the running server picks
+up both the new client and the new columns. This applies to any agent/model
+running this harness, not just the one that authored the migration.
+
 ## Revision and commit protocol
 
 The published baseline is `R<N>`. Each local change increments its ordinal as
