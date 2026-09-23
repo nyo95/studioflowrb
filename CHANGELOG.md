@@ -5,8 +5,38 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.127**
-- Next local revision: **R8.128**
+- Current revision after this entry is committed: **R8.128**
+- Next local revision: **R8.129**
+
+## R8.128 | 2026-09-23 | docs(backlog): record 7 verified logic-audit findings; de-scope allow_parallel
+
+Owner-scoped (pasted audit findings, 2026-09-23): docs-only pass over
+`docs/BACKLOG.md`, no code changes. Every referenced symbol was re-verified
+against current source before being recorded (`sku.service.ts:updateSku()`/
+`restoreSku()`, `source-actions.ts:listLineItemSourcesAction()`,
+`assemblies.ts:deleteAssemblyLine()` — confirmed `entityId:
+line.assembly_template_id` at line 65 instead of `line.id`,
+`projects/service.ts:archiveProject()`, `application/promotion-coordinator.ts`).
+
+- Master Data: added `[BUG]` entries for SKU Brand change invalidating
+  `PriceMaterial.source_link` provenance, SKU restore reaching LIVE with zero
+  live `PriceMaterial`, and archived SKU/Work/Price rows still allowing
+  relationship-field edits (`brand_id`/`vendor_id`).
+- BQ: added `[BUG]` entries for the BQ source-picker server action missing
+  its own `bq.access`/`bq.project.read` authorization check, the cross-app
+  promotion-approval TOCTOU window in `promotion-coordinator.ts` (flagged as
+  cross-app consistency debt, not an isolated BQ bug — no FK design change),
+  and Assembly Line delete recording the wrong audit `entityId`.
+- StudioFlow: added a `[BUG]` entry for `archiveProject()` not purging
+  `STORED` file assets, which conflicts with the already-resolved owner
+  decision recorded in the "Decision gates" section; linked to
+  `PLATFORM-ASSET-STORAGE-ROADMAP.md`.
+- Removed the `[BUG][P3] sf_phase_definition.allow_parallel` entry: owner
+  decision is that phases may run in parallel and `true` for Supervision is
+  intentional product behavior, not a defect. Recorded as a third bullet
+  under "Decision gates — resolved 2026-09-23" instead.
+- KB-020 (office migration-provenance bug) left unchanged.
+- Checks: none run (documentation-only change, no source edited).
 
 ## R8.127 | 2026-09-23 | feat(sf): portfolio Timeline page + per-phase planned dates
 
