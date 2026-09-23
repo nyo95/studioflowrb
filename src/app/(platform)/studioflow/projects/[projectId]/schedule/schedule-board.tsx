@@ -1,16 +1,21 @@
 "use client";
 
-import { ArrowDown, ArrowUp, FileUp, History, ImageIcon, Plus, Search, Settings2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, FileUp, History, ImageIcon, Plus, Search, Settings2 } from "lucide-react";
 import Link from "next/link";
-import { Popover } from "radix-ui";
-import { useCallback, useMemo, useState, useSyncExternalStore, type DragEvent, type ReactNode } from "react";
+import { useMemo, useState, type DragEvent, type ReactNode } from "react";
 
-import { SCHEDULE_CARD_FIELD_KEYS, type ScheduleCardFieldKey } from "@/apps/studioflow/domain/schedule";
+import {
+  SCHEDULE_CARD_FIELD_KEYS,
+  SCHEDULE_DEFAULT_CARD_FIELDS,
+  extraFieldKey,
+  orderCardFields,
+  type ScheduleCardFieldKey,
+  type ScheduleExtraField,
+} from "@/apps/studioflow/domain/schedule";
 import {
   Badge,
   Button,
   Dialog,
-  Drawer,
   EmptyState,
   Field,
   FilterChip,
@@ -44,6 +49,7 @@ import {
   updateScheduleEntryCardFieldsAction,
   updateScheduleOptionAction,
 } from "../../../actions";
+import { ExtraFieldsEditor } from "../../../_components/extra-fields-editor";
 import { useCommand } from "../../../_components/use-command";
 
 type Section = "MATERIAL" | "FIXTURE";
@@ -57,12 +63,13 @@ export type ScheduleOptionView = {
   brandId: string | null;
   brandName: string | null;
   productName: string;
-  skuText: string | null;
   color: string | null;
   pattern: string | null;
   finishing: string | null;
   dimension: string | null;
   notes: string | null;
+  /** Free-form spec lines beyond the typed columns. */
+  extra: ScheduleExtraField[];
   /** Short-lived signed URL of the option photo. */
   imageUrl: string | null;
 };
@@ -75,7 +82,8 @@ export type ScheduleEntryView = {
   qty: string | null;
   unit: string | null;
   location: string | null;
-  cardFields: string[];
+  /** null = no override; the card renders SCHEDULE_DEFAULT_CARD_FIELDS. */
+  cardFields: string[] | null;
   options: ScheduleOptionView[];
 };
 
@@ -85,7 +93,6 @@ type ReuseHit = {
   category: string;
   brandName: string | null;
   productName: string;
-  skuText: string | null;
   color: string | null;
   pattern: string | null;
   finishing: string | null;
@@ -102,12 +109,21 @@ const STATUS_LABEL: Record<string, { label: string; tone: "success" | "neutral" 
 
 type Command = ReturnType<typeof useCommand>;
 
-function specLine(option: Pick<ScheduleOptionView, "skuText" | "color" | "pattern" | "finishing" | "dimension">) {
-  return [option.skuText, option.color, option.pattern, option.finishing, option.dimension].filter(Boolean).join(" · ");
+function specLine(option: Pick<ScheduleOptionView, "color" | "pattern" | "finishing" | "dimension">) {
+  return [option.color, option.pattern, option.finishing, option.dimension].filter(Boolean).join(" · ");
 }
 
 function finalOf(entry: ScheduleEntryView) {
   return entry.options.find((option) => option.isFinal) ?? null;
+}
+
+/**
+ * The option a card speaks for: the final one, else the first. Legacy fell back
+ * the same way (`selectedCatalogOption`), so a row with one unapproved option
+ * still shows its product instead of reading as empty.
+ */
+function shownOptionOf(entry: ScheduleEntryView) {
+  return finalOf(entry) ?? entry.options[0] ?? null;
 }
 
 /** The option a template would be made from: the final one, or the only one. */
@@ -172,95 +188,62 @@ function SchedulePhotoDialog({
   );
 }
 
+/**
+ * One label per field, used on the card and in the edit form alike. Type is the
+ * product designation ("Nude Pro - ATS 1132 M"): it is the card's title, always
+ * shown, so it is not in this list.
+ */
 const CARD_FIELD_LABEL: Record<ScheduleCardFieldKey, string> = {
   brand: "Brand",
-  sku: "Item No",
   color: "Color",
   pattern: "Pattern",
   finishing: "Finishing",
   dimension: "Size",
   location: "Location",
   qty: "Qty",
+  notes: "Notes",
 };
 
-/**
- * Which fields show as captions on a board card. `entry.cardFields` empty
- * means "no override, show everything populated" (today's behavior and the
- * default here too); a non-empty list is an explicit, ordered choice.
- * Matches legacy's per-card "Card fields" popover and its "Use project
- * default" reset.
- */
-function effectiveCardFields(entry: Pick<ScheduleEntryView, "cardFields">): ScheduleCardFieldKey[] {
-  return entry.cardFields.length > 0 ? (entry.cardFields as ScheduleCardFieldKey[]) : [...SCHEDULE_CARD_FIELD_KEYS];
+/** The simple single-input option fields in the checklist; Brand and Notes get their own row shape. */
+const SIMPLE_OPTION_FIELD_KEYS = ["color", "pattern", "finishing", "dimension"] as const;
+
+/** The free-form spec lines a card can caption, in the order they sit on the option. */
+function extraChoicesOf(entry: ScheduleEntryView): Array<{ key: string; label: string }> {
+  const shown = shownOptionOf(entry);
+  return (shown?.extra ?? []).map((field) => ({ key: extraFieldKey(field.label), label: field.label }));
 }
 
-function CardFieldsMenu({ projectId, entry, command }: { projectId: string; entry: ScheduleEntryView; command: Command }) {
-  const [open, setOpen] = useState(false);
-  const key = `${entry.id}-card-fields`;
-  const pending = command.isPending(key);
-  const effective = effectiveCardFields(entry);
+function cardFieldLabel(key: string, extras: ReadonlyArray<{ key: string; label: string }>): string {
+  return CARD_FIELD_LABEL[key as ScheduleCardFieldKey] ?? extras.find((extra) => extra.key === key)?.label ?? key;
+}
 
-  const save = (fields: readonly string[]) =>
-    void command.run(key, () => updateScheduleEntryCardFieldsAction({ projectId, entryId: entry.id, fields: [...fields] }));
+/**
+ * Which fields caption a board card. `cardFields === null` means "no override"
+ * and renders the default set plus every extra spec line the option carries;
+ * an array is an explicit, ordered choice and may legitimately be empty.
+ * Matches legacy's null-vs-list `catalog_fields` and its "Use project default".
+ */
+function effectiveCardFields(entry: ScheduleEntryView): string[] {
+  const extras = extraChoicesOf(entry);
+  if (entry.cardFields !== null) return orderCardFields(entry.cardFields, extras.map((extra) => extra.key));
+  return orderCardFields([...SCHEDULE_DEFAULT_CARD_FIELDS, ...extras.map((extra) => extra.key)], extras.map((extra) => extra.key));
+}
 
-  const toggle = (field: ScheduleCardFieldKey) => {
-    const isChecked = effective.includes(field);
-    // Unchecking the last field would produce `[]`, which is the "no override" sentinel —
-    // that would silently show every field again instead of none. Keep at least one checked;
-    // "Use default" below is the sanctioned way back to the empty/override-cleared state.
-    if (isChecked && effective.length === 1) return;
-    const next = isChecked ? effective.filter((f) => f !== field) : [...effective, field];
-    save(next);
+/** The current display value for each selectable card field — what the board card itself renders. */
+function cardFieldValuesOf(entry: ScheduleEntryView): Record<string, string | null | undefined> {
+  const shown = shownOptionOf(entry);
+  const quantity = entry.qty ? `${entry.qty}${entry.unit ? ` ${entry.unit}` : ""}` : null;
+  return {
+    brand: shown?.brandName,
+    color: shown?.color,
+    pattern: shown?.pattern,
+    finishing: shown?.finishing,
+    dimension: shown?.dimension,
+    location: entry.location,
+    qty: quantity,
+    notes: shown?.notes,
+    ...Object.fromEntries((shown?.extra ?? []).map((field) => [extraFieldKey(field.label), field.value])),
   };
-
-  return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger asChild>
-        {/* A card's whole face is already a <button> (opens the entry panel); this must not be
-            a nested <button> — invalid HTML that breaks hydration. A span with role="button"
-            gives the same semantics and keyboard support without nesting interactive elements. */}
-        <span
-          role="button"
-          tabIndex={0}
-          onClick={(event) => event.stopPropagation()}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              event.stopPropagation();
-              setOpen((current) => !current);
-            }
-          }}
-          aria-label={`Choose fields for ${entry.code}`}
-          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-action bg-surface/90 text-ink-secondary opacity-0 transition-opacity hover:bg-surface hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
-        >
-          <Settings2 size={13} aria-hidden="true" />
-        </span>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          align="end"
-          sideOffset={6}
-          onClick={(event) => event.stopPropagation()}
-          className="z-[65] w-48 rounded-control border border-line bg-surface-raised p-2.5 shadow-elevated"
-        >
-          <p className="mb-1.5 text-label text-ink-tertiary">Card fields</p>
-          <div className="grid gap-1">
-            {SCHEDULE_CARD_FIELD_KEYS.map((fieldKey) => (
-              <label key={fieldKey} className="flex items-center gap-2 rounded-action px-1 py-1 text-sm hover:bg-surface-muted">
-                <input type="checkbox" checked={effective.includes(fieldKey)} disabled={pending} onChange={() => toggle(fieldKey)} />
-                {CARD_FIELD_LABEL[fieldKey]}
-              </label>
-            ))}
-          </div>
-          {entry.cardFields.length > 0 ? (
-            <button type="button" disabled={pending} onClick={() => save([])} className="mt-1.5 text-xs font-medium text-ink-secondary hover:text-ink hover:underline">
-              Use default
-            </button>
-          ) : null}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
-  );
 }
 
 function Thumb({ url, alt, className = "h-14 w-11" }: { url: string | null; alt: string; className?: string }) {
@@ -275,21 +258,6 @@ function Thumb({ url, alt, className = "h-14 w-11" }: { url: string | null; alt:
       )}
     </span>
   );
-}
-
-// ── Responsive hook ───────────────────────────────────────────────────────────
-
-function useIsDesktop() {
-  const subscribe = useCallback(
-    (onChange: () => void) => {
-      const mq = window.matchMedia("(min-width: 768px)");
-      mq.addEventListener("change", onChange);
-      return () => mq.removeEventListener("change", onChange);
-    },
-    [],
-  );
-  const getSnapshot = () => window.matchMedia("(min-width: 768px)").matches;
-  return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }
 
 // ── Drag-reorder state (shared by the board grid and the list rows) ──────────
@@ -344,19 +312,11 @@ function BoardView({
           <div className="grid min-w-0 flex-1 grid-cols-2 items-start gap-x-5 gap-y-8 @2xl:grid-cols-3 @4xl:grid-cols-4">
             {group.rows.map((entry) => {
               const final = finalOf(entry);
-              const quantity = entry.qty ? `${entry.qty}${entry.unit ? ` ${entry.unit}` : ""}` : null;
-              const fieldValue: Record<ScheduleCardFieldKey, string | null | undefined> = {
-                brand: final?.brandName,
-                sku: final?.skuText,
-                color: final?.color,
-                pattern: final?.pattern,
-                finishing: final?.finishing,
-                dimension: final?.dimension,
-                location: entry.location,
-                qty: quantity,
-              };
-              const fieldKeys = effectiveCardFields(entry);
-              const details: Array<[string, string | null | undefined]> = fieldKeys.map((key) => [CARD_FIELD_LABEL[key], fieldValue[key]]);
+              const shown = shownOptionOf(entry);
+              const extras = extraChoicesOf(entry);
+              const fieldValue = cardFieldValuesOf(entry);
+              const details: Array<[string, string | null | undefined]> = effectiveCardFields(entry)
+                .map((key) => [cardFieldLabel(key, extras), fieldValue[key]] as [string, string | null | undefined]);
               const photoTarget = templateSourceOf(entry);
               return (
                 <button
@@ -376,9 +336,9 @@ function BoardView({
                   className={`group grid min-w-0 content-start text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-line-focus ${canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${draggingId === entry.id ? "opacity-40" : ""} ${dragOverId === entry.id && draggingId && draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-2 outline-line-focus" : ""}`}
                 >
                   <span className="relative mb-2.5 block aspect-[4/5] w-full overflow-hidden bg-surface-muted">
-                    {final?.imageUrl ? (
+                    {shown?.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={final.imageUrl} alt={final.productName} className="h-full w-full object-cover transition-opacity group-hover:opacity-90" draggable={false} />
+                      <img src={shown.imageUrl} alt={shown.productName} className="h-full w-full object-cover transition-opacity group-hover:opacity-90" draggable={false} />
                     ) : (
                       <span className="absolute inset-0 grid place-items-center text-micro tracking-[0.18em] text-ink-tertiary">NO IMAGE</span>
                     )}
@@ -404,16 +364,11 @@ function BoardView({
                         </span>
                       </span>
                     ) : null}
-                    {canEdit ? (
-                      <span className="absolute left-2 top-2 z-[1]">
-                        <CardFieldsMenu projectId={projectId} entry={entry} command={command} />
-                      </span>
-                    ) : null}
                   </span>
-                  {final ? (
-                    <span className="font-display text-sm font-semibold uppercase leading-tight text-ink">{final.productName}</span>
+                  {shown ? (
+                    <span className="font-display text-sm font-semibold uppercase leading-tight text-ink">{shown.productName}</span>
                   ) : (
-                    <span className="text-sm italic text-ink-tertiary">{entry.options.length ? "No final option yet" : "Reserved — no product yet"}</span>
+                    <span className="text-sm italic text-ink-tertiary">Reserved — no product yet</span>
                   )}
                   <span className="mt-2 grid">
                     {details.map(([label, value]) => value ? (
@@ -468,7 +423,6 @@ export function ScheduleBoard({
   const command = useCommand();
   const { run, isPending, error } = command;
   const confirm = useConfirm();
-  const isDesktop = useIsDesktop();
   const [section, setSection] = useState<Section>(() => (entries.some((e) => e.section === "MATERIAL") || !entries.length ? "MATERIAL" : "FIXTURE"));
   const [viewMode, setViewMode] = useState<"list" | "board">("board");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -572,7 +526,7 @@ export function ScheduleBoard({
           className="py-10"
         />
       ) : (
-        <div className={`grid ${open && isDesktop ? "md:grid-cols-[1fr_22rem]" : ""}`}>
+        <div className="grid">
           <div className="min-w-0">
             {viewMode === "board" ? (
               <BoardView
@@ -592,7 +546,7 @@ export function ScheduleBoard({
                 <div className="hidden items-center gap-3 border-b border-line px-(--ui-section-px) py-1.5 text-micro uppercase tracking-[0.06em] text-ink-tertiary sm:flex" aria-hidden="true">
                   <span className="w-11 shrink-0" />
                   <span className="w-14 shrink-0">Code</span>
-                  <span className="min-w-0 flex-1">Product</span>
+                  <span className="min-w-0 flex-1">Type</span>
                   <span className="w-28 shrink-0">Location</span>
                   <span className="w-20 shrink-0 text-right">Qty</span>
                   <span className="w-8 shrink-0" />
@@ -605,7 +559,7 @@ export function ScheduleBoard({
                     </div>
                     <ul className="m-0 list-none divide-y divide-line-subtle p-0">
                       {group.rows.map((entry, index) => {
-                        const final = finalOf(entry);
+                        const shown = shownOptionOf(entry);
                         const busy = command.pendingKeys.some((key) => key.startsWith(entry.id));
                         return (
                           <li
@@ -623,19 +577,19 @@ export function ScheduleBoard({
                             className={`flex items-center gap-3 px-(--ui-section-px) py-2.5 ${canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"} ${listDrag.draggingId === entry.id ? "opacity-40" : ""} ${listDrag.dragOverId === entry.id && listDrag.draggingId && listDrag.draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-[-2px] outline-line-focus" : ""}`}
                           >
                             <button type="button" onClick={() => setOpenId(entry.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                              <Thumb url={final?.imageUrl ?? null} alt={final ? final.productName : `${entry.code} has no photo`} />
+                              <Thumb url={shown?.imageUrl ?? null} alt={shown ? shown.productName : `${entry.code} has no photo`} />
                               <span className="w-14 shrink-0 font-ui-mono text-sm font-semibold tabular-nums text-ink">{entry.code}</span>
                               <span className="grid min-w-0 flex-1 gap-0.5">
-                                {final ? (
+                                {shown ? (
                                   <>
                                     <span className="truncate text-sm font-medium text-ink">
-                                      {final.productName}
-                                      {final.brandName ? <span className="font-normal text-ink-secondary"> · ex. {final.brandName}</span> : null}
+                                      {shown.productName}
+                                      {shown.brandName ? <span className="font-normal text-ink-secondary"> · ex. {shown.brandName}</span> : null}
                                     </span>
-                                    {specLine(final) ? <span className="truncate text-xs text-ink-tertiary">{specLine(final)}</span> : null}
+                                    {specLine(shown) ? <span className="truncate text-xs text-ink-tertiary">{specLine(shown)}</span> : null}
                                   </>
                                 ) : (
-                                  <span className="text-sm italic text-ink-tertiary">{entry.options.length ? "No final option yet" : "Reserved — no product yet"}</span>
+                                  <span className="text-sm italic text-ink-tertiary">Reserved — no product yet</span>
                                 )}
                               </span>
                               <span className="hidden w-28 shrink-0 truncate text-sm text-ink-secondary sm:block">{entry.location ?? ""}</span>
@@ -669,44 +623,11 @@ export function ScheduleBoard({
               </div>
             )}
           </div>
-
-          {/* Desktop inline panel */}
-          {open && isDesktop ? (
-            <div className="hidden md:flex md:flex-col border-l border-line-subtle">
-              <div className="flex shrink-0 items-start justify-between gap-2 border-b border-line-subtle px-4 py-3">
-                <div>
-                  <p className="text-sm font-semibold leading-tight text-ink">{open.code} · {open.category}</p>
-                  <p className="text-xs text-ink-secondary">{SECTION_LABEL[open.section]}</p>
-                </div>
-                <button
-                  type="button"
-                  aria-label="Close"
-                  onClick={() => setOpenId(null)}
-                  className="mt-0.5 rounded-control p-1 text-ink-tertiary hover:bg-surface hover:text-ink"
-                >
-                  <X className="h-4 w-4" aria-hidden="true" />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4">
-                <EntryPanelContent
-                  key={open.id}
-                  projectId={projectId}
-                  entry={open}
-                  brands={brands}
-                  canEdit={canEdit}
-                  command={command}
-                  confirm={confirm.confirm}
-                  onClose={() => setOpenId(null)}
-                />
-              </div>
-            </div>
-          ) : null}
         </div>
       )}
 
-      {/* Mobile drawer */}
-      {open && !isDesktop ? (
-        <EntryDrawer
+      {open ? (
+        <EntryDialog
           key={open.id}
           projectId={projectId}
           entry={open}
@@ -739,27 +660,27 @@ type ProductDraft = {
   brandId: string;
   brandName: string;
   productName: string;
-  skuText: string;
   color: string;
   finishing: string;
   dimension: string;
   pattern: string;
   notes: string;
+  extra: ScheduleExtraField[];
 };
 
-const EMPTY_PRODUCT: ProductDraft = { brandId: "", brandName: "", productName: "", skuText: "", color: "", finishing: "", dimension: "", pattern: "", notes: "" };
+const EMPTY_PRODUCT: ProductDraft = { brandId: "", brandName: "", productName: "", color: "", finishing: "", dimension: "", pattern: "", notes: "", extra: [] };
 
 function productFromOption(option: ScheduleOptionView): ProductDraft {
   return {
     brandId: option.brandId ?? "",
     brandName: option.brandId ? "" : option.brandName ?? "",
     productName: option.productName,
-    skuText: option.skuText ?? "",
     color: option.color ?? "",
     finishing: option.finishing ?? "",
     dimension: option.dimension ?? "",
     pattern: option.pattern ?? "",
     notes: option.notes ?? "",
+    extra: option.extra.map((field) => ({ ...field })),
   };
 }
 
@@ -769,12 +690,12 @@ function toSnapshot(draft: ProductDraft) {
     brandId: draft.brandId || null,
     brandName: draft.brandId ? null : text(draft.brandName),
     productName: draft.productName.trim(),
-    skuText: text(draft.skuText),
     color: text(draft.color),
     finishing: text(draft.finishing),
     pattern: text(draft.pattern),
     dimension: text(draft.dimension),
     notes: text(draft.notes),
+    extra: draft.extra.map((field) => ({ label: field.label.trim(), value: field.value.trim() })).filter((field) => field.label && field.value),
   };
 }
 
@@ -783,8 +704,8 @@ function ProductFields({ value, onChange, brands, extraBrand }: { value: Product
   const brandOptions = extraBrand && !brands.some((b) => b.id === extraBrand.id) ? [extraBrand, ...brands] : brands;
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <Field label="Product" required className="sm:col-span-2">
-        <Input value={value.productName} onChange={set("productName")} maxLength={200} placeholder="e.g. Easy Clean Matt" />
+      <Field label="Type" required className="sm:col-span-2" description="The product designation, e.g. “Nude Pro - ATS 1132 M”. It is the card title.">
+        <Input value={value.productName} onChange={set("productName")} maxLength={200} placeholder="e.g. Nude Pro - ATS 1132 M" />
       </Field>
       <Field label="Brand">
         <Select value={value.brandId} onChange={(e) => onChange({ ...value, brandId: e.target.value, brandName: e.target.value ? "" : value.brandName })}>
@@ -795,14 +716,16 @@ function ProductFields({ value, onChange, brands, extraBrand }: { value: Product
       <Field label="Brand name" description={value.brandId ? "Taken from Master Data." : undefined}>
         <Input value={value.brandId ? brandOptions.find((b) => b.id === value.brandId)?.name ?? "" : value.brandName} onChange={set("brandName")} disabled={!!value.brandId} maxLength={160} />
       </Field>
-      <Field label="SKU / code"><Input value={value.skuText} onChange={set("skuText")} maxLength={160} /></Field>
       <Field label="Color"><Input value={value.color} onChange={set("color")} maxLength={160} /></Field>
-      <Field label="Pattern / motif"><Input value={value.pattern} onChange={set("pattern")} maxLength={160} /></Field>
+      <Field label="Pattern"><Input value={value.pattern} onChange={set("pattern")} maxLength={160} /></Field>
       <Field label="Finishing"><Input value={value.finishing} onChange={set("finishing")} maxLength={160} /></Field>
-      <Field label="Dimension"><Input value={value.dimension} onChange={set("dimension")} maxLength={160} placeholder="e.g. 60 × 60 cm" /></Field>
+      <Field label="Size"><Input value={value.dimension} onChange={set("dimension")} maxLength={160} placeholder="e.g. 60 × 60 cm" /></Field>
       <Field label="Notes" className="sm:col-span-2">
         <Textarea value={value.notes} onChange={set("notes")} maxLength={2000} rows={2} className="min-h-[60px]" />
       </Field>
+      <div className="sm:col-span-2">
+        <ExtraFieldsEditor value={value.extra} onChange={(extra) => onChange({ ...value, extra })} />
+      </div>
     </div>
   );
 }
@@ -903,7 +826,46 @@ function AddItemDialog({ projectId, section, categories, brands, command, onClos
   );
 }
 
-// ── Entry panel content (shared between desktop panel and mobile drawer) ──────
+/**
+ * One row of the unified checklist: a checkbox and, only once it is checked,
+ * the input(s) that fill the field in — so ticking a field is never blocked
+ * by it being empty (that was the point of ticking it), and there is one
+ * place per field instead of a visibility toggle here and a value form
+ * elsewhere (owner decision 2026-09-23, closer to legacy's per-card inline
+ * editing than a separate popover ever was).
+ */
+function ChecklistRow({
+  label,
+  checked,
+  disabled,
+  disabledHint,
+  onToggle,
+  className,
+  children,
+}: {
+  label: string;
+  checked: boolean;
+  disabled: boolean;
+  disabledHint?: string;
+  onToggle: () => void;
+  className?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className={`rounded-control border ${checked ? "border-line-subtle" : "border-transparent"} ${className ?? ""}`}>
+      <label
+        title={disabled ? disabledHint : undefined}
+        className={`flex items-center gap-2 rounded-control px-1.5 py-1.5 text-sm ${disabled ? "text-ink-tertiary" : "hover:bg-surface-muted"}`}
+      >
+        <input type="checkbox" checked={checked} disabled={disabled} onChange={onToggle} />
+        {label}
+      </label>
+      {checked && children ? <div className="px-1.5 pb-2 pt-0.5">{children}</div> : null}
+    </div>
+  );
+}
+
+// ── Entry panel content (the body of EntryDialog) ──────────────────────────────
 
 function EntryPanelContent({
   projectId,
@@ -929,15 +891,56 @@ function EntryPanelContent({
   const [reuse, setReuse] = useState(false);
   const [photoFor, setPhotoFor] = useState<ScheduleOptionView | null>(null);
   const [inlineEdit, setInlineEdit] = useState<string | null>(null);
-  const dirty = fields.qty !== initial.qty || fields.unit !== initial.unit || fields.location !== initial.location;
 
-  const saveFields = () => run(`${entry.id}-fields`, () => updateScheduleEntryAction({
-    projectId,
-    entryId: entry.id,
-    qty: fields.qty.trim() || null,
-    unit: fields.unit.trim() || null,
-    location: fields.location.trim() || null,
-  }));
+  // The checklist edits the option the card itself speaks for — same rule as
+  // the card face (shownOptionOf). Local draft mirrors it and resyncs if a
+  // different option becomes shown (e.g. another one is marked final) while
+  // this dialog stays open.
+  const shown = shownOptionOf(entry);
+  const [optionDraft, setOptionDraft] = useState<ProductDraft>(() => (shown ? productFromOption(shown) : EMPTY_PRODUCT));
+  // Adjust state during render rather than in an effect (React's own pattern
+  // for "reset a draft when its source identity changes"): only the shown
+  // option's identity resyncs the draft, not every keystroke it holds.
+  const [shownIdSeen, setShownIdSeen] = useState(shown?.id ?? null);
+  if (shown?.id !== shownIdSeen) {
+    setShownIdSeen(shown?.id ?? null);
+    setOptionDraft(shown ? productFromOption(shown) : EMPTY_PRODUCT);
+  }
+
+  const entryFieldsKey = `${entry.id}-fields`;
+  const saveLocation = () => {
+    if (fields.location === initial.location) return;
+    void run(entryFieldsKey, () => updateScheduleEntryAction({ projectId, entryId: entry.id, location: fields.location.trim() || null }));
+  };
+  const saveQty = () => {
+    if (fields.qty === initial.qty && fields.unit === initial.unit) return;
+    void run(entryFieldsKey, () => updateScheduleEntryAction({ projectId, entryId: entry.id, qty: fields.qty.trim() || null, unit: fields.unit.trim() || null }));
+  };
+
+  const optionFieldsKey = `${entry.id}-option-fields`;
+  const setOptionField = (key: keyof ProductDraft) => (event: { target: { value: string } }) =>
+    setOptionDraft((current) => ({ ...current, [key]: event.target.value }));
+  const saveOptionDraft = (next: ProductDraft) => {
+    if (!shown) return;
+    void run(optionFieldsKey, () => updateScheduleOptionAction({ projectId, optionId: shown.id, snapshot: toSnapshot(next) }));
+  };
+  const brandOptions = shown?.brandId && !brands.some((b) => b.id === shown.brandId)
+    ? [{ id: shown.brandId, name: shown.brandName ?? "Brand" }, ...brands]
+    : brands;
+
+  const cardFieldsKey = `${entry.id}-card-fields`;
+  const extraChoices = extraChoicesOf(entry);
+  const effectiveFields = effectiveCardFields(entry);
+  const saveCardFields = (values: readonly string[] | null) =>
+    void run(cardFieldsKey, () => updateScheduleEntryCardFieldsAction({ projectId, entryId: entry.id, fields: values === null ? null : [...values] }));
+  // Unchecking everything is a real choice (photo, code and title only), not a
+  // reset — `null` is the reset, and "Use default" below is how it is reached.
+  // Ticking is never blocked by the field being empty — ticking is how a field
+  // starts being filled in (owner decision 2026-09-23; the old "grey out an
+  // empty field" rule made an empty field un-tickable, which was the opposite
+  // of useful for "I don't know the brand yet, but note it here").
+  const toggleCardField = (field: string) =>
+    saveCardFields(effectiveFields.includes(field) ? effectiveFields.filter((key) => key !== field) : [...effectiveFields, field]);
 
   const removePhoto = async (option: ScheduleOptionView) => {
     const ok = await confirm({
@@ -961,20 +964,114 @@ function EntryPanelContent({
 
   return (
     <div className="grid gap-5">
-      <div className="grid gap-3 sm:grid-cols-[1fr_6rem_6rem]">
-        <Field label="Location"><Input value={fields.location} onChange={(e) => setFields({ ...fields, location: e.target.value })} disabled={!canEdit} maxLength={160} /></Field>
-        <Field label="Qty"><Input inputMode="decimal" value={fields.qty} onChange={(e) => setFields({ ...fields, qty: e.target.value })} disabled={!canEdit} maxLength={20} /></Field>
-        <Field label="Unit"><Input value={fields.unit} onChange={(e) => setFields({ ...fields, unit: e.target.value })} disabled={!canEdit} maxLength={40} /></Field>
-      </div>
-      {canEdit ? (
-        <div className="-mt-2 flex justify-end">
-          <Button size="sm" variant="secondary" disabled={!dirty} pending={isPending(`${entry.id}-fields`)} onClick={() => void saveFields()}>Save details</Button>
+      <div className="grid gap-2">
+        <Text weight="semibold">Card content</Text>
+        <Text size="sm" tone="tertiary">
+          {entry.cardFields === null ? "Using the default set." : "Custom for this item."} Tick a field to fill it in and put it on
+          the card; Type and the photo always show. Unticking hides it without losing what you typed.
+        </Text>
+        <div className="grid gap-1.5 sm:grid-cols-2">
+          <ChecklistRow label="Location" checked={effectiveFields.includes("location")} disabled={!canEdit || isPending(cardFieldsKey)} onToggle={() => toggleCardField("location")}>
+            <Input
+              autoFocus
+              value={fields.location}
+              onChange={(e) => setFields({ ...fields, location: e.target.value })}
+              onBlur={saveLocation}
+              disabled={!canEdit || isPending(entryFieldsKey)}
+              maxLength={160}
+            />
+          </ChecklistRow>
+
+          <ChecklistRow label="Qty" checked={effectiveFields.includes("qty")} disabled={!canEdit || isPending(cardFieldsKey)} onToggle={() => toggleCardField("qty")}>
+            <div className="grid grid-cols-[1fr_5.5rem] gap-1.5">
+              <Input autoFocus inputMode="decimal" placeholder="Amount" value={fields.qty} onChange={(e) => setFields({ ...fields, qty: e.target.value })} onBlur={saveQty} disabled={!canEdit || isPending(entryFieldsKey)} maxLength={20} />
+              <Input placeholder="Unit" value={fields.unit} onChange={(e) => setFields({ ...fields, unit: e.target.value })} onBlur={saveQty} disabled={!canEdit || isPending(entryFieldsKey)} maxLength={40} />
+            </div>
+          </ChecklistRow>
+
+          <ChecklistRow
+            label="Brand"
+            checked={effectiveFields.includes("brand")}
+            disabled={!canEdit || isPending(cardFieldsKey) || !shown}
+            disabledHint={!shown ? "Add an option below first." : undefined}
+            onToggle={() => toggleCardField("brand")}
+          >
+            <div className="grid grid-cols-2 gap-1.5">
+              <Select
+                value={optionDraft.brandId}
+                disabled={!canEdit || isPending(optionFieldsKey)}
+                onChange={(e) => {
+                  const next = { ...optionDraft, brandId: e.target.value, brandName: e.target.value ? "" : optionDraft.brandName };
+                  setOptionDraft(next);
+                  saveOptionDraft(next);
+                }}
+              >
+                <option value="">Other (type the name)</option>
+                {brandOptions.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
+              </Select>
+              <Input
+                placeholder="Brand name"
+                value={optionDraft.brandId ? brandOptions.find((b) => b.id === optionDraft.brandId)?.name ?? "" : optionDraft.brandName}
+                onChange={setOptionField("brandName")}
+                onBlur={() => saveOptionDraft(optionDraft)}
+                disabled={!canEdit || isPending(optionFieldsKey) || !!optionDraft.brandId}
+                maxLength={160}
+              />
+            </div>
+          </ChecklistRow>
+
+          {SIMPLE_OPTION_FIELD_KEYS.map((key) => (
+            <ChecklistRow
+              key={key}
+              label={CARD_FIELD_LABEL[key]}
+              checked={effectiveFields.includes(key)}
+              disabled={!canEdit || isPending(cardFieldsKey) || !shown}
+              disabledHint={!shown ? "Add an option below first." : undefined}
+              onToggle={() => toggleCardField(key)}
+            >
+              <Input
+                autoFocus
+                value={optionDraft[key]}
+                onChange={setOptionField(key)}
+                onBlur={() => saveOptionDraft(optionDraft)}
+                disabled={!canEdit || isPending(optionFieldsKey)}
+                maxLength={160}
+                placeholder={key === "dimension" ? "e.g. 60 × 60 cm" : undefined}
+              />
+            </ChecklistRow>
+          ))}
+
+          <ChecklistRow
+            className="sm:col-span-2"
+            label="Notes"
+            checked={effectiveFields.includes("notes")}
+            disabled={!canEdit || isPending(cardFieldsKey) || !shown}
+            disabledHint={!shown ? "Add an option below first." : undefined}
+            onToggle={() => toggleCardField("notes")}
+          >
+            <Textarea autoFocus value={optionDraft.notes} onChange={setOptionField("notes")} onBlur={() => saveOptionDraft(optionDraft)} disabled={!canEdit || isPending(optionFieldsKey)} maxLength={2000} rows={2} className="min-h-[60px]" />
+          </ChecklistRow>
+
+          {extraChoices.map((extra) => (
+            <ChecklistRow
+              key={extra.key}
+              label={extra.label}
+              checked={effectiveFields.includes(extra.key)}
+              disabled={!canEdit || isPending(cardFieldsKey)}
+              onToggle={() => toggleCardField(extra.key)}
+            />
+          ))}
         </div>
-      ) : null}
+        {canEdit && entry.cardFields !== null ? (
+          <button type="button" disabled={isPending(cardFieldsKey)} onClick={() => saveCardFields(null)} className="justify-self-start text-xs font-medium text-ink-secondary hover:text-ink hover:underline">
+            Use default
+          </button>
+        ) : null}
+      </div>
 
       <div className="grid gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <Text weight="semibold">Options</Text>
+          <Text weight="semibold">Spec options</Text>
           {canEdit ? (
             <div className="flex gap-2">
               <Button size="sm" variant="ghost" leadingIcon={<History className="h-3.5 w-3.5" />} onClick={() => setReuse(true)}>From past project</Button>
@@ -1111,7 +1208,15 @@ function EntryPanelContent({
 
 // ── Entry drawer (mobile wrapper) ─────────────────────────────────────────────
 
-function EntryDrawer({
+/**
+ * The full item editor — Item details, What shows on the card, and Spec
+ * options — as its own dialog rather than a slim sidebar squeezed beside the
+ * board. Same dialog on desktop and mobile, matching every other schedule
+ * dialog in this file (owner decision 2026-09-23: the old 22rem inline panel
+ * left no room for the card-field checkboxes and the option-edit form
+ * without heavy scrolling).
+ */
+function EntryDialog({
   projectId,
   entry,
   brands,
@@ -1129,7 +1234,7 @@ function EntryDrawer({
   onClose: () => void;
 }) {
   return (
-    <Drawer open onOpenChange={(value) => { if (!value) onClose(); }} title={`${entry.code} · ${entry.category}`} description={SECTION_LABEL[entry.section]} size="lg">
+    <Dialog open onOpenChange={(value) => { if (!value) onClose(); }} title={`${entry.code} · ${entry.category}`} description={SECTION_LABEL[entry.section]} size="lg">
       <EntryPanelContent
         projectId={projectId}
         entry={entry}
@@ -1139,7 +1244,7 @@ function EntryDrawer({
         confirm={confirm}
         onClose={onClose}
       />
-    </Drawer>
+    </Dialog>
   );
 }
 

@@ -561,12 +561,13 @@ const ScheduleSnapshot = z.strictObject({
   brandId: Id.nullish(),
   brandName: z.string().max(160).nullish(),
   productName: z.string().max(200),
-  skuText: z.string().max(160).nullish(),
   color: z.string().max(160).nullish(),
   pattern: z.string().max(160).nullish(),
   finishing: z.string().max(160).nullish(),
   dimension: z.string().max(160).nullish(),
   notes: z.string().max(2000).nullish(),
+  /** Free-form spec lines; the service normalizes, de-duplicates and caps them. */
+  extra: z.array(z.strictObject({ label: z.string().max(60), value: z.string().max(300) })).max(12).nullish(),
 });
 const ScheduleEntryInput = z.strictObject({
   projectId: Id,
@@ -598,7 +599,8 @@ export async function updateScheduleEntryAction(input: z.infer<typeof ScheduleEn
   });
 }
 
-const ScheduleEntryCardFields = z.strictObject({ projectId: Id, entryId: Id, fields: z.array(z.string().max(40)).max(20) });
+/** `fields: null` clears the override and returns the card to the default set. */
+const ScheduleEntryCardFields = z.strictObject({ projectId: Id, entryId: Id, fields: z.array(z.string().max(64)).max(24).nullable() });
 export async function updateScheduleEntryCardFieldsAction(input: z.infer<typeof ScheduleEntryCardFields>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();

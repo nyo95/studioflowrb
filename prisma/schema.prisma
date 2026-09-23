@@ -1631,12 +1631,15 @@ model SfScheduleTemplateItem {
   brand_id             String?
   brand_name           String?
   product_name         String
-  sku_text             String?
   color                String?
   pattern              String?
   finishing            String?
   dimension            String?
   notes                String?
+  /** Free-form spec lines as `[{label, value}]`, copied into the option on apply. */
+  extra                Json                        @default("[]")
+  /** Card-field choice of the row this item was saved from; null = the project default. */
+  card_fields          Json?
   image_key            String?
   qty                  Decimal?                    @db.Decimal(12, 2)
   unit                 String?
@@ -1666,8 +1669,8 @@ model SfScheduleEntry {
   qty             Decimal?          @db.Decimal(12, 2)
   unit            String?
   location        String?
-  /** Per-card field selection for the board view; empty = show every populated field (default). */
-  card_fields     String[]          @default([])
+  /** Board-card field choice; null = no override (SCHEDULE_DEFAULT_CARD_FIELDS), an array = explicit and may be empty. */
+  card_fields     Json?
   active_index    Int               @default(0)
   version_locked  Boolean           @default(false)
   template_item_id String?
@@ -1694,12 +1697,13 @@ model SfScheduleOption {
   brand_id     String?
   brand_name   String?
   product_name String
-  sku_text     String?
   color        String?
   pattern      String?
   finishing    String?
   dimension    String?
   notes        String?
+  /** Free-form spec lines as `[{label, value}]`; the typed columns above stay the home of the fields every card carries. */
+  extra        Json                   @default("[]")
   image_key    String?
   search_key   String
   created_at   DateTime               @default(now())

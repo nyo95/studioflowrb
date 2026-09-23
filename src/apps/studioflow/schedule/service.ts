@@ -1,8 +1,10 @@
+import { Prisma } from "@/generated/prisma/client";
+
 import { createPrivateObjectKey } from "@platform/core/storage";
 
 import { STUDIOFLOW_IMAGE_TYPES, sniffImage } from "../domain/images";
 import {
-  SCHEDULE_CARD_FIELD_KEYS,
+  SCHEDULE_DEFAULT_CARD_FIELDS,
   SCHEDULE_IMAGE_BYTES,
   SCHEDULE_SECTIONS,
   compareOptionLabels,
@@ -10,8 +12,11 @@ import {
   isPermutation,
   nextGapless,
   nextOptionLabel,
+  isScheduleCardFieldKey,
+  normalizeExtraFields,
   normalizeScheduleCategory,
   normalizeSchedulePrefix,
+  orderCardFields,
   parseLegacyScheduleCsv,
   parseLegacyScheduleSheet,
   parseScheduleCode,
@@ -39,6 +44,12 @@ import {
 } from "../shared";
 
 import { cleanSnapshot, createEntryWithOptionalOption, optionData, resolvePrefix, seedScheduleFromTemplates, type SnapshotInput } from "./sync";
+
+/** `card_fields` is JSON on the row: null = no override, array = explicit (possibly empty). */
+function cardFieldsOf(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  return orderCardFields(value.filter((key): key is string => typeof key === "string" && isScheduleCardFieldKey(key)));
+}
 
 const ENTRY_ENTITY = "schedule-entry";
 const OPTION_ENTITY = "schedule-option";
@@ -85,12 +96,12 @@ function templateItemData(snapshot: ReturnType<typeof cleanSnapshot>) {
     brand_id: snapshot.brandId,
     brand_name: snapshot.brandName,
     product_name: snapshot.productName,
-    sku_text: snapshot.skuText,
     color: snapshot.color,
     pattern: snapshot.pattern,
     finishing: snapshot.finishing,
     dimension: snapshot.dimension,
     notes: snapshot.notes,
+    extra: snapshot.extra,
     image_key: snapshot.imageKey,
   };
 }
@@ -145,7 +156,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     return extension;
   }
 
-  async function insertTemplateItem(tx: TxClient, input: { actor: CommandContext["actor"]; templateCategoryId?: string | null; section: ScheduleSection; category: { label: string; key: string }; snapshot: ReturnType<typeof cleanSnapshot>; qty: string | null; unit: string | null; location: string | null; metadata?: Record<string, unknown> }) {
+  async function insertTemplateItem(tx: TxClient, input: { actor: CommandContext["actor"]; templateCategoryId?: string | null; section: ScheduleSection; category: { label: string; key: string }; snapshot: ReturnType<typeof cleanSnapshot>; qty: string | null; unit: string | null; location: string | null; cardFields?: string[] | null; metadata?: Record<string, unknown> }) {
     const { section, category } = input;
     const parent = input.templateCategoryId
       ? await tx.sfScheduleTemplateCategory.findUnique({ where: { id: input.templateCategoryId } })
@@ -166,6 +177,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         qty: input.qty,
         unit: input.unit,
         location: input.location,
+        card_fields: input.cardFields ?? undefined,
         sort_order: sortOrder + 1,
       },
     });
@@ -255,7 +267,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         qty: entry.qty?.toString() ?? null,
         unit: entry.unit,
         location: entry.location,
-        cardFields: entry.card_fields,
+        cardFields: cardFieldsOf(entry.card_fields),
         versionLocked: entry.version_locked,
         templateItemId: entry.template_item_id,
         options: [...entry.options].sort((a, b) => compareOptionLabels(a.label, b.label)).map((option) => ({
@@ -266,12 +278,12 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
           brandId: option.brand_id,
           brandName: option.brand_name,
           productName: option.product_name,
-          skuText: option.sku_text,
           color: option.color,
           pattern: option.pattern,
           finishing: option.finishing,
           dimension: option.dimension,
           notes: option.notes,
+          extra: normalizeExtraFields(option.extra),
           imageUrl: option.image_key ? urls.get(option.image_key) ?? null : null,
         })),
       }));
@@ -400,12 +412,12 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
           brandId: source.brand_id,
           brandName: source.brand_name,
           productName: source.product_name,
-          skuText: source.sku_text,
           color: source.color,
           pattern: source.pattern,
           finishing: source.finishing,
           dimension: source.dimension,
           notes: source.notes,
+          extra: normalizeExtraFields(source.extra),
           imageKey: source.image_key,
         });
         const item = await insertTemplateItem(tx, {
@@ -416,6 +428,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
           qty: entry.qty?.toString() ?? null,
           unit: entry.unit,
           location: entry.location,
+          cardFields: cardFieldsOf(entry.card_fields),
           metadata: { projectId: input.projectId, entryId: entry.id, optionId: source.id },
         });
         return { templateItemId: item.id };
@@ -526,14 +539,22 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       });
     },
 
-    /** Board-card field selection; `fields: []` resets to the default (show every populated field). */
-    async updateEntryCardFields(input: CommandContext & { projectId: string; entryId: string; fields: string[] }) {
+    /**
+     * Board-card field choice. `fields: null` clears the override so the card
+     * falls back to SCHEDULE_DEFAULT_CARD_FIELDS; an array is an explicit
+     * choice and may be empty (photo, code and title only).
+     */
+    async updateEntryCardFields(input: CommandContext & { projectId: string; entryId: string; fields: string[] | null }) {
       requireCommand(input, P.scheduleManage);
-      const fields = [...new Set(input.fields)].filter((key): key is (typeof SCHEDULE_CARD_FIELD_KEYS)[number] => (SCHEDULE_CARD_FIELD_KEYS as readonly string[]).includes(key));
+      const fields = input.fields === null
+        ? null
+        : orderCardFields([...new Set(input.fields)].filter((key) => isScheduleCardFieldKey(key)));
       return runTransaction(async (tx) => {
         const entry = await loadEntry(tx, input.projectId, input.entryId, true);
-        await tx.sfScheduleEntry.update({ where: { id: entry.id }, data: { card_fields: fields } });
-        await writeAudit(ports, tx, { action: "studioflow.schedule.entry-card-fields-updated", entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor, metadata: { projectId: input.projectId, code: scheduleCode(entry.prefix, entry.increment), fields } });
+        const before = cardFieldsOf(entry.card_fields);
+        if (JSON.stringify(before) === JSON.stringify(fields)) return { entryId: entry.id };
+        await tx.sfScheduleEntry.update({ where: { id: entry.id }, data: { card_fields: fields ?? Prisma.DbNull } });
+        await writeAudit(ports, tx, { action: "studioflow.schedule.entry-card-fields-updated", entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor, changes: { cardFields: { from: before, to: fields } }, metadata: { projectId: input.projectId, code: scheduleCode(entry.prefix, entry.increment), usesDefault: fields === null } });
         return { entryId: entry.id };
       });
     },
@@ -738,11 +759,11 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         category: row.entry.category,
         brandName: row.brand_name,
         productName: row.product_name,
-        skuText: row.sku_text,
         color: row.color,
         pattern: row.pattern,
         finishing: row.finishing,
         dimension: row.dimension,
+        extra: normalizeExtraFields(row.extra),
       }));
     },
 
@@ -760,12 +781,12 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
             brand_id: source.brand_id,
             brand_name: source.brand_name,
             product_name: source.product_name,
-            sku_text: source.sku_text,
             color: source.color,
             pattern: source.pattern,
             finishing: source.finishing,
             dimension: source.dimension,
             notes: source.notes,
+            extra: normalizeExtraFields(source.extra),
             image_key: source.image_key,
             search_key: source.search_key,
           },
@@ -876,8 +897,9 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
             location: optionalText(row.location || row.area || null, 160),
             snapshot: {
               brandName,
-              productName,
-              skuText: row.sku || row.catalog_sku || null,
+              // Legacy "Item No" is the same designation as Type, so an
+              // article code column is appended to it rather than stored twice.
+              productName: [productName, row.sku || row.catalog_sku || ""].map((part) => part.trim()).filter(Boolean).join(" - "),
               color: row.color || row.catalog_color || null,
               pattern: row.pattern || row.motif || row.catalog_motif || null,
               finishing: row.finishing || row.catalog_finishing || null,

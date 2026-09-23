@@ -1,4 +1,12 @@
-import { fallbackPrefix, nextGapless, scheduleSearchKey, type ScheduleSection } from "../domain/schedule";
+import {
+  fallbackPrefix,
+  nextGapless,
+  normalizeExtraFields,
+  orderCardFields,
+  scheduleSearchKey,
+  type ScheduleExtraField,
+  type ScheduleSection,
+} from "../domain/schedule";
 import { optionalText, requiredText, type TxClient } from "../shared";
 
 /**
@@ -9,38 +17,39 @@ import { optionalText, requiredText, type TxClient } from "../shared";
 export type SnapshotInput = {
   brandId?: string | null;
   brandName?: string | null;
+  /** The product designation shown as the card title ("Type" in the UI and in the legacy sheet). */
   productName: string;
-  skuText?: string | null;
   color?: string | null;
   pattern?: string | null;
   finishing?: string | null;
   dimension?: string | null;
   notes?: string | null;
+  extra?: readonly ScheduleExtraField[] | null;
   imageKey?: string | null;
 };
 
 export function cleanSnapshot(input: SnapshotInput) {
-  const productName = requiredText(input.productName, "SCHEDULE_PRODUCT_REQUIRED", "Product name", 200);
+  const productName = requiredText(input.productName, "SCHEDULE_PRODUCT_REQUIRED", "Type", 200);
   const brandName = optionalText(input.brandName, 160);
-  const skuText = optionalText(input.skuText, 160);
   const color = optionalText(input.color, 160);
   const pattern = optionalText(input.pattern, 160);
   const finishing = optionalText(input.finishing, 160);
   const dimension = optionalText(input.dimension, 160);
   const notes = optionalText(input.notes, 2000);
   const imageKey = optionalText(input.imageKey, 500);
+  const extra = normalizeExtraFields(input.extra ?? []);
   return {
     brandId: optionalText(input.brandId, 80),
     brandName,
     productName,
-    skuText,
     color,
     pattern,
     finishing,
     dimension,
     notes,
+    extra,
     imageKey,
-    searchKey: scheduleSearchKey({ brandName, productName, skuText, color, pattern, finishing, dimension }),
+    searchKey: scheduleSearchKey({ brandName, productName, color, pattern, finishing, dimension, extra }),
   };
 }
 
@@ -49,12 +58,12 @@ export function optionData(snapshot: ReturnType<typeof cleanSnapshot>) {
     brand_id: snapshot.brandId,
     brand_name: snapshot.brandName,
     product_name: snapshot.productName,
-    sku_text: snapshot.skuText,
     color: snapshot.color,
     pattern: snapshot.pattern,
     finishing: snapshot.finishing,
     dimension: snapshot.dimension,
     notes: snapshot.notes,
+    extra: snapshot.extra,
     image_key: snapshot.imageKey,
     search_key: snapshot.searchKey,
   };
@@ -73,6 +82,7 @@ export async function createEntryWithOptionalOption(tx: TxClient, input: {
   qty?: string | null;
   unit?: string | null;
   location?: string | null;
+  cardFields?: readonly string[] | null;
   templateItemId?: string | null;
   snapshot?: SnapshotInput | null;
 }) {
@@ -108,6 +118,7 @@ export async function createEntryWithOptionalOption(tx: TxClient, input: {
       qty: input.qty ?? null,
       unit: input.unit ?? null,
       location: input.location ?? null,
+      card_fields: input.cardFields ? orderCardFields(input.cardFields) : undefined,
       template_item_id: input.templateItemId ?? null,
     },
   });
@@ -146,17 +157,18 @@ export async function seedScheduleFromTemplates(tx: TxClient, projectId: string)
       qty: item.qty?.toString() ?? null,
       unit: item.unit,
       location: item.location,
+      cardFields: Array.isArray(item.card_fields) ? (item.card_fields as string[]) : null,
       templateItemId: item.id,
       snapshot: {
         brandId: item.brand_id,
         brandName: item.brand_name,
         productName: item.product_name,
-        skuText: item.sku_text,
         color: item.color,
         pattern: item.pattern,
         finishing: item.finishing,
         dimension: item.dimension,
         notes: item.notes,
+        extra: normalizeExtraFields(item.extra),
         imageKey: item.image_key,
       },
     });

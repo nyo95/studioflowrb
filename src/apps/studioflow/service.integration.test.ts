@@ -614,7 +614,7 @@ describe("SF-R3 Product Schedule", () => {
       qty: "2",
       unit: "pail",
       location: "Bedroom",
-      snapshot: { productName: "Dulux Easy Clean", brandName: "Dulux", skuText: "DX-01", color: "Warm White" },
+      snapshot: { productName: "Dulux Easy Clean - DX-01", brandName: "Dulux", color: "Warm White", extra: [{ label: "Coverage", value: "12 m²/L" }] },
     });
     const second = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "Jotun Majestic", brandName: "Jotun" } });
     assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => [e.code, e.category, e.options[0]?.label, e.options[0]?.isFinal]), [
@@ -645,7 +645,7 @@ describe("SF-R3 Product Schedule", () => {
       templateCategoryId: category.templateCategoryId,
       section: "MATERIAL",
       category: "HPL",
-      snapshot: { brandId: brand.id, productName: "TH 121 AA", skuText: "TH-121", finishing: "Doff" },
+      snapshot: { brandId: brand.id, productName: "TH 121 AA - TH-121", finishing: "Doff" },
       qty: "1",
       unit: "sheet",
       location: "Cabinet",
@@ -682,7 +682,8 @@ describe("SF-R3 Product Schedule", () => {
       csv: "category,brand,product,sku,color,qty,unit,location\nTile,Roman,Granitio,GR-1,Ivory,12,m2,Lobby\n",
     });
     assert.equal(imported.created, 1);
-    assert.ok((await sf.schedule.listSchedule({ grants: ALL, projectId: target.projectId, section: "MATERIAL" })).some((row) => row.options[0].productName === "Granitio"));
+    // An article-code column is appended to Type rather than stored twice (R8.111).
+    assert.ok((await sf.schedule.listSchedule({ grants: ALL, projectId: target.projectId, section: "MATERIAL" })).some((row) => row.options[0].productName === "Granitio - GR-1"));
     assert.notEqual(sourceEntry.entryId, targetEntry.entryId);
   });
 

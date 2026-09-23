@@ -77,7 +77,7 @@ except where §9 below overrides them.
 | Phase actions: activate, bypass, submit internal, approve internal, reject internal/client, submit client, approve client, reopen, complete supervision (`phase-service.ts`) | KEEP | §5.2 |
 | Admin revision override hard reset (`executeOverrideRevision`, `admin-revision-override.tsx`) | KEEP | `studioflow.phase.override`; history snapshot into audit |
 | Revision `major.minor` (`Revision`) | KEEP | §5.4 |
-| Activity TODO/FEEDBACK per revision, deferral, due date (`Activity`, `activity-manager.tsx`) | KEEP | §6.1 |
+| Activity TODO/FEEDBACK per revision, deferral, due date (`Activity`, `activity-manager.tsx`) | PARTIAL | FEEDBACK-only, §6.1; TODO mode and deferral superseded by V2-D1 (todos live in `SfChecklistItem`, §6.2; deferral mesh purged R8.98) |
 | Approval blocker `assertNoPendingTasks` (root checklist only) | KEEP | §6.4 |
 | Checklist tree (depth 1), priority 1–4, due, assignee, labels, cascade toggle, reorder, filter views (`ProjectChecklist`, `checklist-*`, `saved-checklist-filters.tsx`) | KEEP | §6.2 |
 | Checklist templates global/per-phase + sync (`ChecklistTemplate`, `template-manager.tsx`, `executeSyncProjectChecklists`) | KEEP | §6.3 and StudioFlow settings |
@@ -200,7 +200,7 @@ Stored states: `PENDING`, `IN_PROGRESS`, `ON_REVIEW_INTERNAL`,
 |---|---|---|---|
 | activate | PENDING | IN_PROGRESS | sequential check (prev READY_FOR_NEXT/COMPLETED unless order 1 or `allow_parallel`); project must be ACTIVE; revision 1.0 |
 | bypass | PENDING | READY_FOR_NEXT (or COMPLETED if last) | locked; revision 1.0 COMPLETED; project COMPLETED if last |
-| submitInternal | IN_PROGRESS | ON_REVIEW_INTERNAL | blocked by open TODO activities in the active revision or phase-tagged deferred TODOs |
+| submitInternal | IN_PROGRESS | ON_REVIEW_INTERNAL | blocked by unchecked root checklist items only (`todoBlockers`, V2-D1 — `SfActivity` carries no TODO mode or deferral) |
 | approveInternal | ON_REVIEW_INTERNAL | APPROVED_INTERNAL | full blocker (§6.4) |
 | submitClient | IN_PROGRESS / ON_REVIEW_INTERNAL / APPROVED_INTERNAL | ON_REVIEW_CLIENT | full blocker (§6.4) |
 | rejectInternal | ON_REVIEW_INTERNAL / ON_REVIEW_CLIENT | IN_PROGRESS | close revision; new `major.minor+1`; open FEEDBACK → TODO (assignee kept, fallback PIC designer, or PIC drafter when phase is CD) |
@@ -246,6 +246,13 @@ Legacy `Activity`: `content`, `mode` TODO/FEEDBACK, `status` OPEN/COMPLETED,
 `revision_id?`, `deferred_from_version?`. Commands: add, edit, set due, toggle,
 delete, defer (detach from revision, keep phase tag, record version).
 
+**Superseded by V2-D1 (Todo SSOT migration, R8.9x):** `SfActivity` is
+FEEDBACK-only — the TODO mode, `due_at`, and `defer` command described above
+do not exist on the rebuilt model. Project/phase to-dos live exclusively in
+`SfChecklistItem` (§6.2); the deferral mesh (`deferred_from_version` and the
+defer command) was fully purged in R8.98. Adding a `mode: "TODO"` activity is
+rejected with `ACTIVITY_TODO_DEPRECATED`.
+
 ### 6.2 Checklist item (project/phase tasks)
 
 Legacy `ProjectChecklist`: `project_id`, `phase_id?` (null = general),
@@ -264,10 +271,15 @@ rows. Deleting a template detaches generated rows (they become plain tasks).
 
 ### 6.4 Blocker projection
 
-One pure function used by approveInternal, submitClient, and approveClient (and shown in the UI before the
-button is pressed): open activities in the active revision + open deferred
-activities tagged to the phase + unchecked **root** checklist items of the
-phase. submitInternal uses the TODO-only subset (§5.2).
+Two pure projections over the same counts (`domain/blockers.ts`), used by the
+phase commands and shown in the UI before the button is pressed:
+- `fullBlockers` (approveInternal, submitClient, approveClient): open FEEDBACK
+  activities in the active revision + unchecked **root** checklist items of
+  the phase.
+- `todoBlockers` (submitInternal): unchecked **root** checklist items only —
+  no activity or deferred bucket (V2-D1; superseded the original "TODO-only
+  subset of the same list" design, since `SfActivity` no longer carries a
+  TODO mode to subset from).
 
 ## 7. Today (StudioFlow home)
 
@@ -315,15 +327,37 @@ count), MOM, Schedule, History. Mobile: drawer.
 
 ## 10. MOM (port `extensions/mom`)
 
-Document: `topic` (default "SITE INSPECTION REPORT"), `meeting_date`,
-`venue?`, `attendees?`, `prepared_by_name`, `created_by`. Items ordered, with
+Document: `topic` (caller-required at creation, no default — the "New MOM"
+dialog prompts for it before the row exists), `meeting_date`, `venue?`,
+`attendees?`, `prepared_by_name`, `created_by`. Items ordered, with
 `is_text_only` and list style (`decimal`, `disc`, `dash`, `none`); points
 ordered with style (`default`, `none`); images ordered per item through `ObjectStorage` and the UI Engine
-image workspace. Commands: create/update/delete document; create/update/
+image workspace (crop, freehand pen + arrow/box/circle annotation, and a Pan
+tool for repositioning — same shared workspace as Schedule photos, §11.7).
+Commands: create/update/delete document; create/update/
 delete/reorder items, points, images. Parent-chain project scope assertion
 kept. Print view kept (UI_ENGINE §13). No issue/supersede state. Delete is a
 real delete of a MOM document with confirmation (legacy behavior) and an audit
 snapshot.
+
+**Revision snapshots.** Independent of the "no issue/supersede state" rule
+above (that's about document *lifecycle*, not this): a document carries a
+save/restore revision-snapshot system (`RevisionsCard`, `saveMomRevisionAction`/
+`restoreMomRevisionAction`) — the user can name and save a full snapshot of
+the current content at any point, see a list of prior saved revisions with
+who saved them and when, and restore any of them (replacing current content,
+own confirmation flow). Retention keeps the latest `revisionRetention` saved
+revisions, oldest pruned first. This is manual, user-triggered snapshotting,
+not automatic versioning tied to edits, and it's unrelated to StudioFlow
+Phase `SfRevision` (§5.4) — a different, project-phase-scoped concept.
+
+The Meeting Details header (topic/date/venue/prepared-by/attendees) renders
+collapsed to a `Topic · Date · Venue` summary by default and expands to the
+full form on click, since it's metadata set once and rarely revisited.
+Point text areas recognize a typed `1.`/`-`/`•` list prefix and auto-continue
+it on Enter, but only when the section's list style is `NONE` — when a style
+is set, `pointMarkers()` already renders the marker outside the textarea, so
+auto-continuing inside it too would duplicate it.
 
 Implementation notes (R8.72, SF-R2):
 
@@ -363,13 +397,44 @@ transactional renumber that uses a deferrable unique constraint or a
 two-phase update inside the service (Executor chooses; behavior must match:
 codes stay gapless per `(project, section, prefix)` after add/delete/reorder).
 
-### 11.3 Option
+### 11.3 Option (the spec)
 
 `label` (A, B, C…), `is_final`, `status` DRAFT/APPROVED/NOT_USED, snapshot as
-**typed columns** (brand id/name via Master Data public Brand port, product
-name, sku text, color, finishing, dimension, notes, image key?) instead of a
-JSON blob, plus derived `search_key`. Marking final approves it and sets
+**typed columns** (brand id/name via Master Data public Brand port, `product_name`,
+color, pattern, finishing, dimension, notes, image key?) plus an `extra` JSON
+array (§11.9) and derived `search_key`. Marking final approves it and sets
 siblings NOT_USED; deleting the final option promotes the next sibling.
+
+**Vocabulary (owner decision 2026-09-23).** Three things were previously all
+called "metadata"; they are now named separately everywhere — UI, code and
+this contract:
+
+| Name | Owner | Fields |
+|---|---|---|
+| **Spec** | Option | Brand, Type, Color, Pattern, Finishing, Size, Notes, plus `extra` |
+| **Item details** | Entry | Location, Qty, Unit |
+| **Card fields** | Entry | which of the above caption the board card (§11.8) |
+
+**Type** is the product designation — "Nude Pro - ATS 1132 M" — stored in
+`product_name` and shown as the card title. It is the legacy Google Sheet's
+`Type` column and is always displayed, so it is not a card-field toggle.
+
+**`sku_text` is PURGED (R8.111).** Legacy carried both an "Item No"
+(`specs.catalog_sku`) and a Type; the owner ruled they are the same
+designation, so the column was dropped and any value it held was folded into
+`product_name` as `Type - Code`. CSV import appends an article-code column to
+Type the same way instead of storing it twice.
+
+**Reuse pool.** `search_key` is empty when brand *and* type are both
+placeholders (`N/A`, `PENDING`, `[RESERVED]`, `GENERIC`, blank…), which keeps
+an unfilled row out of "From past project" — legacy's
+`deriveScheduleSpecFields` rule, which the rebuild had not ported. Brand is
+**not** required: a spec with no catalogued brand is normal and stays
+searchable by its Type.
+
+**The card speaks for the final option, else the first** (legacy
+`selectedCatalogOption`). A row holding one unapproved option shows that
+product rather than reading as empty.
 
 ### 11.4 Reuse from past projects
 
@@ -425,6 +490,96 @@ object, so an object is deleted only after commit and only when no option or
 template item references it. The schedule list shows the final option's
 thumbnail; the item panel shows each option's photo. Retention of objects left
 behind by failures stays under KB-002.
+
+The shared `platform/ui_engine` image workspace (used for this crop step, and
+identically by MOM photos, §10) opens the file picker immediately on mount
+(no separate "Choose image" click first), lets the user scroll-to-zoom and
+drag-to-pan the preview directly (the crop-zoom/horizontal-focus/vertical-
+focus sliders remain as a secondary, keyboard-accessible way to set the same
+values), and includes an annotation toolbar — pen, arrow, box, circle, a
+5-color swatch set, and a "Pan" tool for repositioning without leaving
+drawing mode — baked into the saved image at crop time. This is UI-Engine-
+owned browser behavior, not Schedule- or MOM-specific policy.
+
+### 11.8 Card fields
+
+`sf_schedule_entry.card_fields` is **nullable JSON**: `null` means "no
+override" and renders `SCHEDULE_DEFAULT_CARD_FIELDS`; an array is an explicit
+ordered choice and **may legitimately be empty** (a card with its photo, code
+and Type only). This is legacy's `catalog_fields` null-vs-list distinction.
+The R8.109 `TEXT[]` column used `{}` for both meanings, which made "default"
+and "everything" the same stored value, hid the "Use default" affordance, and
+forced a rule that the last checkbox could not be unticked; all three are
+gone.
+
+Selectable fields: **Brand, Color, Pattern, Finishing, Size, Location, Qty,
+Notes**, plus one entry per extra spec line the shown option carries (§11.9),
+addressed as `x:<slug-of-label>`. Type and the photo always render.
+
+**Default set: Brand, Color, Finishing, Location, Notes** (owner decision
+2026-09-23; legacy's own default was Type + Brand). An override is stored in
+canonical field order, never in the order the boxes were ticked, so unticking
+and re-ticking a field never moves its row to the bottom of the card.
+
+Edited from the entry panel via `schedule.manage`, project-scoped like every
+other schedule write; the panel states whether the entry is on the default or
+on a custom choice, and "Use default" writes `null`. An empty row (a chosen
+field the option has not filled in) is not rendered **on the card** — but
+ticking a field's checkbox is never refused for being empty; see §11.10.
+
+A template item carries the card-field choice of the row it was saved from
+(`sf_schedule_template_item.card_fields`), so "Apply templates" reproduces the
+card the studio approved rather than resetting it to the default.
+
+**Qty and Unit stay available for both sections but are off by default**
+(owner decision 2026-09-23: quantity is a Fixture concept; legacy's own sheet
+import discards Qty on Material sheets, which the rebuild already mirrors).
+
+### 11.9 Extra spec fields
+
+An option and a template item each carry `extra`, a JSON array of
+`{label, value}` — free-form specification lines such as "Abrasion class /
+PEI IV" that do not deserve a column of their own. Owner decision
+2026-09-23: the fields that appear on nearly every card stay typed columns so
+search, ordering and CSV keep working off the database, and only the long tail
+goes to JSON. This is deliberately **not** legacy's `data_snapshot`, which
+mirrored four fields into columns and documented its own sync risk; here the
+JSON is the only copy of what it holds.
+
+Rules: at most 12 lines per option, label ≤ 60 and value ≤ 300 characters,
+both trimmed; a line missing either half is dropped; labels de-duplicate
+case-insensitively. Values join `search_key`, so an extra line is searchable
+in "From past project". Extras travel with reuse, "Save as template item" and
+"Apply templates", exactly like the typed columns.
+
+### 11.10 The entry editor (R8.112, owner review 2026-09-23)
+
+The entry panel is one `Dialog` (`size="lg"`), on both desktop and mobile —
+not a 22rem sidebar squeezed beside the board on desktop with a separate
+`Drawer` on mobile. Same dialog pattern as every other schedule dialog in
+this file (Add item, Import CSV, …).
+
+**Item details and card fields share one checklist**, row per field
+(`ChecklistRow`): a checkbox, and — only once ticked — the input(s) that fill
+that field in, in the same row. Location and Qty(+Unit) write to the entry;
+Brand (Master Data select + free-text fallback), Color, Pattern, Finishing,
+Size and Notes write to the option the card speaks for (§11.3's "the final
+option, else the first"), auto-saving the full option snapshot on blur.
+Unticking a field only stops it captioning the card; it never discards what
+was typed.
+
+**Ticking is never refused for a field being empty.** An earlier pass greyed
+out and disabled the checkbox for a field with nothing to show, reasoning
+that ticking it would not visibly change the card — but that made "I don't
+know the brand yet, tick it anyway so I remember to fill it in" impossible,
+which is the normal state of an unfinalized spec. Owner: *"kalau brandnya
+masih belum tau gmn? better legacy sih sebenernya ya?"* — legacy never
+conflated "show this field" with "this field has a value" in the first
+place. A row backed by an option is disabled only when **no option exists
+yet** to attach a value to ("Add an option below first"); this is a
+different, legitimate reason from the field being blank, which is not a
+reason to disable at all. Extra spec lines keep a plain checkbox with no
+reveal, since one cannot exist with a blank label or value (§11.9).
 
 ## 12. Foundation centralization map
 

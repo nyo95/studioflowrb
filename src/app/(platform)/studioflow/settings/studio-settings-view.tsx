@@ -2,6 +2,10 @@
 
 import { useState, type ReactNode } from "react";
 
+import { normalizeExtraFields } from "@/apps/studioflow/domain/schedule";
+
+import { ExtraFieldsEditor } from "../_components/extra-fields-editor";
+
 import {
   Badge,
   Button,
@@ -61,12 +65,12 @@ type ScheduleTemplate = {
     product_name: string;
     brand_id: string | null;
     brand_name: string | null;
-    sku_text: string | null;
     color: string | null;
     pattern: string | null;
     finishing: string | null;
     dimension: string | null;
     notes: string | null;
+    extra: unknown;
     is_active: boolean;
     sort_order: number;
     qty: { toString(): string } | null;
@@ -273,17 +277,16 @@ function ScheduleSettings({
         {canManage ? <Button size="sm" variant="secondary" onClick={() => setItemDialog("new")}>Add template item</Button> : null}
       </TableTitle>
       <DataTable density="compact" minWidth={980}>
-        <TableHeader><TableRow><TableHead>Section</TableHead><TableHead>Category</TableHead><TableHead>Brand</TableHead><TableHead>Product</TableHead><TableHead>SKU</TableHead><TableHead align="end">Qty</TableHead><TableHead>Unit</TableHead><TableHead>Location</TableHead><TableHead>Status</TableHead><TableHead align="end">Order</TableHead>{canManage ? <TableHead stickyEnd align="end">Actions</TableHead> : null}</TableRow></TableHeader>
+        <TableHeader><TableRow><TableHead>Section</TableHead><TableHead>Category</TableHead><TableHead>Brand</TableHead><TableHead>Type</TableHead><TableHead align="end">Qty</TableHead><TableHead>Unit</TableHead><TableHead>Location</TableHead><TableHead>Status</TableHead><TableHead align="end">Order</TableHead>{canManage ? <TableHead stickyEnd align="end">Actions</TableHead> : null}</TableRow></TableHeader>
         <TableBody>
           {items.length === 0 ? (
-            <TableRow><TableCell colSpan={canManage ? 11 : 10}><Text size="sm" tone="tertiary">No template items yet. Add one here or use “Save as template item” on a project schedule row.</Text></TableCell></TableRow>
+            <TableRow><TableCell colSpan={canManage ? 10 : 9}><Text size="sm" tone="tertiary">No template items yet. Add one here or use “Save as template item” on a project schedule row.</Text></TableCell></TableRow>
           ) : items.map((row) => (
             <TableRow key={row.id}>
               <TableCell>{SECTION_LABEL[row.section]}</TableCell>
               <TableCell>{row.category}</TableCell>
               <TableCell>{row.brand_name ?? <Text size="sm" tone="tertiary">—</Text>}</TableCell>
               <TableCell><span className={`font-medium ${row.is_active ? "" : "text-ink-tertiary line-through"}`}>{row.product_name}</span></TableCell>
-              <TableCell>{row.sku_text ?? ""}</TableCell>
               <TableCell align="end"><span className="tabular-nums">{row.qty?.toString() ?? ""}</span></TableCell>
               <TableCell>{row.unit ?? ""}</TableCell>
               <TableCell>{row.location ?? ""}</TableCell>
@@ -337,7 +340,6 @@ function TemplateItemDialog({
     brandId: text(item?.brand_id),
     brandName: item?.brand_id ? "" : text(item?.brand_name),
     productName: text(item?.product_name),
-    skuText: text(item?.sku_text),
     color: text(item?.color),
     pattern: text(item?.pattern),
     finishing: text(item?.finishing),
@@ -346,6 +348,7 @@ function TemplateItemDialog({
     qty: item?.qty?.toString() ?? "",
     unit: text(item?.unit),
     location: text(item?.location),
+    extra: normalizeExtraFields(item?.extra),
   });
   const set = (key: keyof typeof draft) => (event: { target: { value: string } }) => setDraft({ ...draft, [key]: event.target.value });
   const key = item ? `template-item-${item.id}` : "schedule-item";
@@ -358,12 +361,12 @@ function TemplateItemDialog({
       brandId: draft.brandId || null,
       brandName: draft.brandId ? null : nullable(draft.brandName),
       productName: draft.productName.trim(),
-      skuText: nullable(draft.skuText),
       color: nullable(draft.color),
       pattern: nullable(draft.pattern),
       finishing: nullable(draft.finishing),
       dimension: nullable(draft.dimension),
       notes: nullable(draft.notes),
+      extra: draft.extra.map((field) => ({ label: field.label.trim(), value: field.value.trim() })).filter((field) => field.label && field.value),
     };
     const quantities = { qty: nullable(draft.qty), unit: nullable(draft.unit), location: nullable(draft.location) };
     const ok = await run(key, () => item
@@ -390,7 +393,7 @@ function TemplateItemDialog({
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Section"><SectionSelect value={draft.section} disabled={!!item} onChange={(section) => setDraft({ ...draft, section })} /></Field>
         <Field label="Category" required><Input list="schedule-settings-categories" value={draft.category} disabled={!!item} maxLength={80} onChange={set("category")} /></Field>
-        <Field label="Product" required className="sm:col-span-2"><Input value={draft.productName} maxLength={200} onChange={set("productName")} /></Field>
+        <Field label="Type" required className="sm:col-span-2" description="The product designation, e.g. “Nude Pro - ATS 1132 M”."><Input value={draft.productName} maxLength={200} onChange={set("productName")} /></Field>
         <Field label="Brand">
           <Select value={draft.brandId} onChange={(e) => setDraft({ ...draft, brandId: e.target.value, brandName: e.target.value ? "" : draft.brandName })}>
             <option value="">Other (type the name)</option>
@@ -398,15 +401,17 @@ function TemplateItemDialog({
           </Select>
         </Field>
         <Field label="Brand name"><Input value={draft.brandId ? brandOptions.find((b) => b.id === draft.brandId)?.name ?? "" : draft.brandName} disabled={!!draft.brandId} maxLength={160} onChange={set("brandName")} /></Field>
-        <Field label="SKU / code"><Input value={draft.skuText} maxLength={160} onChange={set("skuText")} /></Field>
         <Field label="Color"><Input value={draft.color} maxLength={160} onChange={set("color")} /></Field>
-        <Field label="Pattern / motif"><Input value={draft.pattern} maxLength={160} onChange={set("pattern")} /></Field>
+        <Field label="Pattern"><Input value={draft.pattern} maxLength={160} onChange={set("pattern")} /></Field>
         <Field label="Finishing"><Input value={draft.finishing} maxLength={160} onChange={set("finishing")} /></Field>
-        <Field label="Dimension"><Input value={draft.dimension} maxLength={160} onChange={set("dimension")} /></Field>
+        <Field label="Size"><Input value={draft.dimension} maxLength={160} onChange={set("dimension")} /></Field>
         <Field label="Qty"><Input inputMode="decimal" value={draft.qty} maxLength={20} onChange={set("qty")} /></Field>
         <Field label="Unit"><Input value={draft.unit} maxLength={40} onChange={set("unit")} /></Field>
         <Field label="Location" className="sm:col-span-2"><Input value={draft.location} maxLength={160} onChange={set("location")} /></Field>
         <Field label="Notes" className="sm:col-span-2"><Textarea rows={2} value={draft.notes} maxLength={2000} onChange={set("notes")} /></Field>
+        <div className="sm:col-span-2">
+          <ExtraFieldsEditor value={draft.extra} onChange={(extra) => setDraft({ ...draft, extra })} disabled={pending} />
+        </div>
       </div>
     </Dialog>
   );

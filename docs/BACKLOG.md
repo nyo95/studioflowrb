@@ -56,7 +56,13 @@ Rules carried over unchanged from the prior trackers:
 - [ ] [PLANNED] Redesign the top-header/sidebar boundary. Design input already
   captured in `apps/platform/GLOBAL-MENU-DESIGN-BRIEF.md` (owner feedback,
   2026-09-16) — not yet a locked decision. Preserve the approved semantic
-  colors.
+  colors. **Partially executed 2026-09-23 (R8.110):** logo shrunk, account
+  menu slimmed to `Account / Settings / Sign out` (brief line 138-140), and
+  the "one settings sidebar" direction (brief line 133) is now fully built
+  (closes KB-031, see StudioFlow section). Still open from the brief: where
+  the app switcher lives, and whether it needs persistent visible nav at all
+  — those open design questions (brief "Decision Inputs Needed") aren't
+  resolved by this pass.
 - [ ] [BUG][P3] KB-020 — Office rebuild migration history contains an
   untracked migration (`20260904153201_add_updated_by_label_vendor_brand`, no
   matching file in repository history). Pre-existing environment/history gap,
@@ -128,25 +134,15 @@ and "direct hard-delete resolves a pre-existing pending request…".
   level) and produces a total the estimator cannot audit from what's on
   screen. Needs a UI decision (both fields don't fit the current 110px "Koef."
   column) before it can be fixed — recorded here rather than rushed.
-- [ ] [BUG][P3] Sibling `sort_order` collisions on plain insert. `addSection`,
-  `addSubsection`, `addItem`, `addSubObject`, and `addLineItem`
-  (`project-tree.ts`) all default `sort_order` to `0` when the caller omits
-  it, and no UI action (`src/app/(platform)/bq/actions.ts`,
-  `[id]/actions.ts`) ever supplies one — so every manually-added sibling under
-  the same parent gets `sort_order = 0`. `getProjectDetail` orders only by
-  `{ sort_order: "asc" }` with no secondary tiebreaker, so same-parent display
-  order isn't guaranteed stable across reads. Distinct from the already-known
-  "no reorder for Sections/L1/L2/L3" gap (this is about insertion order, not
-  the absence of a reorder UI) — fix by computing `max(sibling sort_order) + 1`
-  at insert time, likely alongside whatever "add reorder" work happens.
-- [ ] [BUG][P3] Promotion/project-lifecycle check-then-act races elsewhere.
-  The same TOCTOU shape fixed in `promotions.ts` this session (see below)
-  recurs in `src/apps/bq/services/projects.ts` (`lockProject`,
-  `archiveProject`, `approveProjectDeletion`, etc.): each is a plain
-  `findUnique` → validate → `update` with no conditional guard. Lower priority
-  than the promotion fix — these are single-admin actions, not two-different-
-  approvers races — but the same `updateMany`-with-status-guard pattern
-  applies if a concrete double-click/double-tab incident is ever observed.
+
+**Fixed 2026-09-23 (R8.109):** sibling `sort_order` collisions on plain
+insert (`addSection`/`addSubsection`/`addItem`/`addSubObject`/`addLineItem`
+in `project-tree.ts` now compute `max(sibling sort_order) + 1` when the
+caller omits one) and the `lockProject`/`unlockProject`/`archiveProject`/
+`restoreProject`/`approveProjectDeletion`/`rejectProjectDeletion`
+check-then-act races in `projects.ts` (now guarded with the same
+`updateMany`-with-status-guard pattern as `transitionPromotionStatus`). See
+`CHANGELOG.md` R8.109.
 
 **Fixed this session (2026-09-22, R8.107):**
 - Assembly-applied Cost Components never carried a `source_price_snapshot`
@@ -212,20 +208,43 @@ re-investigated.
   (R8.86). Needs a browser walk of both: settings tables (create/edit/reorder)
   and the option photo upload/crop/save round trip. Close both KB numbers
   together once verified — same feature area.
+**Fixed 2026-09-23 (R8.111–R8.112):** Product Schedule spec model — migration
+`20260923000000_sf_schedule_spec_model` applied to both `studioflow_rebuild`
+and `studioflow_rebuild_test` and browser-verified: Type label everywhere,
+extra spec lines appearing as card rows and as their own checkboxes, a row
+whose only option is not final still showing its product, "From past project"
+no longer returning reserved rows, and (R8.112) the merged Item-details/card-
+fields checklist ticking and saving correctly at both desktop and 375px. See
+`CHANGELOG.md` R8.111/R8.112.
+
 - [ ] [UNVERIFIED] SF-R4 phase accent palette (R8.84) — browser walk of
   project overview, project rail, and Today at desktop and 840 px: phase
   colors visible but restrained, status still readable without relying on
   color alone.
 
+### Parity gaps (legacy behavior the rebuild does not have yet)
+
+- [ ] [PARITY][P2] **Print / export the Product Schedule board as a
+  client-and-contractor catalogue sheet.** Legacy's `CatalogBoard` *is* the
+  printable deliverable — `@media print` rules, a running header carrying
+  project name, year and page number, and `no-print` on every editing
+  affordance. That is also the reason per-card "card fields" exists at all:
+  the choice is "what gets printed for the client", which is why legacy's
+  default was a lean Type + Brand rather than every populated field. The
+  rebuild board has no print path, so the card-field feature currently only
+  affects the on-screen board. Deferred by the owner on 2026-09-23 in favour
+  of landing the data/UI consistency first (R8.111); see
+  `STUDIOFLOW-REWORK-CONTRACT.md` §11.8.
+
 ### Open defects
 
-- [ ] [BUG][P2] KB-031 — Users and Roles & Access are split out of the General
-  Settings canvas into separate account-menu destinations, while Studio
-  Settings labels its area "Studio Settings" — the foundation/general
-  settings boundary feels split instead of centralized. Needs a focused
-  Foundation Settings IA plan: move Users and Roles & Access into the
-  General/Foundation Settings shell/sidebar without changing existing access
-  checks.
+**Fixed 2026-09-23 (R8.110):** KB-031 — Users and Roles & Access (and Master
+Data Settings) now render inside the shared `SettingsShell`/`SettingsNavigation`
+sidebar alongside General Settings, instead of being flat pages reachable
+only from a separate account-menu "Administration" submenu; that submenu was
+slimmed to a single "Settings" entry per `GLOBAL-MENU-DESIGN-BRIEF.md`'s own
+explored direction. No access-check changes. See `CHANGELOG.md` R8.110.
+
 - [ ] [BUG][P3] `sf_phase_definition.allow_parallel` for the dev database's
   migrated Supervision definition was observed `true` (expected `false` from
   the original seed) during V2-E browser verification (R8.105). Predates
@@ -236,33 +255,12 @@ re-investigated.
 
 ### Cleanup / dead code (confirmed unreachable, not a behavioral defect)
 
-- [ ] [CLEANUP] `src/apps/studioflow/mom-images.ts` (10 MB limit) is dead: its
-  only consumer is the archived `_legacy_project_id` route tree (excluded from
-  `tsconfig`, non-routable) and `mom.contract.test.ts:37`, which locks the
-  stale "no larger than 10 MB" text even though the live MOM upload path
-  (`mom-editor.tsx` → `actions.ts` → `mom.service.ts`) enforces 3 MB
-  (`domain/mom.ts` `MOM_LIMITS.imageBytes`). A future reader can wrongly
-  conclude the UI allows 10 MB. Purge `mom-images.ts`, retarget
-  `mom.contract.test.ts` at the live 3 MB policy, and remove the archived
-  `_legacy_project_id` tree (`src/app/(platform)/studioflow/projects/_legacy_project_id/**`,
-  ~20 files including `requirements/`, `mom/`, `phases/` sub-routes) and its
-  guard test `requirements.ui.test.ts` in the same pass — they're coupled.
-- [ ] [CLEANUP] Contract vocabulary drift left over from the V2-D1 Todo-SSOT
-  migration (`SfChecklistItem` replacing TODO-mode `SfActivity`):
-  - `STUDIOFLOW-REWORK-CONTRACT.md` §5.2/§6.4 still describe submitInternal as
-    blocked by "open TODO activities … deferred TODOs"; current code
-    (`todoBlockers`, unchecked root checklist items only) has no deferred
-    bucket at all (deferral mesh was fully purged in R8.98).
-  - `STUDIOFLOW-REWORK-CONTRACT.md` §6.1 KEEP table and
-    `STUDIOFLOW-PHASE-ENGINE-V2-CONTRACT.md` §9 still reference
-    "Activity TODO/FEEDBACK per revision, deferral, due date" / "deferred
-    items" — deferral cannot succeed (V2-D1 restricts `SfActivity` to
-    FEEDBACK-only) and the dead mesh was removed in R8.98.
-  - `PHASE-ENGINE-V2-BASELINE-AUDIT.md:19` "FEEDBACK → TODO on reject" is a
-    superseded description; V2-D1 changed the reject-conversion target to
-    `SfChecklistItem`.
-  - One vocabulary pass across these three documents would resync
-    "docs – codebase – business logic" for this area.
+**Fixed 2026-09-23 (R8.109):** purged dead `mom-images.ts` and the archived
+`_legacy_project_id` route tree (+ its guard test), retargeted
+`mom.contract.test.ts` at the live 3 MB policy, and resynced the contract
+vocabulary drift across `STUDIOFLOW-REWORK-CONTRACT.md`,
+`STUDIOFLOW-PHASE-ENGINE-V2-CONTRACT.md`, and
+`PHASE-ENGINE-V2-BASELINE-AUDIT.md`. See `CHANGELOG.md` R8.109.
 
 *(SF-06 `overrideRevision` hard-delete-with-audit-snapshot design and the
 StudioFlow UI Engine adoption gaps — phase rail, project directory table, MOM

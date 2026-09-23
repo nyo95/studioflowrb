@@ -1,7 +1,11 @@
 # UI/UX & Business-Flow Critique — 2026-09-23
 
-Status: owner feedback / design input, not a locked decision (same status class
-as [`GLOBAL-MENU-DESIGN-BRIEF.md`](apps/platform/GLOBAL-MENU-DESIGN-BRIEF.md)).
+Status: §1–§5 (except §4b) executed 2026-09-23, R8.110 — see `CHANGELOG.md`
+R8.110 for what shipped. §4b (`DESIGN.md` tone/density revision) remains
+owner feedback / design input, not a locked decision (same status class
+as [`GLOBAL-MENU-DESIGN-BRIEF.md`](apps/platform/GLOBAL-MENU-DESIGN-BRIEF.md))
+— deliberately left as a separate, explicitly-scoped decision given its
+app-wide blast radius, per its own recommendation below.
 Created: 2026-09-23, from a live browser walkthrough of the R8.108 build.
 
 This records owner critique of the current UI/UX across StudioFlow (Product
@@ -43,6 +47,20 @@ real editor (crop/pan sliders + a freehand red-line annotation layer) appears.
   precise but slower and less familiar than direct pinch/scroll-zoom +
   drag-to-pan, which is what every comparable consumer tool (WhatsApp,
   Google Photos) uses.
+
+**Follow-up, R8.111.** Moving the popover into the panel (R8.110) fixed the
+*location* of the control but not the model behind it, which the owner flagged
+on the same day: the eight checkboxes came from a field set that disagreed
+with the data model (`sku_text` duplicated Type, `notes` had a column but
+could never reach a card), the stored `TEXT[]` used `{}` for both "default"
+and "everything", and toggling a field on a card that had no value for it did
+nothing visible. R8.111 rebuilds that model — one vocabulary (Spec / Item
+details / Card fields), `sku_text` purged into Type, nullable-JSON
+`card_fields` with a real default set, `extra` spec lines, and two legacy
+parity bugs fixed. See `CHANGELOG.md` R8.111 and
+`STUDIOFLOW-REWORK-CONTRACT.md` §11.3/§11.8/§11.9. The remaining half of §1's
+premise — that this card is a printable client deliverable — is recorded as a
+parity gap in `docs/BACKLOG.md`.
 
 **Doc/codebase gap found.** Neither
 [`STUDIOFLOW-REWORK-CONTRACT.md`](apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md)
@@ -305,9 +323,23 @@ basis for.
 
 Roughly cheapest-and-safest to most involved:
 
-1. Tooltip-adoption pass (§4a) — mechanical, no design decision required.
-2. Schedule photo-modal skip + Card Fields relocation (§1) — contained to one file.
-3. MOM Meeting Details collapse + list-typing (§2) — contained to one file/component.
-4. Master Data quick-create unification (§5) — touches three dialogs and the `BrandSupplier` write path; worth a short design pass first given it changes a contracted relation-ownership rule.
-5. Global nav/settings execution against the existing brief (§3) — already scoped in `GLOBAL-MENU-DESIGN-BRIEF.md`, just needs a decision + execution pass.
-6. `DESIGN.md` tone/density revision (§4b) — largest blast radius, needs its own explicit decision before any component work.
+1. ~~Tooltip-adoption pass (§4a) — mechanical, no design decision required.~~
+   **Not done in R8.110** — deferred; see note below.
+2. ~~Schedule photo-modal skip + Card Fields relocation (§1)~~ **Done, R8.110**;
+   the underlying field model reworked in **R8.111** (see §1 follow-up).
+3. ~~MOM Meeting Details collapse + list-typing (§2)~~ **Done, R8.110.**
+4. ~~Master Data quick-create unification (§5)~~ **Done, R8.110** (including
+   the contract text revision to `brand-contract.md`/`vendor-contract.md`).
+5. ~~Global nav/settings execution against the existing brief (§3)~~ **Done,
+   R8.110** — logo, account menu, settings sidebar, animated search. The
+   brief's own still-open questions (app switcher placement, launcher style)
+   were not in scope and remain open.
+6. `DESIGN.md` tone/density revision (§4b) — largest blast radius, needs its
+   own explicit decision before any component work. **Not done, by design.**
+
+**Note on §4a (tooltip adoption):** not executed in this pass. It's genuinely
+mechanical but requires per-field judgment across ~88 files to apply
+`DESIGN.md` §14's rule correctly (only *ambiguous, risky, or constrained*
+copy qualifies — this isn't a global find-and-replace); it was scoped out to
+keep this pass to concrete, verifiable UI/logic changes rather than a
+subjective, wide-surface content audit. Worth a dedicated follow-up pass.

@@ -5,8 +5,310 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.108**
-- Next local revision: **R8.109**
+- Current revision after this entry is committed: **R8.112**
+- Next local revision: **R8.113**
+
+## R8.111 | 2026-09-23 | feat(sf): Product Schedule spec model — one vocabulary, legacy-faithful card fields
+
+Owner review of the Product Schedule card ("card? information? metadata?")
+found the display layer and the data model disagreeing. Legacy
+`CatalogBoard.tsx` was re-read as the specification. Owner decisions taken
+during the review are recorded in `STUDIOFLOW-REWORK-CONTRACT.md` §11.3,
+§11.8 and the new §11.9.
+
+### Vocabulary
+
+One word per thing, in UI, code and contract. **Spec** = the option's product
+attributes. **Item details** = the entry's Location/Qty/Unit. **Card fields**
+= which of those caption the board card. The word "metadata" is gone from the
+schedule surface. The panel's "Options" heading is now "Spec options", and
+Location/Qty/Unit sit under an "Item details" heading instead of floating
+above the card-field checkboxes with nothing naming them.
+
+### Type replaces Item No
+
+Legacy carried both an "Item No" (`specs.catalog_sku`) and a Type; the owner
+ruled they are the same designation ("Nude Pro - ATS 1132 M"). `sku_text` is
+dropped from `sf_schedule_option` and `sf_schedule_template_item`, its value
+folded into `product_name`, and every label for that field — card, option
+form, template form, list header — is now **Type**. CSV import appends an
+article-code column to Type rather than storing it twice. Labels were also
+reconciled elsewhere: the card said "Size" while the form said "Dimension",
+and the card said "Pattern" while the form said "Pattern / motif".
+
+### Card fields behave like legacy again
+
+- `card_fields` becomes **nullable JSON**. `null` = no override, an array =
+  an explicit choice that may be empty. The old `TEXT[]` used `{}` for both,
+  so "default" and "explicitly everything" were indistinguishable, "Use
+  default" never appeared, and unticking the last box had to be blocked.
+- **Default set: Brand, Color, Finishing, Location, Notes.** Previously every
+  populated field showed, which is not a choice at all.
+- **Notes joins the selectable fields** (it had a column and a form field but
+  could never appear on a card); Pattern, Size and Qty are now off by default.
+- Overrides are stored in **canonical field order**, so unticking and
+  re-ticking a field no longer moves its row to the bottom of the card.
+- The panel says whether the entry is on the default or on a custom choice.
+- A **template item carries the card-field choice** of the row it was saved
+  from, so "Apply templates" reproduces the approved card.
+
+### Extra spec fields
+
+Options and template items gained `extra`, a JSON `[{label, value}]` array for
+specification lines that do not deserve a column ("Abrasion class / PEI IV"),
+edited through a shared `ExtraFieldsEditor`. Capped at 12 lines, label ≤ 60,
+value ≤ 300, half-filled lines dropped, labels de-duplicated. Extras render as
+card rows, are individually selectable as card fields (`x:<slug>`), join
+`search_key`, and travel with reuse and templates. The typed columns stay the
+home of everything that appears on nearly every card, so search, ordering and
+CSV keep working off the database — this is not a return to legacy's
+`data_snapshot`, which mirrored fields into columns and documented its own
+sync risk.
+
+### Two parity bugs found while reading legacy
+
+- **The card now falls back to the first option** when no option is final
+  (legacy `selectedCatalogOption`: final → active index → first). A row with
+  one unapproved option showed "No final option yet" and no spec rows at all,
+  even with the product fully filled in.
+- **Placeholder rows stay out of the reuse pool.** `search_key` is empty when
+  brand *and* type are both placeholders (`N/A`, `PENDING`, `[RESERVED]`,
+  blank…), porting legacy's `deriveScheduleSpecFields` rule that the rebuild
+  had never implemented, so empty reserved rows no longer surface in "From
+  past project". Brand is deliberately **not** made mandatory — a spec with no
+  catalogued brand is normal and stays searchable by its Type.
+
+### Migration
+
+`20260923000000_sf_schedule_spec_model` folds `sku_text` into `product_name`
+and drops it, adds `extra` to options and template items, rebuilds every
+`search_key` under the new rule, converts `sf_schedule_entry.card_fields` from
+`TEXT[]` to nullable JSONB (`{}` → `NULL`, stored choices keep their fields
+minus `sku`), and adds `card_fields` to template items. Applied to both
+`studioflow_rebuild` and `studioflow_rebuild_test` and verified: `tsc`,
+`eslint`, and the full `npm test` (462 passed) all clean, plus a browser walk
+of the schedule board and template settings.
+
+### Not in this pass
+
+Printing the board as a client/contractor catalogue sheet — the reason legacy
+had card fields at all — is recorded in `docs/BACKLOG.md` as a parity gap, at
+the owner's instruction to land the data and UI consistency first.
+
+## R8.112 | 2026-09-23 | feat(sf): Product Schedule editor — dialog panel, tick-to-fill checklist
+
+Two more owner review passes on the same screen, both from using the R8.111
+board live in the browser.
+
+### Pass 1: a real editor, not a sidebar
+
+The entry panel was a slim 22rem (~350px) sidebar squeezed beside the board on
+desktop and a separate `Drawer` on mobile — with the card-content section,
+its checkboxes, and every option's edit form all fighting for that width. It
+is now one `Dialog` (`size="lg"`, 760px), used on both breakpoints, replacing
+`EntryDrawer`/the desktop-panel branch/`useIsDesktop` entirely — the same
+dialog pattern already used by "Add item" and every other schedule dialog in
+this file.
+
+While rebuilding the panel, `card_fields = []` (R8.111's "explicit, nothing
+selected" state) was found colliding with `card_fields = null` ("no
+override") in the UI's own greyed-out-checkbox styling; both are now handled
+without conflating them.
+
+### Pass 2: ticking a field is how you say "I don't know it yet"
+
+Live testing surfaced a real usability bug in the pass-1 UI: a field with no
+value on the shown option was greyed out and **un-tickable**, on the reasoning
+that ticking an empty field would not change the card. But that made "I don't
+know the brand yet, but note that it belongs on this card" impossible to
+express — the exact case that comes up on nearly every unfinalized spec.
+Owner: *"kalau brandnya masih belum tau gmn? better legacy sih sebenernya
+ya?"* Legacy never separated "show this field" from "edit this field" in the
+first place — its checklist was a plain visibility toggle, and the value was
+typed directly on the card face.
+
+**Item details and What-shows-on-the-card are merged into one checklist**
+(`ChecklistRow`): each field is one row, a checkbox, and — only once ticked —
+the input(s) that fill it in, right there. Unticking never discards what was
+typed, it only stops that field from captioning the card. This closes the
+gap pass 1 opened:
+
+- Location and Qty (+Unit) write straight to the entry, per row, on blur —
+  the old batched "Save details" button is gone.
+- Brand (Master Data select + free-text fallback), Color, Pattern, Finishing,
+  Size and Notes write to the option the card already speaks for
+  (`shownOptionOf`: the final option, else the first) — the full option
+  snapshot re-saves on any of their blurs, since the write path takes a whole
+  snapshot, not a per-field patch.
+- A row backed by an option (everything except Location/Qty) disables only
+  when there is no option yet to attach a value to ("Add an option below
+  first"), never because the value happens to be blank.
+- Extra spec lines keep a plain checkbox (no reveal needed — by construction
+  an extra field never exists with an empty label or value).
+- The card itself is unchanged: an empty field, ticked or not, still does not
+  render a row (owner decision, this pass) — only the *editing* side changed.
+
+### Verification
+
+`tsc`, `eslint`, and `npm test` (466 passed, including the disposable
+`studioflow_rebuild_test` database) all clean. Browser-verified: the dialog
+opens at both desktop and 375px with the same content; ticking Brand reveals
+the select/input and saves on blur (confirmed against the option row below);
+ticking and unticking Qty toggles its two inputs without disturbing the other
+rows' state.
+
+## R8.110 | 2026-09-23 | feat(sf,masterdata,ui-engine): execute UIUX-CRITIQUE-2026-09-23.md §1–§5
+
+Implemented every recommendation in `docs/UIUX-CRITIQUE-2026-09-23.md` except
+§4b (revising `DESIGN.md`'s density/tone stance) — that item is explicitly a
+locked-contract revision with app-wide blast radius per the critique's own
+text and is left as a separate, explicitly-scoped decision rather than
+folded into this pass.
+
+### §1 StudioFlow Product Schedule
+
+- **Card Fields folded into the entry panel.** The per-card "what shows on
+  this card" checkboxes moved from a hover-revealed gear-icon popover
+  (`CardFieldsMenu`, removed) into a "What shows on the card" sub-section of
+  the entry panel itself, right below Location/Qty/Unit. Same
+  `updateScheduleEntryCardFieldsAction` write path, no server change.
+- **Photo picker opens immediately.** `ImageWorkspace` now auto-triggers the
+  OS file picker on mount when no image is chosen yet, instead of requiring
+  a "Choose image" button click first inside the dialog; the button remains
+  as a fallback if the picker is cancelled.
+- **Scroll-to-zoom, drag-to-pan, and an expanded annotation toolbar** (pen,
+  arrow, box, circle, 5-color swatch set, plus a "Pan" tool) replace the
+  single freehand red-line tool, implemented once in the shared
+  `platform/ui_engine/patterns/image-workspace.tsx` (used identically by
+  Schedule and MOM photos). Pan is a selectable tool routed through the same
+  canvas pointer-capture as drawing, not a second competing pointer
+  listener, so dragging to pan never fights with drawing a stroke.
+
+### §2 StudioFlow MOM
+
+- **Meeting Details collapses to a `Topic · Date · Venue` summary**,
+  expandable on click, instead of permanently occupying full form height
+  above the working content.
+- **Typed "1."/"-"/"•" list markers auto-continue on Enter** in point notes,
+  scoped to when the section's list style is `NONE` (so it never duplicates
+  the externally-rendered marker `pointMarkers()` already draws for
+  DECIMAL/DISC/DASH sections). Enter on an empty marker line ends the list.
+- Annotation toolbar upgrade shared with §1 (same `ImageWorkspace`).
+
+### §3 Global navigation, header, and Settings
+
+Executes `apps/platform/GLOBAL-MENU-DESIGN-BRIEF.md`'s own explored
+direction and closes `BACKLOG.md` KB-031:
+
+- Logo shrunk (`h-[38px] max-w-[190px]` → `h-7 max-w-[150px]`).
+- **Users, Roles & Access, and Master Data Settings now render inside the
+  shared `SettingsShell`/`SettingsNavigation` sidebar** alongside General
+  Settings — previously flat pages reachable only via the account menu.
+  `SettingsShell` gained a `fill` prop so a `DirectoryShell fill` table
+  inside it still reaches viewport height.
+- **Account menu slimmed to Account / Settings / Sign out** (brief's own
+  proposed simplification) — the "Administration" submenu with separate
+  Users/Roles links is gone now that they're reachable from inside the
+  settings canvas. `shell-rules.ts`'s `getAdministrationMenuVisibility`
+  (4 booleans) replaced by `getSettingsMenuVisibility` (1 boolean).
+- **Header search animates open**: the icon now expands inline into a
+  topbar input (CSS width/opacity transition, `Popover.Anchor` spanning
+  icon+input so the results dropdown lines up with the full row) instead of
+  popping open a detached floating panel.
+
+### §5 Master Data quick-create unification
+
+- **New shared `VendorQuickCreateDialog`** (`platform/ui_engine/patterns/`)
+  — name + required Supplier Type, used identically from Brand's
+  Owner-supplier field, Brand's new "+ Create new supplier for this brand"
+  affordance on the Suppliers field, and Pricing's supplier field (refactored
+  onto the shared component, no behavior change there).
+  `createBrandVendorQuickAction` (renamed from `createOwnerVendorQuickAction`)
+  now requires and applies a `vendorTypeId`, closing the "owner supplier
+  created with zero Vendor Types, invisible to every price picker" gap.
+  `listBrandDirectoryRefs` gained a `vendorTypes` (material-capable) list.
+- **Brand's Suppliers field can now create a new supplier in one step**,
+  writing the `BrandSupplier` row through the existing
+  `createBrand`/`updateBrand` write path (no new transaction code needed —
+  it already writes a `BrandSupplier` row for every id present in
+  `suppliers`, and already required `assertVendorMaterialCapable`, which the
+  new quick-create satisfies since it now always assigns a type).
+- `brand-contract.md` §4.1 and `vendor-contract.md` §11 updated: the
+  "owner-only Vendor may have zero Vendor Types" allowance is now scoped to
+  the full Vendor directory form (a deliberate choice on the full form),
+  not Brand's quick-create paths (which always require one).
+
+### Verification
+
+`tsc --noEmit` and `eslint .` clean; existing `shell-rules.test.ts` updated
+for the renamed function and passing; full non-DB unit suite (102 tests)
+passing. Browser-verified live (dev server with a real DB connection):
+Card Fields panel toggle + persistence, Meeting Details collapse/expand,
+list auto-continue (via direct `KeyboardEvent` dispatch — the browser
+automation's synthetic key press doesn't reliably reach a focused textarea,
+a harness limitation rather than a product one), Settings sidebar on
+Users/Roles/Master Data Settings, slimmed account menu, animated search
+with live results, and both Brand-side quick-create flows end-to-end
+(vendor created with a type, linked into Owner supplier and Suppliers).
+Not verified: the post-upload crop/pan/annotation canvas UI, since the
+browser tool used here has no file-upload capability to supply a real image.
+
+## R8.109 | 2026-09-23 | fix(bq,sf): BACKLOG sweep — insert-order sort_order, project-lifecycle races, dead code, contract drift
+
+Worked every open `docs/BACKLOG.md` item that did not require owner input
+(design decision, IA plan, or dev-environment forensics) — the rest (decision
+gates, UI-invisible-markup design call, Foundation Settings IA, the dev-DB
+`allow_parallel` anomaly, asset-storage/Google-Drive planning, and every
+`[UNVERIFIED]` browser-walk item) are left open as-is.
+
+### Fixed — correctness
+
+- **BQ sibling `sort_order` collisions on plain insert:** `addSection`,
+  `addSubsection`, `addItem`, `addSubObject`, and `addLineItem`
+  (`project-tree.ts`) all defaulted `sort_order` to `0` when the caller
+  omitted it, and no UI action ever supplied one — every manually-added
+  sibling under the same parent landed at `sort_order = 0`, leaving
+  same-parent display order unstable across reads. Fixed by computing
+  `max(sibling sort_order) + 1` at insert time, scoped to the same parent,
+  when the caller doesn't pass an explicit `sortOrder`. Regression test:
+  `service.integration.test.ts` "assigns sequential sort_order to siblings
+  inserted without an explicit order".
+- **BQ project-lifecycle check-then-act races:** `lockProject`,
+  `unlockProject`, `archiveProject`, `restoreProject`,
+  `approveProjectDeletion`, and `rejectProjectDeletion` (`projects.ts`) each
+  read status with a plain `findUnique`, validated, then wrote with a plain
+  `update` — the same shape already fixed for BQ promotion approvals in
+  R8.107. A double-click/double-tab race could double-apply a transition or,
+  for `approveProjectDeletion`, attempt to delete an already-deleted project.
+  Fixed with the same guarded-`updateMany`/`deleteMany` pattern as
+  `transitionPromotionStatus`: the WHERE clause re-checks status in the same
+  statement as the write, so the loser's call matches zero rows and throws a
+  clean conflict instead of racing. Regression tests:
+  `service.integration.test.ts` "guards concurrent project archive attempts
+  against a lost-update race" and "guards concurrent deletion approvals from
+  deleting the same project twice".
+
+### Cleanup — dead code and doc drift
+
+- Purged `src/apps/studioflow/mom-images.ts` (dead: only consumer was the
+  archived, non-routable `_legacy_project_id` route tree) and removed that
+  entire archived tree (~24 files under
+  `src/app/(platform)/studioflow/projects/_legacy_project_id/**`) plus its
+  guard test `requirements.ui.test.ts`. Retargeted `mom.contract.test.ts`'s
+  image-size-policy assertion from the deleted 10 MB legacy constant to the
+  live 3 MB limit in `domain/mom.ts` (`MOM_LIMITS.imageBytes`).
+- Resynced StudioFlow contract vocabulary left over from the V2-D1 Todo-SSOT
+  migration: `STUDIOFLOW-REWORK-CONTRACT.md` §2 disposition matrix, §5.2, and
+  §6.1/§6.4 still described `SfActivity` as carrying a TODO mode and a defer
+  command and `submitInternal`/`fullBlockers` as counting deferred activities
+  — none of which exist since V2-D1 restricted `SfActivity` to FEEDBACK-only
+  and R8.98 purged the deferral mesh. Updated those sections to match
+  `domain/blockers.ts` (`fullBlockers`/`todoBlockers`) as actually
+  implemented. Also fixed `STUDIOFLOW-PHASE-ENGINE-V2-CONTRACT.md` §9's
+  "SfActivity FEEDBACK + deferred items" and annotated
+  `PHASE-ENGINE-V2-BASELINE-AUDIT.md`'s "FEEDBACK → TODO on reject" row as
+  superseded (the reject-conversion target is `SfChecklistItem`, not an
+  `SfActivity` TODO) rather than rewriting that dated snapshot's claims.
 
 ## R8.108 | 2026-09-23 | fix(sf): R8.107 regression sweep — schedule board, checklist permissions, client-name race
 

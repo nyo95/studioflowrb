@@ -30,12 +30,12 @@ describe("Schedule Board/List outer branching and pattern form preservation", ()
     assert.ok(listUl > -1 && listUl > toggle, "list rows render only inside the else branch, not before the board branch");
   });
 
-  it("opens a single shared inspector for both views", () => {
+  it("opens a single shared editor dialog for both views (R8.112: no separate desktop-panel/mobile-drawer split)", () => {
     const boardOpen = scheduleBoard.indexOf("onOpen={setOpenId}", scheduleBoard.indexOf("<BoardView"));
-    const drawer = scheduleBoard.indexOf("<EntryDrawer");
-    assert.ok(boardOpen > -1, "BoardView opens the shared inspector");
-    assert.equal(drawer, scheduleBoard.lastIndexOf("<EntryDrawer"), "EntryDrawer is rendered once at the outer level");
-    assert.ok(scheduleBoard.indexOf("{/* Desktop inline panel */}") > scheduleBoard.indexOf('<div className="min-w-0">'), "desktop panel is a sibling of the view pane, not inside it");
+    const dialogUsage = (scheduleBoard.match(/<EntryDialog/g) ?? []).length;
+    assert.ok(boardOpen > -1, "BoardView opens the shared editor");
+    assert.equal(dialogUsage, 1, "EntryDialog is rendered exactly once, as a sibling of the view pane, not once per breakpoint");
+    assert.doesNotMatch(scheduleBoard, /useIsDesktop\(\)|<EntryDrawer|md:grid-cols-\[1fr_22rem\]/, "the split desktop-sidebar/mobile-drawer layout must not come back");
   });
 
   it("has the List button and Board button in the toolbar", () => {
@@ -56,12 +56,12 @@ describe("Schedule Board/List outer branching and pattern form preservation", ()
 
   it("includes pattern in toSnapshot and specLine", () => {
     assert.match(scheduleBoard, /pattern:\s*text\(draft\.pattern\)/);
-    assert.match(scheduleBoard, /Pick<ScheduleOptionView, "skuText" \| "color" \| "pattern" \| "finishing" \| "dimension">/);
+    assert.match(scheduleBoard, /Pick<ScheduleOptionView, "color" \| "pattern" \| "finishing" \| "dimension">/);
   });
 
-  it("has a Pattern / motif field in ProductFields", () => {
+  it("has a Pattern field in ProductFields", () => {
     const productFieldsIndex = scheduleBoard.indexOf("function ProductFields");
-    const patternField = scheduleBoard.indexOf('<Field label="Pattern / motif">', productFieldsIndex);
+    const patternField = scheduleBoard.indexOf('<Field label="Pattern">', productFieldsIndex);
     assert.ok(patternField > -1, "Pattern field exists in ProductFields");
     assert.ok(patternField > scheduleBoard.indexOf('<Field label="Color">', productFieldsIndex), "Pattern sits after Color");
     assert.ok(patternField < scheduleBoard.indexOf('<Field label="Finishing">', productFieldsIndex), "Pattern sits before Finishing");
@@ -75,7 +75,7 @@ describe("Schedule Board/List outer branching and pattern form preservation", ()
     assert.match(settingsView, /pattern:\s*string\s*\| null;/);
     assert.match(settingsView, /pattern:\s*text\(item\?\.pattern\)/);
     assert.match(settingsView, /pattern:\s*nullable\(draft\.pattern\)/);
-    assert.match(settingsView, /<Field label="Pattern \/ motif">/);
+    assert.match(settingsView, /<Field label="Pattern">/);
   });
 
   it("preserves pattern in service templateItemData", () => {
@@ -84,5 +84,50 @@ describe("Schedule Board/List outer branching and pattern form preservation", ()
 
   it("handles pattern/motif/catalog_motif CSV import aliases", () => {
     assert.match(serviceTs, /pattern:\s*row\.pattern\s*\|\|\s*row\.motif\s*\|\|\s*row\.catalog_motif/);
+  });
+});
+
+describe("R8.112: card-field checkboxes grey out when there is nothing to show", () => {
+  it("cardFieldValuesOf renders the board card, unchanged since R8.112", () => {
+    assert.match(scheduleBoard, /function cardFieldValuesOf\(entry: ScheduleEntryView\)/);
+    const boardViewIndex = scheduleBoard.indexOf("function BoardView");
+    const panelIndex = scheduleBoard.indexOf("function EntryPanelContent");
+    assert.match(scheduleBoard.slice(boardViewIndex, panelIndex), /const fieldValue = cardFieldValuesOf\(entry\);/);
+  });
+
+  it("still hides the empty row on the card itself (does not start rendering blanks)", () => {
+    assert.match(scheduleBoard, /details\.map\(\(\[label, value\]\) => value \? \(/);
+  });
+});
+
+describe("R8.113: Item details and card fields merged into one tick-to-fill-in checklist", () => {
+  it("the empty-value gate from R8.112 is gone from the panel — ticking a field is never blocked by it being blank", () => {
+    assert.doesNotMatch(scheduleBoard, /!hasValue\(/, "an empty-field checkbox gate must not come back");
+    const panelIndex = scheduleBoard.indexOf("function EntryPanelContent");
+    assert.doesNotMatch(scheduleBoard.slice(panelIndex), /cardFieldValuesOf\(entry\)/, "the panel no longer reads field values just to grey out a checkbox");
+  });
+
+  it("Location/Qty checkboxes disable only for permission or a pending save; option-backed ones also require a shown option to write to", () => {
+    const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"));
+    assert.match(panelBody, /disabled=\{!canEdit \|\| isPending\(cardFieldsKey\)\}/, "an entry-level row (Location/Qty) disables only for permission/pending");
+    assert.match(panelBody, /disabled=\{!canEdit \|\| isPending\(cardFieldsKey\) \|\| !shown\}/, "an option-level row disables with no shown option to attach a value to — not because the value is blank");
+  });
+
+  it("reveals a field's input only once its checkbox is ticked (ChecklistRow)", () => {
+    assert.match(scheduleBoard, /\{checked && children \? <div className="px-1\.5 pb-2 pt-0\.5">\{children\}<\/div> : null\}/);
+  });
+
+  it("auto-saves on blur — the separate 'Save details' button is gone", () => {
+    assert.doesNotMatch(scheduleBoard, /Save details/, "entry fields now save per-row on blur, not through a batched button");
+    assert.match(scheduleBoard, /const saveOptionDraft = \(next: ProductDraft\) => \{/);
+    assert.match(scheduleBoard, /onBlur=\{\(\) => saveOptionDraft\(optionDraft\)\}/);
+    assert.match(scheduleBoard, /onBlur=\{saveLocation\}/);
+    assert.match(scheduleBoard, /onBlur=\{saveQty\}/);
+  });
+
+  it("Brand keeps its Master Data select + free-text fallback inline in the checklist row", () => {
+    const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"));
+    assert.match(panelBody, /label="Brand"/);
+    assert.match(panelBody, /Other \(type the name\)/);
   });
 });
