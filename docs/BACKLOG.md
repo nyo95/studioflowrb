@@ -205,14 +205,14 @@ re-investigated.
 
 ### Planned (owner-confirmed scope, 2026-09-23 — none built yet)
 
-- [ ] [PLANNED] **Projects directory: move project-info editing off the detail
-  page and onto the list.** Owner: modifying designer/drafter/opening date and
-  other administrative project fields should happen from the Projects table
-  itself (a modal/dialog or similar, mechanism left to implementation), not by
-  opening the project. The project detail page then narrows to phase-focused
-  information only. Today `project-directory.tsx` has filters but no inline
-  edit; every field change requires navigating into the project. Next up
-  after the open bugs/planned items below are resolved.
+**Fixed 2026-09-23 (R8.120):** Projects directory — administrative fields
+(name, client, contact, designer/drafter, opening date, type, area, address,
+priority, status) moved off the project detail page and onto a row-action
+"Edit details" modal on `/studioflow/projects`, alongside Archive/Restore and
+"Apply checklist templates" as separate row-menu items. The project's own
+pages now show client/designer/drafter/status/priority as read-only header
+text only — no edit affordance. See `CHANGELOG.md` R8.120.
+
 - [ ] [PLANNED] **StudioFlow Library.** Rebuild of the legacy read-only
   Library page: search/discover Master Data's Brand catalog from inside
   StudioFlow (owner: *"rebuild dari studioflow 'library' dengan kemampuan

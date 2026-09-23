@@ -16,6 +16,8 @@ import {
   EntityPrimaryCell,
   FilterChip,
   FormattedInstant,
+  RowActionsCell,
+  RowActionsHead,
   SearchField,
   SegmentBar,
   Select,
@@ -31,13 +33,20 @@ import {
 
 import { PersonChip, type Person } from "../_components/people";
 import { NewProjectDialog } from "./new-project-dialog";
+import { ProjectRowActions } from "./project-row-actions";
 
 type ProjectRow = {
   id: string;
   name: string;
+  readableName: string;
   client: { id: string; name: string } | null;
   status: "ACTIVE" | "ON_HOLD" | "COMPLETED";
   priority: "URGENT" | "NORMAL" | "LOW";
+  projectType: string;
+  openingDate: string | null;
+  clientContact: string | null;
+  address: string | null;
+  area: string | null;
   archivedAt: Date | null;
   updatedAt: Date;
   designer: Person;
@@ -132,12 +141,13 @@ export function ProjectDirectory({
             <TableHead>Designer / Drafter</TableHead>
             <TableHead align="end">Open</TableHead>
             <TableHead>Updated</TableHead>
+            {canManage ? <RowActionsHead /> : null}
           </TableRow>
         </TableHeader>
         <TableBody>
           {projects.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5}>
+              <TableCell colSpan={canManage ? 6 : 5}>
                 <EmptyState title={filters.archived ? "No archived projects" : "No projects match"} description={canManage && !filters.archived ? "Create the first project to start its phases." : undefined} action={canManage && !filters.archived ? <Button onClick={() => setCreating(true)}>New project</Button> : undefined} />
               </TableCell>
             </TableRow>
@@ -167,6 +177,13 @@ export function ProjectDirectory({
               </TableCell>
               <TableCell align="end"><span className="tabular-nums">{project.openItems}</span></TableCell>
               <TableCell><FormattedInstant value={project.updatedAt} locale={locale} timeZone={timezone} /></TableCell>
+              {canManage ? (
+                <RowActionsCell>
+                  <span onClick={(e) => e.stopPropagation()}>
+                    <ProjectRowActions project={project} people={people} clients={clients} />
+                  </span>
+                </RowActionsCell>
+              ) : null}
             </TableRow>
           ))}
         </TableBody>

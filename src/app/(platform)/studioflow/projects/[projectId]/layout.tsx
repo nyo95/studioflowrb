@@ -3,15 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AppError } from "@platform/core/errors";
-import { hasPermission } from "@platform/core/rbac";
-import { STUDIOFLOW_PERMISSIONS as P, STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
+import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { Badge, Breadcrumb, ContextNavHeading, MetaList, Notice, PageHeader, SettingsShell } from "@/platform/ui_engine";
 
 import { pageSession } from "../../_components/session";
 import { PRIORITY_LABEL, PROJECT_STATUS_LABEL } from "../../_components/phase-status";
 import { ProjectNavLinks } from "./project-nav-links";
-import { ProjectHeaderActions } from "./project-header-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -22,15 +20,12 @@ export default async function ProjectLayout({ children, params }: { children: Re
     if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
     throw error;
   });
-  const [people, clients, momDocuments, scheduleEntries] = await Promise.all([
-    studioFlow.projects.listAssignablePeople({ grants }),
-    studioFlow.projects.listClients({ grants }),
+  const [momDocuments, scheduleEntries] = await Promise.all([
     studioFlow.mom.listDocuments({ grants, projectId }),
     studioFlow.schedule.listSchedule({ grants, projectId }),
   ]);
   const momCount = momDocuments.length;
   const scheduleCount = scheduleEntries.length;
-  const canManage = hasPermission(grants, P.projectManage);
 
   return (
     <div className="grid gap-4">
@@ -48,10 +43,6 @@ export default async function ProjectLayout({ children, params }: { children: Re
             ]}
           />
         }
-        actions={canManage ? <ProjectHeaderActions project={project} people={people} clients={[
-          ...clients.map((c) => ({ id: c.id, name: c.name })),
-          ...(project.client && !clients.some((c) => c.id === project.client!.id) ? [{ id: project.client.id, name: `${project.client.name} (archived)` }] : []),
-        ]} /> : undefined}
         divider
       />
       {project.archivedAt ? (

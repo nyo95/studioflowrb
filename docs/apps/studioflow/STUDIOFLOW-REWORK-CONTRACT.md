@@ -314,6 +314,23 @@ The project workspace keeps the legacy two-level navigation: app rail +
 project rail listing Overview, the five phases (state dot + open-root-task
 count), MOM, Schedule, History. Mobile: drawer.
 
+**Administrative fields are edited from the Projects directory, not the
+project's own pages (owner, 2026-09-23).** Name, client, client contact,
+designer/drafter PIC, opening date, project type, area, address, priority,
+and status are all edited through one `EditProjectDialog` opened from a
+project's row-action menu on `/studioflow/projects`
+(`project-row-actions.tsx`, `edit-project-dialog.tsx`); archive/restore and
+"Apply checklist templates" are separate items in that same row menu, mirroring
+how the Clients directory already does Edit/Archive. The project's own header
+(`layout.tsx`) now only *displays* client/designer/drafter/status/priority as
+read-only text (`MetaList`) — it carries no edit affordance, so every project
+page (Overview, MOM, Schedule, History) is phase/record-focused only. The
+service/action layer is unchanged: `updateProjectAction` still covers
+name/client/designer/drafter/opening-date/type/contact/address/area, and
+`setProjectPriorityAction`/`setProjectStatusAction`/`archiveProjectAction`/
+`restoreProjectAction`/`syncChecklistAction` remain their own calls — only the
+caller moved.
+
 ## 9. Overrides of earlier ratified decisions
 
 - D-SF-03 (MOM lifecycle DRAFT/ISSUED/SUPERSEDED) → **replaced** by §10

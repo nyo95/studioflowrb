@@ -5,8 +5,47 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.119**
-- Next local revision: **R8.120**
+- Current revision after this entry is committed: **R8.120**
+- Next local revision: **R8.121**
+
+## R8.120 | 2026-09-23 | feat(sf): move project-info editing from the detail page onto the Projects list
+
+Owner: *"modifikasi desainer/drafter/timeline opening dll itu ada di tabel /
+halaman proyek [list] ini... di project detail hanya fokus pada informasi
+keterangan phase saja."* Closes the `docs/BACKLOG.md` "Projects directory"
+planned item from this session's discussion.
+
+- `listProjects` (`src/apps/studioflow/projects/service.ts`) now also returns
+  `readableName`, `projectType`, `clientContact`, `address`, `area` — the
+  fields `getProject` already had but the list view didn't, needed for the
+  new edit form without a per-row fetch.
+- New `EditProjectDialog` (`edit-project-dialog.tsx`) — the same fields the
+  old header dialog had (name/client/contact/designer/drafter/opening date/
+  type/area/address), plus priority and status folded in as two more Select
+  fields (saved via their own `setProjectPriorityAction`/
+  `setProjectStatusAction` calls after `updateProjectAction`, matching how
+  the removed header kept them as separate service calls).
+- New `ProjectRowActions` (`project-row-actions.tsx`) — a `RowActionMenu` per
+  Projects-list row: Edit details, Apply checklist templates, Archive
+  project… (or just Restore project for an archived row) — mirrors the
+  Clients directory's existing Edit/Archive/Restore row-menu pattern.
+  `project-directory.tsx` gained a `RowActionsHead`/`RowActionsCell` column,
+  shown only when `canManage`.
+- Deleted `project-header-actions.tsx` (fully superseded) and dropped its
+  `actions` prop from `[projectId]/layout.tsx` along with the `people`/
+  `clients`/`canManage` fetches that existed only to feed it. The layout's
+  `MetaList` still *displays* client/designer/drafter/status/priority as
+  read-only text — it just carries no edit control anymore, so every project
+  page (Overview, MOM, Schedule, History) is phase/record-focused only.
+- `STUDIOFLOW-REWORK-CONTRACT.md` §8 documents the new location.
+
+Verification: `tsc`, `check:boundaries`, `check:legacy-runtime` clean.
+`npm test`: 491 passed, 0 failed (no test exercised the moved UI directly,
+but the underlying `updateProject`/`setProjectPriority`/`setProjectStatus`/
+`archiveProject`/`restoreProject`/`syncChecklist` service methods are
+unchanged and already covered). Browser acceptance intentionally deferred —
+owner asked to test manually before any further browser-driven verification.
+
 
 ## R8.119 | 2026-09-23 | fix(bq): zero a Work Item's markup once it has no children left; record backlog decisions
 
