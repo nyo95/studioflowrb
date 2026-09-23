@@ -13,6 +13,7 @@ import { useActionState,useState,useTransition } from "react";
 
 import { Button,ConfirmDialog,DataTable,EmptyState,EntityPrimaryCell,Field,FormActions,InlineError,Input,Notice,Spinner,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Textarea } from "@/platform/ui_engine";
 import { archiveRoleAction,createRoleAction,replaceRoleGrantsAction,updateRoleAction } from "./actions";
+import type { AppGroup } from "./permission-grouping";
 
 type RoleRow = {
   id: string;
@@ -27,12 +28,12 @@ type RoleRow = {
 
 export function RolesDirectory({
   roles,
-  registryPermissions,
+  permissionGroups,
   canManage,
   integrityIssues,
 }: {
   roles: RoleRow[];
-  registryPermissions: readonly string[];
+  permissionGroups: AppGroup[];
   canManage: boolean;
   integrityIssues: { roleId: string; roleCode: string; permissionId: string }[];
 }) {
@@ -144,7 +145,7 @@ return (
             <Textarea id="role-description" name="description" maxLength={500} rows={2} />
           </Field>
           <Field id="role-grants" label="Permissions">
-            <PermissionCheckboxes name="permissionIds" permissions={registryPermissions} />
+            <PermissionCheckboxes name="permissionIds" groups={permissionGroups} />
           </Field>
           {createState?.ok === false ? <InlineError>{createState.error.safeMessage}</InlineError> : null}
           <FormActions>
@@ -200,7 +201,7 @@ return (
             <input type="hidden" name="roleId" value={grantsTarget.id} />
             <PermissionCheckboxes
               name="permissionIds"
-              permissions={registryPermissions}
+              groups={permissionGroups}
               checkedIds={grantsTarget.permissionIds}
             />
             {grantsState?.ok === false ? <InlineError>{grantsState.error.safeMessage}</InlineError> : null}
@@ -238,26 +239,77 @@ return (
   );
 }
 
+/**
+ * Grouped by app, then by resource within that app — a resource's Read /
+ * Manage (or whatever actions it has) sit on one row instead of being two
+ * unrelated lines lost in what used to be one flat 39-permission scroll.
+ * Grouping itself comes from `permission-grouping.ts`, computed server-side
+ * from the real registry, not guessed here.
+ */
 function PermissionCheckboxes({
   name,
-  permissions,
+  groups,
   checkedIds = [],
 }: {
   name: string;
-  permissions: readonly string[];
+  groups: readonly AppGroup[];
   checkedIds?: readonly string[];
 }) {
+  const [query, setQuery] = useState("");
+  const trimmed = query.trim().toLowerCase();
+  const matches = (label: string) => label.toLowerCase().includes(trimmed);
+  const filteredGroups = trimmed
+    ? groups
+        .map((app) => ({
+          ...app,
+          resources: app.resources
+            .map((resource) => ({
+              ...resource,
+              permissions: resource.permissions.filter((p) => matches(p.id) || matches(resource.resourceLabel) || matches(app.appLabel)),
+            }))
+            .filter((resource) => resource.permissions.length > 0),
+        }))
+        .filter((app) => app.resources.length > 0)
+    : groups;
+
   return (
-    <div className="grid max-h-[240px] gap-1.5 overflow-auto py-1">
-      {permissions.map((permission) => (
-        <Checkbox
-          key={permission}
-          name={name}
-          value={permission}
-          defaultChecked={checkedIds.includes(permission)}
-          label={<span className="font-ui-mono text-xs">{permission}</span>}
-        />
-      ))}
+    <div className="grid gap-2">
+      <Input
+        type="search"
+        aria-label="Search permissions"
+        placeholder="Search permissions…"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+      />
+      <div className="grid max-h-[360px] gap-3 overflow-auto rounded-control border border-line p-2.5">
+        {filteredGroups.length === 0 ? (
+          <Text tone="secondary" size="sm">No permissions match &ldquo;{query}&rdquo;.</Text>
+        ) : (
+          filteredGroups.map((app) => (
+            <div key={app.appLabel} className="grid gap-1.5">
+              <Text as="span" weight="semibold" size="sm">{app.appLabel}</Text>
+              <div className="grid gap-1 border-l border-line-subtle pl-2.5">
+                {app.resources.map((resource) => (
+                  <div key={resource.resourceLabel} className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <Text as="span" size="sm" tone="secondary" className="min-w-[9rem]">{resource.resourceLabel}</Text>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      {resource.permissions.map((permission) => (
+                        <Checkbox
+                          key={permission.id}
+                          name={name}
+                          value={permission.id}
+                          defaultChecked={checkedIds.includes(permission.id)}
+                          label={permission.actionLabel}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

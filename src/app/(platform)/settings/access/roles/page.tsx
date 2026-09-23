@@ -8,6 +8,7 @@ import { toSafeErrorPayload, type SafeErrorPayload } from "@platform/core/errors
 import { platformAccess } from "@platform/runtime";
 import { listGrantIntegrityIssues } from "@platform/core/rbac/services";
 import { prisma } from "@platform/core/db";
+import { groupPermissionsByApp } from "./permission-grouping";
 import { RolesDirectory } from "./roles-directory";
 
 export const dynamic = "force-dynamic";
@@ -58,7 +59,7 @@ export default async function RolesPage() {
             ...role,
             archivedAt: role.archivedAt ? role.archivedAt.toISOString() : null,
           }))}
-          registryPermissions={getPermissionRegistry().permissions}
+          permissionGroups={groupPermissionsByApp(getPermissionRegistry().permissions, getPermissionRegistry())}
           canManage={grants.includes("platform.role.manage")}
           integrityIssues={integrityIssues}
         />

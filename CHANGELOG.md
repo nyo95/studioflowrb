@@ -5,8 +5,55 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.115**
-- Next local revision: **R8.116**
+- Current revision after this entry is committed: **R8.116**
+- Next local revision: **R8.117**
+
+## R8.116 | 2026-09-23 | feat(platform): group the Roles & Access permissions list into a matrix by app and resource
+
+Owner request, from the "New role"/"Grants" dialogs: a screenshot of the flat
+39-item permission checkbox list, asked *"benerin permissionnya dalam bentuk
+matrix ini bs?"*. This is the explicit follow-up deferred in R8.115 (that
+revision grouped the *Users → Create* Roles picker; this one grouped the
+*Roles & Access → Permissions* picker, which the earlier entry noted decomposes
+naturally into `app.resource.action`).
+
+Considered a fixed-column grid (App × Resource rows, Read/Write/Manage/…
+columns) first and rejected it: real actions aren't uniform across resources
+(`Audit` has only `read`, `Promotion` only `approve`, `Phase` has
+`work`/`review`/`override`, none of which are "write"), so a rigid grid would
+be mostly meaningless blank cells. Instead grouped by app, then by resource
+within that app, rendering each resource's actual declared actions inline —
+same scannable effect as a matrix, no invented cells.
+
+- New `permission-grouping.ts`: `groupPermissionsByApp` parses each
+  `app.resource.action` ID (and the two-segment `app.access` form, labelled
+  "Access this app") and buckets it under its app, then its resource, in the
+  order the registry already declares them — no re-sorting, no name-guessing.
+- `PermissionCheckboxes` (in `roles-directory.tsx`) rewritten to render that
+  grouped structure — app heading, resource sub-heading, its action
+  checkboxes on one line — with the existing search box now filtering by
+  permission ID, resource label, or app label together.
+- `roles/page.tsx` now builds `permissionGroups` from the registry and passes
+  it to `RolesDirectory` in place of the old flat `registryPermissions` list.
+
+Verification: `tsc`, `eslint`, `check:boundaries`, `check:legacy-runtime`,
+`npm test` (490 passed — 8 new unit tests for the grouping logic) all clean.
+Browser-verified at `/settings/access/roles`: "New role" dialog renders
+Platform/Master Data/BQ/StudioFlow sections with correct Read/Manage pairing,
+single-action resources (Audit, Promotion, Deletion) show one checkbox with no
+phantom blank cell, multi-action resources (Library: Read/Manage/Promote;
+Phase: Work/Review/Override) show all their real actions; search for
+"schedule" correctly narrows to StudioFlow → Schedule → Manage only; checkbox
+state survives clearing the search (verified via direct DOM state, not just
+visually); "Grants — Platform Owner" shows all 39 permissions checked;
+"Grants — SF-RF Drafter Acceptance" shows exactly its 3 actual permissions
+checked and nothing else. Both dialogs closed without saving.
+
+Note: `page.tsx` already carried the same unrelated uncommitted
+`SettingsShell`/`SettingsNavigation` wrapper noted in R8.115; again only this
+revision's own two edits (the `groupPermissionsByApp` import and the
+`permissionGroups` prop) were staged from that file, leaving the wrapper
+exactly as it was, still uncommitted.
 
 ## R8.115 | 2026-09-23 | feat(platform): group the New User Roles picker by app, checkboxes instead of a native multi-select
 
