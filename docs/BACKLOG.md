@@ -190,6 +190,34 @@ in `page.tsx` render body) is already resolved** in the current tree — no
 `Date.now()` call remains in that file; removed from this backlog rather than
 re-investigated.
 
+### Planned (owner-confirmed scope, 2026-09-23 — none built yet)
+
+- [ ] [PLANNED] **Projects directory: move project-info editing off the detail
+  page and onto the list.** Owner: modifying designer/drafter/opening date and
+  other administrative project fields should happen from the Projects table
+  itself (a modal/dialog or similar, mechanism left to implementation), not by
+  opening the project. The project detail page then narrows to phase-focused
+  information only. Today `project-directory.tsx` has filters but no inline
+  edit; every field change requires navigating into the project. Next up
+  after the open bugs/planned items below are resolved.
+- [ ] [PLANNED] **StudioFlow Library.** Rebuild of the legacy read-only
+  Library page: search/discover Master Data's Brand catalog from inside
+  StudioFlow (owner: *"rebuild dari studioflow 'library' dengan kemampuan
+  search dari masterdata utk brand"*). This is the "wave 2+" Library the
+  contract already named (`STUDIOFLOW-REWORK-CONTRACT.md` §0 RW-04, §14) —
+  scope is now owner-confirmed, but explicitly deprioritized behind the two
+  items above (owner: *"boleh di cicil setelah ini"*). No route/service exists
+  yet; distinct from the unrelated BQ app's own "BQ Library" feature.
+- [ ] [PLANNED] **Project timeline / Gantt chart.** Per-project Gantt with an
+  "opening" end date and a start date (default: when the project is added,
+  overridable) and a breakdown per phase. No schema exists for this today —
+  `SfPhase` has no start/end date field (only `order_index` and the
+  retrospective `status_changed_at`); `SfProject.opening_date` is the only
+  related field and covers just one end of the range. Was an explicit non-goal
+  for wave 1 (`STUDIOFLOW-REWORK-CONTRACT.md` §14); scope now owner-confirmed
+  but deprioritized behind the two items above (owner: *"boleh di kerjakan
+  setelah ini"*).
+
 ### Verification backlog (code done, needs a browser walk to close)
 
 - [ ] [UNVERIFIED] Deliverables panel (phase workspace) — upload PDF/image

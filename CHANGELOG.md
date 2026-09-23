@@ -5,8 +5,33 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.117**
-- Next local revision: **R8.118**
+- Current revision after this entry is committed: **R8.118**
+- Next local revision: **R8.119**
+
+## R8.118 | 2026-09-23 | docs(sf): record three owner-confirmed StudioFlow scope decisions in BACKLOG.md
+
+Planner/reviewer discussion of the StudioFlow left nav (Today/Projects/
+Clients/Library/Timeline) surfaced three scope decisions the owner locked but
+that weren't code yet, so they're recorded in `docs/BACKLOG.md` under
+StudioFlow → Planned rather than left only in chat:
+
+- Move project-info editing (designer/drafter/opening date, etc.) off the
+  project detail page and onto the Projects list itself (modal or similar);
+  the detail page then narrows to phase-focused information only.
+- StudioFlow Library — rebuild of the legacy read-only Library page
+  (search/discover Master Data's Brand catalog from inside StudioFlow, the
+  "wave 2+" Library already named in `STUDIOFLOW-REWORK-CONTRACT.md`).
+- Project timeline / Gantt chart — per-project Gantt with an overridable
+  start date and an "opening" end date, broken down per phase. No schema for
+  this exists today (`SfPhase` has no start/end date field).
+
+The latter two are explicitly deprioritized behind the first item and behind
+clearing the existing open bugs/planned items across Platform/Master
+Data/BQ (owner: *"selesaikan dlu 3 bug terbuka dan 12 item nya"*). No code,
+schema, or route changes in this revision — documentation only.
+
+Verification: N/A (doc-only). No dirty files outside `docs/BACKLOG.md` and
+`CHANGELOG.md`.
 
 ## R8.117 | 2026-09-23 | feat(sf): MOM sections merge to one free-typed WYSIWYG-lite content field, replacing per-point rows
 
