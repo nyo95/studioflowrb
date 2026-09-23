@@ -399,4 +399,25 @@ describe("BQ R6.1 invariants", () => {
       "APPROVED",
     );
   });
+
+  it("zeroes a Work Item's markup once it has no more children, but not while a child remains", async () => {
+    const { item } = await projectTree();
+    await service.updateItem({ grants: GRANTS, actor: ACTOR, id: item.id, markupL1Pct: "10" });
+    const group = await service.addSubObject({ grants: GRANTS, actor: ACTOR, itemId: item.id, name: "Body", qtyPerL1: "1" });
+    const direct = await service.addLineItem({ grants: GRANTS, actor: ACTOR, itemId: item.id, sourceType: "CUSTOM", titleSnapshot: "Direct", purchaseUnitSnapshot: "PCS", hargaSnapshot: "10", kategori: "ALAT", qty: "1" });
+
+    await service.deleteSubObject({ grants: GRANTS, actor: ACTOR, id: group.id });
+    assert.equal(
+      (await testDb.prisma.bqItem.findUniqueOrThrow({ where: { id: item.id } })).markup_l1_pct.toString(),
+      "10",
+      "a direct line item still makes this Work Item non-childless",
+    );
+
+    await service.deleteLineItem({ grants: GRANTS, actor: ACTOR, id: direct.id });
+    assert.equal(
+      (await testDb.prisma.bqItem.findUniqueOrThrow({ where: { id: item.id } })).markup_l1_pct.toString(),
+      "0",
+      "the last child gone means markup can no longer be seen/edited in the UI, so it must not keep multiplying",
+    );
+  });
 });

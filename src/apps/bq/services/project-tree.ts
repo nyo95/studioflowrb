@@ -25,6 +25,23 @@ export function createProjectTreeService(ctx: BqServiceContext) {
     requireEditableProjectForSubObject,
   } = ctx;
 
+  /**
+   * A childless Work Item's own markupL1Pct becomes invisible in the UI (it
+   * shows the Coefficient field instead, §Work Item row) but the calculation
+   * engine keeps applying it — a silently active multiplier the user can no
+   * longer see or edit. Zero it the moment the last sub-object/line item
+   * under this Work Item is deleted, so nothing keeps multiplying unseen.
+   */
+  async function zeroMarkupIfChildless(itemId: string): Promise<void> {
+    const [subObjectCount, lineItemCount] = await Promise.all([
+      db.bqSubObject.count({ where: { item_id: itemId } }),
+      db.bqLineItem.count({ where: { item_id: itemId } }),
+    ]);
+    if (subObjectCount === 0 && lineItemCount === 0) {
+      await db.bqItem.update({ where: { id: itemId }, data: { markup_l1_pct: "0" } });
+    }
+  }
+
   // Every sibling under the same parent otherwise defaults to sort_order 0,
   // making same-parent display order unstable across reads (bq-contract §13.2).
   async function nextSortOrder(aggregate: () => Promise<{ _max: { sort_order: number | null } }>): Promise<number> {
@@ -355,8 +372,9 @@ async function deleteSubObject(input: {
   id: string;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
-  await requireEditableProjectForSubObject(input.id);
+  const itemId = await requireEditableProjectForSubObject(input.id);
   await db.bqSubObject.delete({ where: { id: input.id } });
+  await zeroMarkupIfChildless(itemId);
   await auditWriter({
     appId: "bq",
     action: "bq.sub-object.deleted",
@@ -537,8 +555,9 @@ async function deleteLineItem(input: {
   id: string;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
-  await requireEditableProjectForLineItem(input.id);
+  const itemId = await requireEditableProjectForLineItem(input.id);
   await db.bqLineItem.delete({ where: { id: input.id } });
+  await zeroMarkupIfChildless(itemId);
   await auditWriter({
     appId: "bq",
     action: "bq.line-item.deleted",

@@ -76,7 +76,7 @@ export type BqServiceContext = {
   requireEditableProjectForSection: (sectionId: string) => Promise<void>;
   requireEditableProjectForSubsection: (subsectionId: string) => Promise<void>;
   requireEditableProjectForItem: (itemId: string) => Promise<void>;
-  requireEditableProjectForLineItem: (lineItemId: string) => Promise<void>;
+  requireEditableProjectForLineItem: (lineItemId: string) => Promise<string>;
   requireEditableProjectForSubObject: (subObjectId: string) => Promise<string>;
 };
 
@@ -153,7 +153,7 @@ export function createBqServiceContext(rootDb: PrismaClient, deps: BqServiceDeps
     await requireEditableProject(projectId);
   }
 
-  async function requireEditableProjectForLineItem(lineItemId: string): Promise<void> {
+  async function requireEditableProjectForLineItem(lineItemId: string): Promise<string> {
     const lineItem = await db.bqLineItem.findUnique({
       where: { id: lineItemId },
       select: { item_id: true, sub_object: { select: { item_id: true } } },
@@ -164,6 +164,7 @@ export function createBqServiceContext(rootDb: PrismaClient, deps: BqServiceDeps
       throw new AppError("CONFLICT", "bq.line-item.invalid-parent", "Cost Component does not belong to a Work Item");
     }
     await requireEditableProjectForItem(itemId);
+    return itemId;
   }
 
   async function requireEditableProjectForSubObject(subObjectId: string): Promise<string> {

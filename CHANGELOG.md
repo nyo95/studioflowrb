@@ -5,8 +5,45 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.118**
-- Next local revision: **R8.119**
+- Current revision after this entry is committed: **R8.119**
+- Next local revision: **R8.120**
+
+## R8.119 | 2026-09-23 | fix(bq): zero a Work Item's markup once it has no children left; record backlog decisions
+
+Fixes the BQ `[BUG][P1]` from `docs/BACKLOG.md`: `calculation-engine.ts`
+applies `markupL1Pct` for every L1 Work Item regardless of children, but
+`project-editor.tsx`'s single "Koef." column only shows `koefisien` once an
+item is childless — a Work Item that had a breakdown (and a nonzero
+`markupL1Pct`) whose children are later all deleted kept that markup
+silently multiplying the total, invisible and uneditable. Owner decision:
+zero it automatically rather than redesign the column to show both fields.
+
+- `zeroMarkupIfChildless` (`src/apps/bq/services/project-tree.ts`) checks the
+  Work Item's remaining sub-object/direct-line-item count after a delete and
+  resets `markup_l1_pct` to `"0"` once both are zero. Wired into
+  `deleteSubObject` and `deleteLineItem`.
+- `requireEditableProjectForLineItem` (`src/apps/bq/services/context.ts`) now
+  returns the owning `itemId` (previously `void`) so `deleteLineItem` can run
+  the check without a second lookup; its 3 existing call sites were
+  unaffected (none used the return value).
+- Regression test: `service.integration.test.ts` "zeroes a Work Item's markup
+  once it has no more children, but not while a child remains" — covers both
+  the delete-last-sub-object and delete-last-direct-line-item paths, and
+  confirms markup survives while a sibling child remains.
+
+Also recorded five other owner decisions from this session's planner
+discussion directly in `docs/BACKLOG.md` (no code yet for any of these):
+BQ price modes TBC/By Owner mean a blanked, non-computed price; the physical
+Samples workflow is scoped (Product Schedule → vendor request → received
+badge, not a notification bell; no StudioFlow→Master Data auto-write, a
+review request instead); the global app-switcher redesign is locked to
+Option B (dropdown near the logo); StudioFlow asset retention purges on
+project archive; Google Drive activation stays deferred.
+
+Verification: `tsc`, `check:boundaries`, `check:legacy-runtime` clean.
+`npm test`: 491 passed, 0 failed (490 + the new regression test), against
+the real-Postgres BQ integration suite.
+
 
 ## R8.118 | 2026-09-23 | docs(sf): record three owner-confirmed StudioFlow scope decisions in BACKLOG.md
 

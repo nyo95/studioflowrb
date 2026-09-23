@@ -36,15 +36,15 @@ Rules carried over unchanged from the prior trackers:
 
 ---
 
-## Decision gates (owner input needed before work can start)
+## Decision gates — resolved 2026-09-23
 
-- [ ] Decide StudioFlow `STORED`-asset retention policy before storage bytes
-  ship further (per-project retention window: when removed section photos are
-  reaped, whether archived-project files are purged or preserved). No
-  automatic cleanup runs today; files accumulate under the bounded kantor
-  rebuild storage root. Blocked on Google Drive activation decision below.
-- [ ] Decide Google Drive activation, account ownership, and production
-  egress for StudioFlow file storage.
+- **StudioFlow `STORED`-asset retention policy: purge on project archive.**
+  When a project is archived, its files are deleted rather than kept
+  indefinitely or purged on a fixed timer. No automatic cleanup runs today;
+  this still needs implementing against `PLATFORM-ASSET-STORAGE-ROADMAP.md`.
+- **Google Drive activation: deferred.** StudioFlow file storage stays on the
+  existing local/bounded storage root; do not scope Drive account
+  ownership/egress until there's a clear need.
 
 ---
 
@@ -55,14 +55,13 @@ Rules carried over unchanged from the prior trackers:
   approved future consumers.
 - [ ] [PLANNED] Redesign the top-header/sidebar boundary. Design input already
   captured in `apps/platform/GLOBAL-MENU-DESIGN-BRIEF.md` (owner feedback,
-  2026-09-16) — not yet a locked decision. Preserve the approved semantic
-  colors. **Partially executed 2026-09-23 (R8.110):** logo shrunk, account
-  menu slimmed to `Account / Settings / Sign out` (brief line 138-140), and
-  the "one settings sidebar" direction (brief line 133) is now fully built
-  (closes KB-031, see StudioFlow section). Still open from the brief: where
-  the app switcher lives, and whether it needs persistent visible nav at all
-  — those open design questions (brief "Decision Inputs Needed") aren't
-  resolved by this pass.
+  2026-09-16). Preserve the approved semantic colors. **Partially executed
+  2026-09-23 (R8.110):** logo shrunk, account menu slimmed to
+  `Account / Settings / Sign out` (brief line 138-140), and the "one settings
+  sidebar" direction (brief line 133) is now fully built (closes KB-031, see
+  StudioFlow section). **App switcher placement locked 2026-09-23: Option B**
+  (brief line 58) — current app name near the brand/logo, opening a
+  dropdown/command menu to switch apps, top bar stays clean. Not yet built.
 - [ ] [BUG][P3] KB-020 — Office rebuild migration history contains an
   untracked migration (`20260904153201_add_updated_by_label_vendor_brand`, no
   matching file in repository history). Pre-existing environment/history gap,
@@ -80,7 +79,21 @@ Rules carried over unchanged from the prior trackers:
 ## Master Data
 
 - [ ] [PLANNED] Define media/file behavior after shared storage exists.
-- [ ] [PLANNED] Define the physical Samples workflow.
+- [ ] [PLANNED] **Physical Samples workflow**, scoped by the owner 2026-09-23:
+  from a Product Schedule entry, staff can request a physical sample from a
+  vendor/supplier; when the sample is received, the designer sees a badge/
+  indicator (on Product Schedule or Today — not a global notification bell;
+  that's a separate, much larger Core-level capability, currently `DEFER`ed
+  per `CORE.md`, and out of scope here). A received sample does **not**
+  auto-create a SKU/price row in Master Data — Master Data's public contract
+  is read-only by design (`pricing-contract.md` §12) and StudioFlow has no
+  sanctioned write path into it. Instead, StudioFlow records a request that a
+  Master Data user reviews and enters themselves. Also needs a genuine SKU
+  concept inside Product Schedule (there isn't one today — `sku_text` was
+  purged in R8.111 and folded into `product_name`), kept as its own
+  StudioFlow-owned data, not a live reference into Master Data's `Sku` table
+  (matches how `brand_id` already works: copied at pick-time, no FK, so a
+  later Master Data edit/delete never touches a Schedule option).
 - [ ] [PLANNED] Define workbook import/export policy and error reporting.
 - [ ] [CLEANUP][P2] KB-025 — `src/apps/masterdata/services/index.ts` exports
   many internal-implementation helpers with no external consumer found. Not a
@@ -109,7 +122,9 @@ and "direct hard-delete resolves a pre-existing pending request…".
 ## BQ
 
 - [ ] [PLANNED] Add Quotation PDF output and Terms & Conditions.
-- [ ] [PLANNED] Add price modes such as TBC and By Owner.
+- [ ] [PLANNED] Add price modes TBC and By Owner. Owner-confirmed, 2026-09-23:
+  both modes mean the price is left blank/not counted toward the total — a
+  marker line, not a computed value.
 - [ ] [PLANNED] Add Rate Library after sufficient project-line evidence exists.
 - [ ] [PLANNED] Add revision/version comparison between BQ snapshots.
 - [ ] [PLANNED] Define formal StudioFlow linking through a stable external
@@ -121,19 +136,17 @@ and "direct hard-delete resolves a pre-existing pending request…".
   unpriced item not blanking the document, calculator input from inline
   numeric cells, promotion status/review controls in BQ Library/Master Data).
   No `InlineEdit` browser interaction evidence recorded yet.
-- [ ] [BUG][P1] `markupL1Pct` is engine-active but UI-invisible for a
-  standalone (childless) Work Item. `calculation-engine.ts:102` applies
-  `applyMarkup(exactProduct(hargaSnapshot, koefisien), markupL1Pct)` for
-  **every** L1, children or not — but `project-editor.tsx:504-515` swaps the
-  single "Koef." column's content by `hasChildren`: childless shows only
-  `koefisien`, with-children shows only `markupL1Pct`. A Work Item that had a
-  breakdown (and therefore a nonzero `markupL1Pct`) whose children are later
-  all deleted becomes standalone with its markup still silently multiplying
-  the total — invisible and uneditable until a dummy child is re-added to
-  bring the field back. Violates bq-contract §13.2 (inline-editable at every
-  level) and produces a total the estimator cannot audit from what's on
-  screen. Needs a UI decision (both fields don't fit the current 110px "Koef."
-  column) before it can be fixed — recorded here rather than rushed.
+**Fixed 2026-09-23 (R8.119):** `markupL1Pct` was engine-active but
+UI-invisible for a standalone (childless) Work Item — `calculation-engine.ts`
+applies `markupL1Pct` for every L1 regardless of children, but
+`project-editor.tsx`'s single "Koef." column only shows `koefisien` once a
+Work Item is childless, hiding a nonzero leftover `markupL1Pct` that kept
+silently multiplying the total. Owner decision: zero `markupL1Pct` the moment
+a Work Item's last sub-object/line item is deleted (`zeroMarkupIfChildless`,
+`project-tree.ts`), rather than surfacing both fields in the cramped column.
+Regression test: `service.integration.test.ts` "zeroes a Work Item's markup
+once it has no more children, but not while a child remains". See
+`CHANGELOG.md` R8.119.
 
 **Fixed 2026-09-23 (R8.109):** sibling `sort_order` collisions on plain
 insert (`addSection`/`addSubsection`/`addItem`/`addSubObject`/`addLineItem`
