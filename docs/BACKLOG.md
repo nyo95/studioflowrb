@@ -222,15 +222,21 @@ read-only Brand discovery over Master Data's existing `listBrandLibraryReads`
 public read port (no new Master Data code needed; it already returned
 everything the page shows). See `CHANGELOG.md` R8.124,
 `STUDIOFLOW-REWORK-CONTRACT.md` §7a.
-**Fixed 2026-09-23 (R8.125):** Project timeline / Gantt — a `ProjectTimeline`
-bar on the project Overview page, spanning `timelineStartDate` (new
-`SfProject.timeline_start_date`, overridable, defaults to `created_at`'s
-date) to `openingDate`, broken into one segment per phase. **Not** a
-calendar-accurate per-phase Gantt — no schema exists for independently-dated
-phase start/end, so segments are equal-width by sequence, not by real
-duration; recorded as a known simplification, not silently claimed as more
-than it is. See `CHANGELOG.md` R8.125, `STUDIOFLOW-REWORK-CONTRACT.md` §8.
-A true per-phase-dated Gantt remains future work if the owner wants it.
+**Fixed 2026-09-23 (R8.125, upgraded R8.127):** Project timeline / Gantt — a
+`ProjectTimeline` bar on the project Overview page, spanning
+`timelineStartDate` (`SfProject.timeline_start_date`, overridable, defaults
+to `created_at`'s date) to `openingDate`, one segment per phase. R8.125
+shipped it equal-width-by-sequence only (no per-phase dates existed yet).
+R8.127 added owner-overridable `SfPhase.planned_start_date`/`planned_end_date`
+(additive, unset by default) — a phase with both set now draws at its real
+position/width against the span; a phase without them still uses the
+original equal-width fallback, so nothing regresses for projects that never
+set them. R8.127 also added `/studioflow/timeline`, a portfolio-wide Gantt
+(one bar per project) with client/designer-drafter/status/date-range filters
+and the planned-dates editor (click a segment). See `CHANGELOG.md` R8.125,
+R8.127, `STUDIOFLOW-REWORK-CONTRACT.md` §8. Still not delivered: a
+duration report derived from actual status-change history (these are
+*planned*, owner-entered dates, not computed from phase transitions).
 
 ### Verification backlog (code done, needs a browser walk to close)
 

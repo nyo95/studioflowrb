@@ -5,8 +5,65 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.126**
-- Next local revision: **R8.127**
+- Current revision after this entry is committed: **R8.127**
+- Next local revision: **R8.128**
+
+## R8.127 | 2026-09-23 | feat(sf): portfolio Timeline page + per-phase planned dates
+
+Owner-scoped (chat, 2026-09-23): after seeing R8.125's per-project Gantt bar,
+owner asked for a dedicated page with every project's timeline, filterable,
+and confirmed (via in-chat questions) it should use real per-phase dates
+rather than staying sequence-only, with client/designer-drafter/status/date
+filters, as a new sidebar item. Plan recorded in `PLAN.md` before
+implementation (SF-PORTFOLIO-TIMELINE).
+
+- Schema: `SfPhase.planned_start_date`/`planned_end_date` (nullable `DATE`,
+  additive migration `20260923040000_sf_phase_planned_dates`, applied to
+  local dev and test databases per `docs/agent/README.md`). Unset means "no
+  override" — same philosophy as R8.125's `timelineStartDate`.
+- Shared geometry: `src/apps/studioflow/domain/timeline.ts`
+  (`resolveTimelineSpan` + `computePhaseSegments`, unit-tested) replaces the
+  inline math that used to live only in `ProjectTimeline`. A phase with both
+  planned dates set draws at its real position; without them it keeps the
+  original equal-width sequence slot — an all-undated project renders
+  identically to before. The span widens to cover any fully-dated phase that
+  falls outside the project's own start/opening range, so a saved date can
+  never end up clamped to zero width and hidding behind an undated phase's
+  fallback slot.
+- New `/studioflow/timeline` (`page.tsx`, `timeline-directory.tsx`,
+  `edit-phase-dates-dialog.tsx`): one Gantt row per non-archived project,
+  filterable by client, designer/drafter (reuses the existing PIC concept),
+  status, and a date range (kept when the project's span overlaps it,
+  computed in application code same place the date fallbacks already are).
+  Clicking a phase segment opens a dialog to set/clear its planned dates,
+  gated by `studioflow.project.manage`; the page itself is read-only and
+  gated by `studioflow.project.read` like the rest of StudioFlow. New sidebar
+  item "Timeline" between Projects and Clients
+  (`src/apps/studioflow/public/nav.ts`, `nav.tsx`, `ChartGantt` icon).
+- `listProjects`/`listProjectPhases` now also select/return
+  `plannedStartDate`/`plannedEndDate` per phase; the existing Overview page
+  `ProjectTimeline` bar was upgraded to the shared geometry (read-only there,
+  editing stays on the Timeline page only) — no behavior change for a
+  project whose phases have no planned dates.
+- `setPhasePlannedDates` service command
+  (`src/apps/studioflow/phases/service.ts`) + `setPhasePlannedDatesAction`;
+  validates end ≥ start, audited as
+  `studioflow.phase.planned-dates-changed`. Not gated by phase lock — this is
+  schedule metadata, not phase-work content.
+- Docs: `STUDIOFLOW-REWORK-CONTRACT.md` §8 rewritten for the new page and
+  shared rendering rule; `docs/BACKLOG.md`'s R8.125 timeline note updated to
+  record the R8.127 upgrade instead of still reading as outstanding future
+  work.
+- Tests: `src/apps/studioflow/domain/timeline.test.ts` (13 cases covering
+  span resolution, equal-width/dated/mixed segments, span widening, and the
+  partially-dated-phase edge case that widening must ignore).
+
+Found during browser verification, fixed before commit: the new client
+components (`"use client"`, unlike the server-rendered original
+`ProjectTimeline`) re-ran `resolveTimelineSpan` on hydration with a fresh
+`Date.now()`, producing a genuine SSR/client attribute mismatch on the
+"today" marker; fixed by capturing `now` once on the server and threading it
+through as a prop instead of defaulting inside the client tree.
 
 ## R8.126 | 2026-09-23 | docs(agent): record dev-DB migration discipline as a harness rule
 

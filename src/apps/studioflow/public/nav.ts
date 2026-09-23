@@ -4,6 +4,7 @@
 export const STUDIOFLOW_ROUTES = {
   root: "/studioflow",
   projects: "/studioflow/projects",
+  timeline: "/studioflow/timeline",
   project: (projectId: string) => `/studioflow/projects/${projectId}`,
   projectPhase: (projectId: string, phaseId: string) => `/studioflow/projects/${projectId}/phases/${phaseId}`,
   projectHistory: (projectId: string) => `/studioflow/projects/${projectId}/history`,
@@ -26,6 +27,7 @@ export const STUDIOFLOW_NAV_LINKS: {
   workspace: [
     { href: "/studioflow", label: "Today", exact: true },
     { href: "/studioflow/projects", label: "Projects" },
+    { href: "/studioflow/timeline", label: "Timeline" },
     { href: "/studioflow/clients", label: "Clients" },
     { href: "/studioflow/library", label: "Library" },
   ],

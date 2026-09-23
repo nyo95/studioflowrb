@@ -319,6 +319,7 @@ Routes (canonical, D-SF-07 redirects from `/projects/...` stay allowed):
 | Route | Content |
 |---|---|
 | `/studioflow/projects` | project directory (legacy filters: status, priority, PIC, client; search) |
+| `/studioflow/timeline` | portfolio Gantt: one bar per project, filterable by client/PIC/status/date range (§ below) |
 | `/studioflow/projects/[projectId]` | overview: identity header, phase strip, general checklist, open work |
 | `/studioflow/projects/[projectId]/phases/[phaseId]` | phase page: state + actions, active revision, activities, phase checklist, revision history |
 | `/studioflow/projects/[projectId]/mom` and `/mom/[momId]` (+ print) | MOM |
@@ -348,23 +349,41 @@ name/client/designer/drafter/opening-date/type/contact/address/area, and
 `restoreProjectAction`/`syncChecklistAction` remain their own calls — only the
 caller moved. `timelineStartDate` (see below) also joined `updateProjectAction`.
 
-**Timeline / Gantt (owner, 2026-09-23 — shipped ahead of wave 2).** The
-Overview page (`/studioflow/projects/[projectId]`) renders a `ProjectTimeline`
-bar between the phase-tab strip and the phase canvas: a span from
-`timelineStartDate` (an overridable date, `SfProject.timeline_start_date`,
+**Timeline / Gantt (owner, 2026-09-23 — shipped ahead of wave 2; upgraded to
+per-phase dates and a portfolio page the same day).** Every project's bar
+spans `timelineStartDate` (an overridable date, `SfProject.timeline_start_date`,
 falling back to the project's `created_at` date when unset — "starts when the
 project is added, unless overridden") to `openingDate` (falls back to "today
-+30 days, ongoing" when no opening date is set yet), broken into one
-equal-width segment per phase, colored by `phaseAccentDotClass` and dimmed
-while `PENDING`, with a vertical "today" marker. **This is a sequence
-breakdown, not calendar-accurate per phase** — no schema exists for an
-independently-dated phase start/end (`SfPhase` only has `order_index` and the
-single latest `status_changed_at`, not a full transition history), so segment
-width shows *where in the overall span the project sits, split by phase*,
-not "phase 2 took 12 days." A true per-phase-dated Gantt would need new
-schema and is future work if the owner wants it. `timelineStartDate` is
-editable in the same `EditProjectDialog` as the other administrative fields
-above (§ above), defaulting to blank meaning "use the created-at fallback."
++30 days, ongoing" when no opening date is set yet). Within that span, each
+phase draws as a segment colored by `phaseAccentDotClass`, dimmed while
+`PENDING`: a phase with both `SfPhase.planned_start_date` and
+`planned_end_date` set (owner-overridable, additive, unset by default) draws
+at its real position and width against the span; a phase without them keeps
+the original equal-width-by-sequence slot — so a project with no planned
+dates at all renders exactly as before this upgrade. This is still not a
+"phase 2 took 12 days" duration report derived from actual status-change
+history (`SfPhase` still only has the single latest `status_changed_at`, not
+a full transition log) — it is *planned* scheduling the owner enters, shown
+against the project's overall span. The shared geometry
+(`src/apps/studioflow/domain/timeline.ts`, `resolveTimelineSpan` +
+`computePhaseSegments`) is used by both:
+
+- The Overview page (`/studioflow/projects/[projectId]`) `ProjectTimeline`
+  bar between the phase-tab strip and the phase canvas — read-only, with a
+  vertical "today" marker.
+- `/studioflow/timeline` — a new sidebar item, one bar per non-archived
+  project across the whole portfolio, filterable by client, designer/drafter
+  (the same PIC concept as the Projects directory), project status, and a
+  date range (kept when the project's span overlaps the selected range).
+  Clicking a phase segment (gated by `studioflow.project.manage`) opens a
+  small dialog to set or clear that phase's planned start/end; clearing both
+  resets it to the equal-width fallback. The page itself is read-only beyond
+  that dialog and is gated by `studioflow.project.read` like the rest of the
+  app.
+
+`timelineStartDate` remains editable in `EditProjectDialog` (§ above); planned
+per-phase dates are edited only from `/studioflow/timeline`, not from the
+phase page or `EditProjectDialog`, to keep one editing surface for this data.
 
 ## 9. Overrides of earlier ratified decisions
 
@@ -753,7 +772,10 @@ Implementation notes recorded in R8.71:
 CD drawing list, deliverables/files and uploads, SketchUp, render boards,
 product requests/vendor follow-up, comments/chat/presence, "Upcoming" as a
 distinct legacy nav surface, Google Drive, legacy data migration, undo.
-(Library/Brand discovery page and a per-project sequence-breakdown Gantt both
+(Library/Brand discovery page, a per-project Gantt, owner-overridable
+per-phase planned dates, and a portfolio-wide `/studioflow/timeline` page all
 shipped 2026-09-23, ahead of schedule — see §7a and §8 — once the owner
-confirmed scope; a true calendar-accurate per-phase-dated Gantt remains
-future work, as does a portfolio-wide "Upcoming" view across projects.)
+confirmed scope each time. Still not delivered: a duration report *derived*
+from actual phase status-change history (planned dates are entered, not
+computed), and "Upcoming" as its own distinct legacy nav surface/queue — the
+portfolio page above is a Gantt, not the legacy "waiting on me" queue.)

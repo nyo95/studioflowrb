@@ -1234,6 +1234,9 @@ model SfPhase {
   seat_snapshot     String
   /// When status last changed; drives "waiting N days".
   status_changed_at DateTime?
+  /// Portfolio Timeline (owner, 2026-09-23): overridable planned start/end; unset falls back to the equal-width sequence split.
+  planned_start_date DateTime?    @db.Date
+  planned_end_date   DateTime?    @db.Date
   created_at        DateTime      @default(now())
   updated_at        DateTime      @updatedAt
 

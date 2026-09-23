@@ -238,6 +238,26 @@ export async function phaseCommandAction(input: z.infer<typeof PhaseCommand>): P
   });
 }
 
+// ── Portfolio Timeline ─────────────────────────────────────────────────────
+
+const PhasePlannedDates = z.strictObject({ projectId: Id, phaseId: Id, plannedStartDate: DateOnly, plannedEndDate: DateOnly });
+export async function setPhasePlannedDatesAction(input: z.infer<typeof PhasePlannedDates>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(PhasePlannedDates, input);
+    const result = await studioFlow.phases.setPhasePlannedDates({
+      ...ctx,
+      projectId: data.projectId,
+      phaseId: data.phaseId,
+      plannedStartDate: data.plannedStartDate || null,
+      plannedEndDate: data.plannedEndDate || null,
+    });
+    refresh(data.projectId);
+    revalidatePath("/studioflow/timeline", "layout");
+    return result;
+  });
+}
+
 // ── Activities ──────────────────────────────────────────────────────────────
 
 // V2-D1: SfActivity is FEEDBACK-only. phaseId is required. For todos use checklistAction.

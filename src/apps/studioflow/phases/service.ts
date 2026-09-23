@@ -350,6 +350,35 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         return { phaseId: phase.id, revisionId };
       });
     },
+
+    /** Portfolio Timeline (owner, 2026-09-23): overridable planned start/end for the Gantt page. `null` clears back to the equal-width sequence fallback. Schedule metadata, not phase-work — not gated by phase lock. */
+    async setPhasePlannedDates(input: PhaseCommandInput & { plannedStartDate?: string | null; plannedEndDate?: string | null }) {
+      requireCommand(input, P.projectManage);
+      const startDate = input.plannedStartDate === undefined ? undefined : input.plannedStartDate ? dateOnlyToDate(input.plannedStartDate) : null;
+      const endDate = input.plannedEndDate === undefined ? undefined : input.plannedEndDate ? dateOnlyToDate(input.plannedEndDate) : null;
+      if (startDate && endDate && startDate > endDate) {
+        throw invalid("PHASE_PLANNED_DATES_INVALID", "Planned end date cannot be before the planned start date.");
+      }
+      return runTransaction(async (tx) => {
+        const project = await loadWritableProject(tx, input.projectId);
+        const phase = await tx.sfPhase.findUnique({ where: { id: input.phaseId } });
+        if (!phase || phase.project_id !== project.id) throw notFound("phase");
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        const data: { planned_start_date?: Date | null; planned_end_date?: Date | null } = {};
+        if (startDate !== undefined) {
+          const to = dateToDateOnly(startDate);
+          if (dateToDateOnly(phase.planned_start_date) !== to) { changes.plannedStartDate = { from: dateToDateOnly(phase.planned_start_date), to }; data.planned_start_date = startDate; }
+        }
+        if (endDate !== undefined) {
+          const to = dateToDateOnly(endDate);
+          if (dateToDateOnly(phase.planned_end_date) !== to) { changes.plannedEndDate = { from: dateToDateOnly(phase.planned_end_date), to }; data.planned_end_date = endDate; }
+        }
+        if (Object.keys(changes).length === 0) return { phaseId: phase.id };
+        await tx.sfPhase.update({ where: { id: phase.id }, data });
+        await writeAudit(ports, tx, { action: "studioflow.phase.planned-dates-changed", entityType: "phase", entityId: phase.id, actor: input.actor, changes, metadata: { projectId: project.id, phaseName: phase.name_snapshot } });
+        return { phaseId: phase.id };
+      });
+    },
   };
 
   // ── Activities ──────────────────────────────────────────────────────────
@@ -486,7 +515,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         select: {
           id: true, project_id: true, definition_id: true, order_index: true, status: true, is_locked: true,
           allow_parallel: true, name_snapshot: true, prefix_snapshot: true, seat_snapshot: true,
-          status_changed_at: true,
+          status_changed_at: true, planned_start_date: true, planned_end_date: true,
           revisions: { where: { status: "ACTIVE" }, take: 1, select: { major: true, minor: true } },
         },
       });
@@ -516,6 +545,8 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           seat: snap.seatSnapshot,
           waitingDays: status === "PENDING" || status === "COMPLETED" || status === "READY_FOR_NEXT" ? null : waitingDays(phase.status_changed_at, now),
           statusChangedAt: phase.status_changed_at,
+          plannedStartDate: dateToDateOnly(phase.planned_start_date),
+          plannedEndDate: dateToDateOnly(phase.planned_end_date),
           activeRevision: phase.revisions[0] ? revisionLabel(phase.revisions[0], snap.prefixSnapshot) : null,
           openRootChecklist: counts.openRootChecklistItems,
           blockers: fullBlockers(counts),

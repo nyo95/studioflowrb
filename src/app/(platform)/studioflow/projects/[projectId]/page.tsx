@@ -81,7 +81,7 @@ export default async function ProjectOverviewPage({
       <ProjectTimeline
         startDate={project.timelineStartDate}
         openingDate={project.openingDate}
-        phases={phases.map((phase) => ({ id: phase.id, definitionId: phase.definitionId, label: phase.label, status: phase.status }))}
+        phases={phases.map((phase) => ({ id: phase.id, definitionId: phase.definitionId, label: phase.label, status: phase.status, plannedStartDate: phase.plannedStartDate, plannedEndDate: phase.plannedEndDate }))}
       />
 
       {/* Canvas — suspends independently; key forces reset on phase switch */}

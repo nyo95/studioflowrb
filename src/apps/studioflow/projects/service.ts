@@ -336,7 +336,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         orderBy: [{ priority: "asc" }, { name: "desc" }],
         include: {
           client: { select: { id: true, name: true } },
-          phases: { orderBy: { order_index: "asc" }, select: { id: true, definition_id: true, status: true, is_locked: true, status_changed_at: true, name_snapshot: true } },
+          phases: { orderBy: { order_index: "asc" }, select: { id: true, definition_id: true, status: true, is_locked: true, status_changed_at: true, name_snapshot: true, planned_start_date: true, planned_end_date: true } },
           _count: { select: { activities: { where: { status: "OPEN" } }, checklist_items: { where: { is_checked: false, parent_id: null } } } },
         },
       });
@@ -360,7 +360,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         updatedAt: row.updated_at,
         designer: people.get(row.pic_designer_id) ?? { id: row.pic_designer_id, displayName: "Unknown", active: false },
         drafter: people.get(row.pic_drafter_id) ?? { id: row.pic_drafter_id, displayName: "Unknown", active: false },
-        phases: row.phases.map((phase) => ({ id: phase.id, definitionId: phase.definition_id, status: phase.status as PhaseStatus, isLocked: phase.is_locked, statusChangedAt: phase.status_changed_at, label: phase.name_snapshot })),
+        phases: row.phases.map((phase) => ({ id: phase.id, definitionId: phase.definition_id, status: phase.status as PhaseStatus, isLocked: phase.is_locked, statusChangedAt: phase.status_changed_at, label: phase.name_snapshot, plannedStartDate: dateToDateOnly(phase.planned_start_date), plannedEndDate: dateToDateOnly(phase.planned_end_date) })),
         openItems: row._count.activities + row._count.checklist_items,
       }));
     },

@@ -1,6 +1,6 @@
 "use client";
 
-import { BookMarked, Building2, FolderKanban, ListChecks, Settings } from "lucide-react";
+import { BookMarked, Building2, ChartGantt, FolderKanban, ListChecks, Settings } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { NavGroup, NavItem, UtilitySection } from "@/platform/ui_engine";
@@ -9,6 +9,7 @@ import { STUDIOFLOW_NAV_LINKS } from "@/apps/studioflow/public/nav";
 const ICONS: Record<string, typeof ListChecks> = {
   "/studioflow": ListChecks,
   "/studioflow/projects": FolderKanban,
+  "/studioflow/timeline": ChartGantt,
   "/studioflow/clients": Building2,
   "/studioflow/library": BookMarked,
   "/studioflow/settings": Settings,
