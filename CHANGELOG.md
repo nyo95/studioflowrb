@@ -5,8 +5,30 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.132**
-- Next local revision: **R8.133**
+- Current revision after this entry is committed: **R8.133**
+- Next local revision: **R8.134**
+
+## R8.133 | 2026-09-24 | docs(masterdata): audit and lock — no code changes
+
+Owner-scoped (chat, 2026-09-24): "cek masterdata dulu - kalau sudah semua nya
+solid - kunci dulu." Audited, found solid, recorded the lock — no source
+changes in this revision.
+
+Audit: 35/35 `masterdata` integration tests pass in isolation; 0 open `[BUG]`
+entries in `docs/BACKLOG.md`; no TODO/FIXME in `src/apps/masterdata`. One
+apparent gap surfaced while reading `vendor-contract.md` §14.4 ("Brand
+permanent delete... currently missing") — checked against
+`brand.service.ts` and it is already implemented (`brand.archived` audit
+action, deletion-request flow); that table is a stale historical migration
+checklist from the Vendor rework, not a live gap.
+
+`docs/BACKLOG.md`'s Master Data section gains a **LOCKED** note: no
+modification to Master Data app code without an explicit new owner request,
+including drive-by cleanups found while working elsewhere. The existing
+`[PLANNED]`/`[CLEANUP]` entries stay as recorded future work, not something
+to start unprompted.
+
+Checks: none needed (docs-only). No schema migration; no new dependency.
 
 ## R8.132 | 2026-09-24 | feat(sf,ui-engine): Product Schedule print/export as a second consumer of the shared UI Engine print view
 

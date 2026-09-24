@@ -82,6 +82,17 @@ Rules carried over unchanged from the prior trackers:
 
 ## Master Data
 
+**LOCKED (owner, 2026-09-24).** Audited this session: 35/35 masterdata
+integration tests pass, 0 open `[BUG]` entries, no TODO/FIXME in source, and
+the only apparent gap found (`vendor-contract.md` §14.4 "Brand permanent
+delete... currently missing") turned out to already be implemented
+(`brand.archived` audit action + deletion-request flow both exist) — that
+table is stale historical migration checklist, not a live gap. Owner
+decision: do not modify Master Data app code without an explicit new owner
+request, even to "clean up" or "improve" something found in passing. The
+`[PLANNED]`/`[CLEANUP]` items below remain legitimate future work, not an
+invitation to start them unasked.
+
 - [ ] [PLANNED] Define media/file behavior after shared storage exists.
 
 **Fixed 2026-09-23 (R8.123):** Physical Samples workflow — from a Product
