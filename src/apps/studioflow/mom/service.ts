@@ -24,6 +24,7 @@ import {
   hasPermission,
   invalid,
   loadWritableProject,
+  mapWriteError,
   notFound,
   nowOf,
   optionalText,
@@ -160,16 +161,18 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
     const latest = kept[0] ? parseMomSnapshot(kept[0].snapshot) : null;
     if (latest && momSnapshotsEqual(latest, snapshot)) return null;
     const number = nextRevisionNumber(kept.map((revision) => revision.number));
-    await tx.sfMomRevision.create({
-      data: {
-        document_id: documentId,
-        number,
-        note,
-        snapshot: snapshot as unknown as Prisma.InputJsonValue,
-        created_by_id: actor.userId,
-        created_by_name: actor.label.slice(0, MOM_LIMITS.preparedBy),
-      },
-    });
+    try {
+      await tx.sfMomRevision.create({
+        data: {
+          document_id: documentId,
+          number,
+          note,
+          snapshot: snapshot as unknown as Prisma.InputJsonValue,
+          created_by_id: actor.userId,
+          created_by_name: actor.label.slice(0, MOM_LIMITS.preparedBy),
+        },
+      });
+    } catch (error) { mapWriteError(error); }
     const dropNumbers = revisionsToPrune([...kept.map((revision) => revision.number), number]);
     const dropped = kept.filter((revision) => dropNumbers.includes(revision.number));
     if (dropped.length > 0) await tx.sfMomRevision.deleteMany({ where: { id: { in: dropped.map((revision) => revision.id) } } });

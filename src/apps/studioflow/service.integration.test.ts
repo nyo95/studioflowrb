@@ -1377,6 +1377,42 @@ describe("SF-V2-E phase definitions", () => {
     await sf.phases.submitForClientReview({ ...run, phaseId: handover.id });
     await sf.phases.approveClient({ ...run, phaseId: handover.id });
     assert.equal((await sf.projects.getProject({ grants: ALL, projectId })).status, "COMPLETED");
+
+    // Reopening the phase that completed the project must not leave the
+    // project stuck COMPLETED while the phase itself is IN_PROGRESS again —
+    // it would silently vanish from Today (which excludes COMPLETED projects)
+    // even though there is now active work on it.
+    await sf.phases.reopenPhase({ ...run, phaseId: handover.id, intent: "CLIENT", reason: "One more revision" });
+    assert.equal((await sf.projects.getProject({ grants: ALL, projectId })).status, "ACTIVE");
+    assert.equal((await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: handover.id })).status, "IN_PROGRESS");
+  });
+
+  it("converts open feedback instead of orphaning it when completeSupervision closes the revision (the one lock path with no blocker check)", async () => {
+    // approveInternal/approveClient refuse to lock a phase with open feedback
+    // (assertFullyUnblocked), and rejectPhase converts it explicitly — but
+    // completeSupervision is legacy-parity lenient (no blocker gate) and used
+    // to close the revision without doing either, permanently orphaning any
+    // still-OPEN feedback (invisible to Today/blockers once the revision is
+    // no longer ACTIVE, with nothing left to resurface it on).
+    const { projectId } = await newProject();
+    // Moodboard starts IN_PROGRESS (cannot be bypassed); finish it normally.
+    const moodboard = await phaseOf(projectId, "moodboard");
+    await sf.phases.submitForClientReview({ ...as(designer), projectId, phaseId: moodboard.id });
+    await sf.phases.approveClient({ ...as(designer), projectId, phaseId: moodboard.id });
+    for (const key of ["layout", "design3d", "cd"] as const) {
+      await sf.phases.bypassPhase({ ...as(designer), projectId, phaseId: (await phaseOf(projectId, key)).id, reason: "Skip" });
+    }
+    const supervision = await phaseOf(projectId, "supervision");
+    const base = { ...as(designer), projectId, phaseId: supervision.id };
+    await sf.phases.activatePhase(base);
+    await sf.phases.addActivity({ ...base, content: "Open note on the closed revision", mode: "FEEDBACK" });
+
+    await sf.phases.completeSupervision(base);
+
+    const todo = await testDb.prisma.sfChecklistItem.findFirst({ where: { phase_id: supervision.id, label: "Open note on the closed revision" } });
+    assert.ok(todo, "the open feedback must convert to a checklist item, not vanish once its revision closes");
+    const activity = await testDb.prisma.sfActivity.findFirstOrThrow({ where: { phase_id: supervision.id, content: "Open note on the closed revision" } });
+    assert.equal(activity.status, "COMPLETED", "the original feedback activity must be marked done so it no longer double-counts as open work");
   });
 
   it("never rewrites project snapshots when the template is edited, and protects definitions in use", async () => {

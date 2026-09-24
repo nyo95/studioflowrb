@@ -229,6 +229,47 @@ describe("BQ R6.1 invariants", () => {
     assert.equal(stored?.sections.find((row) => row.id === subsection.id)?.recommendations.length, 1);
   });
 
+  it("deletes a Library item that is still a Template recommendation instead of crashing on the source check constraint", async () => {
+    const material = await service.createLibMaterial({ grants: GRANTS, actor: ACTOR, name: "Recommended and doomed", purchaseUnit: "SHEET", harga: "100", currency: "IDR" });
+    const template = await service.createTemplate({ grants: GRANTS, actor: ACTOR, name: "Doomed template" });
+    const section = await service.addTemplateSection({ grants: GRANTS, actor: ACTOR, templateId: template.id, name: "Interior" });
+    await service.addTemplateRecommendation({ grants: GRANTS, actor: ACTOR, templateSectionId: section.id, libItemType: "material", libItemId: material.id });
+
+    // Previously this threw a raw Postgres check-constraint error: the FK is
+    // ON DELETE SET NULL, but the recommendation requires exactly one source.
+    await service.deleteLibMaterial({ grants: GRANTS, actor: ACTOR, id: material.id });
+
+    const stored = await service.getTemplateWithSections(template.id);
+    assert.equal(stored?.sections.find((row) => row.id === section.id)?.recommendations.length, 0, "the orphaned recommendation is removed, not left dangling");
+  });
+
+  it("gives assembly custom lines gapless sort_order even after a deletion, instead of colliding via count()", async () => {
+    const assembly = await service.createAssemblyTemplate({ grants: GRANTS, actor: ACTOR, name: "Reorder check" });
+    const first = await service.addAssemblyCustomLine({ grants: GRANTS, actor: ACTOR, assemblyId: assembly.id, title: "A", harga: "1" });
+    const second = await service.addAssemblyCustomLine({ grants: GRANTS, actor: ACTOR, assemblyId: assembly.id, title: "B", harga: "1" });
+    const third = await service.addAssemblyCustomLine({ grants: GRANTS, actor: ACTOR, assemblyId: assembly.id, title: "C", harga: "1" });
+    assert.deepEqual([first.sort_order, second.sort_order, third.sort_order], [0, 1, 2]);
+
+    await service.deleteAssemblyLine({ grants: GRANTS, actor: ACTOR, lineId: second.id });
+    // count() would now return 2, colliding with the untouched third line.
+    const fourth = await service.addAssemblyCustomLine({ grants: GRANTS, actor: ACTOR, assemblyId: assembly.id, title: "D", harga: "1" });
+    assert.equal(fourth.sort_order, 3, "the next line must sort after the highest surviving sibling, not reuse a still-occupied slot");
+  });
+
+  it("assigns sequential sort_order to Template sections and recommendations, not a fixed 0", async () => {
+    const material = await service.createLibMaterial({ grants: GRANTS, actor: ACTOR, name: "Order check", purchaseUnit: "SHEET", harga: "100", currency: "IDR" });
+    const template = await service.createTemplate({ grants: GRANTS, actor: ACTOR, name: "Order template" });
+    const sectionA = await service.addTemplateSection({ grants: GRANTS, actor: ACTOR, templateId: template.id, name: "A" });
+    const sectionB = await service.addTemplateSection({ grants: GRANTS, actor: ACTOR, templateId: template.id, name: "B" });
+    assert.equal(sectionA.sort_order, 0);
+    assert.equal(sectionB.sort_order, 1, "a second top-level section must not collide with the first at sort_order 0");
+
+    const recA = await service.addTemplateRecommendation({ grants: GRANTS, actor: ACTOR, templateSectionId: sectionA.id, libItemType: "material", libItemId: material.id });
+    const recB = await service.addTemplateRecommendation({ grants: GRANTS, actor: ACTOR, templateSectionId: sectionA.id, libItemType: "material", libItemId: material.id });
+    assert.equal(recA.sort_order, 0);
+    assert.equal(recB.sort_order, 1, "a second recommendation on the same section must not collide with the first at sort_order 0");
+  });
+
   it("does not write or audit semantically identical project-tree updates", async () => {
     const { project, section, item } = await projectTree();
     const group = await service.addSubObject({ grants: GRANTS, actor: ACTOR, itemId: item.id, name: "Body", qtyPerL1: "1" });

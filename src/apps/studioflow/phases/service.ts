@@ -95,6 +95,19 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     return true;
   }
 
+  /**
+   * Reverse of completeProjectIfLast: reopening or hard-resetting a phase
+   * means the project has active work again, so a COMPLETED project must not
+   * stay COMPLETED — otherwise it silently drops out of every status/Today
+   * filter that excludes completed projects while its reopened phase is
+   * plainly IN_PROGRESS.
+   */
+  async function reactivateProjectIfCompleted(tx: TxClient, project: ProjectRow, actor: AuditActor): Promise<void> {
+    if (project.status !== "COMPLETED") return;
+    await tx.sfProject.update({ where: { id: project.id }, data: { status: "ACTIVE" } });
+    await writeAudit(ports, tx, { action: "studioflow.project.status-changed", entityType: "project", entityId: project.id, actor, changes: { status: { from: project.status, to: "ACTIVE" } }, metadata: { projectId: project.id, reason: "phase-reopened" } });
+  }
+
   async function assertFullyUnblocked(tx: TxClient, phaseId: string) {
     const blockers = fullBlockers(await readBlockerCounts(tx, phaseId));
     if (blockers.total > 0) {
@@ -282,6 +295,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const number = nextRevision(base, input.intent);
         const revision = await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phase.id, ...number } });
         await setPhase(tx, phase, { status: "IN_PROGRESS", is_locked: false });
+        await reactivateProjectIfCompleted(tx, project, input.actor);
         await audit(tx, input.actor, "reopened", phase, from, "IN_PROGRESS", { reason, intent: input.intent, revision: revisionLabel(number, phase.prefix_snapshot), revisionId: revision.id });
         return { phaseId: phase.id, revision: revisionLabel(number, phase.prefix_snapshot) };
       });
@@ -294,8 +308,38 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         if (!isLegacySupervisionDefinition(phase.definition_id) || phase.status !== "IN_PROGRESS" || phase.is_locked) throw invalidState("Only Supervision in progress can be finished.");
         await setPhase(tx, phase, { status: "COMPLETED", is_locked: true });
         const current = await activeRevision(tx, phase.id);
-        if (current) await closeRevision(tx, current.id);
-        await audit(tx, input.actor, "supervision-completed", phase, "IN_PROGRESS", "COMPLETED");
+        let converted: string[] = [];
+        if (current) {
+          // Unlike approveInternal/approveClient, this completion has no
+          // assertFullyUnblocked gate (legacy parity: Supervision finishes on
+          // its own terms). Closing the revision without converting any
+          // still-OPEN feedback the same way rejectPhase does would orphan it
+          // permanently: invisible to Today/blockers, which only look at the
+          // active revision, with no active revision left to resurface it on.
+          const feedback = await tx.sfActivity.findMany({ where: { revision_id: current.id, mode: "FEEDBACK", status: "OPEN" }, orderBy: { created_at: "asc" } });
+          const fallbackAssignee = phaseSnapshot(phase).seatSnapshot === "drafter" ? project.pic_drafter_id : project.pic_designer_id;
+          for (const item of feedback) {
+            const id = randomUUID();
+            await tx.sfChecklistItem.create({
+              data: {
+                id,
+                project_id: project.id,
+                phase_id: phase.id,
+                label: item.content,
+                is_checked: false,
+                assigned_to_id: item.assigned_to_id ?? fallbackAssignee,
+                due_at: item.due_at,
+                created_by_id: item.created_by_id,
+              },
+            });
+            converted.push(id);
+          }
+          if (feedback.length > 0) {
+            await tx.sfActivity.updateMany({ where: { id: { in: feedback.map((item) => item.id) } }, data: { status: "COMPLETED", completed_at: nowOf(ports) } });
+          }
+          await closeRevision(tx, current.id);
+        }
+        await audit(tx, input.actor, "supervision-completed", phase, "IN_PROGRESS", "COMPLETED", { feedbackConverted: converted.length });
         await completeProjectIfLast(tx, phase, project, input.actor);
         return { phaseId: phase.id };
       });
@@ -311,7 +355,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         }
       }
       return runTransaction(async (tx) => {
-        const { phase } = await loadPhase(tx, input.projectId, input.phaseId);
+        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId);
         const revisions = await tx.sfRevision.findMany({
           where: { phase_id: phase.id },
           orderBy: [{ major: "asc" }, { minor: "asc" }],
@@ -340,6 +384,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           await tx.sfRevision.create({ data: { id: revisionId, phase_id: phase.id, major: input.major!, minor: input.minor! } });
         }
         await setPhase(tx, phase, { status: target, is_locked: false });
+        await reactivateProjectIfCompleted(tx, project, input.actor);
         await audit(tx, input.actor, "revision-overridden", phase, from, target, {
           mode: input.mode,
           note,

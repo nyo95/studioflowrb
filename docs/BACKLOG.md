@@ -134,6 +134,31 @@ and "direct hard-delete resolves a pre-existing pending request…".
 
 ## BQ
 
+- [ ] [BUG] `nextSortOrder` (`project-tree.ts`) reads `MAX(sort_order)` and
+  inserts in two separate, non-transactional calls on the plain `db` client
+  (not `tx`) — used by `addSection`/`addSubsection`/`addItem`/`addSubObject`/
+  `addLineItem`. Two near-simultaneous adds under the same parent (double
+  submit, or two collaborators) can both read the same MAX and insert with
+  the same `sort_order`; there is no unique constraint to catch it. Found and
+  verified 2026-09-24 in a logic audit; not fixed in that pass because a
+  correct fix means wrapping each of five call sites in a transaction (and
+  deciding whether `requireEditableProject*` guards move inside it too) —
+  broader surgery than warranted to rush. The narrower `count()`-vs-`MAX+1`
+  sibling bugs in `assemblies.ts`/`templates.ts` were fixed in the same audit
+  (R8.134) since those were single-line swaps; this one needs its own pass.
+- [ ] [BUG] `addLineItemAction`'s MASTERDATA/material branch
+  (`src/app/(platform)/bq/[id]/actions.ts:386`) calls
+  `masterDataRead.listMaterialPriceOptions({ limit: 200 })` with no `search`
+  term to re-validate a selected price, then `.find()`s it by id.
+  `listMaterialPriceOptions` orders by `sku.name asc` and caps `take` at 200,
+  so a valid price whose SKU sorts past position 200 falls outside the
+  window and the action wrongly throws "no longer available" even though the
+  source picker (which does pass `search`) just found it. Found and verified
+  2026-09-24. Not fixed in that pass: the clean fix needs a by-id lookup in
+  Master Data's public read port, and Master Data is locked (see its section
+  above) — needs an explicit owner request to touch it, or a workaround
+  entirely on the BQ side (e.g. carry the picked option's snapshot through
+  the form instead of re-fetching by id).
 - [ ] [PLANNED] Add Quotation PDF output and Terms & Conditions.
 - [ ] [PLANNED] Add price modes TBC and By Owner. Owner-confirmed, 2026-09-23:
   both modes mean the price is left blank/not counted toward the total — a

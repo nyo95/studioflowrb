@@ -20,8 +20,12 @@ async function addAssemblyCustomLine(input: { grants: PermissionGrants; actor: {
   const koefisien = requirePositiveCoefficient(input.koefisien ?? "1");
   const assembly = await db.bqAssemblyTemplate.findUnique({ where: { id: input.assemblyId } });
   if (!assembly) throw new AppError("NOT_FOUND", "bq.assembly.not-found", "Assembly template not found");
-  const existingCount = await db.bqAssemblyLine.count({ where: { assembly_template_id: input.assemblyId } });
-  const line = await db.bqAssemblyLine.create({ data: { assembly_template_id: assembly.id, source_type: "CUSTOM", title_snapshot: input.title, purchase_unit_snapshot: input.purchaseUnit ?? "ls", harga_snapshot: input.harga ?? "0", currency_snapshot: input.currency ?? "IDR", kategori: requireKategori(input.kategori ?? "MATERIAL"), qty: input.qty ?? "1", koefisien, sort_order: existingCount } });
+  // count() collides with a surviving sibling once any line has been deleted
+  // (e.g. lines 0,1,2 -> delete 1 -> count()=2 duplicates the untouched line
+  // at sort_order 2); MAX+1 never reuses a still-occupied slot.
+  const maxSortOrder = await db.bqAssemblyLine.aggregate({ where: { assembly_template_id: input.assemblyId }, _max: { sort_order: true } });
+  const nextSortOrder = (maxSortOrder._max.sort_order ?? -1) + 1;
+  const line = await db.bqAssemblyLine.create({ data: { assembly_template_id: assembly.id, source_type: "CUSTOM", title_snapshot: input.title, purchase_unit_snapshot: input.purchaseUnit ?? "ls", harga_snapshot: input.harga ?? "0", currency_snapshot: input.currency ?? "IDR", kategori: requireKategori(input.kategori ?? "MATERIAL"), qty: input.qty ?? "1", koefisien, sort_order: nextSortOrder } });
   await auditWriter({ appId: "bq", action: "bq.assembly-line.created", entityType: "BqAssemblyLine", entityId: line.id, actor: input.actor });
   return line;
 }
@@ -71,8 +75,8 @@ async function applyAssemblyTemplate(input: { grants: PermissionGrants; actor: {
   const assembly = await db.bqAssemblyTemplate.findUnique({ where: { id: input.assemblyId }, include: { lines: { orderBy: { sort_order: "asc" } } } });
   if (!assembly) throw new AppError("NOT_FOUND", "bq.assembly.not-found", "Assembly template not found");
   if (!assembly.lines.length) throw new AppError("VALIDATION", "bq.assembly.empty", "An assembly must contain at least one Cost Component");
-  const existingSubObjectCount = await db.bqSubObject.count({ where: { item_id: input.itemId } });
-  const subObject = await db.bqSubObject.create({ data: { item_id: input.itemId, name: assembly.name, qty_per_l1: input.qtyPerL1 ?? "1", sort_order: existingSubObjectCount } });
+  const maxSubObjectSortOrder = await db.bqSubObject.aggregate({ where: { item_id: input.itemId }, _max: { sort_order: true } });
+  const subObject = await db.bqSubObject.create({ data: { item_id: input.itemId, name: assembly.name, qty_per_l1: input.qtyPerL1 ?? "1", sort_order: (maxSubObjectSortOrder._max.sort_order ?? -1) + 1 } });
   await db.bqLineItem.createMany({ data: assembly.lines.map((line) => ({ sub_object_id: subObject.id, source_type: line.source_type, source_ref_id: line.source_ref_id, source_imported_at: new Date(), title_snapshot: line.title_snapshot, purchase_unit_snapshot: line.purchase_unit_snapshot, base_unit_snapshot: line.base_unit_snapshot, purchase_to_base_factor_snapshot: line.purchase_to_base_factor_snapshot, source_price_snapshot: line.source_type === "CUSTOM" ? null : line.harga_snapshot, harga_snapshot: line.harga_snapshot, currency_snapshot: line.currency_snapshot, kategori: line.kategori, qty: line.qty, koefisien: line.koefisien, sort_order: line.sort_order, notes: line.notes })) });
   await auditWriter({ appId: "bq", action: "bq.assembly.applied", entityType: "BqSubObject", entityId: subObject.id, actor: input.actor, changes: { assemblyId: assembly.id } });
   return subObject;

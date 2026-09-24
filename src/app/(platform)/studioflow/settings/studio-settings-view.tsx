@@ -9,6 +9,7 @@ import { ExtraFieldsEditor } from "../_components/extra-fields-editor";
 import {
   Badge,
   Button,
+  Checkbox,
   DataTable,
   Dialog,
   Field,
@@ -636,10 +637,12 @@ function TemplateGroup({
             <Input aria-label={`New ${group.label} checklist item`} density="compact" className="flex-1" placeholder="Add checklist item…" value={draft} maxLength={200} onChange={(e) => setDraft(e.target.value)} />
             <Button type="submit" size="sm" pending={pendingKey === addKey} disabled={!draft.trim()}>Add</Button>
           </div>
-          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-ink-secondary select-none">
-            <input type="checkbox" className="accent-primary" checked={draftOptional} onChange={(e) => setDraftOptional(e.target.checked)} />
-            Optional (warning only, won&apos;t block approval)
-          </label>
+          <Checkbox
+            className="text-xs text-ink-secondary"
+            checked={draftOptional}
+            onCheckedChange={(value) => setDraftOptional(value === true)}
+            label="Optional (warning only, won't block approval)"
+          />
         </form>
       ) : null}
     </SectionCard>

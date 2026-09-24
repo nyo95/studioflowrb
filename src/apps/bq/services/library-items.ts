@@ -102,6 +102,10 @@ async function deleteLibMaterial(input: {
   id: string;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+  // The recommendation's FK is ON DELETE SET NULL, but its check constraint
+  // requires exactly one source column set — nulling this one without
+  // removing the row would fail that constraint mid-delete.
+  await db.bqTemplateRecommendation.deleteMany({ where: { lib_material_id: input.id } });
   await db.bqLibMaterial.delete({ where: { id: input.id } });
   await auditWriter({
     appId: "bq",
@@ -200,6 +204,7 @@ async function deleteLibLabor(input: {
   id: string;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+  await db.bqTemplateRecommendation.deleteMany({ where: { lib_labor_id: input.id } });
   await db.bqLibLabor.delete({ where: { id: input.id } });
   await auditWriter({
     appId: "bq",
@@ -298,6 +303,7 @@ async function deleteLibMaterialLabor(input: {
   id: string;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+  await db.bqTemplateRecommendation.deleteMany({ where: { lib_material_labor_id: input.id } });
   await db.bqLibMaterialLabor.delete({ where: { id: input.id } });
   await auditWriter({
     appId: "bq",
@@ -395,6 +401,7 @@ async function deleteLibCustomItem(input: {
   id: string;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+  await db.bqTemplateRecommendation.deleteMany({ where: { lib_custom_item_id: input.id } });
   await db.bqLibCustomItem.delete({ where: { id: input.id } });
   await auditWriter({
     appId: "bq",
