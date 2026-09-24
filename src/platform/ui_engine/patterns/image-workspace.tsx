@@ -96,7 +96,6 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
   const pickerRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
-  const autoOpened = useRef(false);
   const panState = useRef<{ pointerId: number; startX: number; startY: number; startPanX: number; startPanY: number } | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -111,15 +110,6 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
-
-  // The dialog's own "Choose image" click is a needless extra step — open the
-  // OS picker as soon as this workspace mounts with nothing chosen yet. The
-  // button stays as a fallback if the user cancels that picker.
-  useEffect(() => {
-    if (autoOpened.current || disabled || previewUrl) return;
-    autoOpened.current = true;
-    pickerRef.current?.click();
-  }, [disabled, previewUrl]);
 
   useEffect(() => {
     const canvas = overlayRef.current;

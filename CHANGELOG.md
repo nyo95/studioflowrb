@@ -5,8 +5,34 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.141**
-- Next local revision: **R8.142**
+- Current revision after this entry is committed: **R8.142**
+- Next local revision: **R8.143**
+
+## R8.142 | 2026-09-24 | fix(ui-engine): stop auto-opening the OS file picker when an image workspace mounts
+
+Partial reversal of R8.110's "photo picker opens immediately" and directly
+relevant to R8.141's "collapsing the wrapper dialog away is what makes the
+photo click feel instant" rationale — the owner tried it live on the
+Schedule board's "+ Add photo" overlay and didn't want it: *"saat diklik
+jangan lgsg keluarin dialog pencarian image - keluarin modal dulu, di
+dalam nya baru ada utk select image."*
+
+- `platform/ui_engine/patterns/image-workspace.tsx`: removed the
+  mount-time `useEffect` that auto-clicked the hidden file input (and the
+  now-unused `autoOpened` ref). The "Choose image" button — already the
+  empty-state UI, previously described as "a fallback if the user cancels
+  the picker" — is now the only way to open the OS file dialog again, for
+  every `ImageWorkspace` consumer (Schedule options and MOM section
+  photos alike, since it's the one shared component).
+- No other change: R8.141's single-modal structure (board photo click
+  opens the same `EntryDialog`, pre-swapped to `InlinePhotoEditor`) stays
+  exactly as it is — the modal now simply shows its content first instead
+  of being instantly obscured by the native file dialog.
+
+Verification: `tsc`, `check:boundaries`, `check:legacy-runtime` clean.
+`npm test`: 521 passed (no test exercised the auto-open behavior directly).
+Browser acceptance intentionally deferred — owner asked to test manually.
+
 
 ## R8.141 | 2026-09-24 | fix(sf): Product Schedule photo capture is inline in the entry dialog, not a second stacked modal
 
