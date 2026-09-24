@@ -5,8 +5,57 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.140**
-- Next local revision: **R8.141**
+- Current revision after this entry is committed: **R8.141**
+- Next local revision: **R8.142**
+
+## R8.141 | 2026-09-24 | fix(sf): Product Schedule photo capture is inline in the entry dialog, not a second stacked modal
+
+Owner-scoped (chat, 2026-09-24), after confirming how the Board view's card
+"thumbnail + card content" layout works: *"modalnya jd 1 aja, di klik di
+body / di judul kartu -> munculin modal. saat klik image -> otomatis cari
+gambar."*
+
+**Before:** a board card had two disconnected popups. Clicking the card body
+opened the full item editor (`EntryDialog`). Clicking the card's photo area
+opened a second, separate `SchedulePhotoDialog` — its own `Dialog`, stacked
+on top if the editor was already open (the entry panel's own per-option
+"Change photo" button did exactly this: a modal opening a modal).
+
+**Fix:** there is now exactly one dialog. `SchedulePhotoDialog` is gone;
+its guts became `InlinePhotoEditor`, which swaps in for the option's row
+inside the already-open entry panel — the same in-place swap
+`OptionInlineForm` already used for editing product details, just applied
+to the photo step too. The board card's photo click (`onOpenPhoto`) now
+opens the *same* `EntryDialog` as a body click, passing an
+`initialPhotoOptionId` so the panel starts with that option's row already
+swapped to the photo editor — `EntryPanelContent` consumes this once via a
+render-time ref comparison (`autoPhotoAppliedRef`, mirroring the existing
+`shownIdRef` resync pattern a few lines below it), not a `useEffect`, since
+this file's lint config rejects synchronous `setState` inside effects.
+`ImageWorkspace` already opens the OS file picker itself as soon as it
+mounts, so this alone delivers "click the photo → the file picker just
+appears" with no button click of ours in between — the "automatically" in
+the owner's ask was mostly already true, it was just hidden behind an extra
+modal.
+
+`ScheduleBoard` centralizes every path that opens the panel (board card,
+list row, row-action "Open") through one `openEntry(id, photoOptionId?)`
+helper, so a stale auto-photo target from an earlier photo click can never
+leak into a later, unrelated open of the same entry.
+
+Updated the `schedule.regression.test.ts` assertion that pinned the old
+`onOpen={setOpenId}` literal (now `onOpen={(id) => openEntry(id)}`) and
+added a regression test asserting photo capture no longer opens its own
+`Dialog`.
+
+Checks: `tsc --noEmit` clean; `eslint .` clean; full suite 521/521. Verified
+in the browser: clicking a card's photo area opens the single entry dialog
+with the option's row already swapped to the photo picker (`Choose image`
+visible, `Cancel` returns to the normal row); clicking the card title opens
+the same dialog at the normal Card-content view with no photo editor
+active; clicking "Add photo" from inside an already-open dialog swaps the
+row in place with no second dialog appearing. No schema migration; no new
+dependency.
 
 ## R8.140 | 2026-09-24 | fix(platform): reuse recently-rendered dynamic pages on revisit instead of refetching the whole layout chain
 

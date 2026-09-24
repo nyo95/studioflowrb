@@ -97,12 +97,15 @@ type Command = ReturnType<typeof useCommand>;
 const PHOTO_ASPECT = 4 / 5;
 
 /**
- * Photo crop/upload dialog for one option. Shared by the board card's direct
- * "Add photo" overlay and the entry panel's per-option control, so a photo
- * can be set without first opening the panel — matching legacy, where the
- * card's own photo area is the upload trigger.
+ * Photo crop/upload panel for one option. Renders inline in place of the
+ * option row (same swap pattern as `OptionInlineForm`) rather than as its
+ * own `Dialog` — the entry panel is already a modal, and stacking a second
+ * modal on top of it read as two disconnected popups for one action (owner,
+ * 2026-09-24: "modalnya jd 1 aja"). `ImageWorkspace` opens the OS file
+ * picker itself as soon as it mounts, so swapping the row in already gives
+ * "click photo → file picker appears" with no extra click of our own.
  */
-function SchedulePhotoDialog({
+function InlinePhotoEditor({
   projectId,
   entryCode,
   option,
@@ -134,19 +137,17 @@ function SchedulePhotoDialog({
   };
 
   return (
-    <Dialog
-      open
-      onOpenChange={(value) => { if (!value) onClose(); }}
-      title={`Photo — ${entryCode} option ${option.label}`}
-      description="Choose a photo and crop it to the 4:5 catalog frame."
-      size="lg"
-      dismissible={!isPending(pendingKey)}
-    >
-      <div className="grid gap-2">
-        <ImageWorkspace label="Schedule photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" onPrepared={onPrepared} disabled={isPending(pendingKey)} />
-        {photoError ? <InlineError>{photoError}</InlineError> : null}
+    <div className="grid gap-2">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <Text size="sm" weight="semibold">{`Photo — ${entryCode} option ${option.label}`}</Text>
+          <Text size="sm" tone="tertiary">Choose a photo and crop it to the 4:5 catalog frame.</Text>
+        </div>
+        <Button type="button" size="sm" variant="ghost" onClick={onClose} disabled={isPending(pendingKey)}>Cancel</Button>
       </div>
-    </Dialog>
+      <ImageWorkspace label="Schedule photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" onPrepared={onPrepared} disabled={isPending(pendingKey)} />
+      {photoError ? <InlineError>{photoError}</InlineError> : null}
+    </div>
   );
 }
 
@@ -236,7 +237,7 @@ function BoardView({
   onMoveCategory,
   onDelete,
   onReorder,
-  onQuickPhoto,
+  onOpenPhoto,
 }: {
   projectId: string;
   groups: Array<{ category: string; rows: ScheduleEntryView[] }>;
@@ -247,7 +248,7 @@ function BoardView({
   onMoveCategory: (entry: ScheduleEntryView) => void;
   onDelete: (entry: ScheduleEntryView) => void;
   onReorder: (rows: ScheduleEntryView[], draggedId: string, targetId: string) => void;
-  onQuickPhoto: (entry: ScheduleEntryView, option: ScheduleOptionView) => void;
+  onOpenPhoto: (entry: ScheduleEntryView, option: ScheduleOptionView) => void;
 }) {
   const { draggingId, dragOverId, start, end, over, leave } = useRowDrag();
   return (
@@ -307,8 +308,8 @@ function BoardView({
                         tabIndex={0}
                         aria-label={photoTarget.imageUrl ? `Change photo of ${entry.code}` : `Add photo to ${entry.code}`}
                         title={photoTarget.imageUrl ? "Change photo" : "Add photo"}
-                        onClick={(event) => { event.stopPropagation(); onQuickPhoto(entry, photoTarget); }}
-                        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); onQuickPhoto(entry, photoTarget); } }}
+                        onClick={(event) => { event.stopPropagation(); onOpenPhoto(entry, photoTarget); }}
+                        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); onOpenPhoto(entry, photoTarget); } }}
                         className="absolute inset-0 grid place-items-center opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
                       >
                         <span className="rounded-action bg-ink/70 px-2 py-1 text-micro font-semibold uppercase tracking-[0.1em] text-surface">
@@ -378,9 +379,17 @@ export function ScheduleBoard({
   const [section, setSection] = useState<Section>(() => (entries.some((e) => e.section === "MATERIAL") || !entries.length ? "MATERIAL" : "FIXTURE"));
   const [viewMode, setViewMode] = useState<"list" | "board">("board");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [autoPhotoOptionId, setAutoPhotoOptionId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<null | "add" | "import" | { move: ScheduleEntryView }>(null);
-  const [quickPhoto, setQuickPhoto] = useState<{ entry: ScheduleEntryView; option: ScheduleOptionView } | null>(null);
   const listDrag = useRowDrag();
+
+  /** Every path that opens the entry panel goes through here, so a stale
+   * auto-photo target from a previous image click never leaks into a plain
+   * "open the item" click (owner, 2026-09-24: one modal, not two). */
+  const openEntry = (id: string, photoOptionId: string | null = null) => {
+    setOpenId(id);
+    setAutoPhotoOptionId(photoOptionId);
+  };
 
   const counts = useMemo(() => ({
     MATERIAL: entries.filter((e) => e.section === "MATERIAL").length,
@@ -491,13 +500,13 @@ export function ScheduleBoard({
                 projectId={projectId}
                 groups={groups}
                 command={command}
-                onOpen={setOpenId}
+                onOpen={(id) => openEntry(id)}
                 canEdit={canEdit}
                 canManageTemplates={canManageTemplates}
                 onMoveCategory={(entry) => setDialog({ move: entry })}
                 onDelete={removeEntry}
                 onReorder={reorderGroup}
-                onQuickPhoto={(entry, option) => setQuickPhoto({ entry, option })}
+                onOpenPhoto={(entry, option) => openEntry(entry.id, option.id)}
               />
             ) : (
               <div className="grid">
@@ -534,7 +543,7 @@ export function ScheduleBoard({
                             }}
                             className={`flex items-center gap-3 px-(--ui-section-px) py-2.5 ${canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"} ${listDrag.draggingId === entry.id ? "opacity-40" : ""} ${listDrag.dragOverId === entry.id && listDrag.draggingId && listDrag.draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-[-2px] outline-line-focus" : ""}`}
                           >
-                            <button type="button" onClick={() => setOpenId(entry.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                            <button type="button" onClick={() => openEntry(entry.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                               <Thumb url={shown?.imageUrl ?? null} alt={shown ? shown.productName : `${entry.code} has no photo`} />
                               <span className="w-14 shrink-0 font-ui-mono text-sm font-semibold tabular-nums text-ink">{entry.code}</span>
                               <span className="grid min-w-0 flex-1 gap-0.5">
@@ -559,7 +568,7 @@ export function ScheduleBoard({
                                 label={`Actions for ${entry.code}`}
                                 pending={busy}
                                 items={[
-                                  { label: "Open", onSelect: () => setOpenId(entry.id) },
+                                  { label: "Open", onSelect: () => openEntry(entry.id) },
                                   ...(canManageTemplates && templateSourceOf(entry)
                                     ? [{ label: "Save as template item", onSelect: () => void run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })) }]
                                     : []),
@@ -594,6 +603,7 @@ export function ScheduleBoard({
           command={command}
           confirm={confirm.confirm}
           onClose={() => setOpenId(null)}
+          initialPhotoOptionId={autoPhotoOptionId}
         />
       ) : null}
 
@@ -603,9 +613,6 @@ export function ScheduleBoard({
       {dialog === "import" ? <ImportDialog projectId={projectId} section={section} command={command} onClose={() => setDialog(null)} /> : null}
       {dialog && typeof dialog === "object" ? (
         <MoveDialog projectId={projectId} entry={dialog.move} categories={categories} command={command} onClose={() => setDialog(null)} />
-      ) : null}
-      {quickPhoto ? (
-        <SchedulePhotoDialog projectId={projectId} entryCode={quickPhoto.entry.code} option={quickPhoto.option} command={command} onClose={() => setQuickPhoto(null)} />
       ) : null}
       {confirm.dialog}
     </div>
@@ -834,6 +841,7 @@ function EntryPanelContent({
   confirm,
   onClose,
   onDirtyChange,
+  initialPhotoOptionId,
 }: {
   projectId: string;
   entry: ScheduleEntryView;
@@ -843,14 +851,30 @@ function EntryPanelContent({
   confirm: ReturnType<typeof useConfirm>["confirm"];
   onClose: () => void;
   onDirtyChange?: (dirty: boolean) => void;
+  /** Set once, from the board card's photo click, to open the panel with
+   * that option's photo editor already active — this component owns
+   * consuming it (a ref, not a prop echoed back) so a stale value can never
+   * leak into a later, unrelated open of the same mounted panel. */
+  initialPhotoOptionId?: string | null;
 }) {
   const { run, isPending } = command;
   const [editing, setEditing] = useState<ScheduleOptionView | "new" | null>(null);
   const [reuse, setReuse] = useState(false);
-  const [photoFor, setPhotoFor] = useState<ScheduleOptionView | null>(null);
+  const [photoFor, setPhotoFor] = useState<string | null>(null);
   const [inlineEdit, setInlineEdit] = useState<string | null>(null);
   const [sampleFor, setSampleFor] = useState<ScheduleOptionView | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Adjust-during-render, not useEffect: this fires once per fresh mount
+  // (the panel fully unmounts on close, so the ref always starts at null),
+  // and the ref guard keeps it from re-firing on every re-render the way a
+  // second useState here previously caused a loop elsewhere in this file.
+  const normalizedInitialPhotoOptionId = initialPhotoOptionId ?? null;
+  const autoPhotoAppliedRef = useRef<string | null>(null);
+  if (autoPhotoAppliedRef.current !== normalizedInitialPhotoOptionId) {
+    autoPhotoAppliedRef.current = normalizedInitialPhotoOptionId;
+    if (normalizedInitialPhotoOptionId && entry.options.some((option) => option.id === normalizedInitialPhotoOptionId)) setPhotoFor(normalizedInitialPhotoOptionId);
+  }
 
   // The checklist edits the option the card itself speaks for — same rule as
   // the card face (shownOptionOf).
@@ -1169,6 +1193,13 @@ function EntryPanelContent({
                   </li>
                 );
               }
+              if (photoFor === option.id) {
+                return (
+                  <li id={`opt-${option.id}`} key={option.id} className="rounded-control border border-line-focus bg-surface px-3 py-2.5">
+                    <InlinePhotoEditor projectId={projectId} entryCode={entry.code} option={option} command={command} onClose={() => setPhotoFor(null)} />
+                  </li>
+                );
+              }
               return (
                 <li id={`opt-${option.id}`} key={option.id} className={`rounded-control border px-3 py-2 ${option.isFinal ? "border-success-line bg-success-surface/40" : "border-line"}`}>
                   <div className="flex items-start gap-2">
@@ -1177,7 +1208,7 @@ function EntryPanelContent({
                       {canEdit ? (
                         <button
                           type="button"
-                          onClick={() => { setPhotoFor(option); }}
+                          onClick={() => { setPhotoFor(option.id); }}
                           aria-label={option.imageUrl ? `Change photo of option ${option.label}` : `Add photo to option ${option.label}`}
                           title={option.imageUrl ? "Change photo" : "Add photo"}
                           className="rounded-[4px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus"
@@ -1190,7 +1221,7 @@ function EntryPanelContent({
                       {canEdit ? (
                         <button
                           type="button"
-                          onClick={() => { setPhotoFor(option); }}
+                          onClick={() => { setPhotoFor(option.id); }}
                           className="text-xs font-medium text-ink-secondary hover:text-ink hover:underline"
                         >
                           {option.imageUrl ? "Change photo" : "Add photo"}
@@ -1237,7 +1268,7 @@ function EntryPanelContent({
                         items={[
                           ...(option.isFinal ? [] : [{ label: "Set as final", onSelect: () => void run(`${entry.id}-opt-${option.id}`, () => markScheduleFinalAction({ projectId, optionId: option.id })) }]),
                           { label: "Edit", onSelect: () => setInlineEdit(option.id) },
-                          { label: option.imageUrl ? "Change photo" : "Add photo", onSelect: () => { setPhotoFor(option); } },
+                          { label: option.imageUrl ? "Change photo" : "Add photo", onSelect: () => { setPhotoFor(option.id); } },
                           ...(option.imageUrl ? [{ label: "Remove photo", onSelect: () => void removePhoto(option) }] : []),
                           option.sampleRequest?.status === "REQUESTED"
                             ? { label: "Mark sample received", separatorBefore: true, onSelect: () => void run(`${entry.id}-opt-${option.id}`, () => receiveScheduleSampleAction({ projectId, requestId: option.sampleRequest!.id })) }
@@ -1266,9 +1297,6 @@ function EntryPanelContent({
         />
       ) : null}
       {reuse ? <ReuseDialog projectId={projectId} entry={entry} command={command} onClose={() => setReuse(false)} /> : null}
-      {photoFor ? (
-        <SchedulePhotoDialog projectId={projectId} entryCode={entry.code} option={photoFor} command={command} onClose={() => setPhotoFor(null)} />
-      ) : null}
       {sampleFor ? (
         <SampleRequestDialog projectId={projectId} option={sampleFor} command={command} onClose={() => setSampleFor(null)} />
       ) : null}
@@ -1294,6 +1322,7 @@ function EntryDialog({
   command,
   confirm,
   onClose,
+  initialPhotoOptionId,
 }: {
   projectId: string;
   entry: ScheduleEntryView;
@@ -1302,6 +1331,7 @@ function EntryDialog({
   command: Command;
   confirm: ReturnType<typeof useConfirm>["confirm"];
   onClose: () => void;
+  initialPhotoOptionId?: string | null;
 }) {
   // Card content no longer auto-saves per field; closing with an unsaved
   // draft needs a discard confirmation, same as Master Data's edit dialogs.
@@ -1332,6 +1362,7 @@ function EntryDialog({
         confirm={confirm}
         onClose={onClose}
         onDirtyChange={(dirty) => { isDirtyRef.current = dirty; }}
+        initialPhotoOptionId={initialPhotoOptionId}
       />
     </Dialog>
   );

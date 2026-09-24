@@ -32,11 +32,17 @@ describe("Schedule Board/List outer branching and pattern form preservation", ()
   });
 
   it("opens a single shared editor dialog for both views (R8.112: no separate desktop-panel/mobile-drawer split)", () => {
-    const boardOpen = scheduleBoard.indexOf("onOpen={setOpenId}", scheduleBoard.indexOf("<BoardView"));
+    const boardOpen = scheduleBoard.indexOf("onOpen={(id) => openEntry(id)}", scheduleBoard.indexOf("<BoardView"));
     const dialogUsage = (scheduleBoard.match(/<EntryDialog/g) ?? []).length;
     assert.ok(boardOpen > -1, "BoardView opens the shared editor");
     assert.equal(dialogUsage, 1, "EntryDialog is rendered exactly once, as a sibling of the view pane, not once per breakpoint");
     assert.doesNotMatch(scheduleBoard, /useIsDesktop\(\)|<EntryDrawer|md:grid-cols-\[1fr_22rem\]/, "the split desktop-sidebar/mobile-drawer layout must not come back");
+  });
+
+  it("routes both card-body and card-photo clicks through the same entry dialog (R8.141: one modal, not a separate photo dialog)", () => {
+    assert.doesNotMatch(scheduleBoard, /<Dialog[\s\S]{0,80}Photo — /, "photo capture must not open its own Dialog anymore");
+    assert.match(scheduleBoard, /onOpenPhoto={\(entry, option\) => openEntry\(entry\.id, option\.id\)}/, "the board card's photo click opens the shared entry dialog with an auto-photo target, not a separate dialog");
+    assert.match(scheduleBoard, /photoFor === option\.id/, "the entry dialog swaps the option row inline for its photo editor, like it already does for OptionInlineForm");
   });
 
   it("has the List button and Board button in the toolbar", () => {

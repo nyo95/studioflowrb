@@ -631,6 +631,22 @@ values), and includes an annotation toolbar — pen, arrow, box, circle, a
 drawing mode — baked into the saved image at crop time. This is UI-Engine-
 owned browser behavior, not Schedule- or MOM-specific policy.
 
+**One dialog, not a photo dialog stacked on the item dialog (owner,
+2026-09-24: "modalnya jd 1 aja").** The photo workspace above renders
+*inline*, swapped in for the option's row inside the already-open entry
+panel (`EntryDialog`/`EntryPanelContent`), the same in-place swap the panel
+already uses for editing an option's product details. There is no longer a
+separate `Dialog` for photo capture. Clicking a board card's photo area
+opens the one entry dialog with that option's row pre-swapped to the photo
+editor (an `initialPhotoOptionId` the panel consumes once, via the same
+render-time ref-comparison pattern as its `shownIdRef` resync, not an
+effect); clicking the card body/title opens the same dialog at its normal
+view. Because the image workspace already auto-opens the OS file picker on
+mount (previous paragraph), collapsing the wrapper dialog away is what
+makes "click the photo → file picker appears" actually feel automatic —
+before, the picker still had to wait for a whole second modal to mount
+first.
+
 ### 11.8 Card fields
 
 `sf_schedule_entry.card_fields` is **nullable JSON**: `null` means "no
