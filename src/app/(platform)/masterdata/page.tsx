@@ -76,8 +76,8 @@ export default async function MasterDataPage() {
       {/* ── Count tiles ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {tiles.map(({ key, label, count, delta, href, Icon }) => (
-          <Link key={key} href={href} className="text-inherit no-underline">
-            <SectionCard className="group h-full">
+          <Link key={key} href={href} className="rounded-card text-inherit no-underline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-line-focus">
+            <SectionCard className="group h-full transition-colors hover:bg-surface-muted">
               <div className="flex items-center justify-between">
                 <span className="flex h-8 w-8 items-center justify-center rounded-action bg-surface-muted text-ink-secondary">
                   <Icon size={16} aria-hidden="true" />

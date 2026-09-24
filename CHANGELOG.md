@@ -5,8 +5,16 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.143**
-- Next local revision: **R8.144**
+- Current revision after this entry is committed: **R8.144**
+- Next local revision: **R8.145**
+
+## R8.144 | 2026-09-24 | fix(masterdata): restore hover background and focus ring on count tiles
+
+R8.143's migration to `SectionCard` dropped the hover surface and focus-visible ring that the original raw-Tailwind count tiles carried directly on the `Link` element. The regression was caught in Reviewer browser acceptance.
+
+- `src/app/(platform)/masterdata/page.tsx`: added `transition-colors hover:bg-surface-muted` to each tile's `SectionCard`; added `rounded-card focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-line-focus` to the wrapping `Link`.
+
+Verification: browser acceptance confirmed — `hover:bg-surface-muted` and `focus-visible:outline-*` present in rendered DOM; Master Data home, StudioFlow Today, and Login page all pass visual inspection.
 
 ## R8.143 | 2026-09-24 | feat(platform): redesign entry apps for improved user-friendliness and UI Engine consistency
 
