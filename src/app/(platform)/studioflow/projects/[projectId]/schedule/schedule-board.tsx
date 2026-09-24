@@ -2,7 +2,7 @@
 
 import { ArrowDown, ArrowUp, FileUp, History, ImageIcon, Plus, Printer, Search, Settings2 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 
@@ -14,6 +14,7 @@ import {
   effectiveCardFields,
   extraChoicesOf,
   finalOf,
+  resolveCardFields,
   shownOptionOf,
   specLine,
   templateSourceOf,
@@ -832,6 +833,7 @@ function EntryPanelContent({
   command,
   confirm,
   onClose,
+  onDirtyChange,
 }: {
   projectId: string;
   entry: ScheduleEntryView;
@@ -840,49 +842,100 @@ function EntryPanelContent({
   command: Command;
   confirm: ReturnType<typeof useConfirm>["confirm"];
   onClose: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const { run, isPending } = command;
-  const initial = { qty: entry.qty ?? "", unit: entry.unit ?? "", location: entry.location ?? "" };
-  const [fields, setFields] = useState(initial);
   const [editing, setEditing] = useState<ScheduleOptionView | "new" | null>(null);
   const [reuse, setReuse] = useState(false);
   const [photoFor, setPhotoFor] = useState<ScheduleOptionView | null>(null);
   const [inlineEdit, setInlineEdit] = useState<string | null>(null);
   const [sampleFor, setSampleFor] = useState<ScheduleOptionView | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // The checklist edits the option the card itself speaks for — same rule as
-  // the card face (shownOptionOf). Local draft mirrors it and resyncs if a
-  // different option becomes shown (e.g. another one is marked final) while
-  // this dialog stays open.
+  // the card face (shownOptionOf).
   const shown = shownOptionOf(entry);
-  const [optionDraft, setOptionDraft] = useState<ProductDraft>(() => (shown ? productFromOption(shown) : EMPTY_PRODUCT));
-  // Resync the draft only when the shown option's *identity* changes (e.g. a
-  // different option becomes final while this dialog stays open) — a ref,
-  // not a second piece of state, tracks what was last seen so this can never
-  // itself trigger a further state update that re-enters this check.
+  const extraChoices = extraChoicesOf(entry);
+  const extraKeys = extraChoices.map((extra) => extra.key);
+
+  // Owner decision 2026-09-24: this section no longer auto-saves per field on
+  // blur — every edit here (item fields, product details, card-field choice)
+  // is a local draft until "Save" is pressed, matching Master Data's
+  // draft/discard pattern. `baseline` is what is actually persisted; the
+  // three pieces of local state below are the in-progress draft.
+  const baselineOf = (source: ScheduleEntryView, shownOption: ScheduleOptionView | null) => ({
+    fields: { qty: source.qty ?? "", unit: source.unit ?? "", location: source.location ?? "" },
+    option: shownOption ? productFromOption(shownOption) : EMPTY_PRODUCT,
+    cardFields: source.cardFields,
+  });
+  const [baseline, setBaseline] = useState(() => baselineOf(entry, shown));
+  const [fields, setFields] = useState(baseline.fields);
+  const [optionDraft, setOptionDraft] = useState<ProductDraft>(baseline.option);
+  const [cardFieldsDraft, setCardFieldsDraft] = useState<string[] | null>(baseline.cardFields);
+
+  // Resync the whole draft only when the shown option's *identity* changes
+  // (e.g. a different option becomes final while this dialog stays open) —
+  // a ref, not a second piece of state, tracks what was last seen so this can
+  // never itself trigger a further state update that re-enters this check.
   const shownIdRef = useRef(shown?.id ?? null);
   if (shownIdRef.current !== (shown?.id ?? null)) {
     shownIdRef.current = shown?.id ?? null;
-    setOptionDraft(shown ? productFromOption(shown) : EMPTY_PRODUCT);
+    const next = baselineOf(entry, shown);
+    setBaseline(next);
+    setFields(next.fields);
+    setOptionDraft(next.option);
+    setCardFieldsDraft(next.cardFields);
   }
 
+  const displayCardFields = resolveCardFields(cardFieldsDraft, extraKeys);
+  const optionChanged = JSON.stringify(optionDraft) !== JSON.stringify(baseline.option);
+  const fieldsChanged = fields.qty !== baseline.fields.qty || fields.unit !== baseline.fields.unit || fields.location !== baseline.fields.location;
+  const cardFieldsChanged = JSON.stringify(resolveCardFields(cardFieldsDraft, extraKeys)) !== JSON.stringify(resolveCardFields(baseline.cardFields, extraKeys));
+  const isDirty = optionChanged || fieldsChanged || cardFieldsChanged;
+  // Tell the dialog wrapper whether it's safe to close without confirming —
+  // a ref write in the parent, not a state update, so this stays a pure
+  // "synchronize with an external system" effect.
+  useEffect(() => { onDirtyChange?.(isDirty); }, [isDirty, onDirtyChange]);
+  // Needs a Type before an option can be created (matches OptionDialog's own
+  // rule) — blocks Save only when the missing piece is the option itself.
+  const optionNeedsType = optionChanged && !shown && !optionDraft.productName.trim();
+
   const entryFieldsKey = `${entry.id}-fields`;
-  const saveLocation = () => {
-    if (fields.location === initial.location) return;
-    void run(entryFieldsKey, () => updateScheduleEntryAction({ projectId, entryId: entry.id, location: fields.location.trim() || null }));
+  const optionFieldsKey = `${entry.id}-option-fields`;
+  const cardFieldsKey = `${entry.id}-card-fields`;
+  const savePending = isPending(entryFieldsKey) || isPending(optionFieldsKey) || isPending(cardFieldsKey);
+
+  const saveAll = async () => {
+    setSaveError(null);
+    if (optionChanged && !optionNeedsType) {
+      const snapshot = toSnapshot(optionDraft);
+      const ok = await run(optionFieldsKey, () => shown
+        ? updateScheduleOptionAction({ projectId, optionId: shown.id, snapshot })
+        : createScheduleOptionAction({ projectId, entryId: entry.id, snapshot }));
+      if (!ok) return;
+    }
+    if (fieldsChanged) {
+      const ok = await run(entryFieldsKey, () => updateScheduleEntryAction({
+        projectId, entryId: entry.id,
+        qty: fields.qty.trim() || null, unit: fields.unit.trim() || null, location: fields.location.trim() || null,
+      }));
+      if (!ok) return;
+    }
+    if (cardFieldsChanged) {
+      const ok = await run(cardFieldsKey, () => updateScheduleEntryCardFieldsAction({ projectId, entryId: entry.id, fields: cardFieldsDraft === null ? null : [...cardFieldsDraft] }));
+      if (!ok) return;
+    }
+    setBaseline({ fields, option: optionDraft, cardFields: cardFieldsDraft });
   };
-  const saveQty = () => {
-    if (fields.qty === initial.qty && fields.unit === initial.unit) return;
-    void run(entryFieldsKey, () => updateScheduleEntryAction({ projectId, entryId: entry.id, qty: fields.qty.trim() || null, unit: fields.unit.trim() || null }));
+  const discardDraft = () => {
+    setFields(baseline.fields);
+    setOptionDraft(baseline.option);
+    setCardFieldsDraft(baseline.cardFields);
+    setSaveError(null);
   };
 
-  const optionFieldsKey = `${entry.id}-option-fields`;
   const setOptionField = (key: keyof ProductDraft) => (event: { target: { value: string } }) =>
     setOptionDraft((current) => ({ ...current, [key]: event.target.value }));
-  const saveOptionDraft = (next: ProductDraft) => {
-    if (!shown) return;
-    void run(optionFieldsKey, () => updateScheduleOptionAction({ projectId, optionId: shown.id, snapshot: toSnapshot(next) }));
-  };
   const brandOptions = shown?.brandId && !brands.some((b) => b.id === shown.brandId)
     ? [{ id: shown.brandId, name: shown.brandName ?? "Brand" }, ...brands]
     : brands;
@@ -899,18 +952,12 @@ function EntryPanelContent({
       : []),
   ];
   const handleBrandChange = (next: string) => {
-    const draft = isKnownBrandId(next)
+    setOptionDraft(isKnownBrandId(next)
       ? { ...optionDraft, brandId: next, brandName: "" }
-      : { ...optionDraft, brandId: "", brandName: next };
-    setOptionDraft(draft);
-    saveOptionDraft(draft);
+      : { ...optionDraft, brandId: "", brandName: next });
   };
 
-  const cardFieldsKey = `${entry.id}-card-fields`;
-  const extraChoices = extraChoicesOf(entry);
-  const effectiveFields = effectiveCardFields(entry);
-  const saveCardFields = (values: readonly string[] | null) =>
-    void run(cardFieldsKey, () => updateScheduleEntryCardFieldsAction({ projectId, entryId: entry.id, fields: values === null ? null : [...values] }));
+  const effectiveFields = displayCardFields;
   // Unchecking everything is a real choice (photo, code and title only), not a
   // reset — `null` is the reset, and "Use default" below is how it is reached.
   // Ticking is never blocked by the field being empty — ticking is how a field
@@ -918,7 +965,7 @@ function EntryPanelContent({
   // empty field" rule made an empty field un-tickable, which was the opposite
   // of useful for "I don't know the brand yet, but note it here").
   const toggleCardField = (field: string) =>
-    saveCardFields(effectiveFields.includes(field) ? effectiveFields.filter((key) => key !== field) : [...effectiveFields, field]);
+    setCardFieldsDraft(effectiveFields.includes(field) ? effectiveFields.filter((key) => key !== field) : [...effectiveFields, field]);
 
   const removePhoto = async (option: ScheduleOptionView) => {
     const ok = await confirm({
@@ -952,8 +999,7 @@ function EntryPanelContent({
           <ChecklistRow
             label="Brand"
             checked={effectiveFields.includes("brand")}
-            disabled={!canEdit || isPending(cardFieldsKey) || !shown}
-            disabledHint={!shown ? "Add an option below first." : undefined}
+            disabled={!canEdit || savePending}
             onToggle={() => toggleCardField("brand")}
           >
             <CreatableSearch
@@ -967,25 +1013,21 @@ function EntryPanelContent({
               searchPlaceholder="Search brands…"
               emptyLabel="No brands found"
               allowClear
-              disabled={!canEdit || isPending(optionFieldsKey)}
+              disabled={!canEdit || savePending}
               className="w-full"
             />
           </ChecklistRow>
 
           {/* Type has no checkbox — it is the card title and always shows (§11.3). */}
           <div className="rounded-control border border-line-subtle">
-            <div
-              title={!shown ? "Add an option below first." : undefined}
-              className={`flex items-center gap-2 rounded-control px-1.5 py-1.5 text-sm ${!shown ? "text-ink-tertiary" : ""}`}
-            >
+            <div className="flex items-center gap-2 rounded-control px-1.5 py-1.5 text-sm">
               Type <span className="text-xs font-normal text-ink-tertiary">always shown</span>
             </div>
             <div className="px-1.5 pb-2 pt-0.5">
               <Input
                 value={optionDraft.productName}
                 onChange={setOptionField("productName")}
-                onBlur={() => saveOptionDraft(optionDraft)}
-                disabled={!canEdit || isPending(optionFieldsKey) || !shown}
+                disabled={!canEdit || savePending}
                 maxLength={200}
                 placeholder="e.g. Nude Pro - ATS 1132 M"
               />
@@ -997,38 +1039,35 @@ function EntryPanelContent({
               key={key}
               label={CARD_FIELD_LABEL[key]}
               checked={effectiveFields.includes(key)}
-              disabled={!canEdit || isPending(cardFieldsKey) || !shown}
-              disabledHint={!shown ? "Add an option below first." : undefined}
+              disabled={!canEdit || savePending}
               onToggle={() => toggleCardField(key)}
             >
               <Input
                 autoFocus
                 value={optionDraft[key]}
                 onChange={setOptionField(key)}
-                onBlur={() => saveOptionDraft(optionDraft)}
-                disabled={!canEdit || isPending(optionFieldsKey)}
+                disabled={!canEdit || savePending}
                 maxLength={160}
               />
             </ChecklistRow>
           ))}
 
-          <ChecklistRow label="Location" checked={effectiveFields.includes("location")} disabled={!canEdit || isPending(cardFieldsKey)} onToggle={() => toggleCardField("location")}>
+          <ChecklistRow label="Location" checked={effectiveFields.includes("location")} disabled={!canEdit || savePending} onToggle={() => toggleCardField("location")}>
             <Input
               autoFocus
               value={fields.location}
               onChange={(e) => setFields({ ...fields, location: e.target.value })}
-              onBlur={saveLocation}
-              disabled={!canEdit || isPending(entryFieldsKey)}
+              disabled={!canEdit || savePending}
               maxLength={160}
             />
           </ChecklistRow>
 
           {/* Qty only for Fixture — a Material line is specified, not counted; legacy's own sheet import already discards Qty on Material (owner decision 2026-09-23). */}
           {entry.section === "FIXTURE" ? (
-            <ChecklistRow label="Qty" checked={effectiveFields.includes("qty")} disabled={!canEdit || isPending(cardFieldsKey)} onToggle={() => toggleCardField("qty")}>
+            <ChecklistRow label="Qty" checked={effectiveFields.includes("qty")} disabled={!canEdit || savePending} onToggle={() => toggleCardField("qty")}>
               <div className="grid grid-cols-[1fr_5.5rem] gap-1.5">
-                <Input autoFocus inputMode="decimal" value={fields.qty} onChange={(e) => setFields({ ...fields, qty: e.target.value })} onBlur={saveQty} disabled={!canEdit || isPending(entryFieldsKey)} maxLength={20} />
-                <Input placeholder="Unit" value={fields.unit} onChange={(e) => setFields({ ...fields, unit: e.target.value })} onBlur={saveQty} disabled={!canEdit || isPending(entryFieldsKey)} maxLength={40} />
+                <Input autoFocus inputMode="decimal" value={fields.qty} onChange={(e) => setFields({ ...fields, qty: e.target.value })} disabled={!canEdit || savePending} maxLength={20} />
+                <Input placeholder="Unit" value={fields.unit} onChange={(e) => setFields({ ...fields, unit: e.target.value })} disabled={!canEdit || savePending} maxLength={40} />
               </div>
             </ChecklistRow>
           ) : null}
@@ -1036,16 +1075,14 @@ function EntryPanelContent({
           <ChecklistRow
             label="Size"
             checked={effectiveFields.includes("dimension")}
-            disabled={!canEdit || isPending(cardFieldsKey) || !shown}
-            disabledHint={!shown ? "Add an option below first." : undefined}
+            disabled={!canEdit || savePending}
             onToggle={() => toggleCardField("dimension")}
           >
             <Input
               autoFocus
               value={optionDraft.dimension}
               onChange={setOptionField("dimension")}
-              onBlur={() => saveOptionDraft(optionDraft)}
-              disabled={!canEdit || isPending(optionFieldsKey)}
+              disabled={!canEdit || savePending}
               maxLength={160}
               placeholder="e.g. 60 × 60 cm"
             />
@@ -1055,11 +1092,10 @@ function EntryPanelContent({
             className="sm:col-span-2"
             label="Notes"
             checked={effectiveFields.includes("notes")}
-            disabled={!canEdit || isPending(cardFieldsKey) || !shown}
-            disabledHint={!shown ? "Add an option below first." : undefined}
+            disabled={!canEdit || savePending}
             onToggle={() => toggleCardField("notes")}
           >
-            <SimpleTextEditor autoFocus value={optionDraft.notes} onChange={setOptionField("notes")} onBlur={() => saveOptionDraft(optionDraft)} disabled={!canEdit || isPending(optionFieldsKey)} maxLength={2000} rows={2} />
+            <SimpleTextEditor autoFocus value={optionDraft.notes} onChange={setOptionField("notes")} disabled={!canEdit || savePending} maxLength={2000} rows={2} />
           </ChecklistRow>
 
           {extraChoices.map((extra) => (
@@ -1067,15 +1103,25 @@ function EntryPanelContent({
               key={extra.key}
               label={extra.label}
               checked={effectiveFields.includes(extra.key)}
-              disabled={!canEdit || isPending(cardFieldsKey)}
+              disabled={!canEdit || savePending}
               onToggle={() => toggleCardField(extra.key)}
             />
           ))}
         </div>
-        {canEdit && entry.cardFields !== null ? (
-          <button type="button" disabled={isPending(cardFieldsKey)} onClick={() => saveCardFields(null)} className="justify-self-start text-xs font-medium text-ink-secondary hover:text-ink hover:underline">
+        {canEdit && cardFieldsDraft !== null ? (
+          <button type="button" disabled={savePending} onClick={() => setCardFieldsDraft(null)} className="justify-self-start text-xs font-medium text-ink-secondary hover:text-ink hover:underline">
             Use default
           </button>
+        ) : null}
+        {optionNeedsType ? <InlineError>Enter a Type before saving product details.</InlineError> : null}
+        {saveError ? <InlineError>{saveError}</InlineError> : null}
+        {canEdit ? (
+          <FormActions>
+            <Button type="button" variant="ghost" disabled={!isDirty || savePending} onClick={discardDraft}>Discard</Button>
+            <Button type="button" variant="primary" pending={savePending} disabled={!isDirty || optionNeedsType} onClick={() => void saveAll().catch((error) => setSaveError(error instanceof Error ? error.message : "Could not save."))}>
+              Save
+            </Button>
+          </FormActions>
         ) : null}
       </div>
 
@@ -1257,8 +1303,26 @@ function EntryDialog({
   confirm: ReturnType<typeof useConfirm>["confirm"];
   onClose: () => void;
 }) {
+  // Card content no longer auto-saves per field; closing with an unsaved
+  // draft needs a discard confirmation, same as Master Data's edit dialogs.
+  // A ref, not state: EntryPanelContent reports dirtiness on every change,
+  // but only the moment of closing needs to read it.
+  const isDirtyRef = useRef(false);
+  const requestClose = async () => {
+    if (isDirtyRef.current) {
+      const ok = await confirm({
+        title: "Discard changes?",
+        description: "You have unsaved changes in this item's Card content. Discard them and close?",
+        confirmLabel: "Discard changes",
+        cancelLabel: "Keep editing",
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
+    onClose();
+  };
   return (
-    <Dialog open onOpenChange={(value) => { if (!value) onClose(); }} title={`${entry.code} · ${entry.category}`} description={SECTION_LABEL[entry.section]} size="lg">
+    <Dialog open onOpenChange={(value) => { if (!value) void requestClose(); }} title={`${entry.code} · ${entry.category}`} description={SECTION_LABEL[entry.section]} size="lg">
       <EntryPanelContent
         projectId={projectId}
         entry={entry}
@@ -1267,6 +1331,7 @@ function EntryDialog({
         command={command}
         confirm={confirm}
         onClose={onClose}
+        onDirtyChange={(dirty) => { isDirtyRef.current = dirty; }}
       />
     </Dialog>
   );

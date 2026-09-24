@@ -5,8 +5,63 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.135**
-- Next local revision: **R8.136**
+- Current revision after this entry is committed: **R8.136**
+- Next local revision: **R8.137**
+
+## R8.136 | 2026-09-24 | feat(sf): Product Schedule entry panel — explicit Save/Discard, no option required to fill in product info
+
+Owner-scoped (chat, 2026-09-24), following the R8.135 crash fix: two
+deliberate reversals of R8.112/R8.113 decisions, both explicitly requested
+by the owner after seeing the panel in the browser.
+
+**Reversal 1 — explicit Save/Discard, not per-field auto-save-on-blur.**
+Owner: *"mending disave aja dari pada di react live sync gitu... kaya di
+masterdata tuh, kalau ga fokus ntar ada discard / keep editing."* Every edit
+in `EntryPanelContent`'s "Card content" checklist (item fields, product
+details, which fields are ticked) is now a local draft (`fields`,
+`optionDraft`, `cardFieldsDraft`, all baselined together and resynced only
+when the shown option's identity changes — reusing the same ref-based
+pattern R8.135 fixed, not a second copy of the bug). A **Save** button
+commits whatever changed via the existing actions
+(`updateScheduleOptionAction`/`createScheduleOptionAction`,
+`updateScheduleEntryAction`, `updateScheduleEntryCardFieldsAction`); a
+**Discard** button resets the draft. Closing the dialog with an unsaved
+draft prompts "Discard changes? / Keep editing" via the existing
+`useConfirm()` hook, matching Master Data's edit-dialog wording — the entry
+dialog tracks dirtiness through a ref (`EntryDialog`'s `isDirtyRef`, written
+by `EntryPanelContent`'s `onDirtyChange` callback) rather than lifting the
+draft state itself, so the guard only reads it at the moment of closing.
+
+**Reversal 2 — no checklist row requires an option to exist first.** Owner:
+*"opsi mah hal berbeda... naturalnya di buat dulu card berisi informasi
+(produk) - kalau ga yakin baru tambah opsi. ga ada aturannya harus punya 2
+opsi atau lebih dulu."* R8.112 disabled Brand/Color/Pattern/Finishing/Size/
+Notes whenever the entry had zero options ("Add an option below first") —
+this was also what made R8.135's crash reproducible in the first place, on
+exactly this state. Every row now disables only for edit permission or an
+in-flight save. Pressing Save with no option yet **creates the first one**
+(`createOption`, the same call `OptionDialog`'s "Add option" already used)
+from whatever was filled in; with an option already shown, Save updates it —
+one `shown ? update : create` branch, mirroring `OptionDialog` exactly rather
+than inventing a second create path.
+
+`domain/schedule.ts` gains `resolveCardFields(override, extraKeys)`,
+factored out of `effectiveCardFields` so the client-side draft can mirror the
+same null-vs-list default logic without duplicating it.
+
+`docs/apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md` §11.10 records both
+reversals in place, next to the R8.112/R8.113 text they supersede.
+`schedule.regression.test.ts`'s two assertions that specifically guarded the
+old behavior (`auto-saves on blur...`, `...also require a shown option to
+write to`) are replaced with assertions for the new behavior; the file's
+other R8.112/R8.113 regression tests (row order, Brand combobox, WYSIWYG
+Notes, ChecklistRow reveal) are untouched since nothing about them changed.
+
+Checks: `tsc --noEmit` clean; `eslint .` clean; full suite 520/520. Browser
+verification of the new Save/Discard flow itself is the owner's to do (they
+were already testing this page live when the reversal was requested); the
+crash fix half (R8.135) was independently verified in the browser before
+this. No schema migration; no new dependency.
 
 ## R8.135 | 2026-09-24 | fix(sf): Product Schedule entry panel infinite-render crash on a zero-option entry
 

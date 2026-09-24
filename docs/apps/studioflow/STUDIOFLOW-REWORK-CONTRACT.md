@@ -655,11 +655,23 @@ this file (Add item, Import CSV, …).
 (`ChecklistRow`): a checkbox, and — only once ticked — the input(s) that fill
 that field in, in the same row. Location and Qty(+Unit) write to the entry;
 Brand, Color, Pattern, Finishing, Size and Notes write to the option the card
-speaks for (§11.3's "the final option, else the first"), auto-saving the full
-option snapshot on blur. Unticking a field only stops it captioning the card;
-it never discards what was typed. Row order (R8.113, owner-specified):
-**Brand, Type, Color, Pattern, Finishing, Location, Qty (Fixture only,
-§11.1), Size, Notes**, then any extra spec lines (§11.9).
+speaks for (§11.3's "the final option, else the first"). Unticking a field
+only stops it captioning the card; it never discards what was typed. Row
+order (R8.113, owner-specified): **Brand, Type, Color, Pattern, Finishing,
+Location, Qty (Fixture only, §11.1), Size, Notes**, then any extra spec lines
+(§11.9).
+
+**Reversed, R8.136 (owner, 2026-09-24): explicit Save/Discard, not per-field
+auto-save-on-blur.** R8.112 shipped this checklist auto-saving each field the
+instant it lost focus. Owner: *"mending disave aja dari pada di react live
+sync gitu... kaya di masterdata tuh, kalau ga fokus ntar ada discard / keep
+editing"* — every edit in this checklist (item fields, product details, and
+which fields are ticked) is now a local draft; nothing is written until
+**Save** is pressed. Closing the dialog with an unsaved draft prompts
+"Discard changes? / Keep editing", the same pattern Master Data's edit
+dialogs use. A **Discard** button next to Save resets the draft without
+closing. This does not touch the separate "Add option" / "Edit option"
+dialog (`OptionDialog`), which already saved this way.
 
 **Type sits in the checklist too, right after Brand, with no checkbox**
 (R8.113) — it edits `product_name` directly, but since Type always shows
@@ -689,11 +701,22 @@ know the brand yet, tick it anyway so I remember to fill it in" impossible,
 which is the normal state of an unfinalized spec. Owner: *"kalau brandnya
 masih belum tau gmn? better legacy sih sebenernya ya?"* — legacy never
 conflated "show this field" with "this field has a value" in the first
-place. A row backed by an option is disabled only when **no option exists
-yet** to attach a value to ("Add an option below first"); this is a
-different, legitimate reason from the field being blank, which is not a
-reason to disable at all. Extra spec lines keep a plain checkbox with no
-reveal, since one cannot exist with a blank label or value (§11.9).
+place. Extra spec lines keep a plain checkbox with no reveal, since one
+cannot exist with a blank label or value (§11.9).
+
+**Reversed, R8.136 (owner, 2026-09-24): no row is disabled for lack of an
+option.** R8.112 disabled the option-backed rows (Brand, Color, Pattern,
+Finishing, Size, Notes) whenever the entry had zero options yet, on the
+theory that there was no option row to attach a value to. Owner: *"opsi mah
+hal berbeda... naturalnya di buat dulu card berisi informasi (produk) - kalau
+ga yakin baru tambah opsi. ga ada aturannya harus punya 2 opsi atau lebih
+dulu"* — an Option (A, B, C…) exists to compare multiple candidates; a single
+product's own info should never require creating one first. Every checklist
+row now disables only for edit permission or an in-flight save. Pressing
+**Save** with no option yet creates the first one (via the same `createOption`
+path as OptionDialog's "Add option") from whatever was filled in; if an
+option already exists, Save updates it instead — the same create-or-update
+branch already used by `OptionDialog`.
 
 **§11.11 Physical sample requests (owner, 2026-09-23).** A schedule option
 can carry a physical sample request: `requestedFrom` (vendor/supplier, free

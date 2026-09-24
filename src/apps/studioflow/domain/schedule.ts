@@ -190,10 +190,15 @@ export function cardFieldLabel(key: string, extras: ReadonlyArray<{ key: string;
  * an array is an explicit, ordered choice and may legitimately be empty.
  * Matches legacy's null-vs-list `catalog_fields` and its "Use project default".
  */
+/** Shared by `effectiveCardFields` and any client-side draft mirroring the same null-vs-list choice before it is saved. */
+export function resolveCardFields(override: readonly string[] | null, extraKeys: readonly string[]): string[] {
+  if (override !== null) return orderCardFields(override, extraKeys);
+  return orderCardFields([...SCHEDULE_DEFAULT_CARD_FIELDS, ...extraKeys], extraKeys);
+}
+
 export function effectiveCardFields(entry: ScheduleEntryView): string[] {
   const extras = extraChoicesOf(entry);
-  if (entry.cardFields !== null) return orderCardFields(entry.cardFields, extras.map((extra) => extra.key));
-  return orderCardFields([...SCHEDULE_DEFAULT_CARD_FIELDS, ...extras.map((extra) => extra.key)], extras.map((extra) => extra.key));
+  return resolveCardFields(entry.cardFields, extras.map((extra) => extra.key));
 }
 
 /** The current display value for each selectable card field — what the board card itself renders. */

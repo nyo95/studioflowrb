@@ -109,22 +109,28 @@ describe("R8.113: Item details and card fields merged into one tick-to-fill-in c
     assert.doesNotMatch(scheduleBoard.slice(panelIndex), /cardFieldValuesOf\(entry\)/, "the panel no longer reads field values just to grey out a checkbox");
   });
 
-  it("Location/Qty checkboxes disable only for permission or a pending save; option-backed ones also require a shown option to write to", () => {
-    const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"));
-    assert.match(panelBody, /disabled=\{!canEdit \|\| isPending\(cardFieldsKey\)\}/, "an entry-level row (Location/Qty) disables only for permission/pending");
-    assert.match(panelBody, /disabled=\{!canEdit \|\| isPending\(cardFieldsKey\) \|\| !shown\}/, "an option-level row disables with no shown option to attach a value to — not because the value is blank");
+  it("R8.135: every Card content row disables only for permission or a pending save — no row requires a shown option to be tickable", () => {
+    // Owner reversal, 2026-09-24: PT-01-style items (no option yet) can now
+    // have their product info filled in directly; a checkbox is never gated
+    // on `shown` existing, only on edit permission / an in-flight save.
+    const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"), scheduleBoard.indexOf("function EntryDialog"));
+    assert.doesNotMatch(panelBody, /\|\| !shown\}/, "no Card content row may disable itself for lack of a shown option");
+    const rowCount = (panelBody.match(/disabled=\{!canEdit \|\| savePending\}/g) ?? []).length;
+    assert.ok(rowCount >= 7, `expected every Card content checkbox row to use the shared !canEdit || savePending gate, found ${rowCount}`);
   });
 
   it("reveals a field's input only once its checkbox is ticked (ChecklistRow)", () => {
     assert.match(scheduleBoard, /\{checked && children \? <div className="px-1\.5 pb-2 pt-0\.5">\{children\}<\/div> : null\}/);
   });
 
-  it("auto-saves on blur — the separate 'Save details' button is gone", () => {
-    assert.doesNotMatch(scheduleBoard, /Save details/, "entry fields now save per-row on blur, not through a batched button");
-    assert.match(scheduleBoard, /const saveOptionDraft = \(next: ProductDraft\) => \{/);
-    assert.match(scheduleBoard, /onBlur=\{\(\) => saveOptionDraft\(optionDraft\)\}/);
-    assert.match(scheduleBoard, /onBlur=\{saveLocation\}/);
-    assert.match(scheduleBoard, /onBlur=\{saveQty\}/);
+  it("R8.135: Card content is a draft with an explicit Save/Discard pair — per-field auto-save-on-blur is gone", () => {
+    // Owner reversal, 2026-09-24: "jangan langsung update reactive tapi harus
+    // di save dulu baru di update" — batched Save, matching Master Data's
+    // draft/discard pattern, replaces R8.113's per-row onBlur auto-save.
+    const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"), scheduleBoard.indexOf("function EntryDialog"));
+    assert.doesNotMatch(panelBody, /onBlur=/, "no Card content field may auto-save on blur anymore");
+    assert.match(panelBody, /onClick=\{\(\) => void saveAll\(\)/, "an explicit Save action exists");
+    assert.match(panelBody, /onClick=\{discardDraft\}/, "an explicit Discard action exists");
   });
 
   it("Brand is one row in the checklist, not a floating select+input pair", () => {
