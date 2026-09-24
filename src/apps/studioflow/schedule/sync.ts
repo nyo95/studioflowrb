@@ -28,8 +28,18 @@ export type SnapshotInput = {
   imageKey?: string | null;
 };
 
-export function cleanSnapshot(input: SnapshotInput) {
-  const productName = requiredText(input.productName, "SCHEDULE_PRODUCT_REQUIRED", "Type", 200);
+export function cleanSnapshot(input: SnapshotInput, options?: { requireProductName?: boolean }): ReturnType<typeof buildSnapshot> {
+  // Template items may reserve a category with no product decided yet (owner
+  // decision 2026-09-24, folding "default categories" into Template Items) —
+  // a live option's snapshot stays required, since a real schedule row always
+  // needs the product it names.
+  const productName = (options?.requireProductName ?? true)
+    ? requiredText(input.productName, "SCHEDULE_PRODUCT_REQUIRED", "Type", 200)
+    : optionalText(input.productName, 200) ?? "";
+  return buildSnapshot(input, productName);
+}
+
+function buildSnapshot(input: SnapshotInput, productName: string) {
   const brandName = optionalText(input.brandName, 160);
   const color = optionalText(input.color, 160);
   const pattern = optionalText(input.pattern, 160);
@@ -134,17 +144,19 @@ export async function createEntryWithOptionalOption(tx: TxClient, input: {
 
 /**
  * Materialize the studio schedule templates in one project (legacy "Apply
- * template" and new-project bootstrap): every active template item once, then
- * one empty reserve row for each default category that has no row yet.
+ * template" and new-project bootstrap): every active template item once.
+ * A template item with a blank Type reserves its category with no product —
+ * the "default categories" concept folded into Template Items (owner
+ * decision 2026-09-24): a category that should always show up, with no
+ * settled default product yet, is just a template item with Type left blank,
+ * the same way a live schedule entry already supports "Reserve code only".
  * Idempotent. Returns the number of rows created.
  */
 export async function seedScheduleFromTemplates(tx: TxClient, projectId: string): Promise<number> {
-  const [categories, items, existing] = await Promise.all([
-    tx.sfScheduleTemplateCategory.findMany({ where: { is_active: true, is_default_entry: true }, orderBy: [{ section: "asc" }, { sort_order: "asc" }] }),
+  const [items, existing] = await Promise.all([
     tx.sfScheduleTemplateItem.findMany({ where: { is_active: true }, orderBy: [{ section: "asc" }, { sort_order: "asc" }] }),
-    tx.sfScheduleEntry.findMany({ where: { project_id: projectId }, select: { section: true, category_key: true, template_item_id: true } }),
+    tx.sfScheduleEntry.findMany({ where: { project_id: projectId }, select: { template_item_id: true } }),
   ]);
-  const categoryKeys = new Set(existing.map((row) => `${row.section}:${row.category_key}`));
   const templateIds = new Set(existing.map((row) => row.template_item_id).filter(Boolean));
   let created = 0;
   for (const item of items) {
@@ -159,7 +171,7 @@ export async function seedScheduleFromTemplates(tx: TxClient, projectId: string)
       location: item.location,
       cardFields: Array.isArray(item.card_fields) ? (item.card_fields as string[]) : null,
       templateItemId: item.id,
-      snapshot: {
+      snapshot: item.product_name ? {
         brandId: item.brand_id,
         brandName: item.brand_name,
         productName: item.product_name,
@@ -170,16 +182,8 @@ export async function seedScheduleFromTemplates(tx: TxClient, projectId: string)
         notes: item.notes,
         extra: normalizeExtraFields(item.extra),
         imageKey: item.image_key,
-      },
+      } : null,
     });
-    categoryKeys.add(`${item.section}:${item.category_key}`);
-    created += 1;
-  }
-  for (const category of categories) {
-    const key = `${category.section}:${category.category_key}`;
-    if (categoryKeys.has(key)) continue;
-    await createEntryWithOptionalOption(tx, { projectId, section: category.section, category: category.category, categoryKey: category.category_key });
-    categoryKeys.add(key);
     created += 1;
   }
   return created;

@@ -662,10 +662,8 @@ describe("SF-R3 Product Schedule", () => {
   it("applies templates idempotently and snapshots Master Data Brand through the public port", async () => {
     const tag = randomUUID().slice(0, 8);
     const brand = await testDb.prisma.brand.create({ data: { id: randomUUID(), name: `TACO ${tag}`, slug: `taco-${tag}` } });
-    const category = await sf.schedule.upsertTemplateCategory({ ...as(designer), section: "MATERIAL", category: "HPL", isDefaultEntry: true });
     await sf.schedule.createTemplateItem({
       ...as(designer),
-      templateCategoryId: category.templateCategoryId,
       section: "MATERIAL",
       category: "HPL",
       snapshot: { brandId: brand.id, productName: "TH 121 AA - TH-121", finishing: "Doff" },
@@ -747,10 +745,8 @@ describe("SF-R3 Product Schedule", () => {
   });
 
   it("preserves pattern through template items, seeding, reuse, and search", async () => {
-    const category = await sf.schedule.upsertTemplateCategory({ ...as(designer), section: "MATERIAL", category: "Paint" });
     await sf.schedule.createTemplateItem({
       ...as(designer),
-      templateCategoryId: category.templateCategoryId,
       section: "MATERIAL",
       category: "Paint",
       snapshot: { productName: "Easy Clean", pattern: "Marble" },
@@ -880,9 +876,11 @@ describe("SF-R3 Product Schedule", () => {
     const one = await sf.schedule.createTemplateItem({ ...as(designer), section: "FIXTURE", category: "Lighting", snapshot: { productName: "Downlight" } });
     const two = await sf.schedule.createTemplateItem({ ...as(designer), section: "FIXTURE", category: "Lighting", snapshot: { productName: "Track light" } });
     const templates = await sf.schedule.listTemplates({ grants: ALL });
-    assert.deepEqual(templates.map((t) => [t.category, t.items.length, t.is_default_entry]), [["Lighting", 2, false]], "items get a category row");
+    assert.deepEqual(templates.map((t) => [t.category, t.items.length]), [["Lighting", 2]], "items get a category row");
     await sf.schedule.setTemplateItemActive({ ...as(designer), templateItemId: two.templateItemId, isActive: false });
-    await sf.schedule.upsertTemplateCategory({ ...as(designer), section: "MATERIAL", category: "Paint", isDefaultEntry: true });
+    // "Default categories" folded into Template Items (owner, 2026-09-24): a
+    // blank Type reserves the category with no default product.
+    await sf.schedule.createTemplateItem({ ...as(designer), section: "MATERIAL", category: "Paint", snapshot: { productName: "" } });
     const { projectId } = await newProject();
     const seeded = await sf.schedule.listSchedule({ grants: ALL, projectId });
     assert.deepEqual(seeded.map((row) => [row.category, row.options.length]).sort(), [["Lighting", 1], ["Paint", 0]], "new projects get template items and reserve rows");

@@ -729,16 +729,6 @@ export async function upsertSchedulePrefixAction(input: z.infer<typeof ScheduleP
   });
 }
 
-const ScheduleTemplateCategoryInput = z.strictObject({ section: ScheduleSection, category: z.string().min(1).max(80), isDefaultEntry: z.boolean().optional(), isActive: z.boolean().optional() });
-export async function upsertScheduleTemplateCategoryAction(input: z.infer<typeof ScheduleTemplateCategoryInput>): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => {
-    const ctx = await context();
-    const result = await studioFlow.schedule.upsertTemplateCategory({ ...ctx, ...parse(ScheduleTemplateCategoryInput, input) });
-    refresh();
-    return result;
-  });
-}
-
 const ScheduleTemplateItemInput = z.strictObject({
   templateCategoryId: Id.nullish(),
   section: ScheduleSection,
@@ -852,15 +842,6 @@ export async function deleteScheduleTemplateItemAction(templateItemId: string): 
   return runSafeAction(async () => {
     const ctx = await context();
     const result = await studioFlow.schedule.deleteTemplateItem({ ...ctx, templateItemId: parse(Id, templateItemId) });
-    refresh();
-    return result;
-  });
-}
-
-export async function deleteScheduleTemplateCategoryAction(templateCategoryId: string): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => {
-    const ctx = await context();
-    const result = await studioFlow.schedule.deleteTemplateCategory({ ...ctx, templateCategoryId: parse(Id, templateCategoryId) });
     refresh();
     return result;
   });

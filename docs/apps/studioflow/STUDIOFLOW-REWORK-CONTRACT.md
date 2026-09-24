@@ -536,17 +536,36 @@ legacy Google Sheets format is kept (port `lib/schedule/csv-*`).
 
 ### 11.5 Templates and prefixes
 
-Prefix dictionary `(section, category) → prefix`; schedule template
-categories with `is_default_entry` seed empty reserve entries on new projects
-and via an explicit "Apply template" action; template items with a snapshot.
-Managed in StudioFlow settings as three tables (prefix dictionary, default
-categories, template items); template items can be added and edited there
+Prefix dictionary `(section, category) → prefix`; template items with a
+snapshot, seeded onto new projects and via an explicit "Apply template"
+action. Managed in StudioFlow settings as two tables (prefix dictionary,
+template items); template items can be added and edited there
 (section/category fixed after creation; rows already copied into projects keep
 their own snapshot). A schedule row whose final option (or only option) is set
 can be saved as a template item from the project schedule ("Save as template
 item", legacy `createScheduleTemplateItemFromEntryAction`); the item keeps the
 option photo and the row's qty/unit/location. Both need `settings.manage`; the
 schedule page links to these settings for that permission.
+
+**"Default categories" folded into Template Items (owner, 2026-09-24).**
+`SfScheduleTemplateCategory.is_default_entry` was a separate, third settings
+table: a category flagged this way seeded an always-empty reserve row on new
+projects, independent of whether it had any template items. Owner: *"default
+categories mah tergantung template items aja ga sih? di joint... template itu
+konsepnya reserved dengan jenis2 yg biasa kita pakai."* A category needing no
+settled default product but that should still always be reserved is now
+expressed the same way a live schedule entry already supports "Reserve code
+only" (§11.1): a Template Item with **Type left blank**. `seedScheduleFromTemplates`
+seeds one entry per active template item either way — with a snapshot when
+Type is filled in, with none (zero options, reserved) when it is blank — so
+the same seeding pass that always ran now covers both cases; the second,
+separate seeding pass driven by `is_default_entry` is gone, and so is the
+column, the dedicated "Default categories" table, and its two commands
+(`upsertTemplateCategory`, `deleteTemplateCategory`). A live option's Type
+stays required (`cleanSnapshot`'s default); only a Template Item's may be
+blank (`cleanSnapshot(..., { requireProductName: false })`) — a template
+represents "what to seed", which may legitimately be "nothing yet", where a
+live option always names a real product.
 
 ### 11.6 Implementation notes (R8.73–R8.74)
 

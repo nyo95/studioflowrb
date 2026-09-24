@@ -163,10 +163,12 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       : await tx.sfScheduleTemplateCategory.findUnique({ where: { section_category_key: { section, category_key: category.key } } });
     if (input.templateCategoryId && !parent) throw notFound("schedule template");
     // Items always hang under a category row so settings can list and manage them.
+    const categoryMaxSortOrder = await tx.sfScheduleTemplateCategory.aggregate({ where: { section }, _max: { sort_order: true } });
     const categoryRow = parent ?? await tx.sfScheduleTemplateCategory.create({
-      data: { section, category: category.label, category_key: category.key, is_default_entry: false, sort_order: (await tx.sfScheduleTemplateCategory.count({ where: { section } })) + 1 },
+      data: { section, category: category.label, category_key: category.key, sort_order: (categoryMaxSortOrder._max.sort_order ?? 0) + 1 },
     });
-    const sortOrder = await tx.sfScheduleTemplateItem.count({ where: { section, category_key: category.key } });
+    const itemMaxSortOrder = await tx.sfScheduleTemplateItem.aggregate({ where: { section, category_key: category.key }, _max: { sort_order: true } });
+    const sortOrder = (itemMaxSortOrder._max.sort_order ?? -1) + 1;
     const item = await tx.sfScheduleTemplateItem.create({
       data: {
         template_category_id: categoryRow.id,
@@ -342,28 +344,12 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       });
     },
 
-    async upsertTemplateCategory(input: CommandContext & { section: string; category: string; isDefaultEntry?: boolean; isActive?: boolean }) {
-      requireCommand(input, P.settingsManage);
-      const section = sectionOf(input.section);
-      const category = categoryOf(input.category);
-      return runTransaction(async (tx) => {
-        const count = await tx.sfScheduleTemplateCategory.count({ where: { section } });
-        const row = await tx.sfScheduleTemplateCategory.upsert({
-          where: { section_category_key: { section, category_key: category.key } },
-          update: { category: category.label, is_default_entry: input.isDefaultEntry ?? false, is_active: input.isActive ?? true },
-          create: { section, category: category.label, category_key: category.key, is_default_entry: input.isDefaultEntry ?? false, is_active: input.isActive ?? true, sort_order: count + 1 },
-        });
-        await writeAudit(ports, tx, { action: "studioflow.schedule.template-category-upserted", entityType: TEMPLATE_ENTITY, entityId: row.id, actor: input.actor, metadata: { section, category: category.label } });
-        return { templateCategoryId: row.id };
-      });
-    },
-
     async createTemplateItem(input: CommandContext & TemplateItemInput & { templateCategoryId?: string | null; section: string; category: string }) {
       requireCommand(input, P.settingsManage);
       const section = sectionOf(input.section);
       const category = categoryOf(input.category);
       const brand = await brandSnapshot(ports, input.snapshot.brandId);
-      const snapshot = cleanSnapshot({ ...input.snapshot, ...brand, imageKey: null });
+      const snapshot = cleanSnapshot({ ...input.snapshot, ...brand, imageKey: null }, { requireProductName: false });
       return runTransaction(async (tx) => {
         const item = await insertTemplateItem(tx, {
           actor: input.actor,
@@ -389,7 +375,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         : input.snapshot.brandId
           ? await brandSnapshot(ports, input.snapshot.brandId)
           : { brandId: null, brandName: input.snapshot.brandName ?? null };
-      const snapshot = cleanSnapshot({ ...input.snapshot, ...brand, imageKey: current.image_key });
+      const snapshot = cleanSnapshot({ ...input.snapshot, ...brand, imageKey: current.image_key }, { requireProductName: false });
       const next = {
         ...templateItemData(snapshot),
         qty: decimalText(input.qty),
@@ -477,17 +463,6 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       });
       await removeUnreferenced([result.imageKey]);
       return { templateItemId: result.templateItemId };
-    },
-
-    async deleteTemplateCategory(input: CommandContext & { templateCategoryId: string }) {
-      requireCommand(input, P.settingsManage);
-      return runTransaction(async (tx) => {
-        const row = await tx.sfScheduleTemplateCategory.findUnique({ where: { id: input.templateCategoryId } });
-        if (!row) throw notFound("schedule template");
-        await tx.sfScheduleTemplateCategory.delete({ where: { id: row.id } });
-        await writeAudit(ports, tx, { action: "studioflow.schedule.template-category-deleted", entityType: TEMPLATE_ENTITY, entityId: row.id, actor: input.actor, metadata: { section: row.section, category: row.category } });
-        return { templateCategoryId: row.id };
-      });
     },
 
     async deletePrefix(input: CommandContext & { prefixId: string }) {

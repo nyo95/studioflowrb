@@ -1580,7 +1580,6 @@ model SfScheduleTemplateCategory {
   section          SfScheduleSection
   category         String
   category_key     String
-  is_default_entry Boolean           @default(false)
   is_active        Boolean           @default(true)
   sort_order       Int               @default(0)
   created_at       DateTime          @default(now())

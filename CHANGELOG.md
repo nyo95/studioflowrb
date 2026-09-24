@@ -5,8 +5,59 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.136**
-- Next local revision: **R8.137**
+- Current revision after this entry is committed: **R8.137**
+- Next local revision: **R8.138**
+
+## R8.137 | 2026-09-24 | feat(sf): fold "Default categories" into Template Items; fix a sort_order count() bug found along the way
+
+Owner-scoped (chat, 2026-09-24): after explaining what Prefix dictionary /
+Default categories / Template items each do (the owner found the Settings
+page's three-table split confusing and suspected overlap), the owner
+proposed collapsing Default Categories into Template Items: *"default
+categories mah tergantung template items aja ga sih? di joint... template
+itu konsepnya reserved dengan jenis2 yg biasa kita pakai."* Confirmed
+`SfScheduleTemplateCategory` had 0 rows in the dev DB, so no migration
+concern.
+
+**The merge.** A category that should always be reserved with no settled
+default product is now a Template Item with **Type left blank**, the same
+"Reserve code only" concept a live schedule entry already supports (§11.1),
+instead of a separate `is_default_entry` flag on a third table. Changes:
+- Migration `20260924000000_sf_schedule_drop_default_entry` drops
+  `sf_schedule_template_category.is_default_entry`.
+- `sync.ts`'s `seedScheduleFromTemplates` loses its second seeding pass
+  (driven by `is_default_entry`); the one remaining pass conditionally omits
+  the option snapshot when `product_name` is blank, so a blank-Type template
+  item reserves its category with zero options, matching what the second
+  pass used to do.
+- `cleanSnapshot` gains an opt-in `{ requireProductName: false }` — used only
+  by `createTemplateItem`/`updateTemplateItem`. A live option's Type stays
+  required everywhere else (option creation/update, CSV import,
+  "Save as template item").
+- Removed: `upsertTemplateCategory`/`deleteTemplateCategory` (service),
+  `upsertScheduleTemplateCategoryAction`/`deleteScheduleTemplateCategoryAction`
+  (actions), the "Default categories" table in Studio Settings, and its
+  `ScheduleTemplate.is_default_entry` field.
+- `TemplateItemDialog`'s Type field is no longer `required`; the Template
+  items table shows "Reserved only — no default product" for a blank one.
+
+**Also fixed while in this code: a `count()`-based `sort_order` bug in
+`insertTemplateItem`** (same class as R8.134's BQ fixes) — both the
+auto-created category row and the item itself computed `sort_order` via
+`count()`, which collides with a surviving sibling after any deletion.
+Swapped both to `MAX(sort_order)+1`, matching the pattern already used
+elsewhere in this file.
+
+`STUDIOFLOW-REWORK-CONTRACT.md` §11.5 records the merge and the reasoning.
+`service.integration.test.ts` updated: the two direct `upsertTemplateCategory`
+calls that only existed to pre-create a category (already auto-created by
+`createTemplateItem`) are removed; the one test exercising "default
+categories" now creates a blank-Type template item instead and asserts the
+same "reserved, zero options" outcome.
+
+Checks: `tsc --noEmit` clean; `eslint .` clean; full suite 520/520. Migration
+applied to both `studioflow_rebuild` and `studioflow_rebuild_test`; Prisma
+Client regenerated. No new dependency.
 
 ## R8.136 | 2026-09-24 | feat(sf): Product Schedule entry panel — explicit Save/Discard, no option required to fill in product info
 
