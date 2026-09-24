@@ -123,14 +123,6 @@ and "direct hard-delete resolves a pre-existing pending request…".
 
 ## BQ
 
-- [ ] [BUG] Cross-app promotion validation has a TOCTOU consistency window —
-  `src/application/promotion-coordinator.ts` validates the Master Data
-  reference in one operation/transaction, then approves the BQ promotion in
-  another; the referenced Master Data price can be archived/deleted between
-  the two, letting approval persist a stale/invalid reference. Cross-app
-  consistency debt, not an isolated BQ bug — fix later via revalidation or an
-  atomic boundary where practical. Do not turn the current plain-ID design
-  into a DB FK without an explicit architecture decision.
 - [ ] [PLANNED] Add Quotation PDF output and Terms & Conditions.
 - [ ] [PLANNED] Add price modes TBC and By Owner. Owner-confirmed, 2026-09-23:
   both modes mean the price is left blank/not counted toward the total — a

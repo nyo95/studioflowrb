@@ -5,8 +5,39 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.129**
-- Next local revision: **R8.130**
+- Current revision after this entry is committed: **R8.130**
+- Next local revision: **R8.131**
+
+## R8.130 | 2026-09-24 | fix(masterdata,bq): fix TOCTOU auto-reject and source-link brand mismatch on restore
+
+Owner-scoped (chat, 2026-09-24): two remaining open logic-audit bugs.
+
+**Bug: TOCTOU — BQ promotion auto-reject when reference archived before approval**
+(`src/application/promotion-coordinator.ts:approve()`)
+Previously, if `validatePromotionReference` threw (price archived between
+admin opening the UI and clicking Approve), the error propagated and the
+promotion stayed stuck in `REQUESTED`. Now: validation failure is caught,
+`rejectPromotion` is called automatically with a reason, and
+`PROMOTION_REFERENCE_ARCHIVED` is thrown so the UI can surface a clear
+message. The narrow microsecond window where validate passes but the price
+is archived before `approvePromotion` writes remains theoretically possible
+but is not a practical risk; the product direction (treat as rejected) is
+now enforced for the realistic case. Unit tests: 2/2 pass in
+`src/application/promotion-coordinator.test.ts` (new file).
+
+**Bug: source-link brand mismatch on restore**
+(`src/apps/masterdata/services/shared.ts:assertPriceMaterialRestorable()`)
+When a live price with a `source_link_id` is archived directly, the SKU's
+brand can then be changed (no live source-linked price triggers the
+`SKU_BRAND_CHANGE_BLOCKED` guard). On restore the price would come back with
+a source link pointing at the old brand, not the SKU's new brand — a silent
+provenance corruption. Added: `if (sourceLink && sku.brand_id &&
+sourceLink.brand_id !== sku.brand_id) throw PRICE_SOURCE_LINK_BRAND_MISMATCH`.
+Regression test added to `src/apps/masterdata/service.integration.test.ts`.
+
+Backlog: removed both fixed bug entries; BQ TOCTOU entry is now closed.
+Checks: `tsc --noEmit` clean; coordinator unit 2/2; masterdata integration
+32/32. No schema migrations; no new dependencies.
 
 ## R8.129 | 2026-09-24 | fix(masterdata,bq): fix 5 verified logic-audit bugs; add regression tests
 

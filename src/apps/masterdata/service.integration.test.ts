@@ -518,6 +518,39 @@ describe("Master Data service", () => {
     );
   });
 
+  it("blocks price restore when its source link brand no longer matches the SKU brand", async () => {
+    const context = await createMaterialContext();
+    const brand2 = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Brand Two Mismatch" });
+    const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    const vendor2 = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Supplier Mismatch Guard" });
+    await testDb.prisma.vendorVendorType.create({ data: { id: crypto.randomUUID(), vendor_id: vendor2.vendorId, vendor_type_id: supplierType.id } });
+
+    // Two prices: Price 1 gets the source link; Price 2 acts as the live safety net
+    const { skuId } = await service.createSku({
+      grants: GRANTS, actor: ACTOR, name: "Source-Link Mismatch SKU", brandId: context.brandId,
+      baseUnitId: context.unit.id, categoryId: context.categoryId,
+      priceMaterials: [
+        { supplierVendorId: context.vendorId, amount: "500", currency: "IDR" },
+        { supplierVendorId: vendor2.vendorId, amount: "500", currency: "IDR" },
+      ],
+    });
+    const prices = await testDb.prisma.priceMaterial.findMany({ where: { sku_id: skuId }, orderBy: { created_at: "asc" } });
+    const price1 = prices[0];
+    const link = await testDb.prisma.brandLink.create({ data: { id: crypto.randomUUID(), brand_id: context.brandId, kind: "CATALOG", url: "https://example.com/mismatch" } });
+    await service.updatePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price1.id, amount: "500", currency: "IDR", sourceLinkId: link.id });
+
+    // Archive Price 1 (Price 2 keeps the SKU live); no live source-linked price remains
+    await service.archivePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price1.id });
+    // Brand change is now allowed (the only source-linked price is archived)
+    await service.updateSku({ grants: GRANTS, actor: ACTOR, skuId, name: "Source-Link Mismatch SKU", brandId: brand2.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId });
+
+    // Restore Price 1 — source_link still points to Brand 1, but SKU now has Brand 2
+    await assert.rejects(
+      () => service.restorePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price1.id }),
+      (error: unknown) => error instanceof AppError && error.code === "PRICE_SOURCE_LINK_BRAND_MISMATCH",
+    );
+  });
+
   it("handles Unit update and list queries", async () => {
     const created = await service.createUnit({ grants: GRANTS, actor: ACTOR, code: "TEST_ROLL", name: "Test Roll" });
     await assert.rejects(
