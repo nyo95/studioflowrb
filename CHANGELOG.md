@@ -5,8 +5,49 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.134**
-- Next local revision: **R8.135**
+- Current revision after this entry is committed: **R8.135**
+- Next local revision: **R8.136**
+
+## R8.135 | 2026-09-24 | fix(sf): Product Schedule entry panel infinite-render crash on a zero-option entry
+
+Owner-reported (chat, 2026-09-24, browser): opening the entry panel for a
+schedule item with no options yet ("Reserved — no product yet") crashed the
+whole page with "Too many re-renders." Reproduced in the browser and fixed.
+
+**Root cause** (`schedule-board.tsx`'s `EntryPanelContent`): the draft-resync
+block used two separate `useState`s —
+```
+const [shownIdSeen, setShownIdSeen] = useState(shown?.id ?? null);
+if (shown?.id !== shownIdSeen) { setShownIdSeen(...); setOptionDraft(...); }
+```
+— React's own documented "adjust state during render" pattern, but with a
+second piece of *state* (not a ref) tracking what was last seen. Confirmed by
+bisection (temporarily short-circuiting the block) that this exact code was
+the trigger; for an entry with zero options (`shown` stays `null` across
+every render) this should have been a same-value no-op per React's `Object.is`
+bailout, but empirically was not — swapping `shownIdSeen` from a second
+`useState` to a plain `useRef` (mutating a ref during render never itself
+schedules a re-render, only the one `setOptionDraft` call can) resolved it
+outright, verified in the browser with a clean console both for the
+zero-option case and for adding an option afterward.
+
+This also satisfies `react-hooks/set-state-in-effect`, which rejected an
+initial `useEffect`-based alternative fix (moving the resync into an effect
+runs the same setState one render later, which the linter flags as
+avoidable). The `useState`-based render-time pattern is unchanged everywhere
+else in this file; only this one two-state instance is now ref-based.
+
+Owner also asked whether the panel should stop reactively re-deriving from
+the shown option at all and only update after an explicit Save — noted as a
+separate, larger design question (not applied here): this fix keeps today's
+existing resync-on-identity-change behavior (a different option becoming
+final while the dialog stays open still updates the draft), just without the
+crash.
+
+Checks: `tsc --noEmit` clean; `eslint .` clean; full suite 520/520 (unchanged
+count — this is a client-only rendering bug with no server-testable
+behavior; verified by reproducing and re-testing in the browser instead). No
+schema migration; no new dependency.
 
 ## R8.134 | 2026-09-24 | fix(bq,studioflow,ui-engine): full-repo logic + UI-consistency audit — 7 bugs fixed, 2 deferred
 

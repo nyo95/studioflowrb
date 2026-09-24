@@ -2,7 +2,7 @@
 
 import { ArrowDown, ArrowUp, FileUp, History, ImageIcon, Plus, Printer, Search, Settings2 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState, type DragEvent, type ReactNode } from "react";
+import { useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 
@@ -856,12 +856,13 @@ function EntryPanelContent({
   // this dialog stays open.
   const shown = shownOptionOf(entry);
   const [optionDraft, setOptionDraft] = useState<ProductDraft>(() => (shown ? productFromOption(shown) : EMPTY_PRODUCT));
-  // Adjust state during render rather than in an effect (React's own pattern
-  // for "reset a draft when its source identity changes"): only the shown
-  // option's identity resyncs the draft, not every keystroke it holds.
-  const [shownIdSeen, setShownIdSeen] = useState(shown?.id ?? null);
-  if (shown?.id !== shownIdSeen) {
-    setShownIdSeen(shown?.id ?? null);
+  // Resync the draft only when the shown option's *identity* changes (e.g. a
+  // different option becomes final while this dialog stays open) — a ref,
+  // not a second piece of state, tracks what was last seen so this can never
+  // itself trigger a further state update that re-enters this check.
+  const shownIdRef = useRef(shown?.id ?? null);
+  if (shownIdRef.current !== (shown?.id ?? null)) {
+    shownIdRef.current = shown?.id ?? null;
     setOptionDraft(shown ? productFromOption(shown) : EMPTY_PRODUCT);
   }
 
