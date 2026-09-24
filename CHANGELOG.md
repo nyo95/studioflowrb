@@ -5,8 +5,38 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.142**
-- Next local revision: **R8.143**
+- Current revision after this entry is committed: **R8.143**
+- Next local revision: **R8.144**
+
+## R8.143 | 2026-09-24 | feat(platform): redesign entry apps for improved user-friendliness and UI Engine consistency
+
+Owner-requested redesign (rumah session, 2026-09-24): *"redesign the entry apps supaya feels lebih user friendly, uiux lebih konsisten dengan bisnis logic, feels lightweight tapi informatif dengan seminimal mungkin bloattext yg ga perlu."* Four entry surfaces were identified as needing improvement:
+
+**Workspace Launcher** (the app picker after login):
+- **Before:** Every app card showed the same generic `LayoutGrid` icon + filler copy ("Open {app.name}", generic footer text "More applications appear here automatically…").
+- **After:** Each app now shows its own distinct icon (Master Data → `Box`, BQ → `FileText`, StudioFlow → `Workflow`) + a one-line business description explaining what the app actually does ("Brands, suppliers, SKUs, and pricing catalog…", "Project cost estimates and bill of quantities", "Design project execution and task management"). The fallback for new apps is safe (`Box` + generic "Access {app.name}") so the launcher doesn't break if a fourth app appears. Generic footer removed entirely — the descriptions already explain what each app does.
+
+**Login page**:
+- **Before:** Hardcoded copy said "Sign in to your StudioFlow account" even though the login is the shared platform entry for all three apps — a factual error.
+- **After:** Now reads "Sign in to {settings.appTitle}." (the actual platform name from settings, already loaded for the brand mark). Falls back to "Sign in to continue." if appTitle is somehow missing. No invented platform name, no hardcoded assumption.
+
+**StudioFlow Today landing**:
+- **Before:** Just a plain `PageHeader` with eyebrow + title + scope description ("What is on your plate…"). No summary, no numbers — felt empty.
+- **After:** Description now shows a real summary calculated from the `today` data already being fetched: "{firstName}, {N} open · {M} overdue · {K} due today" (or "no open work" when empty). All three counts are derived from `today.groups` (flatten tasks, filter by `!isChecked` and `dueDate`), so there's no extra database hit.
+
+**Master Data home**:
+- **Before:** Most "informative" page but built entirely from raw Tailwind classes (`text-label`, `text-ink-tertiary`, `font-display`, `text-display`, `rounded-card`, `border-line`, etc.) — bypassed the UI Engine completely, which is an architectural violation and the source of visual inconsistency.
+- **After:** Fully migrated to UI Engine components: `PageHeader` (replaces the raw hero div), `SectionCard` (replaces every manual `rounded-card border border-line bg-surface`), `MetricValue` (replaces raw `text-2xl font-semibold tabular-nums text-ink` — this is the component's first actual use in the codebase, despite being defined in the engine since the beginning), `Heading`, `Text`, `Badge`. Every card, tile, and section now comes from the engine's public surface, so Master Data finally shares the same visual DNA as the rest of the platform.
+
+Changes:
+- `src/app/(platform)/page.tsx`: added `APP_META` map with distinct icons + descriptions; changed import from `LayoutGrid` to `Box, FileText, Workflow`; removed the generic "More applications appear…" footer text.
+- `src/app/login/login-form.tsx`: changed `LoginForm` to accept `appTitle?: string` prop; replaced hardcoded "Sign in to your StudioFlow account." with conditional `{appTitle ? 'Sign in to ${appTitle}.' : 'Sign in to continue.'}`.
+- `src/app/login/page.tsx`: passed `appTitle={settings.appTitle}` to `LoginForm`.
+- `src/app/(platform)/studioflow/page.tsx`: calculated summary metrics (`openTasks`, `overdue`, `dueToday` counts) from `today.groups`; replaced static description with dynamic summary string.
+- `src/app/(platform)/masterdata/page.tsx`: migrated entire page from raw Tailwind to UI Engine (`PageHeader`, `PageShell`, `SectionCard`, `MetricValue`, `Text`, `Heading`, `Badge`, `buttonClasses`); removed ~150 lines of raw `className` attribute content, replaced with semantic component composition.
+
+Verification: `tsc --noEmit` clean, `check:boundaries` clean, `check:legacy-runtime` clean. Full suite 521/521 passed. Browser verification intentionally deferred per session lane ("rumah" — commit only, no manual browser test requirement).
+
 
 ## R8.142 | 2026-09-24 | fix(ui-engine): stop auto-opening the OS file picker when an image workspace mounts
 

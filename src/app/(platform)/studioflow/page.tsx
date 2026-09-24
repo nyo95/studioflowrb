@@ -22,12 +22,23 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   ]);
   const firstName = displayName.split(" ")[0] ?? displayName;
 
+  const allTasks = today.groups.flatMap((g) => g.tasks);
+  const dateToday = new Date().toISOString().split("T")[0];
+  const openTasks = allTasks.filter((t) => !t.isChecked);
+  const overdue = openTasks.filter((t) => t.dueDate && t.dueDate < dateToday);
+  const dueToday = openTasks.filter((t) => t.dueDate === dateToday);
+  const summary = [
+    openTasks.length > 0 ? `${openTasks.length} open` : null,
+    overdue.length > 0 ? `${overdue.length} overdue` : null,
+    dueToday.length > 0 ? `${dueToday.length} due today` : null,
+  ].filter(Boolean).join(" · ") || "No open work";
+
   return (
     <>
       <PageHeader
         eyebrow="StudioFlow"
         title="Today"
-        description={today.scope === "mine" ? `What is on your plate, ${firstName} — every project where you are the designer or drafter.` : "Open work across every running project."}
+        description={today.scope === "mine" ? `${firstName}, ${summary.toLowerCase()}` : `${summary} across running projects`}
         actions={canSeeAll ? (
           <div className="flex gap-1.5" role="group" aria-label="Scope">
             <Link href="/studioflow" prefetch={false}><FilterChip selected={today.scope === "mine"}>My projects</FilterChip></Link>

@@ -34,7 +34,7 @@ export default async function LoginPage() {
           // eslint-disable-next-line @next/next/no-img-element -- owner-configured URL/path has no fixed image host.
           <img src={settings.brandMarkUrl} alt="" className="max-h-16 max-w-16 object-contain" />
         ) : null}
-        <LoginForm />
+        <LoginForm appTitle={settings.appTitle} />
       </div>
     </PageShell>
   );

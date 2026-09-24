@@ -7,9 +7,9 @@ import { InlineError, Input, Field, FormActions, Button, Spinner, SectionCard, T
 import type { ActionResult } from "@platform/core/actions";
 import { loginAction } from "./actions";
 
-const INITIAL_STATE: ActionResult<{ redirectTo: string }> | null = null;
+const INITIAL_STATE: ActionResult<{ redirectTo: string; appTitle?: string }> | null = null;
 
-export function LoginForm() {
+export function LoginForm({ appTitle }: { appTitle?: string }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(loginAction, INITIAL_STATE);
 
@@ -21,7 +21,7 @@ export function LoginForm() {
     <SectionCard className="w-full max-w-[420px]">
       <form action={formAction} noValidate>
         <Text as="p" tone="secondary" className="mb-4">
-          Sign in to your StudioFlow account.
+          {appTitle ? `Sign in to ${appTitle}.` : "Sign in to continue."}
         </Text>
         <Field id="login-email" label="Email">
           <Input
