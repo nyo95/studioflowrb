@@ -163,6 +163,19 @@ export async function assertSkuRestorable(tx: TxClient, skuId: string): Promise<
   if (baseUnit.status !== "ACTIVE" || purchaseUnit?.status === "ARCHIVED") throw new AppError("CONFLICT", "SKU_UNIT_INACTIVE", "SKU cannot be restored while one of its Units is archived.");
   if (categories.length === 0 || categories.some((row) => row.category.status !== "ACTIVE")) throw new AppError("CONFLICT", "SKU_CATEGORY_INACTIVE", "SKU cannot be restored without active Categories.");
   if (identityConflict) throw new AppError("CONFLICT", "SKU_IDENTITY_CONFLICT", "A live SKU already uses this identity.");
+  const candidatePriceCauses = await tx.archiveCause.findMany({
+    where: { entity_type: "price_material", kind: "PARENT", parent_type: "sku", parent_id: skuId },
+    select: { entity_id: true },
+  });
+  if (candidatePriceCauses.length === 0) throw new AppError("CONFLICT", "SKU_NO_RESTORABLE_PRICE", "SKU cannot be restored because no PriceMaterial would be restored with it.");
+  const candidatePriceIds = candidatePriceCauses.map((c) => c.entity_id);
+  const stillCausedPrices = await tx.archiveCause.findMany({
+    where: { entity_type: "price_material", entity_id: { in: candidatePriceIds }, NOT: [{ kind: "PARENT", parent_type: "sku", parent_id: skuId }] },
+    select: { entity_id: true },
+    distinct: ["entity_id"],
+  });
+  const stillCausedPriceSet = new Set(stillCausedPrices.map((c) => c.entity_id));
+  if (candidatePriceIds.every((id) => stillCausedPriceSet.has(id))) throw new AppError("CONFLICT", "SKU_NO_RESTORABLE_PRICE", "SKU cannot be restored because all its PriceMaterial rows still have other archive causes. Restore or address those causes first.");
 }
 
 export async function assertPriceMaterialRestorable(tx: TxClient, priceId: string): Promise<void> {

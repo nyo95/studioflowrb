@@ -62,7 +62,7 @@ async function deleteAssemblyLine(input: { grants: PermissionGrants; actor: { ki
   const line = await db.bqAssemblyLine.findUnique({ where: { id: input.lineId } });
   if (!line) throw new AppError("NOT_FOUND", "bq.assembly-line.not-found", "Assembly line not found");
   await db.bqAssemblyLine.delete({ where: { id: input.lineId } });
-  await auditWriter({ appId: "bq", action: "bq.assembly-line.deleted", entityType: "BqAssemblyLine", entityId: line.assembly_template_id, actor: input.actor });
+  await auditWriter({ appId: "bq", action: "bq.assembly-line.deleted", entityType: "BqAssemblyLine", entityId: line.id, actor: input.actor });
 }
 
 async function applyAssemblyTemplate(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; itemId: string; assemblyId: string; qtyPerL1?: string }) {

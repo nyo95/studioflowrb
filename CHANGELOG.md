@@ -5,8 +5,70 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.128**
-- Next local revision: **R8.129**
+- Current revision after this entry is committed: **R8.129**
+- Next local revision: **R8.130**
+
+## R8.129 | 2026-09-24 | fix(masterdata,bq): fix 5 verified logic-audit bugs; add regression tests
+
+Owner-scoped (chat, 2026-09-23/24): implement all five ready code fixes from
+the R8.128 logic-audit backlog pass. No schema migrations; no new
+dependencies.
+
+**Bug #7 — wrong audit `entityId` in `deleteAssemblyLine`**
+(`src/apps/bq/services/assemblies.ts:deleteAssemblyLine()`)
+Changed `entityId: line.assembly_template_id` to `entityId: line.id`. The
+deleted row is a `BqAssemblyLine`, so `entityId` must be the line's own id.
+Regression test added to `src/apps/bq/service.integration.test.ts`.
+
+**Bug #5 — `listLineItemSourcesAction` missing BQ authorization**
+(`src/app/(platform)/bq/[id]/source-actions.ts`)
+Added `requirePermission(grants, BQ_PERMISSIONS.access)` + an
+`hasPermission` OR-check for `bq.project.read` / `bq.project.manage`. The
+`authorize()` helper now self-enforces the BQ boundary before listing any
+sources. Replaced the two dynamic `import()` calls inside the function body
+with static top-level imports (`hasPermission` from rbac,
+`MASTERDATA_PERMISSIONS` from masterdata/public, `BQ_PERMISSIONS` from
+bq/public, `AppError` from errors).
+
+**Bug #4 — archived entities remain mutable**
+(`src/apps/masterdata/services/sku.service.ts:updateSku()`,
+`pricing.service.ts:updatePriceMaterial()`, `updatePriceMaterialLabor()`,
+`updatePriceLabor()`)
+Added `if (existing.deleted_at !== null)` guard immediately after loading
+each entity, throwing `AppError("CONFLICT", "SKU_ARCHIVED"|"PRICE_ARCHIVED",
+...)`. Regression tests for all four paths added to
+`src/apps/masterdata/service.integration.test.ts`.
+
+**Bug #2 — SKU Brand change invalidates `PriceMaterial.source_link`
+provenance**
+(`src/apps/masterdata/services/sku.service.ts:updateSku()`)
+After the brand-archived check, added a brand-change guard: if the brand is
+being changed, count live `PriceMaterial` rows with a non-null `source_link_id`
+for this SKU; throw `AppError("CONFLICT", "SKU_BRAND_CHANGE_BLOCKED", ...)`
+if any exist. Users must clear source links before swapping the brand.
+Regression test added (including positive path: brand change succeeds once
+links are cleared).
+
+**Bug #3 — SKU restore can produce a LIVE SKU with zero live PriceMaterial**
+(`src/apps/masterdata/services/shared.ts:assertSkuRestorable()`)
+Added a restorable-price check at the end of `assertSkuRestorable`: finds
+all `ArchiveCause` rows with `entity_type=price_material, kind=PARENT,
+parent_type=sku, parent_id=skuId` (the prices that *would* be restored). If
+none exist, throws `SKU_NO_RESTORABLE_PRICE`. Otherwise filters to prices
+that have no OTHER cause besides this SKU; if every candidate price still has
+another cause, throws `SKU_NO_RESTORABLE_PRICE` with a distinct message.
+Mirrors `removeParentCausesAndFindRestored` logic. Regression test: archive
+SKU + both its vendors → restoreSku throws `SKU_NO_RESTORABLE_PRICE`.
+
+**Backlog updates (docs/BACKLOG.md):**
+- Removed KB-020 (office migration provenance) — office DB will be reset.
+- Removed fixed bug entries #2, #3, #4 (Master Data) and #5, #7 (BQ).
+- Reclassified #8 (project archive not purging STORED assets) from `[BUG]`
+  to `[PLANNED]`; deferred until PLATFORM-ASSET-STORAGE-ROADMAP.md lands.
+
+Checks: `tsc --noEmit` clean; `service.integration.test.ts` (BQ) 16/16 pass;
+`service.integration.test.ts` (Master Data) 31/31 pass. No browser-facing
+behavior changed.
 
 ## R8.128 | 2026-09-23 | docs(backlog): record 7 verified logic-audit findings; de-scope allow_parallel
 

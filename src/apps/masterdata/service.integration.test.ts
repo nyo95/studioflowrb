@@ -423,6 +423,101 @@ describe("Master Data service", () => {
     assert.notEqual((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: skuId } })).deleted_at, null);
   });
 
+  it("rejects updates to archived SKU, archived material price, archived work prices", async () => {
+    const context = await createMaterialContext();
+    const subconType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUBCON" } });
+    const workVendor = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Work Vendor Archived Guard" });
+    await testDb.prisma.vendorVendorType.create({ data: { id: crypto.randomUUID(), vendor_id: workVendor.vendorId, vendor_type_id: subconType.id } });
+    const workCat = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Work Cat Archived Guard", kind: "WORK" });
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "M2" } });
+
+    const { skuId } = await service.createSku({
+      grants: GRANTS, actor: ACTOR, name: "Archived Guard SKU", brandId: context.brandId,
+      baseUnitId: context.unit.id, categoryId: context.categoryId,
+      priceMaterials: [{ supplierVendorId: context.vendorId, amount: "500", currency: "IDR" }],
+    });
+    const price = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: skuId } });
+    const mlPrice = await service.createPriceMaterialLabor({ grants: GRANTS, actor: ACTOR, name: "ML Guard", categoryId: workCat.categoryId, vendorId: workVendor.vendorId, unitId: unit.id, amount: "100", currency: "IDR" });
+    const laborPrice = await service.createPriceLabor({ grants: GRANTS, actor: ACTOR, name: "Labor Guard", categoryId: workCat.categoryId, vendorId: workVendor.vendorId, unitId: unit.id, amount: "80", currency: "IDR" });
+
+    // Simulate an already-archived price directly (bypassing the service's last-price guard)
+    await testDb.prisma.priceMaterial.update({ where: { id: price.id }, data: { deleted_at: new Date() } });
+    await assert.rejects(
+      () => service.updatePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price.id, amount: "600", currency: "IDR" }),
+      (error: unknown) => error instanceof AppError && error.code === "PRICE_ARCHIVED",
+    );
+
+    await service.archiveSku({ grants: GRANTS, actor: ACTOR, skuId });
+    await assert.rejects(
+      () => service.updateSku({ grants: GRANTS, actor: ACTOR, skuId, name: "Archived Guard SKU", brandId: context.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId }),
+      (error: unknown) => error instanceof AppError && error.code === "SKU_ARCHIVED",
+    );
+
+    await service.archivePriceMaterialLabor({ grants: GRANTS, actor: ACTOR, priceMaterialLaborId: mlPrice.priceMaterialLaborId });
+    await assert.rejects(
+      () => service.updatePriceMaterialLabor({ grants: GRANTS, actor: ACTOR, priceMaterialLaborId: mlPrice.priceMaterialLaborId, name: "ML Guard Updated", categoryId: workCat.categoryId, vendorId: workVendor.vendorId, unitId: unit.id, amount: "120", currency: "IDR" }),
+      (error: unknown) => error instanceof AppError && error.code === "PRICE_ARCHIVED",
+    );
+
+    await service.archivePriceLabor({ grants: GRANTS, actor: ACTOR, priceLaborId: laborPrice.priceLaborId });
+    await assert.rejects(
+      () => service.updatePriceLabor({ grants: GRANTS, actor: ACTOR, priceLaborId: laborPrice.priceLaborId, name: "Labor Guard Updated", categoryId: workCat.categoryId, vendorId: workVendor.vendorId, unitId: unit.id, amount: "90", currency: "IDR" }),
+      (error: unknown) => error instanceof AppError && error.code === "PRICE_ARCHIVED",
+    );
+  });
+
+  it("blocks SKU brand change when live material prices have source links", async () => {
+    const context = await createMaterialContext();
+    const brand2 = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Brand Two" });
+    const { skuId } = await service.createSku({
+      grants: GRANTS, actor: ACTOR, name: "Brand-Linked SKU", brandId: context.brandId,
+      baseUnitId: context.unit.id, categoryId: context.categoryId,
+      priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1000", currency: "IDR" }],
+    });
+    const price = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: skuId } });
+    const link = await testDb.prisma.brandLink.create({ data: { id: crypto.randomUUID(), brand_id: context.brandId, kind: "CATALOG", url: "https://example.com/catalog" } });
+
+    await service.updatePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price.id, amount: "1000", currency: "IDR", sourceLinkId: link.id });
+
+    await assert.rejects(
+      () => service.updateSku({ grants: GRANTS, actor: ACTOR, skuId, name: "Brand-Linked SKU", brandId: brand2.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId }),
+      (error: unknown) => error instanceof AppError && error.code === "SKU_BRAND_CHANGE_BLOCKED",
+    );
+
+    // Clearing the source link allows the brand change to proceed
+    await service.updatePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price.id, amount: "1000", currency: "IDR", sourceLinkId: null });
+    await service.updateSku({ grants: GRANTS, actor: ACTOR, skuId, name: "Brand-Linked SKU", brandId: brand2.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId });
+    assert.equal((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: skuId } })).brand_id, brand2.brandId);
+  });
+
+  it("blocks SKU restore when all its prices still have other archive causes", async () => {
+    const context = await createMaterialContext();
+    const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    const vendor2 = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Supplier Two Restore Block" });
+    await testDb.prisma.vendorVendorType.create({ data: { id: crypto.randomUUID(), vendor_id: vendor2.vendorId, vendor_type_id: supplierType.id } });
+
+    const { skuId } = await service.createSku({
+      grants: GRANTS, actor: ACTOR, name: "All-Blocked SKU", brandId: context.brandId,
+      baseUnitId: context.unit.id, categoryId: context.categoryId,
+      priceMaterials: [
+        { supplierVendorId: context.vendorId, amount: "100", currency: "IDR" },
+        { supplierVendorId: vendor2.vendorId, amount: "110", currency: "IDR" },
+      ],
+    });
+
+    // Archive SKU — both prices now have PARENT(sku) cause
+    await service.archiveSku({ grants: GRANTS, actor: ACTOR, skuId });
+
+    // Archive each vendor — each price now also has a PARENT(vendor) cause
+    await service.archiveVendor({ grants: GRANTS, actor: ACTOR, vendorId: context.vendorId });
+    await service.archiveVendor({ grants: GRANTS, actor: ACTOR, vendorId: vendor2.vendorId });
+
+    await assert.rejects(
+      () => service.restoreSku({ grants: GRANTS, actor: ACTOR, skuId }),
+      (error: unknown) => error instanceof AppError && error.code === "SKU_NO_RESTORABLE_PRICE",
+    );
+  });
+
   it("handles Unit update and list queries", async () => {
     const created = await service.createUnit({ grants: GRANTS, actor: ACTOR, code: "TEST_ROLL", name: "Test Roll" });
     await assert.rejects(

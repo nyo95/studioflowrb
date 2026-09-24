@@ -86,6 +86,7 @@ export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts
       const categoryIds = [input.categoryId];
       return runTransaction(async (tx) => {
         const existing = await tx.sku.findUniqueOrThrow({ where: { id: input.skuId }, include: { categories: true } });
+        if (existing.deleted_at !== null) throw new AppError("CONFLICT", "SKU_ARCHIVED", "Cannot update an archived SKU.");
         const baseUnit = await tx.unit.findUniqueOrThrow({ where: { id: input.baseUnitId } });
         if (baseUnit.status !== "ACTIVE") throw new AppError("VALIDATION", "SKU_BASE_UNIT_INACTIVE", "Base unit must be active.");
         let purchaseUnit = null;
@@ -95,6 +96,10 @@ export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts
         const measurement = await resolveSkuMeasurement(tx, measurementInput, baseUnit, purchaseUnit);
         const brand = input.brandId ? await tx.brand.findUniqueOrThrow({ where: { id: input.brandId } }) : null;
         if (brand?.deleted_at) throw new AppError("VALIDATION", "SKU_BRAND_ARCHIVED", "Brand is archived.");
+        if ((input.brandId || null) !== (existing.brand_id || null)) {
+          const linkedPriceCount = await tx.priceMaterial.count({ where: { sku_id: input.skuId, deleted_at: null, source_link_id: { not: null } } });
+          if (linkedPriceCount > 0) throw new AppError("CONFLICT", "SKU_BRAND_CHANGE_BLOCKED", "Brand cannot be changed while live material prices have source links. Clear source links first.");
+        }
         const categories = await tx.category.findMany({ where: { id: { in: categoryIds } }, select: { id: true, kind: true, status: true } });
         if (categories.length !== categoryIds.length) throw new AppError("VALIDATION", "SKU_CATEGORY_NOT_FOUND", "One or more categories not found.");
         for (const cat of categories) { if (cat.status !== "ACTIVE") throw new AppError("VALIDATION", "SKU_CATEGORY_INACTIVE", `Category ${cat.id} is not active.`); if (cat.kind !== "PRODUCT") throw new AppError("VALIDATION", "SKU_CATEGORY_KIND_INVALID", "SKU categories must be PRODUCT categories."); }

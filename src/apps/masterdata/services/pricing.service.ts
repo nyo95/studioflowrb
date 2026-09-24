@@ -53,6 +53,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       const amount = requiredAmount(input.amount);
       return runTransaction(async (tx: any) => {
         const existing = await tx.priceMaterial.findUniqueOrThrow({ where: { id: input.priceMaterialId }, include: { sku: true } });
+        if (existing.deleted_at !== null) throw new AppError("CONFLICT", "PRICE_ARCHIVED", "Cannot update an archived price.");
         if (input.sourceLinkId) { const link = await tx.brandLink.findUniqueOrThrow({ where: { id: input.sourceLinkId } }); if (!existing.sku.brand_id) throw new AppError("VALIDATION", "LINK_BRAND_REQUIRED", "Source link requires a SKU Brand."); if (link.brand_id !== existing.sku.brand_id) throw new AppError("VALIDATION", "LINK_BRAND_MISMATCH", "Source link must belong to the SKU's Brand."); }
         const unitId = input.unitId ?? existing.unit_id;
         const unit = await tx.unit.findUniqueOrThrow({ where: { id: unitId } });
@@ -162,6 +163,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       const amount = requiredAmount(input.amount);
       return runTransaction(async (tx: any) => {
         const existing = await tx.priceMaterialLabor.findUniqueOrThrow({ where: { id: input.priceMaterialLaborId } });
+        if (existing.deleted_at !== null) throw new AppError("CONFLICT", "PRICE_ARCHIVED", "Cannot update an archived price.");
         const category = await tx.category.findUniqueOrThrow({ where: { id: input.categoryId } });
         if (category.status !== "ACTIVE") throw new AppError("VALIDATION", "CATEGORY_INACTIVE", "Category is not active.");
         if (category.kind !== "WORK") throw new AppError("VALIDATION", "CATEGORY_NOT_WORK", "Category must be of kind WORK.");
@@ -274,6 +276,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       const amount = requiredAmount(input.amount);
       return runTransaction(async (tx: any) => {
         const existing = await tx.priceLabor.findUniqueOrThrow({ where: { id: input.priceLaborId } });
+        if (existing.deleted_at !== null) throw new AppError("CONFLICT", "PRICE_ARCHIVED", "Cannot update an archived price.");
         const category = await tx.category.findUniqueOrThrow({ where: { id: input.categoryId } });
         if (category.status !== "ACTIVE") throw new AppError("VALIDATION", "CATEGORY_INACTIVE", "Category is not active.");
         if (category.kind !== "WORK") throw new AppError("VALIDATION", "CATEGORY_NOT_WORK", "Category must be of kind WORK.");

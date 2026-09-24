@@ -73,13 +73,6 @@ Rules carried over unchanged from the prior trackers:
   `authenticated-shell/navigation.tsx`/`index.tsx`. Mobile/narrow-viewport
   treatment beyond generic truncation, and per-app icons, remain undecided —
   not blocking, no icon field exists in the apps registry yet.
-- [ ] [BUG][P3] KB-020 — Office rebuild migration history contains an
-  untracked migration (`20260904153201_add_updated_by_label_vendor_brand`, no
-  matching file in repository history). Pre-existing environment/history gap,
-  not a routing failure. Do not reset the office database or fabricate the
-  missing SQL/checksum; recover the original migration and reconcile
-  provenance before using `migrate dev` against this database.
-
 ## UI Engine and Shared Utilities
 
 - [ ] [UNVERIFIED] Browser walk of Badge/FilterChip/Avatar/Switch/multi-select
@@ -89,30 +82,6 @@ Rules carried over unchanged from the prior trackers:
 
 ## Master Data
 
-- [ ] [BUG] SKU Brand change can invalidate `PriceMaterial.source_link`
-  provenance — `src/apps/masterdata/services/sku.service.ts:updateSku()`
-  allows changing `brand_id` while live `PriceMaterial` rows still hold a
-  `source_link_id`. Existing pricing rules require a `source_link_id`, when
-  present, to belong to the SKU's current Brand — so SKU Brand A + a price
-  source-linked to Brand A, then SKU changed to Brand B, leaves a live price
-  still pointing at Brand A. Preferred fix direction: block the Brand change
-  while any live `PriceMaterial` has a source link; force links to be
-  cleared/reselected rather than silently rewriting provenance.
-- [ ] [BUG] SKU restore can produce a LIVE SKU with zero live `PriceMaterial`
-  — `src/apps/masterdata/services/sku.service.ts:restoreSku()` can bring a
-  SKU back to LIVE even when every child price is still archived for another
-  cause (e.g. Vendor archive) or no price remains at all, violating the
-  invariant `LIVE SKU => at least 1 LIVE PriceMaterial`. Preferred fix
-  direction: restore eligibility must guarantee at least one live/restore-
-  eligible child price before the SKU becomes LIVE; enforce in the shared
-  restorable-invariant logic rather than per-entity.
-- [ ] [BUG] Archived relationship-bearing entities remain mutable — confirmed
-  for archived SKU (`brand_id` still changeable) and archived Work/Price rows
-  (`vendor_id` still changeable). This can leave an archive cause pointing at
-  an old parent and later allow an incorrect restore once that old parent is
-  restored. Preferred product/architecture direction: archived entities
-  should be read-only for relationship-bearing fields — restore first, then
-  edit — rather than building a complex archive-cause rewiring system.
 - [ ] [PLANNED] Define media/file behavior after shared storage exists.
 
 **Fixed 2026-09-23 (R8.123):** Physical Samples workflow — from a Product
@@ -154,12 +123,6 @@ and "direct hard-delete resolves a pre-existing pending request…".
 
 ## BQ
 
-- [ ] [BUG] BQ source-picker server action missing BQ authorization —
-  `src/app/(platform)/bq/[id]/source-actions.ts:listLineItemSourcesAction()`
-  relies on principal/master-data grants but never enforces the BQ
-  project/page read boundary (`bq.access` / `bq.project.read`). Server
-  actions must enforce their own authorization since they can be invoked
-  independently of UI route rendering. Security/business-boundary bug.
 - [ ] [BUG] Cross-app promotion validation has a TOCTOU consistency window —
   `src/application/promotion-coordinator.ts` validates the Master Data
   reference in one operation/transaction, then approves the BQ promotion in
@@ -168,11 +131,6 @@ and "direct hard-delete resolves a pre-existing pending request…".
   consistency debt, not an isolated BQ bug — fix later via revalidation or an
   atomic boundary where practical. Do not turn the current plain-ID design
   into a DB FK without an explicit architecture decision.
-- [ ] [BUG] BQ Assembly Line delete writes the wrong audit `entityId` —
-  `src/apps/bq/services/assemblies.ts:deleteAssemblyLine()` identifies the
-  deleted row by `lineId` but records `line.assembly_template_id` as the
-  audit `entityId`; `entityType` is `BqAssemblyLine`, so `entityId` must be
-  `line.id`. Audit correctness bug.
 - [ ] [PLANNED] Add Quotation PDF output and Terms & Conditions.
 - [ ] [PLANNED] Add price modes TBC and By Owner. Owner-confirmed, 2026-09-23:
   both modes mean the price is left blank/not counted toward the total — a
@@ -341,13 +299,10 @@ only from a separate account-menu "Administration" submenu; that submenu was
 slimmed to a single "Settings" entry per `GLOBAL-MENU-DESIGN-BRIEF.md`'s own
 explored direction. No access-check changes. See `CHANGELOG.md` R8.110.
 
-- [ ] [BUG] Project archive does not purge STORED file assets —
-  `src/apps/studioflow/projects/service.ts:archiveProject()` marks the
-  project archived and audits it but never deletes stored file objects. This
-  conflicts with the resolved owner decision (see "Decision gates" above):
-  `STORED` assets are purged on project archive. Lifecycle/business gap, not
-  a pricing/data-integrity bug — tracked against
-  `apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md`.
+- [ ] [PLANNED] Purge STORED file assets on project archive —
+  `archiveProject()` currently skips object deletion; owner decision is to
+  purge on archive (see "Decision gates" above). Deferred until the storage
+  layer (`PLATFORM-ASSET-STORAGE-ROADMAP.md`) is in place.
 
 ### Cleanup / dead code (confirmed unreachable, not a behavioral defect)
 

@@ -1,11 +1,19 @@
 "use server";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
+import { requirePermission, hasPermission } from "@platform/core/rbac";
+import { AppError } from "@platform/core/errors";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { bqPublicRead, masterDataRead } from "@/apps/bq/runtime";
+import { BQ_PERMISSIONS } from "@/apps/bq/public";
+import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
 
 async function authorize() {
   const { grants } = await requirePrincipalGrants();
+  requirePermission(grants, BQ_PERMISSIONS.access);
+  if (!hasPermission(grants, BQ_PERMISSIONS.projectRead) && !hasPermission(grants, BQ_PERMISSIONS.projectManage)) {
+    throw new AppError("FORBIDDEN", "BQ_PROJECT_ACCESS_REQUIRED", "BQ project read or manage access is required.");
+  }
   return { grants };
 }
 
@@ -49,8 +57,6 @@ export async function listLineItemSourcesAction(query: string): Promise<ActionRe
 
     /* Master Data access is a separate grant: an estimator without it still gets
        the Library, rather than an error that hides the half they may use. */
-    const { hasPermission } = await import("@platform/core/rbac");
-    const { MASTERDATA_PERMISSIONS } = await import("@/apps/masterdata/public");
     if (hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialRead)) {
       const materials = await masterDataRead.listMaterialPriceOptions({ search, limit: 50 });
       for (const option of materials) {

@@ -102,6 +102,15 @@ describe("BQ R6.1 invariants", () => {
     assert.equal(reverted.harga_snapshot.toString(), "15000", "Revert must be available for assembly-applied non-CUSTOM lines, not just directly-added ones");
   });
 
+  it("records the deleted line's own id as the audit entityId when deleting an assembly line", async () => {
+    const assembly = await service.createAssemblyTemplate({ grants: GRANTS, actor: ACTOR, name: "Audit ID Check" });
+    const line = await service.addAssemblyCustomLine({ grants: GRANTS, actor: ACTOR, assemblyId: assembly.id, title: "Paint", purchaseUnit: "L", harga: "50000", currency: "IDR", kategori: "MATERIAL" });
+    await service.deleteAssemblyLine({ grants: GRANTS, actor: ACTOR, lineId: line.id });
+    const audit = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "bq.assembly-line.deleted" } });
+    assert.equal(audit.entity_id, line.id, "audit entityId must be the deleted line's own id, not the parent assembly template id");
+    assert.notEqual(audit.entity_id, assembly.id);
+  });
+
   it("derives Library category and defaults coefficient to one", async () => {
     const material = await service.createLibMaterial({ grants: GRANTS, actor: ACTOR, name: "Board", purchaseUnit: "SHEET", harga: "100", currency: "IDR" });
     const labor = await service.createLibLabor({ grants: GRANTS, actor: ACTOR, name: "Install", purchaseUnit: "M2", harga: "50", currency: "IDR" });
