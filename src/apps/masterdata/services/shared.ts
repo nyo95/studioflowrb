@@ -185,7 +185,7 @@ export async function assertPriceMaterialRestorable(tx: TxClient, priceId: strin
   if (vendor.deleted_at) throw new AppError("CONFLICT", "PRICE_VENDOR_ARCHIVED", "Price cannot be restored while its Supplier is archived.");
   if (unit.status !== "ACTIVE") throw new AppError("CONFLICT", "PRICE_UNIT_INACTIVE", "Price cannot be restored while its Unit is archived.");
   if (sourceLink?.brand.deleted_at) throw new AppError("CONFLICT", "PRICE_SOURCE_BRAND_ARCHIVED", "Price cannot be restored while its source Brand is archived.");
-  if (sourceLink && sku.brand_id && sourceLink.brand_id !== sku.brand_id) throw new AppError("CONFLICT", "PRICE_SOURCE_LINK_BRAND_MISMATCH", "Source link brand no longer matches the SKU's current brand. Clear the source link before restoring.");
+  if (sourceLink && sourceLink.brand_id !== sku.brand_id) throw new AppError("CONFLICT", "PRICE_SOURCE_LINK_BRAND_MISMATCH", "Source link brand no longer matches the SKU's current brand. Clear the source link before restoring.");
   await assertVendorMaterialCapable(tx, vendor.id); if (conflict) throw new AppError("CONFLICT", "PRICE_PAIR_CONFLICT", "A live price already exists for this SKU and Supplier.");
 }
 

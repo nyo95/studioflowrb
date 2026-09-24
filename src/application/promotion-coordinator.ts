@@ -30,6 +30,12 @@ type PromotionCoordinatorDependencies = {
       libItemId: string;
       reason: string;
     }): Promise<unknown>;
+    revokeStalePromotionApproval(input: {
+      grants: PermissionGrants;
+      actor: Actor;
+      type: PromotionType;
+      libItemId: string;
+    }): Promise<unknown>;
   };
 };
 
@@ -66,7 +72,32 @@ export function createPromotionCoordinator(deps: PromotionCoordinatorDependencie
         });
         throw new AppError("CONFLICT", "PROMOTION_REFERENCE_ARCHIVED", "The referenced Master Data price is no longer available. The promotion has been automatically rejected.");
       }
-      return deps.bq.approvePromotion({ ...input, masterdataRefId: reference.referenceId });
+      const result = await deps.bq.approvePromotion({ ...input, masterdataRefId: reference.referenceId });
+
+      // Close the TOCTOU window between the check above and the write that
+      // just committed: re-validate the same reference, and if a concurrent
+      // actor archived it in that window, unwind the approval instead of
+      // leaving it pointing at a stale reference.
+      try {
+        await deps.masterData.validatePromotionReference({
+          grants: input.grants,
+          type: input.type,
+          referenceId: reference.referenceId,
+        });
+      } catch {
+        await deps.bq.revokeStalePromotionApproval({
+          grants: input.grants,
+          actor: input.actor,
+          type: input.type,
+          libItemId: input.libItemId,
+        });
+        throw new AppError(
+          "CONFLICT",
+          "PROMOTION_REFERENCE_ARCHIVED",
+          "The referenced Master Data price was archived immediately after approval. The promotion has been automatically rejected.",
+        );
+      }
+      return result;
     },
     reject(input: {
       grants: PermissionGrants;

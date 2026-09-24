@@ -18,6 +18,7 @@ export const bqPublicRead = createBqPublicRead(prisma);
 export const bqPublicCommands = {
   listPromotionRequests: bqService.listPromotionRequests,
   approvePromotion: bqService.approvePromotion,
+  revokeStalePromotionApproval: bqService.revokeStalePromotionApproval,
   rejectPromotion: bqService.rejectPromotion,
 };
 

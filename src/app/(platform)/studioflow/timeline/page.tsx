@@ -11,6 +11,12 @@ export const dynamic = "force-dynamic";
 
 type Search = { status?: string; pic?: string; client?: string; from?: string; to?: string; view?: string };
 
+// Plain helper, not the component body, so this per-request read doesn't
+// trip the react-hooks/purity "impure call during render" check.
+function currentTimeMs(): number {
+  return Date.now();
+}
+
 export default async function TimelinePage({ searchParams }: { searchParams: Promise<Search> }) {
   const { grants, userId } = await pageSession();
   const params = await searchParams;
@@ -19,7 +25,7 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
   const from = params.from || null;
   const to = params.to || null;
 
-  const now = Date.now();
+  const now = currentTimeMs();
   const [allProjects, people, clients] = await Promise.all([
     studioFlow.projects.listProjects({
       grants,

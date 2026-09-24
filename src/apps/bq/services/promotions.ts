@@ -14,7 +14,7 @@ const PROMOTABLE = {
 } as const;
 
 type PromotionStatus = "DRAFT" | "REQUESTED" | "APPROVED" | "REJECTED";
-type PromotionUpdate = { promotion_status: PromotionStatus; masterdata_ref_id?: string };
+type PromotionUpdate = { promotion_status: PromotionStatus; masterdata_ref_id?: string | null };
 
 export function createPromotionService(ctx: BqServiceContext) {
   const { db, auditWriter } = ctx;
@@ -158,6 +158,36 @@ async function approvePromotion(input: {
   });
 }
 
+/**
+ * System-only compensation for the cross-app TOCTOU race: the promotion
+ * coordinator re-validates the Master Data reference immediately after this
+ * app's approval commits, and calls this to unwind the approval if that
+ * reference was archived concurrently. Distinct from `rejectPromotion`,
+ * which is the user-facing action gated to REQUESTED items only.
+ */
+async function revokeStalePromotionApproval(input: {
+  grants: PermissionGrants;
+  actor: { kind: string; userId?: string; label: string };
+  type: PromotableType;
+  libItemId: string;
+}) {
+  requirePermission(input.grants, MASTERDATA_PERMISSIONS.promotionApprove);
+  await loadPromotable(input.type, input.libItemId, ["APPROVED"]);
+  await transitionPromotionStatus(input.type, input.libItemId, ["APPROVED"], {
+    promotion_status: "REJECTED",
+    masterdata_ref_id: null,
+  });
+
+  await auditWriter({
+    appId: "bq",
+    action: "bq.promotion.approval-reverted",
+    entityType: "BqLibItem",
+    entityId: input.libItemId,
+    actor: input.actor,
+    changes: { reason: "Referenced Master Data price was archived immediately after approval." },
+  });
+}
+
 async function rejectPromotion(input: {
   grants: PermissionGrants;
   actor: { kind: string; userId?: string; label: string };
@@ -190,6 +220,7 @@ async function rejectPromotion(input: {
     requestPromotion,
     listPromotionRequests,
     approvePromotion,
+    revokeStalePromotionApproval,
     rejectPromotion,
   };
 }

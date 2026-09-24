@@ -5,8 +5,69 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.130**
-- Next local revision: **R8.131**
+- Current revision after this entry is committed: **R8.131**
+- Next local revision: **R8.132**
+
+## R8.131 | 2026-09-24 | fix(masterdata,bq): close the residual TOCTOU window and unbranded-SKU restore loophole R8.130 left open
+
+Owner-scoped (chat, 2026-09-24): R8.130 fixed the easy half of each bug and
+explicitly flagged what it left open; this closes both remaining gaps.
+
+**Bug: BQ promotion TOCTOU — the actual race, not just the pre-check**
+(`src/application/promotion-coordinator.ts:approve()`,
+`src/apps/bq/services/promotions.ts`, `src/apps/bq/runtime.ts`)
+R8.130 only caught the case where the Master Data reference was *already*
+archived when `validatePromotionReference` ran, and its own changelog entry
+noted the real gap — a concurrent archive landing between that check and
+`approvePromotion`'s write — as "theoretically possible but not a practical
+risk." Since Master Data and BQ are separate apps with no shared transaction
+(cross-app FK/transactions are forbidden by this repo's architecture), the
+window can't be closed with a lock; it's closed with a saga instead:
+`approve()` now re-validates the same reference immediately after
+`approvePromotion` commits, and if a concurrent actor archived it in that
+window, calls a new `bq.revokeStalePromotionApproval()` to unwind the
+approval (`APPROVED` -> `REJECTED`, `masterdata_ref_id` cleared) before
+throwing `PROMOTION_REFERENCE_ARCHIVED`. `revokeStalePromotionApproval` is a
+system-only compensation, gated the same as approve/reject, and deliberately
+separate from the user-facing `rejectPromotion` (which stays scoped to
+`REQUESTED` items per bq-contract §8.2). New regression test in
+`promotion-coordinator.test.ts` simulates the concurrent archive landing
+between the two validate calls and asserts the approval is unwound rather
+than left pointing at a stale reference.
+
+**Bug: source-link brand mismatch — the unbranded-SKU case R8.130 missed**
+(`src/apps/masterdata/services/shared.ts:assertPriceMaterialRestorable()`)
+R8.130's guard was `if (sourceLink && sku.brand_id && sourceLink.brand_id !==
+sku.brand_id)` — the `sku.brand_id &&` short-circuit meant that if the SKU's
+Brand was cleared to `null` (unbranded) rather than changed to a different
+Brand, the whole check was skipped and a price restored with a source link
+pointing at a Brand the SKU is no longer even associated with. Removed the
+`sku.brand_id &&` guard; `sourceLink.brand_id !== sku.brand_id` alone already
+covers both the "different brand" and "no brand" cases correctly, since
+`sourceLink.brand_id` is never null. Regression test added to
+`service.integration.test.ts` covering the unbranding path specifically.
+
+**Unrelated drive-by: impure `Date.now()` in `TimelinePage`**
+(`src/app/(platform)/studioflow/timeline/page.tsx`)
+`npm run lint` (run as a proportionate check before this commit) failed on
+`react-hooks/purity` for a bare `Date.now()` call in the R8.127 Timeline
+page's component body. Moved it into a plain non-component helper
+(`currentTimeMs()`) — same value, satisfies the rule. No behavior change.
+
+**Also this session:** dev and test databases were out of sync with
+`schema.prisma` after pulling R8.121-R8.130 (missing
+`sf_phase_planned_dates` migration + stale generated Prisma Client caused 60
+integration tests to fail). Ran `prisma migrate reset --force` on
+`studioflow_rebuild` (dev) and `prisma migrate deploy` on
+`studioflow_rebuild_test`, then `prisma generate`. Not a code change; noted
+here since it's why the full suite needed a re-run before these fixes could
+be verified.
+
+Backlog: no entries to remove — both bugs were already closed out of
+`docs/BACKLOG.md` by R8.130; this revision only deepens those same fixes.
+Checks: `tsc --noEmit` clean; `eslint .` clean; full suite 516/516 (up from
+514 — the two new regression tests). No schema migrations; no new
+dependencies.
 
 ## R8.130 | 2026-09-24 | fix(masterdata,bq): fix TOCTOU auto-reject and source-link brand mismatch on restore
 

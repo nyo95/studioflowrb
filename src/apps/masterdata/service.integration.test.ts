@@ -551,6 +551,37 @@ describe("Master Data service", () => {
     );
   });
 
+  it("blocks price restore when the SKU was unbranded, not just moved to another brand", async () => {
+    const context = await createMaterialContext();
+    const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    const vendor2 = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Supplier Unbrand Guard" });
+    await testDb.prisma.vendorVendorType.create({ data: { id: crypto.randomUUID(), vendor_id: vendor2.vendorId, vendor_type_id: supplierType.id } });
+
+    const { skuId } = await service.createSku({
+      grants: GRANTS, actor: ACTOR, name: "Unbrand Guard SKU", brandId: context.brandId,
+      baseUnitId: context.unit.id, categoryId: context.categoryId,
+      priceMaterials: [
+        { supplierVendorId: context.vendorId, amount: "500", currency: "IDR" },
+        { supplierVendorId: vendor2.vendorId, amount: "500", currency: "IDR" },
+      ],
+    });
+    const prices = await testDb.prisma.priceMaterial.findMany({ where: { sku_id: skuId }, orderBy: { created_at: "asc" } });
+    const price1 = prices[0];
+    const link = await testDb.prisma.brandLink.create({ data: { id: crypto.randomUUID(), brand_id: context.brandId, kind: "CATALOG", url: "https://example.com/unbrand" } });
+    await service.updatePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price1.id, amount: "500", currency: "IDR", sourceLinkId: link.id });
+
+    // Archive Price 1, then clear the SKU's Brand entirely (brand_id -> null)
+    await service.archivePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price1.id });
+    await service.updateSku({ grants: GRANTS, actor: ACTOR, skuId, name: "Unbrand Guard SKU", brandId: undefined, baseUnitId: context.unit.id, categoryId: context.categoryId });
+
+    // Restore Price 1 — source_link still points to the old Brand, but the SKU now has none.
+    // sku.brand_id is null here, so a guard that short-circuits on a falsy brand_id would miss this.
+    await assert.rejects(
+      () => service.restorePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price1.id }),
+      (error: unknown) => error instanceof AppError && error.code === "PRICE_SOURCE_LINK_BRAND_MISMATCH",
+    );
+  });
+
   it("handles Unit update and list queries", async () => {
     const created = await service.createUnit({ grants: GRANTS, actor: ACTOR, code: "TEST_ROLL", name: "Test Roll" });
     await assert.rejects(
