@@ -5,8 +5,53 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.139**
-- Next local revision: **R8.140**
+- Current revision after this entry is committed: **R8.140**
+- Next local revision: **R8.141**
+
+## R8.140 | 2026-09-24 | fix(platform): reuse recently-rendered dynamic pages on revisit instead of refetching the whole layout chain
+
+Owner-scoped (chat, 2026-09-24), reported right after R8.139 landed:
+*"sudah dicoba, masih muncul spinner besar tiap pindah project. knp ga di
+selaraskan?"* — R8.139 split the project layout's own Suspense boundaries
+correctly, but the platform-wide spinner (`(platform)/loading.tsx`) still
+covered the *entire* shell — including `(platform)/layout.tsx` and
+`studioflow/layout.tsx` above it — on every revisit.
+
+**Root cause:** Next.js's Client Router Cache defaults
+`experimental.staleTimes.dynamic` to 0 seconds (unset in this repo's
+`next.config.ts`). Per Next's own docs, ordinary forward navigation already
+reuses shared layouts via partial rendering regardless of this setting — but
+a *revisit* of a dynamic route (leaving it and coming back, e.g. Projects
+list → a project → Projects list → the same project) is exactly what
+`staleTimes.dynamic` governs: at 0s, the client treats the previously
+rendered page as immediately stale and refetches the whole route tree for
+that URL, re-running every layout in the chain from
+`(platform)/layout.tsx` down. With only one project seeded in the dev
+database, every "switching projects" test the owner did was actually this
+exact revisit pattern, so the app shell (rail, StudioFlow nav) re-rendered
+under the generic spinner on every click regardless of the R8.139 split.
+
+**Fix:** set `experimental.staleTimes: { dynamic: 30 }` in `next.config.ts`,
+matching Next's own documented example value. A dynamic page revisited
+within 30s of its last render is now served from the client cache instead of
+being refetched, so the shell no longer re-executes (and the generic
+spinner no longer shows) on a quick back-and-forth between routes sharing a
+layout. This is a platform-wide navigation-freshness trade-off, not a
+StudioFlow-specific one: any dynamic route revisited inside that window may
+show up-to-30s-old data (including permission grants, since
+`resolvePrincipalGrantsForRequest` is only deduped *within* one render, not
+across renders) until the window elapses or the user does a hard reload.
+Recorded as a platform-level decision rather than in
+`STUDIOFLOW-REWORK-CONTRACT.md`, since it isn't StudioFlow-specific.
+
+Checks: `tsc --noEmit` clean; `eslint .` clean; full test suite not
+re-run (config-only change, no service/business logic touched). Verified in
+the browser: repeated Projects-list ↔ project-detail navigation on the seeded
+project dropped from ~1.2s full reloads to ~50-125ms RSC fetches
+(`?_rsc=` responses confirmed in network log, not full-document reloads), no
+visible shell spinner, no console errors beyond an expected one-time HMR
+websocket reconnect from the dev-server restart needed to pick up the config
+change. No schema migration; no new dependency.
 
 ## R8.139 | 2026-09-24 | fix(sf): project rail is app shell — stream it independently of project/count data
 
