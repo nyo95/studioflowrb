@@ -713,6 +713,31 @@ which per `CORE.md`'s own classification is a much larger, currently
 `Mark sample received` in the option's row-action menu
 (`requestScheduleSampleAction`/`receiveScheduleSampleAction`).
 
+### 11.11 Print / export (R8.132, owner-scoped 2026-09-24)
+
+Legacy's `CatalogBoard` was itself the printable client-and-contractor
+deliverable. The rebuild's board gains the same capability as a **second
+consumer** of the shared print view (UI_ENGINE §13, §10's MOM print route was
+the first), not app-owned code: `/studioflow/print/projects/:id/schedule`
+renders every entry as a catalogue card (photo, code, Type, and whichever
+card fields — §11.8 — the on-screen board shows for that entry, read through
+the same `effectiveCardFields`/`cardFieldValuesOf` functions the board itself
+calls, now shared from `domain/schedule.ts` so the two can never disagree),
+grouped by category within each section. A "Print / PDF" link on the board
+toolbar opens it, matching the MOM editor's own link exactly.
+
+**Paper size and orientation are user-selectable** (A4/Letter,
+portrait/landscape) via `?paper=&orientation=`, the one concrete gap the
+owner named in legacy's export (fixed to one layout). This is a new UI
+Engine capability — `DocumentSheet`'s `printFormat` prop plus the
+`PrintFormatPicker` pattern — available to any future print consumer, not
+schedule-specific. **No true per-page running header or page counter**:
+Chrome/Firefox do not support CSS Paged Media running elements or `@page`
+margin-box content, so — same as MOM's print page — the header (project,
+client, print date) appears once at the top of the document; adding a real
+"page N of M" would need a server-side PDF render pipeline, which the owner
+declined to add for this.
+
 ## 12. Foundation centralization map
 
 | Need | Classification | Canonical home |

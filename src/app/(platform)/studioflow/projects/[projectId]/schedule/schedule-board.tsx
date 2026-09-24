@@ -1,16 +1,26 @@
 "use client";
 
-import { ArrowDown, ArrowUp, FileUp, History, ImageIcon, Plus, Search, Settings2 } from "lucide-react";
+import { ArrowDown, ArrowUp, FileUp, History, ImageIcon, Plus, Printer, Search, Settings2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type DragEvent, type ReactNode } from "react";
 
+import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
+
 import {
-  SCHEDULE_CARD_FIELD_KEYS,
-  SCHEDULE_DEFAULT_CARD_FIELDS,
-  extraFieldKey,
-  orderCardFields,
-  type ScheduleCardFieldKey,
+  SCHEDULE_CARD_FIELD_LABEL as CARD_FIELD_LABEL,
+  SCHEDULE_SECTION_LABEL as SECTION_LABEL,
+  cardFieldLabel,
+  cardFieldValuesOf,
+  effectiveCardFields,
+  extraChoicesOf,
+  finalOf,
+  shownOptionOf,
+  specLine,
+  templateSourceOf,
+  type ScheduleEntryView,
   type ScheduleExtraField,
+  type ScheduleOptionView,
+  type ScheduleSampleRequestView,
 } from "@/apps/studioflow/domain/schedule";
 import {
   Badge,
@@ -61,52 +71,6 @@ import { useCommand } from "../../../_components/use-command";
 type Section = "MATERIAL" | "FIXTURE";
 type Brand = { id: string; name: string };
 
-export type ScheduleOptionView = {
-  id: string;
-  label: string;
-  isFinal: boolean;
-  status: string;
-  brandId: string | null;
-  brandName: string | null;
-  productName: string;
-  color: string | null;
-  pattern: string | null;
-  finishing: string | null;
-  dimension: string | null;
-  notes: string | null;
-  /** Free-form spec lines beyond the typed columns. */
-  extra: ScheduleExtraField[];
-  /** Short-lived signed URL of the option photo. */
-  imageUrl: string | null;
-  /** Latest physical sample request against this option, if any. */
-  sampleRequest: ScheduleSampleRequestView | null;
-};
-
-export type ScheduleSampleRequestView = {
-  id: string;
-  status: "REQUESTED" | "RECEIVED";
-  requestedFrom: string;
-  note: string | null;
-  requestedByName: string;
-  requestedAt: Date;
-  receivedByName: string | null;
-  receivedAt: Date | null;
-  receivedNote: string | null;
-};
-
-export type ScheduleEntryView = {
-  id: string;
-  section: Section;
-  category: string;
-  code: string;
-  qty: string | null;
-  unit: string | null;
-  location: string | null;
-  /** null = no override; the card renders SCHEDULE_DEFAULT_CARD_FIELDS. */
-  cardFields: string[] | null;
-  options: ScheduleOptionView[];
-};
-
 type ReuseHit = {
   optionId: string;
   sourceProjectName: string;
@@ -120,7 +84,6 @@ type ReuseHit = {
   isFinal: boolean;
 };
 
-const SECTION_LABEL: Record<Section, string> = { MATERIAL: "Material", FIXTURE: "Fixture" };
 const STATUS_LABEL: Record<string, { label: string; tone: "success" | "neutral" | "warning" }> = {
   APPROVED: { label: "Final", tone: "success" },
   DRAFT: { label: "Option", tone: "neutral" },
@@ -128,28 +91,6 @@ const STATUS_LABEL: Record<string, { label: string; tone: "success" | "neutral" 
 };
 
 type Command = ReturnType<typeof useCommand>;
-
-function specLine(option: Pick<ScheduleOptionView, "color" | "pattern" | "finishing" | "dimension">) {
-  return [option.color, option.pattern, option.finishing, option.dimension].filter(Boolean).join(" · ");
-}
-
-function finalOf(entry: ScheduleEntryView) {
-  return entry.options.find((option) => option.isFinal) ?? null;
-}
-
-/**
- * The option a card speaks for: the final one, else the first. Legacy fell back
- * the same way (`selectedCatalogOption`), so a row with one unapproved option
- * still shows its product instead of reading as empty.
- */
-function shownOptionOf(entry: ScheduleEntryView) {
-  return finalOf(entry) ?? entry.options[0] ?? null;
-}
-
-/** The option a template would be made from: the final one, or the only one. */
-function templateSourceOf(entry: ScheduleEntryView) {
-  return finalOf(entry) ?? (entry.options.length === 1 ? entry.options[0] : null);
-}
 
 /** Legacy catalog photos are portrait 4:5. */
 const PHOTO_ASPECT = 4 / 5;
@@ -253,63 +194,8 @@ function SampleRequestDialog({
   );
 }
 
-/**
- * One label per field, used on the card and in the edit form alike. Type is the
- * product designation ("Nude Pro - ATS 1132 M"): it is the card's title, always
- * shown, so it is not in this list.
- */
-const CARD_FIELD_LABEL: Record<ScheduleCardFieldKey, string> = {
-  brand: "Brand",
-  color: "Color",
-  pattern: "Pattern",
-  finishing: "Finishing",
-  dimension: "Size",
-  location: "Location",
-  qty: "Qty",
-  notes: "Notes",
-};
-
 /** Simple single-input option fields between Type and Location in the checklist; Brand, Size and Notes get their own row shape. */
 const SIMPLE_OPTION_FIELD_KEYS = ["color", "pattern", "finishing"] as const;
-
-/** The free-form spec lines a card can caption, in the order they sit on the option. */
-function extraChoicesOf(entry: ScheduleEntryView): Array<{ key: string; label: string }> {
-  const shown = shownOptionOf(entry);
-  return (shown?.extra ?? []).map((field) => ({ key: extraFieldKey(field.label), label: field.label }));
-}
-
-function cardFieldLabel(key: string, extras: ReadonlyArray<{ key: string; label: string }>): string {
-  return CARD_FIELD_LABEL[key as ScheduleCardFieldKey] ?? extras.find((extra) => extra.key === key)?.label ?? key;
-}
-
-/**
- * Which fields caption a board card. `cardFields === null` means "no override"
- * and renders the default set plus every extra spec line the option carries;
- * an array is an explicit, ordered choice and may legitimately be empty.
- * Matches legacy's null-vs-list `catalog_fields` and its "Use project default".
- */
-function effectiveCardFields(entry: ScheduleEntryView): string[] {
-  const extras = extraChoicesOf(entry);
-  if (entry.cardFields !== null) return orderCardFields(entry.cardFields, extras.map((extra) => extra.key));
-  return orderCardFields([...SCHEDULE_DEFAULT_CARD_FIELDS, ...extras.map((extra) => extra.key)], extras.map((extra) => extra.key));
-}
-
-/** The current display value for each selectable card field — what the board card itself renders. */
-function cardFieldValuesOf(entry: ScheduleEntryView): Record<string, string | null | undefined> {
-  const shown = shownOptionOf(entry);
-  const quantity = entry.qty ? `${entry.qty}${entry.unit ? ` ${entry.unit}` : ""}` : null;
-  return {
-    brand: shown?.brandName,
-    color: shown?.color,
-    pattern: shown?.pattern,
-    finishing: shown?.finishing,
-    dimension: shown?.dimension,
-    location: entry.location,
-    qty: quantity,
-    notes: shown?.notes,
-    ...Object.fromEntries((shown?.extra ?? []).map((field) => [extraFieldKey(field.label), field.value])),
-  };
-}
 
 function Thumb({ url, alt, className = "h-14 w-11" }: { url: string | null; alt: string; className?: string }) {
   return (
@@ -554,30 +440,36 @@ export function ScheduleBoard({
           <button type="button" onClick={() => setViewMode("list")} className={`inline-flex min-h-[--ui-control-height-sm] items-center gap-1 rounded-control px-2 text-xs font-medium transition-colors ${viewMode === "list" ? "bg-surface-muted text-ink" : "text-ink-secondary hover:bg-surface-muted hover:text-ink"}`} aria-pressed={viewMode === "list"}>List</button>
           <button type="button" onClick={() => setViewMode("board")} className={`inline-flex min-h-[--ui-control-height-sm] items-center gap-1 rounded-control px-2 text-xs font-medium transition-colors ${viewMode === "board" ? "bg-surface-muted text-ink" : "text-ink-secondary hover:bg-surface-muted hover:text-ink"}`} aria-pressed={viewMode === "board"}>Board</button>
         </div>
-        {canEdit || canManageTemplates ? (
-          <div className="flex flex-wrap gap-2">
-            {canManageTemplates ? (
-              <Link
-                prefetch={false}
-                href={`${settingsHref}#product-schedule`}
-                className="inline-flex min-h-(--ui-control-height-sm) items-center gap-1.5 rounded-control px-2.5 text-xs font-medium text-ink-secondary hover:bg-surface-muted hover:text-ink"
-              >
-                <Settings2 aria-hidden="true" className="h-3.5 w-3.5" /> Template settings
-              </Link>
-            ) : null}
-            {canEdit ? <>
-            <Button size="sm" variant="ghost" pending={isPending("templates")} onClick={() => run("templates", () => applyScheduleTemplatesAction({ projectId }))}>
-              Apply templates
-            </Button>
-            <Button size="sm" variant="secondary" leadingIcon={<FileUp className="h-3.5 w-3.5" />} onClick={() => setDialog("import")}>
-              Import CSV
-            </Button>
-            <Button size="sm" variant="primary" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => setDialog("add")}>
-              Add item
-            </Button>
-            </> : null}
-          </div>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Link
+            prefetch={false}
+            target="_blank"
+            href={STUDIOFLOW_ROUTES.projectSchedulePrint(projectId)}
+            className="inline-flex min-h-(--ui-control-height-sm) items-center gap-1.5 rounded-control border border-line bg-surface px-2.5 text-xs font-medium text-ink hover:border-line-strong"
+          >
+            <Printer aria-hidden="true" className="h-3.5 w-3.5" /> Print / PDF
+          </Link>
+          {canManageTemplates ? (
+            <Link
+              prefetch={false}
+              href={`${settingsHref}#product-schedule`}
+              className="inline-flex min-h-(--ui-control-height-sm) items-center gap-1.5 rounded-control px-2.5 text-xs font-medium text-ink-secondary hover:bg-surface-muted hover:text-ink"
+            >
+              <Settings2 aria-hidden="true" className="h-3.5 w-3.5" /> Template settings
+            </Link>
+          ) : null}
+          {canEdit ? <>
+          <Button size="sm" variant="ghost" pending={isPending("templates")} onClick={() => run("templates", () => applyScheduleTemplatesAction({ projectId }))}>
+            Apply templates
+          </Button>
+          <Button size="sm" variant="secondary" leadingIcon={<FileUp className="h-3.5 w-3.5" />} onClick={() => setDialog("import")}>
+            Import CSV
+          </Button>
+          <Button size="sm" variant="primary" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => setDialog("add")}>
+            Add item
+          </Button>
+          </> : null}
+        </div>
       </div>
 
       <StatBar entries={entries} section={section} />

@@ -5,8 +5,72 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.131**
-- Next local revision: **R8.132**
+- Current revision after this entry is committed: **R8.132**
+- Next local revision: **R8.133**
+
+## R8.132 | 2026-09-24 | feat(sf,ui-engine): Product Schedule print/export as a second consumer of the shared UI Engine print view
+
+Owner-scoped (chat, 2026-09-24): close the `[PARITY][P2]` backlog item —
+Product Schedule had no print/export path, unlike legacy's `CatalogBoard`.
+Explicit owner direction this session: match legacy's simple running-header
+style (no need to chase per-page numbering); the one thing to actually
+improve over legacy is that its export size was fixed — paper size should be
+configurable this time.
+
+**Shared capability, not app-owned code.** `DocumentSheet`, `DocumentBlock`,
+and `PrintButton` (`platform/ui_engine`, UI_ENGINE §13) already existed with
+one consumer, MOM's print route (§10). This makes Product Schedule the
+second consumer instead of forking a parallel print implementation:
+`src/app/(document)/studioflow/print/projects/[projectId]/schedule/page.tsx`,
+reached from a new "Print / PDF" link on the board toolbar
+(`schedule-board.tsx`), styled and behaving exactly like MOM's own link.
+
+**New UI Engine capability: selectable paper size/orientation** — the actual
+improvement over legacy. `DocumentSheet` gains an optional `printFormat:
+{ paper: "A4" | "LETTER"; orientation: "portrait" | "landscape" }` prop that
+drives both the on-screen preview width and an injected `@page { size: ...;
+}` rule, so the real print/PDF output matches what was picked, not just the
+preview. New client pattern `PrintFormatPicker` (`patterns/print-format.tsx`)
+reads/writes `?paper=&orientation=` via `router.replace`, the same
+URL-driven-filter idiom already used elsewhere — no new client state pattern
+introduced. `format` (the old `"a4-portrait" | "a4-landscape"` prop) is
+untouched; MOM is not forced onto the new prop.
+
+**Known, owner-accepted limitation: no true per-page running header or page
+counter.** Chrome/Firefox do not support CSS Paged Media running
+elements/`@page` margin-box content — confirmed and discussed with the owner
+before building; a real "page N of M" needs a server-side PDF-render
+pipeline, which the owner explicitly declined to add. The printed header
+(project, client, print date) appears once at the top, same pattern as MOM's
+existing print page.
+
+**Extracted card-rendering logic to prevent drift**
+(`src/apps/studioflow/domain/schedule.ts`): `ScheduleEntryView`,
+`ScheduleOptionView`, `ScheduleSampleRequestView`, and the pure functions that
+decide what a board card shows (`finalOf`, `shownOptionOf`,
+`templateSourceOf`, `effectiveCardFields`, `cardFieldValuesOf`,
+`extraChoicesOf`, `cardFieldLabel`, `specLine`, plus the card-field-label and
+section-label maps) moved out of the client-only `schedule-board.tsx` into
+the shared domain module. Both the on-screen board and the new print page
+import the same functions, so the printed catalogue cannot drift from what
+the board itself shows — this was a precondition for building the print view
+at all, not a separate refactor. `schedule-board.tsx`'s own rendering is
+unchanged; `schedule.regression.test.ts`'s source-matching assertions for the
+moved functions were updated to check `domain/schedule.ts` instead.
+
+`docs/apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md` §11 gains §11.11
+recording this. `docs/BACKLOG.md`'s `[PARITY][P2]` entry is closed (moved to
+a "Fixed" note) and a new `[UNVERIFIED]` entry added — code is done, no
+browser walk has happened yet.
+
+BQ `[PLANNED]` backlog items are explicitly deferred by the owner this
+session; none touched here.
+
+Checks: `tsc --noEmit` clean; `eslint .` clean; full suite 516/516 (read-only
+view over already-tested data, so no new integration-test surface — the
+extraction is covered by the existing regression test plus the full board's
+existing behavioral tests still passing unchanged). No schema migration; no
+new dependency.
 
 ## R8.131 | 2026-09-24 | fix(masterdata,bq): close the residual TOCTOU window and unbranded-SKU restore loophole R8.130 left open
 

@@ -254,6 +254,12 @@ duration report derived from actual status-change history (these are
   (R8.86). Needs a browser walk of both: settings tables (create/edit/reorder)
   and the option photo upload/crop/save round trip. Close both KB numbers
   together once verified — same feature area.
+- [ ] [UNVERIFIED] Product Schedule print/export (R8.132) —
+  `/studioflow/print/projects/:id/schedule`. Needs a browser walk: open from
+  the board's "Print / PDF" link, confirm cards match the on-screen board,
+  toggle paper/orientation and confirm both the preview and the browser's
+  print-preview dialog reflect it, confirm toolbar controls are absent from
+  the printed/exported output.
 **Fixed 2026-09-23 (R8.111–R8.112):** Product Schedule spec model — migration
 `20260923000000_sf_schedule_spec_model` applied to both `studioflow_rebuild`
 and `studioflow_rebuild_test` and browser-verified: Type label everywhere,
@@ -270,17 +276,18 @@ fields checklist ticking and saving correctly at both desktop and 375px. See
 
 ### Parity gaps (legacy behavior the rebuild does not have yet)
 
-- [ ] [PARITY][P2] **Print / export the Product Schedule board as a
-  client-and-contractor catalogue sheet.** Legacy's `CatalogBoard` *is* the
-  printable deliverable — `@media print` rules, a running header carrying
-  project name, year and page number, and `no-print` on every editing
-  affordance. That is also the reason per-card "card fields" exists at all:
-  the choice is "what gets printed for the client", which is why legacy's
-  default was a lean Type + Brand rather than every populated field. The
-  rebuild board has no print path, so the card-field feature currently only
-  affects the on-screen board. Deferred by the owner on 2026-09-23 in favour
-  of landing the data/UI consistency first (R8.111); see
-  `STUDIOFLOW-REWORK-CONTRACT.md` §11.8.
+**Fixed 2026-09-24 (R8.132):** Print / export the Product Schedule board as a
+client-and-contractor catalogue sheet — deferred on 2026-09-23 in favour of
+landing data/UI consistency first (R8.111), owner scoped it back in this
+session. `/studioflow/print/projects/:id/schedule`, a second consumer of the
+shared UI Engine print view (§10's MOM print route was the first), reusing
+the board's own `effectiveCardFields`/`cardFieldValuesOf` logic (moved to
+`domain/schedule.ts`) so the printed card can never drift from the on-screen
+one. Paper size/orientation are user-selectable (`DocumentSheet.printFormat`
++ `PrintFormatPicker`, a new canonical UI Engine capability) — the concrete
+gap the owner named in legacy's fixed-layout export. No true per-page running
+header/page counter: browsers don't support it without a PDF-render pipeline,
+which the owner declined to add; see `STUDIOFLOW-REWORK-CONTRACT.md` §11.11.
 
 ### Open defects
 

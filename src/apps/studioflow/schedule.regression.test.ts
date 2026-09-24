@@ -12,6 +12,7 @@ const settingsView = readFileSync(
   "src/app/(platform)/studioflow/settings/studio-settings-view.tsx",
   "utf8",
 );
+const scheduleDomain = readFileSync("src/apps/studioflow/domain/schedule.ts", "utf8");
 
 describe("Schedule Board/List outer branching and pattern form preservation", () => {
   it("renders BoardView exactly once at the outer view-mode conditional", () => {
@@ -56,7 +57,7 @@ describe("Schedule Board/List outer branching and pattern form preservation", ()
 
   it("includes pattern in toSnapshot and specLine", () => {
     assert.match(scheduleBoard, /pattern:\s*text\(draft\.pattern\)/);
-    assert.match(scheduleBoard, /Pick<ScheduleOptionView, "color" \| "pattern" \| "finishing" \| "dimension">/);
+    assert.match(scheduleDomain, /Pick<ScheduleOptionView, "color" \| "pattern" \| "finishing" \| "dimension">/);
   });
 
   it("has a Pattern field in ProductFields", () => {
@@ -88,8 +89,9 @@ describe("Schedule Board/List outer branching and pattern form preservation", ()
 });
 
 describe("R8.112: card-field checkboxes grey out when there is nothing to show", () => {
-  it("cardFieldValuesOf renders the board card, unchanged since R8.112", () => {
-    assert.match(scheduleBoard, /function cardFieldValuesOf\(entry: ScheduleEntryView\)/);
+  it("cardFieldValuesOf renders the board card, unchanged since R8.112 (moved to domain/schedule.ts so the print catalogue can share it)", () => {
+    assert.match(scheduleDomain, /export function cardFieldValuesOf\(entry: ScheduleEntryView\)/);
+    assert.match(scheduleBoard, /\bcardFieldValuesOf,/, "schedule-board.tsx imports the shared function rather than redefining it");
     const boardViewIndex = scheduleBoard.indexOf("function BoardView");
     const panelIndex = scheduleBoard.indexOf("function EntryPanelContent");
     assert.match(scheduleBoard.slice(boardViewIndex, panelIndex), /const fieldValue = cardFieldValuesOf\(entry\);/);

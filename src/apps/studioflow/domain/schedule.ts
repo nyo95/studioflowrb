@@ -83,6 +83,136 @@ export function normalizeExtraFields(input: unknown): ScheduleExtraField[] {
   return out;
 }
 
+// ── Board/print card view — shared by the on-screen ScheduleBoard and the
+// printable catalogue route so a card renders identically in both places.
+// The printed sheet must show exactly what the on-screen card shows, not a
+// re-derived approximation, so both call these same functions.
+
+export type ScheduleSampleRequestView = {
+  id: string;
+  status: "REQUESTED" | "RECEIVED";
+  requestedFrom: string;
+  note: string | null;
+  requestedByName: string;
+  requestedAt: Date;
+  receivedByName: string | null;
+  receivedAt: Date | null;
+  receivedNote: string | null;
+};
+
+export type ScheduleOptionView = {
+  id: string;
+  label: string;
+  isFinal: boolean;
+  status: string;
+  brandId: string | null;
+  brandName: string | null;
+  productName: string;
+  color: string | null;
+  pattern: string | null;
+  finishing: string | null;
+  dimension: string | null;
+  notes: string | null;
+  /** Free-form spec lines beyond the typed columns. */
+  extra: ScheduleExtraField[];
+  /** Short-lived signed URL of the option photo. */
+  imageUrl: string | null;
+  /** Latest physical sample request against this option, if any. */
+  sampleRequest: ScheduleSampleRequestView | null;
+};
+
+export type ScheduleEntryView = {
+  id: string;
+  section: ScheduleSection;
+  category: string;
+  code: string;
+  qty: string | null;
+  unit: string | null;
+  location: string | null;
+  /** null = no override; the card renders SCHEDULE_DEFAULT_CARD_FIELDS. */
+  cardFields: string[] | null;
+  options: ScheduleOptionView[];
+};
+
+export const SCHEDULE_SECTION_LABEL: Record<ScheduleSection, string> = { MATERIAL: "Material", FIXTURE: "Fixture" };
+
+export function specLine(option: Pick<ScheduleOptionView, "color" | "pattern" | "finishing" | "dimension">): string {
+  return [option.color, option.pattern, option.finishing, option.dimension].filter(Boolean).join(" · ");
+}
+
+export function finalOf(entry: ScheduleEntryView): ScheduleOptionView | null {
+  return entry.options.find((option) => option.isFinal) ?? null;
+}
+
+/**
+ * The option a card speaks for: the final one, else the first. Legacy fell back
+ * the same way (`selectedCatalogOption`), so a row with one unapproved option
+ * still shows its product instead of reading as empty.
+ */
+export function shownOptionOf(entry: ScheduleEntryView): ScheduleOptionView | null {
+  return finalOf(entry) ?? entry.options[0] ?? null;
+}
+
+/** The option a template would be made from: the final one, or the only one. */
+export function templateSourceOf(entry: ScheduleEntryView): ScheduleOptionView | null {
+  return finalOf(entry) ?? (entry.options.length === 1 ? entry.options[0] : null);
+}
+
+/**
+ * One label per field, used on the card and in the edit form alike. Type is the
+ * product designation ("Nude Pro - ATS 1132 M"): it is the card's title, always
+ * shown, so it is not in this list.
+ */
+export const SCHEDULE_CARD_FIELD_LABEL: Record<ScheduleCardFieldKey, string> = {
+  brand: "Brand",
+  color: "Color",
+  pattern: "Pattern",
+  finishing: "Finishing",
+  dimension: "Size",
+  location: "Location",
+  qty: "Qty",
+  notes: "Notes",
+};
+
+/** The free-form spec lines a card can caption, in the order they sit on the option. */
+export function extraChoicesOf(entry: ScheduleEntryView): Array<{ key: string; label: string }> {
+  const shown = shownOptionOf(entry);
+  return (shown?.extra ?? []).map((field) => ({ key: extraFieldKey(field.label), label: field.label }));
+}
+
+export function cardFieldLabel(key: string, extras: ReadonlyArray<{ key: string; label: string }>): string {
+  return SCHEDULE_CARD_FIELD_LABEL[key as ScheduleCardFieldKey] ?? extras.find((extra) => extra.key === key)?.label ?? key;
+}
+
+/**
+ * Which fields caption a board card. `cardFields === null` means "no override"
+ * and renders the default set plus every extra spec line the option carries;
+ * an array is an explicit, ordered choice and may legitimately be empty.
+ * Matches legacy's null-vs-list `catalog_fields` and its "Use project default".
+ */
+export function effectiveCardFields(entry: ScheduleEntryView): string[] {
+  const extras = extraChoicesOf(entry);
+  if (entry.cardFields !== null) return orderCardFields(entry.cardFields, extras.map((extra) => extra.key));
+  return orderCardFields([...SCHEDULE_DEFAULT_CARD_FIELDS, ...extras.map((extra) => extra.key)], extras.map((extra) => extra.key));
+}
+
+/** The current display value for each selectable card field — what the board card itself renders. */
+export function cardFieldValuesOf(entry: ScheduleEntryView): Record<string, string | null | undefined> {
+  const shown = shownOptionOf(entry);
+  const quantity = entry.qty ? `${entry.qty}${entry.unit ? ` ${entry.unit}` : ""}` : null;
+  return {
+    brand: shown?.brandName,
+    color: shown?.color,
+    pattern: shown?.pattern,
+    finishing: shown?.finishing,
+    dimension: shown?.dimension,
+    location: entry.location,
+    qty: quantity,
+    notes: shown?.notes,
+    ...Object.fromEntries((shown?.extra ?? []).map((field) => [extraFieldKey(field.label), field.value])),
+  };
+}
+
 /**
  * Values that state "nothing was specified yet". Ported from legacy
  * `schedule-spec-fields.ts`: a row whose brand and type are both placeholders
