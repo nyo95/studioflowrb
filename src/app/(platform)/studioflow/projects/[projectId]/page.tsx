@@ -24,7 +24,6 @@ import { pageSession } from "../../_components/session";
 import { DeliverablesPanel } from "./phases/[phaseId]/deliverables-panel";
 import { PhaseActions } from "./phases/[phaseId]/phase-actions";
 import { RevisionHistory } from "./phases/[phaseId]/revision-history";
-import { ProjectTimeline } from "./project-timeline";
 
 export const dynamic = "force-dynamic";
 
@@ -77,12 +76,6 @@ export default async function ProjectOverviewPage({
       <SectionCard padded={false}>
         <PipelineStrip steps={pipelineSteps} label="Phase tabs" />
       </SectionCard>
-
-      <ProjectTimeline
-        startDate={project.timelineStartDate}
-        openingDate={project.openingDate}
-        phases={phases.map((phase) => ({ id: phase.id, definitionId: phase.definitionId, label: phase.label, status: phase.status, plannedStartDate: phase.plannedStartDate, plannedEndDate: phase.plannedEndDate }))}
-      />
 
       {/* Canvas — suspends independently; key forces reset on phase switch */}
       {selectedPhaseId ? (

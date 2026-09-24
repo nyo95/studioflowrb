@@ -366,24 +366,26 @@ history (`SfPhase` still only has the single latest `status_changed_at`, not
 a full transition log) — it is *planned* scheduling the owner enters, shown
 against the project's overall span. The shared geometry
 (`src/apps/studioflow/domain/timeline.ts`, `resolveTimelineSpan` +
-`computePhaseSegments`) is used by both:
+`computePhaseSegments`) is used by:
 
-- The Overview page (`/studioflow/projects/[projectId]`) `ProjectTimeline`
-  bar between the phase-tab strip and the phase canvas — read-only, with a
-  vertical "today" marker.
-- `/studioflow/timeline` — a new sidebar item, one bar per non-archived
-  project across the whole portfolio, filterable by client, designer/drafter
-  (the same PIC concept as the Projects directory), project status, and a
-  date range (kept when the project's span overlaps the selected range).
-  Clicking a phase segment (gated by `studioflow.project.manage`) opens a
-  small dialog to set or clear that phase's planned start/end; clearing both
-  resets it to the equal-width fallback. The page itself is read-only beyond
-  that dialog and is gated by `studioflow.project.read` like the rest of the
-  app.
+- `/studioflow/timeline` — a sidebar item, one bar per non-archived project
+  across the whole portfolio, filterable by client, designer/drafter (the
+  same PIC concept as the Projects directory), project status, and a date
+  range (kept when the project's span overlaps the selected range). Clicking
+  a phase segment (gated by `studioflow.project.manage`) opens a small dialog
+  to set or clear that phase's planned start/end; clearing both resets it to
+  the equal-width fallback. The page itself is read-only beyond that dialog
+  and is gated by `studioflow.project.read` like the rest of the app.
 
-`timelineStartDate` remains editable in `EditProjectDialog` (§ above); planned
-per-phase dates are edited only from `/studioflow/timeline`, not from the
-phase page or `EditProjectDialog`, to keep one editing surface for this data.
+**Removed from the Overview page (owner, 2026-09-24).** The per-project
+`ProjectTimeline` bar (originally between the phase-tab strip and the phase
+canvas) duplicated what `/studioflow/timeline` already shows for that one
+project, with no added information — owner: *"buang saja timeline di view
+ini"*. `project-timeline.tsx` is deleted; the shared geometry module stays,
+since the portfolio page is still its only consumer now. `timelineStartDate`
+remains editable in `EditProjectDialog` (§ above) and still drives the
+portfolio bar; planned per-phase dates are still edited only from
+`/studioflow/timeline`.
 
 ## 9. Overrides of earlier ratified decisions
 

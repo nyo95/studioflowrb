@@ -271,6 +271,9 @@ and the planned-dates editor (click a segment). See `CHANGELOG.md` R8.125,
 R8.127, `STUDIOFLOW-REWORK-CONTRACT.md` §8. Still not delivered: a
 duration report derived from actual status-change history (these are
 *planned*, owner-entered dates, not computed from phase transitions).
+**Removed from the Overview page 2026-09-24 (R8.138):** the per-project bar
+duplicated `/studioflow/timeline`'s per-project view with no added
+information; `/studioflow/timeline` remains. See `CHANGELOG.md` R8.138.
 
 ### Verification backlog (code done, needs a browser walk to close)
 

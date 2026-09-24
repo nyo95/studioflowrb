@@ -56,7 +56,7 @@ export default async function ProjectLayout({ children, params }: { children: Re
           <>
             <ContextNavHeading>Project</ContextNavHeading>
             <ProjectNavLinks items={[{ href: STUDIOFLOW_ROUTES.project(projectId), label: "Overview", exact: true, marker: null, detail: null }]} />
-            <ContextNavHeading>Records</ContextNavHeading>
+            <ContextNavHeading>Extensions</ContextNavHeading>
             <ProjectNavLinks items={[
               { href: STUDIOFLOW_ROUTES.projectMom(projectId), label: "MOM", marker: null, detail: momCount > 0 ? String(momCount) : null },
               { href: STUDIOFLOW_ROUTES.projectSchedule(projectId), label: "Schedule", marker: null, detail: scheduleCount > 0 ? String(scheduleCount) : null },

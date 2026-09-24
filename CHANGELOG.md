@@ -5,8 +5,35 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.137**
-- Next local revision: **R8.138**
+- Current revision after this entry is committed: **R8.138**
+- Next local revision: **R8.139**
+
+## R8.138 | 2026-09-24 | fix(sf): remove the duplicate per-project Timeline bar; rename the project sidebar's "Records" group to "Extensions"
+
+Two small owner requests from the browser, given mid-turn while other work
+was in flight.
+
+**Removed the per-project `ProjectTimeline` bar from the Overview page**
+(owner: *"buang saja timeline di view ini"*). It duplicated
+`/studioflow/timeline`'s per-project view (same span, same phase segments)
+with nothing the portfolio page didn't already show for that project.
+Deleted `project-timeline.tsx` and its usage in
+`projects/[projectId]/page.tsx`. The shared geometry
+(`domain/timeline.ts`'s `resolveTimelineSpan`/`computePhaseSegments`) stays —
+`/studioflow/timeline` and `timeline-directory.tsx` are still live
+consumers. `timelineStartDate` stays editable from `EditProjectDialog` and
+still drives the portfolio bar; nothing about editing or the underlying data
+changed, only this one display removed.
+`STUDIOFLOW-REWORK-CONTRACT.md` §8 and `docs/BACKLOG.md`'s R8.125/R8.127 note
+record the removal.
+
+**Renamed the project sidebar's "Records" heading to "Extensions"**
+(`projects/[projectId]/layout.tsx`) — MOM/Schedule/History now sit under
+"Extensions" instead of "Records". Label-only; no route or permission
+change.
+
+Checks: `tsc --noEmit` clean; `eslint .` clean; full suite 520/520. No schema
+migration; no new dependency.
 
 ## R8.137 | 2026-09-24 | feat(sf): fold "Default categories" into Template Items; fix a sort_order count() bug found along the way
 
