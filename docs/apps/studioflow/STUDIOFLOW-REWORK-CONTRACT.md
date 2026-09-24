@@ -332,6 +332,23 @@ The project workspace keeps the legacy two-level navigation: app rail +
 project rail listing Overview, the five phases (state dot + open-root-task
 count), MOM, Schedule, History. Mobile: drawer.
 
+**The project rail is app shell and streams independently of page data
+(owner, 2026-09-24).** `layout.tsx` used to `await` the project record and
+the MOM/Schedule counts before returning *any* JSX, so the rail/header
+waited on the same data the page content did — owner: *"harusnya saat
+loading, yang loading ini nya aja, side bar itu kan app shell harusnya."*
+Split into three pieces: the outer `ProjectLayout` returns the `SettingsShell`
+frame and static nav links (hrefs need no data) synchronously; a
+`<Suspense>`-wrapped `ProjectHeader` fetches the project record for the
+breadcrumb/title/meta/archived-notice; a second `<Suspense>`-wrapped
+`ProjectExtensionsNav` fetches the MOM/Schedule counts for their nav badges,
+falling back to the same links with no badge while counting. A new
+`loading.tsx` for this segment (Next.js's own convention) gives `page.tsx`'s
+own content area — the phase-tab strip and canvas — its own independent
+fallback, decoupled from the layout entirely. `notFound()` on a missing
+project still discards the whole route (Next.js resolves it up to the
+nearest not-found boundary regardless of which Suspense boundary threw it).
+
 **Administrative fields are edited from the Projects directory, not the
 project's own pages (owner, 2026-09-23).** Name, client, client contact,
 designer/drafter PIC, opening date, project type, area, address, priority,

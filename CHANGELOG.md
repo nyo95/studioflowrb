@@ -5,8 +5,45 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.138**
-- Next local revision: **R8.139**
+- Current revision after this entry is committed: **R8.139**
+- Next local revision: **R8.140**
+
+## R8.139 | 2026-09-24 | fix(sf): project rail is app shell — stream it independently of project/count data
+
+Owner-scoped (chat, 2026-09-24), from watching the project workspace load:
+*"harusnya saat loading, yang loading ini nya aja, side bar itu kan app shell
+harusnya"* — the sidebar shouldn't wait on the same data the page content
+does.
+
+**Root cause:** `layout.tsx`'s top-level async function `await`ed
+`getProject` and the MOM/Schedule counts before returning any JSX at all.
+Since that JSX includes the `SettingsShell` frame and nav rail, the whole
+shell was gated behind the same data fetch as the page content, even though
+the rail's *links* need no data (only their badge counts do).
+
+**Fix:** split `layout.tsx` into three pieces. The outer `ProjectLayout`
+returns the `SettingsShell` frame and static "Overview"/"MOM"/"Schedule"/
+"History" links synchronously (after only the cheap `params`/session reads).
+A `<Suspense>`-wrapped `ProjectHeader` component fetches the project record
+for the breadcrumb, title, meta line, and archived notice. A second,
+independently-`<Suspense>`-wrapped `ProjectExtensionsNav` fetches the
+MOM/Schedule counts for their nav badges, falling back to the same links
+with no badge while counting. A new `loading.tsx` for this route segment
+(Next.js's own file convention) gives `page.tsx`'s own content — the
+phase-tab strip and canvas — its own independent fallback, so the content
+area's loading state is fully decoupled from the layout's.
+`notFound()` on a missing project still discards the whole route regardless
+of which Suspense boundary it's thrown from — verified this still works
+(Next.js resolves it to the nearest not-found boundary, not the throwing
+component's own parent).
+
+`STUDIOFLOW-REWORK-CONTRACT.md` §8 records the split and the reasoning.
+
+Checks: `tsc --noEmit` clean; `eslint .` clean; full suite 520/520 (no
+service-layer change — pure Server Component restructuring). Verified in the
+browser: Overview and Schedule pages render correctly, nav/header persist
+across navigation, no console errors. No schema migration; no new
+dependency.
 
 ## R8.138 | 2026-09-24 | fix(sf): remove the duplicate per-project Timeline bar; rename the project sidebar's "Records" group to "Extensions"
 
