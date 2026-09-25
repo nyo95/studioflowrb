@@ -21,7 +21,7 @@ export function ProjectNavLinks({ items }: { items: Item[] }) {
             href={item.href}
             active={active}
             title={item.title}
-            marker={item.marker ? <span className={`h-2 w-2 rounded-pill ${item.marker}`} /> : undefined}
+            marker={item.marker ? <span className={`h-[7px] w-[7px] rounded-pill ${item.marker}`} /> : undefined}
             detail={item.detail}
           >
             {item.label}

@@ -157,13 +157,19 @@ const AVATAR_SIZE_CLASSES: Record<AvatarSize, string> = {
   lg: "h-[26px] w-[26px] text-micro",
 };
 
-/** Initials derived from a display name: at most two leading letters. */
+/**
+ * Initials derived from a display name: at most two letters. A multi-word name
+ * gives first + last initial; a single-word one gives its first two letters,
+ * because taking "the initial of each word" leaves a lone letter rattling
+ * around in a 24px circle for everyone with a mononym.
+ */
 export function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
-  const first = parts[0]?.[0] ?? "";
-  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
-  return (first + last).toUpperCase() || "?";
+  const mark = parts.length > 1
+    ? (parts[0]?.[0] ?? "") + (parts[parts.length - 1]?.[0] ?? "")
+    : (parts[0] ?? "").slice(0, 2);
+  return mark.toUpperCase() || "?";
 }
 
 export function Avatar({

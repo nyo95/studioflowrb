@@ -56,5 +56,8 @@ export function ContextNavLink({ href, active = false, marker, detail, children,
 }
 
 export function ContextNavHeading({ children, className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cx("px-2.5 pb-1 pt-3 text-label text-ink-tertiary first:pt-0.5", className)} {...props}>{children}</div>;
+  /* Prototype `.a-railhead`: 10px sans, .11em tracking. It was `text-label`,
+     the mono identity utility — right for a data label, too mechanical for a
+     rail's section heads. */
+  return <div className={cx("px-2 pb-[5px] pt-[9px] text-[10px] font-semibold uppercase leading-[1.2] tracking-[0.11em] text-ink-tertiary first:pt-0.5", className)} {...props}>{children}</div>;
 }
