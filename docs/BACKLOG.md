@@ -1,6 +1,9 @@
 # Consolidated Backlog
 
-Status: active, reconciled through **R8.106** on 2026-09-22. Replaces
+Status: active, reconciled through **R8.106** on 2026-09-22, plus a full-repo
+logic + UI/UX audit at `ee9e09e` on 2026-09-26 (see "Full-repo logic + UI/UX
+audit" below; that pass found 1 P0, 3 P1, 13 P2, 15 P3, and 2 currently-failing
+guard tests). Replaces
 `roadmap.md`, `review.md`, and `knownbug.md` (merged and archived to
 `archive/roadmap-2026-09-22.md`, `archive/review-2026-09-22.md`,
 `archive/knownbug-2026-09-22.md` on 2026-09-22 at owner request — full
@@ -357,6 +360,412 @@ editor, schedule board, settings pages all using custom components instead of
 UI Engine composites — are recorded as accepted architecture debt, not logic
 defects; see `docs/apps/studioflow/PHASE-ENGINE-V2-BASELINE-AUDIT.md` and the
 2026-09-22 logic-bug-fix session in `CHANGELOG.md` R8.107 for the reasoning.)*
+
+---
+
+## Full-repo logic + UI/UX audit (2026-09-26, post-R8.163)
+
+Run against `main` @ `ee9e09e` after fast-forwarding R8.145-R8.163. Read-only
+audit: backend domain logic, platform core (errors/db/rbac/audit), UI/UX flows,
+and structural/boundary debt. Every item below was verified by reading the
+cited lines; the P0/P1 items were independently re-confirmed a second time.
+`npm run typecheck`, `check:boundaries`, and `check:legacy-runtime` all PASS -
+several items below exist precisely *because* a passing check does not cover
+them.
+
+**Baseline: `npm test` is RED - 519/521 pass, 2 fail.** Both failures are in
+`src/platform/ui_engine/ui-engine.test.ts` and both are guard regressions, not
+product bugs: the token-lock test (KB-045) and the domain-vocabulary guard
+(KB-046). A guard that always fails is a guard nobody runs, so both are P3
+only in blast radius but should be triaged early.
+
+### P0 - must fix
+
+- [ ] [BUG] **KB-035 - Last-access-administrator guard is skipped whenever two
+  or more administrators exist, allowing a permanent platform lockout.**
+  `src/platform/core/rbac/services.ts:132`. `requireChangeKeepsAccessAdministrator`
+  short-circuits on `if (administrators.length > 1) continue;` BEFORE calling
+  `options.simulate`, so the invariant is only ever checked when exactly one
+  administrator exists. Reachable: `replaceRoleGrants` (`services.ts:776-783`)
+  from `src/app/(platform)/settings/access/roles/actions.ts:72`. If users A and
+  B are both `ACTIVE` and both hold role `R`, and `R` carries
+  `platform.user.manage` + `platform.role.manage`, then A submitting
+  `replaceRoleGrants({ roleId: R, permissionIds: [] })` passes the guard for
+  both users and `deleteMany` (`services.ts:785`) commits a platform with zero
+  access administrators. Nobody can then re-grant `platform.role.manage`;
+  recovery needs direct database surgery. Not caught by tests because
+  `platform-access.integration.test.ts:67-85` `seedAdmin()` mints a NEW role per
+  administrator, so no test ever has two admins sharing a role. Fix: drop the
+  short-circuit and evaluate the post-change administrator set for emptiness;
+  add a two-admins-one-role integration test.
+
+### P1 - fix next
+
+- [ ] [BUG] **KB-036 - Private-asset signed URLs fall back to a hardcoded,
+  publicly-known HMAC secret that is undocumented and never validated.**
+  `src/platform/infrastructure/storage/filesystem.ts:98` (signer) and
+  `src/app/api/platform/assets/private/route.ts:26` (verifier) both use
+  `process.env.SESSION_SECRET || "local-storage-secret"`. `SESSION_SECRET` is
+  absent from `.env.example`, and `src/instrumentation.ts` `register()` performs
+  no environment validation, so a deployment that follows the documented setup
+  runs on the known key. With it, any authenticated user can mint
+  `HMAC("local-storage-secret", "<key>:<expires>")` for ANY object key; the
+  route's only authorization is the signature, and it is fully bypassable.
+  Fix: make `SESSION_SECRET` mandatory, throw at boot in `register()` when unset
+  or under 32 bytes, delete the fallback, document it in `.env.example`.
+
+- [ ] [BUG] **SF-07 - Today-page header counts "today" in UTC while the filter
+  chips and every due-date badge on the same screen count in the studio
+  timezone.** `src/app/(platform)/studioflow/page.tsx:28` uses
+  `new Date().toISOString().split("T")[0]`, while
+  `today-view.tsx:68` uses the purpose-built
+  `currentDateOnly({ timeZone: timezone })` (default `Asia/Jakarta`, UTC+7).
+  For 7 hours every day (00:00-06:59 WIB) the header and the chips disagree on
+  the same task list on the app's landing page: a task due today reads "Today"
+  on its badge and is counted as overdue in the header, and a task due yesterday
+  is counted as due today. The existing test at
+  `src/platform/utilities/date/date.test.ts:141-142` already asserts the two
+  zones diverge, so the bypass is known. Fix: use `currentDateOnly({ timeZone })`
+  for `dateToday`, or move the summary into `TodayView` where `timezone` is
+  already in scope.
+
+- [ ] [BUG] **KB-037 - The boundary checker skips every route directory not named
+  after a registered app, and 6 live cross-app internal imports sit in that hole.**
+  `scripts/check-boundaries.mjs:175-181` (`routeLaneApp`) returns an app only
+  when `segments[0]` is literally `bq`/`masterdata`/`studioflow`; anything else
+  (`settings/`, `account/`, `(document)/`) returns `null`, and every rule then
+  skips it via the `if (importer.kind !== "app" && importer.kind !== "platform") continue;`
+  guard. Live violations it cannot see:
+  `src/app/(platform)/settings/general/masterdata/page.tsx:7-8`,
+  `supplier-categories-actions.ts:9-10`, and `vendor-types-actions.ts:9-10` all
+  import `@/apps/masterdata/service` and `@/apps/masterdata/runtime`; plus
+  `src/app/promotion-runtime.ts:2-3` imports both apps' `runtime`. The tree is
+  gated on `masterdata.dictionary.read`, labelled "Master Data Settings", and is
+  absent from Master Data's own `MASTERDATA_ROUTES`/`MASTERDATA_NAV_LINKS` - so
+  Master Data's route-ownership rule has no reason to look there. Note
+  `MASTERDATA_PERMISSIONS` is ALREADY re-exported at
+  `src/apps/masterdata/public/index.ts:6`, so 3 of the 6 imports have a
+  compliant alternative available today with no design decision attached. The
+  checker's own fixtures never cover a non-app route dir
+  (`scripts/test-boundaries-checker.mjs:65-66,121,165-177`). Fix: add an
+  explicit route-to-app ownership map, delete the `{ kind: "other" }` escape
+  hatch, and add non-app-route fixtures.
+
+### P2 - fix in the next few passes
+
+- [ ] [BUG] **SF-08 - Editing a project name can silently change the project
+  number, desynchronising `name` from `project_code`.**
+  `src/apps/studioflow/projects/service.ts:483-491`. `looksFormatted`
+  (`domain/naming.ts:7-9`) only tests the shape `^\d{4}-\d+ .+`, so a manager who
+  types `"2027-412 Foo"` passes the guard, and only `data.name` is written -
+  `project_code` is never compared. The dialog invites exactly this: the field is
+  pre-filled with the readable name only (`edit-project-dialog.tsx:35`) and
+  carries the hint "The number 2025-429 stays fixed." (`:75`). Consequences: the
+  directory shows two numbers for one project (`project_code` at
+  `projects/service.ts:346`, the name carries the typed one); the auto-numbering
+  safety net is blind to it because the sequence scan reads `project_code` only
+  (`projects/service.ts:157`); and the hint itself is computed by slicing the
+  name string (`edit-project-dialog.tsx:49`), so it will assert "2027-412 stays
+  fixed" while the stored code is `2025-429`. Because MOM and printed documents
+  carry the name, the drift can reach client-facing output. Fix: reject a typed
+  code that differs from `project.project_code`, and derive the hint from
+  `project.code` instead of slicing the name.
+
+- [ ] [BUG] **SF-09 - Blocker counts are fetched one phase at a time - 3 SQL
+  statements per phase, serially, on every project page.** `readBlockerCounts`
+  (`src/apps/studioflow/phases/blocker-query.ts:5-15`) takes a single `phaseId`
+  and issues 3 statements. `listProjectPhases` calls it in a serial `for` loop
+  (`src/apps/studioflow/phases/service.ts:568-570`); `listNavPhases` and
+  `listPhaseAttention` (`today/service.ts:146-170`) do the same per phase. With
+  the contract's 5 phases per project, the project overview issues 17 statements
+  as 12 sequential round trips before its own `Promise.all` can resolve - and
+  `listNavPhases` adds `1 + P` more on EVERY project sub-page. The Today page is
+  `11 + 3P`, where P is every in-flight phase in the studio (the filter at
+  `today/service.ts:129-132` is not scoped to the user's projects), against a
+  pool capped at `DB_POOL_MAX` default 10 (`src/platform/core/db/pool-settings.ts:8-11`).
+  Fix: one `findMany` over `phase_id in ids` plus two `groupBy` calls, joined in
+  memory - 3 statements per page instead of `2 + 3P`.
+
+- [ ] [BUG] **SF-10 - Header quick-search fetches every match with full
+  relations, then displays six.** `src/app/(platform)/studioflow/actions.ts:966-979`
+  calls `listProjects` and `listClients` and applies `.slice(0, 6)` afterwards.
+  Neither service bounds the result: `listProjects` (`projects/service.ts:334-343`)
+  has no `take` and pulls `client`, every phase of every match, and two filtered
+  `_count`s, then resolves the whole designer/drafter directory;
+  `listClients` (`:211-221`) has no `take` either. The action fires on every
+  250 ms debounced keystroke from the standing header field on every
+  `/studioflow` page (`header-search.tsx:33,55-64`), so a two-letter term drags
+  the whole matching table plus every matching client's project list across the
+  wire to show 12 rows. Fix: `take: 6` on the search path with a narrow
+  projection, leaving the full directory query for the Projects page.
+
+- [ ] [BUG] **KB-038 - `text-ink-muted` does not exist, so 3 classes emit
+  nothing and the resting state is wrong.** `globals.css` bridges only `ink`,
+  `ink-2`, `ink-3`, `ink-inverse`, `ink-secondary`, `ink-tertiary`; `tokens.css`
+  has no `--ui-text-muted` at all. Used at
+  `src/app/(platform)/studioflow/projects/[projectId]/phases/[phaseId]/deliverables-panel.tsx:108,118,147`
+  - the download icon, the delete icon, and the "PDF, PNG, JPEG, WebP, ZIP - max
+  25 MB" hint. Each falls back to inherited full-strength ink, while
+  `hover:text-ink` / `hover:text-danger` DO resolve - so the resting state is
+  wrong and the hover is correct, the exact inverse of the intent. Fix:
+  `text-ink-tertiary` at all three sites.
+
+- [ ] [BUG] **SF-11 - Schedule List/Board toggle renders at half its intended
+  height from an invalid CSS declaration.** `schedule-board.tsx:450-451` uses
+  `min-h-[--ui-control-height-sm]`. The bare bracket form is not a valid CSS
+  variable reference and compiles to `min-height: --ui-control-height-sm`, which
+  the browser discards, so the buttons get no minimum height. The correct form,
+  used 113 times elsewhere in this repo, is `min-h-(--ui-control-height-sm)`.
+  The token is 32px light / 24px dark (`tokens.css:123,175`), and the
+  neighbouring "Print / PDF" (`:458`) and "Template settings" (`:466`) already
+  use the valid form, so the row reads as visibly broken. Only these 2 sites plus
+  `src/platform/ui_engine/layouts/shells.tsx:204` (`bg-[--ui-border-subtle]` in
+  the currently-unused `NavSeparator`) are value-position uses; the 5 other
+  `[--x:VALUE]` occurrences are valid Tailwind property definitions, not defects.
+  Fix: `min-h-(--ui-control-height-sm)`.
+
+- [ ] [CLEANUP] **KB-039 - `CORE.md`'s app-layer contract names directories that
+  no app has, while the boundary tool reports OK.**
+  `CORE.md:47-51` states that app `infrastructure/` owns Prisma queries and app
+  `application/` owns transaction scope. Neither directory exists in any of the
+  three apps; every Prisma query, `runTransaction` call, and raw statement lives
+  directly in service modules (`src/apps/masterdata/service.ts:20`,
+  `bq/service.ts`, `studioflow/service.ts`). Only the third rule - `domain/`
+  never imports Prisma - actually holds (verified clean). `AGENTS.md` also
+  requires every feature to classify its capability as REUSE/EXTEND/ADD/
+  APP-OWNED/PURGE, which is unimplementable as written against layers that do not
+  exist. This is a Planner decision: either amend `CORE.md` to sanction the
+  actual `service.ts` + `runtime.ts` shape, or schedule the layer split. What
+  must not persist is a contract that describes absent directories while an audit
+  tool reports "Architecture boundaries OK".
+
+- [ ] [BUG] **KB-040 - The duplicate-primitive rule matches one syntactic form of
+  `Intl` display, and two live date-formatting bypasses sit in the hole.**
+  `scripts/check-boundaries.mjs:38` matches only
+  `/new\s+Intl\.DateTimeFormat\s*\(/`. `toLocaleDateString` produces the same
+  user-visible date display and is matched by nothing. `docs/UTILITY-INVENTORY.md:26`
+  classifies date/time display as REUSE onto `formatInstant`/`formatDateOnly` and
+  forbids private substitutes, yet
+  `src/app/(platform)/masterdata/page.tsx:22` and
+  `src/app/(document)/studioflow/print/projects/[projectId]/schedule/page.tsx:80`
+  both use `toLocaleDateString("id-ID", ...)`. Neither appears in the recorded
+  deferral table (`UTILITY-INVENTORY.md:71-78`) nor the allow list. The
+  `(document)` site is doubly invisible: wrong syntax AND outside every
+  classified lane (KB-037). Fix: widen the rule to the whole `Intl` display
+  surface, then converge both call sites.
+
+- [ ] [BUG] **KB-041 - No checker reads `prisma/schema.prisma`, so the
+  cross-app-foreign-key rule is entirely unenforced.** `check-boundaries.mjs:397,533`
+  and `check-legacy-runtime.mjs:120-123` walk `srcDir` and root config files
+  only. `AGENTS.md` names cross-app database foreign keys as forbidden. The
+  current schema IS clean (verified: no cross-app `@relation`;
+  `DeletionRequest` and `BqProjectDeletionRequest` deliberately store scalar
+  `requester_user_id`/`requester_label` snapshots, matching `CORE.md:209`), but
+  that compliance is unprotected - one `@relation` between the `bq` and
+  `master_data` schemas would pass both checks and `tsc` silently. Fix: parse
+  the schema and fail when a relation's target model lives in another app schema;
+  add a deliberate-violation fixture.
+
+- [ ] [BUG] **KB-042 - Argon2id hashing runs inside the serializable
+  transaction, pinning a pooled connection for ~40 ms of CPU per call.**
+  `src/platform/core/rbac/services.ts:412` and `:485`,
+  `src/platform/core/auth/account.ts:87`, `auth/bootstrap.ts:87` all await
+  `hashPassword()` (m=19456, t=2) inside the `runTransaction` callback opened at
+  `Serializable` (`src/platform/runtime.ts:20-21`). The work is pure CPU and
+  needs no transaction, yet it holds a checked-out connection (pool default 10)
+  for the full hash, and a `P2034` conflict re-runs the hash on retry. Not a
+  correctness bug - the write is rolled back first - but it converts CPU time
+  into connection-hold time and delays the KB-035 invariant checks relative to
+  commit. Fix: hoist `const passwordHash = await hashPassword(...)` above the
+  `runTransaction(...)` call; the value is transaction-independent.
+
+- [ ] [BUG] **SF-12 - Today scope chips nest a `<button>` inside a `<Link>`,
+  which is invalid HTML and breaks the engine's own ARIA contract.**
+  `src/app/(platform)/studioflow/page.tsx:45-46` wraps `<FilterChip>` in
+  `<Link>`, but `FilterChip` renders a real
+  `<button type="button" aria-pressed={selected}>`
+  (`src/platform/ui_engine/primitives/actions.tsx:115-127`). The engine documents
+  the intended contract in `primitives/button-classes.ts` - the caller sets
+  `aria-pressed` for the button form OR `aria-current` for the link form - and
+  `FILTER_CHIP_BASE_CLASSES` even includes `no-underline` and `cursor-pointer` so
+  the chip can BE the anchor. Result: a toggle button announced inside a link,
+  whose `aria-pressed` describes a state that activation cannot change (it
+  navigates). NOT YET CONFIRMED in a browser whether a mouse click still
+  navigates - the code does not prove it either way. Fix: apply
+  `filterChipClasses(selected)` to the `Link` itself with `aria-current`.
+
+- [ ] [BUG] **SF-13 - Print routes have no error or loading boundary.**
+  `src/app/(document)/` has no sibling `error.tsx` or `loading.tsx`. The schedule
+  print page converts only `NOT_FOUND`/`FORBIDDEN` to `notFound()` and rethrows
+  everything else
+  (`src/app/(document)/studioflow/print/projects/[projectId]/schedule/page.tsx:47-50`),
+  which lands on Next's built-in unstyled English error page instead of the app's
+  branded one at `src/app/(platform)/error.tsx:8-11`. There is no loading state
+  either, so a new print tab is blank while the database is queried. Reachable
+  from Schedule "Print / PDF" (`schedule-board.tsx:454-461`) and the MOM print
+  link. Fix: add `(document)/error.tsx` and `loading.tsx`.
+
+- [ ] [CLEANUP] **KB-043 - Generic directory machinery is copy-pasted instead of
+  shared.** Seven byte-identical ~10-line `runRowAction` pending/error/success
+  wrappers: `masterdata/{brand,category,sku,unit,vendor}-directory.tsx` and
+  `settings/access/{roles,users}-directory.tsx`. Ten private re-implementations of
+  the filter/sort/paginate pipeline across the same set plus `deletion-directory`,
+  `supplier-category-directory`, `vendor-type-directory`. `AGENTS.md` requires one
+  canonical implementation for a generic capability, and `CORE.md:428` assigns
+  generic interaction state to UI ENGINE. Note the existing record is slightly
+  wrong: `docs/UTILITY-INVENTORY.md:86-90` classifies the pagination copies as
+  PURGE-merging because `pageCount` is `1` vs canonical `0` and the local clamp
+  differs - that is a two-line behavioural difference, not a different
+  capability, so the right move is to EXTEND `buildPageMeta`/`usePagination` and
+  converge, not to leave ten copies on record as unreconciled.
+
+- [ ] [BUG] **KB-044 - `runTransaction` has no dedicated test.**
+  `src/platform/core/db/transactions.ts` has no `transactions.test.ts`, though
+  `db/` has five sibling suites. `CORE.md:58` makes the transaction boundary a
+  contract-level guarantee, yet the commit/rollback/isolation/retry behaviour of
+  the primitive every app depends on is exercised only indirectly by whichever
+  integration tests happen to use it. Fix: direct tests for commit, rollback on
+  throw, and reuse/nesting rejection. Related: project numbering's row-lock
+  guarantee (`projects/service.ts:149-165`) has only sequential coverage
+  (`service.integration.test.ts:121-157`) - no test drives two concurrent
+  creates and asserts distinct codes.
+
+### P3 - record and batch
+
+- [ ] [BUG] **KB-045 - The design-token lock test is stale, so token values are
+  effectively unlocked (CURRENTLY FAILING).**
+  `src/platform/ui_engine/ui-engine.test.ts:217` asserts
+  `--ui-radius-action: 4px`; the token is `7px` (`tokens.css:99`), and
+  `CHANGELOG.md:110` confirms 7px was the intended prototype value
+  ("`--ui-radius-action` is already exactly 7px"). The token is live - consumed
+  by `globals.css:80` and `tokens/index.ts:35` - so only the test is wrong. The
+  same test also locks dialog widths. Fix: update the assertion to 7px.
+
+- [ ] [CLEANUP] **KB-046 - App vocabulary inside the shared token file (CURRENTLY
+  FAILING).** `ui-engine.test.ts:646-654` exists to keep app internals and domain
+  vocabulary out of shared UI sources and currently fails on two comments in
+  `src/platform/ui_engine/tokens/tokens.css`: line 110 `/* full-bleed (BQ, print) */`
+  and the line 172 `/* -- BQ compact density stamp -- */` banner. No behavioural
+  coupling - the `[data-density="compact"]` block itself is a generic mechanism
+  - but a shared file naming a specific app is exactly the ownership break the
+  guard exists to prevent, and it leaves the guard red. Fix: reword to a neutral
+  description and keep the selector.
+
+- [ ] [BUG] **KB-047 - `listAssignableRoles` exposes the full role-to-permission
+  matrix under the weaker `platform.user.read` grant.**
+  `src/platform/core/rbac/services.ts:371-377` requires only
+  `platform.user.read` but returns each role's `code`, `name`, and full
+  `permissionIds`, while every other role-reading surface requires
+  `platform.role.read` (`:272`, `:340`). Reachable from
+  `settings/access/users/page.tsx:36`. Pinned by an existing test
+  (`platform-access.integration.test.ts:292`), so it may be intentional -
+  confirm with the owner rather than assume.
+
+- [ ] [BUG] **KB-048 - `archiveRoleAction` forwards a raw unvalidated id.**
+  `src/app/(platform)/settings/access/roles/actions.ts:92` is the only sibling
+  action that does not `z.string().uuid()`-parse its identifier before calling
+  the service. No privilege bypass today (`archiveRole` re-reads and throws
+  `NOT_FOUND`), but it violates the validate-at-the-boundary convention in
+  `validation/index.ts:10-12`, and a garbage id surfaces as a DB lookup error
+  rather than a clean `VALIDATION` payload.
+
+- [ ] [BUG] **KB-049 - Argon2 verification can throw instead of returning the
+  generic login failure.** `src/platform/core/auth/login.ts:78` and
+  `auth/account.ts:83` call `verify()` unwrapped; `@node-rs/argon2` throws on a
+  hash string that is not valid PHC, and `password_hash` is free-form (the repo's
+  own fixtures write `password_hash: "x"` at
+  `platform-access.integration.test.ts:79,323`). A corrupt value escapes
+  `performLogin` as a raw error that `runSafeAction` collapses to
+  `{ kind: "INTERNAL" }` instead of `LOGIN_FAILED` - a narrow enumeration oracle,
+  and a misleading UX state where "your current password is incorrect" is
+  expected. Fix: wrap `verify` and treat a throw as `verified = false`.
+
+- [ ] [BUG] **MD-01 - Destructive remove buttons have no hover feedback.**
+  `src/app/(platform)/masterdata/vendors/vendor-directory.tsx:158,657,805` use
+  `hover:!text-ink-danger`, an undefined token, so no rule is emitted. The
+  surrounding `!bg-transparent` / `!border-0` are `!important` and defeat the
+  `secondary` variant's hover background and border, and `!text-ink-tertiary` is
+  `!important` so the resting colour survives too - nothing changes on hover at
+  all. Fix: `hover:!text-danger`.
+
+- [ ] [BUG] **SF-14 - Final-option chip loses its success colour.**
+  `schedule-board.tsx:1173` uses `text-success-ink`, which is not bridged
+  (`--ui-success-fg` is bridged as `--color-success`). The chip keeps
+  `bg-success-surface` but its label inherits default ink. Fix: `text-success`.
+
+- [ ] [BUG] **SF-15 - Project overview ships a phase's entire revision history,
+  with every activity of every closed revision, on every render.**
+  `src/apps/studioflow/phases/service.ts:638-644` selects all revisions with no
+  `take` and none on nested `activities`, then projects every non-active
+  revision's full activity list to the client (`:689-695`). Rendered inside
+  collapsed `<details>` (`revision-history.tsx:23-41`) on a `force-dynamic` page.
+  Unbounded in both dimensions and growing for the life of the phase. The visible
+  summary needs only label, timestamps, and an activity count. Fix: return
+  `_count` and load activities on demand.
+
+- [ ] [BUG] **KB-050 - `Drawer` uses the centred-dialog entrance keyframe.**
+  `src/platform/ui_engine/layouts/overlays.tsx:30-31` applies
+  `animate-ui-dialog-in` to drawers; the keyframe translates
+  `translate(-50%, calc(-50% + 8px))`, and CSS animations outrank the drawer's
+  `[transform:none]`, so an edge-anchored panel starts half its width left and
+  half its height up for 140 ms. Cosmetic and currently confined to the
+  component showcase - `Drawer` has one call site, `/ui-engine`, which is
+  deliberately public. Fix: use `animate-ui-fade-in` for drawers.
+
+- [ ] [CLEANUP] **KB-051 - Allow list and documentation point at a route tree
+  that was deleted.** `scripts/check-boundaries.mjs:26-28` has three allow-list
+  entries and `docs/UTILITY-INVENTORY.md:76-78` three doc rows for
+  `src/app/(platform)/studioflow/projects/_legacy_project_id/`, which no longer
+  exists (purged in R8.109, recorded at `docs/BACKLOG.md:348`). An allow-list
+  entry pointing at a missing file is indistinguishable from a working exemption.
+  Fix: delete the entries and make the checker fail on allow-list paths that do
+  not resolve.
+
+- [ ] [CLEANUP] **KB-052 - `CORE.md`'s "current rebuild evidence" block is stale
+  on two of its four claims.** `CORE.md:534-537`. Line 535 references
+  `src/apps/masterdata/infrastructure/request-context.ts#configuredOperatorContext`
+  as pending removal - no `infrastructure` directory exists under any app and the
+  symbol has 0 hits, so the removal already happened. Line 536 says no persisted
+  User/Role/UserRole/RolePermission/Session/Platform General Settings models
+  exist yet - all six do, with routes and integration tests. `AGENTS.md` ranks
+  `CORE.md` second in authority, so a trusting reader concludes the auth
+  foundation is unwired.
+
+- [ ] [CLEANUP] **KB-053 - Both checkers skip by directory NAME and allow-list
+  extensions, so code can opt out of every rule.** `check-boundaries.mjs:32`
+  `SKIP_DIRECTORIES = new Set(["node_modules", ".next", "generated"])` matches
+  `generated` at ANY depth, and `SOURCE_EXTENSIONS` is an allow list, so a
+  developer can neutralise every boundary rule by placing code in a directory
+  called `generated` inside an app. 15 extensionless files in this checkout are
+  invisible to both checkers (see the working-tree note below). Fix: skip only
+  known generated roots (`src/generated/`, `.next/`) and report skipped paths.
+
+- [ ] [CLEANUP] **KB-054 - The legacy-reference scan covers a narrow slice.**
+  `scripts/check-legacy-runtime.mjs:120-123` scans `src/` plus root config files
+  only - not `prisma/`, `scripts/`, `docs/`, or `public/`, which is where a legacy
+  connection string or migration would most plausibly land. Its pattern
+  (`LEGACY_PATH_PATTERN`, line 8) matches only a relative `../studioflow` token,
+  missing absolute paths and other checkout names. Fix: scan the whole repo
+  except `node_modules`/`.next` and match on content signals too.
+
+- [ ] [CLEANUP] **KB-055 - Two lower-risk structural notes, recorded so the
+  categories are not reported as unexamined.** (a) `docs/UTILITY-INVENTORY.md:103,109`
+  overstates checker coverage: line 109 reads as "route ownership is enforced"
+  when `settings/**` and `(document)/**` are unowned by any check (KB-037).
+  (b) `SfActivityMode.TODO` (`prisma/schema.prisma:1126-1132`) is retained for
+  "legacy rows" with zero application references - but its justification points
+  at rows in the REBUILD database, which `AGENTS.md` treats as implemented-state
+  evidence rather than a place to park legacy compatibility. Confirm no rows use
+  it, then drop the member.
+
+### Working-tree debris (not a repo defect - owner call)
+
+15 untracked `.fuse_hidden*` files sit inside route directories, up to 45 KB,
+containing real component source (one begins `"use client"`). They are
+filesystem/sync artifacts, not importable by the `@/` alias or the Next router,
+and per KB-053 both checkers cannot see them. Plus a `nul` file at the repo root
+(a reserved Windows device name). Untracked, so they do not affect Git parity -
+but they will mislead the next reader or agent.
 
 ---
 
