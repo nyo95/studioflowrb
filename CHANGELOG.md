@@ -5,8 +5,36 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.157**
-- Next local revision: **R8.158**
+- Current revision after this entry is committed: **R8.158**
+- Next local revision: **R8.159**
+
+## R8.158 | 2026-09-25 | fix(shell): top-bar mark showed a single letter; drop duplicated topbar padding
+
+Two defects visible in the running app once R8.155 exposed the mark.
+
+**1. The mark rendered as "S".** `productMark` took the first letter of each whitespace-separated word of `settings.appTitle`, which yields exactly one letter for a one-word title — and "StudioFlow" is one word. The rule only ever worked for names like "Master Data".
+
+`brandMark()` now splits a closed-up product name on its capitals, so "StudioFlow" reads "SF"; keeps a name that is already an abbreviation whole, so "RAD" stays "RAD" rather than being cut to "RA"; and still takes initials for multi-word names. An all-caps run is not split, so "Berkah RAD" gives "BR", not "BRA".
+
+The mark also now prefers `settings.organizationName` when it differs from `appTitle`. The chip beside it already names the active application, so taking the app name for both put the same word in the bar twice — the redundancy R8.154 set out to remove. This is the prototype's pairing of `.a-logo` (the studio) with `.a-app` (the application). Set an organization name in platform settings and the mark becomes that studio's mark, as "RAD" is in the prototype.
+
+**2. Duplicated leading padding.** The topbar slot still carried `px-(--ui-page-padding)` (20-24px), left over from when `AppShell`'s header had a separate brand column owning the leading edge. The header sets its own `px-3.5` now, so the app chip sat a further ~22px off the mark. Removed; the topbar's gaps are 10px to match `.a-top`.
+
+**Verified against the running app** (`localhost:3001`, live DOM measurements):
+
+| | prototype | measured |
+|---|---|---|
+| top bar height | 46px | 46px |
+| top bar padding-left | 14px | 14px |
+| mark | studio mark | `SF` (was `S`) |
+| mark to chip gap | 10px | 10px |
+| app chip height | 26px | 26px |
+| icon rail | 48px | 48px at x=0 |
+| project rail | 220px | 220px at x=48, flush (0px seam) |
+| context bar | 44px | 44px, full-bleed from x=268 |
+| content column | own scroll | `overflow-y: auto` |
+
+Both rails measure 922px tall against a 968px viewport — exactly `100dvh - 46px` — confirming the R8.156 flex chain carries a real height, which is what was inert in R8.152.
 
 ## R8.157 | 2026-09-25 | fix(ui): rail and secondary-nav metrics to prototype spec
 
