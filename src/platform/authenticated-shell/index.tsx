@@ -90,16 +90,19 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
       navigationLabel={`${settings.appTitle} navigation`}
       navigation={<AuthenticatedPlatformNavigation domainNavigation={domainNavigation} />}
       utility={domainUtilityNavigation}
+      /* Prototype `.a-top` order: mark, app chip, search, spacer, avatar. The
+         search grows to its own 300px cap and the spacer takes the remainder,
+         so the field keeps its width instead of being pushed about by the
+         account menu's name length. */
       topbar={<div className="flex w-full items-center gap-2.5">
         <HeaderApplicationNavigation apps={apps} />
-        <div className="ml-auto flex min-w-0 items-center gap-2.5">
-          {contextSlot}
-          <AccountMenu
-            name={principal.displayName}
-            logoutAction={logoutAction}
-            showSettings={showSettings}
-          />
-        </div>
+        {contextSlot}
+        <span className="flex-1" aria-hidden="true" />
+        <AccountMenu
+          name={principal.displayName}
+          logoutAction={logoutAction}
+          showSettings={showSettings}
+        />
       </div>}
     >
       {children}

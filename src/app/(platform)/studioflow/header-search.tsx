@@ -4,19 +4,20 @@ import { Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Popover } from "radix-ui";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
-import { Input, Text, useDebouncedValue } from "@/platform/ui_engine";
+import { Text, useDebouncedValue } from "@/platform/ui_engine";
 
 import { globalSearchAction, type GlobalSearchResult } from "./actions";
 
 const EMPTY: GlobalSearchResult = { projects: [], clients: [] };
 
 /**
- * Header quick-search for StudioFlow. Collapsed to an icon until opened, so
- * the shared topbar stays compact on apps that don't need it (shown only
- * while inside /studioflow, same gating as StudioFlowNav/StudioFlowUtilityNav).
+ * Header quick-search for StudioFlow — the prototype's `.a-search`: a standing
+ * field between the app chip and the avatar, not an icon that has to be found
+ * and clicked before it will accept a query. Cmd/Ctrl-K focuses it from
+ * anywhere. Shown only inside /studioflow, same gating as StudioFlowNav.
  */
 export function StudioFlowHeaderSearch() {
   const pathname = usePathname();
@@ -30,8 +31,26 @@ export function StudioFlowHeaderSearch() {
   const requestId = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const debouncedQuery = useDebouncedValue(query, 250);
+  /* The modifier label is a client-only fact. useSyncExternalStore gives the
+     server an empty snapshot and the client the real one, so the hint appears
+     after hydration without a hydration mismatch and without setting state
+     from an effect. The store never emits, so subscribe is a no-op. */
+  const shortcutHint = useSyncExternalStore(
+    useCallback(() => () => {}, []),
+    useCallback(() => (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? "\u2318K" : "Ctrl K"), []),
+    useCallback(() => null, []),
+  );
 
-  useEffect(() => { if (open) inputRef.current?.focus(); }, [open]);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey)) return;
+      event.preventDefault();
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     const term = debouncedQuery.trim();
@@ -61,27 +80,23 @@ export function StudioFlowHeaderSearch() {
           lines up with the whole row, while Trigger stays just the icon —
           it's the only element that opens/closes on click. */}
       <Popover.Anchor asChild>
-        <div className="flex items-center">
-          <Popover.Trigger asChild>
-            <button
-              type="button"
-              aria-label={open ? "Close search" : "Search projects and clients"}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-action text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink"
-            >
-              <Search size={16} aria-hidden="true" />
-            </button>
-          </Popover.Trigger>
-          <div className={open ? "ml-1 w-40 max-w-[45vw] overflow-hidden opacity-100 transition-[width,opacity] duration-200 ease-out sm:w-64" : "ml-0 w-0 overflow-hidden opacity-0 transition-[width,opacity] duration-150 ease-in"}>
-            <Input
-              ref={inputRef}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search projects or clients…"
-              aria-label="Search projects or clients"
-              tabIndex={open ? 0 : -1}
-              className="h-8"
-            />
-          </div>
+        <div className="flex h-[27px] min-w-0 max-w-[300px] flex-1 items-center gap-[7px] rounded-action border border-line-subtle bg-rail-soft px-[9px] transition-colors focus-within:border-line-focus max-[560px]:max-w-none">
+          <Search size={13} aria-hidden="true" className="shrink-0 text-ink-tertiary" />
+          <input
+            ref={inputRef}
+            type="search"
+            value={query}
+            onChange={(event) => { setQuery(event.target.value); setOpen(true); }}
+            onFocus={() => setOpen(true)}
+            placeholder="Search projects, items, MOM"
+            aria-label="Search projects or clients"
+            className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[12.5px] text-ink outline-none placeholder:text-ink-tertiary [&::-webkit-search-cancel-button]:appearance-none"
+          />
+          {shortcutHint ? (
+            <kbd className="shrink-0 rounded-[4px] border border-line px-1 font-ui-mono text-[10px] leading-[14px] text-ink-tertiary max-[560px]:hidden">
+              {shortcutHint}
+            </kbd>
+          ) : null}
         </div>
       </Popover.Anchor>
       <Popover.Portal>

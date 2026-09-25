@@ -5,8 +5,20 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.160**
-- Next local revision: **R8.161**
+- Current revision after this entry is committed: **R8.161**
+- Next local revision: **R8.162**
+
+## R8.161 | 2026-09-25 | feat(shell): standing header search, in the prototype's top-bar order
+
+The top bar's search was an icon that had to be found and clicked before it would take a query, and it sat in the right-hand group beside the account menu. The prototype's `.a-search` is a standing field between the app chip and the avatar.
+
+- `header-search.tsx`: the icon-plus-expanding-input is replaced by a permanent field — 27px tall, capped at 300px, `rail-soft` fill, `line-subtle` hairline, 7px radius, 9px gutter, 12.5px text, placeholder "Search projects, items, MOM", with a `kbd` hint at the trailing edge. Cmd/Ctrl-K focuses and selects it from anywhere. The results popover is unchanged.
+- The modifier label is a client-only fact, so it is read through `useSyncExternalStore` with an empty server snapshot — the hint appears after hydration with no mismatch, and without setting state from an effect (which this repo's lint forbids).
+- `authenticated-shell/index.tsx`: the topbar is ordered mark → app chip → search → spacer → avatar, per `.a-top`. The search takes its own 300px cap and a bare spacer absorbs the remainder, so the field keeps its width rather than being shoved about by the account menu's name length.
+
+Verified live: header 46px; mark at x=14; chip 26px at x=46; search box 27px tall, exactly 300px wide, at x=161; radius 7px; padding 0 9px; hint reads "Ctrl K" on Windows; DOM order mark, chip, search, avatar.
+
+**Not a code issue: the mark reads "SF", not "RAD".** `brandMark()` (R8.158) prefers `settings.organizationName` and falls back to `appTitle` when the two are equal. The shipped default for `organizationName` is `"StudioFlow"` — identical to `appTitle` — so the fallback fires. Setting Organization name to the studio's own mark in Platform Settings makes the top-bar mark that, as `.a-logo` shows "RAD" in the prototype. No code change is needed for it.
 
 ## R8.160 | 2026-09-25 | fix(ui): a compact table clobbered its card's gutter, so its edge columns sat 4px inboard
 
