@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { afterEach, beforeEach, describe, it } from "node:test";
+import crypto from "node:crypto";
 import path from "node:path";
 import os from "node:os";
 import fs from "node:fs/promises";
@@ -7,6 +8,19 @@ import fs from "node:fs/promises";
 import { createLocalFilesystemStorage, createLocalPublicFilesystemStorage } from "./filesystem";
 
 describe("LocalFilesystemStorage adapter", () => {
+  // The adapter signs private read URLs with SESSION_SECRET and deliberately has
+  // no fallback value (see asset-signing.ts), so signing needs a key. Scoped and
+  // restored because the whole suite shares one process, and
+  // asset-signing.test.ts asserts on this variable being absent.
+  const originalSecret = process.env.SESSION_SECRET;
+  beforeEach(() => {
+    process.env.SESSION_SECRET = crypto.randomBytes(32).toString("hex");
+  });
+  afterEach(() => {
+    if (originalSecret === undefined) delete process.env.SESSION_SECRET;
+    else process.env.SESSION_SECRET = originalSecret;
+  });
+
   it("writes, removes, and creates valid absolute-expiry signed URLs safely", async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "studioflow-storage-"));
     try {

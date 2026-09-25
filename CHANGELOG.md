@@ -5,8 +5,75 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.162**
-- Next local revision: **R8.163**
+- Current revision after this entry is committed: **R8.165**
+- Next local revision: **R8.166**
+- Ledger gap: R8.163 (`ee9e09e`) and R8.164 (`b2421de`) shipped without a
+  changelog entry. R8.164 is backfilled below; R8.163 is not, because that
+  commit is not mine to describe. Tracked in `docs/BACKLOG.md`.
+
+## R8.165 | 2026-09-26 | fix(security): private assets were readable with a published key; the admin-lockout guard and the Today clock were both wrong
+
+Four defects from the full-repo audit at `ee9e09e`, fixed together: the one P0,
+and the three P1s the owner authorised.
+
+**KB-036, private-asset read URLs were forgeable by anyone.** The signer and the
+verifier both ran on `process.env.SESSION_SECRET || "local-storage-secret"`, and
+`SESSION_SECRET` was undocumented, so a deployment that followed the written
+setup ran on that published string. The private read route authorises on the HMAC
+and nothing else, so anyone who knew the key could sign a URL for any object.
+`src/platform/infrastructure/storage/asset-signing.ts` is now the one place that
+reads the key, requires at least 32 characters, and has no fallback; comparison
+is `crypto.timingSafeEqual`, because a byte-by-byte `!=` on a digest leaks how
+much of a forgery was right. `register()` asserts the key at boot so a
+misconfigured deployment fails on start rather than on first asset request.
+`SESSION_SECRET` is now required configuration and is documented in
+`.env.example` with its length rule. Note for operators: it is read here and
+only here - session tokens do not use it, they are 32 random bytes from
+`core/auth/token.ts` and need no secret.
+
+**KB-035, stripping a shared role could leave the platform with no
+administrator.** `requireChangeKeepsAccessAdministrator` returned early whenever
+more than one administrator existed, so the invariant was only ever evaluated in
+the single-administrator case. Two administrators sharing one role holding
+`platform.user.manage` + `platform.role.manage` could empty that role, after
+which nobody can re-grant `platform.role.manage` and recovery needs direct
+database surgery. The guard now computes the affected set: if any current
+administrator is untouched the change is safe, and if every one of them is
+affected it simulates the outcome for each and rejects the change unless someone
+retains the capability. Two integration tests were added; the negative one was
+confirmed to fail against the old guard.
+
+**SF-07, the Today header counted "today" in UTC.** `page.tsx` derived the date
+with `toISOString().split("T")` while the filter chips and every due-date badge on
+the same screen used the studio timezone, so for seven hours every day
+(00:00-06:59 WIB) the landing page header and its own chips disagreed about the
+same task list. It now reads the same `PlatformGeneralSettings.timezone` the
+client uses and goes through `currentDateOnly`. The settings read is memoised per
+request with React `cache`, matching `requirePrincipalGrants`, so the layout and
+the page still cost one query.
+
+**KB-037, the boundary checker skipped whole route directories.** `routeLaneApp`
+only recognised a `/<app>/` root segment, so anything else - `settings/`,
+`account/`, the lane root - classified as neither app nor platform and was skipped
+by every rule. Six live cross-app internal imports sat in that hole. The checker
+now has an explicit `PLATFORM_ROUTE_OWNERS` table (`settings/general/masterdata`
+is Master Data's own administration UI, so its `masterdata/service` and
+`masterdata/runtime` imports are intra-app and correct), matched longest-prefix
+first. Two fixtures cover an app-owned route group that is not under the app's
+own root; the rejecting one was confirmed to fail against the old checker.
+
+`npm test` 530/532. The two failures are the pre-existing stale-guard pair
+tracked as KB-045 and KB-046, unchanged by this pass. `typecheck`, `lint`,
+`check:boundaries`, `check:legacy-runtime`, and `next build` all pass. The
+signing tests cover the signer, expiry, and key binding; a signed-URL round trip
+through the running app was not exercised here.
+
+## R8.164 | 2026-09-26 | docs(backlog): record 32 verified audit findings from full-repo logic + UI/UX pass
+
+A full-repo read of the logic and UI/UX surfaces at `ee9e09e`, recorded as 1 P0,
+3 P1, 13 P2, 15 P3, and 2 currently-failing guard tests in `docs/BACKLOG.md`
+under "Full-repo logic + UI/UX audit". Backfilled here because the audit commit
+touched the backlog but not this ledger.
 
 ## R8.162 | 2026-09-25 | fix(ui): H2 asked a 400-weight serif for bold, so the browser faked it
 

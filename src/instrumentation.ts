@@ -11,6 +11,13 @@
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  // Fail at boot rather than serve private assets behind a guessable signature:
+  // the private read route authorizes on the HMAC alone, so an unset or short
+  // SESSION_SECRET is a data-exposure risk, not a degraded feature.
+  const { assertAssetSigningConfigured } = await import(
+    "@platform/infrastructure/storage/asset-signing"
+  );
+  assertAssetSigningConfigured();
   const { initializePermissionRegistry } = await import("@platform/core/rbac/registry");
   const { APP_REGISTRATIONS } = await import("./app/app-registrations");
   initializePermissionRegistry(APP_REGISTRATIONS);

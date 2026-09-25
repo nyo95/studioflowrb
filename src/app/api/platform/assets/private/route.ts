@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import fs from "node:fs/promises";
 import path from "node:path";
-import crypto from "node:crypto";
 import { requirePrincipalGrants } from "@platform/core/auth";
+import { verifyAssetRead } from "@platform/infrastructure/storage/asset-signing";
 import { resolveSafePath } from "@platform/infrastructure/storage/filesystem";
 
 export async function GET(request: Request) {
@@ -22,12 +22,7 @@ export async function GET(request: Request) {
       return new NextResponse("Forbidden", { status: 403 });
     }
 
-    const expectedToken = crypto
-      .createHmac("sha256", process.env.SESSION_SECRET || "local-storage-secret")
-      .update(`${key}:${expires}`)
-      .digest("hex");
-
-    if (token !== expectedToken) {
+    if (!verifyAssetRead(key, expiresTime, token)) {
       return new NextResponse("Forbidden", { status: 403 });
     }
 

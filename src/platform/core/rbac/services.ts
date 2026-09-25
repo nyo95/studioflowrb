@@ -121,24 +121,41 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
     return (await listAccessAdministratorIds(tx)).includes(userId);
   }
 
+  /**
+   * Refuses a change that would leave the platform with no access administrator.
+   *
+   * The invariant is about the *post-change* set, not about any single user: at
+   * least one active user must still hold every permission in
+   * ACCESS_ADMINISTRATOR_PERMISSIONS. So an administrator being degraded is only
+   * fatal when nobody else would remain.
+   *
+   * Administrators this change does not touch keep their capability by
+   * definition, so if any survives untouched the invariant already holds. Only
+   * when EVERY current administrator is affected do we have to ask `simulate`,
+   * and then it must be asked per administrator: one administrator retaining the
+   * capability through a different role is enough to allow the change.
+   *
+   * Note `simulate` models the post-change state for the user it is given. The
+   * single-user commands pass a closure that ignores that argument and answers
+   * for their own affected user, which is why the untouched-administrator
+   * shortcut above is required rather than optional.
+   */
   async function requireChangeKeepsAccessAdministrator(
     tx: DbClient,
     options: { affectedUserIds: string[]; simulate: (tx: DbClient, userId: string) => Promise<boolean> },
   ): Promise<void> {
     const administrators = await listAccessAdministratorIds(tx);
     if (administrators.length === 0) return;
-    for (const userId of options.affectedUserIds) {
-      if (!administrators.includes(userId)) continue;
-      if (administrators.length > 1) continue;
-      const keepsCapability = await options.simulate(tx, userId);
-      if (!keepsCapability) {
-        throw new AppError(
-          "CONFLICT",
-          "LAST_ACCESS_ADMINISTRATOR",
-          "This change is refused: at least one active user must keep user and role management access.",
-        );
-      }
+    const affected = new Set(options.affectedUserIds);
+    if (administrators.some((userId) => !affected.has(userId))) return;
+    for (const userId of administrators) {
+      if (await options.simulate(tx, userId)) return;
     }
+    throw new AppError(
+      "CONFLICT",
+      "LAST_ACCESS_ADMINISTRATOR",
+      "This change is refused: at least one active user must keep user and role management access.",
+    );
   }
 
   async function userHasBothAdminPermissionsExcludingRole(

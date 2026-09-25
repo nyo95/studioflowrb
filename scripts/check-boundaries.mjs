@@ -28,6 +28,21 @@ export const APP_DUPLICATE_PRIMITIVE_ALLOW_LIST = [
   "src/app/(platform)/studioflow/projects/_legacy_project_id/mom/[momId]/page.tsx",
 ];
 
+/**
+ * Platform route subtrees that belong to exactly one app but do not sit under
+ * that app's own `/<app>` root, so the root-segment check alone cannot see them.
+ * Paths are relative to `src/app/(platform)` with forward slashes; the longest
+ * matching prefix wins.
+ *
+ * Without an entry here the owning app is unknown, `classifyImporter` returns
+ * "other", and the whole boundary scan skips the file. That is how six live
+ * `masterdata/service` + `masterdata/runtime` imports went unreported from
+ * `settings/general/masterdata` (KB-037).
+ */
+export const PLATFORM_ROUTE_OWNERS = [
+  { path: "settings/general/masterdata", app: "masterdata" },
+];
+
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 const SKIP_DIRECTORIES = new Set(["node_modules", ".next", "generated"]);
 
@@ -172,15 +187,23 @@ export async function listAppsInDir(appsRoot) {
   return appEntries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
 }
 
-export function routeLaneApp(filePath, projectRoot, apps) {
+export function routeLaneApp(filePath, projectRoot, apps, routeOwners = PLATFORM_ROUTE_OWNERS) {
   const routePlatformRoot = join(resolve(projectRoot), "src", "app", "(platform)");
-  if (!isInside(routePlatformRoot, filePath) && relative(routePlatformRoot, filePath) !== "") return null;
-  const segments = relative(routePlatformRoot, filePath).split(sep);
+  const rel = relative(routePlatformRoot, filePath);
+  if (rel.startsWith("..") || isAbsolute(rel)) return null;
+  const segments = rel.split(sep);
   if (apps.includes(segments[0])) return segments[0];
+  // Longest owned prefix wins, so a nested app-owned route group (e.g. a
+  // masterdata admin UI under settings/) is attributed to its app even though it
+  // does not sit under that app's own `/<app>` root.
+  for (let depth = segments.length; depth > 0; depth--) {
+    const owner = routeOwners.find((candidate) => candidate.path === segments.slice(0, depth).join("/"));
+    if (owner) return owner.app;
+  }
   return null;
 }
 
-export function classifyTarget(targetPath, projectRoot, apps) {
+export function classifyTarget(targetPath, projectRoot, apps, routeOwners = PLATFORM_ROUTE_OWNERS) {
   const appsRoot = join(resolve(projectRoot), "src", "apps");
   const platformRoot = join(resolve(projectRoot), "src", "platform");
   if (isInside(appsRoot, targetPath)) {
@@ -194,12 +217,12 @@ export function classifyTarget(targetPath, projectRoot, apps) {
   if (isInside(platformRoot, targetPath) || relative(platformRoot, targetPath) === "") {
     return { kind: "platform" };
   }
-  const routeApp = routeLaneApp(targetPath, projectRoot, apps);
+  const routeApp = routeLaneApp(targetPath, projectRoot, apps, routeOwners);
   if (routeApp) return { kind: "app", app: routeApp, layer: "route" };
   return { kind: "other" };
 }
 
-export function classifyImporter(filePath, projectRoot, apps) {
+export function classifyImporter(filePath, projectRoot, apps, routeOwners = PLATFORM_ROUTE_OWNERS) {
   const root = resolve(projectRoot);
   const appsRoot = join(root, "src", "apps");
   const platformRoot = join(root, "src", "platform");
@@ -210,7 +233,7 @@ export function classifyImporter(filePath, projectRoot, apps) {
   if (isInside(platformRoot, filePath) || relative(platformRoot, filePath) === "") {
     return { kind: "platform" };
   }
-  const routeApp = routeLaneApp(filePath, root, apps);
+  const routeApp = routeLaneApp(filePath, root, apps, routeOwners);
   if (routeApp) return { kind: "app", app: routeApp, lane: true };
   return { kind: "other" };
 }
@@ -382,7 +405,7 @@ function importDeclares(source, declaredName, fromModule) {
   return false;
 }
 
-export async function collectBoundaryViolations({ projectRoot = process.cwd(), srcDir } = {}) {
+export async function collectBoundaryViolations({ projectRoot = process.cwd(), srcDir, routeOwners = PLATFORM_ROUTE_OWNERS } = {}) {
   projectRoot = resolve(projectRoot);
   srcDir = srcDir ? resolve(srcDir) : join(projectRoot, "src");
 
@@ -397,7 +420,7 @@ export async function collectBoundaryViolations({ projectRoot = process.cwd(), s
   const files = await walkSources(srcDir);
 
   for (const file of files) {
-    const importer = classifyImporter(file, projectRoot, apps);
+    const importer = classifyImporter(file, projectRoot, apps, routeOwners);
     if (importer.kind !== "app" && importer.kind !== "platform") continue;
     const source = await readFile(file, "utf8");
     const importerCore =
@@ -406,7 +429,7 @@ export async function collectBoundaryViolations({ projectRoot = process.cwd(), s
     for (const specifier of extractImportSpecifiers(source, file)) {
       const targetPath = resolveSpecifier(specifier, file, aliasMap, projectRoot);
       if (!targetPath) continue;
-      const target = classifyTarget(targetPath, projectRoot, apps);
+      const target = classifyTarget(targetPath, projectRoot, apps, routeOwners);
 
       if (
         importer.kind === "app" &&

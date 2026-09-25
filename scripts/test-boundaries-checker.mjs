@@ -65,6 +65,14 @@ const FILES = {
   "src/app/(platform)/alpha/route-page.tsx": `import { alphaRule } from "@alpha/domain/rule";\nexport const page = alphaRule;\n`,
   "src/app/(platform)/alpha/route-cross.tsx": `import { Widget } from "@beta/ui/widget";\nexport const bad = Widget;\n`,
 
+  // KB-037: an app-owned route group that is not under the app's own `/<app>`
+  // root. Without PLATFORM_ROUTE_OWNERS these two files classified as "other"
+  // and were skipped entirely, so neither the legal nor the illegal import was
+  // ever examined.
+  "src/app/(platform)/settings/general/beta-owned/page.tsx": `import { betaRule } from "@beta/domain/rule";\nexport const page = betaRule;\n`,
+  "src/app/(platform)/settings/general/beta-owned/cross.tsx": `import { alphaRule } from "@alpha/domain/rule";\nexport const bad = alphaRule;\n`,
+  "src/app/(platform)/settings/general/page.tsx": `import { betaRule } from "@beta/domain/rule";\nexport const unowned = betaRule;\n`,
+
   "src/apps/alpha/reject-domain.ts": `import { betaRule } from "@beta/domain/rule";\nexport const bad1 = betaRule;\n`,
   "src/apps/alpha/reject-application-catchall.ts": `import { useCase } from "@/apps/beta/application/use-case";\nexport const bad2 = useCase;\n`,
   "src/apps/alpha/reject-infrastructure-relative.ts": `import { betaDb } from "../beta/infrastructure/db";\nexport const bad3 = betaDb;\n`,
@@ -95,11 +103,13 @@ function violationKey(projectRoot, violation) {
 const projectRoot = await mkdtemp(join(tmpdir(), "wo3-boundaries-"));
 try {
   await writeTree(projectRoot, FILES);
-  const violations = await collectBoundaryViolations({ projectRoot });
+  const routeOwners = [{ path: "settings/general/beta-owned", app: "beta" }];
+  const violations = await collectBoundaryViolations({ projectRoot, routeOwners });
   const actualKeys = violations.map((v) => violationKey(projectRoot, v)).sort();
 
   const expectedKeys = [
     `src/app/(platform)/alpha/route-cross.tsx | ${RULE_APP_TO_OTHER_APP_INTERNAL} | beta/ui`,
+    `src/app/(platform)/settings/general/beta-owned/cross.tsx | ${RULE_APP_TO_OTHER_APP_INTERNAL} | alpha/domain`,
     `src/apps/alpha/legacy-class.tsx | ${RULE_RAW_LEGACY_UI_CLASS} | ui-card`,
     `src/apps/alpha/deep-ui.ts | ${RULE_APP_TO_UI_ENGINE_INTERNAL} | @/platform/ui_engine/components/button`,
     `src/apps/alpha/reject-domain.ts | ${RULE_APP_TO_OTHER_APP_INTERNAL} | beta/domain`,
@@ -119,6 +129,10 @@ try {
 
   const legalFiles = [
     "src/app/(platform)/alpha/route-page.tsx",
+    "src/app/(platform)/settings/general/beta-owned/page.tsx",
+    // Known residual, recorded in docs/BACKLOG.md: a platform route subtree with
+    // no declared owner is still unclassified and skipped.
+    "src/app/(platform)/settings/general/page.tsx",
     "src/apps/alpha/same-app-relative.ts",
     "src/apps/alpha/same-app-alias.ts",
     "src/apps/alpha/app-to-platform.ts",
@@ -151,7 +165,7 @@ try {
     await rm(platformOnlyRoot, { recursive: true, force: true });
   }
 
-  console.log("PASS boundary fixtures: 14 rejections, legal cases clean, platform-only tree accepted");
+  console.log(`PASS boundary fixtures: ${expectedKeys.length} rejections, legal cases clean, platform-only tree accepted`);
 } finally {
   await rm(projectRoot, { recursive: true, force: true });
 }

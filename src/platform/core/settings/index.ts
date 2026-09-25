@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { z } from "zod";
 
 import { Prisma, type PrismaClient } from "@/generated/prisma/client";
@@ -244,9 +245,21 @@ async function readStoredPlatformGeneralSettings(db: DbClient): Promise<StoredPl
   }
 }
 
+/**
+ * Per-request memoised stored-settings read, matching the `requirePrincipalGrants`
+ * pattern in `core/auth/request.ts`. The platform layout and individual pages
+ * both need these values during one render (the layout for the shell, pages for
+ * locale/timezone-sensitive output), and without this each is a separate query.
+ *
+ * Only the stored read is memoised: presentation mapping stays with the caller so
+ * every consumer shares one cache entry regardless of whether it needs the
+ * managed Brand mark resolved to a URL.
+ */
+const readStoredPlatformGeneralSettingsOnce = cache(readStoredPlatformGeneralSettings);
+
 /** Resolves a managed Brand mark only for presentation; its durable key stays private. */
 export async function readPlatformGeneralSettings(db: DbClient, resolveBrandMarkUrl?: (key: string) => string | Promise<string>): Promise<PlatformGeneralSettings> {
-  return toPresentationSettings(await readStoredPlatformGeneralSettings(db), resolveBrandMarkUrl);
+  return toPresentationSettings(await readStoredPlatformGeneralSettingsOnce(db), resolveBrandMarkUrl);
 }
 
 export type SettingsUpdateResult = { changed: boolean; settings: PlatformGeneralSettings };

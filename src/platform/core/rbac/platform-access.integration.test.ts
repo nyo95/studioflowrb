@@ -385,6 +385,95 @@ describe("role commands and grants", () => {
     assert.equal(stillActive?.status, "ACTIVE");
   });
 
+  it("refuses stripping a shared admin role even when two administrators hold it", async () => {
+    // The realistic topology is one shared Administrator role held by several
+    // people. Both administrators are affected by the grant replacement, so the
+    // post-change administrator set is what decides, not any single user.
+    const role = await db.prisma.role.create({
+      data: {
+        code: "shared-admin",
+        name: "Administrator",
+        role_permissions: { create: FULL_GRANTS.map((permission_id) => ({ permission_id })) },
+      },
+    });
+    const passwordHash = await hashPassword("correct horse battery staple");
+    const first = await db.prisma.user.create({
+      data: { email: "shared-a@example.com", display_name: "Shared A", password_hash: passwordHash, user_roles: { create: { role_id: role.id } } },
+    });
+    const second = await db.prisma.user.create({
+      data: { email: "shared-b@example.com", display_name: "Shared B", password_hash: passwordHash, user_roles: { create: { role_id: role.id } } },
+    });
+    const before = await auditCount();
+
+    await assert.rejects(
+      () =>
+        service.replaceRoleGrants({
+          grants: ["platform.role.manage"],
+          actor: ACTOR,
+          roleId: role.id,
+          permissionIds: ["platform.settings.read"],
+        }),
+      (error: unknown) => error instanceof AppError && error.code === "LAST_ACCESS_ADMINISTRATOR",
+    );
+
+    const grants = await db.prisma.rolePermission.findMany({ where: { role_id: role.id } });
+    assert.equal(grants.length, FULL_GRANTS.length);
+    for (const id of [first.id, second.id]) {
+      assert.equal((await db.prisma.user.findUnique({ where: { id } }))?.status, "ACTIVE");
+    }
+    assert.equal(await auditCount(), before);
+  });
+
+  it("allows stripping a shared admin role when one holder keeps access another way", async () => {
+    const shared = await db.prisma.role.create({
+      data: {
+        code: "shared-admin",
+        name: "Administrator",
+        role_permissions: { create: FULL_GRANTS.map((permission_id) => ({ permission_id })) },
+      },
+    });
+    const fallback = await db.prisma.role.create({
+      data: {
+        code: "fallback-admin",
+        name: "Fallback",
+        role_permissions: {
+          create: ["platform.user.manage", "platform.role.manage"].map((permission_id) => ({ permission_id })),
+        },
+      },
+    });
+    const passwordHash = await hashPassword("correct horse battery staple");
+    await db.prisma.user.create({
+      data: { email: "stripped-a@example.com", display_name: "Stripped A", password_hash: passwordHash, user_roles: { create: { role_id: shared.id } } },
+    });
+    const survivor = await db.prisma.user.create({
+      data: {
+        email: "survivor@example.com",
+        display_name: "Survivor",
+        password_hash: passwordHash,
+        user_roles: { create: [{ role_id: shared.id }, { role_id: fallback.id }] },
+      },
+    });
+
+    const result = await service.replaceRoleGrants({
+      grants: ["platform.role.manage"],
+      actor: ACTOR,
+      roleId: shared.id,
+      permissionIds: ["platform.settings.read"],
+    });
+
+    assert.equal(result.changed, true);
+    const grants = await db.prisma.rolePermission.findMany({ where: { role_id: shared.id } });
+    assert.deepEqual(grants.map((grant) => grant.permission_id), ["platform.settings.read"]);
+    // The survivor is still an access administrator, through the untouched role.
+    const assignments = await db.prisma.userRole.findMany({
+      where: { user_id: survivor.id },
+      select: { role: { select: { role_permissions: { select: { permission_id: true } } } } },
+    });
+    const union = new Set(assignments.flatMap((a) => a.role.role_permissions.map((g) => g.permission_id)));
+    assert.ok(union.has("platform.user.manage"));
+    assert.ok(union.has("platform.role.manage"));
+  });
+
   it("allows self-demotion only when another active access administrator remains", async () => {
     const first = await seedAdmin("self-demo-a@example.com", "Self Demo A");
     const second = await seedAdmin("self-demo-b@example.com", "Self Demo B");

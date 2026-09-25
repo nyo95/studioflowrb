@@ -3,7 +3,8 @@
 Status: active, reconciled through **R8.106** on 2026-09-22, plus a full-repo
 logic + UI/UX audit at `ee9e09e` on 2026-09-26 (see "Full-repo logic + UI/UX
 audit" below; that pass found 1 P0, 3 P1, 13 P2, 15 P3, and 2 currently-failing
-guard tests). Replaces
+guard tests). R8.165 closed that P0 and those three P1s; the two residuals of the
+KB-037 checker work are still open below as KB-037a and KB-037b. Replaces
 `roadmap.md`, `review.md`, and `knownbug.md` (merged and archived to
 `archive/roadmap-2026-09-22.md`, `archive/review-2026-09-22.md`,
 `archive/knownbug-2026-09-22.md` on 2026-09-22 at owner request — full
@@ -381,75 +382,53 @@ only in blast radius but should be triaged early.
 
 ### P0 - must fix
 
-- [ ] [BUG] **KB-035 - Last-access-administrator guard is skipped whenever two
-  or more administrators exist, allowing a permanent platform lockout.**
-  `src/platform/core/rbac/services.ts:132`. `requireChangeKeepsAccessAdministrator`
-  short-circuits on `if (administrators.length > 1) continue;` BEFORE calling
-  `options.simulate`, so the invariant is only ever checked when exactly one
-  administrator exists. Reachable: `replaceRoleGrants` (`services.ts:776-783`)
-  from `src/app/(platform)/settings/access/roles/actions.ts:72`. If users A and
-  B are both `ACTIVE` and both hold role `R`, and `R` carries
-  `platform.user.manage` + `platform.role.manage`, then A submitting
-  `replaceRoleGrants({ roleId: R, permissionIds: [] })` passes the guard for
-  both users and `deleteMany` (`services.ts:785`) commits a platform with zero
-  access administrators. Nobody can then re-grant `platform.role.manage`;
-  recovery needs direct database surgery. Not caught by tests because
-  `platform-access.integration.test.ts:67-85` `seedAdmin()` mints a NEW role per
-  administrator, so no test ever has two admins sharing a role. Fix: drop the
-  short-circuit and evaluate the post-change administrator set for emptiness;
-  add a two-admins-one-role integration test.
+_None. The audit's single P0 (KB-035, the access-administrator lockout guard)
+was fixed in R8.165._
 
 ### P1 - fix next
 
-- [ ] [BUG] **KB-036 - Private-asset signed URLs fall back to a hardcoded,
-  publicly-known HMAC secret that is undocumented and never validated.**
-  `src/platform/infrastructure/storage/filesystem.ts:98` (signer) and
-  `src/app/api/platform/assets/private/route.ts:26` (verifier) both use
-  `process.env.SESSION_SECRET || "local-storage-secret"`. `SESSION_SECRET` is
-  absent from `.env.example`, and `src/instrumentation.ts` `register()` performs
-  no environment validation, so a deployment that follows the documented setup
-  runs on the known key. With it, any authenticated user can mint
-  `HMAC("local-storage-secret", "<key>:<expires>")` for ANY object key; the
-  route's only authorization is the signature, and it is fully bypassable.
-  Fix: make `SESSION_SECRET` mandatory, throw at boot in `register()` when unset
-  or under 32 bytes, delete the fallback, document it in `.env.example`.
+- [ ] [BUG] **KB-037a - `src/app/promotion-runtime.ts` reaches into two apps'
+  `runtime` layer, and the boundary checker still cannot see it.**
+  `src/app/promotion-runtime.ts:2-3` imports `bqPublicCommands` from
+  `@/apps/bq/runtime` and `masterDataPublicCommands` from
+  `@/apps/masterdata/runtime`. Both are cross-app and neither is a `public`
+  layer, so by the same rule as KB-037 they are violations - but the file sits at
+  the `src/app` root beside `app-registrations.ts`, not under the route lane, so
+  `routeLaneApp` still classifies it as `{ kind: "other" }` and no rule reads it.
+  R8.165 fixed the `settings/general/masterdata` half of KB-037 and left this
+  alone deliberately. The obvious repair is blocked: both symbols are named
+  "public commands" but live in `runtime.ts`, and re-exporting them from
+  `*/public/index.ts` would drag the Prisma-bound runtime into the client bundle
+  that `promotion-review.tsx` already imports types from. Moving the command
+  surface into each app's `public` layer is a real boundary change and needs an
+  owner decision on where the promotion command surface lives. Do not fix this by
+  adding a runtime re-export.
 
-- [ ] [BUG] **SF-07 - Today-page header counts "today" in UTC while the filter
-  chips and every due-date badge on the same screen count in the studio
-  timezone.** `src/app/(platform)/studioflow/page.tsx:28` uses
-  `new Date().toISOString().split("T")[0]`, while
-  `today-view.tsx:68` uses the purpose-built
-  `currentDateOnly({ timeZone: timezone })` (default `Asia/Jakarta`, UTC+7).
-  For 7 hours every day (00:00-06:59 WIB) the header and the chips disagree on
-  the same task list on the app's landing page: a task due today reads "Today"
-  on its badge and is counted as overdue in the header, and a task due yesterday
-  is counted as due today. The existing test at
-  `src/platform/utilities/date/date.test.ts:141-142` already asserts the two
-  zones diverge, so the bypass is known. Fix: use `currentDateOnly({ timeZone })`
-  for `dateToday`, or move the summary into `TodayView` where `timezone` is
-  already in scope.
+- [ ] [BUG] **KB-037b - 30 platform-lane files still classify as
+  `{ kind: "other" }` and are skipped by every boundary rule.**
+  R8.165 added `PLATFORM_ROUTE_OWNERS` for app-owned route groups, so the six
+  live cross-app imports are now visible. The remaining 30 files under
+  `src/app/(platform)` have no declared owner and are still skipped: the lane
+  root (`layout.tsx`, `main-route.ts`, `error.tsx`, `loading.tsx`,
+  `page.tsx`, `logout-action.ts`), all of `settings/access/**`, the platform part
+  of `settings/general/**`, and all of `account/**`. Defaulting them to
+  `platform` is not a safe one-liner, which is why R8.165 stopped short:
+  `src/app/(platform)/layout.tsx:11-13,28-35` imports each app's lane nav
+  directly (`./bq/nav`, `./masterdata/nav`, `./studioflow/nav`), so classifying
+  the lane root as platform immediately fails `RULE_PLATFORM_TO_APP` on six
+  imports. Fixing this means deciding where per-app navigation enters the
+  platform shell - the composition root already passes `domainNavigation` and
+  `domainUtilityNavigation` slots, so the likely shape is for the layout to stop
+  importing app lane modules and receive them the way it already receives
+  `contextSlot`. That is an architecture decision, not a checker fix. Verified
+  safe to reclassify: none of the 34 files construct `Intl.DateTimeFormat`, so
+  `collectDuplicatePrimitiveViolations` loses no coverage by narrowing.
 
-- [ ] [BUG] **KB-037 - The boundary checker skips every route directory not named
-  after a registered app, and 6 live cross-app internal imports sit in that hole.**
-  `scripts/check-boundaries.mjs:175-181` (`routeLaneApp`) returns an app only
-  when `segments[0]` is literally `bq`/`masterdata`/`studioflow`; anything else
-  (`settings/`, `account/`, `(document)/`) returns `null`, and every rule then
-  skips it via the `if (importer.kind !== "app" && importer.kind !== "platform") continue;`
-  guard. Live violations it cannot see:
-  `src/app/(platform)/settings/general/masterdata/page.tsx:7-8`,
-  `supplier-categories-actions.ts:9-10`, and `vendor-types-actions.ts:9-10` all
-  import `@/apps/masterdata/service` and `@/apps/masterdata/runtime`; plus
-  `src/app/promotion-runtime.ts:2-3` imports both apps' `runtime`. The tree is
-  gated on `masterdata.dictionary.read`, labelled "Master Data Settings", and is
-  absent from Master Data's own `MASTERDATA_ROUTES`/`MASTERDATA_NAV_LINKS` - so
-  Master Data's route-ownership rule has no reason to look there. Note
-  `MASTERDATA_PERMISSIONS` is ALREADY re-exported at
-  `src/apps/masterdata/public/index.ts:6`, so 3 of the 6 imports have a
-  compliant alternative available today with no design decision attached. The
-  checker's own fixtures never cover a non-app route dir
-  (`scripts/test-boundaries-checker.mjs:65-66,121,165-177`). Fix: add an
-  explicit route-to-app ownership map, delete the `{ kind: "other" }` escape
-  hatch, and add non-app-route fixtures.
+- [ ] [CLEANUP] **`CHANGELOG.md` has no entry for R8.163 (`ee9e09e`).**
+  The "Revision state" block still read R8.162 as current after that commit
+  landed. R8.165 corrects the block to R8.165/R8.166 and backfills R8.164, but
+  R8.163 is not backfilled because it is not this line of work's commit to
+  describe. Someone who knows that change should write its entry.
 
 ### P2 - fix in the next few passes
 
@@ -575,8 +554,9 @@ only in blast radius but should be triaged early.
   needs no transaction, yet it holds a checked-out connection (pool default 10)
   for the full hash, and a `P2034` conflict re-runs the hash on retry. Not a
   correctness bug - the write is rolled back first - but it converts CPU time
-  into connection-hold time and delays the KB-035 invariant checks relative to
-  commit. Fix: hoist `const passwordHash = await hashPassword(...)` above the
+  into connection-hold time and delays the last-access-administrator invariant
+  checks (KB-035, fixed in R8.165) relative to commit. Fix: hoist
+  `const passwordHash = await hashPassword(...)` above the
   `runTransaction(...)` call; the value is transaction-independent.
 
 - [ ] [BUG] **SF-12 - Today scope chips nest a `<button>` inside a `<Link>`,

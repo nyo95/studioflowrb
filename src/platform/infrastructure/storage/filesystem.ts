@@ -1,8 +1,8 @@
 import path from "node:path";
 import fs from "node:fs/promises";
-import crypto from "node:crypto";
 import { AppError } from "@platform/core/errors";
 import type { ObjectStorage, PutObjectInput, StoredObject } from "@platform/core/storage";
+import { signAssetRead } from "./asset-signing";
 
 export type PublicObjectStorage = ObjectStorage & {
   createPublicReadUrl(key: string): string;
@@ -95,9 +95,7 @@ export function createLocalFilesystemStorage(rootDir: string): ObjectStorage {
         throw new AppError("NOT_FOUND", "storage.object-not-found", "The image is unavailable.");
       }
       const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
-      const token = crypto.createHmac("sha256", process.env.SESSION_SECRET || "local-storage-secret")
-        .update(`${key}:${expiresAt}`)
-        .digest("hex");
+      const token = signAssetRead(key, expiresAt);
       return `/api/platform/assets/private?key=${encodeURIComponent(key)}&expires=${expiresAt}&token=${token}`;
     },
   };
