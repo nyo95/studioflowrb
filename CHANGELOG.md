@@ -5,8 +5,19 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.150**
-- Next local revision: **R8.151**
+- Current revision after this entry is committed: **R8.151**
+- Next local revision: **R8.152**
+
+## R8.151 | 2026-09-25 | feat(sf): §7.3 Today — PhaseAttentionSection cross-project strip
+
+Wave B §7.3. The Today page now opens with an "In flight" strip showing every in-progress phase across all projects the user can read, before the per-project task feed.
+
+Service layer:
+- `today/service.ts`: added `PhaseAttentionRow` export type and `listPhaseAttention` method. Fans `sfPhase.findMany` where `status IN ACTIVE_PHASE_STATUSES` and project is live; joins project id + name; calls `readBlockerCounts` per phase in parallel and maps through `phaseStatusDisplay`, `waitingDays`, `availablePhaseCommands`, `phaseAccentDotClass`, `fullBlockers`. Ordered by project priority → project name → phase order_index.
+
+UI:
+- `_components/phase-attention.tsx`: `PhaseAttentionSection` server component. `SectionCard` with `padded={false}` containing a `<ul>` of rows. Each row: accent dot, phase link + project breadcrumb, `PhaseStatusBadge` (status + waiting days), seat badge (hidden below sm), danger badge for open blockers. Conditionally rendered from `page.tsx` when `phaseAttention.length > 0`.
+
 
 ## R8.150 | 2026-09-25 | feat(sf): §7.2 Icon rail — phase links with accent dots in project nav
 
