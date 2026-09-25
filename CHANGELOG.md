@@ -5,8 +5,53 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.154**
-- Next local revision: **R8.155**
+- Current revision after this entry is committed: **R8.157**
+- Next local revision: **R8.158**
+
+## R8.157 | 2026-09-25 | fix(ui): rail and secondary-nav metrics to prototype spec
+
+Ports the remaining `.a-icon-rail` / `.a-rail` measurements from the approved prototype. Radius needed no conversion — the prototype's `--r-sm` is 7px and `--ui-radius-action` is already exactly 7px.
+
+**Icon rail** (`ui_engine/layouts/shells.tsx`):
+
+- `NavItem` 38px tall to 29px expanded / 36x34 collapsed (`.a-icon`); radius `control` (10px) to `action` (7px); icons 16px to 18px; `NavGroup` gap 4px to 2px; rail padding 12px to 8px/5px, with `UtilitySection` matched.
+- **Active state rewritten.** It was a bordered box plus a 3px accent bar. The prototype's `.a-icon.on` is a white plane lifted off the recessed rail: `bg-surface` + `shadow-plane`. The old rule's comment correctly insisted the active state must not rely on fill alone or it collapses into hover — that still holds, and it is still marked on three channels: the plane fill, the shadow that plane casts, and heavier type.
+- **Rail toggle relocated.** It was a 16px-wide sliver pinned to the rail's outer edge at mid-height — easy to hit by accident, hard to find on purpose. Now at the rail foot below the utility icons, per `.a-rail-toggle`.
+
+**Secondary nav** (`ui_engine/layouts/context-nav.tsx`):
+
+- `ContextNavLink` takes `surface?: "plane" | "rail"`. On `rail` the active item is a raised white plane (29px row, 13px text, radius-action) per `.a-nav.on`. `plane` is unchanged and remains the default — `SettingsShell` renders on a white content surface where a white card would be invisible, so it keeps the muted fill. The project rail opts in through `ProjectNavLinks`.
+
+## R8.156 | 2026-09-25 | fix(sf): full-bleed project workspace — move the page measure out of the app layout
+
+Retry of R8.152, this time fixing the cause R8.153 correctly identified rather than the symptom.
+
+**Root cause.** `StudioFlowLayout` wrapped every StudioFlow route in `<PageShell size="wide">` — a centred, max-width-1440px, 22px-padded CSS grid. Two consequences made the prototype's shell unreachable from inside the project layout, and no amount of CSS there could fix either:
+
+1. `flex-1` is inert inside a grid parent, so the project workspace could never be given a constrained height. Its inner `overflow-y-auto` was therefore also inert, and the sticky context bar had no scroll container to stick to.
+2. `mx-auto max-w-(--ui-page-max)` centres the content box, so the secondary rail could never sit flush against the icon rail — on a wide display it floated hundreds of px inboard. Negative margins can undo the padding but not the centring.
+
+The prototype inverts this: `.a-main` is full-bleed and the measure (`.a-measure`) sits *inside* it, below the context bar.
+
+- `studioflow/layout.tsx` returns children bare. The `PageShell` in the access-denied branch stays — that one is a leaf render, not a wrapper.
+- The 7 top-level SF pages each apply their own `<PageShell measure="wide">`, so their rendering context is byte-for-byte what it was.
+- `projects/[projectId]/layout.tsx`: `SettingsShell` to a real two-column workspace. 220px rail (`--ui-secondary-width`) flush to the icon rail with its own scroll; the content column owns the scroll so the 44px context bar (`--ui-header-height`, prototype `.a-ctx`) can stick to it; `PageShell` moves inside that column, leaving the 6 project-subtree pages unchanged.
+
+Verified: all 13 SF pages resolve a measure (7 their own, 6 via the project shell), and `PlatformLayout` passes children straight to `AppShell` with no intervening wrapper, so the flex-column chain from `<main>` to the workspace is unbroken.
+
+## R8.155 | 2026-09-25 | fix(shell): rebuild top bar to prototype spec — 46px, no clipped brand column
+
+The top-left area the owner flagged was a layout defect, not a styling one.
+
+`AppShell`'s header hard-coded a fixed brand column at `w-(--ui-header-brand-width)`, which resolved to `--ui-rail-width` = 48px, then spent `px-4` (32px) on padding. That left a 16px content box, into which the brand was rendered under `overflow-hidden`. Whatever went in — the full wordmark before R8.154, the monogram after — was clipped to an unreadable sliver. R8.154 changed *which* brand went into the box; the box itself was the bug.
+
+Prototype `.a-top` has no brand column at all: one 46px flex row, `gap:10px; padding:0 14px`, laid out logo, app chip, search, spacer, avatar.
+
+- `shells.tsx`: the header is a plain flex row (`gap-2.5`, `px-3.5`); the fixed brand column is gone, so the mark sizes to its own content.
+- `tokens.css`: added `--ui-topbar-height: 46px` (was a hard-coded `h-16`/64px). Removed `--ui-header-brand-width` — the column it sized no longer exists and it had no other reader.
+- `shells.tsx`: the three offsets that hard-coded the old 64px header (grid min-height, rail sticky top and height, main height) now read the token, so header height changes in one place.
+- `authenticated-shell/index.tsx`: `collapsedBrand` is the prototype's `.a-logo` — mono, 12px, tracking .16em, no chip or 36px box.
+- `authenticated-shell/navigation.tsx`: the app chip gets `.a-app` — 26px tall, `bg-rail-soft`, 1px `line-subtle` border, radius-action.
 
 ## R8.154 | 2026-09-25 | fix(shell+sf): eliminate redundant "StudioFlow" labels from rail, header, and page eyebrows
 
