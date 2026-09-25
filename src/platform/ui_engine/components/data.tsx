@@ -170,7 +170,13 @@ export function TableHead({
 
   const identifier = isIdentifierColumn(props as Record<string, unknown>);
   const headClasses = cx(
-    "h-(--ui-th-height,36px) border-b border-line-strong bg-thead-surface px-3 py-(--ui-th-py,8px) align-middle font-semibold uppercase",
+    /* The table is full-bleed inside its card so the header band and row hover
+       reach the card's edges. The edge columns therefore have to carry the
+       card's own gutter themselves, or their text sits 4px inboard of every
+       other line in the card (title, toolbar, footer all use --ui-section-px).
+       Reading the same token also keeps them flush under compact density,
+       where the gutter and the cell padding are both 12px. */
+    "h-(--ui-th-height,36px) border-b border-line-strong bg-thead-surface px-3 first:pl-[var(--ui-card-gutter,var(--ui-section-px))] last:pr-[var(--ui-card-gutter,var(--ui-section-px))] py-(--ui-th-py,8px) align-middle font-semibold uppercase",
     identifier ? IDENTIFIER_CLASSES + " uppercase" : "text-thead text-micro tracking-[0.08em]",
     TABLE_ALIGN_CLASSES[align],
     stickyEnd && "sticky right-0 z-[2] border-l border-l-line",
@@ -232,7 +238,7 @@ export function TableCell({
   return (
     <td
       className={cx(
-        "border-b border-line-subtle px-3 py-(--ui-td-py,10px) align-middle whitespace-nowrap first:shadow-[inset_3px_0_0_var(--ui-row-marker,transparent)]",
+        "border-b border-line-subtle px-3 first:pl-[var(--ui-card-gutter,var(--ui-section-px))] last:pr-[var(--ui-card-gutter,var(--ui-section-px))] py-(--ui-td-py,10px) align-middle whitespace-nowrap first:shadow-[inset_3px_0_0_var(--ui-row-marker,transparent)]",
         identifier && IDENTIFIER_CLASSES,
         TABLE_ALIGN_CLASSES[align],
         wrap && "whitespace-normal",

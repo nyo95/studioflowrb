@@ -5,8 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.159**
-- Next local revision: **R8.160**
+- Current revision after this entry is committed: **R8.160**
+- Next local revision: **R8.161**
+
+## R8.160 | 2026-09-25 | fix(ui): a compact table clobbered its card's gutter, so its edge columns sat 4px inboard
+
+In a `SectionCard`, the first table column's text started 12px from the card edge while the card's own title, toolbar and footer all started at 16px. Every table inside a card was misaligned against the rest of that card.
+
+**Cause.** `DataTable` puts `data-density={density}` on its container, and the BQ compact-density stamp in `tokens.css` redefines `--ui-section-px` from 16px to 12px. That token is the *section card's* gutter, so a compact table silently re-stamped the card's gutter for its whole subtree. Measured live: `--ui-section-px` is 16px at the card and 12px at the table container and its cells.
+
+The table being full-bleed is correct — the header band and row hover should reach the card's edges. What was missing is that the **edge columns** must then carry the card's gutter themselves, and the obvious way to do that (read `--ui-section-px` in the cell) is exactly what the density stamp had already broken.
+
+**Fix.** `SectionCard` republishes its own gutter as `--ui-card-gutter`, resolved at the card — outside any density stamp a child puts on itself. Table edge cells read `var(--ui-card-gutter, var(--ui-section-px))`, so they align to the card when inside one and are unchanged anywhere else. Interior columns keep their tighter 12px padding.
+
+Verified live on the prefix-dictionary table: first `th` and `td` inset 12px → **16px**, matching the card header's 16px; right gutter 16px; table still starts at x=0 of the card (full-bleed intact); interior cells still 12px. `ProjectDirectory` is not a `SectionCard`, so it takes the fallback and is byte-for-byte unchanged.
+
+**Correction to R8.159.** That entry stated Tailwind emits no rule for the `[--ui-rail-width:…]` arbitrary-property form, "verified by walking every CSS rule". While debugging this one I found that rule-walk cannot read this app's stylesheet at all — it reports zero rules even for utilities that demonstrably work — so the claim was unsupported and is withdrawn. The mechanism behind the expanded rail's failure is unconfirmed. R8.159's fix and its measured before/after behaviour (48px → 212px → 48px, no clipping) stand; only the stated cause was wrong.
 
 ## R8.159 | 2026-09-25 | fix(shell): expanded rail stayed 48px and clipped its labels
 

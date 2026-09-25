@@ -43,7 +43,13 @@ export function SectionCard({
 }: SectionCardProps) {
   const hasHeader = Boolean(title || description || hint || action);
   return (
-    <Surface as="section" className={cx("min-w-0 overflow-hidden", className)} {...props}>
+    /* --ui-card-gutter republishes this card's own --ui-section-px, resolved
+       here at the card. A full-bleed child that stamps its own density —
+       DataTable sets data-density, and [data-density="compact"] redefines
+       --ui-section-px to 12px — otherwise clobbers the gutter for everything
+       inside it, so its edge columns landed 4px inboard of the card's title,
+       toolbar and footer. Children that must align to the card read this. */
+    <Surface as="section" className={cx("min-w-0 overflow-hidden [--ui-card-gutter:var(--ui-section-px)]", className)} {...props}>
       {hasHeader ? (
         <div className="flex items-center justify-between gap-3 border-b border-line-subtle px-(--ui-section-px) py-2.5">
           <div className="grid min-w-0 gap-[2px]">
