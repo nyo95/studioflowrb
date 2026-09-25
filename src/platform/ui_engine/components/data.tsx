@@ -61,7 +61,7 @@ export function DataTable({
       className={cx(
         "overflow-hidden bg-surface",
         fill && "flex flex-col flex-1 min-h-0",
-        framed && "rounded-card border border-line",
+        framed && "rounded-card shadow-plane",
         density === "compact" && "[--ui-th-height:32px] [--ui-th-py:6px] [--ui-td-py:7px]",
         stickyHeader && "[--ui-thead-position:sticky]",
         containerClassName,
@@ -342,7 +342,7 @@ export function TableToolbar({ framed = true, search, filters, actions, classNam
     <div
       className={cx(
         "flex min-h-[52px] items-center justify-between gap-3 bg-surface p-2 max-[720px]:flex-col max-[720px]:items-stretch",
-        framed && "rounded-card border border-line",
+        framed && "rounded-card shadow-plane",
         className,
       )}
       {...props}

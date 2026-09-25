@@ -326,7 +326,7 @@ export function NavSubmenu({
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
-          className="z-[65] min-w-52 rounded-control border border-line bg-surface-raised p-[5px] shadow-elevated"
+          className="z-[65] min-w-52 rounded-control bg-surface-raised p-[5px] shadow-elevated"
           side="right"
           align="start"
           sideOffset={0}
@@ -355,20 +355,35 @@ export function NavSubmenu({
 }
 
 export function PageShell({
-  size = "default",
+  size,
+  measure = "default",
   fill = false,
   className,
   ...props
-}: HTMLAttributes<HTMLDivElement> & { size?: "default" | "wide"; fill?: boolean }) {
+}: HTMLAttributes<HTMLDivElement> & {
+  /** @deprecated Use `measure` instead. */
+  size?: "default" | "wide";
+  /** Page measure: narrow (720px forms/settings) · default (1100px main content) · wide (1440px schedule/timeline) */
+  measure?: "narrow" | "default" | "wide";
+  fill?: boolean;
+}) {
+  // measure takes precedence; size is a legacy alias for backward compat
+  const resolvedMeasure =
+    measure !== "default" ? measure :
+    size === "wide" ? "wide" : "default";
+  const maxW =
+    resolvedMeasure === "narrow" ? "max-w-(--ui-page-narrow)" :
+    resolvedMeasure === "wide"   ? "max-w-(--ui-page-max)" :
+                                   "max-w-(--ui-page-content)";
   return (
     <div
       className={cx(
         "mx-auto w-full gap-6 p-(--ui-page-padding) max-[560px]:gap-5 [&>*]:min-w-0",
         fill ? "flex min-h-0 flex-1 flex-col" : "grid",
-        size === "default" ? "max-w-(--ui-page-max)" : "max-w-(--ui-page-wide-max)",
+        maxW,
         className,
       )}
-      data-size={size}
+      data-measure={resolvedMeasure}
       {...props}
     />
   );

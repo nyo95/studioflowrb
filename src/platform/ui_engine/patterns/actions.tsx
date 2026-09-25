@@ -42,7 +42,7 @@ export function RowActionMenu({
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
-          className="z-[65] min-w-[190px] overflow-hidden rounded-control border border-line bg-surface-raised shadow-elevated p-[5px]"
+          className="z-[65] min-w-[190px] overflow-hidden rounded-control bg-surface-raised shadow-elevated p-[5px]"
           sideOffset={5}
           align="end"
         >
@@ -100,7 +100,7 @@ export function ButtonMenu({
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
-          className="z-[65] min-w-[200px] overflow-hidden rounded-control border border-line bg-surface-raised shadow-elevated p-[5px]"
+          className="z-[65] min-w-[200px] overflow-hidden rounded-control bg-surface-raised shadow-elevated p-[5px]"
           sideOffset={5}
           align={align}
         >

@@ -129,7 +129,7 @@ export function Combobox({
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
-          className="z-[65] w-[min(320px,calc(100vw-24px))] min-w-[190px] overflow-hidden rounded-control border border-line bg-surface-raised shadow-elevated"
+          className="z-[65] w-[min(320px,calc(100vw-24px))] min-w-[190px] overflow-hidden rounded-control bg-surface-raised shadow-elevated"
           sideOffset={5}
           align="start"
         >

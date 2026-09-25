@@ -218,7 +218,7 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
     setZoom((current) => clamp(current - event.deltaY / 500, 1, 3));
   };
 
-  return <div className="grid gap-3 rounded-control border border-line p-3" aria-label={label}>
+  return <div className="grid gap-3 rounded-control shadow-plane p-3" aria-label={label}>
     <input ref={pickerRef} className="sr-only" type="file" accept={accept} disabled={disabled || pending} onChange={(event) => { select(event.target.files?.[0]); event.target.value = ""; }} />
     {!previewUrl ? <Button type="button" variant="secondary" onClick={() => pickerRef.current?.click()} disabled={disabled}>Choose image</Button> : <>
       <div

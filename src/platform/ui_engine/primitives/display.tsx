@@ -127,7 +127,7 @@ export function Surface({
   children?: ReactNode;
 }) {
   return (
-    <Tag className={cx("bg-surface border border-line rounded-card", elevated && "shadow-elevated", className)} {...props}>
+    <Tag className={cx("bg-surface shadow-plane rounded-card", elevated && "shadow-elevated", className)} {...props}>
       {children}
     </Tag>
   );
@@ -259,9 +259,9 @@ export function ProgressBar({
 export type SegmentState = "done" | "current" | "idle" | "blocked";
 
 const SEGMENT_STATE_CLASSES: Record<SegmentState, string> = {
-  done: "bg-action",
-  current: "bg-warning",
-  idle: "bg-line",
+  done:    "bg-mark",
+  current: "bg-mark/20 shadow-[inset_0_0_0_1.5px_var(--color-mark)]",
+  idle:    "bg-line",
   blocked: "bg-danger",
 };
 

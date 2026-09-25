@@ -28,7 +28,7 @@ export type DialogProps = {
 };
 
 const DIALOG_FRAME_CLASSES =
-  "fixed z-[51] flex flex-col overflow-hidden rounded-card border border-line bg-surface-raised shadow-elevated animate-ui-dialog-in";
+  "fixed z-[51] flex flex-col overflow-hidden rounded-card bg-surface-raised shadow-elevated animate-ui-dialog-in";
 const DIALOG_HEADER_CLASSES = "flex shrink-0 items-start justify-between gap-4 px-4 py-3.5 border-b border-line";
 const DIALOG_FOOTER_CLASSES = "flex shrink-0 items-center justify-end gap-4 px-4 py-3.5 border-t border-line";
 

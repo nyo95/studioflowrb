@@ -26,7 +26,7 @@ export function DirectoryShell({
   return (
     <div className={cx(fill ? "flex min-h-0 flex-1 flex-col gap-4" : "grid gap-4", className)} {...props}>
       {header}
-      {surface ? <div className={cx("min-w-0 overflow-hidden rounded-card border border-line bg-surface", fill && "flex flex-col flex-1 min-h-0")} data-directory-surface>
+      {surface ? <div className={cx("min-w-0 overflow-hidden rounded-card bg-surface shadow-plane", fill && "flex flex-col flex-1 min-h-0")} data-directory-surface>
         {toolbar ? <div className="border-b border-line">{toolbar}</div> : null}
         <div className={cx("min-w-0", fill && "flex min-h-0 flex-1 flex-col")}>{children}</div>
         {pagination ? <div className="border-t border-line px-4 py-3">{pagination}</div> : null}
