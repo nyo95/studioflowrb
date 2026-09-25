@@ -38,7 +38,6 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   return (
     <>
       <PageHeader
-        eyebrow="StudioFlow"
         title="Today"
         description={today.scope === "mine" ? `${firstName}, ${summary.toLowerCase()}` : `${summary} across running projects`}
         actions={canSeeAll ? (

@@ -52,7 +52,6 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
   return (
     <>
       <PageHeader
-        eyebrow="StudioFlow"
         title="Timeline"
         description="Every project's phase schedule in one Gantt — filter by client, PIC, status, or date range; click a segment to set its planned dates."
         divider

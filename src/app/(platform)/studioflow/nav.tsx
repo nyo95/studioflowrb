@@ -24,7 +24,7 @@ export function StudioFlowNav() {
   const pathname = usePathname();
   if (!pathname.startsWith("/studioflow")) return null;
   return (
-    <NavGroup label="StudioFlow navigation" heading="StudioFlow">
+    <NavGroup label="StudioFlow navigation">
       {STUDIOFLOW_NAV_LINKS.workspace.map(({ href, label, exact }) => {
         const Icon = ICONS[href] ?? ListChecks;
         return (

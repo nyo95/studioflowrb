@@ -22,7 +22,7 @@ export default async function StudioSettingsPage() {
   const defaultTemplate = phaseTemplates.find((template) => template.isDefault && template.isActive);
   return (
     <>
-      <PageHeader eyebrow="StudioFlow" title="Studio Settings" description="How projects are named and which checklist every project gets." divider />
+      <PageHeader title="Studio Settings" description="How projects are named and which checklist every project gets." divider />
       <SettingsShell navigationLabel="Studio Settings navigation" navigation={<StudioSettingsNav />}>
         <StudioSettingsView
           autoNaming={settings.autoNamingEnabled}

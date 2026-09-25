@@ -5,8 +5,18 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.153**
-- Next local revision: **R8.154**
+- Current revision after this entry is committed: **R8.154**
+- Next local revision: **R8.155**
+
+## R8.154 | 2026-09-25 | fix(shell+sf): eliminate redundant "StudioFlow" labels from rail, header, and page eyebrows
+
+With the app-name chip now the canonical location for the active application name (Option B, R8.152), four separate "StudioFlow" labels appeared simultaneously on every SF page:
+
+1. **Header brand area** (`ui_engine/layouts/shells.tsx`): `AppShell` header always rendered `{brand}` (full text "StudioFlow"), which gets truncated to "S.." inside the fixed 48px brand area. Fixed by using `collapsedBrand ?? brand` when `isCollapsed` — shows the "SF" monogram instead of the truncated text.
+2. **Rail NavGroup heading** (`studioflow/nav.tsx`): `NavGroup heading="StudioFlow"` rendered a "STUDIOFLOW" section label above every nav item in the left rail. Removed the `heading` prop; `label` is kept for accessibility.
+3. **Page eyebrows** (7 files): Every top-level SF page (`page.tsx`, `projects/page.tsx`, `clients/page.tsx`, `timeline/page.tsx`, `library/page.tsx`, `settings/page.tsx`) had `PageHeader eyebrow="StudioFlow"`. Removed on all — the topbar chip already identifies the active app.
+
+Verification: `tsc --noEmit` clean.
 
 ## R8.153 | 2026-09-25 | fix(sf): restore SettingsShell-based project layout; fix R8.152 regression
 

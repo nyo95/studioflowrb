@@ -13,7 +13,7 @@ export default async function ClientsPage() {
   const clients = await studioFlow.projects.listClients({ grants, includeArchived: true });
   return (
     <>
-      <PageHeader eyebrow="StudioFlow" title="Clients" description="Who the studio works for. Clients are records, not users." divider />
+      <PageHeader title="Clients" description="Who the studio works for. Clients are records, not users." divider />
       <ClientDirectory clients={clients} canManage={hasPermission(grants, P.projectManage)} />
     </>
   );

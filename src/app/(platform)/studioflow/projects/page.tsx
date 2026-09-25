@@ -32,7 +32,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeader eyebrow="StudioFlow" title="Projects" description="Every studio project, its five phases, and who holds it." divider />
+      <PageHeader title="Projects" description="Every studio project, its five phases, and who holds it." divider />
       <ProjectDirectory
         projects={projects}
         people={people}

@@ -11,7 +11,7 @@ export default async function LibraryPage() {
   const brands = await studioFlow.library.listBrands({ grants });
   return (
     <>
-      <PageHeader eyebrow="StudioFlow" title="Library" description="Browse Master Data's Brand catalog for reference — read-only, nothing here writes back to Master Data." divider />
+      <PageHeader title="Library" description="Browse Master Data's Brand catalog for reference — read-only, nothing here writes back to Master Data." divider />
       <LibraryDirectory brands={brands} />
     </>
   );

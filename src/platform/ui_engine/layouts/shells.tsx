@@ -90,7 +90,7 @@ export function AppShell({
         {topbar ? (
           <header className="sticky top-0 z-20 flex h-16 items-center border-b border-line bg-surface/94 backdrop-blur-[12px]">
             <div className="flex h-full w-(--ui-header-brand-width) min-w-0 shrink-0 items-center px-4 max-[840px]:w-auto max-[840px]:px-3">
-              <div className="min-w-0 overflow-hidden">{brand}</div>
+              <div className="min-w-0 overflow-hidden">{isCollapsed ? (collapsedBrand ?? brand) : brand}</div>
             </div>
             <div className="flex min-w-0 flex-1 items-center">{topbar}</div>
           </header>
