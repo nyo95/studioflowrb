@@ -21,130 +21,106 @@ All apps must feel like one product. Do not create a separate visual language pe
 
 ## 2. Canonical Typography
 
-- Page and major-view headings: `Instrument Serif` / `font-serif`
-- Operational UI/body: `Instrument Sans` / `font-sans`
+Three web fonts, each with a single job.
 
-| Role | Default |
-|---|---|
-| H1 | serif, 32px, semibold/bold, tight |
-| H2 | serif, 24px, semibold/bold, tight |
-| H3 | sans, 18px, semibold |
-| H4 | sans, 16px, semibold |
-| H5 | sans, 14px, semibold |
-| H6 | sans, 12px, semibold |
-| Body | sans, `text-sm`, normal |
-| Control/chrome | sans, `13px` (`text-[0.8125rem]`), normal/medium |
-| UI Meta | sans, `11px`, bold, uppercase, wide tracking |
+| Font | Variable | Role |
+|---|---|---|
+| **Schibsted Grotesk** | `--font-sans` / `--ui-font-sans` | All operational UI — headings H3–H6, body, chrome, controls, tables |
+| **Instrument Serif** | `--font-serif` / `--ui-font-serif` | Display: H1, H2, document titles, MOM surface. Identity without decoration. |
+| **JetBrains Mono** | `--font-mono` / `--ui-font-mono` | Labels (`text-label`), identifiers, reference codes, data cells with codes |
 
-H1–H2 provide restrained product identity. H3–H6, tables, controls, labels, menus, and data use sans-serif. Do not invent arbitrary sizes when an existing semantic role fits.
+Type scale — five sizes, no others:
 
-**Body vs Control/chrome.** Body is what the operator came to read — table cell
-values, record names, form values, prose. Chrome is what frames it: navigation
-items, menu items, tabs, badges, notices, the meta line under a page title, and
-mono identifiers. Chrome sits one step down at 13px so it recedes behind the
-content it surrounds; a screen where chrome and content share a size reads as an
-undifferentiated wall. Content never drops to 13px to win space — if a column is
-tight, cut the column, not the type.
+| Name | Size | Line height | Use |
+|---|---|---|---|
+| micro | 11px (`text-micro`) | 16px | Labels (`text-label`), eyebrows, meta in tight spaces |
+| meta | 13.5px (`text-meta`) | 20px | Chrome: nav items, tabs, badges, meta lines, table chrome |
+| base | 16px (`text-base`) | 24px | Body copy, table cell values, form values |
+| title | 21px (`text-title`) | 25px | Section headings, H3 in sans |
+| display | 30px (`text-display`) | 34.5px | H1/H2 in serif only |
 
-This role is not new. It is what `NavItem`, `NavSubmenu`, `RowActionMenu`,
-`StatusBadge`, `Notice`, `MetaList`, and the table identifier face already use,
-and what the approved StudioFlow design specifies for its chrome. It was
-recorded here in R7.22 so the size stops looking like drift.
+**Body vs chrome.** Body is what the operator came to read — cell values, record names, form values. Chrome frames it: nav items, tabs, badges, meta lines, mono identifiers. Chrome sits one step down (`text-meta`) so it recedes behind the content it surrounds. Content never drops to meta size to win space — cut the column, not the type.
+
+**Mono identifiers.** `text-label` uses JetBrains Mono — not sans. Labels, eyebrows, group headings, and reference codes read as structured data rather than prose. This is the visual grammar of `NavItem`, `StatusBadge`, and table identifier cells.
+
+**Instrument Serif is not Instrument Sans.** Instrument Sans does not exist in this product. The serif earns its place on large display moments and the MOM document surface; it does not appear in operational chrome or data tables.
+
+**Loading.** Schibsted Grotesk and JetBrains Mono load via `next/font/google`. Instrument Serif loads via `localFont` from `src/app/fonts/` (woff2 files committed to the repo) because Google Fonts does not serve it as a variable font.
 
 ## 3. Color Semantics
 
-Three tones, in a fixed relationship:
+Three planes in a fixed depth order: **ground → content → emphasis**.
 
-- **Near-white ground** `#fbfbfb` — the page. Nothing sits *on* it directly except spacing.
-- **White planes** `#ffffff` — cards, tables, toolbars. Everything the
-  operator actually reads or acts on.
-- **Warm chrome** — the rail uses a controlled mix of Surface Muted and Surface;
-  the sticky topbar remains a translucent white plane.
-- **Near-black emphasis** `#1c1a18` — reserved for the primary action and compact
-  identity marks, not repeated across every table.
+**Ground** (`--ui-canvas`, `#F1EEE9`): the page behind everything. At 1.13:1 under white it is a real plane — visible, not a hint. Nothing sits on it directly except spacing. Switch between the three ground ramps via `[data-ground]` on `<html>`: `gray` (default), `clay`, `ivory`.
 
-The ground is what separates the white rail from the white content surfaces, but it
-is deliberately shallow — 1.035:1 against white, close to the perceptual floor. It
-reads as a hint, not as a plane. **The 1px border is therefore still the real edge**,
-and any white plane that drops its border will disappear. Ink is a warm near-black
-rather than a blue-black, which keeps the two warm semantic states (danger, warning)
-reading as signal rather than fighting the ground.
+**Planes** (`--ui-surface`, `#FFFFFF`): cards, tables, toolbars, topbar — everything the operator reads or acts on. Shadow-carried hairlines define the edge (`--ui-shadow-plane`). The ground is deep enough that shadow alone separates white planes from it; drawn borders are retained only where a shadow would be invisible (structural rail dividers, focus rings).
 
-Hierarchy still leans on the three type roles (serif display / sans operational /
-mono data), on spacing, and on state. A screen that reads flat is usually missing
-one of those, not missing more tint.
+**Rail** (`--ui-rail`, `#E8E3DB`): recesses below the ground — it reads as application chrome, not a content card. The rail being darker than the ground is deliberate: it says "this is the machine, not the work."
 
-Base:
-- Canvas (page ground): `#fbfbfb`
-- Surface (rail, cards, tables, toolbars): `#ffffff`
-- Surface muted (hover, selected, disabled): `#f5f4f2`
-- Table header surface: `#f5f4f2` on `#55524d` label
-- Primary text: `#1c1a18`
-- Secondary text: `#55524d`
-- Tertiary/meta: `#6e6a65`
-- Default border: `#e0dfdc`
-- Subtle border: `#eeedeb`
-- Strong border: `#c2c0bc`
-- Focus border: `#57534e`
-- Primary action: `#1c1a18` / white
-- Primary hover: `#332f2b`
+**Emphasis** (`--ui-action-primary`, `#231F1C`): constant graphite. It never changes per screen. "The dark button is the one that commits" is true everywhere.
 
-Data face: `--ui-font-mono` is the platform monospace stack — no web font is
-loaded for it. Use it for identifiers and reference codes so a reference reads as
-a reference rather than as prose. Do not use it for running text.
+**Phase hues** — five identity marks, shapes only:
+- Moodboard `--ph-mood` `#6F7D45`
+- Layout Plan `--ph-layout` `#B6782F`
+- 3D Design `--ph-3d` `#9B5F55`
+- Construction Doc `--ph-cd` `#466F88`
+- Supervision `--ph-sup` `#695B8A`
 
-Contrast floor: every text token must clear WCAG AA (4.5:1) against both Surface
-and Canvas. Tertiary/meta text is held at `#6e6a65` for this reason — it carries
-table headers, eyebrows, placeholders, and disabled labels, all of which are small.
-Do not lighten it.
+Phase hues appear as filled bars, dots, rings, meter fills, and Gantt segments. **Never as text colour, never on a button.** `--ui-mark` holds the active phase hue and is set by JS on phase entry. A deep ramp (`--ph-*-deep`) is available for phase labels that must sit on ground or surface at 4.5:1+.
 
-Semantic state:
-- danger/destructive: red foreground + subtle surface + border
-- success: emerald foreground + subtle surface + border
-- warning/pending: amber foreground + subtle surface + border
+**Ink:** warm near-black (`#1A1714`), not blue-black. Secondary `#57504A`, tertiary `#6A635C`. Every text token clears WCAG AA (4.5:1) against both surface and canvas. Do not lighten tertiary — it carries table headers, eyebrows, placeholders, and disabled labels, all at small sizes.
 
-Before/after change previews use danger/success semantics only when that meaning is accurate. Domain statuses choose a semantic state in app code; UI Engine never infers business meaning from a status string.
-
-Do not introduce app-specific accent colors for ordinary navigation, cards, or buttons without product-level approval.
+**Semantic state:** danger/destructive red `#A63A2E`, success emerald `#3F7150`, warning amber `#956113` — each with a matching surface wash and border. Do not introduce app-specific accent colours for ordinary navigation, cards, or buttons without product-level approval.
 
 ## 4. Radius & Surface
 
-- Card: 8px
-- Control: 6px
-- Action/button/input: 4px
-- Pill: only for badges/chips where appropriate
+Concentric radii — inner controls are tighter than their outer containers:
 
-Primary surfaces are white with a 1px subtle/default border and no shadow by default. Shadow is reserved for dialogs, drawers, menus, floating toolbars, or genuinely elevated content. Avoid deep elevation and card-inside-card layouts.
+| Element | Radius | Token |
+|---|---|---|
+| Cards, sections, modals | 14px | `--ui-radius-card` |
+| Controls, toolbars, dropdowns | 10px | `--ui-radius-control` |
+| Inputs, action buttons | 7px | `--ui-radius-action` |
+| Badges, chips | 999px | `--ui-radius-pill` |
 
-Elevation model — two physical planes plus restrained emphasis:
+Elevation model — shadow-carried hairlines replace drawn borders on content planes:
 
-| Plane | What sits there | Treatment |
-| --- | --- | --- |
-| Ground | Page background behind everything | Near-white `#fbfbfb`, never bordered |
-| Plane | Cards, tables, toolbars, topbar | White + 1px border, no shadow |
-| Chrome | Rail | Warm muted surface + 1px border, no shadow |
-| Emphasis | Primary action, compact identity mark | Near-black `#1c1a18` |
+| Plane | Treatment | Shadow token |
+|---|---|---|
+| Ground | `--ui-canvas` `#F1EEE9`, no shadow | — |
+| Content plane (resting) | `--ui-surface` + shadow hairline | `--ui-shadow-plane` |
+| Content plane (hover/focus) | `--ui-surface` + raised shadow | `--ui-shadow-raise` |
+| Rail / chrome | `--ui-rail` `#E8E3DB`, structural border | — |
+| Dialog / menu / drawer | `--ui-surface` + full elevation | `--ui-shadow-over` |
+| Emphasis | `--ui-action-primary` `#231F1C` | — |
 
-The rail is quiet application chrome, not another content card. Its warm-muted
-surface separates navigation from work while the border retains the exact edge.
-Every white content plane still carries its border — at 1.035:1 the ground alone
-cannot define an edge.
+`--ui-shadow-plane`: a 0.5px hairline ring + 1px micro shadow. This replaces the `1px border` on cards and tables. Structural dividers (sidebar separator, header bottom) keep a drawn border because a shadow would be invisible against an adjacent surface.
 
-Application chrome belongs to the ground plane, not the content plane. If the rail,
-the page background, and the cards all render white, nothing has altitude and the
-whole screen reads flat — the operator then has to re-scan the page from scratch on
-every visit. Keep chrome on Canvas so content is the only thing that rises.
+Do not stack cards inside cards. One elevation depth per screen section.
 
 ## 5. Spacing & Density
 
 Canonical base:
-- section padding X: 16px
-- section padding Y: 16px
-- section gap: 16px
-- page padding: 20–24px
-- max page width: ~1440px
 
-This is an operational tool, not a marketing site. Optimize for scanning and repeated daily use. BQ may be denser because spreadsheet-like efficiency is a product requirement.
+| Token | Value |
+|---|---|
+| `--ui-section-px` | 16px |
+| `--ui-section-py` | 16px |
+| `--ui-section-gap` | 16px |
+| `--ui-page-padding` | 20–24px (clamped) |
+| `--ui-page-max` | 1440px |
+| `--ui-row-y` | 9px (comfortable row padding) |
+| `--ui-control-height-md` | 36px |
+| `--ui-control-height-sm` | 32px |
+
+This is an operational tool, not a marketing site. Optimize for scanning and repeated daily use.
+
+**BQ compact density.** Apply `data-density="compact"` on `<html>` for BQ only. This stamp tightens row padding to 6px, controls to 28px/24px, and section padding to 12/10px. It is a single attribute change — no component-level overrides.
+
+**Page measure variants.** `PageShell` accepts a `measure` prop:
+- default (1100px): Today, Overview, phase canvas
+- narrow (720px): Forms, settings
+- wide (1440px): Schedule board, Timeline
 
 ## 6. Page Structure
 

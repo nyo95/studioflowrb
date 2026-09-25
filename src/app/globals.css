@@ -5,9 +5,10 @@
 @import "../platform/ui_engine/tokens/tokens.css";
 @import "../platform/ui_engine/styles/base.css";
 
-/* The one uppercase label style (eyebrows, group headings, dropdown section labels). */
+/* ── UI meta label: mono, small-caps for identity lines ──────────────────── */
 @utility text-label {
-  font-size: 0.6875rem;
+  font-family: var(--ui-font-mono);
+  font-size: 0.6875rem;   /* 11px */
   line-height: 1rem;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -22,79 +23,103 @@
  * emits var(--ui-*) references directly — no literal value is duplicated.
  */
 @theme inline {
-  --color-canvas: var(--ui-canvas);
-  --color-surface: var(--ui-surface);
-  --color-surface-raised: var(--ui-surface-raised);
+  /* Surfaces */
+  --color-canvas:        var(--ui-canvas);
+  --color-surface:       var(--ui-surface);
+  --color-surface-raised:var(--ui-surface-raised);
   --color-surface-muted: var(--ui-surface-muted);
-  --color-line-subtle: var(--ui-border-subtle);
-  --color-line: var(--ui-border-default);
-  --color-line-strong: var(--ui-border-strong);
-  --color-line-focus: var(--ui-border-focus);
-  --color-ink: var(--ui-text-primary);
+  --color-rail:          var(--ui-rail);
+  --color-rail-soft:     var(--ui-rail-soft);
+
+  /* Borders / lines */
+  --color-line-subtle:   var(--ui-border-subtle);
+  --color-line:          var(--ui-border-default);
+  --color-line-strong:   var(--ui-border-strong);
+  --color-line-focus:    var(--ui-border-focus);
+
+  /* Ink */
+  --color-ink:           var(--ui-text-primary);
+  --color-ink-2:         var(--ui-text-secondary);
+  --color-ink-3:         var(--ui-text-tertiary);
+  --color-ink-inverse:   var(--ui-text-inverse);
+  /* Legacy aliases */
   --color-ink-secondary: var(--ui-text-secondary);
-  --color-ink-tertiary: var(--ui-text-tertiary);
-  --color-ink-inverse: var(--ui-text-inverse);
-  --color-action: var(--ui-action-primary);
-  --color-action-hover: var(--ui-action-primary-hover);
-  --color-danger: var(--ui-danger-fg);
-  --color-danger-surface: var(--ui-danger-bg);
-  --color-danger-line: var(--ui-danger-border);
-  --color-success: var(--ui-success-fg);
-  --color-success-surface: var(--ui-success-bg);
-  --color-success-line: var(--ui-success-border);
-  --color-warning: var(--ui-warning-fg);
-  --color-warning-surface: var(--ui-warning-bg);
-  --color-warning-line: var(--ui-warning-border);
+  --color-ink-tertiary:  var(--ui-text-tertiary);
+
+  /* Action */
+  --color-action:        var(--ui-action-primary);
+  --color-action-hover:  var(--ui-action-primary-hover);
+  --color-action-ink:    var(--ui-action-ink);
+
+  /* Semantic */
+  --color-danger:        var(--ui-danger-fg);
+  --color-danger-surface:var(--ui-danger-bg);
+  --color-danger-line:   var(--ui-danger-border);
+  --color-success:       var(--ui-success-fg);
+  --color-success-surface:var(--ui-success-bg);
+  --color-success-line:  var(--ui-success-border);
+  --color-warning:       var(--ui-warning-fg);
+  --color-warning-surface:var(--ui-warning-bg);
+  --color-warning-line:  var(--ui-warning-border);
+
+  /* Phase hues */
+  --color-ph-mood:    var(--ph-mood);
+  --color-ph-layout:  var(--ph-layout);
+  --color-ph-3d:      var(--ph-3d);
+  --color-ph-cd:      var(--ph-cd);
+  --color-ph-sup:     var(--ph-sup);
+  --color-mark:       var(--ui-mark);
+
+  /* Table */
   --color-thead-surface: var(--ui-table-header-bg);
-  --color-thead: var(--ui-table-header-fg);
+  --color-thead:         var(--ui-table-header-fg);
 
-  --radius-card: var(--ui-radius-card);
+  /* Radii */
+  --radius-card:    var(--ui-radius-card);
   --radius-control: var(--ui-radius-control);
-  --radius-action: var(--ui-radius-action);
-  --radius-pill: var(--ui-radius-pill);
+  --radius-action:  var(--ui-radius-action);
+  --radius-pill:    var(--ui-radius-pill);
 
+  /* Shadows */
+  --shadow-plane:    var(--ui-shadow-plane);
+  --shadow-raise:    var(--ui-shadow-raise);
+  --shadow-over:     var(--ui-shadow-over);
   --shadow-elevated: var(--ui-shadow-elevated);
 
-  /* Type scale — the only sizes the product uses:
-     micro 11 · xs 12 · meta 13 · sm 14 (body/UI) · base 16 · xl 20 ·
-     title 22 (serif H2) · 2xl 24 · display 30 (serif H1).
-     Meta sits one step below body so identity lines never compete with it. */
-  --text-micro: 0.6875rem;
+  /* Font families */
+  --font-ui-sans:  var(--ui-font-sans);
+  --font-ui-serif: var(--ui-font-serif);
+  --font-ui-mono:  var(--ui-font-mono);
+  /* Legacy aliases */
+  --font-display:  var(--ui-font-serif);
+
+  /* Type scale — five sizes the product uses:
+     11px micro · 12.5px xs · 13.5px meta (chrome) · 16px base · 21px display */
+  --text-micro:              0.6875rem;   /* 11px */
   --text-micro--line-height: 1rem;
-  --text-meta: 0.8125rem;
-  --text-meta--line-height: 1.25rem;
-  --text-title: 1.375rem;
-  --text-title--line-height: 1.25;
-  --text-display: 1.875rem;
+  --text-meta:               0.84375rem;  /* 13.5px */
+  --text-meta--line-height:  1.25rem;
+  --text-title:              1.3125rem;   /* 21px */
+  --text-title--line-height: 1.2;
+  --text-display:            1.875rem;    /* 30px */
   --text-display--line-height: 1.15;
 
-  --font-display: var(--font-serif), serif;
-  --font-ui-mono: var(--ui-font-mono);
-
-  --animate-ui-spin: ui-spin 800ms linear infinite;
-  --animate-ui-skeleton: ui-skeleton 1.3s ease-in-out infinite;
-  --animate-ui-fade-in: ui-fade-in 120ms ease-out;
+  /* Animations */
+  --animate-ui-spin:      ui-spin 800ms linear infinite;
+  --animate-ui-skeleton:  ui-skeleton 1.3s ease-in-out infinite;
+  --animate-ui-fade-in:   ui-fade-in 120ms ease-out;
   --animate-ui-dialog-in: ui-dialog-in 140ms ease-out;
 
   @keyframes ui-spin {
-    to {
-      transform: rotate(360deg);
-    }
+    to { transform: rotate(360deg); }
   }
   @keyframes ui-skeleton {
-    to {
-      background-position: -200% 0;
-    }
+    to { background-position: -200% 0; }
   }
   @keyframes ui-fade-in {
-    from {
-      opacity: 0;
-    }
+    from { opacity: 0; }
   }
   @keyframes ui-dialog-in {
-    from {
-      opacity: 0;
-      transform: translate(-50%, calc(-50% + 8px));
-    }
+    from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); }
   }
 }

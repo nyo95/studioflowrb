@@ -1,158 +1,286 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   StudioFlow UI Engine — Design tokens (R8.145)
+   Single source of truth. Tailwind bridge lives in globals.css @theme inline.
+   Prototype: https://claude.ai/artifact/PE5G9naCBEfKUhU1J3nfcg (v6)
+───────────────────────────────────────────────────────────────────────────── */
+
 :root {
-  /* ── Surfaces ────────────────────────────────────────────────── */
-  --ui-canvas: #fbfbfb;
-  --ui-surface: #ffffff;
-  --ui-surface-raised: #ffffff;
-  --ui-surface-muted: #edece9;
+  /* ── Ground & surfaces ────────────────────────────────────────────────────
+     Three planes in a fixed depth order:
+       ground  →  content planes  →  emphasis
+     Rail recedes BELOW the ground; dialogs float ABOVE content planes.      */
+  --ui-canvas:          #F1EEE9;  /* ground — 1.13:1 under white, a real plane */
+  --ui-surface:         #FFFFFF;  /* content: cards, tables, toolbars          */
+  --ui-surface-raised:  #FAF8F5;  /* inset: table headers, code, muted input   */
+  --ui-surface-muted:   #EFEBE4;  /* hover, selected, disabled                 */
+  --ui-rail:            #E8E3DB;  /* recessed chrome (sidebar rail)            */
+  --ui-rail-soft:       #EFEBE4;  /* softer rail accent                        */
 
-  /* ── Borders ─────────────────────────────────────────────────── */
-  --ui-border-subtle: #eeedeb;
-  --ui-border-default: #e0dfdc;
-  --ui-border-strong: #c2c0bc;
-  --ui-border-focus: #57534e;
+  /* ── Ground ramps (switchable via [data-ground] on <html>) ──────────────  */
+  /* default (gray-warm) defined above; override blocks below switch it       */
 
-  /* ── Text ────────────────────────────────────────────────────── */
-  --ui-text-primary: #1c1a18;
-  --ui-text-secondary: #55524d;
-  --ui-text-tertiary: #6e6a65;
-  --ui-text-inverse: #ffffff;
+  /* ── Borders ─────────────────────────────────────────────────────────────
+     Shadow-carried hairlines are the primary edge. Keep border tokens for
+     components that still use drawn borders (structural dividers, focus).    */
+  --ui-border-subtle:   #ECE7DF;
+  --ui-border-default:  #DED7CD;
+  --ui-border-strong:   #C3B9AC;
+  --ui-border-focus:    #1A1714;
 
-  /* ── Actions ─────────────────────────────────────────────────── */
-  --ui-action-primary: #1c1a18;
-  --ui-action-primary-hover: #332f2b;
+  /* ── Ink (text) ──────────────────────────────────────────────────────────  */
+  --ui-text-primary:    #1A1714;
+  --ui-text-secondary:  #57504A;
+  --ui-text-tertiary:   #6A635C;
+  --ui-text-inverse:    #FFFFFF;
 
-  /* ── Semantic ────────────────────────────────────────────────── */
-  --ui-danger-fg: #b91c1c;
-  --ui-danger-bg: #fef2f2;
-  --ui-danger-border: #fecaca;
-  --ui-success-fg: #047857;
-  --ui-success-bg: #ecfdf5;
-  --ui-success-border: #a7f3d0;
-  --ui-warning-fg: #b45309;
-  --ui-warning-bg: #fffbeb;
-  --ui-warning-border: #fde68a;
+  /* ── Actions ─────────────────────────────────────────────────────────────
+     One constant action colour — graphite. It never moves per screen.
+     "The dark button is the one that commits" stays true everywhere.         */
+  --ui-action-primary:       #231F1C;
+  --ui-action-primary-hover: #3A3531;
+  --ui-action-ink:           #FFFFFF;  /* text on action buttons              */
 
-  /* ── Phase colours (StudioFlow) ──────────────────────────────── */
-  --ui-phase-moodboard: #6f7d45;
-  --ui-phase-layout: #b6782f;
-  --ui-phase-design-3d: #9b5f55;
-  --ui-phase-cd: #466f88;
-  --ui-phase-supervision: #695b8a;
+  /* ── Selection state ────────────────────────────────────────────────────  */
+  --ui-sel-wash: color-mix(in srgb, var(--ui-text-primary) 6%, var(--ui-surface));
+  --ui-sel-line: var(--ui-border-strong);
 
-  /* ── Data table ──────────────────────────────────────────────── */
-  --ui-table-header-bg: #f5f4f2;
-  --ui-table-header-fg: #55524d;
+  /* ── Semantic ────────────────────────────────────────────────────────────  */
+  --ui-danger-fg:       #A63A2E;
+  --ui-danger-bg:       #F8ECEA;
+  --ui-danger-border:   #E8B4AE;
+  --ui-success-fg:      #3F7150;
+  --ui-success-bg:      #EAF2EC;
+  --ui-success-border:  #A8D4B4;
+  --ui-warning-fg:      #956113;
+  --ui-warning-bg:      #F8F1E3;
+  --ui-warning-border:  #E5C98A;
 
-  /* ── Typography ──────────────────────────────────────────────── */
-  --ui-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  /* ── Phase hues (StudioFlow identity marks) ──────────────────────────────
+     Used ONLY for shapes: strips, dots, rings, meter fills, Gantt segments.
+     Never for text colour, buttons, or actionable elements.
+     --ui-mark is set by JS when the user enters a phase context.             */
+  --ph-mood:       #6F7D45;  /* Moodboard        */
+  --ph-layout:     #B6782F;  /* Layout Plan      */
+  --ph-3d:         #9B5F55;  /* 3D Design        */
+  --ph-cd:         #466F88;  /* Construction Doc */
+  --ph-sup:        #695B8A;  /* Supervision      */
 
-  /* ── Radii ───────────────────────────────────────────────────── */
-  --ui-radius-card: 8px;
-  --ui-radius-control: 6px;
-  --ui-radius-action: 4px;
-  --ui-radius-pill: 3px;
+  /* Deep ramp — cleared to 4.5:1 for phase labels on ground/surface         */
+  --ph-mood-deep:    #636F3D;
+  --ph-layout-deep:  #926026;
+  --ph-3d-deep:      #955B52;
+  --ph-cd-deep:      #3C6079;
+  --ph-sup-deep:     #5E4F7C;
 
-  /* ── Spacing ─────────────────────────────────────────────────── */
-  --ui-section-px: 16px;
-  --ui-section-py: 16px;
-  --ui-section-gap: 16px;
+  /* Aliases for legacy code that uses --ui-phase-* names                    */
+  --ui-phase-moodboard:   var(--ph-mood);
+  --ui-phase-layout:      var(--ph-layout);
+  --ui-phase-design-3d:   var(--ph-3d);
+  --ui-phase-cd:          var(--ph-cd);
+  --ui-phase-supervision: var(--ph-sup);
+
+  /* Contextual phase identity mark — shapes only, set by JS on phase entry  */
+  --ui-mark: var(--ph-mood);
+
+  /* ── Table ────────────────────────────────────────────────────────────── */
+  --ui-table-header-bg: var(--ui-surface-raised);
+  --ui-table-header-fg: var(--ui-text-secondary);
+
+  /* ── Typography ──────────────────────────────────────────────────────────
+     Font families reference Next.js CSS variable injections from layout.tsx  */
+  --ui-font-sans:  var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --ui-font-serif: var(--font-serif), Georgia, "Times New Roman", serif;
+  --ui-font-mono:  var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* ── Radii (concentric: inner → outer) ──────────────────────────────────
+     7 inputs/actions  ·  10 controls/toolbars  ·  14 cards/sections         */
+  --ui-radius-card:    14px;
+  --ui-radius-control: 10px;
+  --ui-radius-action:   7px;
+  --ui-radius-pill:    999px;
+
+  /* ── Spacing ─────────────────────────────────────────────────────────────  */
+  --ui-section-px:   16px;
+  --ui-section-py:   16px;
+  --ui-section-gap:  16px;
   --ui-page-padding: clamp(20px, 2.5vw, 24px);
-  --ui-page-max: 1440px;
-  --ui-page-wide-max: 1920px;
+  --ui-page-narrow:  720px;   /* forms, settings              */
+  --ui-page-content: 1100px;  /* Today, Overview, phase canvas */
+  --ui-page-max:     1440px;  /* schedule, timeline (wide)    */
+  --ui-page-wide-max:1920px;  /* full-bleed (BQ, print)       */
 
-  /* ── Shell layout ────────────────────────────────────────────── */
-  --ui-rail-width: 200px;
-  --ui-header-brand-width: var(--ui-rail-width);
-  --ui-rail-collapsed-width: 56px;
+  /* ── Shell layout ────────────────────────────────────────────────────────  */
+  --ui-rail-width:           48px;   /* icon rail default                    */
+  --ui-rail-expanded-width: 212px;   /* icon rail expanded (with labels)     */
+  --ui-secondary-width:     220px;   /* contextual secondary sidebar         */
+  --ui-header-height:        44px;   /* sticky context bar                   */
+  /* legacy alias kept for any code that reads it */
+  --ui-header-brand-width:  var(--ui-rail-width);
+  --ui-rail-collapsed-width:var(--ui-rail-width);
 
-  /* ── Controls ────────────────────────────────────────────────── */
+  /* ── Controls ────────────────────────────────────────────────────────────  */
+  --ui-row-y:              9px;   /* comfortable density row padding        */
   --ui-control-height-sm: 32px;
   --ui-control-height-md: 36px;
 
-  /* ── Dialogs ─────────────────────────────────────────────────── */
-  --ui-dialog-sm: 420px;
-  --ui-dialog-md: 560px;
-  --ui-dialog-lg: 760px;
-  --ui-dialog-xl: 980px;
-  --ui-dialog-full: 1180px;
-  --ui-dialog-max-height: 90dvh;
+  /* ── Dialogs ─────────────────────────────────────────────────────────────  */
+  --ui-dialog-sm:         420px;
+  --ui-dialog-md:         560px;
+  --ui-dialog-lg:         760px;
+  --ui-dialog-xl:         980px;
+  --ui-dialog-full:      1180px;
+  --ui-dialog-max-height:  90dvh;
 
-  /* ── Elevation ───────────────────────────────────────────────── */
-  --ui-shadow-elevated: 0 18px 48px rgb(28 26 24 / 0.13), 0 3px 12px rgb(28 26 24 / 0.06);
+  /* ── Elevation (shadow-carried hairlines replace drawn borders) ──────────
+     plane  = the card sits still, a whisper hairline defines its edge
+     raise  = card rises on hover or focus
+     over   = dialogs, menus, floating toolbars                              */
+  --ui-shadow-plane:    0 0 0 .5px rgb(26 23 20 / .07),  0 1px  2px rgb(26 23 20 / .05);
+  --ui-shadow-raise:    0 0 0 .5px rgb(26 23 20 / .08),  0 4px 14px rgb(26 23 20 / .07);
+  --ui-shadow-over:     0 0 0 .5px rgb(26 23 20 / .10),  0 22px 50px rgb(26 23 20 / .16), 0 4px 12px rgb(26 23 20 / .07);
+  /* Legacy alias */
+  --ui-shadow-elevated: var(--ui-shadow-over);
 }
 
-/* ── Dark theme ─────────────────────────────────────────────────────────────
-   Defined in both the media query (for "system" viewers, the common case) and
-   under the explicit stamp so the toggle overrides in either direction.
-   Every token defined in :root is redefined here — a token with no dark
-   override silently shows the light value on a dark ground (the classic bug). */
+/* ── Ground ramp: Clay ───────────────────────────────────────────────────── */
+[data-ground="clay"] {
+  --ui-canvas:       #F5EFE7;
+  --ui-rail:         #EDE3D5;
+  --ui-rail-soft:    #F3EAE0;
+  --ui-border-subtle:#EDE5D9;
+  --ui-border-default:#E0D4C4;
+}
+
+/* ── Ground ramp: Ivory ──────────────────────────────────────────────────── */
+[data-ground="ivory"] {
+  --ui-canvas:       #F7F5EE;
+  --ui-rail:         #EDE8DC;
+  --ui-rail-soft:    #F3F0E7;
+  --ui-border-subtle:#EDEADF;
+  --ui-border-default:#DED8CC;
+}
+
+/* ── Ground ramp: Gray (default alias, explicit for completeness) ─────────── */
+[data-ground="gray"] {
+  --ui-canvas:       #F1EEE9;
+  --ui-rail:         #E8E3DB;
+  --ui-rail-soft:    #EFEBE4;
+  --ui-border-subtle:#ECE7DF;
+  --ui-border-default:#DED7CD;
+}
+
+/* ── BQ compact density stamp ────────────────────────────────────────────── */
+[data-density="compact"] {
+  --ui-row-y:              6px;
+  --ui-control-height-sm: 24px;
+  --ui-control-height-md: 28px;
+  --ui-section-px:        12px;
+  --ui-section-py:        10px;
+  --ui-section-gap:       12px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DARK THEME
+   Both blocks (media query + explicit stamp) so the toggle overrides in
+   either direction. Every token defined in :root is redefined here.
+═══════════════════════════════════════════════════════════════════════════ */
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --ui-canvas: #111110;
-    --ui-surface: #1a1917;
-    --ui-surface-raised: #222120;
-    --ui-surface-muted: #2c2a27;
-    --ui-border-subtle: #2a2826;
-    --ui-border-default: #38352f;
-    --ui-border-strong: #514d47;
-    --ui-border-focus: #a8a4a0;
-    --ui-text-primary: #f2f1ef;
-    --ui-text-secondary: #9e9a95;
-    --ui-text-tertiary: #7e7a75;
-    --ui-text-inverse: #1c1a18;
-    --ui-action-primary: #f2f1ef;
-    --ui-action-primary-hover: #e5e2de;
-    --ui-danger-fg: #f87171;
-    --ui-danger-bg: #200f0f;
-    --ui-danger-border: #7f1d1d;
-    --ui-success-fg: #34d399;
-    --ui-success-bg: #0c1e15;
-    --ui-success-border: #065f46;
-    --ui-warning-fg: #fbbf24;
-    --ui-warning-bg: #1e1800;
-    --ui-warning-border: #78350f;
-    --ui-phase-moodboard: #a3b367;
-    --ui-phase-layout: #d4954a;
-    --ui-phase-design-3d: #c28078;
-    --ui-phase-cd: #6b96b0;
-    --ui-phase-supervision: #9380bc;
-    --ui-table-header-bg: #222120;
-    --ui-table-header-fg: #9e9a95;
-    --ui-shadow-elevated: 0 18px 48px rgb(0 0 0 / 0.5), 0 4px 16px rgb(0 0 0 / 0.25);
+    color-scheme: dark;
+    --ui-canvas:          #131211;
+    --ui-surface:         #1C1A18;
+    --ui-surface-raised:  #232120;
+    --ui-surface-muted:   #2A2825;
+    --ui-rail:            #181615;
+    --ui-rail-soft:       #201E1C;
+    --ui-border-subtle:   #272422;
+    --ui-border-default:  #332F2B;
+    --ui-border-strong:   #4D4740;
+    --ui-border-focus:    #F3F1EE;
+    --ui-text-primary:    #F3F1EE;
+    --ui-text-secondary:  #A39C94;
+    --ui-text-tertiary:   #8A837A;
+    --ui-text-inverse:    #1C1A18;
+    --ui-action-primary:       #F0EDE9;
+    --ui-action-primary-hover: #DED9D3;
+    --ui-action-ink:           #17150F;
+    --ui-sel-wash: color-mix(in srgb, var(--ui-text-primary) 8%, var(--ui-surface));
+    --ui-sel-line: var(--ui-border-strong);
+    --ui-danger-fg:       #E07068;
+    --ui-danger-bg:       #200F0F;
+    --ui-danger-border:   #7F1D1D;
+    --ui-success-fg:      #5DB87A;
+    --ui-success-bg:      #0C1E15;
+    --ui-success-border:  #065F46;
+    --ui-warning-fg:      #D4975A;
+    --ui-warning-bg:      #1E1800;
+    --ui-warning-border:  #78350F;
+    --ph-mood:       #A0B069;
+    --ph-layout:     #D3954B;
+    --ph-3d:         #C28079;
+    --ph-cd:         #6D98B2;
+    --ph-sup:        #9482BD;
+    --ph-mood-deep:    #A0B069;
+    --ph-layout-deep:  #D3954B;
+    --ph-3d-deep:      #C28079;
+    --ph-cd-deep:      #6D98B2;
+    --ph-sup-deep:     #9482BD;
+    --ui-mark:            var(--ph-mood);
+    --ui-table-header-bg: var(--ui-surface-raised);
+    --ui-table-header-fg: var(--ui-text-secondary);
+    --ui-shadow-plane:    0 0 0 .5px rgb(255 255 255 / .07), 0 1px  2px rgb(0 0 0 / .40);
+    --ui-shadow-raise:    0 0 0 .5px rgb(255 255 255 / .08), 0 4px 14px rgb(0 0 0 / .45);
+    --ui-shadow-over:     0 0 0 .5px rgb(255 255 255 / .10), 0 22px 50px rgb(0 0 0 / .60), 0 4px 12px rgb(0 0 0 / .35);
+    --ui-shadow-elevated: var(--ui-shadow-over);
   }
 }
 
 :root[data-theme="dark"] {
-  --ui-canvas: #111110;
-  --ui-surface: #1a1917;
-  --ui-surface-raised: #222120;
-  --ui-surface-muted: #2c2a27;
-  --ui-border-subtle: #2a2826;
-  --ui-border-default: #38352f;
-  --ui-border-strong: #514d47;
-  --ui-border-focus: #a8a4a0;
-  --ui-text-primary: #f2f1ef;
-  --ui-text-secondary: #9e9a95;
-  --ui-text-tertiary: #7e7a75;
-  --ui-text-inverse: #1c1a18;
-  --ui-action-primary: #f2f1ef;
-  --ui-action-primary-hover: #e5e2de;
-  --ui-danger-fg: #f87171;
-  --ui-danger-bg: #200f0f;
-  --ui-danger-border: #7f1d1d;
-  --ui-success-fg: #34d399;
-  --ui-success-bg: #0c1e15;
-  --ui-success-border: #065f46;
-  --ui-warning-fg: #fbbf24;
-  --ui-warning-bg: #1e1800;
-  --ui-warning-border: #78350f;
-  --ui-phase-moodboard: #a3b367;
-  --ui-phase-layout: #d4954a;
-  --ui-phase-design-3d: #c28078;
-  --ui-phase-cd: #6b96b0;
-  --ui-phase-supervision: #9380bc;
-  --ui-table-header-bg: #222120;
-  --ui-table-header-fg: #9e9a95;
-  --ui-shadow-elevated: 0 18px 48px rgb(0 0 0 / 0.5), 0 4px 16px rgb(0 0 0 / 0.25);
+  color-scheme: dark;
+  --ui-canvas:          #131211;
+  --ui-surface:         #1C1A18;
+  --ui-surface-raised:  #232120;
+  --ui-surface-muted:   #2A2825;
+  --ui-rail:            #181615;
+  --ui-rail-soft:       #201E1C;
+  --ui-border-subtle:   #272422;
+  --ui-border-default:  #332F2B;
+  --ui-border-strong:   #4D4740;
+  --ui-border-focus:    #F3F1EE;
+  --ui-text-primary:    #F3F1EE;
+  --ui-text-secondary:  #A39C94;
+  --ui-text-tertiary:   #8A837A;
+  --ui-text-inverse:    #1C1A18;
+  --ui-action-primary:       #F0EDE9;
+  --ui-action-primary-hover: #DED9D3;
+  --ui-action-ink:           #17150F;
+  --ui-sel-wash: color-mix(in srgb, var(--ui-text-primary) 8%, var(--ui-surface));
+  --ui-sel-line: var(--ui-border-strong);
+  --ui-danger-fg:       #E07068;
+  --ui-danger-bg:       #200F0F;
+  --ui-danger-border:   #7F1D1D;
+  --ui-success-fg:      #5DB87A;
+  --ui-success-bg:      #0C1E15;
+  --ui-success-border:  #065F46;
+  --ui-warning-fg:      #D4975A;
+  --ui-warning-bg:      #1E1800;
+  --ui-warning-border:  #78350F;
+  --ph-mood:       #A0B069;
+  --ph-layout:     #D3954B;
+  --ph-3d:         #C28079;
+  --ph-cd:         #6D98B2;
+  --ph-sup:        #9482BD;
+  --ph-mood-deep:    #A0B069;
+  --ph-layout-deep:  #D3954B;
+  --ph-3d-deep:      #C28079;
+  --ph-cd-deep:      #6D98B2;
+  --ph-sup-deep:     #9482BD;
+  --ui-mark:            var(--ph-mood);
+  --ui-table-header-bg: var(--ui-surface-raised);
+  --ui-table-header-fg: var(--ui-text-secondary);
+  --ui-shadow-plane:    0 0 0 .5px rgb(255 255 255 / .07), 0 1px  2px rgb(0 0 0 / .40);
+  --ui-shadow-raise:    0 0 0 .5px rgb(255 255 255 / .08), 0 4px 14px rgb(0 0 0 / .45);
+  --ui-shadow-over:     0 0 0 .5px rgb(255 255 255 / .10), 0 22px 50px rgb(0 0 0 / .60), 0 4px 12px rgb(0 0 0 / .35);
+  --ui-shadow-elevated: var(--ui-shadow-over);
 }
