@@ -5,8 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.161**
-- Next local revision: **R8.162**
+- Current revision after this entry is committed: **R8.162**
+- Next local revision: **R8.163**
+
+## R8.162 | 2026-09-25 | fix(ui): H2 asked a 400-weight serif for bold, so the browser faked it
+
+The owner reported headings had gone back to a thin face despite R8.148 moving them off it. Nothing regressed — H1 is still `font-ui-sans font-black`. What they were seeing is H2, which R8.148 deliberately left on Instrument Serif.
+
+**The defect is real and objective, not a matter of taste.** `HEADING_LEVEL_CLASSES[2]` was `font-display font-bold` — Instrument Serif at weight 700. That face ships here at 400 only: `layout.tsx` loads `InstrumentSerif-Regular.woff2` and `InstrumentSerif-Italic.woff2`, and there is no bold file. The browser therefore synthesised the weight by smearing the 400 outlines, which renders thin and slack rather than bold. This is the same reason R8.148 gave for moving H1 off the face — it simply left H2 behind on it.
+
+H1 and H2 are now one display pair separated by size rather than by typeface: H2 is `font-ui-sans font-black tracking-[-0.02em] text-title`. Schibsted Grotesk is loaded as a variable font over 400–900, so 900 is a real outline; confirmed in the running app via `document.fonts` ("Schibsted Grotesk 400 900 loaded") and a computed weight of 900 on a 21px `h2`.
+
+The serif tier is kept in the system at the owner's direction, and `font-display` remains available for anything that wants Instrument Serif at its real 400.
+
+Blast radius is one element: `level={2}` has exactly one consumer app-wide (the phase title), and no `<Heading>` is rendered without an explicit level, so nothing falls through to the level-2 default.
+
+**Context.** That phase title only became conspicuous because R8.156 removed the project `PageHeader`, which had carried `<Heading level={1}>{project.name}</Heading>`. The project subtree now has no `h1` at all — the project name lives in the 44px context bar's breadcrumb, as in the prototype — so an accent style sized to sit *below* a page title became the topmost text on the page. Left as is, per the owner's answer that the phase title's size should not change.
 
 ## R8.161 | 2026-09-25 | feat(shell): standing header search, in the prototype's top-bar order
 

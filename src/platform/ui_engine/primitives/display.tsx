@@ -8,12 +8,19 @@ export type HeadingProps = HTMLAttributes<HTMLHeadingElement> & {
   level?: HeadingLevel;
 };
 
-/* H1: system-UI black for display authority (SF Pro Display Black on Mac).
-   H2: Instrument Serif bold for editorial section heads.
-   H3–H6: sans operational heads. */
+/* H1 and H2 are one display pair, separated by size, not by typeface.
+   H3–H6: sans operational heads.
+
+   H2 was `font-display font-bold` — Instrument Serif at weight 700. That face
+   ships here at 400 only (layout.tsx loads Regular and Italic; there is no
+   bold file), so the browser synthesised the weight by smearing the 400
+   outlines. The result read thin and slack rather than bold, which is the
+   defect R8.148 cited when it moved H1 off this face — it left H2 on it.
+   Schibsted Grotesk is loaded as a variable font over 400–900, so the weights
+   below are real outlines. */
 const HEADING_LEVEL_CLASSES: Record<HeadingLevel, string> = {
   1: "font-ui-sans font-black tracking-[-0.03em] text-display text-balance text-ink-2",
-  2: "font-display font-bold tracking-[-0.015em] text-title text-balance",
+  2: "font-ui-sans font-black tracking-[-0.02em] text-title text-balance",
   3: "text-base font-semibold tracking-[-0.01em] leading-[1.3] text-balance",
   4: "text-sm font-semibold leading-[1.35]",
   5: "text-sm font-semibold leading-[1.35]",
