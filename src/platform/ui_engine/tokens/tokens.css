@@ -113,9 +113,8 @@
   --ui-rail-width:           48px;   /* icon rail default                    */
   --ui-rail-expanded-width: 212px;   /* icon rail expanded (with labels)     */
   --ui-secondary-width:     220px;   /* contextual secondary sidebar         */
+  --ui-topbar-height:        46px;   /* global top bar (brand + app switch)  */
   --ui-header-height:        44px;   /* sticky context bar                   */
-  /* legacy alias kept for any code that reads it */
-  --ui-header-brand-width:  var(--ui-rail-width);
   --ui-rail-collapsed-width:var(--ui-rail-width);
 
   /* ── Controls ────────────────────────────────────────────────────────────  */

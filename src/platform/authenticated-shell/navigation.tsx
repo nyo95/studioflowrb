@@ -59,10 +59,10 @@ export function HeaderApplicationNavigation({ apps }: { apps: readonly ShellAppL
             onMouseEnter={openNow}
             onMouseLeave={closeSoon}
             aria-label="Switch application"
-            className="inline-flex min-h-8 min-w-0 items-center gap-1.5 rounded-action px-2.5 text-sm font-medium transition-colors hover:bg-surface-muted"
+            className="inline-flex h-[26px] min-w-0 shrink-0 items-center gap-1.5 rounded-action border border-line-subtle bg-rail-soft px-2.5 text-[12.5px] font-semibold text-ink transition-colors hover:bg-surface-muted"
           >
             {activeApp ? <span className="truncate font-semibold text-ink">{activeApp.name}</span> : null}
-            {apps.length > 1 ? <ChevronDown size={11} aria-hidden="true" className="shrink-0 text-ink-tertiary" /> : null}
+            {apps.length > 1 ? <ChevronDown size={10} aria-hidden="true" className="shrink-0 text-ink-tertiary" /> : null}
           </button>
         </Popover.Trigger>
         <Popover.Portal>

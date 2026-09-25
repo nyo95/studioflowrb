@@ -88,11 +88,9 @@ export function AppShell({
       <div className={cx("min-h-dvh overflow-x-clip", className)} data-collapsed={isCollapsed || undefined}>
         {/* The top bar is one fixed line: its width and content never depend on the rail state. */}
         {topbar ? (
-          <header className="sticky top-0 z-20 flex h-16 items-center border-b border-line bg-surface/94 backdrop-blur-[12px]">
-            <div className="flex h-full w-(--ui-header-brand-width) min-w-0 shrink-0 items-center px-4 max-[840px]:w-auto max-[840px]:px-3">
-              <div className="min-w-0 overflow-hidden">{isCollapsed ? (collapsedBrand ?? brand) : brand}</div>
-            </div>
-            <div className="flex min-w-0 flex-1 items-center">{topbar}</div>
+          <header className="sticky top-0 z-20 flex h-(--ui-topbar-height) items-center gap-2.5 border-b border-line-subtle bg-surface/82 px-3.5 backdrop-blur-[12px] max-[840px]:px-3">
+            <div className="flex shrink-0 items-center">{isCollapsed ? (collapsedBrand ?? brand) : brand}</div>
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">{topbar}</div>
           </header>
         ) : null}
         <div
@@ -102,13 +100,13 @@ export function AppShell({
               ? "grid-cols-[var(--ui-rail-width)_minmax(0,1fr)] max-[840px]:grid-cols-1 max-[840px]:block"
               : "grid-cols-1",
             isCollapsed && "[--ui-rail-width:var(--ui-rail-collapsed-width)]",
-            topbar ? "min-h-[calc(100dvh-4rem)]" : "min-h-dvh",
+            topbar ? "min-h-[calc(100dvh-var(--ui-topbar-height))]" : "min-h-dvh",
           )}
         >
           {/* Warm chrome and a drawn rule separate navigation from the work area. */}
           {railVisible ? <aside
             className={cx(
-              "group relative sticky top-16 flex h-[calc(100dvh-4rem)] max-w-screen min-w-0 flex-col overflow-hidden border-r border-line",
+              "group relative sticky top-(--ui-topbar-height) flex h-[calc(100dvh-var(--ui-topbar-height))] max-w-screen min-w-0 flex-col overflow-hidden border-r border-line-subtle",
               "bg-[color-mix(in_srgb,var(--ui-surface-muted)_52%,var(--ui-surface))]",
               !topbar && "top-0 h-screen",
               "max-[840px]:static max-[840px]:h-auto max-[840px]:border-b max-[840px]:border-r-0",
@@ -151,7 +149,7 @@ export function AppShell({
             </nav>
             {utility ?? null}
           </aside> : null}
-          <main className="flex h-[calc(100dvh-4rem)] min-h-0 min-w-0 flex-col overflow-auto max-[840px]:h-auto max-[840px]:overflow-visible">{children}</main>
+          <main className="flex h-[calc(100dvh-var(--ui-topbar-height))] min-h-0 min-w-0 flex-col overflow-auto max-[840px]:h-auto max-[840px]:overflow-visible">{children}</main>
         </div>
       </div>
     </RailContext.Provider>

@@ -55,12 +55,14 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
         </Link>
       )}
       collapsedBrand={settings.brandMarkUrl ? (
-        <Link href="/" aria-label={`Open ${settings.appTitle} home`} className="flex h-9 w-9 items-center justify-center rounded-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
-          <img src={settings.brandMarkUrl} alt={settings.appTitle} className="h-8 w-8 object-contain" />
+        <Link href="/" aria-label={`Open ${settings.appTitle} home`} className="flex items-center rounded-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
+          <img src={settings.brandMarkUrl} alt={settings.appTitle} className="h-6 w-auto max-w-24 object-contain" />
         </Link>
       ) : (
-        <Link href="/" aria-label={`Open ${settings.appTitle} home`} className="flex h-9 w-9 items-center justify-center rounded-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
-          <Text as="span" weight="semibold">{appAbbreviation ?? productMark}</Text>
+        /* The top bar's mark is a mono monogram on its own baseline — no chip,
+           no box. Sized to sit on one 46px line beside the app chip. */
+        <Link href="/" aria-label={`Open ${settings.appTitle} home`} className="flex items-center rounded-action px-0.5 font-ui-mono text-xs font-medium tracking-[0.16em] text-ink no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
+          {appAbbreviation ?? productMark}
         </Link>
       )}
       collapsible
