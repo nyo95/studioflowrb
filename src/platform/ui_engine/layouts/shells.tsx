@@ -3,7 +3,7 @@
 import { ChevronLeft,ChevronRight,Lock } from "lucide-react";
 import Link from "next/link";
 import { DropdownMenu } from "radix-ui";
-import { createContext,useContext,useEffect,useState,type AnchorHTMLAttributes,type ButtonHTMLAttributes,type HTMLAttributes,type ReactNode } from "react";
+import { createContext,useContext,useEffect,useState,type AnchorHTMLAttributes,type ButtonHTMLAttributes,type CSSProperties,type HTMLAttributes,type ReactNode } from "react";
 
 import { cx } from "../internal/cx";
 import { getEffectiveRailCollapsed } from "../internal/rail-state";
@@ -89,7 +89,10 @@ export function AppShell({
         {/* The top bar is one fixed line: its width and content never depend on the rail state. */}
         {topbar ? (
           <header className="sticky top-0 z-20 flex h-(--ui-topbar-height) items-center gap-2.5 border-b border-line-subtle bg-surface/82 px-3.5 backdrop-blur-[12px] max-[840px]:px-3">
-            <div className="flex shrink-0 items-center">{isCollapsed ? (collapsedBrand ?? brand) : brand}</div>
+            {/* Always the compact mark. The top bar is one 46px line and the app
+                chip beside it already names the application, so the full wordmark
+                here read "StudioFlow StudioFlow" whenever the rail was expanded. */}
+            <div className="flex shrink-0 items-center">{collapsedBrand ?? brand}</div>
             <div className="flex min-w-0 flex-1 items-center gap-2.5">{topbar}</div>
           </header>
         ) : null}
@@ -99,9 +102,20 @@ export function AppShell({
             railVisible
               ? "grid-cols-[var(--ui-rail-width)_minmax(0,1fr)] max-[840px]:grid-cols-1 max-[840px]:block"
               : "grid-cols-1",
-            isCollapsed && "[--ui-rail-width:var(--ui-rail-collapsed-width)]",
             topbar ? "min-h-[calc(100dvh-var(--ui-topbar-height))]" : "min-h-dvh",
           )}
+          /* The expanded width is set inline, not as a `[--ui-rail-width:…]`
+             utility. Tailwind emits no rule for that arbitrary-property form
+             here, so the override silently did nothing — which went unnoticed
+             because the previous value it pointed at, --ui-rail-collapsed-width,
+             was itself defined as var(--ui-rail-width): both states resolved to
+             48px, so an expanded rail kept a 48px column and clipped its labels.
+             An inline custom property always applies, and the grid-cols utility
+             above (which does generate) picks it up. Mobile keeps its own
+             grid-template-columns classes because this touches only the token. */
+          style={railVisible && !isCollapsed
+            ? ({ "--ui-rail-width": "var(--ui-rail-expanded-width)" } as CSSProperties)
+            : undefined}
         >
           {/* Warm chrome and a drawn rule separate navigation from the work area. */}
           {railVisible ? <aside
@@ -129,7 +143,7 @@ export function AppShell({
             ) : null}
             <nav
               className={cx(
-                "min-w-0 flex-1 overflow-auto px-2 pt-2 pb-2",
+                "min-w-0 flex-1 overflow-auto px-[9px] pt-2 pb-2",
                 isCollapsed && "px-[5px]",
                 "max-[840px]:flex max-[840px]:flex-none max-[840px]:gap-1 max-[840px]:overflow-x-auto max-[840px]:p-2.5 max-[840px]:[scrollbar-width:none] max-[840px]:[&::-webkit-scrollbar]:hidden",
               )}
@@ -145,7 +159,7 @@ export function AppShell({
               <button
                 type="button"
                 className={cx(
-                  "mx-2 mb-2 grid h-7 shrink-0 items-center justify-items-start rounded-action border-0 bg-transparent px-2 font-ui-mono text-xs text-ink-tertiary transition-colors",
+                  "mx-[9px] mb-2 grid h-7 shrink-0 items-center justify-items-start rounded-action border-0 bg-transparent px-2 font-ui-mono text-xs text-ink-tertiary transition-colors",
                   "hover:bg-[color-mix(in_srgb,var(--ui-text-primary)_7%,transparent)] hover:text-ink",
                   "focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-line-focus",
                   "group-data-collapsed:mx-auto group-data-collapsed:w-9 group-data-collapsed:justify-items-center group-data-collapsed:px-0",
@@ -444,7 +458,7 @@ export function PageHeader({
  */
 export function UtilitySection({ children }: { children: ReactNode }) {
   return (
-    <div className="grid gap-0.5 border-t border-line-subtle px-2 pt-2 pb-1 max-[840px]:hidden group-data-collapsed:px-[5px]">
+    <div className="grid gap-0.5 border-t border-line-subtle px-[9px] pt-2 pb-1 max-[840px]:hidden group-data-collapsed:px-[5px]">
       {children}
     </div>
   );

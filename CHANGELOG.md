@@ -5,8 +5,37 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.158**
-- Next local revision: **R8.159**
+- Current revision after this entry is committed: **R8.159**
+- Next local revision: **R8.160**
+
+## R8.159 | 2026-09-25 | fix(shell): expanded rail stayed 48px and clipped its labels
+
+Expanding the icon rail produced a broken state: `data-collapsed` came off and the labels rendered, but the column stayed 48px, so every label was clipped and the nav grew a horizontal scrollbar.
+
+**Two faults, one of which hid the other.**
+
+1. **The width override never applied.** The grid asked for `var(--ui-rail-width)` and, while collapsed, overrode it with the Tailwind arbitrary-property utility `[--ui-rail-width:var(--ui-rail-collapsed-width)]`. Tailwind emits no rule for that arbitrary-property form in this setup — verified in the running app by walking every CSS rule (including inside `@layer`) for one that touches `--ui-rail-width`: there are none. The override had therefore always been inert.
+
+2. **It was invisible because the two tokens were the same value.** `--ui-rail-collapsed-width` was defined as `var(--ui-rail-width)`, i.e. 48px — the very token it was overriding. So the inert override changed nothing that anyone could see, and `--ui-rail-expanded-width: 212px` had *zero readers anywhere in the codebase*. Collapsed and expanded both resolved to 48px.
+
+This is a leftover from when `--ui-rail-width` meant "the full rail width" and `--ui-rail-collapsed-width` was the narrow one. When the design moved to a 48px icon rail, `--ui-rail-width` was redefined as 48px and `--ui-rail-expanded-width` added, but the grid logic kept the old shape.
+
+Fixed by setting the expanded width as an **inline custom property**, which always applies, and letting the existing `grid-cols-[var(--ui-rail-width)_minmax(0,1fr)]` utility (which does generate) read it. Mobile keeps its own `grid-template-columns` classes because only the token is touched. `--ui-rail-collapsed-width` is deleted — `--ui-rail-width` is now itself the at-rest width, documented as such.
+
+**Also: the top-bar mark duplicated the app name when expanded.** The header rendered `isCollapsed ? (collapsedBrand ?? brand) : brand`, so expanding the rail swapped the monogram for the full wordmark and the bar read "StudioFlow StudioFlow ⌄" beside the chip — the redundancy R8.154 removed, which had only ever been fixed for the collapsed case. The rail's state has no bearing on the header, so the mark is now always the compact one.
+
+Rail gutters are 9px when expanded (`.a-icon-rail[data-expanded]{padding:8px 9px}`), 5px collapsed.
+
+**Verified in the running app**, toggling both ways:
+
+| | collapsed | expanded | prototype |
+|---|---|---|---|
+| rail column | 48px | 212px | 48 / 212 |
+| nav item | 36x34px | 29px tall | `.a-icon` 36x34, 29px expanded |
+| label clipping | none | none | — |
+| top-bar mark | `SF` | `SF` | compact in both |
+
+Collapsing again returns the column to 48px cleanly.
 
 ## R8.158 | 2026-09-25 | fix(shell): top-bar mark showed a single letter; drop duplicated topbar padding
 
