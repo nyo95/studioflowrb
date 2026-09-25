@@ -1,7 +1,7 @@
 import { hasPermission } from "@platform/core/rbac";
 import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
-import { PageHeader, SettingsShell } from "@/platform/ui_engine";
+import { PageHeader, PageShell, SettingsShell } from "@/platform/ui_engine";
 
 import { pageSession } from "../_components/session";
 import { StudioSettingsNav } from "./studio-settings-nav";
@@ -21,7 +21,7 @@ export default async function StudioSettingsPage() {
   ]);
   const defaultTemplate = phaseTemplates.find((template) => template.isDefault && template.isActive);
   return (
-    <>
+    <PageShell measure="wide">
       <PageHeader title="Studio Settings" description="How projects are named and which checklist every project gets." divider />
       <SettingsShell navigationLabel="Studio Settings navigation" navigation={<StudioSettingsNav />}>
         <StudioSettingsView
@@ -35,6 +35,6 @@ export default async function StudioSettingsPage() {
           canManage={hasPermission(grants, P.settingsManage)}
         />
       </SettingsShell>
-    </>
+    </PageShell>
   );
 }

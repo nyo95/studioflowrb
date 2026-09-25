@@ -2,7 +2,7 @@ import { hasPermission } from "@platform/core/rbac";
 import { resolveTimelineSpan } from "@/apps/studioflow/domain/timeline";
 import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
-import { PageHeader } from "@/platform/ui_engine";
+import { PageHeader, PageShell } from "@/platform/ui_engine";
 
 import { pageSession } from "../_components/session";
 import { TimelineDirectory } from "./timeline-directory";
@@ -50,7 +50,7 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
   });
 
   return (
-    <>
+    <PageShell measure="wide">
       <PageHeader
         title="Timeline"
         description="Every project's phase schedule in one Gantt — filter by client, PIC, status, or date range; click a segment to set its planned dates."
@@ -64,6 +64,6 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
         canManage={hasPermission(grants, P.projectManage)}
         now={now}
       />
-    </>
+    </PageShell>
   );
 }

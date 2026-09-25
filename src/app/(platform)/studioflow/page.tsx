@@ -3,7 +3,7 @@ import Link from "next/link";
 import { hasPermission } from "@platform/core/rbac";
 import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
-import { FilterChip, PageHeader } from "@/platform/ui_engine";
+import { FilterChip, PageHeader, PageShell } from "@/platform/ui_engine";
 
 import { pageSession } from "./_components/session";
 import { PhaseAttentionSection } from "./_components/phase-attention";
@@ -36,7 +36,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   ].filter(Boolean).join(" · ") || "No open work";
 
   return (
-    <>
+    <PageShell measure="wide">
       <PageHeader
         title="Today"
         description={today.scope === "mine" ? `${firstName}, ${summary.toLowerCase()}` : `${summary} across running projects`}
@@ -61,6 +61,6 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         canWork={hasPermission(grants, P.phaseWork)}
         canManageTasks={hasPermission(grants, P.taskManage)}
       />
-    </>
+    </PageShell>
   );
 }

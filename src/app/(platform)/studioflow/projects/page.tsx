@@ -1,7 +1,7 @@
 import { hasPermission } from "@platform/core/rbac";
 import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
-import { PageHeader } from "@/platform/ui_engine";
+import { PageHeader, PageShell } from "@/platform/ui_engine";
 
 import { pageSession } from "../_components/session";
 import { ProjectDirectory } from "./project-directory";
@@ -31,7 +31,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   ]);
 
   return (
-    <>
+    <PageShell measure="wide">
       <PageHeader title="Projects" description="Every studio project, its five phases, and who holds it." divider />
       <ProjectDirectory
         projects={projects}
@@ -41,6 +41,6 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         canManage={hasPermission(grants, P.projectManage)}
         autoNaming={settings.autoNamingEnabled}
       />
-    </>
+    </PageShell>
   );
 }

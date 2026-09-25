@@ -5,7 +5,7 @@ import { AppError } from "@platform/core/errors";
 import { hasPermission } from "@platform/core/rbac";
 import { STUDIOFLOW_PERMISSIONS as P, STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
-import { Badge, Breadcrumb, DescriptionItem, DescriptionList, EmptyState, PageHeader, SectionCard, StatusBadge } from "@/platform/ui_engine";
+import { Badge, Breadcrumb, DescriptionItem, DescriptionList, EmptyState, PageHeader, PageShell, SectionCard, StatusBadge } from "@/platform/ui_engine";
 
 import { PROJECT_STATUS_LABEL, PROJECT_STATUS_TONE } from "../../_components/phase-status";
 import { pageSession } from "../../_components/session";
@@ -21,7 +21,8 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
     throw error;
   });
   return (
-    <div className="grid gap-4">
+    <PageShell measure="wide">
+      <div className="grid gap-4">
       <Breadcrumb entries={[{ label: "Clients", href: STUDIOFLOW_ROUTES.clients }, { label: client.name }]} />
       <PageHeader title={client.name} meta={client.archived_at ? <Badge>Archived</Badge> : undefined} actions={hasPermission(grants, P.projectManage) ? <ClientEditButton client={{ id: client.id, name: client.name, address: client.address }} /> : undefined} divider />
       <SectionCard title="Details">
@@ -42,6 +43,7 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
           </ul>
         )}
       </SectionCard>
-    </div>
+      </div>
+    </PageShell>
   );
 }

@@ -8,7 +8,7 @@ import type { PermissionGrants } from "@platform/core/rbac";
 import { phaseAccentDotClass, isPhaseFinished, type PhaseStatus } from "@/apps/studioflow/domain/phase";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
-import { Breadcrumb, ContextNavHeading, Notice, SettingsShell } from "@/platform/ui_engine";
+import { Breadcrumb, ContextNavHeading, Notice, PageShell } from "@/platform/ui_engine";
 
 import { pageSession } from "../../_components/session";
 import { PROJECT_STATUS_LABEL } from "../../_components/phase-status";
@@ -38,62 +38,64 @@ export default async function ProjectLayout({
   const { grants } = await pageSession();
 
   return (
-    <div className="grid gap-4">
-      <SettingsShell
-        navigationLabel="Project navigation"
-        navigation={
-          <>
-            {/* Back to all projects — instant, no data */}
-            <div className="pb-1 -mt-0.5">
-              <Link
-                href={STUDIOFLOW_ROUTES.projects}
-                prefetch={false}
-                className="inline-flex items-center gap-1 rounded-action px-1.5 py-1 text-[11px] font-medium text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
-              >
-                <ChevronLeft size={11} aria-hidden="true" />
-                All projects
-              </Link>
-            </div>
-
-            {/* Project identity — streams in independently */}
-            <Suspense fallback={<ProjectRailSkeleton />}>
-              <ProjectRailMeta grants={grants} projectId={projectId} />
-            </Suspense>
-
-            <ContextNavHeading>Project</ContextNavHeading>
-            <ProjectNavLinks
-              items={[
-                {
-                  href: STUDIOFLOW_ROUTES.project(projectId),
-                  label: "Overview",
-                  exact: true,
-                  marker: null,
-                  detail: null,
-                },
-              ]}
-            />
-            <Suspense fallback={null}>
-              <ProjectPhasesNav grants={grants} projectId={projectId} />
-            </Suspense>
-
-            <ContextNavHeading>Documents</ContextNavHeading>
-            <Suspense
-              fallback={
-                <ProjectNavLinks items={EXTENSIONS_SKELETON.map((item) => ({ ...item }))} />
-              }
-            >
-              <ProjectExtensionsNav grants={grants} projectId={projectId} />
-            </Suspense>
-          </>
-        }
+    /* flex-1 against <main> (flex-col, viewport-tall). This only works now that
+       StudioFlowLayout no longer wraps routes in PageShell — inside that grid,
+       flex-1 was inert and this whole shell collapsed (R8.152 -> R8.153). */
+    <div className="flex min-h-0 flex-1 max-[840px]:flex-col">
+      {/* Secondary rail — prototype `.a-rail`: 220px, flush to the icon rail,
+          its own scroll so it stays put while content moves. */}
+      <aside
+        className="flex w-(--ui-secondary-width) shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-line-subtle bg-rail px-[9px] py-3 max-[840px]:w-full max-[840px]:border-r-0 max-[840px]:border-b"
+        aria-label="Project navigation"
       >
-        {/* Breadcrumb + archive notice — stream in before page content */}
-        <Suspense fallback={<ContentHeaderSkeleton />}>
-          <ProjectContentHeader grants={grants} projectId={projectId} />
+        {/* Back to all projects — instant, no data */}
+        <Link
+          href={STUDIOFLOW_ROUTES.projects}
+          prefetch={false}
+          className="inline-flex items-center gap-1 rounded-action px-2 py-1 text-xs text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
+        >
+          <ChevronLeft size={11} aria-hidden="true" />
+          All projects
+        </Link>
+
+        {/* Project identity — streams in independently */}
+        <Suspense fallback={<ProjectRailSkeleton />}>
+          <ProjectRailMeta grants={grants} projectId={projectId} />
         </Suspense>
 
-        {children}
-      </SettingsShell>
+        <ContextNavHeading>Project</ContextNavHeading>
+        <ProjectNavLinks
+          items={[
+            {
+              href: STUDIOFLOW_ROUTES.project(projectId),
+              label: "Overview",
+              exact: true,
+              marker: null,
+              detail: null,
+            },
+          ]}
+        />
+        <Suspense fallback={null}>
+          <ProjectPhasesNav grants={grants} projectId={projectId} />
+        </Suspense>
+
+        <ContextNavHeading>Documents</ContextNavHeading>
+        <Suspense
+          fallback={<ProjectNavLinks items={EXTENSIONS_SKELETON.map((item) => ({ ...item }))} />}
+        >
+          <ProjectExtensionsNav grants={grants} projectId={projectId} />
+        </Suspense>
+      </aside>
+
+      {/* Content column owns the scroll, so the context bar can stick to it. */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+        <Suspense fallback={<ContextBarSkeleton />}>
+          <ProjectContextBar grants={grants} projectId={projectId} />
+        </Suspense>
+        {/* The measure lives inside the content column, not around the shell —
+            the prototype's `.a-measure` inside a full-bleed `.a-main`. */}
+        <PageShell measure="wide">{children}</PageShell>
+      </div>
     </div>
   );
 }
@@ -115,7 +117,7 @@ async function ProjectRailMeta({
     });
 
   return (
-    <div className="pb-3 mb-1 border-b border-line">
+    <div className="pb-3 mb-1 border-b border-line-subtle">
       <div className="text-sm font-semibold text-ink leading-snug truncate">{project.name}</div>
       <div className="mt-0.5 text-xs text-ink-tertiary truncate">
         {project.client?.name ?? "No client"} · {PROJECT_STATUS_LABEL[project.status]}
@@ -124,7 +126,7 @@ async function ProjectRailMeta({
   );
 }
 
-async function ProjectContentHeader({
+async function ProjectContextBar({
   grants,
   projectId,
 }: {
@@ -140,17 +142,23 @@ async function ProjectContentHeader({
 
   return (
     <>
-      <Breadcrumb
-        entries={[
-          { label: "Projects", href: STUDIOFLOW_ROUTES.projects },
-          { label: project.name },
-        ]}
-      />
+      {/* Prototype `.a-ctx`: 44px, sticky, full-bleed, ground-tinted and
+          blurred so content passes under it. */}
+      <div className="sticky top-0 z-10 flex h-(--ui-header-height) shrink-0 items-center gap-2.5 border-b border-line-subtle bg-canvas/90 px-[22px] backdrop-blur-[10px]">
+        <Breadcrumb
+          entries={[
+            { label: "Projects", href: STUDIOFLOW_ROUTES.projects },
+            { label: project.name },
+          ]}
+        />
+      </div>
       {project.archivedAt ? (
-        <Notice tone="warning" title="Archived">
-          This project is read-only.
-          {project.archiveReason ? ` Reason: ${project.archiveReason}` : ""}
-        </Notice>
+        <div className="px-[22px] pt-3">
+          <Notice tone="warning" title="Archived">
+            This project is read-only.
+            {project.archiveReason ? ` Reason: ${project.archiveReason}` : ""}
+          </Notice>
+        </div>
       ) : null}
     </>
   );
@@ -158,15 +166,20 @@ async function ProjectContentHeader({
 
 function ProjectRailSkeleton() {
   return (
-    <div className="pb-3 mb-1 border-b border-line" aria-hidden="true">
+    <div className="pb-3 mb-1 border-b border-line-subtle" aria-hidden="true">
       <div className="h-4 w-40 animate-pulse rounded bg-surface-muted" />
       <div className="mt-1.5 h-3 w-24 animate-pulse rounded bg-surface-muted" />
     </div>
   );
 }
 
-function ContentHeaderSkeleton() {
-  return <div className="h-4 w-48 animate-pulse rounded bg-surface-muted" aria-hidden="true" />;
+function ContextBarSkeleton() {
+  return (
+    <div
+      className="sticky top-0 z-10 h-(--ui-header-height) shrink-0 border-b border-line-subtle bg-canvas/90"
+      aria-hidden="true"
+    />
+  );
 }
 
 type NavPhaseItem = {

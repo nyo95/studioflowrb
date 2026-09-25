@@ -19,5 +19,13 @@ export default async function StudioFlowLayout({ children }: { children: ReactNo
       </PageShell>
     );
   }
-  return <PageShell size="wide">{children}</PageShell>;
+  /* No PageShell here. It is a centred, max-width, padded CSS grid, and
+     wrapping every StudioFlow route in one made a full-bleed, viewport-tall
+     project workspace impossible: `flex-1` is inert inside a grid parent, so
+     the secondary rail could not be given a constrained height and its sticky
+     context bar never worked (the R8.152 regression, reverted in R8.153).
+     Each page now owns its own measure, and the project workspace applies
+     PageShell inside its content column — which is what the prototype does:
+     `.a-main` is full-bleed and `.a-measure` sits inside it. */
+  return <>{children}</>;
 }
