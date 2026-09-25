@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { AppError } from "@platform/core/errors";
 import type { PermissionGrants } from "@platform/core/rbac";
+import { phaseAccentDotClass, isPhaseFinished, type PhaseStatus } from "@/apps/studioflow/domain/phase";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { Badge, Breadcrumb, ContextNavHeading, MetaList, Notice, PageHeader, SettingsShell } from "@/platform/ui_engine";
@@ -43,6 +44,9 @@ export default async function ProjectLayout({ children, params }: { children: Re
           <>
             <ContextNavHeading>Project</ContextNavHeading>
             <ProjectNavLinks items={[{ href: STUDIOFLOW_ROUTES.project(projectId), label: "Overview", exact: true, marker: null, detail: null }]} />
+            <Suspense fallback={null}>
+              <ProjectPhasesNav grants={grants} projectId={projectId} />
+            </Suspense>
             <ContextNavHeading>Extensions</ContextNavHeading>
             <Suspense fallback={<ProjectNavLinks items={EXTENSIONS_SKELETON.map((item) => ({ ...item }))} />}>
               <ProjectExtensionsNav grants={grants} projectId={projectId} />
@@ -84,6 +88,28 @@ async function ProjectHeader({ grants, projectId }: { grants: PermissionGrants; 
           This project is read-only. {project.archiveReason ? `Reason: ${project.archiveReason}` : ""}
         </Notice>
       ) : null}
+    </>
+  );
+}
+
+type NavPhaseItem = { id: string; definitionId: string | null; label: string; status: PhaseStatus; openCount: number };
+
+async function ProjectPhasesNav({ grants, projectId }: { grants: PermissionGrants; projectId: string }) {
+  const phases: NavPhaseItem[] = await studioFlow.phases.listNavPhases({ grants, projectId });
+  if (phases.length === 0) return null;
+  return (
+    <>
+      <ContextNavHeading>Phases</ContextNavHeading>
+      <ProjectNavLinks
+        items={phases.map((phase) => ({
+          href: STUDIOFLOW_ROUTES.projectPhase(projectId, phase.id),
+          label: phase.label,
+          exact: false,
+          marker: phaseAccentDotClass(phase.definitionId),
+          detail: phase.openCount > 0 ? String(phase.openCount) : null,
+          title: isPhaseFinished(phase.status) ? `${phase.label} — done` : phase.label,
+        }))}
+      />
     </>
   );
 }
