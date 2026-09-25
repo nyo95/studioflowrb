@@ -16,11 +16,17 @@ import { ProjectNavLinks } from "./project-nav-links";
 
 export const dynamic = "force-dynamic";
 
-const EXTENSIONS_SKELETON = [
-  { href: "", label: "MOM", exact: false, marker: null, detail: null },
-  { href: "", label: "Schedule", exact: false, marker: null, detail: null },
-  { href: "", label: "History", exact: false, marker: null, detail: null },
-] as const;
+/* Only the document *counts* stream in; the links are pure functions of
+   projectId, so the fallback carries the real hrefs. Empty hrefs collided on
+   `key` and, because `pathname.startsWith("/")` is always true, marked every
+   document link as the current page while the boundary was pending. */
+function extensionsSkeleton(projectId: string) {
+  return [
+    { href: STUDIOFLOW_ROUTES.projectMom(projectId), label: "MOM", exact: false, marker: null, detail: null },
+    { href: STUDIOFLOW_ROUTES.projectSchedule(projectId), label: "Schedule", exact: false, marker: null, detail: null },
+    { href: STUDIOFLOW_ROUTES.projectHistory(projectId), label: "History", exact: false, marker: null, detail: null },
+  ];
+}
 
 /**
  * Project workspace shell: compact secondary nav rail + content area.
@@ -81,7 +87,7 @@ export default async function ProjectLayout({
 
         <ContextNavHeading>Documents</ContextNavHeading>
         <Suspense
-          fallback={<ProjectNavLinks items={EXTENSIONS_SKELETON.map((item) => ({ ...item }))} />}
+          fallback={<ProjectNavLinks items={extensionsSkeleton(projectId)} />}
         >
           <ProjectExtensionsNav grants={grants} projectId={projectId} />
         </Suspense>

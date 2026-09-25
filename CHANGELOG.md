@@ -5,11 +5,40 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.165**
-- Next local revision: **R8.166**
+- Current revision after this entry is committed: **R8.166**
+- Next local revision: **R8.167**
 - Ledger gap: R8.163 (`ee9e09e`) and R8.164 (`b2421de`) shipped without a
   changelog entry. R8.164 is backfilled below; R8.163 is not, because that
   commit is not mine to describe. Tracked in `docs/BACKLOG.md`.
+
+## R8.166 | 2026-09-26 | fix(ui): the project rail's document links shared one empty React key
+
+The owner hit a console error on a project page: "Encountered two children with
+the same key, ``". Three keys were in fact empty, not two.
+
+**Cause.** `projects/[projectId]/layout.tsx` renders the Documents rail behind a
+`Suspense` boundary whose fallback was a module-level `EXTENSIONS_SKELETON` with
+`href: ""` on all three entries, and `ProjectNavLinks` keys on `item.href`. So the
+fallback mounted three siblings keyed `""`. The same empty href caused a second,
+quieter defect: the active test is `pathname === href || pathname.startsWith(href + "/")`,
+and with `href` empty the second arm is `pathname.startsWith("/")`, which is always
+true - so while the boundary was pending, MOM, Schedule, and History all rendered
+as the current page at once.
+
+**Fix.** The fallback now builds the real routes from `projectId`, which the shell
+already has synchronously. Only the document *counts* actually stream in, so
+empty hrefs were never needed; `extensionsSkeleton(projectId)` replaces the const.
+Keys are unique, the links point where their labels say, and nothing is marked
+current until the real nav arrives.
+
+Verified in the running app with the boundary deliberately held pending
+(intercepted requests delayed 900ms): mid-stream, MOM/Schedule/History carry
+`/mom`, `/schedule`, `/history` and none has `aria-current="page"`; the settled
+rail is unchanged, and no console error or warning is emitted. `typecheck`,
+`lint`, `check:boundaries`, `check:legacy-runtime` pass. `npm test` 530/532,
+unchanged - the two failures remain the pre-existing KB-045/KB-046 guard pair.
+
+No migration, no dependency change, no contract change.
 
 ## R8.165 | 2026-09-26 | fix(security): private assets were readable with a published key; the admin-lockout guard and the Today clock were both wrong
 
