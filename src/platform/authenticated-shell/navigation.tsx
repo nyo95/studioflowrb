@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Popover } from "radix-ui";
@@ -59,10 +59,10 @@ export function HeaderApplicationNavigation({ apps }: { apps: readonly ShellAppL
             onMouseEnter={openNow}
             onMouseLeave={closeSoon}
             aria-label="Switch application"
-            className="inline-flex min-h-8 min-w-0 items-center gap-2 rounded-action px-2.5 text-sm text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink"
+            className="inline-flex min-h-8 min-w-0 items-center gap-1.5 rounded-action px-2.5 text-sm font-medium transition-colors hover:bg-surface-muted"
           >
-            <Menu size={16} aria-hidden="true" />
             {activeApp ? <span className="truncate font-semibold text-ink">{activeApp.name}</span> : null}
+            {apps.length > 1 ? <ChevronDown size={11} aria-hidden="true" className="shrink-0 text-ink-tertiary" /> : null}
           </button>
         </Popover.Trigger>
         <Popover.Portal>
