@@ -5,9 +5,18 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.149**
-- Next local revision: **R8.150**
+- Current revision after this entry is committed: **R8.150**
+- Next local revision: **R8.151**
 
+## R8.150 | 2026-09-25 | feat(sf): §7.2 Icon rail — phase links with accent dots in project nav
+
+Wave B §7.2. The project workspace nav rail now lists all phases between the Overview link and the Extensions heading. Each phase link shows the phase's accent color dot as a marker and a trailing open-item count (unchecked root checklist items). The section heading "Phases" only renders when the project has at least one phase.
+
+Service layer:
+- `phases/service.ts`: added `listNavPhases` — lightweight query returning `{ id, definitionId, label, status, openCount }` per phase. Uses a `findMany` + parallel `count` pattern (one count query per phase for unchecked root checklist items, `parent_id: null, is_checked: false`). Local `Row` type annotation suppresses the pre-existing TS7006 pattern that affects every `db.sf*.findMany()` call in this environment.
+
+Layout:
+- `projects/[projectId]/layout.tsx`: added `NavPhaseItem` local type, `ProjectPhasesNav` async server component, and a `<Suspense fallback={null}>` wrapper in the nav tree. Phase items use `phaseAccentDotClass(phase.definitionId)` as the `marker` prop (colored dot) and `String(openCount)` as `detail` when non-zero. Finished phases (`isPhaseFinished`) get a tooltip suffix "— done". The `<Suspense fallback={null}>` keeps the nav shell instant while phase data streams in.
 ## R8.149 | 2026-09-25 | feat(sf): §7.1 PhaseGate — interactive blocker list replaces static Notice
 
 Wave B §7.1. The static "Blockers" `Notice` on the phase detail and project overview pages is replaced by `PhaseGate`, a client component that renders each blocking item as a `Checkbox` the assigned user can resolve inline. Resolving a checklist item calls `checklistAction`; resolving a feedback activity calls `activityAction`. Items are dismissed from view optimistically on click while the server action revalidates in the background.

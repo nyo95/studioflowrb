@@ -603,6 +603,29 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       return results;
     },
 
+    /** Minimal nav data: id, label, accent, and open root-checklist count. Used by the project workspace rail. */
+    async listNavPhases(input: ReadContext & { projectId: string }) {
+      requireRead(input.grants);
+      type Row = { id: string; definition_id: string | null; name_snapshot: string; status: string };
+      const phases: Row[] = await db.sfPhase.findMany({
+        where: { project_id: input.projectId },
+        orderBy: { order_index: "asc" },
+        select: { id: true, definition_id: true, name_snapshot: true, status: true },
+      });
+      const counts: number[] = await Promise.all(
+        phases.map((p) =>
+          db.sfChecklistItem.count({ where: { phase_id: p.id, parent_id: null, is_checked: false } }),
+        ),
+      );
+      return phases.map((p, i) => ({
+        id: p.id,
+        definitionId: p.definition_id,
+        label: p.name_snapshot,
+        status: p.status as PhaseStatus,
+        openCount: counts[i] ?? 0,
+      }));
+    },
+
     async getPhaseDetail(input: ReadContext & { projectId: string; phaseId: string }) {
       requireRead(input.grants);
       const phase = await db.sfPhase.findUnique({
