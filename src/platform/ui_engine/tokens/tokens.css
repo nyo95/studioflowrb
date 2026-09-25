@@ -9,12 +9,12 @@
      Three planes in a fixed depth order:
        ground  →  content planes  →  emphasis
      Rail recedes BELOW the ground; dialogs float ABOVE content planes.      */
-  --ui-canvas:          #F1EEE9;  /* ground — 1.13:1 under white, a real plane */
+  --ui-canvas:          #F0F0F0;  /* ground — 1.13:1 under white, neutral grey  */
   --ui-surface:         #FFFFFF;  /* content: cards, tables, toolbars          */
-  --ui-surface-raised:  #FAF8F5;  /* inset: table headers, code, muted input   */
-  --ui-surface-muted:   #EFEBE4;  /* hover, selected, disabled                 */
-  --ui-rail:            #E8E3DB;  /* recessed chrome (sidebar rail)            */
-  --ui-rail-soft:       #EFEBE4;  /* softer rail accent                        */
+  --ui-surface-raised:  #F5F5F5;  /* inset: table headers, code, muted input   */
+  --ui-surface-muted:   #EBEBEB;  /* hover, selected, disabled                 */
+  --ui-rail:            #E3E3E3;  /* recessed chrome (sidebar rail)            */
+  --ui-rail-soft:       #EBEBEB;  /* softer rail accent                        */
 
   /* ── Ground ramps (switchable via [data-ground] on <html>) ──────────────  */
   /* default (gray-warm) defined above; override blocks below switch it       */
@@ -22,9 +22,9 @@
   /* ── Borders ─────────────────────────────────────────────────────────────
      Shadow-carried hairlines are the primary edge. Keep border tokens for
      components that still use drawn borders (structural dividers, focus).    */
-  --ui-border-subtle:   #ECE7DF;
-  --ui-border-default:  #DED7CD;
-  --ui-border-strong:   #C3B9AC;
+  --ui-border-subtle:   #E8E8E8;
+  --ui-border-default:  #D5D5D5;
+  --ui-border-strong:   #BDBDBD;
   --ui-border-focus:    #1A1714;
 
   /* ── Ink (text) ──────────────────────────────────────────────────────────  */
@@ -153,7 +153,7 @@
 
 /* ── Ground ramp: Ivory ──────────────────────────────────────────────────── */
 [data-ground="ivory"] {
-  --ui-canvas:       #F7F5EE;
+  --ui-canvas:       #F3F2EE;
   --ui-rail:         #EDE8DC;
   --ui-rail-soft:    #F3F0E7;
   --ui-border-subtle:#EDEADF;
@@ -162,7 +162,7 @@
 
 /* ── Ground ramp: Gray (default alias, explicit for completeness) ─────────── */
 [data-ground="gray"] {
-  --ui-canvas:       #F1EEE9;
+  --ui-canvas:       #F0F0F0;
   --ui-rail:         #E8E3DB;
   --ui-rail-soft:    #EFEBE4;
   --ui-border-subtle:#ECE7DF;

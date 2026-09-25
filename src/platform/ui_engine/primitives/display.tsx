@@ -8,9 +8,11 @@ export type HeadingProps = HTMLAttributes<HTMLHeadingElement> & {
   level?: HeadingLevel;
 };
 
-/* H1–H2 carry the serif product identity; H3–H6 are sans operational heads. */
+/* H1: system-UI black for display authority (SF Pro Display Black on Mac).
+   H2: Instrument Serif bold for editorial section heads.
+   H3–H6: sans operational heads. */
 const HEADING_LEVEL_CLASSES: Record<HeadingLevel, string> = {
-  1: "font-display font-bold tracking-[-0.02em] text-display text-balance",
+  1: "font-ui-sans font-black tracking-[-0.03em] text-display text-balance text-ink-2",
   2: "font-display font-bold tracking-[-0.015em] text-title text-balance",
   3: "text-base font-semibold tracking-[-0.01em] leading-[1.3] text-balance",
   4: "text-sm font-semibold leading-[1.35]",
@@ -20,7 +22,8 @@ const HEADING_LEVEL_CLASSES: Record<HeadingLevel, string> = {
 
 export function Heading({ level = 2, className, ...props }: HeadingProps) {
   const Tag = `h${level}` as keyof Pick<HTMLElementTagNameMap, "h1" | "h2" | "h3" | "h4" | "h5" | "h6">;
-  return <Tag className={cx("m-0 text-ink", HEADING_LEVEL_CLASSES[level], className)} {...props} />;
+  /* Level 1 carries its own colour (text-ink-2); all others inherit text-ink. */
+  return <Tag className={cx("m-0", level !== 1 && "text-ink", HEADING_LEVEL_CLASSES[level], className)} {...props} />;
 }
 
 export type TextProps = HTMLAttributes<HTMLElement> & {
