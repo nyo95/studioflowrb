@@ -10,22 +10,38 @@ export type PhaseBlockerCounts = {
   openRootChecklistItems: number;
 };
 
-export type PhaseBlockers = { total: number; reasons: string[] };
+export type BlockerItem = { id: string; text: string };
+
+export type PhaseBlockers = {
+  total: number;
+  reasons: string[];
+  /** Populated only in full phase detail (getPhaseDetail); empty on list views. */
+  activityItems: BlockerItem[];
+  checklistItems: BlockerItem[];
+};
 
 function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
 /** Blockers for approveInternal, submitClient, approveClient. */
-export function fullBlockers(counts: PhaseBlockerCounts): PhaseBlockers {
+export function fullBlockers(
+  counts: PhaseBlockerCounts,
+  items?: { activityItems: { id: string; content: string }[]; checklistItems: { id: string; label: string }[] },
+): PhaseBlockers {
   const reasons: string[] = [];
   if (counts.openRevisionActivities > 0) reasons.push(`${plural(counts.openRevisionActivities, "open feedback item")} in this revision`);
   if (counts.openRootChecklistItems > 0) reasons.push(`${plural(counts.openRootChecklistItems, "checklist item")} not ticked`);
-  return { total: counts.openRevisionActivities + counts.openRootChecklistItems, reasons };
+  return {
+    total: counts.openRevisionActivities + counts.openRootChecklistItems,
+    reasons,
+    activityItems: items?.activityItems.map((a) => ({ id: a.id, text: a.content })) ?? [],
+    checklistItems: items?.checklistItems.map((c) => ({ id: c.id, text: c.label })) ?? [],
+  };
 }
 
 /** Blockers for submitInternal: open todos (unchecked root checklist items) only (V2-D1). */
 export function todoBlockers(counts: PhaseBlockerCounts): PhaseBlockers {
   const total = counts.openRootChecklistItems;
-  return { total, reasons: total > 0 ? [`${plural(total, "open to-do")}`] : [] };
+  return { total, reasons: total > 0 ? [`${plural(total, "open to-do")}`] : [], activityItems: [], checklistItems: [] };
 }

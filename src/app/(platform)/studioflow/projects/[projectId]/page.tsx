@@ -19,6 +19,7 @@ import {
 
 import { ActivityList } from "../../_components/activity-list";
 import { ChecklistTree } from "../../_components/checklist-tree";
+import { PhaseGate } from "../../_components/phase-gate";
 import { PhaseStatusBadge } from "../../_components/phase-status";
 import { pageSession } from "../../_components/session";
 import { DeliverablesPanel } from "./phases/[phaseId]/deliverables-panel";
@@ -155,7 +156,12 @@ async function PhaseCanvas({
         </div>
         {phaseDetail.startBlockedReason ? <Notice className="mt-3" tone="neutral" title="Not yet">{phaseDetail.startBlockedReason}</Notice> : null}
         {phaseDetail.status !== "PENDING" && phaseDetail.blockers.total > 0 && !phaseDetail.isLocked ? (
-          <Notice className="mt-3" tone="danger" title="Blockers">Finish {phaseDetail.blockers.reasons.join(", ")} before this phase can be approved.</Notice>
+          <PhaseGate
+            projectId={projectId}
+            checklistItems={phaseDetail.blockers.checklistItems}
+            activityItems={phaseDetail.blockers.activityItems}
+            canWork={caps.work}
+          />
         ) : null}
       </SectionCard>
 
