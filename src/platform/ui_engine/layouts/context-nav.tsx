@@ -15,6 +15,12 @@ export type ContextNavLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 
   children: ReactNode;
   /** Link component to render (e.g. Next.js `Link`); defaults to a plain anchor. */
   component?: ComponentType<AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }>;
+  /**
+   * Which ground this column sits on. `rail` is recessed chrome, so the active
+   * item lifts off it as a white plane. `plane` is already a content surface,
+   * where a white card would be invisible, so it takes a muted fill instead.
+   */
+  surface?: "plane" | "rail";
 };
 
 /**
@@ -23,14 +29,21 @@ export type ContextNavLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 
  * engine router-agnostic (pass `component={Link}` for client routing); the
  * active state is decided by the consumer.
  */
-export function ContextNavLink({ href, active = false, marker, detail, children, className, component: Anchor = "a" as unknown as ComponentType<AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }>, ...props }: ContextNavLinkProps) {
+export function ContextNavLink({ href, active = false, marker, detail, children, className, surface = "plane", component: Anchor = "a" as unknown as ComponentType<AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }>, ...props }: ContextNavLinkProps) {
   return (
     <Anchor
       href={href}
       aria-current={active ? "page" : undefined}
       className={cx(
-        "flex min-h-8 items-center gap-2 rounded-control px-2.5 py-1.5 text-sm no-underline transition-colors",
-        active ? "bg-surface-muted font-semibold text-ink" : "text-ink-secondary hover:bg-surface-muted hover:text-ink",
+        "flex items-center gap-2 no-underline transition-colors",
+        surface === "rail"
+          ? "min-h-[29px] rounded-action px-2 text-[13px]"
+          : "min-h-8 rounded-control px-2.5 py-1.5 text-sm",
+        active
+          ? surface === "rail"
+            ? "bg-surface font-semibold text-ink shadow-plane"
+            : "bg-surface-muted font-semibold text-ink"
+          : "text-ink-secondary hover:bg-surface-muted hover:text-ink",
         className,
       )}
       {...props}

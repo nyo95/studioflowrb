@@ -127,27 +127,37 @@ export function AppShell({
                 </div>
               </div>
             ) : null}
-            {collapsible && railPresentation !== "compact" && !narrowNavigation ? (
-              <button
-                type="button"
-                className="absolute right-0 top-1/2 z-10 flex h-10 w-4 -translate-y-1/2 items-center justify-center rounded-r-md bg-transparent text-ink-tertiary hover:bg-line/40 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-line-focus"
-                aria-label={isCollapsed ? expandLabel : collapseLabel}
-                aria-expanded={!isCollapsed}
-                onClick={toggle}
-              >
-                {isCollapsed ? <ChevronRight aria-hidden="true" size={12} /> : <ChevronLeft aria-hidden="true" size={12} />}
-              </button>
-            ) : null}
             <nav
               className={cx(
-                "min-w-0 flex-1 overflow-auto px-3 pt-2 pb-3.5",
-                isCollapsed && "px-1.5",
+                "min-w-0 flex-1 overflow-auto px-2 pt-2 pb-2",
+                isCollapsed && "px-[5px]",
                 "max-[840px]:flex max-[840px]:flex-none max-[840px]:gap-1 max-[840px]:overflow-x-auto max-[840px]:p-2.5 max-[840px]:[scrollbar-width:none] max-[840px]:[&::-webkit-scrollbar]:hidden",
               )}
             >
               {navigation}
             </nav>
             {utility ?? null}
+            {/* The rail's expand control belongs at its foot, below the utility
+                icons (prototype `.a-rail-toggle`). It was a 16px sliver pinned to
+                the rail's outer edge at mid-height — an easy thing to hit by
+                accident and a hard thing to find on purpose. */}
+            {collapsible && railPresentation !== "compact" && !narrowNavigation ? (
+              <button
+                type="button"
+                className={cx(
+                  "mx-2 mb-2 grid h-7 shrink-0 items-center justify-items-start rounded-action border-0 bg-transparent px-2 font-ui-mono text-xs text-ink-tertiary transition-colors",
+                  "hover:bg-[color-mix(in_srgb,var(--ui-text-primary)_7%,transparent)] hover:text-ink",
+                  "focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-line-focus",
+                  "group-data-collapsed:mx-auto group-data-collapsed:w-9 group-data-collapsed:justify-items-center group-data-collapsed:px-0",
+                  "max-[840px]:hidden",
+                )}
+                aria-label={isCollapsed ? expandLabel : collapseLabel}
+                aria-expanded={!isCollapsed}
+                onClick={toggle}
+              >
+                {isCollapsed ? <ChevronRight aria-hidden="true" size={13} /> : <ChevronLeft aria-hidden="true" size={13} />}
+              </button>
+            ) : null}
           </aside> : null}
           <main className="flex h-[calc(100dvh-var(--ui-topbar-height))] min-h-0 min-w-0 flex-col overflow-auto max-[840px]:h-auto max-[840px]:overflow-visible">{children}</main>
         </div>
@@ -158,7 +168,7 @@ export function AppShell({
 
 export function NavGroup({ label, heading, children }: { label: string; heading?: string; children: ReactNode }) {
   return (
-    <div role="group" aria-label={label} className="grid gap-1 max-[840px]:contents">
+    <div role="group" aria-label={label} className="grid gap-0.5 max-[840px]:contents">
       {heading ? (
         <p className="mt-1.5 mb-0.5 px-2.5 text-label text-ink-tertiary group-data-collapsed:hidden max-[840px]:hidden">
           {heading}
@@ -196,16 +206,15 @@ export type NavItemProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "childr
 };
 
 const NAV_ITEM_BASE_CLASSES =
-  "relative flex w-full min-h-[38px] items-center gap-2.5 rounded-control border border-transparent bg-transparent px-2.5 py-2 text-sm text-left font-[inherit] text-ink-secondary no-underline max-[840px]:w-auto max-[840px]:shrink-0 max-[840px]:min-h-[34px]";
+  "relative flex w-full min-h-[29px] items-center gap-2.5 rounded-action border-0 bg-transparent px-2 py-0 text-[13px] text-left font-[inherit] text-ink-secondary no-underline transition-colors max-[840px]:w-auto max-[840px]:shrink-0 max-[840px]:min-h-[34px]";
 
 const NAV_ITEM_STATE_CLASSES = {
-  idle: "hover:border-line-subtle hover:bg-surface-muted hover:text-ink",
-  active:
-    "border-line max-[840px]:border-transparent bg-surface max-[840px]:bg-transparent text-ink font-semibold " +
-    /* Current location. Hover already owns the muted fill, so "active" cannot rely on
-       fill alone or the two become indistinguishable. It is marked on three channels
-       at once: an ink rule, ink-weight text, and heavier type. */
-    "before:absolute before:-left-px before:top-1/2 before:h-[18px] before:w-[3px] before:-translate-y-1/2 before:rounded-r-[2px] before:bg-action before:content-[''] max-[840px]:before:hidden",
+  idle: "hover:bg-[color-mix(in_srgb,var(--ui-text-primary)_7%,transparent)] hover:text-ink",
+  /* Current location, per the prototype's `.a-icon.on`: the item lifts off the
+     recessed rail as a white plane. Fill alone would not separate it from hover,
+     so it is still marked on three channels — plane fill, the shadow that plane
+     casts, and heavier type. */
+  active: "bg-surface text-ink font-semibold shadow-plane max-[840px]:bg-transparent max-[840px]:shadow-none",
   disabled: "cursor-not-allowed opacity-48",
 } as const;
 
@@ -231,7 +240,7 @@ export function NavItem({ icon, active = false, disabled = false, badge, childre
     NAV_ITEM_BASE_CLASSES,
     disabled ? NAV_ITEM_STATE_CLASSES.disabled : active ? NAV_ITEM_STATE_CLASSES.active : NAV_ITEM_STATE_CLASSES.idle,
     /* Collapsed rail degrades the item to its icon without the app re-rendering. */
-    "group-data-collapsed:justify-center group-data-collapsed:gap-0 group-data-collapsed:px-0 group-data-collapsed:text-center",
+    "group-data-collapsed:h-[34px] group-data-collapsed:w-9 group-data-collapsed:justify-center group-data-collapsed:gap-0 group-data-collapsed:px-0 group-data-collapsed:text-center",
     "max-[840px]:group-data-collapsed:justify-start max-[840px]:group-data-collapsed:gap-2.5 max-[840px]:group-data-collapsed:px-2.5 max-[840px]:group-data-collapsed:py-[7px] max-[840px]:group-data-collapsed:text-left",
     className,
   );
@@ -244,7 +253,7 @@ export function NavItem({ icon, active = false, disabled = false, badge, childre
 
   const content = (
     <>
-      {icon ? <span className="inline-flex shrink-0 [&_svg]:h-4 [&_svg]:w-4" aria-hidden="true">{icon}</span> : null}
+      {icon ? <span className="inline-flex shrink-0 [&_svg]:h-[18px] [&_svg]:w-[18px]" aria-hidden="true">{icon}</span> : null}
       <span className={labelClasses}>{children}</span>
       {trailing}
     </>
@@ -435,7 +444,7 @@ export function PageHeader({
  */
 export function UtilitySection({ children }: { children: ReactNode }) {
   return (
-    <div className="grid gap-1 border-t border-line px-3 pt-2.5 pb-3.5 max-[840px]:hidden group-data-collapsed:px-1.5">
+    <div className="grid gap-0.5 border-t border-line-subtle px-2 pt-2 pb-1 max-[840px]:hidden group-data-collapsed:px-[5px]">
       {children}
     </div>
   );

@@ -17,6 +17,7 @@ export function ProjectNavLinks({ items }: { items: Item[] }) {
           <ContextNavLink
             key={item.href}
             component={Link}
+            surface="rail"
             href={item.href}
             active={active}
             title={item.title}
