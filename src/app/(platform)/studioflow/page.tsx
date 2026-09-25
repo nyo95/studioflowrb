@@ -6,6 +6,7 @@ import { studioFlow } from "@/apps/studioflow/runtime";
 import { FilterChip, PageHeader } from "@/platform/ui_engine";
 
 import { pageSession } from "./_components/session";
+import { PhaseAttentionSection } from "./_components/phase-attention";
 import { TodayView } from "./today-view";
 
 export const dynamic = "force-dynamic";
@@ -14,8 +15,9 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const { userId, displayName, grants, actor } = await pageSession();
   const { scope: rawScope } = await searchParams;
   const canSeeAll = hasPermission(grants, P.projectManage);
-  const [today, people, labels, filters] = await Promise.all([
+  const [today, phaseAttention, people, labels, filters] = await Promise.all([
     studioFlow.today.getToday({ grants, actor, scope: rawScope === "all" ? "all" : "mine" }),
+    studioFlow.today.listPhaseAttention({ grants }),
     studioFlow.projects.listAssignablePeople({ grants }),
     studioFlow.tasks.listLabels({ grants }),
     studioFlow.tasks.listFilterViews({ grants, actor }),
@@ -47,6 +49,9 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         ) : undefined}
         divider
       />
+      {phaseAttention.length > 0 && (
+        <PhaseAttentionSection phases={phaseAttention} />
+      )}
       <TodayView
         groups={today.groups}
         addTargets={today.addTargets}
