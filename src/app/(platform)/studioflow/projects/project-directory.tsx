@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import { phaseStatusDisplay, type PhaseStatus } from "@/apps/studioflow/domain/phase";
+import { phaseAccentDotClass, phaseStatusDisplay, type PhaseStatus } from "@/apps/studioflow/domain/phase";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import {
@@ -19,7 +19,6 @@ import {
   RowActionsCell,
   RowActionsHead,
   SearchField,
-  SegmentBar,
   Select,
   TableBody,
   TableCell,
@@ -27,8 +26,6 @@ import {
   TableHeader,
   TableRow,
   TableToolbar,
-  Text,
-  type SegmentState,
 } from "@/platform/ui_engine";
 
 import { PersonChip, type Person } from "../_components/people";
@@ -58,16 +55,23 @@ type ProjectRow = {
 
 const STATUS_OPTIONS = [["ALL", "All"], ["ACTIVE", "Active"], ["ON_HOLD", "On hold"], ["COMPLETED", "Completed"]] as const;
 
-function segment(status: PhaseStatus): SegmentState {
-  const group = phaseStatusDisplay(status).group;
-  return group === "Approved" || group === "Done" ? "done" : group === "Not started" ? "idle" : "current";
-}
-
-function currentPhase(phases: ProjectRow["phases"]) {
-  const active = phases.filter((p) => p.status !== "PENDING" && p.status !== "READY_FOR_NEXT" && p.status !== "COMPLETED");
-  if (active.length > 0) return active.map((p) => `${p.label} · ${phaseStatusDisplay(p.status).label}`).join(", ");
-  if (phases.every((p) => p.status === "READY_FOR_NEXT" || p.status === "COMPLETED")) return "All phases finished";
-  return "Waiting to start next phase";
+function PhaseDotLabel({ phases }: { phases: ProjectRow["phases"] }) {
+  const activePhase = phases.find((p) => {
+    const g = phaseStatusDisplay(p.status).group;
+    return g !== "Approved" && g !== "Done" && g !== "Not started";
+  });
+  const lastDone = [...phases].reverse().find((p) => {
+    const g = phaseStatusDisplay(p.status).group;
+    return g === "Approved" || g === "Done";
+  });
+  const phase = activePhase ?? lastDone ?? phases[0];
+  if (!phase) return <span className="text-sm text-ink-3">—</span>;
+  return (
+    <div className="flex min-w-0 items-center gap-1.5">
+      <span className={`size-2 shrink-0 rounded-full ${phaseAccentDotClass(phase.definitionId)}`} aria-hidden="true" />
+      <span className="truncate text-sm text-ink-2">{phase.label}</span>
+    </div>
+  );
 }
 
 export function ProjectDirectory({
@@ -138,10 +142,10 @@ export function ProjectDirectory({
         <TableHeader>
           <TableRow>
             <TableHead>Project</TableHead>
-            <TableHead>Phases</TableHead>
-            <TableHead>Designer / Drafter</TableHead>
-            <TableHead align="end">Open</TableHead>
-            <TableHead>Updated</TableHead>
+            <TableHead className="w-48">Phases</TableHead>
+            <TableHead className="w-44">Designer / Drafter</TableHead>
+            <TableHead className="w-14" align="end">Open</TableHead>
+            <TableHead className="w-28">Updated</TableHead>
             {canManage ? <RowActionsHead /> : null}
           </TableRow>
         </TableHeader>
@@ -164,11 +168,8 @@ export function ProjectDirectory({
                   />
                 </Link>
               </TableCell>
-              <TableCell>
-                <div className="grid min-w-44 gap-1">
-                  <SegmentBar segments={project.phases.map((p) => segment(p.status))} label={project.phases.map((p) => `${p.label}: ${phaseStatusDisplay(p.status).label}`).join(", ")} />
-                  <Text size="sm" tone="secondary" className="truncate">{currentPhase(project.phases)}</Text>
-                </div>
+              <TableCell className="w-48">
+                <PhaseDotLabel phases={project.phases} />
               </TableCell>
               <TableCell>
                 <div className="grid gap-1">
@@ -177,7 +178,7 @@ export function ProjectDirectory({
                 </div>
               </TableCell>
               <TableCell align="end"><span className="tabular-nums">{project.openItems}</span></TableCell>
-              <TableCell><FormattedInstant value={project.updatedAt} locale={locale} timeZone={timezone} /></TableCell>
+              <TableCell className="tabular-nums"><FormattedInstant value={project.updatedAt} locale={locale} timeZone={timezone} /></TableCell>
               {canManage ? (
                 <RowActionsCell>
                   <span onClick={(e) => e.stopPropagation()}>

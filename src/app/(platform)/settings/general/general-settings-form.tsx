@@ -112,7 +112,17 @@ export function GeneralSettingsForm({
             </Field>
             <Field id="settings-brand-mark" label="Brand mark" description="Optional PNG, maximum 2 MB. It is fitted into the header mark without changing its height.">
               <div>
-                <Input id="settings-brand-mark" name="brandMarkFile" type="file" accept="image/png,.png" disabled={disabled} />
+                <label
+                  htmlFor="settings-brand-mark"
+                  className={disabled ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                >
+                  <div className="flex flex-col items-center gap-1.5 rounded-control border border-dashed border-line-strong bg-surface-muted px-4 py-5 text-center transition-colors hover:bg-surface">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-ink-3" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <span className="text-sm text-ink-2">Drop PNG here or <span className="font-medium text-ink">browse</span></span>
+                    <span className="text-xs text-ink-3">Maximum 2 MB</span>
+                  </div>
+                  <input id="settings-brand-mark" name="brandMarkFile" type="file" accept="image/png,.png" disabled={disabled} className="sr-only" />
+                </label>
                 {settings.brandMarkUrl ? <label className="mt-2 flex items-center gap-2 text-sm"><input name="removeBrandMark" type="checkbox" disabled={disabled} /> Remove the current Brand mark</label> : null}
               </div>
             </Field>
