@@ -293,12 +293,15 @@ information; `/studioflow/timeline` remains. See `CHANGELOG.md` R8.138.
   (R8.86). Needs a browser walk of both: settings tables (create/edit/reorder)
   and the option photo upload/crop/save round trip. Close both KB numbers
   together once verified — same feature area.
-- [ ] [UNVERIFIED] Product Schedule print/export (R8.132) —
-  `/studioflow/print/projects/:id/schedule`. Needs a browser walk: open from
-  the board's "Print / PDF" link, confirm cards match the on-screen board,
-  toggle paper/orientation and confirm both the preview and the browser's
-  print-preview dialog reflect it, confirm toolbar controls are absent from
-  the printed/exported output.
+**Fixed 2026-09-25 (R8.164):** Product Schedule print/export (R8.132) —
+browser-verified via headless Chromium against a disposable local Postgres:
+`/studioflow/print/projects/:id/schedule` had never actually worked — it
+crashed with a server 500 (`printFormatFromSearchParams` was exported from a
+`"use client"` file, so calling it from the Server Component page threw).
+Fixed by moving the pure function into a non-client module. Re-verified: the
+route now returns 200, cards match the on-screen board, and toggling
+`?paper=&orientation=` reflects in both the preview and the injected `@page`
+rule. See `CHANGELOG.md` R8.164.
 **Fixed 2026-09-23 (R8.111–R8.112):** Product Schedule spec model — migration
 `20260923000000_sf_schedule_spec_model` applied to both `studioflow_rebuild`
 and `studioflow_rebuild_test` and browser-verified: Type label everywhere,
@@ -341,6 +344,16 @@ explored direction. No access-check changes. See `CHANGELOG.md` R8.110.
   `archiveProject()` currently skips object deletion; owner decision is to
   purge on archive (see "Decision gates" above). Deferred until the storage
   layer (`PLATFORM-ASSET-STORAGE-ROADMAP.md`) is in place.
+- [ ] [BUG] `ui-engine.test.ts` ("UI Engine foundation") has 2 pre-existing,
+  unrelated failures found while running the full suite for R8.164 (out of
+  scope for that change, left open per the proportionate-checks rule):
+  (1) "locks token source, action radius, widths, and horizontal overflow"
+  asserts `--ui-radius-action: 4px` but `tokens/tokens.css` now has `7px` —
+  either the token drifted or the lock is stale, needs an owner call on which
+  is correct; (2) "keeps app internals and domain vocabulary out of shared UI
+  sources" — `tokens/tokens.css` has two comments naming the app "BQ"
+  (`--ui-page-wide-max` and the "BQ compact density stamp" section header),
+  violating UI Engine's app-neutral-source rule.
 
 ### Cleanup / dead code (confirmed unreachable, not a behavioral defect)
 

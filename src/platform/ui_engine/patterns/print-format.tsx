@@ -5,15 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { DocumentOrientation, DocumentPaper, DocumentPrintFormat } from "../layouts/document";
 import { Select } from "../primitives/forms";
 
-export const DEFAULT_PRINT_FORMAT: DocumentPrintFormat = { paper: "A4", orientation: "portrait" };
-
-/** Reads `?paper=&orientation=` (as read from a page's own `searchParams`); defaults to A4 portrait for anything else. */
-export function printFormatFromSearchParams(params: { paper?: string; orientation?: string }): DocumentPrintFormat {
-  const paper: DocumentPaper = params.paper === "LETTER" ? "LETTER" : "A4";
-  const orientation: DocumentOrientation = params.orientation === "landscape" ? "landscape" : "portrait";
-  return { paper, orientation };
-}
-
 /**
  * Paper/orientation selectors for a printable `DocumentSheet` page. Writes its
  * choice into the URL (`?paper=&orientation=`) via `router.replace` — the same
