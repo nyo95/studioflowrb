@@ -5,8 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.144**
-- Next local revision: **R8.145**
+- Current revision after this entry is committed: **R8.149**
+- Next local revision: **R8.150**
+
+## R8.149 | 2026-09-25 | feat(sf): §7.1 PhaseGate — interactive blocker list replaces static Notice
+
+Wave B §7.1. The static "Blockers" `Notice` on the phase detail and project overview pages is replaced by `PhaseGate`, a client component that renders each blocking item as a `Checkbox` the assigned user can resolve inline. Resolving a checklist item calls `checklistAction`; resolving a feedback activity calls `activityAction`. Items are dismissed from view optimistically on click while the server action revalidates in the background.
+
+Domain and query layers were extended to carry item records (IDs + labels) alongside the existing counts:
+- `blocker-query.ts`: added `BlockerItems` type and `readBlockerItems` — fetches open `SfActivity` and unchecked `SfChecklistItem` rows in parallel (skips each query when its count is already zero).
+- `domain/blockers.ts`: added `BlockerItem` type; extended `PhaseBlockers` with `activityItems` and `checklistItems` arrays; updated `fullBlockers` to accept an optional items argument; `todoBlockers` returns empty arrays for the new fields (no N+1 on list views).
+- `phases/service.ts` (`getPhaseDetail`): runs `readBlockerItems` in parallel with the existing detail queries and passes the result to `fullBlockers`. List views (`listProjectPhases`) are unchanged.
+
+UI layer:
+- `_components/phase-gate.tsx` (new): `"use client"` component; one `useState` pair for optimistic dismissed-item sets; items with `key` on the wrapper `<div>` (not on `<Checkbox>`) to match the project's pre-existing broken-JSX-types pattern.
+- `projects/[projectId]/page.tsx` and `phases/[phaseId]/page.tsx`: `PhaseGate` replaces the static `Notice tone="danger"` when `blockers.total > 0 && !isLocked && status !== "PENDING"`.
 
 ## R8.144 | 2026-09-24 | fix(masterdata): restore hover background and focus ring on count tiles
 

@@ -13,3 +13,26 @@ export async function readBlockerCounts(client: Db | TxClient, phaseId: string):
   ]);
   return { openRevisionActivities, openRootChecklistItems };
 }
+
+export type BlockerItems = {
+  activityItems: { id: string; content: string }[];
+  checklistItems: { id: string; label: string }[];
+};
+
+/** Fetches the actual blocker items (IDs + labels) for interactive display. */
+export async function readBlockerItems(
+  client: Db | TxClient,
+  phaseId: string,
+  activeRevisionId: string | null,
+  counts: PhaseBlockerCounts,
+): Promise<BlockerItems> {
+  const [activityItems, checklistItems] = await Promise.all([
+    counts.openRevisionActivities > 0 && activeRevisionId
+      ? client.sfActivity.findMany({ where: { revision_id: activeRevisionId, status: "OPEN" }, select: { id: true, content: true }, orderBy: { created_at: "asc" } })
+      : [],
+    counts.openRootChecklistItems > 0
+      ? client.sfChecklistItem.findMany({ where: { phase_id: phaseId, parent_id: null, is_checked: false, is_blocking: true }, select: { id: true, label: true }, orderBy: { sort_order: "asc" } })
+      : [],
+  ]);
+  return { activityItems, checklistItems };
+}

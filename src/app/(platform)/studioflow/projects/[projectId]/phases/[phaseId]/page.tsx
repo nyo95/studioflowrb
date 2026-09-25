@@ -8,6 +8,7 @@ import { Badge, Heading, MetaList, Notice, SectionCard, Text } from "@/platform/
 
 import { ActivityList } from "../../../../_components/activity-list";
 import { ChecklistTree } from "../../../../_components/checklist-tree";
+import { PhaseGate } from "../../../../_components/phase-gate";
 import { PhaseStatusBadge } from "../../../../_components/phase-status";
 import { PersonChip } from "../../../../_components/people";
 import { pageSession } from "../../../../_components/session";
@@ -66,7 +67,12 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
         </div>
         {phase.startBlockedReason ? <Notice className="mt-3" tone="neutral" title="Not yet">{phase.startBlockedReason}</Notice> : null}
         {phase.status !== "PENDING" && phase.blockers.total > 0 && !phase.isLocked ? (
-          <Notice className="mt-3" tone="danger" title="Blockers">Finish {phase.blockers.reasons.join(", ")} before this phase can be approved.</Notice>
+          <PhaseGate
+            projectId={projectId}
+            checklistItems={phase.blockers.checklistItems}
+            activityItems={phase.blockers.activityItems}
+            canWork={canWork}
+          />
         ) : null}
       </SectionCard>
 

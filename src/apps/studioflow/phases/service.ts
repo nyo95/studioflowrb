@@ -38,7 +38,7 @@ import {
   type StudioFlowPorts,
   type TxClient,
 } from "../shared";
-import { readBlockerCounts } from "./blocker-query";
+import { readBlockerCounts, readBlockerItems } from "./blocker-query";
 
 type PhaseRow = Awaited<ReturnType<TxClient["sfPhase"]["findUniqueOrThrow"]>>;
 type ProjectRow = Awaited<ReturnType<TxClient["sfProject"]["findUniqueOrThrow"]>>;
@@ -638,10 +638,11 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       const seatUserId = snap.seatSnapshot === "drafter" ? phase.project.pic_drafter_id : phase.project.pic_designer_id;
       // R2.4E: Warning projection — non-blocking indicators for UI.
       // Warning-only checklist items (the merged requirements) count here, never in blockers.
-      const [optionalOpen, deliverables, refRevisionId] = await Promise.all([
+      const [optionalOpen, deliverables, refRevisionId, blockerItems] = await Promise.all([
         db.sfChecklistItem.count({ where: { phase_id: phase.id, parent_id: null, is_checked: false, is_blocking: false } }),
         db.sfDeliverable.findMany({ where: { phase_id: phase.id }, select: { revision_id: true } }),
         referenceRevisionId(db, phase.id),
+        readBlockerItems(db, phase.id, active?.id ?? null, counts),
       ]);
       return {
         id: phase.id,
@@ -658,7 +659,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         modifiable: !archived && isPhaseModifiable({ status, isLocked: phase.is_locked }),
         startBlockedReason: status === "PENDING" && !canStart && previous ? `Starts after ${resolvePhaseName(previous)} is approved.` : phase.project.status !== "ACTIVE" && status === "PENDING" ? "The project is not active." : null,
         commands,
-        blockers: fullBlockers(counts),
+        blockers: fullBlockers(counts, blockerItems),
         todoBlockers: todoBlockers(counts),
         warnings: { optionalOpen, deliverableStatus: computeDeliverableStatus(deliverables, refRevisionId) },
         activeRevision: active ? { id: active.id, label: revisionLabel(active, snap.prefixSnapshot), createdAt: active.created_at, activities: active.activities.map(activityView) } : null,
