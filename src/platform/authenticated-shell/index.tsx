@@ -21,6 +21,21 @@ import { RouteAwareAppShell } from "./route-aware-app-shell";
 import { getSettingsMenuVisibility } from "./shell-rules";
 
 
+/**
+ * The top bar's mark, per the prototype's `.a-logo`. Initials for a multi-word
+ * name; a name that is already an abbreviation is kept whole; a single
+ * closed-up product name is split on its capitals, so "StudioFlow" reads "SF"
+ * and not "S" — the previous rule took the first letter of each whitespace-
+ * separated word, which yields exactly one letter for a one-word title.
+ */
+function brandMark(name: string): string {
+  const words = name.trim().split(/[\s_/-]+/).filter(Boolean);
+  if (words.length === 1 && words[0].length <= 3) return words[0].toUpperCase();
+  const parts = words.flatMap((word) => word.match(/[A-Z]+(?![a-z])|[A-Z][a-z0-9]*|[a-z0-9]+/g) ?? [word]);
+  const initials = parts.length > 1 ? parts.map((part) => part[0]).join("") : (parts[0] ?? "");
+  return initials.slice(0, 3).toUpperCase();
+}
+
 export function AuthenticatedShell({ principal, grants, settings, apps, logoutAction, appName, appAbbreviation, domainNavigation, domainUtilityNavigation, contextSlot, children }: {
   principal: SessionPrincipal;
   grants: readonly string[];
@@ -34,7 +49,13 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
   contextSlot?: ReactNode;
   children: ReactNode;
 }) {
-  const productMark = settings.appTitle.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "SF";
+  /* The app chip beside this already names the active application, so the mark
+     takes the organisation whenever that is distinct — the prototype's pairing
+     of `.a-logo` (studio) with `.a-app` (application). */
+  const markSource = settings.organizationName && settings.organizationName !== settings.appTitle
+    ? settings.organizationName
+    : settings.appTitle;
+  const productMark = brandMark(markSource) || "SF";
   const subtitle = appName ?? settings.organizationName;
   const { showSettings } = getSettingsMenuVisibility(grants);
   return (
@@ -69,9 +90,9 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
       navigationLabel={`${settings.appTitle} navigation`}
       navigation={<AuthenticatedPlatformNavigation domainNavigation={domainNavigation} />}
       utility={domainUtilityNavigation}
-      topbar={<div className="flex w-full items-center gap-3 px-(--ui-page-padding)">
+      topbar={<div className="flex w-full items-center gap-2.5">
         <HeaderApplicationNavigation apps={apps} />
-        <div className="ml-auto flex min-w-0 items-center gap-3">
+        <div className="ml-auto flex min-w-0 items-center gap-2.5">
           {contextSlot}
           <AccountMenu
             name={principal.displayName}
