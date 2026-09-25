@@ -5,8 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.151**
-- Next local revision: **R8.152**
+- Current revision after this entry is committed: **R8.153**
+- Next local revision: **R8.154**
+
+## R8.153 | 2026-09-25 | fix(sf): restore SettingsShell-based project layout; fix R8.152 regression
+
+R8.152 replaced `SettingsShell` with a custom `flex flex-1` viewport-tall layout in the project workspace `layout.tsx`. The approach assumed the layout would be a direct child of `<main>`, but `StudioFlowLayout` wraps every StudioFlow page in `<PageShell size="wide">` (a CSS grid with padding). `flex-1` has no effect inside a grid, so the secondary rail had no constrained height, `overflow-y-auto` on the inner containers was inert, and the sticky context bar was broken.
+
+This revision restores the `SettingsShell`-based layout while preserving R8.152's design improvements:
+- `projects/[projectId]/layout.tsx`: reverts to `SettingsShell` for the two-column layout. Keeps the "← All projects" back link at the top of the nav column, the streaming `ProjectRailMeta` (compact name + client + status), section headings "Project" / "Phases" / "Documents" (note: renamed from "Extensions"), `ProjectPhasesNav` and `ProjectExtensionsNav` unchanged. Replaces the 44px sticky context bar with a simpler `ProjectContentHeader` (breadcrumb + optional archive notice) inside a `<Suspense>` fallback above `{children}`.
+- `platform/authenticated-shell/navigation.tsx`: updated stale comment that still described a "hamburger trigger" after R8.152 changed the button to an app-name chip.
+
+Verification: `tsc --noEmit` clean, `check:boundaries` clean.
+
+## R8.152 | 2026-09-25 | feat(shell): app-name chip replaces hamburger in topbar
+
+Navigation.tsx: replaced the `<Menu>` hamburger trigger with an app-name chip (`activeApp.name` + `ChevronDown` when multiple apps exist), per `GLOBAL-MENU-DESIGN-BRIEF.md` Option B (owner decision 2026-09-23). Hover open / close-delay behavior retained. Also included an (incomplete) project workspace layout change that introduced a layout regression — corrected in R8.153.
 
 ## R8.151 | 2026-09-25 | feat(sf): §7.3 Today — PhaseAttentionSection cross-project strip
 

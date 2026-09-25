@@ -15,9 +15,9 @@ function activePath(pathname: string, href: string, includeChildren = true): boo
 
 /**
  * App switching belongs to the continuous top header, not the app-local rail.
- * A hamburger trigger keeps the header compact; it opens on click (so it is
- * fully keyboard- and touch-operable) and also on hover, with a short close
- * delay so moving the pointer from trigger to menu doesn't flicker it shut.
+ * An app-name chip (with ChevronDown when multiple apps exist) opens the
+ * switcher on click or hover; a short close delay prevents flicker when
+ * moving the pointer from chip to menu.
  *
  * Placement is locked to right next to the brand/logo (GLOBAL-MENU-DESIGN-
  * BRIEF.md "Option B", owner decision 2026-09-23) — this component renders
