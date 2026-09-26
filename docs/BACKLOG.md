@@ -20,6 +20,13 @@ inside one file:
   correct business logic.
 - **[CLEANUP]** — dead code, stale contract text, or doc/code drift. Not a
   behavioral defect on its own, but actively misleading to a future reader.
+- **[BLOCKED]** — scope is reviewed and partly locked, but cannot start
+  because one or more named questions below it are still the owner's to
+  answer. **An agent must not guess an answer and proceed.** Read the named
+  question(s) verbatim, ask the owner, and only then either convert the entry
+  to `[PLANNED]` with the answer recorded, or write it up as a `PLAN.md`
+  slice. Do not treat silence, a related-sounding prior decision, or "it
+  seems obvious" as an answer.
 
 Rules carried over unchanged from the prior trackers:
 
@@ -73,6 +80,36 @@ Rules carried over unchanged from the prior trackers:
   `authenticated-shell/navigation.tsx`/`index.tsx`. Mobile/narrow-viewport
   treatment beyond generic truncation, and per-app icons, remain undecided —
   not blocking, no icon field exists in the apps registry yet.
+
+- [ ] [BLOCKED] **Private user-to-user messaging, cross-app (owner roadmap
+  review, 2026-09-26).** Owner confirmed scope: "kayak live collab tapi
+  lebih privat antar user diseluruh web (cross app)" — private 1:1, not a
+  shared project feed, and platform-wide (any user to any user), not
+  StudioFlow-scoped. This is a **new decision**, not an activation of the
+  already-ratified `D-SF-05` (StudioFlow-global/general, *temporary*
+  project collaboration) — D-SF-05 explicitly chose "temporary... not a
+  permanent Project record"; this request is private and presumably
+  persistent, the opposite framing. Legacy has no precedent for this
+  (`extensions/live-collaboration` was a shared, 24-hour-window project
+  `Comment` feed with client-only "unread," `setInterval` polling — not
+  1:1 mail; read-only-verified in this session against
+  `github.com/nyo95/studioflow` @ `c4b0c466...`). Placement: platform/Core,
+  not app-owned — reuse the existing cross-app People Directory (already
+  used for assignment pickers) as the recipient source; per `CORE.md` §14's
+  placement test, a generic message store has no app-specific meaning.
+  **Folds in the `CORE.md` §15 deferred "notification delivery" port as its
+  first consumer** — but keep it minimal: an unread badge can be computed
+  directly from the message table's own `readAt IS NULL`, so do **not**
+  build a separate generic `Notification` entity/port in the same slice;
+  only promote to a shared notification primitive once a second, unrelated
+  event type (e.g. the Master Data sample-request item above) genuinely
+  needs to share one inbox/bell with mail.
+  **Questions the owner must answer before a `PLAN.md` can be written:**
+  1. Delivery: client polling (legacy's own pattern, simplest) is enough,
+     or does this need to feel closer to real-time?
+  2. Can either side delete/hide a conversation on their end only, or are
+     messages permanent for both parties forever?
+
 ## UI Engine and Shared Utilities
 
 - [ ] [UNVERIFIED] Browser walk of Badge/FilterChip/Avatar/Switch/multi-select
@@ -94,6 +131,24 @@ request, even to "clean up" or "improve" something found in passing. The
 invitation to start them unasked.
 
 - [ ] [PLANNED] Define media/file behavior after shared storage exists.
+
+- [ ] [BLOCKED] **Incoming Sample Requests screen (owner roadmap review,
+  2026-09-26).** StudioFlow will add a public read port exposing pending
+  physical-sample requests (`SfScheduleSampleRequest`, see mirrored entry
+  under **StudioFlow** above for the full evidence trail). This entry is the
+  Master Data side: a staff-facing queue to read those requests, record a
+  vendor's quoted price, and create/update the real `Sku` + `PriceMaterial`
+  rows — ported in spirit from legacy's `sample-request-actions.ts`
+  (`VendorFollowUpInput.syncToMaterialPrice`), which is where the actual
+  Master Data write always lived (never StudioFlow). This is real Master
+  Data domain work, not a small add-on: StudioFlow's `requestedFrom` is
+  free text today, not a `Vendor`/`Party` FK, and `Sku.base_unit_id` is a
+  required FK — so "create pricing from a request" means resolving or
+  creating real `Vendor`/`Unit` records too, not just copying two fields.
+  **Do not start this from a general "clean up Master Data" pass** — the
+  standing rule directly above (owner, 2026-09-24) requires an explicit new
+  owner request, and the two questions on the StudioFlow-side mirror entry
+  are still open.
 
 **Fixed 2026-09-23 (R8.123):** Physical Samples workflow — from a Product
 Schedule option, staff can request a physical sample from a vendor/supplier
@@ -274,6 +329,61 @@ duration report derived from actual status-change history (these are
 **Removed from the Overview page 2026-09-24 (R8.138):** the per-project bar
 duplicated `/studioflow/timeline`'s per-project view with no added
 information; `/studioflow/timeline` remains. See `CHANGELOG.md` R8.138.
+
+### Owner roadmap review, 2026-09-26 — four items
+
+Owner brought four ideas in one session; each was checked against locked
+contracts, current code, and (for two of them) read-only legacy evidence
+(`github.com/nyo95/studioflow` @ `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`,
+the same commit already pinned in `D-SF-RECOVERY-DISCOVERY.md`) before being
+recorded here. Terminology note settled the same session: this rebuild has no
+"extension" tier — the hierarchy is Platform/Core → app (StudioFlow/Master
+Data/BQ, peers) → feature module inside an app (MOM, Schedule, Presentation,
+etc., all StudioFlow modules, no sub-tier between them).
+
+- [ ] [PLANNED] **SF-PRESENTATION — Presentation Manager module.** READY plan
+  in `PLAN.md` (copy-ready Executor prompt included) — not started. A
+  project-scoped StudioFlow module: `Board` → many `Slide` (bulk-imported
+  images) → many pinned `Annotation` per slide, each pin optionally linked to
+  a Product Schedule entry (same-app, resolved live so labels can never
+  drift), exportable via the shared UI Engine print view (third consumer,
+  after MOM and Schedule). Ports legacy `RenderBoard`/`RenderAnnotation`
+  (`studioflow-schedule-contract.md` §8: `RenderAnnotation on schedule
+  entries | DEFER | Not contracted`), expanded from legacy's one-image-per-
+  board to many-slides-per-board per owner request ("bulk import gambar").
+  Confirmed no functional dependency on the deferred SketchUp integration
+  (D-SF-06) — legacy's own action file is plain CRUD. Two defaults locked in
+  `PLAN.md`: export is PDF via the existing print pattern (not real `.pptx`
+  generation), bulk import is local multi-file upload only (not pulling from
+  Deliverables/Schedule photos). Flag to the owner before Executor starts if
+  either default is wrong.
+
+- [ ] [BLOCKED] **Sample request → Master Data "incoming requests" queue.**
+  Owner confirmed the shape: StudioFlow only requests; a Master Data staff
+  member processes it manually (contacts vendor, gets a price, creates the
+  SKU/price themselves) — same division of labor as legacy's
+  `sample-request-actions.ts` (`subapps/master-data/`), which never let
+  StudioFlow write into Master Data's schema even though it shared one DB.
+  Confirmed against the locked boundary: `studioflow.md` §4 "StudioFlow
+  reads only Brands through the Master Data public read port, read-only";
+  Master Data's own `pricing-contract.md` §12 "read-only public contract".
+  StudioFlow side: add a public read port (symmetric to Master Data's
+  existing one) exposing pending `SfScheduleSampleRequest` rows — no schema
+  change beyond that. Master Data side (the actual new work — see mirrored
+  entry under **Master Data** below) is what's blocked.
+  **Questions the owner must answer before a `PLAN.md` can be written:**
+  1. New Master Data permission for the "Incoming Sample Requests" screen, or
+     reuse an existing one?
+  2. Does Master Data marking a request "priced" auto-flip StudioFlow's
+     `SfScheduleSampleRequest.status` to `RECEIVED`, or do the two stay
+     independent (Master Data's "we priced it" and StudioFlow's "the
+     physical sample is in the designer's hands" are different moments)?
+  3. `docs/BACKLOG.md`'s own standing rule: *"do not modify Master Data app
+     code without an explicit new owner request, even to clean up or
+     improve something found in passing."* This item **is** that explicit
+     request once the owner answers 1–2, but do not start on Master Data
+     code from this bullet alone — get the direct go-ahead in the same turn
+     work begins.
 
 ### Verification backlog (code done, needs a browser walk to close)
 
