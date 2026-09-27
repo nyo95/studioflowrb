@@ -330,9 +330,9 @@ duration report derived from actual status-change history (these are
 duplicated `/studioflow/timeline`'s per-project view with no added
 information; `/studioflow/timeline` remains. See `CHANGELOG.md` R8.138.
 
-### Owner roadmap review, 2026-09-26 — four items
+### Owner roadmap review, 2026-09-26/27
 
-Owner brought four ideas in one session; each was checked against locked
+Owner brought several ideas over two sessions; each was checked against locked
 contracts, current code, and (for two of them) read-only legacy evidence
 (`github.com/nyo95/studioflow` @ `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`,
 the same commit already pinned in `D-SF-RECOVERY-DISCOVERY.md`) before being
@@ -384,6 +384,61 @@ etc., all StudioFlow modules, no sub-tier between them).
      request once the owner answers 1–2, but do not start on Master Data
      code from this bullet alone — get the direct go-ahead in the same turn
      work begins.
+
+- [ ] [BLOCKED][P3] **AI conversational file filing (owner review,
+  2026-09-27) — explicitly deprioritized: "AI ini bagian paling ga priority,
+  studioflow sudah solid dan usable dulu."** Do not pick this up before the
+  core product is solid, and do not resume planning it without the owner
+  raising it again. What was resolved this session, so a future pass does
+  not re-derive it from scratch:
+  - Primary driver is **not** free-form Q&A — it's checklist automation:
+    `SfChecklistItem` rows are still ticked by hand today after a human
+    manually checks whether a required input (e.g. a fit-out spec sheet, a
+    batch of existing-site photos) has landed. The AI's real job is
+    detecting that arrival and *proposing* the tick — the human confirms,
+    same as every other AI-touches-a-mutation path in this idea (it calls
+    the existing checklist toggle path, never a new one). Ad hoc "what's
+    the bulkhead height on Project A" question-answering is a secondary,
+    smaller want, not the driver.
+  - The `/IN`/`/DATA`/`References` folder names the owner used are a real,
+    existing office convention — but **StudioFlow-native folders on the
+    machine that hosts StudioFlow**, built fresh, not a NAS integration.
+    (An archived, do-not-implement rebuild-era doc, `docs/archive/studioflow-rb/studioflow-project-contract.md`
+    §8.2, happens to use these exact three folder names for unrelated
+    historical reasons — interesting confirmation the owner's instinct
+    matches old thinking, not evidence to build from.)
+  - Hardware is **unprovisioned and tentative** — StudioFlow currently runs
+    on the owner's own PC; no dedicated self-host machine has been bought.
+    Any "local model" sizing/capability call is unanswerable until that
+    changes — this is an infrastructure blocker, not just a software one.
+  - Reviewed a full owner PRD for this (conversational filing, non-goals,
+    tool layer, confirmation-before-mutation) against current code and
+    found it materially sound in philosophy (no direct Prisma, ask-before-
+    assume, respects every locked cross-app boundary) but built on two
+    wrong assumptions about the current schema: (a) it imagines a numbered
+    "D1/D2/D3" deliverable slot the file explicitly targets — the real
+    model tags an uploaded deliverable to whatever `SfRevision`
+    (phase-wide `v{major}.{minor}`) is currently ACTIVE, computed
+    MISSING/CURRENT/OUTDATED, with no "create a new slot" operation; (b)
+    it assumes `.skp`/`.dwg` can already be uploaded as deliverables —
+    today's allow-list is `pdf`/`png`/`jpeg`/`webp`/`zip` only, 25 MB cap
+    (`phases/service.ts`, `DELIVERABLE_ALLOWED_TYPES`/`DELIVERABLE_MAX_BYTES`).
+  - Owner's own fix for the working-file-size problem: **do** upload the
+    real bytes (rejected the archived doc's "metadata only, file stays on
+    the studio's machine" idea — reasonable, since the host machine already
+    is the studio's machine now), but add a **retention policy**: keep only
+    the last N revisions' worth of deliverable per file type per phase
+    (example given: SketchUp — D2+D3 kept, D4 arrives, D2 is deleted).
+    Neither the allow-list expansion nor this pruning logic exists in
+    `uploadDeliverable`/`deleteDeliverable` today; uploads currently
+    accumulate forever.
+  - No LLM/AI SDK dependency exists in `package.json` today — first such
+    integration for this codebase whenever it is picked up.
+  **Before a `PLAN.md` can be written (whenever this is revisited):** confirm
+  the retention count N and what "same type" means (extension? revision
+  slot?); confirm the folder-watching mechanism (server-side fs watch on
+  the host machine, vs. a manual "file arrived" trigger from the UI);
+  confirm hardware once it exists.
 
 ### Verification backlog (code done, needs a browser walk to close)
 
