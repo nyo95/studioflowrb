@@ -392,6 +392,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         address: row.address,
         area: row.area ? row.area.toString() : null,
         archivedAt: row.archived_at,
+        assetsPurgedAt: row.assets_purged_at,
         updatedAt: row.updated_at,
         designer: people.get(row.pic_designer_id) ?? { id: row.pic_designer_id, displayName: "Unknown", active: false },
         drafter: people.get(row.pic_drafter_id) ?? { id: row.pic_drafter_id, displayName: "Unknown", active: false },
@@ -423,6 +424,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         designer: people.get(row.pic_designer_id) ?? { id: row.pic_designer_id, displayName: "Unknown", active: false },
         drafter: people.get(row.pic_drafter_id) ?? { id: row.pic_drafter_id, displayName: "Unknown", active: false },
         archivedAt: row.archived_at,
+        assetsPurgedAt: row.assets_purged_at,
         archivedBy: row.archived_by_id ? people.get(row.archived_by_id)?.displayName ?? null : null,
         archiveReason: row.archive_reason,
         createdAt: row.created_at,
@@ -591,7 +593,9 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         const project = await tx.sfProject.findUnique({ where: { id: input.projectId } });
         if (!project) throw notFound("project");
         if (project.archived_at) throw conflict("PROJECT_ALREADY_ARCHIVED", "This project is already archived.");
-        await tx.sfProject.update({ where: { id: project.id }, data: { archived_at: nowOf(ports), archived_by_id: userId, archive_reason: reason } });
+        // A new archive starts a new retention cycle: clear the purge marker so a project that was purged,
+        // restored, and archived again is eligible for cleanup again (restore deliberately keeps it for its audit).
+        await tx.sfProject.update({ where: { id: project.id }, data: { archived_at: nowOf(ports), archived_by_id: userId, archive_reason: reason, assets_purged_at: null } });
         await writeAudit(ports, tx, { action: "studioflow.project.archived", entityType: "project", entityId: project.id, actor: input.actor, metadata: { projectId: project.id, reason } });
         return { projectId: project.id };
       });

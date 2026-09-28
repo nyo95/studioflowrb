@@ -4,13 +4,20 @@ import { removeUnreferenced } from "../asset-cleanup";
 import { invalid, nowOf, P, requireCommand, writeAudit, type CommandContext, type Db, type StudioFlowPorts } from "../shared";
 
 export function createAssetRetentionService(db: Db, ports: StudioFlowPorts) {
+  /** The one definition of "ready for cleanup", shared by the purge and the preview so they cannot disagree. */
+  async function eligibility(now: Date) {
+    const settings = await db.sfSettings.findUnique({ where: { id: "studio" } });
+    const retentionDays = settings?.archive_retention_days ?? 90;
+    const cutoff = new Date(now.getTime() - retentionDays * 86_400_000);
+    const eligible: Prisma.SfProjectWhereInput = { archived_at: { lt: cutoff }, assets_purged_at: null };
+    return { retentionDays, eligible };
+  }
+
   async function purgeExpiredArchivedAssets(input: { now?: Date; limit?: number } = {}) {
     const now = input.now ?? nowOf(ports);
     const limit = input.limit ?? 25;
     if (!Number.isInteger(limit) || limit < 1) throw invalid("PURGE_LIMIT_INVALID", "Cleanup limit must be a positive whole number.");
-    const settings = await db.sfSettings.findUnique({ where: { id: "studio" } });
-    const cutoff = new Date(now.getTime() - (settings?.archive_retention_days ?? 90) * 86_400_000);
-    const eligible = { archived_at: { lt: cutoff }, assets_purged_at: null };
+    const { eligible } = await eligibility(now);
     const projects = await db.sfProject.findMany({ where: eligible, orderBy: { archived_at: "asc" }, take: limit, select: { id: true } });
     const summary = { projectsPurged: 0, deliverables: 0, momImages: 0, momSnapshotImages: 0, optionPhotos: 0, blobsRemoved: 0, blobsKeptShared: 0, blobFailures: 0, unparseableRevisions: 0 };
     const actor = { kind: "SYSTEM" as const, label: "StudioFlow asset retention" };
@@ -77,6 +84,12 @@ export function createAssetRetentionService(db: Db, ports: StudioFlowPorts) {
     async runAssetCleanup(input: CommandContext & { now?: Date; limit?: number }) {
       requireCommand(input, P.projectManage);
       return purgeExpiredArchivedAssets(input);
+    },
+    /** How many archived projects the next cleanup would purge right now. Reads only; deletes and writes nothing. */
+    async previewAssetCleanup(input: CommandContext & { now?: Date }) {
+      requireCommand(input, P.projectManage);
+      const { retentionDays, eligible } = await eligibility(input.now ?? nowOf(ports));
+      return { eligibleProjects: await db.sfProject.count({ where: eligible }), retentionDays };
     },
   };
 }

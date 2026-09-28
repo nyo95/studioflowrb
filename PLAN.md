@@ -2,7 +2,7 @@
 
 Plan ID: WO-BE-03
 Scope: StudioFlow — correct the archive-retention lifecycle and expose what the Lead's UI needs (backend only)
-Status: READY
+Status: EXECUTED in R8.181 by the Lead (Codex was at its limit; owner combined lanes). Awaiting independent review. Do NOT re-execute.
 Priority: P2
 Owner: owner (Product Owner); Lead: Claude
 Target revision: R8.181

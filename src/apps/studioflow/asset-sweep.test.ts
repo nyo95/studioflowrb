@@ -61,3 +61,24 @@ it("instrumentation starts cleanup only on Node and catches startup/import failu
     assert.deepEqual(logs, runtime === "nodejs" ? ["StudioFlow asset cleanup startup failed."] : []);
   }
 });
+
+it("sweep drains full batches, stops on a short one, and never exceeds ten batches per run", async () => {
+  const source = readFileSync("src/apps/studioflow/asset-sweep.ts", "utf8");
+  const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  async function callsFor(results: unknown[], batchSize = 25) {
+    const callbacks: Array<() => void> = [];
+    const timer = (callback: () => void) => { callbacks.push(callback); return { unref() {} }; };
+    const exports = {} as { startAssetSweep: typeof startAssetSweep };
+    runInNewContext(compiled, { exports, setTimeout: timer, setInterval: timer, clearTimeout() {}, clearInterval() {}, console: { error() {} } });
+    let calls = 0;
+    exports.startAssetSweep(async () => results[Math.min(calls++, results.length - 1)], { NODE_ENV: "production" }, batchSize);
+    callbacks[0]();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    return calls;
+  }
+  assert.equal(await callsFor([{ projectsPurged: 3 }]), 1, "a short first batch stops at once");
+  assert.equal(await callsFor([{ projectsPurged: 25 }, { projectsPurged: 25 }, { projectsPurged: 3 }]), 3, "full batches continue until a short one");
+  assert.equal(await callsFor([{ projectsPurged: 25 }]), 10, "an endless backlog is capped at ten batches per run");
+  assert.equal(await callsFor([{ projectsPurged: 5 }], 5), 10, "the batch size is the injected one");
+  assert.equal(await callsFor([undefined]), 1, "a runner that reports nothing stops after one call");
+});

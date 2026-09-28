@@ -6,6 +6,8 @@ import { startAssetSweep } from "./asset-sweep";
 
 export const studioFlow = createStudioFlowService(prisma, { auditWriter, runTransaction, people: peopleDirectory, storage: objectStorage, masterData: createMasterDataPublicRead(prisma) });
 
+const ASSET_SWEEP_BATCH = 25;
+
 export function startStudioFlowAssetSweep() {
-  return startAssetSweep(() => studioFlow.projects.purgeExpiredArchivedAssets());
+  return startAssetSweep(() => studioFlow.projects.purgeExpiredArchivedAssets({ limit: ASSET_SWEEP_BATCH }), process.env, ASSET_SWEEP_BATCH);
 }

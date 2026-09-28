@@ -5,13 +5,45 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.180**
-- Next local revision: **R8.181**
+- Current revision after this entry is committed: **R8.181**
+- Next local revision: **R8.182**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.181 | 2026-09-28 | fix(studioflow): WO-BE-03 retention lifecycle correction and UI-support reads (executed by the Lead)
+
+**Who did this.** The Backend Executor (Codex) hit its usage limit, so the owner asked the Lead (Claude) to take over
+this one Work Order (lanes combined by explicit owner instruction, AGENTS.md). The Lead wrote WO-BE-03 and also
+implemented it, so **no independent review has happened**: the Lead cannot approve its own work. Codex or a fresh
+session should review this commit, and the owner may also ask ChatGPT for a second opinion. No commit gate item was
+skipped; browser checks are still PENDING.
+
+- **C1 (defect).** `archiveProject` now clears `assets_purged_at` in the same update that sets `archived_at`, so a
+  project archived, purged, restored, given new files and archived again is purged again. `restoreProject` still
+  keeps the marker for its `assetsPurged` audit field. New integration test runs the whole cycle (two purge event
+  pairs, second-cycle file removed, nothing purged inside the second window) and was verified to fail without the fix.
+- **C2.** `startAssetSweep` takes a batch size and keeps running while a batch comes back full, at most 10 batches
+  per run (`MAX_BATCHES_PER_RUN`); timers, 10 s delay, 24 h interval, `unref()` and error handling unchanged.
+  `runtime.ts` passes 25.
+- **C3.** `previewAssetCleanup` (`studioflow.project.manage`) returns `{ eligibleProjects, retentionDays }`; the purge
+  and the preview now share one `eligibility()` helper for the cutoff and predicate. Action
+  `getAssetCleanupPreviewAction`. Reads only; test asserts no audit event and no deletion.
+- **C4.** Action `runAssetCleanupAction(limit?)`: integer 1 to 100, default 25, standard validation payload, refreshes the
+  StudioFlow layout. Tested by executing the real action module with its framework edges stubbed
+  (`asset-cleanup-actions.test.ts`).
+- **C5.** `assetsPurgedAt` added to `listProjects` rows and `getProject`; nothing else in either changed.
+- No migration, no dependency, no layout or copy change, no Master Data or BQ change.
+
+**Checks.** `tsc --noEmit` 0 errors; `eslint .` clean; `npm run check` OK; full `npm test` 563/563 against
+`masterdata_test` (558 before, +2 integration, +2 action, +1 sweep); production build exit 0; `git diff --check`
+clean. The owner's dev server on port 3001 was stopped for the build and restarted (sweep off);
+`next-env.d.ts` was restored and is not staged.
+
+**Limits.** Self-implemented, not independently reviewed. Browser acceptance for R8.173, R8.178 and this change is
+still PENDING. `PLAN.md` is marked EXECUTED so no session re-runs it.
 
 ## R8.180 | 2026-09-28 | docs(changelog): backfill the missing R8.179 entry; WO-BE-03 target moves to R8.181
 

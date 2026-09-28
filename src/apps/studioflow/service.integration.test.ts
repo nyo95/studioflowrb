@@ -280,6 +280,64 @@ describe("WO-BE-02 archived asset retention", () => {
       assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0);
     } finally { logger.mock.restore(); }
   });
+
+  it("WO-BE-03 C1: archive, purge, restore, add a file and archive again purges the new file too", async () => {
+    const db = testDb.prisma;
+    const day = 86_400_000;
+    const cycle = await fixture("Cycle");
+    const purgeEvents = (action: string) => db.auditEvent.count({ where: { entity_id: cycle.projectId, action } });
+    await sf.projects.archiveProject({ ...as(designer), projectId: cycle.projectId, reason: "First archive" });
+    clock = new Date(clock.getTime() + 91 * day);
+    assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 1);
+    assert.ok((await db.sfProject.findUniqueOrThrow({ where: { id: cycle.projectId } })).assets_purged_at);
+
+    await sf.projects.restoreProject({ ...as(designer), projectId: cycle.projectId });
+    const restored = await db.auditEvent.findFirstOrThrow({ where: { entity_id: cycle.projectId, action: "studioflow.project.restored" } });
+    assert.equal((restored.metadata as { assetsPurged: boolean }).assetsPurged, true);
+    const newKey = `${cycle.projectId}/second-cycle`;
+    await storage.put({ key: newKey, body: new Uint8Array([1]), bytes: 1, contentType: "image/png" });
+    const phase = await phaseOf(cycle.projectId, "moodboard");
+    await db.sfDeliverable.create({ data: { project_id: cycle.projectId, phase_id: phase.id, name: "Second-cycle file", storage_key: newKey } });
+
+    await sf.projects.archiveProject({ ...as(designer), projectId: cycle.projectId, reason: "Second archive" });
+    assert.equal((await db.sfProject.findUniqueOrThrow({ where: { id: cycle.projectId } })).assets_purged_at, null, "a new archive clears the marker");
+    clock = new Date(clock.getTime() + 89 * day);
+    assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0);
+    assert.ok(storage.objects.has(newKey), "still inside the second window");
+    clock = new Date(clock.getTime() + 2 * day);
+    const second = await retention().purgeExpiredArchivedAssets();
+    assert.equal(second.projectsPurged, 1);
+    assert.equal(second.deliverables, 1);
+    assert.equal(storage.objects.has(newKey), false, "the second-cycle file is purged");
+    assert.equal(await purgeEvents("studioflow.project.assets_purged"), 2);
+    assert.equal(await purgeEvents("studioflow.project.assets_purge_completed"), 2);
+    assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0, "a project archived once is purged once per cycle");
+  });
+
+  it("WO-BE-03 C3/C5: preview counts what the purge would purge and writes nothing; reads expose assetsPurgedAt", async () => {
+    const db = testDb.prisma;
+    const expired = await fixture("Preview expired", 91);
+    const boundary = await fixture("Preview boundary", 90);
+    const live = await fixture("Preview live");
+    await rejectsWith(retention().previewAssetCleanup(as(drafter, DRAFTER_GRANTS)), "PERMISSION_DENIED");
+    const eventsBefore = await db.auditEvent.count();
+    assert.deepEqual(await retention().previewAssetCleanup(as(designer)), { eligibleProjects: 1, retentionDays: 90 });
+    assert.equal(await db.auditEvent.count(), eventsBefore, "preview writes no audit event");
+    for (const key of Object.values(expired.keys)) assert.ok(storage.objects.has(key), "preview deletes nothing");
+    assert.equal((await db.sfProject.findUniqueOrThrow({ where: { id: expired.projectId } })).assets_purged_at, null);
+    assert.equal((await sf.projects.getProject({ grants: ALL, projectId: expired.projectId })).assetsPurgedAt, null);
+
+    assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 1, "the purge acts on exactly what the preview counted");
+    assert.deepEqual(await retention().previewAssetCleanup(as(designer)), { eligibleProjects: 0, retentionDays: 90 });
+    assert.ok((await sf.projects.getProject({ grants: ALL, projectId: expired.projectId })).assetsPurgedAt instanceof Date);
+    const archivedRows = await sf.projects.listProjects({ grants: ALL, archived: true });
+    assert.ok(archivedRows.find((row) => row.id === expired.projectId)?.assetsPurgedAt instanceof Date);
+    assert.equal(archivedRows.find((row) => row.id === boundary.projectId)?.assetsPurgedAt, null);
+    assert.equal((await sf.projects.getProject({ grants: ALL, projectId: live.projectId })).assetsPurgedAt, null);
+
+    await sf.projects.setAutoNaming({ ...as(designer), enabled: true, archiveRetentionDays: 7 });
+    assert.deepEqual(await retention().previewAssetCleanup(as(designer)), { eligibleProjects: 1, retentionDays: 7 }, "a shorter window makes the 90-day-old project eligible");
+  });
 });
 
 describe("WO-BE-01 backend regressions", () => {

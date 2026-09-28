@@ -177,6 +177,24 @@ export async function archiveProjectAction(projectId: string, reason: string): P
   });
 }
 
+/** How many archived projects the next cleanup would purge right now (reads only). */
+export async function getAssetCleanupPreviewAction(): Promise<ActionResult<{ eligibleProjects: number; retentionDays: number }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    return studioFlow.projects.previewAssetCleanup(ctx);
+  });
+}
+
+/** Owner-triggered cleanup of archived-project files past the retention window. Irreversible. */
+export async function runAssetCleanupAction(limit?: number) {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const result = await studioFlow.projects.runAssetCleanup({ ...ctx, limit: parse(z.number().int().min(1).max(100).default(25), limit) });
+    refresh();
+    return result;
+  });
+}
+
 export async function restoreProjectAction(projectId: string, reason: string): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
