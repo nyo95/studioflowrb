@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { after, before, beforeEach, describe, it } from "node:test";
+import { after, afterEach, before, beforeEach, describe, it, mock } from "node:test";
 
 import { createAuditEventWriter } from "@platform/core/audit/persistence";
 import { closeTestDb, createTestDb, requireDisposableTestDatabaseUrl, truncatePlatformTables, type TestDb } from "@platform/core/db/test-support";
@@ -18,6 +18,9 @@ import { STUDIOFLOW_PERMISSIONS as P } from "./permissions";
 import { createStudioFlowService, type StudioFlowService } from "./service";
 import { readBlockerCounts, readBlockerCountsBatch } from "./phases/blocker-query";
 import { fullBlockers } from "./domain/blockers";
+import { createAssetRetentionService } from "./projects/asset-retention";
+import { runSerializableTransaction } from "@platform/core/db/transactions";
+import type { StudioFlowPorts } from "./shared";
 
 const ALL = [...Object.values(P)];
 const DRAFTER_GRANTS = [P.access, P.projectRead, P.phaseWork, P.taskManage];
@@ -113,6 +116,171 @@ async function phaseOf(projectId: string, legacy: keyof typeof LEGACY) {
 async function revisions(phaseId: string) {
   return (await testDb.prisma.sfRevision.findMany({ where: { phase_id: phaseId }, orderBy: [{ major: "asc" }, { minor: "asc" }] })).map((r) => `v${r.major}.${r.minor}:${r.status}`);
 }
+
+describe("WO-BE-02 archived asset retention", () => {
+  afterEach(() => storage.objects.clear());
+  function retention(overrides: Partial<StudioFlowPorts> = {}) {
+    const db = testDb.prisma;
+    return createAssetRetentionService(db, {
+      runTransaction: (work) => runSerializableTransaction(db, work),
+      auditWriter: createAuditEventWriter(), people: createPeopleDirectory(db), storage,
+      masterData: createMasterDataPublicRead(db), now: () => clock, ...overrides,
+    });
+  }
+
+  async function fixture(name: string, age?: number) {
+    const db = testDb.prisma;
+    const { projectId } = await newProject(name);
+    const phase = await phaseOf(projectId, "moodboard");
+    const keys = { deliverable: `${projectId}/deliverable`, mom: `${projectId}/mom`, oldMom: `${projectId}/old-mom`, option: `${projectId}/option` };
+    for (const key of Object.values(keys)) await storage.put({ key, body: new Uint8Array([1]), bytes: 1, contentType: "image/png" });
+    await db.sfDeliverable.create({ data: { project_id: projectId, phase_id: phase.id, name: "Private file", storage_key: keys.deliverable } });
+    const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId, topic: "Retain this text" });
+    const item = await db.sfMomItem.findFirstOrThrow({ where: { document_id: documentId } });
+    await db.sfMomImage.create({ data: { item_id: item.id, slot: 0, storage_key: keys.mom, content_type: "image/png", bytes: 1 } });
+    const snapshot = { topic: "Original topic", meetingDate: "2026-09-01", venue: "Site", attendees: "Team", preparedByName: "Designer", items: [{ isTextOnly: false, content: "Original revision text", images: [
+      { slot: 0, storageKey: keys.mom, contentType: "image/png", bytes: 1 },
+      { slot: 1, storageKey: keys.oldMom, contentType: "image/png", bytes: 1 },
+    ] }] };
+    const revision = await db.sfMomRevision.create({ data: { document_id: documentId, number: 1, note: "Keep this note", snapshot, created_by_id: designer.id, created_by_name: "Designer" } });
+    const entry = await db.sfScheduleEntry.create({ data: { project_id: projectId, section: "MATERIAL", category: "Floor", category_key: "floor", prefix: "FL", increment: 1, sort_order: 0 } });
+    await db.sfScheduleOption.create({ data: { entry_id: entry.id, label: "A", product_name: "Floor", search_key: "floor", image_key: keys.option } });
+    if (age !== undefined) await db.sfProject.update({ where: { id: projectId }, data: { archived_at: new Date(clock.getTime() - age * 86_400_000) } });
+    return { projectId, keys, documentId, revision, entryId: entry.id };
+  }
+
+  it("purges only expired project assets, preserves text/history and exact audit fields, then restores text-only", async () => {
+    const db = testDb.prisma;
+    const expired = await fixture("Expired", 91);
+    const inside = await fixture("Inside", 89);
+    const boundary = await fixture("Boundary", 90);
+    const live = await fixture("Live");
+    const client = await db.sfClient.findFirstOrThrow();
+    await storage.put({ key: "client-logo", body: new Uint8Array([1]), bytes: 1, contentType: "image/png" });
+    await storage.put({ key: "template-photo", body: new Uint8Array([1]), bytes: 1, contentType: "image/png" });
+    await db.sfClient.update({ where: { id: client.id }, data: { logo_storage_key: "client-logo" } });
+    await db.sfScheduleTemplateItem.create({ data: { section: "MATERIAL", category: "Floor", category_key: "floor", product_name: "Template", image_key: "template-photo" } });
+    const result = await retention().purgeExpiredArchivedAssets();
+    assert.deepEqual(result, { projectsPurged: 1, deliverables: 1, momImages: 1, momSnapshotImages: 2, optionPhotos: 1, blobsRemoved: 4, blobsKeptShared: 0, blobFailures: 0, unparseableRevisions: 0 });
+    for (const key of Object.values(expired.keys)) assert.equal(storage.objects.has(key), false);
+    for (const kept of [inside, boundary, live]) {
+      for (const key of Object.values(kept.keys)) assert.ok(storage.objects.has(key));
+      assert.equal((await db.sfProject.findUniqueOrThrow({ where: { id: kept.projectId } })).assets_purged_at, null);
+    }
+    assert.ok(storage.objects.has("client-logo")); assert.ok(storage.objects.has("template-photo"));
+    assert.equal(await db.sfDeliverable.count({ where: { project_id: expired.projectId } }), 0);
+    assert.equal(await db.sfMomImage.count({ where: { item: { document_id: expired.documentId } } }), 0);
+    assert.equal((await db.sfScheduleOption.findFirstOrThrow({ where: { entry_id: expired.entryId } })).image_key, null);
+    const revision = await db.sfMomRevision.findUniqueOrThrow({ where: { id: expired.revision.id } });
+    const original = expired.revision.snapshot as { items: Array<Record<string, unknown>> };
+    assert.deepEqual(revision, { ...expired.revision, snapshot: { ...original, items: original.items.map((item) => ({ ...item, images: [] })) } });
+    const events = await db.auditEvent.findMany({ where: { entity_id: expired.projectId, action: { startsWith: "studioflow.project.assets_" } }, orderBy: { occurred_at: "asc" } });
+    assert.deepEqual(events.map((event) => event.action), ["studioflow.project.assets_purged", "studioflow.project.assets_purge_completed"]);
+    assert.ok(events.every((event) => event.actor_kind === "SYSTEM"));
+    assert.deepEqual(events[0].metadata, { projectId: expired.projectId, deliverables: 1, momImages: 1, momSnapshotImages: 2, optionPhotos: 1, unparseableRevisions: 0, keysCollected: 4 });
+    assert.deepEqual(events[1].metadata, { projectId: expired.projectId, blobsRemoved: 4, blobsKeptShared: 0, blobFailures: 0 });
+    assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0);
+    await sf.projects.restoreProject({ ...as(designer), projectId: inside.projectId });
+    for (const key of Object.values(inside.keys)) assert.ok(storage.objects.has(key));
+    await sf.projects.restoreProject({ ...as(designer), projectId: expired.projectId });
+    await sf.mom.restoreRevision({ ...as(designer), projectId: expired.projectId, documentId: expired.documentId, revisionId: revision.id });
+    const doc = await sf.mom.getDocument({ grants: ALL, projectId: expired.projectId, documentId: expired.documentId });
+    assert.equal(doc.items[0].content, "Original revision text"); assert.deepEqual(doc.items[0].images, []);
+    for (const [projectId, assetsPurged] of [[inside.projectId, false], [expired.projectId, true]] as const) {
+      const event = await db.auditEvent.findFirstOrThrow({ where: { entity_id: projectId, action: "studioflow.project.restored" } });
+      assert.equal((event.metadata as { assetsPurged: boolean }).assetsPurged, assetsPurged);
+    }
+  });
+
+  it("keeps shared keys, leaves malformed snapshots untouched and preserves legacy snapshot text", async () => {
+    const db = testDb.prisma;
+    const expired = await fixture("Shared expired", 100);
+    const live = await fixture("Shared live");
+    await db.sfScheduleTemplateItem.create({ data: { section: "MATERIAL", category: "Floor", category_key: "floor", product_name: "Template", image_key: expired.keys.option } });
+    await db.sfScheduleOption.updateMany({ where: { entry_id: live.entryId }, data: { image_key: expired.keys.deliverable } });
+    const malformed = { items: [{ images: [{ storageKey: expired.keys.mom }] }], invalid: true };
+    await db.sfMomRevision.create({ data: { document_id: expired.documentId, number: 2, snapshot: malformed, created_by_id: designer.id, created_by_name: "Designer" } });
+    const legacy = { topic: "Legacy", meetingDate: "2026-09-01", venue: null, attendees: null, preparedByName: "Designer", items: [{ isTextOnly: true, listStyle: "DASH", points: [{ text: "Exact text", style: "DEFAULT" }], images: [] }] };
+    const legacyRow = await db.sfMomRevision.create({ data: { document_id: expired.documentId, number: 3, snapshot: legacy, created_by_id: designer.id, created_by_name: "Designer" } });
+    const result = await retention().purgeExpiredArchivedAssets();
+    assert.equal(result.blobsKeptShared, 3); assert.equal(result.blobsRemoved, 1); assert.equal(result.unparseableRevisions, 1);
+    for (const key of [expired.keys.option, expired.keys.deliverable, expired.keys.mom]) assert.ok(storage.objects.has(key));
+    assert.deepEqual((await db.sfMomRevision.findFirstOrThrow({ where: { document_id: expired.documentId, number: 2 } })).snapshot, malformed);
+    assert.deepEqual((await db.sfMomRevision.findUniqueOrThrow({ where: { id: legacyRow.id } })).snapshot, legacy);
+  });
+
+  it("validates settings and permissions, respects changed retention and oldest-first limits", async () => {
+    assert.equal((await sf.projects.getStudioSettings({ grants: ALL })).archiveRetentionDays, 90);
+    for (const archiveRetentionDays of [6, 731, 7.5, NaN]) await rejectsWith(sf.projects.setAutoNaming({ ...as(designer), enabled: true, archiveRetentionDays }), "ARCHIVE_RETENTION_INVALID");
+    await rejectsWith(sf.projects.setAutoNaming({ ...as(drafter, DRAFTER_GRANTS), enabled: true, archiveRetentionDays: 7 }), "PERMISSION_DENIED");
+    await rejectsWith(retention().runAssetCleanup(as(drafter, DRAFTER_GRANTS)), "PERMISSION_DENIED");
+    const older = await fixture("Older", 20);
+    const newer = await fixture("Newer", 10);
+    assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0);
+    await sf.projects.setAutoNaming({ ...as(designer), enabled: true, archiveRetentionDays: 7 });
+    assert.equal((await retention().runAssetCleanup({ ...as(designer), limit: 1 })).projectsPurged, 1);
+    assert.ok((await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: older.projectId } })).assets_purged_at);
+    assert.equal((await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: newer.projectId } })).assets_purged_at, null);
+    await sf.projects.setAutoNaming({ ...as(designer), enabled: false });
+    assert.deepEqual(await sf.projects.getStudioSettings({ grants: ALL }), { autoNamingEnabled: false, archiveRetentionDays: 7 });
+    await sf.projects.setAutoNaming({ ...as(designer), enabled: false, archiveRetentionDays: 730 });
+    assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0);
+  });
+
+  it("claims each project exactly once across concurrent serializable sweeps", async () => {
+    const expired = await fixture("Concurrent purge", 91);
+    const results = await Promise.all([retention().purgeExpiredArchivedAssets(), retention().purgeExpiredArchivedAssets()]);
+    assert.equal(results.reduce((n, result) => n + result.projectsPurged, 0), 1);
+    assert.equal(results.reduce((n, result) => n + result.blobsRemoved, 0), 4);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { entity_id: expired.projectId, action: "studioflow.project.assets_purged" } }), 1);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { entity_id: expired.projectId, action: "studioflow.project.assets_purge_completed" } }), 1);
+  });
+
+  it("rolls back the claim and all records if the primary audit fails, before any storage removal", async () => {
+    const expired = await fixture("Rollback", 91);
+    await assert.rejects(retention({ auditWriter: { write: async () => { throw Error("audit unavailable"); } } }).purgeExpiredArchivedAssets());
+    assert.equal((await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: expired.projectId } })).assets_purged_at, null);
+    assert.equal(await testDb.prisma.sfDeliverable.count({ where: { project_id: expired.projectId } }), 1);
+    assert.deepEqual(await testDb.prisma.sfMomRevision.findUniqueOrThrow({ where: { id: expired.revision.id } }), expired.revision);
+    for (const key of Object.values(expired.keys)) assert.ok(storage.objects.has(key));
+  });
+
+  it("rechecks archive status when a restore happens after candidate selection", async () => {
+    const expired = await fixture("Restored before claim", 91);
+    let restored = false;
+    const service = retention({ runTransaction: async (work) => {
+      if (!restored) {
+        restored = true;
+        await sf.projects.restoreProject({ ...as(designer), projectId: expired.projectId });
+      }
+      return runSerializableTransaction(testDb.prisma, work);
+    } });
+    assert.equal((await service.purgeExpiredArchivedAssets()).projectsPurged, 0);
+    for (const key of Object.values(expired.keys)) assert.ok(storage.objects.has(key));
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { entity_id: expired.projectId, action: "studioflow.project.assets_purged" } }), 0);
+  });
+
+  it("counts storage failures after commit and tolerates a failed completion audit without leaking details", async () => {
+    const expired = await fixture("Failures", 91);
+    const logs: unknown[][] = [];
+    const logger = mock.method(console, "error", (...args: unknown[]) => { logs.push(args); });
+    const writer = createAuditEventWriter();
+    try {
+      const result = await retention({
+        storage: { put: (input) => storage.put(input), createSignedReadUrl: (key, seconds) => storage.createSignedReadUrl(key, seconds), remove: async (key) => {
+          assert.equal(await testDb.prisma.sfDeliverable.count({ where: { project_id: expired.projectId } }), 0);
+          if (key === expired.keys.deliverable) throw Error("secret filename");
+          await storage.remove(key);
+        } },
+        auditWriter: { write: async (event, tx) => { if (event.action.endsWith("assets_purge_completed")) throw Error("secret audit details"); await writer.write(event, tx); } },
+      }).purgeExpiredArchivedAssets();
+      assert.equal(result.projectsPurged, 1); assert.equal(result.blobFailures, 1); assert.equal(result.blobsRemoved, 3);
+      assert.deepEqual(logs, [["StudioFlow asset cleanup completion audit failed."]]);
+      assert.equal(await testDb.prisma.auditEvent.count({ where: { entity_id: expired.projectId, action: "studioflow.project.assets_purged" } }), 1);
+      assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0);
+    } finally { logger.mock.restore(); }
+  });
+});
 
 describe("WO-BE-01 backend regressions", () => {
   it("allocates distinct stored project codes for concurrent creates", async () => {

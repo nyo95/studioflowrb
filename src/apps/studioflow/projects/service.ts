@@ -1,3 +1,4 @@
+import { createAssetRetentionService } from "./asset-retention";
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client";
@@ -90,7 +91,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
 
   async function readSettings(client: Db | TxClient) {
     const row = await client.sfSettings.findUnique({ where: { id: SETTINGS_ID } });
-    return { autoNamingEnabled: row?.auto_naming_enabled ?? true };
+    return { autoNamingEnabled: row?.auto_naming_enabled ?? true, archiveRetentionDays: row?.archive_retention_days ?? 90 };
   }
 
   async function assertPic(userId: string, seat: string): Promise<void> {
@@ -173,23 +174,28 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
 
   return {
     // ── Settings ───────────────────────────────────────────────────────────
+    ...createAssetRetentionService(db, ports),
     async getStudioSettings(input: ReadContext) {
       requireRead(input.grants);
       return readSettings(db);
     },
 
-    async setAutoNaming(input: CommandContext & { enabled: boolean }) {
+    async setAutoNaming(input: CommandContext & { enabled: boolean; archiveRetentionDays?: number }) {
       const userId = requireCommand(input, P.settingsManage);
+      if (input.archiveRetentionDays !== undefined && (!Number.isInteger(input.archiveRetentionDays) || input.archiveRetentionDays < 7 || input.archiveRetentionDays > 730)) {
+        throw invalid("ARCHIVE_RETENTION_INVALID", "Keep archived files for a whole number of days between 7 and 730.");
+      }
       return runTransaction(async (tx) => {
         const before = await readSettings(tx);
-        if (before.autoNamingEnabled === input.enabled) return { autoNamingEnabled: input.enabled };
+        const archiveRetentionDays = input.archiveRetentionDays ?? before.archiveRetentionDays;
+        if (before.autoNamingEnabled === input.enabled && before.archiveRetentionDays === archiveRetentionDays) return before;
         await tx.sfSettings.upsert({
           where: { id: SETTINGS_ID },
-          create: { id: SETTINGS_ID, auto_naming_enabled: input.enabled, updated_by_id: userId },
-          update: { auto_naming_enabled: input.enabled, updated_by_id: userId },
+          create: { id: SETTINGS_ID, auto_naming_enabled: input.enabled, archive_retention_days: archiveRetentionDays, updated_by_id: userId },
+          update: { auto_naming_enabled: input.enabled, archive_retention_days: archiveRetentionDays, updated_by_id: userId },
         });
-        await writeAudit(ports, tx, { action: "studioflow.settings.updated", entityType: "settings", entityId: SETTINGS_ID, actor: input.actor, changes: { autoNamingEnabled: { from: before.autoNamingEnabled, to: input.enabled } } });
-        return { autoNamingEnabled: input.enabled };
+        await writeAudit(ports, tx, { action: "studioflow.settings.updated", entityType: "settings", entityId: SETTINGS_ID, actor: input.actor, changes: { ...(before.autoNamingEnabled !== input.enabled ? { autoNamingEnabled: { from: before.autoNamingEnabled, to: input.enabled } } : {}), ...(before.archiveRetentionDays !== archiveRetentionDays ? { archiveRetentionDays: { from: before.archiveRetentionDays, to: archiveRetentionDays } } : {}) } });
+        return { autoNamingEnabled: input.enabled, archiveRetentionDays };
       });
     },
 
@@ -598,7 +604,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         if (!project) throw notFound("project");
         if (!project.archived_at) throw conflict("PROJECT_NOT_ARCHIVED", "This project is not archived.");
         await tx.sfProject.update({ where: { id: project.id }, data: { archived_at: null, archived_by_id: null, archive_reason: null } });
-        await writeAudit(ports, tx, { action: "studioflow.project.restored", entityType: "project", entityId: project.id, actor: input.actor, metadata: { projectId: project.id, reason: optionalText(input.reason, 500), previousReason: project.archive_reason } });
+        await writeAudit(ports, tx, { action: "studioflow.project.restored", entityType: "project", entityId: project.id, actor: input.actor, metadata: { projectId: project.id, reason: optionalText(input.reason, 500), previousReason: project.archive_reason, assetsPurged: project.assets_purged_at !== null } });
         return { projectId: project.id };
       });
     },

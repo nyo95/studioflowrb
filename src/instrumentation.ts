@@ -21,4 +21,10 @@ export async function register(): Promise<void> {
   const { initializePermissionRegistry } = await import("@platform/core/rbac/registry");
   const { APP_REGISTRATIONS } = await import("./app/app-registrations");
   initializePermissionRegistry(APP_REGISTRATIONS);
+  try {
+    const { startStudioFlowAssetSweep } = await import("./apps/studioflow/runtime");
+    startStudioFlowAssetSweep();
+  } catch {
+    console.error("StudioFlow asset cleanup startup failed.");
+  }
 }

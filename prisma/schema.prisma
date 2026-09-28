@@ -1143,6 +1143,7 @@ enum SfActivityStatus {
 model SfSettings {
   id                  String   @id @default("studio")
   auto_naming_enabled Boolean  @default(true)
+  archive_retention_days Int   @default(90)
   updated_at          DateTime @updatedAt
   updated_by_id       String?
 
@@ -1200,6 +1201,7 @@ model SfProject {
   archived_at     DateTime?
   archived_by_id  String?
   archive_reason  String?
+  assets_purged_at DateTime?
 
   client           SfClient?          @relation(fields: [client_id], references: [id])
   phases           SfPhase[]

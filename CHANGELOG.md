@@ -5,13 +5,72 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.177**
-- Next local revision: **R8.178**
+- Current revision after this entry is committed: **R8.178**
+- Next local revision: **R8.179**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.178 | 2026-09-28 | feat(studioflow): enforce archived project asset retention
+
+Backend Executor completion of revised WO-BE-02. Starting HEAD and remote-tracking
+`origin/main`: `ee15685ca55e22fe03d44e09cc64ef452155a0b1`, branch `main`, published baseline R8;
+R8.178 was the next unused revision. Model/relationship verification confirmed deliverables,
+MOM item images, document revision snapshots, schedule options, and excluded client/template
+keys. No cross-project MOM snapshot-copy path exists in the current service.
+
+- **APP-OWNED / EXTEND:** Studio settings now read and update `archiveRetentionDays` (default 90,
+  integer 7–730), with existing settings permission/audit behavior and backwards-compatible
+  settings action input. No UI controls added.
+- **PURGE / REUSE:** oldest-first batches (default 25) atomically claim expired archived projects,
+  rechecking archive status before deletion. Delete deliverable/MOM image rows, clear option
+  photo keys, and strip image arrays from parseable retained MOM snapshots while preserving
+  original JSON text/fields and revision metadata. Unparseable revisions remain untouched and
+  are counted. Known candidate keys still present in those untouched snapshots are conservatively
+  retained and counted as shared, avoiding dangling references.
+- Extracted the schedule's unreferenced-object cleanup into one StudioFlow helper shared with
+  retention. Checks all five locked row owners before removing a unique key; shared blobs stay.
+  Blob/reference-check failures leave objects in storage and increment `blobFailures`.
+- The locked SYSTEM events are separate and append-only: `studioflow.project.assets_purged`
+  commits with the claim and record changes, with exactly the primary fields; then
+  `studioflow.project.assets_purge_completed` records exactly the storage outcome fields.
+  Completion-audit failures log a fixed safe line and do not undo cleanup.
+- `projects.runAssetCleanup` requires project-manage (plus existing app-access/actor checks).
+  Internal `purgeExpiredArchivedAssets` uses SYSTEM audit context. Node instrumentation starts
+  the app-owned sweep after 10 seconds and every 24 hours using unreferenced timers. The
+  `STUDIOFLOW_ASSET_SWEEP` switch defaults on only in production; documented in `.env.example`.
+- Restore audit metadata includes `assetsPurged`; restore does not recreate files. Tests prove
+  that subsequent MOM revision restoration still restores text with empty image arrays.
+
+**Migration.** One additive migration, `20260928120000_studioflow_archive_asset_retention`,
+adds only `studioflow.sf_settings.archive_retention_days` and
+`studioflow.sf_project.assets_purged_at`. Successfully deployed to **both** rebuild-only local
+databases, `masterdata` and `masterdata_test`, after verifying localhost:5433 matches the
+`masterdata-db` container and the selected ignored env files. Prisma client regenerated.
+No dependency, Master Data, BQ, or platform-storage changes; no push.
+
+**Checks.** Full `npm test`: **558/558**, zero failed/skipped/cancelled. `npm run check`
+(typecheck, boundaries, legacy-runtime), `npm run lint`, `npm run build`, and staged/unstaged
+whitespace checks passed. Coverage includes eligibility/exclusions, exact audit fields,
+snapshot-only images, legacy snapshot text, malformed snapshots, shared keys, concurrent claims,
+restore before claim, rollback on primary-audit failure, storage/completion failures, settings
+permissions/range, and boot defaults/timer/error handling. Initial test-fixture isolation and
+async test flushing failures were corrected before the final full pass; no old assertion weakened.
+Build ran with dev stopped and automatic sweep explicitly off. Dev restarted on port 3001
+using rumah configuration, refreshed client, and sweep off; `next-env.d.ts` preserved, not staged.
+
+**Limits / handoff.** No real project purge was run against dev storage. As locked, a crash after
+the primary commit can leave orphan blobs and no completion event; the claimed project is not
+automatically retried. Unparseable snapshots remain retained. Lead owns the settings field,
+archive/removed-date copy and manual button; three R8.178 browser acceptance items were added.
+Existing planned backlog entry stays open pending Reviewer end-to-end acceptance.
+Unrelated dirty files preserved: `next-env.d.ts`, `.claude/launch.local-untracked.json`,
+`docs/PROJECT-REBUILD-FOUNDATION-REFERENCE.md`, `docs/STUDIOFLOW-RECOVERY-REFERENCE.md`,
+`docs/apps/studioflow/STUDIOFLOW-PRODUCT-MENTAL-MODEL-PHASE-V2-DRAFT.md`, `opencode.json`,
+`public/uploads/brand-marks/22e07e06-00d2-45c0-894b-7b11c736a545.png`, `scripts/dev-seed.ts`,
+`scripts/work-orders/UIUX-APPLE-MINIMALIST.md`.
 
 ## R8.177 | 2026-09-28 | docs(plan): WO-BE-02 audit order locked after the Executor's second BLOCKED / CONFLICT
 

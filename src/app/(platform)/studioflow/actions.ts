@@ -36,10 +36,10 @@ function refresh(projectId?: string) {
 
 // ── Settings ────────────────────────────────────────────────────────────────
 
-export async function setAutoNamingAction(enabled: boolean): Promise<ActionResult<unknown>> {
+export async function setAutoNamingAction(enabled: boolean, archiveRetentionDays?: number): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
-    const result = await studioFlow.projects.setAutoNaming({ ...ctx, enabled: parse(z.boolean(), enabled) });
+    const result = await studioFlow.projects.setAutoNaming({ ...ctx, enabled: parse(z.boolean(), enabled), archiveRetentionDays: parse(z.number().int().min(7).max(730).optional(), archiveRetentionDays) });
     refresh();
     return result;
   });

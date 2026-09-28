@@ -1,3 +1,4 @@
+import { removeUnreferenced as removeUnreferencedAssets } from "../asset-cleanup";
 import { Prisma } from "@/generated/prisma/client";
 
 import { createPrivateObjectKey } from "@platform/core/storage";
@@ -136,15 +137,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
    * points at it. A failure leaves an orphan object, never a broken row.
    */
   async function removeUnreferenced(keys: readonly (string | null | undefined)[]) {
-    const unique = [...new Set(keys.filter((key): key is string => !!key))];
-    await Promise.all(unique.map(async (key) => {
-      const [options, templates] = await Promise.all([
-        db.sfScheduleOption.count({ where: { image_key: key } }),
-        db.sfScheduleTemplateItem.count({ where: { image_key: key } }),
-      ]);
-      if (options + templates > 0) return;
-      await storage.remove(key).catch(() => undefined);
-    }));
+    await removeUnreferencedAssets(db, storage, keys);
   }
 
   function validateImage(file: ScheduleImageUpload): string {

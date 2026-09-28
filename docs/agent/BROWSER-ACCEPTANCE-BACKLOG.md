@@ -30,6 +30,30 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.178] Archive retains files inside the configured window
+- Surface: StudioFlow project archive dialog and settings (Lead UI follow-up)
+- Fixture: disposable project with deliverable, MOM current/revision images and schedule photos; settings manager
+- Viewport: desktop
+- Steps: 1. Set retention to a valid value. 2. Archive the project. 3. Check retained files. 4. Try settings outside 7–730 whole days.
+- Acceptance: files remain inside the window; invalid settings are rejected; archive copy states the configured retention.
+- Status: PENDING
+
+### [R8.178] Manual cleanup respects permissions and shared files
+- Surface: StudioFlow manual cleanup button (Lead UI follow-up)
+- Fixture: disposable expired archived project; shared schedule image used by a live project/template; users with and without project-manage
+- Viewport: desktop
+- Steps: 1. Run cleanup with project-manage. 2. Review summary and both audit events. 3. Run again. 4. Attempt without project-manage.
+- Acceptance: expired project references are cleared; shared files remain; repeat run is a no-op; unauthorized run fails; both counts-only audit events use SYSTEM actors.
+- Status: PENDING
+
+### [R8.178] Restore before and after asset cleanup
+- Surface: StudioFlow archived project and MOM revision restore (Lead UI follow-up)
+- Fixture: disposable archived projects inside and beyond retention; retained MOM revision text
+- Viewport: desktop
+- Steps: 1. Restore inside retention and inspect files. 2. Purge the expired project, restore it, and restore a MOM revision with different text.
+- Acceptance: inside-window files remain; after purge the removed date is visible, project restore succeeds, and MOM revision restores text without missing-image references; restore audit records assetsPurged correctly.
+- Status: PENDING
+
 ### [R8.173] Project overview revision history loads on demand
 - Surface: `/studioflow/projects/[projectId]`
 - Fixture: reader with StudioFlow access/project-read; project with active and closed revisions, including an empty closed revision
