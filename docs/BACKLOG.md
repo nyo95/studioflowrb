@@ -542,7 +542,10 @@ explored direction. No access-check changes. See `CHANGELOG.md` R8.110.
   logo? (3) Is the purge immediate and irreversible, or does it need a confirmation
   step in the archive dialog?
   **Answered 2026-09-28:** keep 90 days (provisional, adjustable), never immediate; see Decision
-  gates. **Work Order WO-BE-02 is READY in `PLAN.md` (target R8.178).**
+  gates. **Backend implemented in R8.178 (WO-BE-02, reviewed by the Lead, verdict CORRECTION
+  REQUIRED for one lifecycle defect).** The correction plus the reads and actions the retention UI needs is
+  WO-BE-03, READY in `PLAN.md` (target R8.180). The retention screens (settings field, archive-dialog copy,
+  archived-project line, cleanup control) are the Lead's and not built yet.
 - [x] [BUG] `ui-engine.test.ts` ("UI Engine foundation") has 2 pre-existing,
   unrelated failures found while running the full suite for R8.164 (out of
   scope for that change, left open per the proportionate-checks rule):

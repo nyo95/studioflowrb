@@ -1,193 +1,115 @@
 # Active Plan
 
-Plan ID: WO-BE-02
-Scope: StudioFlow — keep archived-project files for a retention window, then purge them (backend only)
+Plan ID: WO-BE-03
+Scope: StudioFlow — correct the archive-retention lifecycle and expose what the Lead's UI needs (backend only)
 Status: READY
 Priority: P2
 Owner: owner (Product Owner); Lead: Claude
-Target revision: R8.178
-Last updated: 2026-09-28 (revised twice after the Executor's BLOCKED / CONFLICT reports, see "Resolved conflict")
+Target revision: R8.180
+Last updated: 2026-09-28
 
 ## Outcome
 
-A project's own files are no longer left forever after it is archived, and they are also **not**
-deleted at once. Files are kept for a retention window (owner: 90 days, provisional, adjustable
-in studio settings). Restoring the project inside the window keeps everything. After the window a
-server-side sweep removes that project's files. Nothing outside the project's own files is ever
-removed.
-
-WO-BE-01 (R8.173) was reviewed and accepted by the Lead (R8.174). Master Data is unlocked and BQ is
-still on hold; this plan touches neither.
-
-## Resolved conflict (Lead, 2026-09-28)
-
-The Executor returned `BLOCKED / CONFLICT` on the first version of this plan: `SfMomRevision.snapshot` also holds
-image keys, so purging only `SfMomImage` would leave revisions pointing at missing files, while preserving them
-would keep project files forever. The Lead chose the Executor's option A (strip images from retained snapshots,
-keep revision text and history) because option B defeats the retention purpose and option C destroys revision
-history, which matters more than the images. The Executor also correctly noted shared schedule image keys; the
-shared-key rule is locked below. The plan's earlier "exhaustive list" claim was the Lead's error. Target revision
-moved from R8.176 to R8.177 because R8.176 is used by this correction.
-
-The Executor then returned a second `BLOCKED / CONFLICT`: the audit event written inside the transaction cannot
-contain the results of later storage removal, and audit records are append-only, so it cannot be updated afterwards
-either. The Lead chose the Executor's option A: a primary event inside the transaction and a separate completion
-event after storage removal, with names and fields locked above. Target revision moved to R8.178 because R8.177
-is used by this correction.
+WO-BE-02 (R8.178) is reviewed: gate re-run independently (558/558), logic read in full. One lifecycle
+defect and a few gaps the Lead's UI needs remain. After this plan, retention keeps working after a project has
+been archived, restored, and archived again, and the backend exposes exactly the data and commands the retention
+screens need.
 
 ## Context and Evidence
 
-Authority: `AGENTS.md`, `docs/agent/EXECUTOR.md`, `docs/MODULE-BOUNDARIES.md`, `docs/BACKLOG.md`
-"Decision gates" (owner answers of 2026-09-28) and the "Purge STORED file assets on project archive"
-entry. `archiveProject` / `restoreProject` in `src/apps/studioflow/projects/service.ts` only set or
-clear `archived_at`. Files are removed today only by per-feature deletes that call
-`storage.remove(key)` after the database write (`mom/service.ts`, `phases/service.ts`,
-`schedule/service.ts`); follow that pattern. Re-verify the model list below against
-`prisma/schema.prisma` before coding.
+Authority: `AGENTS.md`, `docs/agent/EXECUTOR.md`, `docs/MODULE-BOUNDARIES.md`, `CHANGELOG.md` R8.178,
+`docs/BACKLOG.md` "Decision gates". Code: `projects/asset-retention.ts`, `projects/service.ts`
+(`archiveProject`, `restoreProject`, `listProjects`, `getProject`), `asset-sweep.ts`,
+`app/(platform)/studioflow/actions.ts`. Re-verify each finding before changing code; report any that does not
+reproduce.
 
 ## Business Rules and Architecture Constraints
 
-- The project's own files are exactly: `SfDeliverable` (has `project_id`, `storage_key`),
-  `SfMomImage` (`storage_key`, reached through its MOM document's project), the image references
-  inside each retained `SfMomRevision.snapshot` of those documents (JSON; see the locked snapshot rule
-  below), and `SfScheduleOption.image_key` (reached through its entry's project). **Never** touch
-  `SfClient.logo_storage_key`, `SfScheduleTemplateItem.image_key` (studio-wide templates), Master Data
-  brand marks, or any file of a non-archived project.
-- Everything stays inside StudioFlow (its own models and its own `ports.storage`); no cross-app access.
-- Purge is **irreversible**, so it must be idempotent, claim-based, and audited. It must be safe if
-  two sweeps run at once or the process restarts mid-way.
+- `SfProject.assets_purged_at` means "this archive cycle's files were purged". A project restored after a purge
+  and archived again starts a new cycle and must become eligible again once the retention window elapses.
+- Purge stays irreversible, claim-based, and audited exactly as locked in WO-BE-02. No change to what is deleted.
+- Everything stays inside StudioFlow; no Master Data, no BQ.
 
 ## Backend Contract (locked)
 
-**Schema (one additive migration, `studioflow` schema, no data rewrite).**
-`SfSettings.archive_retention_days Int @default(90)`; `SfProject.assets_purged_at DateTime?`.
-Apply the migration to **both** local databases (`masterdata` dev and `masterdata_test`) and run
-`prisma generate`; verify each target name before any database command.
+**C1 — Reset the marker when a new archive cycle starts (the defect).** Today nothing clears
+`assets_purged_at`, so archive → purge → restore → new files → archive again leaves the marker set and the eligibility
+filter `assets_purged_at IS NULL` skips the project forever; the new files are never purged. Fix: in `archiveProject`,
+set `assets_purged_at: null` in the same update that sets `archived_at`. Do **not** clear it in `restoreProject`
+(its audit metadata `assetsPurged` reads the marker at restore time and must stay accurate). Test the full cycle with
+fake storage: archive, sweep purges, restore (audit says `assetsPurged: true`), add a file, archive again, advance
+time beyond the window, sweep purges the new file and the audit shows a second pair of purge events.
 
-**Retention setting.** Extend the existing studio-settings read and update
-(`getStudioSettings` / its update command in `projects/service.ts`, and the settings server action)
-to carry `archiveRetentionDays`. Validation: integer, 7 to 730, otherwise a `VALIDATION` error with a
-plain-language message. Same permission as the existing settings update; audit as
-`studioflow.settings.updated`. Do not add a settings screen field; the Lead does that.
+**C2 — Sweep drains its backlog.** `startAssetSweep` currently runs one batch of at most 25 projects per day, so many
+projects maturing together would take days. The scheduled run must call the use case repeatedly while a batch returns
+exactly `limit` purged projects, up to 10 batches per run, then stop. Keep the 10 s initial delay, the 24 h interval,
+the `unref()`, and the swallow-and-log error handling. Test with an injected runner.
 
-**Purge use case.** Add `purgeExpiredArchivedAssets({ now?, limit? })` (StudioFlow project or a small
-sibling module; local structure is yours). It selects projects with `archived_at` older than the
-retention window and `assets_purged_at IS NULL`, oldest first, at most `limit` (default 25) per call.
-For each project it:
-1. **Claims** it atomically (`UPDATE ... SET assets_purged_at = now WHERE id = ? AND assets_purged_at IS NULL`
-   or the Prisma equivalent inside a transaction); if the claim affects zero rows, skip it silently.
-2. In the same transaction, collects the storage keys of the four file kinds above, **deletes** the
-   `SfDeliverable` and `SfMomImage` rows, **strips the images from every retained MOM revision snapshot**
-   (locked rule below), sets the project's `SfScheduleOption.image_key` to `null`, and writes the **primary**
-   audit event (below) with a `SYSTEM` actor. No filenames or storage keys in any event.
-3. After commit, removes each collected key with `ports.storage.remove(key)` **only if no remaining row
-   still references it** (see the shared-key rule), tolerating failures. An unreferenced private blob is
-   acceptable; a dangling row or snapshot reference is not.
-4. After step 3, writes the **completion** audit event (below) in its own small transaction. If that write
-   fails, log one line and continue; the purge itself is already done and is never rolled back.
-Return `{ projectsPurged, deliverables, momImages, momSnapshotImages, optionPhotos, blobsRemoved,
-blobsKeptShared, blobFailures, unparseableRevisions }`.
+**C3 — Preview command.** Add `previewAssetCleanup` (requires `studioflow.project.manage`) returning
+`{ eligibleProjects: number, retentionDays: number }`, using the same cutoff and eligibility predicate as the purge
+(share one helper; do not duplicate the rule). It deletes and writes nothing. Add a server action
+`getAssetCleanupPreviewAction` beside the existing actions.
 
-**Locked audit events (audit is append-only, CORE.md §5: never update an event).** Both use entity type
-`project`, the project id as entity id, and a `SYSTEM` actor; metadata is counts and `projectId` only.
-- `studioflow.project.assets_purged`, written **inside** the purge transaction: `deliverables`, `momImages`,
-  `momSnapshotImages`, `optionPhotos`, `unparseableRevisions`, and `keysCollected` (unique keys considered for
-  removal).
-- `studioflow.project.assets_purge_completed`, written **after** storage removal: `blobsRemoved`,
-  `blobsKeptShared`, `blobFailures`. A run that crashes between the two leaves the primary event without a
-  completion event; that is the visible signal that blob cleanup may be incomplete.
+**C4 — Manual run action.** Add server action `runAssetCleanupAction(limit?)` in `app/(platform)/studioflow/actions.ts`
+calling `runAssetCleanup`, validating `limit` as an integer from 1 to 100 (default 25), through the existing
+`runSafeAction`/`context()` pattern, returning the nine-field summary. It must refresh the same project paths the
+archive/restore actions refresh.
 
-**Locked MOM snapshot rule (resolves the Executor's conflict).** `SfMomRevision.snapshot` keeps image
-storage keys, `restoreRevision` recreates image rows from them, and `unreferenced()` in `mom/service.ts`
-deliberately keeps those blobs alive. On purge, for every `SfMomRevision` of the project's documents:
-parse it with the existing `parseMomSnapshot`, collect its image keys with `momSnapshotImageKeys`, set
-every item's `images` to `[]`, and write the snapshot back. Revision numbers, notes, dates and all text
-stay exactly as they were. A snapshot that fails to parse is left untouched and counted in
-`unparseableRevisions`. After a purge, `restoreRevision` still works and simply restores text without
-images. Do **not** delete revisions and do **not** exempt revision-referenced images from the purge.
-
-**Locked shared-key rule.** Schedule option images share keys with templates and other projects (see
-`removeUnreferenced()` in `schedule/service.ts`). Before removing any blob, after the transaction's
-deletes, check that no remaining StudioFlow row references the key: `SfDeliverable.storage_key`,
-`SfMomImage.storage_key`, `SfScheduleOption.image_key`, `SfScheduleTemplateItem.image_key`,
-`SfClient.logo_storage_key`. Reuse or share the existing `removeUnreferenced()` logic rather than
-re-implementing it differently. A key that is still referenced is kept and counted in `blobsKeptShared`.
-MOM snapshot keys are unique to their document and no copy-across-projects path exists; if you find one,
-report `BLOCKED / CONFLICT`.
-
-**Restore.** `restoreProject` behavior is unchanged except its audit metadata records
-`assetsPurged: boolean` (true when `assets_purged_at` was set). A restore never re-creates files.
-
-**Manual run.** Expose the use case as a command requiring `studioflow.project.manage`, returning the
-summary, so the owner can trigger it (the Lead builds the button).
-
-**Automatic run (no cron exists; this app is self-hosted).** From `src/instrumentation.ts` (Node runtime
-only) start a sweep shortly after boot and then every 24 hours using an unreferenced timer
-(`unref()`), calling the use case with a `SYSTEM` context and catching every error (log one line, never
-crash the server, never log secrets or file names). Controlled by `STUDIOFLOW_ASSET_SWEEP`
-(`on` or `off`); default `on` when `NODE_ENV === "production"`, otherwise `off`. Document the variable in
-`.env.example` without a value. The claim in step 1 is what makes multiple processes safe.
+**C5 — Read models for the UI.** Add `assetsPurgedAt: Date | null` to the `listProjects` row shape and to the
+`getProject` result (both already expose `archivedAt`). Do not change any other field. `getStudioSettings` already
+returns `archiveRetentionDays`; leave it.
 
 ## UI Contract
 
-None from you. The Lead will add: the retention field in settings, "kept for N days" copy in the archive
-dialog, a "files removed on <date>" line on an archived project, and the manual "Run cleanup" button. The
-only route-file change you may make is passing `archiveRetentionDays` through the existing settings
-action so the backend is reachable.
+None from you. The Lead will build the settings field, archive-dialog copy, the archived-project line ("files kept
+until <date>" / "files removed on <date>"), and the cleanup control with preview and confirmation, using only the
+data and actions above. Do not touch layout, styling, or copy in any route component.
 
 ## Boundaries and Non-goals
 
-- No Master Data, no BQ, no platform storage changes, no new dependency.
-- Do not purge on a project that is not archived, or when `archive_retention_days` has not elapsed.
-- Do not add a soft-delete or "trash" model, a per-file purge, or a way to undo a purge.
-- Do not change how archive or restore behave for users beyond the audit field above.
-- No new abstraction layer; reuse `ports.storage`, the audit writer, and `runTransaction`.
+- No schema change and no migration (the column already exists). If you conclude one is needed, report
+  `BLOCKED / CONFLICT`.
+- No Master Data, no BQ, no new dependency, no new abstraction layer.
+- Do not add per-file purge, undo, or a trash model. Do not change retention validation (7 to 730).
+- Do not rename `setAutoNaming`; that naming is a known smell and is not in scope.
 
 ## Acceptance Criteria
 
-1. Integration tests (fake storage): an archived project older than the window loses its deliverable rows,
-   MOM image rows, MOM snapshot image references and option photo keys, and its blobs are removed; a project
-   inside the window, a non-archived project, a client logo, and a template image are untouched. Revision
-   text, numbers and notes survive unchanged. `restoreRevision` on a purged project succeeds and yields text
-   with no images. A schedule option key shared with a template or another project keeps its blob and is
-   counted in `blobsKeptShared`. An unparseable snapshot is left alone and counted.
-2. A second run is a no-op; two concurrent runs purge each project exactly once.
-3. Changing the setting changes which projects qualify; values outside 7 to 730 are rejected.
-4. Restore inside the window changes nothing about files; restore after a purge succeeds and records
-   `assetsPurged: true`.
-5. Both audit events exist with exactly the locked names and count fields, a `SYSTEM` actor, and no filenames
-   or keys; the primary event is committed atomically with the deletions; a blob-removal or completion-event
-   failure does not roll back or crash the run and is reflected in `blobFailures` or a log line.
-6. Boot wiring is off by default outside production and never throws into server startup.
-7. Full `npm test` passes; the boundary check passes (database ownership rule included).
+1. The archive → purge → restore → archive → purge cycle in C1 passes, and a project archived once is still purged
+   exactly once (the existing WO-BE-02 tests still pass).
+2. A sweep with more than `limit` eligible projects purges them all in one scheduled run (up to the 10-batch cap) and
+   stops when a batch is short.
+3. `previewAssetCleanup` counts exactly the projects the sweep would purge at the same instant and changes nothing;
+   without `studioflow.project.manage` it is refused.
+4. `runAssetCleanupAction` rejects a limit outside 1 to 100 with the standard validation payload and returns the
+   summary otherwise.
+5. `assetsPurgedAt` is present on list rows and on `getProject`, and no other field of either changed.
+6. Full `npm test` passes, boundary check passes, no test weakened or deleted.
 
 ## Verification
 
-Run the full commit gate in `docs/agent/EXECUTOR.md`. Database safety: integration tests use the
-rebuild-only `masterdata_test` on the local `masterdata-db` container named in the ignored
-`.env.test.local`; the dev database is `masterdata` on the same container. Confirm names before any
-database command; never touch a legacy database. Stop the dev server before `npm run build`, restore
-`next-env.d.ts` to its owner-modified state afterwards, and never stage it.
+Run the full commit gate in `docs/agent/EXECUTOR.md`. Database safety: integration tests use the rebuild-only
+`masterdata_test` on the local `masterdata-db` container named in the ignored `.env.test.local`; the dev database is
+`masterdata` on the same container. Verify names before any database command; never touch a legacy database. The
+owner's dev server may be running on port 3001: stop it before `npm run build`, restart it afterwards with the sweep
+off, restore `next-env.d.ts` to its owner-modified state, and never stage it.
 
 ## Reviewer Acceptance
 
-The Lead will, after the commit: review the diff and re-run the suite; build the settings field, archive
-dialog copy, archived-project line and manual button; then browser-check archive, restore, and the manual
-run against a disposable project.
+After the commit the Lead re-runs the suite, then builds the retention UI against these actions and runs the browser
+batch (the R8.173 and R8.178 items in `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`) with a disposable QA project.
 
 ## Regression Risks and Recovery
 
-Highest risk is deleting something that is not the project's own file or that another row still points at, so the
-model list and the shared-key rule above are exhaustive and tests assert the exclusions. The purge itself cannot be undone; the migration is additive and the code
-path is disabled outside production by default, so recovery before release is a plain revert.
+Low. C1 touches only the archive update; C2 only the scheduler wrapper; C3 to C5 are additive reads and actions.
+Recovery is a plain revert of the single commit; no migration or data change to undo.
 
 ## Executor Prompt
 
-You are the Backend Executor. Location: rumah. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this
-`PLAN.md`, then implement the entire READY backend outcome (WO-BE-02) and nothing beyond it. Re-verify the
-model list against `prisma/schema.prisma` first, then follow the locked MOM snapshot, shared-key, and two-event audit rules. Do not touch Master Data or BQ. Apply the additive migration
-to both local databases after verifying their names, run the required checks, update `CHANGELOG.md`, and create
-the local revision commit `R8.178`. Never push and never stage `next-env.d.ts`. Stop only for a material
-locked-decision conflict or unsafe boundary, using the `BLOCKED / CONFLICT` report; otherwise finish and reply
-with one copy-ready Planner/Reviewer prompt naming the commit, checks, limitations, and remaining unrelated
-dirty files.
+You are the Backend Executor. Location: rumah. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and the root `PLAN.md`
+(WO-BE-03), then implement the entire READY backend outcome (C1 to C5) and nothing beyond it. Re-verify each finding
+first and report any that does not reproduce. Do not touch Master Data or BQ, and do not change any layout, styling, or
+copy. No migration is expected. Run the required commit gate, update `CHANGELOG.md`, and create the local revision
+commit `R8.180`. Never push and never stage `next-env.d.ts`. Stop only for a material locked-decision conflict or
+unsafe boundary, using the `BLOCKED / CONFLICT` report; otherwise finish and reply with one copy-ready
+Planner/Reviewer prompt naming the commit, checks, limitations, and remaining unrelated dirty files.
