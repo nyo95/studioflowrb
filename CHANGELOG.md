@@ -5,13 +5,35 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.168**
-- Next local revision: **R8.169**
+- Current revision after this entry is committed: **R8.169**
+- Next local revision: **R8.170**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.169 | 2026-09-28 | docs(changelog): record the browser pass that R8.168 listed as not done
+
+R8.168 shipped with "no browser pass of the Brand/Pricing supplier quick-create dialog after the move". That
+pass has now been done; this entry corrects the ledger instead of amending R8.168. No code change.
+
+**Verified in the running dev server (localhost:3001, dev database `masterdata`, signed in as the seeded dev
+owner).** `VendorQuickCreateDialog`, now in `src/app/(platform)/masterdata/vendor-quick-create-dialog.tsx`:
+- Brands -> New brand -> "+ Create new supplier for this brand" opens "Add supplier". The submit button is
+  disabled when empty, still disabled with a name only, and enabled once a Supplier Type is chosen.
+- Cancel after typing raises "Discard changes?", so the `DraftDialog` unsaved-input guard survives the move.
+- Pricing -> New price -> Material price -> Supplier -> typing a new name -> `Add "..." as a new supplier`
+  opens the same dialog ("for this material price") with the same disabled rule.
+- No console errors on either page.
+
+**Not exercised.** Submitting the dialog (deliberately: it writes to the dev database), the Labor and Material +
+Labor price forms, the empty-Supplier-Type alert, and the narrow-viewport and collapsed-rail states. Nothing was
+created; the dev database holds no rows from this check.
+
+**Side effect worth recording.** A production `npm run build` run while the owner's dev server was up on the same
+`.next` directory made the dev page reload repeatedly for a while; it settled without intervention. Run builds
+with the dev server stopped.
 
 ## R8.168 | 2026-09-28 | refactor(architecture): enforce database ownership and shell/domain boundaries; platform audit reads go through Platform
 
