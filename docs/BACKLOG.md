@@ -542,7 +542,7 @@ explored direction. No access-check changes. See `CHANGELOG.md` R8.110.
   logo? (3) Is the purge immediate and irreversible, or does it need a confirmation
   step in the archive dialog?
   **Answered 2026-09-28:** keep 90 days (provisional, adjustable), never immediate; see Decision
-  gates. **Work Order WO-BE-02 is READY in `PLAN.md` (target R8.177).**
+  gates. **Work Order WO-BE-02 is READY in `PLAN.md` (target R8.178).**
 - [x] [BUG] `ui-engine.test.ts` ("UI Engine foundation") has 2 pre-existing,
   unrelated failures found while running the full suite for R8.164 (out of
   scope for that change, left open per the proportionate-checks rule):

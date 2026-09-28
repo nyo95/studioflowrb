@@ -5,13 +5,33 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.176**
-- Next local revision: **R8.177**
+- Current revision after this entry is committed: **R8.177**
+- Next local revision: **R8.178**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.177 | 2026-09-28 | docs(plan): WO-BE-02 audit order locked after the Executor's second BLOCKED / CONFLICT
+
+The Backend Executor stopped again before changing anything (no files, database, or commit touched). Lead-side
+correction only; no code, schema, or dependency change.
+
+- **Conflict.** The plan asked for one audit event, written inside the deletion transaction, to carry the final
+  storage counts. Blob removal must follow commit, and CORE.md §5 makes audit append-only, so that event cannot hold
+  results that do not exist yet and cannot be updated later.
+- **Decision (the Executor's option A).** Two events, names and fields locked in `PLAN.md`:
+  `studioflow.project.assets_purged` inside the transaction (database and snapshot counts) and
+  `studioflow.project.assets_purge_completed` after storage removal (`blobsRemoved`, `blobsKeptShared`,
+  `blobFailures`). A primary event without a completion event is the visible signal of an interrupted cleanup.
+- Target revision moved from R8.177 to **R8.178** because this correction uses R8.177.
+- Process note: two consecutive conflicts came from the Lead specifying a plan without walking the audit and MOM
+  paths first; the Executor's inspection caught both before any change was made.
+
+**Checks.** `npm run check` OK; `git diff --check` clean. No tests run: documentation only.
+
+**Limits.** WO-BE-02 is still not executed.
 
 ## R8.176 | 2026-09-28 | docs(plan): WO-BE-02 revised after the Executor's BLOCKED / CONFLICT (MOM revision snapshots, shared image keys)
 

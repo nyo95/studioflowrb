@@ -5,8 +5,8 @@ Scope: StudioFlow — keep archived-project files for a retention window, then p
 Status: READY
 Priority: P2
 Owner: owner (Product Owner); Lead: Claude
-Target revision: R8.177
-Last updated: 2026-09-28 (revised after the Executor's BLOCKED / CONFLICT, see "Resolved conflict")
+Target revision: R8.178
+Last updated: 2026-09-28 (revised twice after the Executor's BLOCKED / CONFLICT reports, see "Resolved conflict")
 
 ## Outcome
 
@@ -28,6 +28,12 @@ keep revision text and history) because option B defeats the retention purpose a
 history, which matters more than the images. The Executor also correctly noted shared schedule image keys; the
 shared-key rule is locked below. The plan's earlier "exhaustive list" claim was the Lead's error. Target revision
 moved from R8.176 to R8.177 because R8.176 is used by this correction.
+
+The Executor then returned a second `BLOCKED / CONFLICT`: the audit event written inside the transaction cannot
+contain the results of later storage removal, and audit records are append-only, so it cannot be updated afterwards
+either. The Lead chose the Executor's option A: a primary event inside the transaction and a separate completion
+event after storage removal, with names and fields locked above. Target revision moved to R8.178 because R8.177
+is used by this correction.
 
 ## Context and Evidence
 
@@ -72,13 +78,24 @@ For each project it:
    or the Prisma equivalent inside a transaction); if the claim affects zero rows, skip it silently.
 2. In the same transaction, collects the storage keys of the four file kinds above, **deletes** the
    `SfDeliverable` and `SfMomImage` rows, **strips the images from every retained MOM revision snapshot**
-   (locked rule below), sets the project's `SfScheduleOption.image_key` to `null`, and writes one audit
-   event `studioflow.project.assets_purged` with a `SYSTEM` actor and counts only (see below); no filenames.
+   (locked rule below), sets the project's `SfScheduleOption.image_key` to `null`, and writes the **primary**
+   audit event (below) with a `SYSTEM` actor. No filenames or storage keys in any event.
 3. After commit, removes each collected key with `ports.storage.remove(key)` **only if no remaining row
    still references it** (see the shared-key rule), tolerating failures. An unreferenced private blob is
    acceptable; a dangling row or snapshot reference is not.
+4. After step 3, writes the **completion** audit event (below) in its own small transaction. If that write
+   fails, log one line and continue; the purge itself is already done and is never rolled back.
 Return `{ projectsPurged, deliverables, momImages, momSnapshotImages, optionPhotos, blobsRemoved,
-blobsKeptShared, blobFailures, unparseableRevisions }`; the audit event carries the same counts.
+blobsKeptShared, blobFailures, unparseableRevisions }`.
+
+**Locked audit events (audit is append-only, CORE.md §5: never update an event).** Both use entity type
+`project`, the project id as entity id, and a `SYSTEM` actor; metadata is counts and `projectId` only.
+- `studioflow.project.assets_purged`, written **inside** the purge transaction: `deliverables`, `momImages`,
+  `momSnapshotImages`, `optionPhotos`, `unparseableRevisions`, and `keysCollected` (unique keys considered for
+  removal).
+- `studioflow.project.assets_purge_completed`, written **after** storage removal: `blobsRemoved`,
+  `blobsKeptShared`, `blobFailures`. A run that crashes between the two leaves the primary event without a
+  completion event; that is the visible signal that blob cleanup may be incomplete.
 
 **Locked MOM snapshot rule (resolves the Executor's conflict).** `SfMomRevision.snapshot` keeps image
 storage keys, `restoreRevision` recreates image rows from them, and `unreferenced()` in `mom/service.ts`
@@ -138,8 +155,9 @@ action so the backend is reachable.
 3. Changing the setting changes which projects qualify; values outside 7 to 730 are rejected.
 4. Restore inside the window changes nothing about files; restore after a purge succeeds and records
    `assetsPurged: true`.
-5. The purge audit event has a `SYSTEM` actor and counts only; a blob-removal failure does not roll back or
-   crash the run.
+5. Both audit events exist with exactly the locked names and count fields, a `SYSTEM` actor, and no filenames
+   or keys; the primary event is committed atomically with the deletions; a blob-removal or completion-event
+   failure does not roll back or crash the run and is reflected in `blobFailures` or a log line.
 6. Boot wiring is off by default outside production and never throws into server startup.
 7. Full `npm test` passes; the boundary check passes (database ownership rule included).
 
@@ -167,9 +185,9 @@ path is disabled outside production by default, so recovery before release is a 
 
 You are the Backend Executor. Location: rumah. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this
 `PLAN.md`, then implement the entire READY backend outcome (WO-BE-02) and nothing beyond it. Re-verify the
-model list against `prisma/schema.prisma` first, then follow the locked MOM snapshot and shared-key rules. Do not touch Master Data or BQ. Apply the additive migration
+model list against `prisma/schema.prisma` first, then follow the locked MOM snapshot, shared-key, and two-event audit rules. Do not touch Master Data or BQ. Apply the additive migration
 to both local databases after verifying their names, run the required checks, update `CHANGELOG.md`, and create
-the local revision commit `R8.177`. Never push and never stage `next-env.d.ts`. Stop only for a material
+the local revision commit `R8.178`. Never push and never stage `next-env.d.ts`. Stop only for a material
 locked-decision conflict or unsafe boundary, using the `BLOCKED / CONFLICT` report; otherwise finish and reply
 with one copy-ready Planner/Reviewer prompt naming the commit, checks, limitations, and remaining unrelated
 dirty files.
