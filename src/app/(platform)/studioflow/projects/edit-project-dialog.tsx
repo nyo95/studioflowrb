@@ -10,6 +10,8 @@ import { useCommand } from "../_components/use-command";
 
 export type EditableProject = {
   id: string;
+  /** Stored project number; the server rejects a name that tries to change it. */
+  code: string;
   name: string;
   readableName: string;
   client: { id: string; name: string } | null;
@@ -46,7 +48,7 @@ export function EditProjectDialog({ project, people, clients, onClose }: { proje
     area: project.area ?? "",
   });
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((f) => ({ ...f, [key]: value }));
-  const code = project.name.slice(0, project.name.length - project.readableName.length).trim();
+  const code = project.code;
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();

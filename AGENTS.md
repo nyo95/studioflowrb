@@ -91,7 +91,7 @@ weak judgment.
 5. Current code/tests as behavior evidence.
 6. Legacy code at an exact recorded commit as evidence only.
 
-Explain plans, findings, status, trade-offs, and problems to the owner in plain everyday language. Contracts, code, and commit messages retain technical precision.
+Explain plans, findings, status, trade-offs, and problems to the owner in plain everyday Indonesian (bahasa awam), the way you would to a non-programmer who owns the product. Say what a thing means for real use, with a small everyday example, and lead with the decision and a recommendation. Keep file paths, internal names, and terms such as transaction, migration, barrel, or payload out of owner-facing text; put identifiers and hashes on one short trailing line. Ask the owner questions as a yes/no or a pick-one with a recommended default. Contracts, code, and commit messages retain technical precision.
 
 ## Location, rebuild database, and legacy isolation
 

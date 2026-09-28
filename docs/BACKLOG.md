@@ -61,6 +61,16 @@ Rules carried over unchanged from the prior trackers:
   definition is acceptable product behavior, not a data-integrity defect.
   Removes the prior `[BUG][P3]` entry from the StudioFlow Open defects
   section below — no code or data change follows from this.
+- **Archived-project files are kept for 90 days, not deleted at once (owner, 2026-09-28).**
+  Supersedes "purge on archive" above. The number is provisional and adjustable in settings;
+  restoring the project inside the window keeps everything; only after it are the project's own
+  files removed. The client logo is never part of a project purge.
+- **Master Data workbook import/export: approved approach (owner, 2026-09-28).** Edit in Excel and
+  re-import, with a preview before anything is saved, all-or-nothing apply, a per-row error report,
+  and unknown vendors/units/categories rejected instead of created. A spreadsheet library is
+  approved as a new dependency.
+- **SF-PRESENTATION defaults confirmed (owner, 2026-09-28):** export is PDF through the print view
+  (not a real PowerPoint file), and images are uploaded from the device only.
 
 ---
 
@@ -123,16 +133,17 @@ Rules carried over unchanged from the prior trackers:
 
 ## Master Data
 
-**LOCKED (owner, 2026-09-24).** Audited this session: 35/35 masterdata
+**LOCK LIFTED (owner, 2026-09-28; was LOCKED 2026-09-24).** Audited on 2026-09-24: 35/35 masterdata
 integration tests pass, 0 open `[BUG]` entries, no TODO/FIXME in source, and
 the only apparent gap found (`vendor-contract.md` §14.4 "Brand permanent
 delete... currently missing") turned out to already be implemented
 (`brand.archived` audit action + deletion-request flow both exist) — that
 table is stale historical migration checklist, not a live gap. Owner
-decision: do not modify Master Data app code without an explicit new owner
-request, even to "clean up" or "improve" something found in passing. The
-`[PLANNED]`/`[CLEANUP]` items below remain legitimate future work, not an
-invitation to start them unasked.
+decision of 2026-09-24: do not modify Master Data app code without an explicit new owner
+request, even to "clean up" or "improve" something found in passing.
+**Lifted 2026-09-28:** the owner asked to unlock Master Data and start with KB-025. Master Data
+work is allowed again when it is a requested item or an approved Work Order; it is still not an
+invitation to make unrequested drive-by changes.
 
 - [ ] [PLANNED] Define media/file behavior after shared storage exists.
 
@@ -172,7 +183,9 @@ Master Data user adds the SKU/price themselves. See `CHANGELOG.md` R8.123,
   are unanswered: all-or-nothing vs partial import, per-row error report format,
   and whether import may create missing vendors/units/categories or must reject
   unknown references.
-- [ ] [CLEANUP][P2] KB-025 — `src/apps/masterdata/services/index.ts` exports
+  **Answered 2026-09-28:** the Master Data lock is lifted and the approach is decided (see
+  Decision gates). Ready to be written as a Work Order.
+- [x] [CLEANUP][P2] KB-025 — `src/apps/masterdata/services/index.ts` exports
   many internal-implementation helpers with no external consumer found. Not a
   current coupling problem; narrow the barrel when consumers and the public
   boundary are reviewed together.
@@ -367,7 +380,7 @@ etc., all StudioFlow modules, no sub-tier between them).
   `PLAN.md`: export is PDF via the existing print pattern (not real `.pptx`
   generation), bulk import is local multi-file upload only (not pulling from
   Deliverables/Schedule photos). Flag to the owner before Executor starts if
-  either default is wrong.
+  either default is wrong. **Both defaults confirmed by the owner 2026-09-28.**
 
 - [ ] [BLOCKED] **Sample request → Master Data "incoming requests" queue.**
   Owner confirmed the shape: StudioFlow only requests; a Master Data staff
@@ -528,6 +541,8 @@ explored direction. No access-check changes. See `CHANGELOG.md` R8.110.
   the project's own (deliverables, MOM images, schedule photos) and never the client
   logo? (3) Is the purge immediate and irreversible, or does it need a confirmation
   step in the archive dialog?
+  **Answered 2026-09-28:** keep 90 days (provisional, adjustable), never immediate; see Decision
+  gates. Ready to be written as a Work Order.
 - [x] [BUG] `ui-engine.test.ts` ("UI Engine foundation") has 2 pre-existing,
   unrelated failures found while running the full suite for R8.164 (out of
   scope for that change, left open per the proportionate-checks rule):
@@ -583,7 +598,7 @@ was fixed in R8.165._
 
 ### P1 - fix next
 
-- [ ] [BUG] **KB-037a - `src/app/promotion-runtime.ts` reaches into two apps'
+- [x] [BUG] **KB-037a - `src/app/promotion-runtime.ts` reaches into two apps'
   `runtime` layer, and the boundary checker still cannot see it.**
   `src/app/promotion-runtime.ts:2-3` imports `bqPublicCommands` from
   `@/apps/bq/runtime` and `masterDataPublicCommands` from
@@ -607,7 +622,7 @@ was fixed in R8.165._
   without moving anything. Whether the command surface should live in `public`
   remains the open owner decision above; nothing was re-exported.
 
-- [ ] [BUG] **KB-037b - 30 platform-lane files still classify as
+- [x] [BUG] **KB-037b - 30 platform-lane files still classify as
   `{ kind: "other" }` and are skipped by every boundary rule.**
   R8.165 added `PLATFORM_ROUTE_OWNERS` for app-owned route groups, so the six
   live cross-app imports are now visible. The remaining 30 files under
@@ -633,7 +648,7 @@ was fixed in R8.165._
   imports are allowed as layer `route`. Reclassifying the lane root as `platform`
   for `RULE_PLATFORM_TO_APP`, and the nav-slot decision above, are still open.
 
-- [ ] [CLEANUP] **`CHANGELOG.md` has no entry for R8.163 (`ee9e09e`).**
+- [x] [CLEANUP] **`CHANGELOG.md` has no entry for R8.163 (`ee9e09e`).**
   The "Revision state" block still read R8.162 as current after that commit
   landed. R8.165 corrects the block to R8.165/R8.166 and backfills R8.164, but
   R8.163 is not backfilled because it is not this line of work's commit to
@@ -641,7 +656,7 @@ was fixed in R8.165._
 
 ### P2 - fix in the next few passes
 
-- [ ] [BUG] **SF-08 - Editing a project name can silently change the project
+- [x] [BUG] **SF-08 - Editing a project name can silently change the project
   number, desynchronising `name` from `project_code`.**
   `src/apps/studioflow/projects/service.ts:483-491`. `looksFormatted`
   (`domain/naming.ts:7-9`) only tests the shape `^\d{4}-\d+ .+`, so a manager who
@@ -659,7 +674,7 @@ was fixed in R8.165._
   code that differs from `project.project_code`, and derive the hint from
   `project.code` instead of slicing the name.
 
-- [ ] [BUG] **SF-09 - Blocker counts are fetched one phase at a time - 3 SQL
+- [x] [BUG] **SF-09 - Blocker counts are fetched one phase at a time - 3 SQL
   statements per phase, serially, on every project page.** `readBlockerCounts`
   (`src/apps/studioflow/phases/blocker-query.ts:5-15`) takes a single `phaseId`
   and issues 3 statements. `listProjectPhases` calls it in a serial `for` loop
@@ -674,7 +689,7 @@ was fixed in R8.165._
   Fix: one `findMany` over `phase_id in ids` plus two `groupBy` calls, joined in
   memory - 3 statements per page instead of `2 + 3P`.
 
-- [ ] [BUG] **SF-10 - Header quick-search fetches every match with full
+- [x] [BUG] **SF-10 - Header quick-search fetches every match with full
   relations, then displays six.** `src/app/(platform)/studioflow/actions.ts:966-979`
   calls `listProjects` and `listClients` and applies `.slice(0, 6)` afterwards.
   Neither service bounds the result: `listProjects` (`projects/service.ts:334-343`)
@@ -762,7 +777,7 @@ was fixed in R8.165._
   platform `AuditEvent` table directly; both now use `listAuditEvents` /
   `latestAuditActorLabels` in `@platform/core/audit/persistence`.
 
-- [ ] [BUG] **KB-042 - Argon2id hashing runs inside the serializable
+- [x] [BUG] **KB-042 - Argon2id hashing runs inside the serializable
   transaction, pinning a pooled connection for ~40 ms of CPU per call.**
   `src/platform/core/rbac/services.ts:412` and `:485`,
   `src/platform/core/auth/account.ts:87`, `auth/bootstrap.ts:87` all await
@@ -816,7 +831,7 @@ was fixed in R8.165._
   capability, so the right move is to EXTEND `buildPageMeta`/`usePagination` and
   converge, not to leave ten copies on record as unreconciled.
 
-- [ ] [BUG] **KB-044 - `runTransaction` has no dedicated test.**
+- [x] [BUG] **KB-044 - `runTransaction` has no dedicated test.**
   `src/platform/core/db/transactions.ts` has no `transactions.test.ts`, though
   `db/` has five sibling suites. `CORE.md:58` makes the transaction boundary a
   contract-level guarantee, yet the commit/rollback/isolation/retry behaviour of
@@ -855,7 +870,7 @@ was fixed in R8.165._
   workspaces", "Compact density stamp (opt in with data-density=\"compact\")");
   the `[data-density="compact"]` selector and every value are untouched.
 
-- [ ] [BUG] **KB-047 - `listAssignableRoles` exposes the full role-to-permission
+- [x] [BUG] **KB-047 - `listAssignableRoles` exposes the full role-to-permission
   matrix under the weaker `platform.user.read` grant.**
   `src/platform/core/rbac/services.ts:371-377` requires only
   `platform.user.read` but returns each role's `code`, `name`, and full
@@ -865,7 +880,7 @@ was fixed in R8.165._
   (`platform-access.integration.test.ts:292`), so it may be intentional -
   confirm with the owner rather than assume.
 
-- [ ] [BUG] **KB-048 - `archiveRoleAction` forwards a raw unvalidated id.**
+- [x] [BUG] **KB-048 - `archiveRoleAction` forwards a raw unvalidated id.**
   `src/app/(platform)/settings/access/roles/actions.ts:92` is the only sibling
   action that does not `z.string().uuid()`-parse its identifier before calling
   the service. No privilege bypass today (`archiveRole` re-reads and throws
@@ -873,7 +888,7 @@ was fixed in R8.165._
   `validation/index.ts:10-12`, and a garbage id surfaces as a DB lookup error
   rather than a clean `VALIDATION` payload.
 
-- [ ] [BUG] **KB-049 - Argon2 verification can throw instead of returning the
+- [x] [BUG] **KB-049 - Argon2 verification can throw instead of returning the
   generic login failure.** `src/platform/core/auth/login.ts:78` and
   `auth/account.ts:83` call `verify()` unwrapped; `@node-rs/argon2` throws on a
   hash string that is not valid PHC, and `password_hash` is free-form (the repo's
@@ -897,7 +912,7 @@ was fixed in R8.165._
   (`--ui-success-fg` is bridged as `--color-success`). The chip keeps
   `bg-success-surface` but its label inherits default ink. Fix: `text-success`.
 
-- [ ] [BUG] **SF-15 - Project overview ships a phase's entire revision history,
+- [x] [BUG] **SF-15 - Project overview ships a phase's entire revision history,
   with every activity of every closed revision, on every render.**
   `src/apps/studioflow/phases/service.ts:638-644` selects all revisions with no
   `take` and none on nested `activities`, then projects every non-active
@@ -961,6 +976,30 @@ was fixed in R8.165._
   at rows in the REBUILD database, which `AGENTS.md` treats as implemented-state
   evidence rather than a place to park legacy compatibility. Confirm no rows use
   it, then drop the member.
+
+### Closed 2026-09-28 (R8.173 Backend Executor, R8.174 Lead)
+
+- **KB-042** hash outside the transaction, **KB-048** role id validated, **KB-049** a corrupt
+  hash is a failed verification (the original "login calls argon2 directly" detail was wrong:
+  `login.ts` already routes through `verifyPassword`), **KB-044** direct
+  `runSerializableTransaction` tests plus a concurrent project-numbering test. R8.173
+  (`5e036ae`); reviewed and independently re-run by the Lead (548/548). The new password and
+  role-action tests were run against the pre-fix code and fail there.
+- **SF-08** a typed project number that differs from `project_code` is rejected
+  (`PROJECT_CODE_IMMUTABLE`), R8.173; the edit dialog now shows the stored number instead of
+  slicing the name, R8.174.
+- **SF-09** batched blocker and open-item counts, **SF-10** bounded header quick-search,
+  **SF-15** revision history returns counts and loads items on demand. R8.173. Their browser
+  checks are queued in `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md` (PENDING, batch pass).
+- **KB-025** `masterdata/services/index.ts` had no importer at all, so it was dead code, not an
+  over-wide barrel: deleted, R8.174.
+- **KB-047** `listAssignableRoles` now returns `appIds` (which apps a role covers) instead of the
+  full permission list; the Users picker is unchanged. The full matrix stays behind
+  `platform.role.read`. R8.174 (owner asked the Lead to decide, 2026-09-28).
+- **KB-037a / KB-037b** closed as **accepted by the owner, no change** (2026-09-28): the
+  composition root may import an app's `runtime`, and `(platform)/layout.tsx` may import each
+  app's nav from its route lane. The boundary checker already allows exactly these layers.
+- The R8.163 ledger gap was backfilled by the remote R8.164 work.
 
 ### Working-tree debris (not a repo defect - owner call)
 

@@ -5,13 +5,44 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.173**
-- Next local revision: **R8.174**
+- Current revision after this entry is committed: **R8.174**
+- Next local revision: **R8.175**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.174 | 2026-09-28 | fix(lead): review verdict on R8.173, dialog hint, dead barrel, role-list exposure, ledger
+
+**Review of R8.173 (`5e036ae`, WO-BE-01): PASS.** The Lead read the whole diff, re-ran the gate independently
+(`npm run check`, lint, `npm test` 548/548) and ran the new tests against the pre-fix code (R8.172): the three
+password-boundary tests and the role-action test fail there and pass now. Equivalence was checked by reading:
+`quickSearch` uses the same filter, archive handling and order as `listProjects`/`listClients`, and
+`readBlockerCountsBatch` uses the same predicates as the single-phase reader. The Executor's report that the login
+"calls argon2 directly" allegation is not reproducible is correct (`verify` there is an alias of `verifyPassword`);
+the real defect, a throwing verify, is fixed once in `password.ts`. Observation, accepted per WO-BE-01: `changePassword`
+now hashes before the in-transaction current-password check, so a wrong current password costs one hash; it needs a
+signed-in session. Browser checks for R8.173 stay PENDING in `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`
+(the dev database has no closed revision to exercise them without altering the owner's project).
+
+**Lead fixes (owner said the Lead may fix the remaining items)**
+- **SF-08 hint.** The edit-project dialog derived "The number … stays fixed" by slicing the name; it now uses the
+  stored `code`. `ProjectRow` and `EditableProject` gain `code`.
+- **KB-025.** `masterdata/services/index.ts` had no importer; deleted (Master Data lock lifted by the owner).
+- **KB-047.** `listAssignableRoles` returns `appIds` instead of the whole permission list; `role-grouping.ts` groups
+  by them. The Users picker is unchanged; the permission matrix stays behind `platform.role.read`. Tests updated, and
+  one assertion added that `permissionIds` is absent.
+- **Ledger.** `docs/BACKLOG.md`: 13 items closed with evidence; KB-037a/b closed as accepted by the owner; the Master
+  Data lock recorded as lifted; owner decisions recorded (90-day archive retention, Excel round-trip approach with a
+  new spreadsheet dependency approved, SF-PRESENTATION defaults confirmed).
+- `AGENTS.md`: owner-facing text must be plain Indonesian, decision and recommendation first.
+
+**Checks.** `tsc --noEmit` 0 errors; `eslint .` clean; `npm run check` OK; full `npm test` 548/548 against `masterdata_test`. Not run: `npm run build`
+(the owner's dev server was up) and a browser pass of the dialog hint.
+
+**Limits.** Remaining Lead-owned items are UI-only and tooling: SF-11..SF-14, MD-01, KB-038, KB-043, KB-050, checkers
+KB-040/053/054, docs KB-039/052/055a. BQ items stay on hold.
 
 ## R8.173 | 2026-09-28 | fix(backend): complete WO-BE-01 correctness and bounded reads
 

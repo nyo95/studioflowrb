@@ -381,10 +381,12 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
 
     /**
      * List of assignable (live, non-system-any) roles for the user editor.
-     * Includes each role's granted permission IDs so the caller can group
-     * roles by the app(s) they actually grant access to (a Role is not
-     * inherently scoped to one app — e.g. "Platform Owner" spans several —
-     * so this is derived from real grants, not guessed from the role name).
+     * Returns only which apps each role's grants belong to (`appIds`, the
+     * `<appId>.` prefix of its permission IDs) so the caller can group roles
+     * by app without seeing the permission matrix itself, which stays behind
+     * `platform.role.read` (KB-047). A Role is not inherently scoped to one
+     * app — e.g. "Platform Owner" spans several — so this is derived from real
+     * grants, not guessed from the role name.
      */
     async listAssignableRoles(input: { grants: PermissionGrants }) {
       requirePermission(input.grants, "platform.user.read");
@@ -397,7 +399,7 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
         id: row.id,
         code: row.code,
         name: row.name,
-        permissionIds: row.role_permissions.map((grant) => grant.permission_id),
+        appIds: [...new Set(row.role_permissions.map((grant) => grant.permission_id.split(".")[0]))].sort(),
       }));
     },
 

@@ -34,6 +34,8 @@ import { ProjectRowActions } from "./project-row-actions";
 
 type ProjectRow = {
   id: string;
+  /** Stored project number (e.g. 2025-429); the immutable half of `name`. */
+  code: string;
   name: string;
   readableName: string;
   client: { id: string; name: string } | null;

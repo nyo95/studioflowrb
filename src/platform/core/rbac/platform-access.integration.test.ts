@@ -291,9 +291,11 @@ describe("role commands and grants", () => {
     });
     const assignable = await service.listAssignableRoles({ grants: ["platform.user.read"] });
     const found = assignable.find((role) => role.code === "grouping-check");
-    assert.deepEqual(found?.permissionIds.slice().sort(), ["masterdata.access", "masterdata.price.read"]);
+    assert.deepEqual(found?.appIds, ["masterdata"]);
     const empty = assignable.find((role) => role.id === noGrantsRole.roleId);
-    assert.deepEqual(empty?.permissionIds, []);
+    assert.deepEqual(empty?.appIds, []);
+    // KB-047: user.read may group roles by app but must not see the permission matrix.
+    assert.equal("permissionIds" in (found ?? {}), false);
   });
 
   it("refuses archiving system roles and roles with active assignments", async () => {
