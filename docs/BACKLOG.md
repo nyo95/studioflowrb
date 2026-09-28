@@ -85,6 +85,11 @@ Rules carried over unchanged from the prior trackers:
 - [ ] [PLANNED] Execute `apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md`:
   storage port/test seam, provider adapter, Brand mark migration, then
   approved future consumers.
+- [ ] [PLANNED] **Notifications (platform) — backend built in R8.184; the bell and inbox screens are still to build.** In-app
+  inbox only (`core/notifications`, table `platform.Notification`, actions in `(platform)/notifications/actions.ts`); first
+  workflow is sample requests (staff told of a new request, the requester told when it is priced or declined). Delivery is
+  polling. Email, push, preferences, and digests stay deferred; old read notifications are not cleaned up yet (no retention
+  rule was requested). Private user-to-user messaging below is separate and still blocked.
 - [ ] [PLANNED] Redesign the top-header/sidebar boundary. Design input already
   captured in `apps/platform/GLOBAL-MENU-DESIGN-BRIEF.md` (owner feedback,
   2026-09-16). Preserve the approved semantic colors. **Partially executed

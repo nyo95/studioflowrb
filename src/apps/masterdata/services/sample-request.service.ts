@@ -240,6 +240,7 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
         }
         const row = await tx.sampleRequestIntake.update({ where: { id: current.id }, data: { ...data, status: "PRICED", resolved_at: new Date() } });
         await writeAudit(ports, tx, { action: "masterdata.sample-request.priced", entityType: ENTITY, entityId: row.id, actor: input.actor, changes: changesOf(current, data), metadata: { sourceRequestId: row.source_request_id, sourceProjectId: row.source_project_id } });
+        await ports.sampleRequestNotifier?.resolved(tx, { outcome: "priced", intake: toRead(row) });
         return toRead(row);
       });
     },
@@ -253,6 +254,7 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
         const current = await openIntake(tx, input.intakeId);
         const row = await tx.sampleRequestIntake.update({ where: { id: current.id }, data: { status: "DECLINED", staff_note: reason, resolved_at: new Date() } });
         await writeAudit(ports, tx, { action: "masterdata.sample-request.declined", entityType: ENTITY, entityId: row.id, actor: input.actor, metadata: { sourceRequestId: row.source_request_id, sourceProjectId: row.source_project_id } });
+        await ports.sampleRequestNotifier?.resolved(tx, { outcome: "declined", intake: toRead(row) });
         return toRead(row);
       });
     },

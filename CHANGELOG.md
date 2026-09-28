@@ -5,13 +5,42 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.183**
-- Next local revision: **R8.184**
+- Current revision after this entry is committed: **R8.184**
+- Next local revision: **R8.185**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.184 | 2026-09-29 | feat(notifications): platform in-app inbox and the two sample-request events (executed by the Lead)
+
+Part of the same owner-delegated work as R8.183; **not independently reviewed**.
+
+- **Platform.** `platform.Notification` (additive migration `20260929010000_platform_notifications`, applied to `masterdata`
+  and `masterdata_test` after verifying both are the rebuild's local databases; recipient is a plain user id, no foreign key).
+  `core/notifications`: domain-neutral envelope and safety rules (`prepareNotification`: app-prefixed dotted kind, title/body
+  limits, recipient de-duplication and cap, links must be in-app paths only), the transactional `NotificationWriter` port,
+  and `createNotificationCenter` (a person's own inbox: list, unread count, mark read, mark all read; every call is scoped
+  to the caller's user id, so it needs no permission). Composed in `platform/runtime.ts`. `CORE.md` deferred registry: the
+  notification row is now ACTIVATED for in-app items; email, push, preferences, digests stay deferred.
+- **Actions.** `(platform)/notifications/actions.ts`: unread count, list, mark read, mark all read. None accepts a user id;
+  they act for the signed-in user only and revalidate nothing (the bell will poll).
+- **Events.** New optional ports, written inside the event's own transaction: `StudioFlowPorts.sampleRequestNotifier`
+  (called by `requestSample`; `studioflow/sample-request-notifier.ts` tells everyone holding Master Data's public permission
+  `masterdata.sample-request.manage`, never the requester; a failed staff lookup tells nobody and never blocks the request) and
+  `MasterDataServicePorts.sampleRequestNotifier` (called by mark-priced and decline; `masterdata/sample-request-notifier.ts`
+  tells the requester, with the quoted price or the decline reason, and links to the project's schedule via StudioFlow's public
+  route constant). `MASTERDATA_ROUTES.sampleRequests` (`/masterdata/sample-requests`) added for the link target.
+- `docs/MODULE-BOUNDARIES.md` interaction register and `docs/BACKLOG.md` updated.
+- Tests: 7 notification rules (unit), 8 storage and inbox (integration), 4 + 4 notifier (unit), 3 + 3 event (integration, real
+  database), 3 action (unit).
+
+**Checks.** `tsc --noEmit` 0 errors; `eslint .` clean; `npm run check` OK; full `npm test` 618/618. Not run: production build and
+browser (no bell or screen yet).
+
+**Limits.** Nothing shows a notification yet (the bell and inbox come next). Read notifications are never deleted. Not independently
+reviewed. The owner's dev server still holds an older Prisma client and must be restarted.
 
 ## R8.183 | 2026-09-29 | feat(sample-requests): StudioFlow read contract, Master Data intake, and the coordinator that joins them (executed by the Lead)
 

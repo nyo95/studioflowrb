@@ -1,9 +1,14 @@
-import { auditWriter, prisma, runTransaction } from "@platform/runtime";
+import { auditWriter, notificationWriter, prisma, runTransaction } from "@platform/runtime";
 
 import { createMasterDataService } from "./service";
 import { createMasterDataPublicRead } from "./public";
+import { createSampleRequestResolvedNotifier } from "./sample-request-notifier";
 
-export const masterDataService = createMasterDataService(prisma, { auditWriter, runTransaction });
+export const masterDataService = createMasterDataService(prisma, {
+  auditWriter,
+  runTransaction,
+  sampleRequestNotifier: createSampleRequestResolvedNotifier({ writer: notificationWriter }),
+});
 export const masterDataPublicRead = createMasterDataPublicRead(prisma);
 export const masterDataPublicCommands = {
   startSampleRequestIntake: masterDataService.startSampleRequestIntake,

@@ -35,8 +35,10 @@ The previous plan, WO-BE-03 (executed in R8.181, awaiting independent review), i
 - **R8.183 (done):** StudioFlow read contract `createStudioFlowSampleRequestRead`; Master Data permission, `SampleRequestIntake`
   table (additive migration `20260929000000_masterdata_sample_request_intake`), intake service and runtime commands;
   coordinator `src/application/sample-request-coordinator.ts` and shell wiring `src/app/sample-request-runtime.ts`.
-- **Next:** platform notifications (schema, writer port, read service, actions) and the two events; the Master Data
-  "Sample requests" screen with its actions; the notification bell and inbox.
+- **R8.184 (done):** platform notifications (`platform.Notification`, additive migration `20260929010000_platform_notifications`,
+  writer port, per-user center, actions) and the two events: StudioFlow tells sample-request staff of a new request; Master Data
+  tells the requester when it is priced or declined (both through optional notifier ports, written inside the event's transaction).
+- **Next:** the Master Data "Sample requests" screen with its actions; the notification bell and inbox.
 
 ## Risks
 

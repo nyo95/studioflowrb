@@ -226,6 +226,26 @@ model AuditEvent {
   @@schema("platform")
 }
 
+/// In-app notification inbox item. Domain-neutral: an app decides who is told and what it says; the
+/// platform stores it for one recipient and tracks whether that person has read it. The recipient is a
+/// plain user id (no foreign key), like audit actors, so an inbox row never blocks a user change.
+model Notification {
+  id                String    @id @default(uuid())
+  recipient_user_id String
+  app_id            String
+  kind              String
+  title             String
+  body              String?
+  href              String?
+  entity_type       String?
+  entity_id         String?
+  created_at        DateTime  @default(now())
+  read_at           DateTime?
+
+  @@index([recipient_user_id, read_at, created_at])
+  @@schema("platform")
+}
+
 // ============================================================================
 // MASTER DATA — curated first application scope
 // ============================================================================

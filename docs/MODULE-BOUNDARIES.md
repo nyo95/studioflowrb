@@ -89,7 +89,9 @@ reason). A missing generic mechanism is added to Platform once and tested there.
 | StudioFlow → MasterData | READ | `createMasterDataPublicRead(prisma)` injected in `studioflow/runtime.ts` |
 | BQ → MasterData | READ | `masterDataRead` in `bq/runtime.ts`; DTO types in `bq/lib/snapshot.ts` and the BQ editor |
 | BQ ⇄ MasterData: library promotion | COMMAND | `src/application/promotion-coordinator.ts`, ports injected by `src/app/promotion-runtime.ts`; neither app imports the other's runtime |
-| every app → Platform | SHARED INFRASTRUCTURE | audit writer/reader, RBAC, DB runtime, storage, UI Engine |
+| StudioFlow → Master Data staff: sample requests | READ + COMMAND | StudioFlow exposes `createStudioFlowSampleRequestRead` (`studioflow/public`); Master Data keeps its own `SampleRequestIntake` (plain ids, no foreign keys); `src/application/sample-request-coordinator.ts` joins them, wired in `src/app/sample-request-runtime.ts`. Master Data never changes StudioFlow's request |
+| StudioFlow / Master Data → people: notifications | SHARED INFRASTRUCTURE | each app calls the Platform `NotificationWriter` inside its own transaction through a small notifier (`studioflow/sample-request-notifier.ts` finds staff by Master Data's public permission; `masterdata/sample-request-notifier.ts` tells the requester and links to StudioFlow's public route) |
+| every app → Platform | SHARED INFRASTRUCTURE | audit writer/reader, notifications, RBAC, DB runtime, storage, UI Engine |
 | — | EVENT | none. Add one only when a consumer proves the need; a plain TypeScript contract comes first |
 
 A new interaction is classified READ / COMMAND / EVENT / INFRA and added here in the same change.

@@ -223,7 +223,26 @@ export function latestAuditActorLabels(db: PrismaClient, entityType: string, ent
 
 export type MasterDataDeletionTarget = "brand" | "vendor" | "sku" | "unit" | "category" | "vendor_type" | "supplier_category" | "price_material" | "price_material_labor" | "price_labor";
 
-export type MasterDataServicePorts = { runTransaction: <T>(work: (tx: TxClient) => Promise<T>) => Promise<T>; auditWriter: AuditWriter; };
+/** Told when staff finish a sample request, inside the same transaction, so the requester can be informed. Optional. */
+export type SampleRequestResolution = {
+  outcome: "priced" | "declined";
+  intake: {
+    id: string;
+    requesterUserId: string;
+    sourceProjectId: string;
+    sourceProjectName: string;
+    productName: string;
+    quotedAmount: string | null;
+    quotedCurrency: string | null;
+    staffNote: string | null;
+  };
+};
+
+export type MasterDataServicePorts = {
+  runTransaction: <T>(work: (tx: TxClient) => Promise<T>) => Promise<T>;
+  auditWriter: AuditWriter;
+  sampleRequestNotifier?: { resolved(tx: TxClient, resolution: SampleRequestResolution): Promise<void> };
+};
 
 export async function writeAudit(ports: MasterDataServicePorts, tx: TxClient, input: { action: string; entityType: string; entityId: string; actor: AuditActor; changes?: Record<string, { from: unknown; to: unknown }>; metadata?: Record<string, unknown> }): Promise<void> {
   await ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", ...input }), tx);

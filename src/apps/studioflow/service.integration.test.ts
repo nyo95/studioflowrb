@@ -8,7 +8,9 @@ import { AppError } from "@platform/core/errors";
 import { createPeopleDirectory } from "@platform/core/rbac/people";
 import { initializePermissionRegistry } from "@platform/core/rbac/registry";
 import { FakeObjectStorage } from "@platform/core/storage";
-import { createMasterDataPublicRead } from "@/apps/masterdata/public";
+import { createMasterDataPublicRead, MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
+import { createNotificationWriter } from "@platform/core/notifications/persistence";
+import { createSampleRequestNotifier } from "./sample-request-notifier";
 import type { PrismaClient } from "@/generated/prisma/client";
 
 import { APP_REGISTRATIONS } from "../../app/app-registrations";
@@ -81,6 +83,7 @@ async function reset() {
     "sf_project", "sf_client", "sf_project_sequence", "sf_settings",
   ].map((t) => `"studioflow"."${t}"`).join(", ")} RESTART IDENTITY CASCADE`);
   await truncatePlatformTables(testDb);
+  await testDb.prisma.notification.deleteMany();
   await seedDefaultTemplate();
   designer = await seedUser("Dina Designer", ALL);
   drafter = await seedUser("Dodi Drafter", DRAFTER_GRANTS);
@@ -1840,5 +1843,72 @@ describe("Sample-request read contract (StudioFlow public)", () => {
     assert.ok(byId.get(received.requestId)?.receivedAt instanceof Date);
     assert.equal(byId.get(archived.requestId)?.project.archived, true);
     assert.deepEqual(await read.getSampleRequests([]), []);
+  });
+});
+
+describe("Sample-request notifications (StudioFlow side, real database)", () => {
+  function serviceWith(people = createPeopleDirectory(testDb.prisma)) {
+    const db = testDb.prisma;
+    return createStudioFlowService(db, {
+      runTransaction: <T>(work: (tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0]) => Promise<T>) => db.$transaction((tx) => work(tx)),
+      auditWriter: createAuditEventWriter(),
+      people: createPeopleDirectory(db),
+      storage,
+      masterData: createMasterDataPublicRead(db),
+      now: () => clock,
+      sampleRequestNotifier: createSampleRequestNotifier({ writer: createNotificationWriter(), people }),
+    });
+  }
+  async function optionFixture(name: string) {
+    const db = testDb.prisma;
+    const { projectId } = await newProject(name);
+    const entry = await db.sfScheduleEntry.create({ data: { project_id: projectId, section: "MATERIAL", category: "Floor", category_key: "floor", prefix: "FL", increment: 1, sort_order: 0 } });
+    const option = await db.sfScheduleOption.create({ data: { entry_id: entry.id, label: "A", product_name: "Oak Panel", search_key: "oak", brand_name: "Brand" } });
+    return { projectId, optionId: option.id };
+  }
+  const inbox = (userId: string) => testDb.prisma.notification.findMany({ where: { recipient_user_id: userId } });
+
+  it("tells each sample-request staff member once, and not the requester, a non-holder, or a disabled user", async () => {
+    const staffA = await seedUser("Sari Staff", [MASTERDATA_PERMISSIONS.sampleRequestManage]);
+    const staffB = await seedUser("Budi Staff", [MASTERDATA_PERMISSIONS.sampleRequestManage]);
+    const outsider = await seedUser("Olga Outsider", [MASTERDATA_PERMISSIONS.access]);
+    const disabled = await seedUser("Dewi Disabled", [MASTERDATA_PERMISSIONS.sampleRequestManage]);
+    await testDb.prisma.user.update({ where: { id: disabled.id }, data: { status: "DISABLED" } });
+    const requester = await seedUser("Rina Requester", [...ALL, MASTERDATA_PERMISSIONS.sampleRequestManage]);
+    const { projectId, optionId } = await optionFixture("Notify Project");
+
+    const { requestId } = await serviceWith().schedule.requestSample({ ...as(requester), projectId, optionId, requestedFrom: "Toko Kayu" });
+
+    for (const staff of [staffA, staffB]) {
+      const items = await inbox(staff.id);
+      assert.equal(items.length, 1, staff.actor.label);
+      assert.equal(items[0].kind, "studioflow.sample-request.created");
+      assert.equal(items[0].app_id, "studioflow");
+      assert.equal(items[0].href, "/masterdata/sample-requests");
+      assert.deepEqual([items[0].entity_type, items[0].entity_id], ["sample_request", requestId]);
+      assert.equal(items[0].read_at, null);
+      assert.ok(items[0].body?.includes("Oak Panel") && items[0].body.includes("Toko Kayu") && items[0].body.includes("Rina Requester"));
+    }
+    for (const nobody of [outsider, disabled, requester]) assert.equal((await inbox(nobody.id)).length, 0, nobody.actor.label);
+    assert.equal(await testDb.prisma.notification.count(), 2);
+  });
+
+  it("still creates the request, and tells nobody, when the staff lookup fails", async () => {
+    await seedUser("Sari Staff", [MASTERDATA_PERMISSIONS.sampleRequestManage]);
+    const { projectId, optionId } = await optionFixture("Lookup Fails");
+    const broken = { ...createPeopleDirectory(testDb.prisma), async listHolders() { throw new Error("directory down"); } };
+    const { requestId } = await serviceWith(broken).schedule.requestSample({ ...as(designer), projectId, optionId, requestedFrom: "Toko Kayu" });
+    assert.ok(await testDb.prisma.sfScheduleSampleRequest.findUnique({ where: { id: requestId } }));
+    assert.equal(await testDb.prisma.notification.count(), 0);
+  });
+
+  it("tells nobody about a request that was refused", async () => {
+    await seedUser("Sari Staff", [MASTERDATA_PERMISSIONS.sampleRequestManage]);
+    const { projectId, optionId } = await optionFixture("Duplicate");
+    const service = serviceWith();
+    await service.schedule.requestSample({ ...as(designer), projectId, optionId, requestedFrom: "Toko Kayu" });
+    assert.equal(await testDb.prisma.notification.count(), 1);
+    await rejectsWith(service.schedule.requestSample({ ...as(designer), projectId, optionId, requestedFrom: "Toko Lain" }), "SAMPLE_ALREADY_REQUESTED");
+    assert.equal(await testDb.prisma.notification.count(), 1, "the refused duplicate wrote no second notification");
   });
 });

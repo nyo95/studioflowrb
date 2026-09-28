@@ -15,6 +15,7 @@ export const MASTERDATA_ROUTES = {
   units: "/masterdata/units",
   categories: "/masterdata/categories",
   deletions: "/masterdata/deletions",
+  sampleRequests: "/masterdata/sample-requests",
 } as const;
 
 export type MasterDataNavLink = { href: string; label: string; exact?: boolean };

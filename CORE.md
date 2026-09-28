@@ -472,7 +472,7 @@ Foundation is deliberately staged. A capability can be documented before it is i
 | file storage/upload/download, virus/type/size policy | Core port + infrastructure; app policy outside | first approved media/document upload | **ACTIVATED for MOM image objects in R7.52**; Brand mark migration remains deferred |
 | cache/revalidation helper | framework utility | repeated domain-neutral tag/path mechanism in two apps | **DEFER**; route/tag lists remain app-owned |
 | background jobs/outbox/idempotency | Core infrastructure | first durable async workflow/integration | **DEFER**; no event bus placeholder |
-| notification delivery | Core port + app-owned notification meaning | first approved email/in-app notification workflow | **DEFER** |
+| notification delivery | Core port + app-owned notification meaning | first approved email/in-app notification workflow | **ACTIVATED for in-app inbox items in R8.184** (first workflow: sample requests): `core/notifications` owns the envelope, the transactional writer port and a per-user inbox; apps own who is told and what it says. Email, push, preferences, and digests remain **DEFER** |
 | observability/security event sink | Core infrastructure | deployment/identity implementation | **ADD with identity** for safe logs/rate-limit evidence; not business audit |
 | app registry/launcher | Core contract + app registrations | identity Stage F0 | **ADD NOW**; registrations contain metadata/routes, not permissions policy |
 | per-user preferences | Core/settings | proven user-specific theme/density need | **DEFER** |

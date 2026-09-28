@@ -11,6 +11,17 @@ import { STUDIOFLOW_PERMISSIONS } from "./permissions";
 export type TxClient = Prisma.TransactionClient;
 export type Db = PrismaClient;
 
+/** Facts about a new physical-sample request, given to the notifier inside the request's own transaction. */
+export type SampleRequestedEvent = {
+  requestId: string;
+  projectId: string;
+  projectName: string;
+  productName: string;
+  requestedFrom: string;
+  requestedById: string;
+  requestedByName: string;
+};
+
 export type StudioFlowPorts = {
   runTransaction: <T>(work: (tx: TxClient) => Promise<T>) => Promise<T>;
   auditWriter: AuditWriter;
@@ -19,6 +30,8 @@ export type StudioFlowPorts = {
   storage: ObjectStorage;
   /** Public Master Data reads used only for typed snapshots, never FK ownership. */
   masterData: ReturnType<typeof createMasterDataPublicRead>;
+  /** Tells the people who work sample requests. Optional so the service runs, and is tested, without notifications. */
+  sampleRequestNotifier?: { requested(tx: TxClient, event: SampleRequestedEvent): Promise<void> };
   now?: () => Date;
 };
 

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { createAuditEventWriter } from "@platform/core/audit/persistence";
+import { createNotificationCenter, createNotificationWriter } from "@platform/core/notifications/persistence";
 import { prisma, runSerializableTransaction } from "@platform/core/db";
 import { createPlatformAccessService } from "@platform/core/rbac/services";
 import { createPeopleDirectory } from "@platform/core/rbac/people";
@@ -30,6 +31,10 @@ const commonPorts = {
 };
 
 export const auditWriter = commonPorts.auditWriter;
+
+/** Apps write notifications inside their own transaction; people read their own inbox through the center. */
+export const notificationWriter = createNotificationWriter();
+export const notificationCenter = createNotificationCenter(prisma);
 const storageRoot = process.env.STUDIOFLOW_STORAGE_ROOT || path.join(process.cwd(), ".storage");
 const privateRootDir = path.join(storageRoot, "private-assets");
 const publicRootDir = path.join(storageRoot, "public-assets");

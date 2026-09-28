@@ -11,7 +11,9 @@ import {
 } from "@platform/core/db/test-support";
 import { AppError } from "@platform/core/errors";
 
+import { createNotificationWriter } from "@platform/core/notifications/persistence";
 import { createMasterDataService, MASTERDATA_PERMISSIONS } from "./service";
+import { createSampleRequestResolvedNotifier } from "./sample-request-notifier";
 import { createMasterDataPublicRead } from "./public";
 
 const ACTOR = { kind: "USER" as const, userId: "masterdata-test-user", label: "Master Data Test" };
@@ -31,6 +33,7 @@ async function resetMasterData(db: PrismaClient): Promise<void> {
       "master_data"."ArchiveCause",
       "master_data"."DeletionRequest",
       "master_data"."SampleRequestIntake",
+      "platform"."Notification",
       "platform"."AuditEvent"
     RESTART IDENTITY CASCADE
   `);
@@ -1175,5 +1178,64 @@ describe("Sample request intake (Master Data side of StudioFlow sample requests)
     assert.equal((await service.listSampleRequestIntakes({ grants: GRANTS, limit: 1 })).length, 1);
     assert.equal((await service.listSampleRequestIntakes({ grants: GRANTS, limit: 0 })).length, 3, "an unusable limit falls back to the default");
     assert.equal((await service.listSampleRequestIntakes({ grants: GRANTS, limit: -5 })).length, 3, "a negative limit falls back to the default too");
+  });
+});
+
+describe("Sample request notifications (Master Data side, real database)", () => {
+  const STAFF = { kind: "USER" as const, userId: "sample-staff-1", label: "Sari Staff" };
+  const notifying = () => createMasterDataService(testDb.prisma, {
+    runTransaction: (work) => testDb.prisma.$transaction(work),
+    auditWriter: createAuditEventWriter(),
+    sampleRequestNotifier: createSampleRequestResolvedNotifier({ writer: createNotificationWriter() }),
+  });
+  const snapshot = (id: string) => ({
+    sourceRequestId: id, sourceProjectId: "project-9", sourceProjectName: "2026-506 Sociolla", sourceOptionId: "option-1", productName: "Oak Panel",
+    brandName: null, color: null, pattern: null, finishing: null, dimension: null, requestedFrom: "Toko Kayu", requestNote: null,
+    requesterUserId: "designer-1", requesterLabel: "Dina Designer", requestedAt: new Date("2026-09-20T03:00:00Z"),
+  });
+  const inbox = () => testDb.prisma.notification.findMany({ orderBy: { created_at: "asc" } });
+
+  it("tells the requester, and only the requester, when a request is priced", async () => {
+    const service = notifying();
+    const intake = await service.startSampleRequestIntake({ grants: GRANTS, actor: STAFF, snapshot: snapshot("request-1") });
+    assert.equal((await inbox()).length, 0, "taking a request tells nobody");
+    await service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: intake.id, quotedAmount: "99000", quotedCurrency: "IDR" });
+    assert.equal((await inbox()).length, 0, "recording a quote tells nobody");
+    await service.markSampleRequestPriced({ grants: GRANTS, actor: STAFF, intakeId: intake.id });
+    const [note, ...rest] = await inbox();
+    assert.equal(rest.length, 0);
+    assert.equal(note.recipient_user_id, "designer-1");
+    assert.equal(note.kind, "masterdata.sample-request.priced");
+    assert.equal(note.app_id, "masterdata");
+    assert.equal(note.href, "/studioflow/projects/project-9/schedule");
+    assert.deepEqual([note.entity_type, note.entity_id], ["sample_request_intake", intake.id]);
+    assert.ok(note.body?.includes("IDR 99000"));
+    assert.equal(note.read_at, null);
+  });
+
+  it("tells the requester about a decline, with the reason", async () => {
+    const service = notifying();
+    const intake = await service.startSampleRequestIntake({ grants: GRANTS, actor: STAFF, snapshot: snapshot("request-2") });
+    await service.declineSampleRequest({ grants: GRANTS, actor: STAFF, intakeId: intake.id, reason: "Vendor has no stock" });
+    const [note] = await inbox();
+    assert.equal(note.kind, "masterdata.sample-request.declined");
+    assert.equal(note.recipient_user_id, "designer-1");
+    assert.ok(note.body?.includes("Vendor has no stock"));
+  });
+
+  it("writes no notification when finishing the request fails, and rolls a failed notification back with it", async () => {
+    const service = notifying();
+    const intake = await service.startSampleRequestIntake({ grants: GRANTS, actor: STAFF, snapshot: snapshot("request-3") });
+    await assert.rejects(service.markSampleRequestPriced({ grants: GRANTS, actor: STAFF, intakeId: intake.id }), (error: unknown) => error instanceof AppError && error.code === "SAMPLE_PRICE_REQUIRED");
+    assert.equal((await inbox()).length, 0);
+
+    const failing = createMasterDataService(testDb.prisma, {
+      runTransaction: (work) => testDb.prisma.$transaction(work),
+      auditWriter: createAuditEventWriter(),
+      sampleRequestNotifier: { async resolved() { throw new Error("inbox unavailable"); } },
+    });
+    await assert.rejects(failing.declineSampleRequest({ grants: GRANTS, actor: STAFF, intakeId: intake.id, reason: "No" }), /inbox unavailable/);
+    const row = await testDb.prisma.sampleRequestIntake.findUniqueOrThrow({ where: { id: intake.id } });
+    assert.equal(row.status, "IN_PROGRESS", "the request stays open so it can be finished again");
   });
 });

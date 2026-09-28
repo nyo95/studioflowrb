@@ -735,6 +735,16 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         const request = await tx.sfScheduleSampleRequest.create({
           data: { option_id: option.id, requested_from: requestedFrom, note, requested_by_id: userId, requested_by_name: input.actor.label },
         });
+        const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { name: true } });
+        await ports.sampleRequestNotifier?.requested(tx, {
+          requestId: request.id,
+          projectId: input.projectId,
+          projectName: project?.name ?? "",
+          productName: option.product_name,
+          requestedFrom,
+          requestedById: userId,
+          requestedByName: input.actor.label,
+        });
         await writeAudit(ports, tx, { action: "studioflow.schedule.sample-requested", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, metadata: { projectId: input.projectId, entryId: option.entry_id, label: option.label, requestedFrom } });
         return { requestId: request.id };
       });
