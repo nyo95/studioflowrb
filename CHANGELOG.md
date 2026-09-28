@@ -5,13 +5,47 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.181**
-- Next local revision: **R8.182**
+- Current revision after this entry is committed: **R8.182**
+- Next local revision: **R8.183**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.182 | 2026-09-29 | feat(studioflow): archived-file retention screens (settings, archive dialog, archived state, cleanup control)
+
+Lead-owned UI for the WO-BE-02/03 backend; no backend, schema, or dependency change.
+
+- **Settings.** New "Archived project files" card in Studio Settings: whole-day window (7 to 730, same rule as the
+  backend, shown inline and blocking Save when invalid), a plain-language statement of what is and is not removed, and
+  a "Review cleanup…" control for project managers. The card passes the current automatic-numbering value back when
+  saving, because the shared settings command carries both values. A side-nav entry "Archived files" was added.
+- **Cleanup control.** Review first (the count comes from the preview command), then a danger confirmation that requires
+  typing DELETE, then a result that names files removed, files kept because something else uses them, and files that
+  could not be deleted; it says when more projects may be waiting (limit 100 per run).
+- **Archive dialog** states the configured window and that restoring before it keeps the files.
+- **Archived state everywhere it matters:** the project banner, the Archived list row (compact), and the restore dialog
+  (a warning that removed files cannot be brought back). One rule, `archivedFilesState` in
+  `domain/retention.ts`, decides kept / overdue / removed with the same strict boundary the sweep uses; a shared
+  `ArchivedFilesNote` renders it. The server passes its render time so server and client wording agree.
+- New tests: `domain/retention.test.ts` (boundary, changed window, purged marker, validation range).
+
+**Browser verification (real app, dev database, disposable project deleted afterwards).** Settings validation and save
+(91 saved and audit shows only the retention change, then restored to 90; automatic numbering stayed off), review dialog
+empty state and confirm state, DELETE gate, cleanup run, both audit events and the purge marker in the database,
+archive dialog copy, archived row and banner in the kept, overdue and removed states, restore warning, restore audit
+`assetsPurged: true`, archiving again clearing the marker (the WO-BE-03 C1 defect, end to end), the SF-08 edit-dialog
+hint and refusal, and a 375 px pass of the settings card (no horizontal overflow). Not covered: real files present in
+the fixture. Statuses are recorded per item in `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`.
+
+**Checks.** `tsc --noEmit` 0 errors; `eslint .` clean; `npm run check` OK; full `npm test` 568/568; production
+build exit 0; `git diff --check` clean. The dev server was stopped for the build and restarted; `next-env.d.ts` was
+restored and is not staged.
+
+**Limits.** No test with real project files in the browser; the R8.173 revision-history items still need a project with
+a closed revision. The disposable project's audit events remain (audit is append-only), pointing at a project id that no
+longer exists. R8.181 is still awaiting an independent review.
 
 ## R8.181 | 2026-09-28 | fix(studioflow): WO-BE-03 retention lifecycle correction and UI-support reads (executed by the Lead)
 

@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { normalizeExtraFields } from "@/apps/studioflow/domain/schedule";
 
 import { ExtraFieldsEditor } from "../_components/extra-fields-editor";
+import { ArchiveRetentionSettings } from "./archive-retention-settings";
 
 import {
   Badge,
@@ -81,6 +82,8 @@ type BrandChoice = { id: string; name: string };
 
 export function StudioSettingsView({
   autoNaming,
+  archiveRetentionDays,
+  canManageProjects,
   templates,
   scheduleTemplates,
   schedulePrefixes,
@@ -90,6 +93,9 @@ export function StudioSettingsView({
   canManage,
 }: {
   autoNaming: boolean;
+  archiveRetentionDays: number;
+  /** Project-manage holders may run the archived-files cleanup; settings-manage holders may change the window. */
+  canManageProjects: boolean;
   templates: Template[];
   scheduleTemplates: ScheduleTemplate[];
   schedulePrefixes: SchedulePrefix[];
@@ -117,6 +123,8 @@ export function StudioSettingsView({
           <Switch label={autoNaming ? "On" : "Off"} checked={autoNaming} disabled={!canManage || pendingKey === "naming"} onCheckedChange={(checked) => run("naming", () => setAutoNamingAction(checked))} />
         </div>
       </SectionCard>
+
+      <ArchiveRetentionSettings retentionDays={archiveRetentionDays} autoNaming={autoNaming} canManage={canManage} canCleanup={canManageProjects} />
 
       {error ? <InlineError>{error}</InlineError> : null}
 

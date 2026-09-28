@@ -40,6 +40,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         filters={{ status, priority: params.priority ?? "", pic: params.pic ?? "", client: params.client ?? "", q: params.q ?? "", archived }}
         canManage={hasPermission(grants, P.projectManage)}
         autoNaming={settings.autoNamingEnabled}
+        archiveRetentionDays={settings.archiveRetentionDays}
+        asOf={new Date().toISOString()}
       />
     </PageShell>
   );

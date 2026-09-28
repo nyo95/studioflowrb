@@ -10,6 +10,7 @@ import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { Breadcrumb, ContextNavHeading, Notice, PageShell } from "@/platform/ui_engine";
 
+import { ArchivedFilesNote } from "../../_components/archived-files-note";
 import { pageSession } from "../../_components/session";
 import { PROJECT_STATUS_LABEL } from "../../_components/phase-status";
 import { ProjectNavLinks } from "./project-nav-links";
@@ -145,6 +146,9 @@ async function ProjectContextBar({
       if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
       throw error;
     });
+  // Only an archived project needs the retention window; skip the read everywhere else.
+  const settings = project.archivedAt ? await studioFlow.projects.getStudioSettings({ grants }) : null;
+  const asOf = new Date().toISOString();
 
   return (
     <>
@@ -161,8 +165,15 @@ async function ProjectContextBar({
       {project.archivedAt ? (
         <div className="px-[22px] pt-3">
           <Notice tone="warning" title="Archived">
-            This project is read-only.
-            {project.archiveReason ? ` Reason: ${project.archiveReason}` : ""}
+            <span className="block">
+              This project is read-only.
+              {project.archiveReason ? ` Reason: ${project.archiveReason}` : ""}
+            </span>
+            {settings ? (
+              <span className="mt-0.5 block">
+                <ArchivedFilesNote archivedAt={project.archivedAt} assetsPurgedAt={project.assetsPurgedAt} retentionDays={settings.archiveRetentionDays} asOf={asOf} />
+              </span>
+            ) : null}
           </Notice>
         </div>
       ) : null}

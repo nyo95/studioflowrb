@@ -36,7 +36,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop
 - Steps: 1. Set retention to a valid value. 2. Archive the project. 3. Check retained files. 4. Try settings outside 7–730 whole days.
 - Acceptance: files remain inside the window; invalid settings are rejected; archive copy states the configured retention.
-- Status: PENDING
+- Status: PARTIAL (Lead, 2026-09-29). Verified in the browser: settings accept only whole days 7 to 730 (5 was refused, 91 saved and was restored to 90), the archive dialog states the configured retention, and the archived row and banner show the kept-until date. NOT verified in the browser: files staying present inside the window; the disposable project had no files (integration tests cover it).
 
 ### [R8.178] Manual cleanup respects permissions and shared files
 - Surface: StudioFlow manual cleanup button (Lead UI follow-up)
@@ -44,7 +44,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop
 - Steps: 1. Run cleanup with project-manage. 2. Review summary and both audit events. 3. Run again. 4. Attempt without project-manage.
 - Acceptance: expired project references are cleared; shared files remain; repeat run is a no-op; unauthorized run fails; both counts-only audit events use SYSTEM actors.
-- Status: PENDING
+- Status: PARTIAL (Lead, 2026-09-29). Verified with project-manage: the review dialog counted exactly 1 archived project, DELETE was required, the run reported its summary, both audit events exist with SYSTEM actor and the locked counts, and the row and banner then read "files removed". NOT verified in the browser: a repeat run, a user without project-manage, and shared files (no real files in the fixture).
 
 ### [R8.178] Restore before and after asset cleanup
 - Surface: StudioFlow archived project and MOM revision restore (Lead UI follow-up)
@@ -52,7 +52,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop
 - Steps: 1. Restore inside retention and inspect files. 2. Purge the expired project, restore it, and restore a MOM revision with different text.
 - Acceptance: inside-window files remain; after purge the removed date is visible, project restore succeeds, and MOM revision restores text without missing-image references; restore audit records assetsPurged correctly.
-- Status: PENDING
+- Status: PARTIAL (Lead, 2026-09-29). Verified: restoring after the purge shows "Files cannot be brought back" with the removal date, succeeds, records assetsPurged true, and archiving the project again clears the marker so a new cycle can purge. NOT verified in the browser: restoring inside the window with real files, and restoring a MOM revision after a purge.
 
 ### [R8.173] Project overview revision history loads on demand
 - Surface: `/studioflow/projects/[projectId]`
@@ -84,7 +84,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop
 - Steps: 1. Submit a formatted name with a different number. 2. Submit with the existing number. 3. Submit only a readable name.
 - Acceptance: changed number returns the plain-language validation error without saving; same-number and readable-name edits still work. Edit-dialog hint polish remains Lead-owned.
-- Status: PENDING
+- Status: PARTIAL (Lead, 2026-09-29). Verified: the edit dialog shows the stored number ("The number 2026-507 stays fixed.") and a changed number is refused with "The project number cannot be changed." and nothing is saved. NOT verified: same-number and readable-name-only edits.
 
 ---
 

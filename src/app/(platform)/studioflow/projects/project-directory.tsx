@@ -30,6 +30,7 @@ import {
 
 import { PersonChip, type Person } from "../_components/people";
 import { NewProjectDialog } from "./new-project-dialog";
+import { ArchivedFilesNote } from "../_components/archived-files-note";
 import { ProjectRowActions } from "./project-row-actions";
 
 type ProjectRow = {
@@ -48,6 +49,7 @@ type ProjectRow = {
   address: string | null;
   area: string | null;
   archivedAt: Date | null;
+  assetsPurgedAt: Date | null;
   updatedAt: Date;
   designer: Person;
   drafter: Person;
@@ -83,6 +85,8 @@ export function ProjectDirectory({
   filters,
   canManage,
   autoNaming,
+  archiveRetentionDays,
+  asOf,
 }: {
   projects: ProjectRow[];
   people: Person[];
@@ -90,6 +94,10 @@ export function ProjectDirectory({
   filters: { status: string; priority: string; pic: string; client: string; q: string; archived: boolean };
   canManage: boolean;
   autoNaming: boolean;
+  /** Studio setting: how long an archived project's files are kept. */
+  archiveRetentionDays: number;
+  /** Server render time (ISO), so retention wording is identical on server and client. */
+  asOf: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -166,7 +174,9 @@ export function ProjectDirectory({
                     tone={project.status === "ACTIVE" ? "success" : project.status === "ON_HOLD" ? "warning" : "neutral"}
                     statusLabel={project.status === "ON_HOLD" ? "On hold" : project.status === "ACTIVE" ? "Active" : "Completed"}
                     name={<>{project.name}{project.priority === "URGENT" ? <Badge tone="danger" className="ml-2">Urgent</Badge> : null}</>}
-                    secondary={project.client?.name ?? "No client"}
+                    secondary={project.archivedAt ? (
+                      <>{project.client?.name ?? "No client"} · <ArchivedFilesNote variant="compact" archivedAt={project.archivedAt} assetsPurgedAt={project.assetsPurgedAt} retentionDays={archiveRetentionDays} asOf={asOf} /></>
+                    ) : project.client?.name ?? "No client"}
                   />
                 </Link>
               </TableCell>
@@ -184,7 +194,7 @@ export function ProjectDirectory({
               {canManage ? (
                 <RowActionsCell>
                   <span onClick={(e) => e.stopPropagation()}>
-                    <ProjectRowActions project={project} people={people} clients={clients} />
+                    <ProjectRowActions project={project} people={people} clients={clients} archiveRetentionDays={archiveRetentionDays} asOf={asOf} />
                   </span>
                 </RowActionsCell>
               ) : null}

@@ -26,6 +26,8 @@ export default async function StudioSettingsPage() {
       <SettingsShell navigationLabel="Studio Settings navigation" navigation={<StudioSettingsNav />}>
         <StudioSettingsView
           autoNaming={settings.autoNamingEnabled}
+          archiveRetentionDays={settings.archiveRetentionDays}
+          canManageProjects={hasPermission(grants, P.projectManage)}
           templates={templates}
           scheduleTemplates={scheduleTemplates}
           schedulePrefixes={schedulePrefixes}
