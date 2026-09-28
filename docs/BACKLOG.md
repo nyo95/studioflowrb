@@ -69,6 +69,12 @@ Rules carried over unchanged from the prior trackers:
   re-import, with a preview before anything is saved, all-or-nothing apply, a per-row error report,
   and unknown vendors/units/categories rejected instead of created. A spreadsheet library is
   approved as a new dependency.
+- **Sample requests and notifications: Lead defaults (owner delegated, 2026-09-29: "kamu langsung take over").**
+  The open questions on the two BLOCKED sample-request entries were answered by the Lead's recommendations, recorded in
+  `PLAN.md` (WO-SR-01) and open to the owner's veto: a new permission `masterdata.sample-request.manage`; Master Data's
+  "priced" never flips StudioFlow's `RECEIVED`; version one records the quote and links ids but does not create the SKU
+  or price; staff are notified of new requests and the requester of priced or declined ones; delivery is polling. The
+  private user-to-user messaging item stays BLOCKED and is not part of this.
 - **SF-PRESENTATION defaults confirmed (owner, 2026-09-28):** export is PDF through the print view
   (not a real PowerPoint file), and images are uploaded from the device only.
 
@@ -147,7 +153,7 @@ invitation to make unrequested drive-by changes.
 
 - [ ] [PLANNED] Define media/file behavior after shared storage exists.
 
-- [ ] [BLOCKED] **Incoming Sample Requests screen (owner roadmap review,
+- [ ] [PLANNED] **UNBLOCKED 2026-09-29 (see Decision gates); backend built in R8.183, screen still to build.** **Incoming Sample Requests screen (owner roadmap review,
   2026-09-26).** StudioFlow will add a public read port exposing pending
   physical-sample requests (`SfScheduleSampleRequest`, see mirrored entry
   under **StudioFlow** above for the full evidence trail). This entry is the
@@ -382,7 +388,7 @@ etc., all StudioFlow modules, no sub-tier between them).
   Deliverables/Schedule photos). Flag to the owner before Executor starts if
   either default is wrong. **Both defaults confirmed by the owner 2026-09-28.**
 
-- [ ] [BLOCKED] **Sample request → Master Data "incoming requests" queue.**
+- [ ] [PLANNED] **UNBLOCKED 2026-09-29 (see Decision gates); the read port is built in R8.183.** **Sample request → Master Data "incoming requests" queue.**
   Owner confirmed the shape: StudioFlow only requests; a Master Data staff
   member processes it manually (contacts vendor, gets a price, creates the
   SKU/price themselves) — same division of labor as legacy's

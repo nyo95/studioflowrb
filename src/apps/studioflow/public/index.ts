@@ -5,3 +5,5 @@
 export { STUDIOFLOW_PERMISSIONS } from "../permissions";
 export type { StudioFlowPermission } from "../permissions";
 export * from "./nav";
+export { createStudioFlowSampleRequestRead } from "./sample-request-read";
+export type { SampleRequestRead, StudioFlowSampleRequestRead } from "./sample-request-read";

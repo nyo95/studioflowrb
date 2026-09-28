@@ -19,6 +19,7 @@ import { createStudioFlowService, type StudioFlowService } from "./service";
 import { readBlockerCounts, readBlockerCountsBatch } from "./phases/blocker-query";
 import { fullBlockers } from "./domain/blockers";
 import { createAssetRetentionService } from "./projects/asset-retention";
+import { createStudioFlowSampleRequestRead } from "./public/sample-request-read";
 import { runSerializableTransaction } from "@platform/core/db/transactions";
 import type { StudioFlowPorts } from "./shared";
 
@@ -1784,5 +1785,60 @@ describe("SF-V2-E phase definitions", () => {
     const planning = (await phasesOf(projectId))[1];
     const items = await testDb.prisma.sfChecklistItem.findMany({ where: { project_id: projectId } });
     assert.deepEqual(items.map((i) => [i.label, i.phase_id]), [["Collect measurements", planning.id]]);
+  });
+});
+
+describe("Sample-request read contract (StudioFlow public)", () => {
+  async function requestFixture(name: string, requestedAt: string, status: "REQUESTED" | "RECEIVED" = "REQUESTED", archived = false) {
+    const db = testDb.prisma;
+    const { projectId } = await newProject(name);
+    const entry = await db.sfScheduleEntry.create({ data: { project_id: projectId, section: "MATERIAL", category: "Floor", category_key: "floor", prefix: "FL", increment: 1, sort_order: 0 } });
+    const option = await db.sfScheduleOption.create({ data: { entry_id: entry.id, label: "A", product_name: `Product ${name}`, brand_name: "Brand", color: "Oak", finishing: "Matte", dimension: "120x20", search_key: name.toLowerCase(), image_key: `secret/${name}.png` } });
+    const request = await db.sfScheduleSampleRequest.create({ data: { option_id: option.id, requested_from: "Vendor X", note: "Bring a swatch", status, requested_by_id: designer.id, requested_by_name: "Dina Designer", requested_at: new Date(requestedAt), received_at: status === "RECEIVED" ? new Date(requestedAt) : null } });
+    if (archived) await db.sfProject.update({ where: { id: projectId }, data: { archived_at: new Date("2026-09-01T00:00:00Z") } });
+    return { projectId, requestId: request.id, optionId: option.id };
+  }
+
+  it("lists only pending requests of live projects, oldest first, as facts with no storage details", async () => {
+    const read = createStudioFlowSampleRequestRead(testDb.prisma);
+    const newer = await requestFixture("Newer", "2026-09-12T03:00:00Z");
+    const older = await requestFixture("Older", "2026-09-10T03:00:00Z");
+    await requestFixture("Received", "2026-09-09T03:00:00Z", "RECEIVED");
+    await requestFixture("Archived", "2026-09-08T03:00:00Z", "REQUESTED", true);
+
+    const rows = await read.listPendingSampleRequests();
+    assert.deepEqual(rows.map((row) => row.id), [older.requestId, newer.requestId]);
+    const [first] = rows;
+    assert.deepEqual(Object.keys(first).sort(), ["id", "note", "option", "project", "receivedAt", "requestedAt", "requestedBy", "requestedFrom", "status"]);
+    assert.deepEqual(Object.keys(first.option).sort(), ["brandName", "color", "dimension", "finishing", "id", "pattern", "productName"]);
+    assert.equal(first.project.name.includes("Older"), true);
+    assert.equal(first.project.archived, false);
+    assert.deepEqual(first.requestedBy, { id: designer.id, name: "Dina Designer" });
+    assert.equal(first.option.productName, "Product Older");
+    assert.equal(JSON.stringify(rows).includes("secret/"), false, "no storage key leaves StudioFlow");
+  });
+
+  it("caps the list and falls back to the default for an unusable limit", async () => {
+    const read = createStudioFlowSampleRequestRead(testDb.prisma);
+    await requestFixture("One", "2026-09-10T03:00:00Z");
+    await requestFixture("Two", "2026-09-11T03:00:00Z");
+    assert.equal((await read.listPendingSampleRequests({ limit: 1 })).length, 1);
+    for (const limit of [0, -3, Number.NaN]) assert.equal((await read.listPendingSampleRequests({ limit })).length, 2, `limit ${limit}`);
+    assert.equal((await read.listPendingSampleRequests({ limit: 10_000 })).length, 2);
+  });
+
+  it("returns specific requests in any state, flags archived projects, and ignores unknown or repeated ids", async () => {
+    const read = createStudioFlowSampleRequestRead(testDb.prisma);
+    const live = await requestFixture("Live", "2026-09-10T03:00:00Z");
+    const received = await requestFixture("Done", "2026-09-11T03:00:00Z", "RECEIVED");
+    const archived = await requestFixture("Old", "2026-09-12T03:00:00Z", "REQUESTED", true);
+    const rows = await read.getSampleRequests([live.requestId, received.requestId, archived.requestId, live.requestId, "not-a-real-id"]);
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    assert.equal(rows.length, 3);
+    assert.equal(byId.get(live.requestId)?.status, "REQUESTED");
+    assert.equal(byId.get(received.requestId)?.status, "RECEIVED");
+    assert.ok(byId.get(received.requestId)?.receivedAt instanceof Date);
+    assert.equal(byId.get(archived.requestId)?.project.archived, true);
+    assert.deepEqual(await read.getSampleRequests([]), []);
   });
 });

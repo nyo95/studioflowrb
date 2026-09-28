@@ -5,13 +5,42 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.182**
-- Next local revision: **R8.183**
+- Current revision after this entry is committed: **R8.183**
+- Next local revision: **R8.184**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.183 | 2026-09-29 | feat(sample-requests): StudioFlow read contract, Master Data intake, and the coordinator that joins them (executed by the Lead)
+
+**Who did this.** The owner told the Lead to take over the sample-request and notification work directly (Codex was at its
+limit). The Lead decided the open product questions by recommendation and recorded them in `PLAN.md` and `docs/BACKLOG.md`
+for the owner to veto; the Lead also implemented it, so **no independent review has happened**.
+
+- **StudioFlow public read contract.** `createStudioFlowSampleRequestRead` (`public/sample-request-read.ts`, exported from
+  `public`, instantiated in `runtime.ts`): `listPendingSampleRequests` (pending only, live projects only, oldest first, capped)
+  and `getSampleRequests` (any state, flags archived projects). Facts only; no storage keys or images leave StudioFlow.
+- **Master Data.** New permission `masterdata.sample-request.manage`; additive migration
+  `20260929000000_masterdata_sample_request_intake` (enum + `SampleRequestIntake`, source and link columns are plain ids,
+  no foreign keys, applied to `masterdata` and `masterdata_test` after verifying both are the rebuild's local
+  databases); `services/sample-request.service.ts` with `startSampleRequestIntake` (one taker per request, same person
+  idempotent), `recordSampleQuote` (validated vendor/SKU/price links and money, unset fields unchanged), `markSampleRequestPriced`
+  (must state a price), `declineSampleRequest` (reason required), and reads. Audit events `masterdata.sample-request.started`,
+  `quote-recorded`, `priced`, `declined`; free text is never copied into the audit trail. Public types exported from
+  `masterdata/public`; commands exposed on `runtime.ts`.
+- **Coordinator** `src/application/sample-request-coordinator.ts` (wired in `src/app/sample-request-runtime.ts`): merged queue
+  (new requests oldest first, then work in progress, optionally recent finished), `take` copies facts from StudioFlow rather than
+  from the caller and refuses missing, archived, or already-received requests; authorizes before reading StudioFlow.
+- Unusable list limits now fall back to the default consistently (`0` and negatives), in Master Data and in the StudioFlow contract.
+- Tests: 8 Master Data integration, 3 StudioFlow read-contract integration, 7 coordinator unit.
+
+**Checks.** `tsc --noEmit` 0 errors; `eslint .` clean; `npm run check` OK; full `npm test` 586/586 against `masterdata_test`.
+Not run: production build and browser (no screen yet; both come with the UI revisions).
+
+**Limits.** No notifications yet and no screen; nothing in the running app uses this until the next revisions. Not independently
+reviewed. The owner's dev server was not restarted, so it still holds the previous Prisma client until the next restart.
 
 ## R8.182 | 2026-09-29 | feat(studioflow): archived-file retention screens (settings, archive dialog, archived state, cleanup control)
 

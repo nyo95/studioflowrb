@@ -70,6 +70,7 @@ export const MASTERDATA_PERMISSIONS = {
   priceWorkManage: "masterdata.price-work.manage",
   promotionApprove: "masterdata.promotion.approve",
   deletionApprove: "masterdata.deletion.approve",
+  sampleRequestManage: "masterdata.sample-request.manage",
 } as const;
 
 export function requiredAmount(value: string): string {

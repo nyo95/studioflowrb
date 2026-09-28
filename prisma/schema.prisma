@@ -680,6 +680,52 @@ model DeletionRequest {
   @@schema("master_data")
 }
 
+enum SampleRequestIntakeStatus {
+  IN_PROGRESS
+  PRICED
+  DECLINED
+
+  @@schema("master_data")
+}
+
+/// Master Data's own record of working a StudioFlow sample request. StudioFlow only asks; this table is
+/// where staff take it, note the vendor's quote, and finish it as priced or declined. Every source and
+/// reference column is a plain id or a snapshot: there is no foreign key to StudioFlow, and vendor/SKU/price
+/// links are ids checked when written, so this row keeps its meaning if either side later changes.
+model SampleRequestIntake {
+  id                  String                    @id @default(uuid())
+  source_request_id   String                    @unique
+  source_project_id   String
+  source_project_name String
+  source_option_id    String
+  product_name        String
+  brand_name          String?
+  color               String?
+  pattern             String?
+  finishing           String?
+  dimension           String?
+  requested_from      String
+  request_note        String?
+  requester_user_id   String
+  requester_label     String
+  requested_at        DateTime
+  status              SampleRequestIntakeStatus @default(IN_PROGRESS)
+  vendor_id           String?
+  quoted_amount       Decimal?                  @db.Decimal(16, 2)
+  quoted_currency     String?
+  staff_note          String?
+  sku_id              String?
+  price_material_id   String?
+  handled_by_user_id  String
+  handled_by_label    String
+  started_at          DateTime                  @default(now())
+  resolved_at         DateTime?
+  updated_at          DateTime                  @updatedAt
+
+  @@index([status, started_at])
+  @@schema("master_data")
+}
+
 // ============================================================================
 // BQ — Bill of Quantity (app-owned, isolated schema)
 // ============================================================================

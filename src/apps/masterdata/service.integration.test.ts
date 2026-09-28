@@ -30,6 +30,7 @@ async function resetMasterData(db: PrismaClient): Promise<void> {
       "master_data"."Sku",
       "master_data"."ArchiveCause",
       "master_data"."DeletionRequest",
+      "master_data"."SampleRequestIntake",
       "platform"."AuditEvent"
     RESTART IDENTITY CASCADE
   `);
@@ -1021,5 +1022,158 @@ describe("Master Data service", () => {
       await testDb.prisma.deletionRequest.findUniqueOrThrow({ where: { id: request.requestId } }).then((decision) => decision.status),
       "PENDING",
     );
+  });
+});
+
+describe("Sample request intake (Master Data side of StudioFlow sample requests)", () => {
+  const STAFF = { kind: "USER" as const, userId: "sample-staff-1", label: "Sari Staff" };
+  const OTHER = { kind: "USER" as const, userId: "sample-staff-2", label: "Budi Staff" };
+  const snapshot = (id: string) => ({
+    sourceRequestId: id, sourceProjectId: "project-1", sourceProjectName: "2026-506 Test Project", sourceOptionId: "option-1",
+    productName: "Oak Panel", brandName: "Panel Brand", color: "Natural", pattern: null, finishing: "Matte", dimension: "1200x2400",
+    requestedFrom: "Toko Kayu", requestNote: "Need a 30 cm sample", requesterUserId: "designer-1", requesterLabel: "Dina Designer",
+    requestedAt: new Date("2026-09-20T03:00:00Z"),
+  });
+  const rejectsWithCode = (promise: Promise<unknown>, code: string) =>
+    assert.rejects(promise, (error: unknown) => error instanceof AppError && error.code === code, `expected ${code}`);
+  const start = (id = "request-1", actor = STAFF) => service.startSampleRequestIntake({ grants: GRANTS, actor, snapshot: snapshot(id) });
+  const eventsFor = (entityId: string) => testDb.prisma.auditEvent.findMany({ where: { entity_id: entityId }, orderBy: { occurred_at: "asc" } });
+
+  it("refuses every operation without the sample-request permission", async () => {
+    const intake = await start();
+    const denied = GRANTS.filter((grant) => grant !== MASTERDATA_PERMISSIONS.sampleRequestManage);
+    for (const attempt of [
+      service.startSampleRequestIntake({ grants: denied, actor: STAFF, snapshot: snapshot("request-x") }),
+      service.recordSampleQuote({ grants: denied, actor: STAFF, intakeId: intake.id, quotedAmount: "10", quotedCurrency: "IDR" }),
+      service.markSampleRequestPriced({ grants: denied, actor: STAFF, intakeId: intake.id, quotedAmount: "10", quotedCurrency: "IDR" }),
+      service.declineSampleRequest({ grants: denied, actor: STAFF, intakeId: intake.id, reason: "No" }),
+      service.listSampleRequestIntakes({ grants: denied }),
+      service.getSampleRequestIntake({ grants: denied, intakeId: intake.id }),
+    ]) await rejectsWithCode(attempt, "PERMISSION_DENIED");
+    assert.equal(await testDb.prisma.sampleRequestIntake.count(), 1, "nothing was created or changed");
+  });
+
+  it("takes a request once: same person is idempotent, another person and a finished request conflict", async () => {
+    const first = await start("request-1");
+    assert.equal(first.status, "IN_PROGRESS");
+    assert.deepEqual(first.handledBy, { id: STAFF.userId, label: STAFF.label });
+    assert.equal(first.productName, "Oak Panel");
+    assert.equal((await start("request-1")).id, first.id, "pressing Take twice returns the same intake");
+    await rejectsWithCode(start("request-1", OTHER), "SAMPLE_INTAKE_ALREADY_TAKEN");
+    assert.equal(await testDb.prisma.sampleRequestIntake.count(), 1);
+
+    await service.declineSampleRequest({ grants: GRANTS, actor: STAFF, intakeId: first.id, reason: "Vendor stopped this line" });
+    await rejectsWithCode(start("request-1"), "SAMPLE_INTAKE_ALREADY_RESOLVED");
+    const events = await eventsFor(first.id);
+    assert.deepEqual(events.map((event) => event.action), ["masterdata.sample-request.started", "masterdata.sample-request.declined"]);
+    assert.ok(events.every((event) => event.actor_kind === "USER" && event.app_id === "masterdata"));
+  });
+
+  it("checks source facts and rejects an unusable actor", async () => {
+    await rejectsWithCode(service.startSampleRequestIntake({ grants: GRANTS, actor: STAFF, snapshot: { ...snapshot("request-2"), productName: "   " } }), "SAMPLE_SOURCE_INVALID");
+    await rejectsWithCode(service.startSampleRequestIntake({ grants: GRANTS, actor: STAFF, snapshot: { ...snapshot("request-2"), requestedFrom: "x".repeat(301) } }), "SAMPLE_SOURCE_INVALID");
+    await rejectsWithCode(service.startSampleRequestIntake({ grants: GRANTS, actor: { kind: "SYSTEM", label: "system" }, snapshot: snapshot("request-2") }), "ACTOR_REQUIRED");
+    assert.equal(await testDb.prisma.sampleRequestIntake.count(), 0);
+  });
+
+  it("records a quote with validated links, leaves unset fields alone, and audits what changed", async () => {
+    const context = await createMaterialContext();
+    const { skuId } = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Quoted SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1000", currency: "IDR" }] });
+    const intake = await start();
+
+    const quoted = await service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: intake.id, vendorId: context.vendorId, quotedAmount: "125000.5", quotedCurrency: "idr", staffNote: "  Valid until October  ", skuId });
+    assert.equal(quoted.vendorId, context.vendorId);
+    assert.equal(quoted.quotedAmount, "125000.5");
+    assert.equal(quoted.quotedCurrency, "IDR", "currency is normalized");
+    assert.equal(quoted.staffNote, "Valid until October");
+    assert.equal(quoted.skuId, skuId);
+    assert.equal(quoted.status, "IN_PROGRESS");
+
+    const untouched = await service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: intake.id, staffNote: "Follow up Monday" });
+    assert.equal(untouched.quotedAmount, "125000.5");
+    assert.equal(untouched.vendorId, context.vendorId, "fields that were not sent stay as they were");
+
+    const cleared = await service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: intake.id, quotedAmount: null });
+    assert.equal(cleared.quotedAmount, null);
+    assert.equal(cleared.quotedCurrency, null, "clearing the amount clears its currency");
+
+    const noop = await eventsFor(intake.id);
+    await service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: intake.id });
+    assert.equal((await eventsFor(intake.id)).length, noop.length, "a call that changes nothing writes no audit event");
+    const quoteEvent = noop.find((event) => event.action === "masterdata.sample-request.quote-recorded");
+    assert.ok(quoteEvent, "the first quote was audited");
+    assert.deepEqual((quoteEvent!.changes as Record<string, { from: unknown; to: unknown }>).quotedCurrency, { from: null, to: "IDR" });
+    assert.equal(JSON.stringify(noop).includes("Valid until October"), false, "free-text notes are not copied into the audit trail");
+  });
+
+  it("refuses bad money and links without changing the request", async () => {
+    const context = await createMaterialContext();
+    const archived = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Gone Supplier" });
+    await service.archiveVendor({ grants: GRANTS, actor: ACTOR, vendorId: archived.vendorId });
+    const intake = await start();
+    const attempt = (fields: Record<string, unknown>) => service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: intake.id, ...fields });
+    await rejectsWithCode(attempt({ quotedAmount: "abc", quotedCurrency: "IDR" }), "PRICE_AMOUNT_INVALID");
+    await rejectsWithCode(attempt({ quotedAmount: "-5", quotedCurrency: "IDR" }), "PRICE_AMOUNT_NEGATIVE");
+    await rejectsWithCode(attempt({ quotedAmount: "5" }), "CURRENCY_INVALID");
+    await rejectsWithCode(attempt({ quotedAmount: "5", quotedCurrency: "RUPIAH" }), "CURRENCY_INVALID");
+    await rejectsWithCode(attempt({ quotedCurrency: "IDR" }), "SAMPLE_AMOUNT_REQUIRED");
+    await rejectsWithCode(attempt({ vendorId: crypto.randomUUID() }), "SAMPLE_VENDOR_NOT_FOUND");
+    await rejectsWithCode(attempt({ vendorId: archived.vendorId }), "SAMPLE_VENDOR_NOT_FOUND");
+    await rejectsWithCode(attempt({ skuId: crypto.randomUUID() }), "SAMPLE_SKU_NOT_FOUND");
+    await rejectsWithCode(attempt({ priceMaterialId: crypto.randomUUID() }), "SAMPLE_PRICE_NOT_FOUND");
+    await rejectsWithCode(attempt({ staffNote: "n".repeat(1001) }), "SAMPLE_NOTE_TOO_LONG");
+    await rejectsWithCode(service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: crypto.randomUUID(), staffNote: "x" }), "SAMPLE_INTAKE_NOT_FOUND");
+    const row = await testDb.prisma.sampleRequestIntake.findUniqueOrThrow({ where: { id: intake.id } });
+    assert.equal(row.vendor_id, null);
+    assert.equal(row.quoted_amount, null);
+    assert.equal(context.vendorId.length > 0, true);
+  });
+
+  it("marks priced only with a price, then closes the request for further changes", async () => {
+    const context = await createMaterialContext();
+    const { skuId } = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Priced SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1000", currency: "IDR" }] });
+    const price = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: skuId } });
+    const withAmount = await start("request-a");
+    const withLink = await start("request-b");
+    const neither = await start("request-c");
+
+    await rejectsWithCode(service.markSampleRequestPriced({ grants: GRANTS, actor: STAFF, intakeId: neither.id, staffNote: "just a note" }), "SAMPLE_PRICE_REQUIRED");
+    assert.equal((await service.getSampleRequestIntake({ grants: GRANTS, intakeId: neither.id })).status, "IN_PROGRESS");
+
+    const pricedByAmount = await service.markSampleRequestPriced({ grants: GRANTS, actor: STAFF, intakeId: withAmount.id, quotedAmount: "99000", quotedCurrency: "IDR" });
+    assert.equal(pricedByAmount.status, "PRICED");
+    assert.ok(pricedByAmount.resolvedAt instanceof Date);
+    const pricedByLink = await service.markSampleRequestPriced({ grants: GRANTS, actor: STAFF, intakeId: withLink.id, priceMaterialId: price.id });
+    assert.equal(pricedByLink.priceMaterialId, price.id);
+    assert.equal(pricedByLink.quotedAmount, null, "a linked price is enough; no amount is invented");
+
+    await rejectsWithCode(service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: withAmount.id, staffNote: "late edit" }), "SAMPLE_INTAKE_NOT_OPEN");
+    await rejectsWithCode(service.markSampleRequestPriced({ grants: GRANTS, actor: STAFF, intakeId: withAmount.id, quotedAmount: "1", quotedCurrency: "IDR" }), "SAMPLE_INTAKE_NOT_OPEN");
+    await rejectsWithCode(service.declineSampleRequest({ grants: GRANTS, actor: STAFF, intakeId: withAmount.id, reason: "too late" }), "SAMPLE_INTAKE_NOT_OPEN");
+    assert.deepEqual((await eventsFor(withAmount.id)).map((event) => event.action), ["masterdata.sample-request.started", "masterdata.sample-request.priced"]);
+  });
+
+  it("declines only with a reason", async () => {
+    const intake = await start();
+    await rejectsWithCode(service.declineSampleRequest({ grants: GRANTS, actor: STAFF, intakeId: intake.id, reason: "   " }), "SAMPLE_REASON_INVALID");
+    const declined = await service.declineSampleRequest({ grants: GRANTS, actor: STAFF, intakeId: intake.id, reason: "  Vendor has no stock  " });
+    assert.equal(declined.status, "DECLINED");
+    assert.equal(declined.staffNote, "Vendor has no stock");
+    assert.ok(declined.resolvedAt instanceof Date);
+  });
+
+  it("lists by status and source id, newest first, within a clamped limit", async () => {
+    const a = await start("request-a");
+    const b = await start("request-b");
+    const c = await start("request-c");
+    await service.declineSampleRequest({ grants: GRANTS, actor: STAFF, intakeId: b.id, reason: "No" });
+    assert.deepEqual((await service.listSampleRequestIntakes({ grants: GRANTS })).map((row) => row.id), [c.id, b.id, a.id]);
+    assert.deepEqual((await service.listSampleRequestIntakes({ grants: GRANTS, status: "IN_PROGRESS" })).map((row) => row.id), [c.id, a.id]);
+    assert.deepEqual((await service.listSampleRequestIntakes({ grants: GRANTS, status: "DECLINED" })).map((row) => row.id), [b.id]);
+    assert.deepEqual((await service.listSampleRequestIntakes({ grants: GRANTS, sourceRequestIds: ["request-a", "missing"] })).map((row) => row.id), [a.id]);
+    assert.deepEqual(await service.listSampleRequestIntakes({ grants: GRANTS, sourceRequestIds: [] }), []);
+    assert.equal((await service.listSampleRequestIntakes({ grants: GRANTS, limit: 1 })).length, 1);
+    assert.equal((await service.listSampleRequestIntakes({ grants: GRANTS, limit: 0 })).length, 3, "an unusable limit falls back to the default");
+    assert.equal((await service.listSampleRequestIntakes({ grants: GRANTS, limit: -5 })).length, 3, "a negative limit falls back to the default too");
   });
 });

@@ -6,6 +6,11 @@ import { createMasterDataPublicRead } from "./public";
 export const masterDataService = createMasterDataService(prisma, { auditWriter, runTransaction });
 export const masterDataPublicRead = createMasterDataPublicRead(prisma);
 export const masterDataPublicCommands = {
+  startSampleRequestIntake: masterDataService.startSampleRequestIntake,
+  recordSampleQuote: masterDataService.recordSampleQuote,
+  markSampleRequestPriced: masterDataService.markSampleRequestPriced,
+  declineSampleRequest: masterDataService.declineSampleRequest,
+  listSampleRequestIntakes: masterDataService.listSampleRequestIntakes,
   listPromotionReferences: masterDataService.listPromotionReferences,
   validatePromotionReference: masterDataService.validatePromotionReference,
 };
