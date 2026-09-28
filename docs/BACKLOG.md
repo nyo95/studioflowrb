@@ -167,6 +167,11 @@ Master Data user adds the SKU/price themselves. See `CHANGELOG.md` R8.123,
   import/export of SKU + pricing via Excel/CSV, similar in spirit to the
   existing vendor-catalog import. Error-reporting policy (partial-failure
   behavior, per-row error surfacing) still needs to be designed — not started.
+  **Blocked on two things (2026-09-28):** Master Data is LOCKED by the owner
+  (2026-09-24) until an explicit new request names it, and the design questions
+  are unanswered: all-or-nothing vs partial import, per-row error report format,
+  and whether import may create missing vendors/units/categories or must reject
+  unknown references.
 - [ ] [CLEANUP][P2] KB-025 — `src/apps/masterdata/services/index.ts` exports
   many internal-implementation helpers with no external consumer found. Not a
   current coupling problem; narrow the barrel when consumers and the public
@@ -345,8 +350,10 @@ recorded here. Terminology note settled the same session: this rebuild has no
 Data/BQ, peers) → feature module inside an app (MOM, Schedule, Presentation,
 etc., all StudioFlow modules, no sub-tier between them).
 
-- [ ] [PLANNED] **SF-PRESENTATION — Presentation Manager module.** READY plan
-  in `PLAN.md` (copy-ready Executor prompt included) — not started. A
+- [ ] [PLANNED] **SF-PRESENTATION — Presentation Manager module.** QUEUED plan
+  in `apps/studioflow/SF-PRESENTATION-PLAN.md` (moved out of `PLAN.md` on
+  2026-09-28; must be re-cut into a backend Work Order plus a Lead UI revision
+  and its two defaults confirmed before it runs) — not started. A
   project-scoped StudioFlow module: `Board` → many `Slide` (bulk-imported
   images) → many pinned `Annotation` per slide, each pin optionally linked to
   a Product Schedule entry (same-app, resolved live so labels can never
@@ -513,6 +520,14 @@ explored direction. No access-check changes. See `CHANGELOG.md` R8.110.
   `archiveProject()` currently skips object deletion; owner decision is to
   purge on archive (see "Decision gates" above). Deferred until the storage
   layer (`PLATFORM-ASSET-STORAGE-ROADMAP.md`) is in place.
+  **Needs owner answers before a Work Order (2026-09-28):** the storage layer is
+  now in place (`SfDeliverable`, `SfMomImage`, schedule option photos and the client
+  logo all hold storage keys), but `restoreProject` exists, so purging on archive
+  makes a later restore return a project whose files are gone. (1) Is that
+  acceptable, or should restore be blocked or warn? (2) Which assets purge: only
+  the project's own (deliverables, MOM images, schedule photos) and never the client
+  logo? (3) Is the purge immediate and irreversible, or does it need a confirmation
+  step in the archive dialog?
 - [x] [BUG] `ui-engine.test.ts` ("UI Engine foundation") has 2 pre-existing,
   unrelated failures found while running the full suite for R8.164 (out of
   scope for that change, left open per the proportionate-checks rule):

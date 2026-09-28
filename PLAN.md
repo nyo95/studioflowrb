@@ -1,175 +1,166 @@
 # Active Plan
 
-Status: **READY**
+Plan ID: WO-BE-01
+Scope: Backend correctness and hardening — Platform (auth/RBAC/transactions) and StudioFlow. No Master Data, no BQ.
+Status: READY
+Priority: P2
+Owner: owner (Product Owner); Lead: Claude
+Target revision: R8.173
+Last updated: 2026-09-28
 
-## SF-PRESENTATION — Presentation Manager (StudioFlow module)
+## Outcome
 
-### Origin
+Eight verified backend defects from `docs/BACKLOG.md` are fixed with tests, without
+changing any product behavior, permission meaning, route, or schema. Each item
+below was re-verified by the Lead against `main` @ `aa182d2` before this plan was
+written.
 
-Owner request (2026-09-26 session): a centralized, non-destructive annotation
-board over design renders — "seperti PPT yang bisa dianotasi" — to replace
-sending clients/vendors a manually-annotated PowerPoint. Reviewed against:
+## Context and Evidence
 
-- legacy evidence (`nyo95/studioflow` @ `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`,
-  read-only, public GitHub, matches the pinned commit in
-  `D-SF-RECOVERY-DISCOVERY.md`): `RenderBoard`/`RenderAnnotation` — a
-  project-owned board holding a render image, with non-destructive pin
-  callouts (x/y %) each optionally linked to a Product Schedule entry. Listed
-  in `docs/archive/studioflow-rb/studioflow-schedule-contract.md` §8 as
-  `RenderAnnotation on schedule entries | DEFER | Not contracted`. Verified
-  it has **no functional dependency on the SketchUp plugin/sync** — plain
-  CRUD, gated by the same permission as the rest of Product Schedule — so it
-  is not blocked by SketchUp's own deferred status (D-SF-06).
-- current rebuild: the shipped `ImageWorkspace` (UI Engine) freehand-pen
-  annotation is a different, smaller thing — it bakes strokes into the raster
-  at save time (no persisted annotation data, one photo at a time). Not a fit
-  for "centralized" / re-editable / multi-image. Kept as-is; not touched by
-  this plan.
-- placement: owner confirmed (this session) this module is project-scoped,
-  same as MOM and Product Schedule — so it is a **module inside the
-  StudioFlow app** (`src/apps/studioflow/presentation`), not a new top-level
-  app and not a cross-app capability. No public port needed: it reads
-  Schedule entries same-app.
+Authority: `AGENTS.md`, `docs/agent/EXECUTOR.md`, `CORE.md` §2 (transactions) and §3
+(identity), `docs/MODULE-BOUNDARIES.md`. Origin: the 2026-09-26 audit in
+`docs/BACKLOG.md` ("Full-repo logic + UI/UX audit"). **Re-verify each finding against
+the current code before changing it.** If a finding no longer holds, do not change
+the code; report it as "not reproducible" in the handoff.
 
-### Scope (this slice)
+## Business Rules and Architecture Constraints
 
-A `Board` (per project) holding many `Slide`s (bulk-imported images — this is
-a deliberate scope expansion over legacy's one-image-per-board model, to
-match "bulk import" / deck framing), each slide carrying independent,
-non-destructive pin `Annotation`s. A pin may optionally link to one Product
-Schedule entry (same-app FK) so its label can never drift from the entry's
-real code/product name; or it may carry only a free-text note. Boards are
-exportable as a print/PDF document, one page per slide, via the same shared
-UI Engine print view already used by MOM and Product Schedule (UI_ENGINE
-§13) — this is the third consumer of that pattern.
+- Every fix is behavior-preserving except where an item says otherwise.
+- Cross-app access stays through `public/`; `platform` stays domain-neutral;
+  database ownership per `docs/MODULE-BOUNDARIES.md` (the boundary checker enforces it).
+- REUSE existing helpers; ADD nothing generic unless an item names it.
 
-### Data model (new migration, `studioflow` schema)
+## Backend Contract (locked, per item)
 
-Mirrors `SfScheduleEntry`'s conventions (`Sf<Thing>` model, `sf_snake_case`
-table, cascade from project/board/slide):
+**A1 — KB-042: hash outside the transaction.** `hashPassword()` currently runs inside
+the `runTransaction` callback at `platform/core/rbac/services.ts` (create-user and
+reset-password paths, ~L429 and ~L502), `platform/core/auth/account.ts` (~L87), and
+`platform/core/auth/bootstrap.ts` (~L87). Compute the hash before opening the
+transaction. Locked constraints: (a) hash only *after* every non-transactional check
+that could already fail the call (permission, input validation), so error precedence
+and who pays the CPU cost do not change; (b) in `account.ts` the current-password
+check happens inside the transaction — do not move that check or the error it raises;
+(c) no change to transaction isolation, audit content, or return values.
 
-- `SfPresentationBoard` — `id`, `project_id` (FK `SfProject`, cascade),
-  `title`, `sort_order`, `created_by`, `created_at`, `updated_at`.
-- `SfPresentationSlide` — `id`, `board_id` (FK cascade), `image_key`
-  (private `ObjectStorage` key — **not** a raw URL like legacy; short-lived
-  signed URLs on read, same pattern as Schedule/MOM photos), `image_ratio`
-  (float?, natural w/h for stable layout — ported from legacy), `sort_order`,
-  `created_at`, `updated_at`.
-- `SfPresentationAnnotation` — `id`, `slide_id` (FK cascade), `schedule_entry_id`
-  (nullable FK `SfScheduleEntry`, `onDelete: SetNull` — ported from legacy
-  exactly), `pin_x`, `pin_y` (Float, 0–100, % of image), `label_side`
-  (enum `auto`/`left`/`right`, ported from legacy `RenderLabelSide`), `note`
-  (nullable text override), `sort_order`, `created_at`, `updated_at`.
+**A2 — KB-049: a corrupt hash is a failed verification, not an exception.**
+`@node-rs/argon2` throws on a non-PHC string. Make the canonical
+`verifyPassword` in `platform/core/auth/password.ts` return `false` when verification
+throws, and make `platform/core/auth/login.ts` use that same function instead of calling
+argon2 `verify` directly (one canonical path). Locked outcomes: a corrupt stored hash
+yields the same generic `LOGIN_FAILED` as a wrong password; `changePassword` yields
+`CURRENT_PASSWORD_INCORRECT`; the dummy-hash timing path for unknown users is kept.
 
-### Service (`src/apps/studioflow/presentation/service.ts`)
+**A3 — KB-048: validate the role id at the boundary.** In
+`app/(platform)/settings/access/roles/actions.ts`, `archiveRoleAction` must parse its id with
+the same `z.string().uuid()` helper its sibling actions use, so a garbage id returns the
+clean `VALIDATION` payload, not a DB error. No other change to that action.
 
-Registered in `createStudioFlowService` alongside `mom`/`schedule` (same
-composition pattern, `service.ts`). Commands: `createBoard`, `updateBoard`
-(title/reorder), `deleteBoard`; `addSlides` (bulk — multiple images in one
-call, one `ObjectStorage.put` each), `reorderSlides`, `deleteSlide`;
-`addAnnotation`, `updateAnnotation` (move pin / edit note / relink entry),
-`deleteAnnotation`. Reads: `listBoards(projectId)`, `getBoard(boardId)` —
-resolves each linked annotation's entry to a live code/product-name/thumbnail
-summary at read time (same "resolve against current Schedule data" principle
-`domain/schedule.ts` already uses), never a frozen copy.
+**A4 — KB-044: direct tests for the transaction runner.** Add
+`platform/core/db/transactions.test.ts` for `runSerializableTransaction` **as it is
+implemented**: commit returns the callback value; a throwing callback propagates and is not
+retried; a `P2034` conflict is retried and succeeds within `SERIALIZABLE_TRANSACTION_MAX_ATTEMPTS`;
+`P2034` on every attempt is rethrown after the last attempt; a non-`P2034` error is never
+retried. Use a fake `InteractiveTransactionClient`; no database needed. Do **not** add
+nesting or reuse rejection: the backlog mentions it but the contract does not implement
+it. If you believe the contract requires it, report `BLOCKED / CONFLICT`. Also add one
+StudioFlow integration test that starts two concurrent project creations and asserts two
+distinct project codes (the row-lock guarantee in `projects/service.ts`, ~L149-165, has only
+sequential coverage today).
 
-New permission: `studioflow.presentation.manage` (mutations), gated for reads
-by the existing `access` + `projectRead` grants — same shape as
-`momManage`/`scheduleManage` in `permissions.ts`.
+**B1 — SF-08: a typed project number must not drift from `project_code`.** In
+`studioflow/projects/service.ts` `updateProject` (~L483-491), when the submitted name
+`looksFormatted` and its leading code differs from the project's stored `project_code`, reject
+with a `VALIDATION` `AppError` (stable code `PROJECT_CODE_IMMUTABLE`, plain-language message
+saying the project number cannot be changed). When the leading code equals the stored
+`project_code`, behavior is unchanged. Do not touch `edit-project-dialog.tsx`; the Lead
+fixes its hint afterwards.
 
-### UI
+**B2 — SF-09: batch blocker counts.** Add a batched reader in
+`studioflow/phases/blocker-query.ts` taking a list of phase ids and returning the same count
+shape per phase from a constant number of statements (one `findMany` over `phase_id in ids`
+plus two `groupBy`, joined in memory). Replace the serial per-phase loop in
+`phases/service.ts` `listProjectPhases` and in `today/service.ts` `listPhaseAttention`.
+`listNavPhases` (same file) counts *open root checklist items* per phase with one `count`
+per phase (`1 + P` statements on every project sub-page): replace those with a single
+`groupBy` on `phase_id`; that count is not the blocker count and its meaning stays the same.
+Keep the single-phase `readBlockerCounts` for its transactional callers (`phases/service.ts`
+~L112, ~L176). Results must equal what the per-phase reader returns for the same data (prove with
+a multi-phase test); no ordering or shape change.
 
-New project-workspace nav entry "Presentation", same tier as MOM/Schedule
-(`STUDIOFLOW_ROUTES.projectPresentation(projectId)` etc., following the
-existing `nav.ts` pattern). Board list → open a board → slide strip + main
-canvas on the current slide. Click the image to drop a pin; a small popover
-picks "link to Schedule entry" (reuse Schedule's existing entry
-search/picker) or leaves it a free-text-only pin; drag an existing pin to
-reposition. Export button opens the print route
-`/studioflow/print/projects/[projectId]/presentation/[boardId]`, built the
-same way as the Schedule print page: `DocumentSheet`/`DocumentBlock`/
-`PrintButton`/`PrintFormatPicker`, one page per slide, pins rendered as
-numbered markers with a legend beneath resolving live entry data.
+**B3 — SF-10: bound the header quick-search.** Add a dedicated service method for the
+quick-search that returns only `{ projects: [{id, name, clientName}], clients: [{id, name}] }`
+with `take: limit` (default 6) and a minimal `select`, reusing the same permission check,
+match semantics, and archived-record handling as `listProjects`/`listClients` today. Point
+`globalSearchAction` (`app/(platform)/studioflow/actions.ts`) at it; its
+`GlobalSearchResult` type and the values returned stay identical. Leave `listProjects` and
+`listClients` untouched for the directory pages. Prove equivalence with a test.
 
-### REUSE / EXTEND / ADD ledger (`CORE.md` §14 placement test)
+**B4 — SF-15: stop shipping a phase's whole revision history.** In
+`studioflow/phases/service.ts` (~L638-695) return, for closed revisions, `activityCount` from
+`_count` instead of the full `activities` list, and add a service method that returns one
+revision's activities on demand under the same read permission. Add the matching server
+action and the minimal wiring in
+`app/(platform)/studioflow/projects/[projectId]/phases/[phaseId]/revision-history.tsx` so
+opening a `<details>` loads and shows the same list it shows today. Locked UI limit: keep the
+existing markup and classes; add only what loading needs (a loading and an error line). The
+Lead redoes presentation afterwards.
 
-- **REUSE**: `ObjectStorage` (slide images); `DocumentSheet`/`PrintButton`/
-  `PrintFormatPicker`/`printFormatFromSearchParams` (export — third consumer,
-  no changes needed); StudioFlow permission/route/nav conventions; Schedule
-  entry read (same app, plain query — no public port).
-- **EXTEND**: `FileDropZone` (UI Engine) needs a multi-file variant for bulk
-  import — check its current single-file assumption first; small, additive.
-- **ADD, app-owned (not UI Engine)**: the click/drag pin-editor interaction.
-  One consumer today; per `CORE.md` §14 rule 6, it stays inside
-  `apps/studioflow/presentation` until a second consumer (e.g. MOM wanting
-  pinned photo notes) makes it worth promoting — do not pre-build it generic.
-- **No cross-app boundary anywhere in this slice** — everything is inside
-  StudioFlow.
+## UI Contract
 
-### Explicit defaults locked for this slice (flag if you want either changed)
+Only B1 (none), B3 (action wiring) and B4 (`revision-history.tsx`) touch route files, and only as
+described above. No layout, copy, or styling change. Anything else in `app/` is out of scope.
 
-1. **Export = PDF via the existing browser-print pattern**, not literal
-   `.pptx` file generation. Real PPTX output is a materially different,
-   larger tool (OOXML generation) — recommended only as a later fast-follow
-   if PDF genuinely does not satisfy sending this to clients/vendors.
-2. **Bulk import = local multi-file upload from device only.** Pulling
-   images from existing Deliverables or Schedule option photos into a board
-   is a reasonable fast-follow, not in this slice.
+## Boundaries and Non-goals
 
-### Ordinary implementation choices (Executor's judgment, not locked here)
+- **Master Data is LOCKED** by the owner (2026-09-24): do not modify any file under
+  `src/apps/masterdata/**` or `src/app/(platform)/masterdata/**`. This also excludes KB-025.
+- **BQ is on hold** by the owner (2026-09-28): do not touch `src/apps/bq/**`,
+  `src/app/(platform)/bq/**`, or BQ tests.
+- No schema change and no migration. If any item would need one, stop with `BLOCKED / CONFLICT`.
+- Not in this plan (Lead or owner decisions, do not pick them up): KB-047 (owner must confirm the
+  behavior is not intentional), KB-037a/b, KB-055(b) (drops an enum member), KB-040/053/054
+  (checker work), and every UI-only item (SF-11..SF-14, MD-01, KB-038, KB-043, KB-050).
+- No new abstraction layer, dependency, or refactor beyond the items above.
 
-- Exact nav placement among the existing project tabs.
-- Slide reorder interaction (drag handles vs. move-up/down), matching
-  whichever pattern the Schedule list already uses.
+## Acceptance Criteria
 
-### Checks required before handoff back
+1. Each of A1–A4 and B1–B4 behaves as its contract states, or is reported "not reproducible".
+2. Each fixed item has a test that fails on the old behavior and passes on the new one
+   (A4 and the concurrency test are new coverage, not fixes).
+3. `npm test` passes fully (532 tests green at the start); no test was weakened or deleted.
+4. All four `hashPassword()` call sites named in A1 run outside `runTransaction`, and error
+   precedence for permission and validation failures is unchanged.
 
-`tsc --noEmit`, `eslint .`, `node scripts/check-boundaries.mjs`, full
-`npm test` (new integration test file for the presentation service,
-mirroring `service.integration.test.ts`'s pattern), migration applied to
-both the dev and disposable test databases. Browser walk is owed after the
-commit (per the normal loop) — record it `[UNVERIFIED]` in
-`docs/BACKLOG.md` if it can't be done in the same pass.
+## Verification
 
-### Sizing
+Run the full commit gate in `docs/agent/EXECUTOR.md` (`npm test`, typecheck, lint, boundary
+check, legacy-runtime check, production build, whitespace check). Database safety: integration
+tests use the rebuild-only test database named in the ignored `.env.test.local`
+(`masterdata_test` on the local `masterdata-db` container). Verify the target name before any
+database command; never touch a legacy database. Stop the dev server before `npm run build`
+(a build during `next dev` disturbs the dev server's `.next`), and restore `next-env.d.ts` to
+its owner-modified state afterwards; never stage it.
 
-One coherent vertical slice (schema + service + UI + print + tests) per the
-work-sizing rule in `docs/agent/README.md` — do not split by layer/table/route.
+## Reviewer Acceptance
 
----
+The Lead will, after the commit: review the diff and run the full suite; browser-check the
+project overview and phase page (revision history opens and loads), the header quick-search, and
+project rename with a mismatched number; then fix the edit-dialog hint and polish the
+revision-history UI as the next revision.
 
-## Copy-ready Executor prompt
+## Regression Risks and Recovery
 
-```
-Lane: EXECUTOR. Location: kantor (load .env.kantor if present; this cloud
-checkout has neither .env.rumah nor .env.kantor, so derive/confirm a local
-disposable Postgres the same way R8.163/R8.164 did — verify the target name
-explicitly contains studioflow_rebuild before any DB command).
+Highest risk is A1 (accidentally changing error precedence) and B4 (changing what users see in
+closed revisions). Recovery is a plain revert of the single commit; there is no migration or data
+change to undo.
 
-Read docs/agent/EXECUTOR.md, then PLAN.md (SF-PRESENTATION, READY) in full.
+## Executor Prompt
 
-Implement the Presentation Manager module exactly as scoped in PLAN.md:
-schema (SfPresentationBoard/Slide/Annotation), service
-(src/apps/studioflow/presentation/service.ts, registered in
-service.ts), permission (studioflow.presentation.manage), UI (board
-list/editor, pin drop/drag/link-to-schedule-entry, bulk multi-file import),
-and the print/export route (third consumer of the shared UI Engine print
-view — copy the Schedule print route's shape).
-
-The two explicit defaults in PLAN.md (PDF-only export, device-upload-only
-bulk import) are locked for this slice — do not expand scope to real .pptx
-generation or Deliverables/Schedule-photo import without checking back.
-
-Everything is same-app (inside apps/studioflow) — there is no cross-app
-port to design here.
-
-Before writing code: check FileDropZone's current single-file assumption
-and confirm the EXTEND (multi-file) is actually needed, rather than assuming.
-
-Finish with: implementation + integration tests + tsc/eslint/boundaries
-clean + one local revision commit (R8.<next>, determined fresh from
-CHANGELOG.md, never inferred) + updated CHANGELOG.md entry. Browser
-acceptance may be deferred to [UNVERIFIED] in docs/BACKLOG.md if it can't
-be done in the same pass. End with a Planner/Reviewer handoff prompt: outcome,
-commit, checks run, limitations, dirty files, request for verdict.
-```
+You are the Backend Executor. Location: rumah. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this
+`PLAN.md`, then implement the entire READY backend outcome (WO-BE-01) and nothing beyond it.
+Re-verify each finding against current code first; report any that no longer reproduces instead of
+changing it. Do not touch Master Data or BQ. Run the required checks, update `CHANGELOG.md`, and
+create the local revision commit `R8.173`. Never push. Stop only for a material locked-decision
+conflict or unsafe boundary, using the `BLOCKED / CONFLICT` report; otherwise finish and reply with
+one copy-ready Planner/Reviewer prompt naming the commit, checks, limitations, and remaining
+unrelated dirty files.

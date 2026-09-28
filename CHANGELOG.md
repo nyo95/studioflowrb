@@ -5,13 +5,38 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.171**
-- Next local revision: **R8.172**
+- Current revision after this entry is committed: **R8.172**
+- Next local revision: **R8.173**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.172 | 2026-09-28 | docs(plan): WO-BE-01 backend correctness pass — first Work Order for the Backend Executor
+
+Lead-side preparation only; no code, schema, or dependency change. `main` was pushed at `aa182d2` (R8.170, R8.171)
+immediately before.
+
+- Root `PLAN.md` is now **WO-BE-01** (READY, target **R8.173**): eight re-verified backend defects, each with a
+  locked fix and tests: KB-042 (hash outside the transaction), KB-049 (corrupt hash is a failed verify), KB-048
+  (validate role id), KB-044 (direct `runSerializableTransaction` tests plus a concurrent project-numbering test),
+  SF-08 (typed project number may not drift from `project_code`), SF-09 (batched blocker/open-item counts), SF-10
+  (bounded header quick-search), SF-15 (revision history returns counts, activities load on demand).
+- The previous active plan moved, unchanged apart from a QUEUED banner, to
+  `docs/apps/studioflow/SF-PRESENTATION-PLAN.md`; `docs/BACKLOG.md` and `docs/README.md` point at it. It must be
+  re-cut into a backend Work Order plus a Lead UI revision, and its two defaults confirmed, before it runs.
+- Corrections to the backlog's own text, recorded in the plan: `runSerializableTransaction` has no nesting/reuse
+  rejection (tests cover what exists); `listNavPhases` counts open checklist items, not blockers.
+- Deliberately excluded from WO-BE-01: Master Data (LOCKED by the owner 2026-09-24, includes KB-025), BQ (on hold),
+  KB-047 (owner must confirm), KB-037a/b, KB-055(b), checker items KB-040/053/054, and UI-only items.
+- `docs/BACKLOG.md`: the asset-purge-on-archive and workbook import/export entries now carry the owner questions
+  that block them.
+
+**Checks.** `npm run check` OK; `git diff --check` clean. No tests run: documentation only.
+
+**Limits.** Location "rumah" in the Executor prompt is inferred from the presence of `.env.rumah`. WO-BE-01 was not
+executed; it is the handoff.
 
 ## R8.171 | 2026-09-28 | docs(agents): Lead + Backend Executor operating model (Claude leads, Codex executes backend)
 
