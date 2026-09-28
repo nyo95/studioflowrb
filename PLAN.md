@@ -5,8 +5,8 @@ Scope: StudioFlow — keep archived-project files for a retention window, then p
 Status: READY
 Priority: P2
 Owner: owner (Product Owner); Lead: Claude
-Target revision: R8.176
-Last updated: 2026-09-28
+Target revision: R8.177
+Last updated: 2026-09-28 (revised after the Executor's BLOCKED / CONFLICT, see "Resolved conflict")
 
 ## Outcome
 
@@ -18,6 +18,16 @@ removed.
 
 WO-BE-01 (R8.173) was reviewed and accepted by the Lead (R8.174). Master Data is unlocked and BQ is
 still on hold; this plan touches neither.
+
+## Resolved conflict (Lead, 2026-09-28)
+
+The Executor returned `BLOCKED / CONFLICT` on the first version of this plan: `SfMomRevision.snapshot` also holds
+image keys, so purging only `SfMomImage` would leave revisions pointing at missing files, while preserving them
+would keep project files forever. The Lead chose the Executor's option A (strip images from retained snapshots,
+keep revision text and history) because option B defeats the retention purpose and option C destroys revision
+history, which matters more than the images. The Executor also correctly noted shared schedule image keys; the
+shared-key rule is locked below. The plan's earlier "exhaustive list" claim was the Lead's error. Target revision
+moved from R8.176 to R8.177 because R8.176 is used by this correction.
 
 ## Context and Evidence
 
@@ -32,8 +42,9 @@ clear `archived_at`. Files are removed today only by per-feature deletes that ca
 ## Business Rules and Architecture Constraints
 
 - The project's own files are exactly: `SfDeliverable` (has `project_id`, `storage_key`),
-  `SfMomImage` (`storage_key`, reached through its MOM document's project), and
-  `SfScheduleOption.image_key` (reached through its entry's project). **Never** touch
+  `SfMomImage` (`storage_key`, reached through its MOM document's project), the image references
+  inside each retained `SfMomRevision.snapshot` of those documents (JSON; see the locked snapshot rule
+  below), and `SfScheduleOption.image_key` (reached through its entry's project). **Never** touch
   `SfClient.logo_storage_key`, `SfScheduleTemplateItem.image_key` (studio-wide templates), Master Data
   brand marks, or any file of a non-archived project.
 - Everything stays inside StudioFlow (its own models and its own `ports.storage`); no cross-app access.
@@ -59,13 +70,33 @@ retention window and `assets_purged_at IS NULL`, oldest first, at most `limit` (
 For each project it:
 1. **Claims** it atomically (`UPDATE ... SET assets_purged_at = now WHERE id = ? AND assets_purged_at IS NULL`
    or the Prisma equivalent inside a transaction); if the claim affects zero rows, skip it silently.
-2. In the same transaction, collects the storage keys of the three file kinds above, **deletes** the
-   `SfDeliverable` and `SfMomImage` rows, sets the project's `SfScheduleOption.image_key` to `null`, and
-   writes one audit event `studioflow.project.assets_purged` with a `SYSTEM` actor and counts only
-   (deliverables, MOM images, option photos, and how many blobs could not be removed); no filenames.
-3. After commit, removes each blob with `ports.storage.remove(key)`, tolerating failures (count them in a
-   second audit note or log line; an unreferenced private blob is acceptable, a dangling row is not).
-Return a summary `{ projectsPurged, deliverables, momImages, optionPhotos, blobFailures }`.
+2. In the same transaction, collects the storage keys of the four file kinds above, **deletes** the
+   `SfDeliverable` and `SfMomImage` rows, **strips the images from every retained MOM revision snapshot**
+   (locked rule below), sets the project's `SfScheduleOption.image_key` to `null`, and writes one audit
+   event `studioflow.project.assets_purged` with a `SYSTEM` actor and counts only (see below); no filenames.
+3. After commit, removes each collected key with `ports.storage.remove(key)` **only if no remaining row
+   still references it** (see the shared-key rule), tolerating failures. An unreferenced private blob is
+   acceptable; a dangling row or snapshot reference is not.
+Return `{ projectsPurged, deliverables, momImages, momSnapshotImages, optionPhotos, blobsRemoved,
+blobsKeptShared, blobFailures, unparseableRevisions }`; the audit event carries the same counts.
+
+**Locked MOM snapshot rule (resolves the Executor's conflict).** `SfMomRevision.snapshot` keeps image
+storage keys, `restoreRevision` recreates image rows from them, and `unreferenced()` in `mom/service.ts`
+deliberately keeps those blobs alive. On purge, for every `SfMomRevision` of the project's documents:
+parse it with the existing `parseMomSnapshot`, collect its image keys with `momSnapshotImageKeys`, set
+every item's `images` to `[]`, and write the snapshot back. Revision numbers, notes, dates and all text
+stay exactly as they were. A snapshot that fails to parse is left untouched and counted in
+`unparseableRevisions`. After a purge, `restoreRevision` still works and simply restores text without
+images. Do **not** delete revisions and do **not** exempt revision-referenced images from the purge.
+
+**Locked shared-key rule.** Schedule option images share keys with templates and other projects (see
+`removeUnreferenced()` in `schedule/service.ts`). Before removing any blob, after the transaction's
+deletes, check that no remaining StudioFlow row references the key: `SfDeliverable.storage_key`,
+`SfMomImage.storage_key`, `SfScheduleOption.image_key`, `SfScheduleTemplateItem.image_key`,
+`SfClient.logo_storage_key`. Reuse or share the existing `removeUnreferenced()` logic rather than
+re-implementing it differently. A key that is still referenced is kept and counted in `blobsKeptShared`.
+MOM snapshot keys are unique to their document and no copy-across-projects path exists; if you find one,
+report `BLOCKED / CONFLICT`.
 
 **Restore.** `restoreProject` behavior is unchanged except its audit metadata records
 `assetsPurged: boolean` (true when `assets_purged_at` was set). A restore never re-creates files.
@@ -98,8 +129,11 @@ action so the backend is reachable.
 ## Acceptance Criteria
 
 1. Integration tests (fake storage): an archived project older than the window loses its deliverable rows,
-   MOM image rows and option photo keys, and its blobs are removed; a project inside the window, a non-archived
-   project, a client logo, and a template image are untouched.
+   MOM image rows, MOM snapshot image references and option photo keys, and its blobs are removed; a project
+   inside the window, a non-archived project, a client logo, and a template image are untouched. Revision
+   text, numbers and notes survive unchanged. `restoreRevision` on a purged project succeeds and yields text
+   with no images. A schedule option key shared with a template or another project keeps its blob and is
+   counted in `blobsKeptShared`. An unparseable snapshot is left alone and counted.
 2. A second run is a no-op; two concurrent runs purge each project exactly once.
 3. Changing the setting changes which projects qualify; values outside 7 to 730 are rejected.
 4. Restore inside the window changes nothing about files; restore after a purge succeeds and records
@@ -125,17 +159,17 @@ run against a disposable project.
 
 ## Regression Risks and Recovery
 
-Highest risk is deleting something that is not the project's own file, so the model list above is exhaustive
-and tests assert the exclusions. The purge itself cannot be undone; the migration is additive and the code
+Highest risk is deleting something that is not the project's own file or that another row still points at, so the
+model list and the shared-key rule above are exhaustive and tests assert the exclusions. The purge itself cannot be undone; the migration is additive and the code
 path is disabled outside production by default, so recovery before release is a plain revert.
 
 ## Executor Prompt
 
 You are the Backend Executor. Location: rumah. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this
 `PLAN.md`, then implement the entire READY backend outcome (WO-BE-02) and nothing beyond it. Re-verify the
-model list against `prisma/schema.prisma` first. Do not touch Master Data or BQ. Apply the additive migration
+model list against `prisma/schema.prisma` first, then follow the locked MOM snapshot and shared-key rules. Do not touch Master Data or BQ. Apply the additive migration
 to both local databases after verifying their names, run the required checks, update `CHANGELOG.md`, and create
-the local revision commit `R8.176`. Never push and never stage `next-env.d.ts`. Stop only for a material
+the local revision commit `R8.177`. Never push and never stage `next-env.d.ts`. Stop only for a material
 locked-decision conflict or unsafe boundary, using the `BLOCKED / CONFLICT` report; otherwise finish and reply
 with one copy-ready Planner/Reviewer prompt naming the commit, checks, limitations, and remaining unrelated
 dirty files.

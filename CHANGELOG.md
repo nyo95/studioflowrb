@@ -5,13 +5,38 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.175**
-- Next local revision: **R8.176**
+- Current revision after this entry is committed: **R8.176**
+- Next local revision: **R8.177**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.176 | 2026-09-28 | docs(plan): WO-BE-02 revised after the Executor's BLOCKED / CONFLICT (MOM revision snapshots, shared image keys)
+
+The Backend Executor stopped, correctly, before changing anything: no files, database, or commit were touched. Lead-side
+correction only; no code, schema, or dependency change.
+
+- **Conflict.** The first WO-BE-02 called its three-model file list exhaustive. It was not: `SfMomRevision.snapshot`
+  (JSON) also holds image storage keys, `restoreRevision` recreates image rows from them, and `unreferenced()` in
+  `mom/service.ts` deliberately keeps those blobs. Purging only `SfMomImage` would leave revisions pointing at missing
+  files; preserving them would keep project files forever. The Executor also found that schedule option images share
+  keys with templates and other projects.
+- **Decision (Lead, the Executor's option A).** Purge strips images from every retained MOM revision snapshot of the
+  project's documents, keeping revision numbers, notes, dates and text; `restoreRevision` afterwards restores text
+  without images. Rejected: exempting revision images (defeats retention) and deleting revisions (loses history).
+- **Shared-key rule locked.** A blob is removed only if no remaining StudioFlow row references its key
+  (deliverable, MOM image, schedule option, template item, client logo); otherwise it is kept and counted.
+- **Audit counts locked.** `projectsPurged, deliverables, momImages, momSnapshotImages, optionPhotos, blobsRemoved,
+  blobsKeptShared, blobFailures, unparseableRevisions`.
+- Target revision moved from R8.176 to **R8.177** because this correction uses R8.176.
+- Process note: the Lead's "exhaustive list" claim was wrong and was caught by the Executor's inspection; the
+  `BLOCKED / CONFLICT` protocol worked as designed.
+
+**Checks.** `npm run check` OK; `git diff --check` clean. No tests run: documentation only.
+
+**Limits.** WO-BE-02 is still not executed.
 
 ## R8.175 | 2026-09-28 | docs(plan): WO-BE-02 archived-project file retention — second Work Order for the Backend Executor
 
