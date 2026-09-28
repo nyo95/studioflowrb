@@ -5,13 +5,53 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.178**
-- Next local revision: **R8.179**
+- Current revision after this entry is committed: **R8.180**
+- Next local revision: **R8.181**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.180 | 2026-09-28 | docs(changelog): backfill the missing R8.179 entry; WO-BE-03 target moves to R8.181
+
+R8.179 (`bb0be53`) was committed without its changelog entry: the patch script stopped on a wrong anchor and the
+commit command that followed ran anyway. Commits are not amended, so the entry is supplied here and the ledger is
+marked accordingly. Process fix: ledger edits and their commit are now chained so a failed edit stops the commit.
+
+- Adds the R8.179 entry below (the review of R8.178).
+- `docs/BACKLOG.md` and `PLAN.md` now name **R8.181** as WO-BE-03's target, because R8.180 is used by this correction.
+
+**Checks.** `npm run check` OK; `git diff --check` clean. Documentation only.
+
+**Limits.** WO-BE-03 is not executed.
+
+## R8.179 | 2026-09-28 | docs(plan): review of R8.178 (CORRECTION REQUIRED) and WO-BE-03 (entry backfilled in R8.180)
+
+**Review of R8.178 (`6db6554`, WO-BE-02): CORRECTION REQUIRED, one item.** The Lead read the purge use case, cleanup
+helper, sweep, wiring, migration and the schedule refactor, and re-ran the gate independently (`tsc` 0 errors, lint,
+`npm run check`, `npm test` 558/558). The migration is exactly the two additive columns. The claim re-checks archive
+eligibility inside a serializable transaction, so a concurrent restore cannot be purged; snapshots are rewritten in the
+same transaction as the row deletes; blobs are removed only when no row references them; both audit events match the
+locked names. The schedule delete now shares the safer helper.
+
+- **Defect (a gap in the Lead's plan, implemented as written).** `assets_purged_at` is never cleared. Archive, purge,
+  restore, add files, archive again: the marker still hides the project from the sweep, so the new files are kept
+  forever. Correction: reset it when a new archive cycle starts.
+- Accepted observations: one batch of 25 projects per day would take days to drain a large backlog (folded into
+  WO-BE-03); `purgeExpiredArchivedAssets` is exposed without a permission check on the service object, safe today
+  because only the boot sweep and the guarded `runAssetCleanup` call it; `setAutoNaming` now also carries the
+  retention days, a naming smell, not changed.
+- **WO-BE-03** (READY, originally targeting R8.180, now **R8.181**) returns the correction to the Backend Executor
+  together with the small backend pieces the Lead's retention UI needs: a preview command, a manual-run action,
+  `assetsPurgedAt` on the project reads, and the sweep backlog drain.
+- Browser acceptance for R8.173 and R8.178 stays PENDING; it runs as one batch with a disposable QA project after
+  WO-BE-03.
+
+**Checks.** `npm run check` OK; `git diff --check` clean. No tests run for the documentation change itself.
+
+**Limits.** WO-BE-03 is not executed. The retention UI is not built. The owner's dev server on port 3001 was restarted
+by the Executor with the sweep off.
 
 ## R8.178 | 2026-09-28 | feat(studioflow): enforce archived project asset retention
 

@@ -5,7 +5,7 @@ Scope: StudioFlow — correct the archive-retention lifecycle and expose what th
 Status: READY
 Priority: P2
 Owner: owner (Product Owner); Lead: Claude
-Target revision: R8.180
+Target revision: R8.181
 Last updated: 2026-09-28
 
 ## Outcome
@@ -110,6 +110,6 @@ You are the Backend Executor. Location: rumah. Read `AGENTS.md`, `docs/agent/EXE
 (WO-BE-03), then implement the entire READY backend outcome (C1 to C5) and nothing beyond it. Re-verify each finding
 first and report any that does not reproduce. Do not touch Master Data or BQ, and do not change any layout, styling, or
 copy. No migration is expected. Run the required commit gate, update `CHANGELOG.md`, and create the local revision
-commit `R8.180`. Never push and never stage `next-env.d.ts`. Stop only for a material locked-decision conflict or
+commit `R8.181`. Never push and never stage `next-env.d.ts`. Stop only for a material locked-decision conflict or
 unsafe boundary, using the `BLOCKED / CONFLICT` report; otherwise finish and reply with one copy-ready
 Planner/Reviewer prompt naming the commit, checks, limitations, and remaining unrelated dirty files.
