@@ -354,7 +354,7 @@ capability required by that picker. PriceMaterial requires
 
 **Brand's quick-create paths share one dialog, but not one rule.** The Brand
 dialog's Owner-supplier field and its Suppliers field can each spawn a Vendor
-inline (shared `VendorQuickCreateDialog`, `platform/ui_engine/patterns`), and
+inline (shared `VendorQuickCreateDialog`, `src/app/(platform)/masterdata/vendor-quick-create-dialog.tsx`), and
 the bar depends on what the new Vendor is for:
 
 - **Suppliers field** (and Pricing's quick entry): requires name + at least

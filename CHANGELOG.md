@@ -5,13 +5,62 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.167**
-- Next local revision: **R8.168**
+- Current revision after this entry is committed: **R8.168**
+- Next local revision: **R8.169**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.168 | 2026-09-28 | refactor(architecture): enforce database ownership and shell/domain boundaries; platform audit reads go through Platform
+
+Architecture hardening of the existing modular monolith. No workflow, route, permission, schema, or data
+change. Full rationale, ownership table, and the cross-app interaction register are in the new
+`docs/MODULE-BOUNDARIES.md`.
+
+**Audit result.** Cross-app imports were already clean: every app-to-app edge goes through `public/`, and
+the one two-app use case (library promotion) lives in `src/application/promotion-coordinator.ts` with
+injected ports. No cross-schema foreign keys. The gaps were in enforcement and in two places where an app
+reached into Platform-owned data.
+
+**Violations fixed**
+- StudioFlow's project History read (`projects/service.ts`) queried the platform `AuditEvent` model directly.
+- MasterData's latest-actor query (`services/shared.ts`) ran raw SQL against `"platform"."AuditEvent"`.
+- Both now use the Platform audit read side added to `@platform/core/audit/persistence`:
+  `listAuditEvents` and `latestAuditActorLabels` (same queries, scoped to one `appId`, no app knowledge).
+- `VendorQuickCreateDialog` encoded MasterData policy (vendor needs a Supplier Type) inside the UI Engine and
+  had only MasterData consumers. Moved unchanged to `src/app/(platform)/masterdata/vendor-quick-create-dialog.tsx`;
+  removed from the `patterns` barrel; its imports now come from `@/platform/ui_engine`.
+
+**New checks in `scripts/check-boundaries.mjs`** (each with rejection + legal fixtures)
+- `database ownership`: foreign Prisma model access (`prisma|db|tx.<model>`), foreign `Prisma.<Model>*` types,
+  foreign-schema names in raw SQL, and any `@relation` across two schemas. Shell counts as Platform; tests exempt.
+  Closes KB-041.
+- `shell -> app/<internal>`: files under `src/app` and `src/application` that no app owns may import an app's
+  `public`, `runtime`, or route lane only.
+- `app domain -> persistence`: `apps/<app>/domain/**` may not import Prisma, `src/generated`, or infrastructure.
+- `(document)/<app>` route groups are now owned by their app (were unclassified and skipped).
+- Fixture change: `settings/general/page.tsx` importing `@beta/domain` was recorded as a legal "known residual";
+  it is now a rejection.
+
+**Contract / dependency changes.** New exports `listAuditEvents`, `latestAuditActorLabels`, `AuditReadClient`,
+`AuditEventMatch`, `AuditEventRead` from `platform/core/audit/persistence.ts` (that file now imports the
+`Prisma` value, not only its type). No migration. No dependency added.
+
+**Decision recorded, not changed.** The shell rule permits an app's `runtime` layer, which codifies today's
+`src/app/promotion-runtime.ts`. Whether the promotion command surface should move into `public` remains the
+open owner decision in KB-037a; nothing was re-exported.
+
+**Checks.** `tsc --noEmit` 0 errors; `eslint .` clean; `npm run check` OK (typecheck, boundaries, legacy-runtime);
+`scripts/test-boundaries-checker.mjs` passes all three fixture groups; `npm run build` succeeds. Full `npm test`
+against `masterdata_test`: 530/532 pass. The 2 failures are the pre-existing, unrelated `ui-engine.test.ts` ones
+already recorded in `docs/BACKLOG.md` (token radius lock; `BQ` in `tokens.css` comments).
+
+**Not done / limits.** No browser pass of the Brand/Pricing supplier quick-create dialog after the move; it is
+verified by typecheck, lint, and build only. KB-037b is only partly closed (import rules now cover the lane
+root; reclassifying it as `platform` and the nav-slot decision are still open). `npm test` needs the local
+test database.
 
 ## R8.167 | 2026-09-28 | chore(merge): join local R8.164–R8.166 with origin/main R8.164 and the PLAN/BACKLOG chores
 

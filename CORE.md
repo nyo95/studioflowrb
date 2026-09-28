@@ -49,7 +49,7 @@ Core must not own app workflows, entity CRUD, pricing policy, BQ calculation sem
 - App `domain/` never imports Prisma or DB types.
 - App `infrastructure/` owns Prisma queries for that app's data.
 - App `application/` orchestrates infrastructure ports/use cases and transaction scope.
-- Cross-app reads/writes go through the owning app's `public/` contract. A shared Prisma client does not authorize direct access to another app's models.
+- Cross-app reads/writes go through the owning app's `public/` contract. A shared Prisma client does not authorize direct access to another app's models. The full ownership, dependency, and enforcement rules are in [`docs/MODULE-BOUNDARIES.md`](docs/MODULE-BOUNDARIES.md).
 - Core provides no generic repository or active-record abstraction.
 
 ### Transactions

@@ -1,9 +1,6 @@
 "use client";
 
-import { Button } from "../primitives/actions";
-import { Input, Select } from "../primitives/forms";
-import { Field, FormActions } from "../components/forms";
-import { DraftDialog } from "./draft-dialog";
+import { Button, DraftDialog, Field, FormActions, Input, Select } from "@/platform/ui_engine";
 
 export type VendorTypeOption = { id: string; name: string };
 

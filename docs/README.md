@@ -24,6 +24,7 @@ tests, and migrations prove implemented state.
 | Document | Purpose |
 |---|---|
 | ~~[`alignment.md`](archive/studioflow-rb/alignment.md)~~ | **Superseded** — R7.xx rebuild alignment artifact; moved to `archive/studioflow-rb/` in R8.75. The active StudioFlow authority is the rework contract. |
+| [`MODULE-BOUNDARIES.md`](MODULE-BOUNDARIES.md) | Enforced modular-monolith rules: module ownership, dependency direction, public-contract and database-ownership rules, the cross-app interaction register, and the explicit no-microservices decision; enforced by `scripts/check-boundaries.mjs` |
 | [`UTILITY-INVENTORY.md`](UTILITY-INVENTORY.md) | Evidence-backed disposition ledger (REUSE/EXTEND/ADD/APP-OWNED/PURGE) for shared utilities and their duplicates; enforced by `scripts/check-boundaries.mjs` |
 | [`BACKLOG.md`](BACKLOG.md) | Consolidated worklist — every open `[PLANNED]`/`[UNVERIFIED]`/`[BUG]`/`[CLEANUP]` item across every app, in one file. Replaces `roadmap.md`/`review.md`/`knownbug.md` (archived 2026-09-22). |
 | ~~`roadmap.md`~~ / ~~`review.md`~~ / ~~`knownbug.md`~~ | **Superseded 2026-09-22** — merged into `BACKLOG.md`; full historical record at [`archive/roadmap-2026-09-22.md`](archive/roadmap-2026-09-22.md), [`archive/review-2026-09-22.md`](archive/review-2026-09-22.md), [`archive/knownbug-2026-09-22.md`](archive/knownbug-2026-09-22.md). |

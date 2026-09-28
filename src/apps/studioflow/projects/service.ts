@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client";
+import { listAuditEvents } from "@platform/core/audit/persistence";
 import type { PersonSummary } from "@platform/core/rbac/people";
 import { currentDateOnly } from "@platform/utilities/date";
 import { toDecimalString } from "@platform/utilities/decimal";
@@ -576,21 +577,11 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       requireRead(input.grants);
       const project = await db.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true } });
       if (!project) throw notFound("project");
-      const rows = await db.auditEvent.findMany({
-        where: { app_id: "studioflow", OR: [{ entity_type: "project", entity_id: project.id }, { metadata: { path: ["projectId"], equals: project.id } }] },
-        orderBy: { occurred_at: "desc" },
-        take: Math.min(Math.max(input.limit ?? 200, 1), 500),
-        select: { id: true, action: true, entity_type: true, actor_label: true, occurred_at: true, changes: true, metadata: true },
+      return listAuditEvents(db, {
+        appId: "studioflow",
+        anyOf: [{ entityType: "project", entityId: project.id }, { metadata: { path: ["projectId"], equals: project.id } }],
+        limit: Math.min(Math.max(input.limit ?? 200, 1), 500),
       });
-      return rows.map((row) => ({
-        id: row.id,
-        action: row.action,
-        entityType: row.entity_type,
-        actorLabel: row.actor_label,
-        occurredAt: row.occurred_at,
-        changes: (row.changes ?? null) as Record<string, { from: unknown; to: unknown }> | null,
-        metadata: (row.metadata ?? null) as Record<string, unknown> | null,
-      }));
     },
 
     canManageProjects(grants: ReadContext["grants"]) {

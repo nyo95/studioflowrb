@@ -9,7 +9,8 @@ import { DirectoryShell,DraftDialog,Pagination,RowActionMenu,RowActionsCell,RowA
 import { Plus } from "lucide-react";
 import { useRef,useState,useTransition } from "react";
 
-import { Button,ConfirmDialog,CreatableMultiSelect,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,InlineError,Input,Notice,SearchField,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,useFormDraftGuard,useOptionOverlay,VendorQuickCreateDialog } from "@/platform/ui_engine";
+import { Button,ConfirmDialog,CreatableMultiSelect,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,InlineError,Input,Notice,SearchField,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,useFormDraftGuard,useOptionOverlay } from "@/platform/ui_engine";
+import { VendorQuickCreateDialog } from "../vendor-quick-create-dialog";
 import { createCategoryAction } from "../categories/actions";
 import {
 archiveBrandAction,

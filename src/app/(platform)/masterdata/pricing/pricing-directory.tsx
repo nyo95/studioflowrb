@@ -4,7 +4,8 @@ import { UpdatedCell } from "../updated-cell";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { DirectoryShell,RowActionMenu,RowActionsCell,RowActionsHead } from "@/platform/ui_engine";
 
-import { Button,ButtonMenu,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,Text,Tooltip,useFormDraftGuard,useOptionOverlay,VendorQuickCreateDialog,type SortDirection } from "@/platform/ui_engine";
+import { Button,ButtonMenu,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,Text,Tooltip,useFormDraftGuard,useOptionOverlay,type SortDirection } from "@/platform/ui_engine";
+import { VendorQuickCreateDialog } from "../vendor-quick-create-dialog";
 import { compareDecimals,formatDecimal,type DecimalString } from "@platform/utilities/decimal";
 import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurement";
 import { createMoney,formatMoney } from "@platform/utilities/money";

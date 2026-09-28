@@ -5,6 +5,7 @@ import { join, relative } from "node:path";
 import {
   collectAllViolations,
   collectBoundaryViolations,
+  collectDatabaseOwnershipViolations,
   collectDuplicatePrimitiveViolations,
   collectPermissionVocabularyViolations,
   collectRouteOwnershipViolations,
@@ -12,11 +13,14 @@ import {
   RULE_APP_TO_UI_ENGINE_INTERNAL,
   RULE_CORE_TO_INFRASTRUCTURE,
   RULE_CORE_TO_UI_ENGINE,
+  RULE_DATABASE_OWNERSHIP,
+  RULE_DOMAIN_TO_PERSISTENCE,
   RULE_DUPLICATE_PRIMITIVE,
   RULE_PERMISSION_VOCABULARY,
   RULE_PLATFORM_TO_APP,
   RULE_RAW_LEGACY_UI_CLASS,
   RULE_ROUTE_OWNERSHIP,
+  RULE_SHELL_TO_APP_INTERNAL,
 } from "./check-boundaries.mjs";
 
 const TSCONFIG = {
@@ -73,6 +77,22 @@ const FILES = {
   "src/app/(platform)/settings/general/beta-owned/cross.tsx": `import { alphaRule } from "@alpha/domain/rule";\nexport const bad = alphaRule;\n`,
   "src/app/(platform)/settings/general/page.tsx": `import { betaRule } from "@beta/domain/rule";\nexport const unowned = betaRule;\n`,
 
+  // Shell files (no app owns them) may reach an app only through public / runtime / route.
+  "src/app/(platform)/settings/general/shell-public.tsx": `import { something } from "@beta/public";\nexport const ok1 = something;\n`,
+  "src/app/(platform)/settings/general/shell-runtime.tsx": `import { betaService } from "@beta/runtime";\nexport const ok2 = betaService;\n`,
+  "src/apps/beta/runtime.ts": `export const betaService = {};\n`,
+  "src/application/coordinator.ts": `import { something } from "@beta/public";\nexport const ok3 = something;\n`,
+  "src/application/bad-coordinator.ts": `import { betaDb } from "@beta/infrastructure/db";\nexport const bad = betaDb;\n`,
+
+  // Route groups outside (platform) are owned by the app named in their first segment.
+  "src/app/(document)/alpha/print/page.tsx": `import { alphaRule } from "@alpha/domain/rule";\nexport const doc = alphaRule;\n`,
+  "src/app/(document)/alpha/print/cross.tsx": `import { betaRule } from "@beta/domain/rule";\nexport const bad = betaRule;\n`,
+
+  // App domain code stays free of persistence (CORE.md "Layer access").
+  "src/apps/alpha/domain/uses-generated.ts": `import type { PrismaClient } from "@/generated/prisma/client";\nexport type P = PrismaClient;\n`,
+  "src/apps/alpha/domain/uses-package.ts": `import { Prisma } from "@prisma/client";\nexport const P = Prisma;\n`,
+  "src/apps/alpha/domain/uses-generated.test.ts": `import type { PrismaClient } from "@/generated/prisma/client";\nexport type T = PrismaClient;\n`,
+
   "src/apps/alpha/reject-domain.ts": `import { betaRule } from "@beta/domain/rule";\nexport const bad1 = betaRule;\n`,
   "src/apps/alpha/reject-application-catchall.ts": `import { useCase } from "@/apps/beta/application/use-case";\nexport const bad2 = useCase;\n`,
   "src/apps/alpha/reject-infrastructure-relative.ts": `import { betaDb } from "../beta/infrastructure/db";\nexport const bad3 = betaDb;\n`,
@@ -111,6 +131,11 @@ try {
     `src/app/(platform)/alpha/route-cross.tsx | ${RULE_APP_TO_OTHER_APP_INTERNAL} | beta/ui`,
     `src/app/(platform)/settings/general/beta-owned/cross.tsx | ${RULE_APP_TO_OTHER_APP_INTERNAL} | alpha/domain`,
     `src/apps/alpha/legacy-class.tsx | ${RULE_RAW_LEGACY_UI_CLASS} | ui-card`,
+    `src/app/(platform)/settings/general/page.tsx | ${RULE_SHELL_TO_APP_INTERNAL} | beta/domain`,
+    `src/application/bad-coordinator.ts | ${RULE_SHELL_TO_APP_INTERNAL} | beta/infrastructure`,
+    `src/app/(document)/alpha/print/cross.tsx | ${RULE_APP_TO_OTHER_APP_INTERNAL} | beta/domain`,
+    `src/apps/alpha/domain/uses-generated.ts | ${RULE_DOMAIN_TO_PERSISTENCE} | @/generated/prisma/client`,
+    `src/apps/alpha/domain/uses-package.ts | ${RULE_DOMAIN_TO_PERSISTENCE} | @prisma/client`,
     `src/apps/alpha/deep-ui.ts | ${RULE_APP_TO_UI_ENGINE_INTERNAL} | @/platform/ui_engine/components/button`,
     `src/apps/alpha/reject-domain.ts | ${RULE_APP_TO_OTHER_APP_INTERNAL} | beta/domain`,
     `src/apps/alpha/reject-application-catchall.ts | ${RULE_APP_TO_OTHER_APP_INTERNAL} | beta/application`,
@@ -130,9 +155,11 @@ try {
   const legalFiles = [
     "src/app/(platform)/alpha/route-page.tsx",
     "src/app/(platform)/settings/general/beta-owned/page.tsx",
-    // Known residual, recorded in docs/BACKLOG.md: a platform route subtree with
-    // no declared owner is still unclassified and skipped.
-    "src/app/(platform)/settings/general/page.tsx",
+    "src/app/(platform)/settings/general/shell-public.tsx",
+    "src/app/(platform)/settings/general/shell-runtime.tsx",
+    "src/application/coordinator.ts",
+    "src/app/(document)/alpha/print/page.tsx",
+    "src/apps/alpha/domain/uses-generated.test.ts",
     "src/apps/alpha/same-app-relative.ts",
     "src/apps/alpha/same-app-alias.ts",
     "src/apps/alpha/app-to-platform.ts",
@@ -271,4 +298,64 @@ try {
   console.log("PASS foundation fixtures: import/layer rules, permission SSOT, route ownership, duplicate primitives");
 } finally {
   await rm(foundationRoot, { recursive: true, force: true });
+}
+const DATABASE_FILES = {
+  "tsconfig.json": JSON.stringify(TSCONFIG, null, 2),
+  "prisma/schema.prisma": "datasource db {\n  provider = \"postgresql\"\n  schemas  = [\"platform\", \"alpha\", \"beta\"]\n}\nmodel User {\n  id String @id\n  @@schema(\"platform\")\n}\nmodel AlphaThing {\n  id String @id\n  @@schema(\"alpha\")\n}\nmodel BetaWidget {\n  id String @id\n  @@schema(\"beta\")\n}\nmodel AlphaLink {\n  id String @id\n  thingId String\n  thing AlphaThing @relation(fields: [thingId], references: [id])\n  widgetId String\n  widget BetaWidget @relation(fields: [widgetId], references: [id])\n  ownerId String\n  owner User @relation(fields: [ownerId], references: [id])\n  @@schema(\"alpha\")\n}\n",
+
+  "src/apps/alpha/own.ts": `export const ok = (db) => db.alphaThing.findMany();\n`,
+  "src/apps/alpha/own-tx.ts": `export const ok = (tx) => tx.alphaThing.update({});\n`,
+  "src/apps/alpha/own-raw.ts": "export const ok = (db) => db.$queryRaw`SELECT 1 FROM \"alpha\".\"alpha_thing\"`;\n",
+  "src/apps/alpha/foreign-delegate.ts": `export const bad = (tx) => tx.betaWidget.update({});\n`,
+  "src/apps/alpha/foreign-nested.ts": `export const bad = (ports) => ports.db.betaWidget.findMany();\n`,
+  "src/apps/alpha/foreign-platform.ts": `export const bad = (db) => db.user.findMany();\n`,
+  "src/apps/alpha/foreign-type.ts": `import { Prisma } from "@/generated/prisma/client";\nexport type W = Prisma.BetaWidgetWhereInput;\n`,
+  "src/apps/alpha/foreign-raw.ts": "export const bad = (db) => db.$queryRaw`SELECT 1 FROM \"beta\".\"beta_widget\"`;\n",
+  "src/apps/alpha/foreign-raw-string.ts": "export const SQL = 'SELECT 1 FROM \"platform\".\"AuditEvent\"';\n",
+  "src/apps/alpha/comment-and-unrelated.ts": `// db.betaWidget is not touched here\nexport const note = "db.betaWidget";\nexport const other = (foo) => foo.betaWidget;\n`,
+  "src/apps/alpha/foreign.test.ts": `export const seeded = (db) => db.betaWidget.create({});\n`,
+  "src/app/(platform)/alpha/page.tsx": `export const page = (db) => db.alphaThing.findMany();\n`,
+  "src/app/(platform)/alpha/bad-page.tsx": `export const bad = (prisma) => prisma.betaWidget.findMany();\n`,
+  "src/platform/core/users.ts": `export const ok = (db) => db.user.findMany();\n`,
+  "src/platform/core/leak.ts": `export const bad = (db) => db.alphaThing.findMany();\n`,
+  "src/app/(platform)/account/session.ts": `export const ok = (prisma) => prisma.user.findMany();\n`,
+  "src/app/(platform)/account/leak.ts": `export const bad = (prisma) => prisma.alphaThing.findMany();\n`,
+  "src/apps/beta/own.ts": `export const ok = (db) => db.betaWidget.findMany();\n`,
+};
+
+const databaseRoot = await mkdtemp(join(tmpdir(), "wo3-boundaries-database-"));
+try {
+  await writeTree(databaseRoot, DATABASE_FILES);
+  const database = await collectDatabaseOwnershipViolations({ projectRoot: databaseRoot });
+  assert.deepEqual(
+    database.map((v) => violationKey(databaseRoot, v)).sort(),
+    [
+      `prisma/schema.prisma | ${RULE_DATABASE_OWNERSHIP} | AlphaLink.widget -> BetaWidget`,
+      `prisma/schema.prisma | ${RULE_DATABASE_OWNERSHIP} | AlphaLink.owner -> User`,
+      `src/app/(platform)/account/leak.ts | ${RULE_DATABASE_OWNERSHIP} | prisma.alphaThing`,
+      `src/app/(platform)/alpha/bad-page.tsx | ${RULE_DATABASE_OWNERSHIP} | prisma.betaWidget`,
+      `src/apps/alpha/foreign-delegate.ts | ${RULE_DATABASE_OWNERSHIP} | tx.betaWidget`,
+      `src/apps/alpha/foreign-nested.ts | ${RULE_DATABASE_OWNERSHIP} | db.betaWidget`,
+      `src/apps/alpha/foreign-platform.ts | ${RULE_DATABASE_OWNERSHIP} | db.user`,
+      `src/apps/alpha/foreign-raw-string.ts | ${RULE_DATABASE_OWNERSHIP} | "platform"."...`,
+      `src/apps/alpha/foreign-raw.ts | ${RULE_DATABASE_OWNERSHIP} | "beta"."...`,
+      `src/apps/alpha/foreign-type.ts | ${RULE_DATABASE_OWNERSHIP} | Prisma.BetaWidgetWhereInput`,
+      `src/platform/core/leak.ts | ${RULE_DATABASE_OWNERSHIP} | db.alphaThing`,
+    ].sort(),
+  );
+
+  const noSchemaRoot = await mkdtemp(join(tmpdir(), "wo3-boundaries-noschema-"));
+  try {
+    await writeTree(noSchemaRoot, {
+      "tsconfig.json": JSON.stringify(TSCONFIG, null, 2),
+      "src/apps/alpha/x.ts": "export const x = (db) => db.betaWidget;\n",
+    });
+    assert.deepEqual(await collectDatabaseOwnershipViolations({ projectRoot: noSchemaRoot }), []);
+  } finally {
+    await rm(noSchemaRoot, { recursive: true, force: true });
+  }
+
+  console.log("PASS database ownership fixtures: foreign delegates, nested receivers, Prisma types, raw SQL schemas, cross-schema relations; own access, comments and tests clean");
+} finally {
+  await rm(databaseRoot, { recursive: true, force: true });
 }

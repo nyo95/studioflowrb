@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { prepareAuditEvent, type AuditActor, type AuditWriter } from "@platform/core/audit";
+import { latestAuditActorLabels as readLatestAuditActorLabels } from "@platform/core/audit/persistence";
 import { AppError, mapPrismaKnownError } from "@platform/core/errors";
 import { hasPermission, requirePermission, type PermissionGrants } from "@platform/core/rbac";
 import { normalizeText } from "@platform/utilities/normalization";
@@ -215,10 +216,8 @@ export async function createDeletionRequest(tx: TxClient, input: { targetType: s
   return req.id;
 }
 
-export async function latestAuditActorLabels(db: PrismaClient, entityType: string, entityIds: readonly string[]): Promise<Map<string, string>> {
-  if (entityIds.length === 0) return new Map();
-  const rows = await db.$queryRaw<{ entity_id: string; actor_label: string }[]>(Prisma.sql`SELECT DISTINCT ON (entity_id) entity_id, actor_label FROM "platform"."AuditEvent" WHERE app_id = 'masterdata' AND entity_type = ${entityType} AND entity_id IN (${Prisma.join(entityIds)}) ORDER BY entity_id, occurred_at DESC`);
-  return new Map(rows.map((row) => [row.entity_id, row.actor_label]));
+export function latestAuditActorLabels(db: PrismaClient, entityType: string, entityIds: readonly string[]): Promise<Map<string, string>> {
+  return readLatestAuditActorLabels(db, { appId: "masterdata", entityType, entityIds });
 }
 
 export type MasterDataDeletionTarget = "brand" | "vendor" | "sku" | "unit" | "category" | "vendor_type" | "supplier_category" | "price_material" | "price_material_labor" | "price_labor";

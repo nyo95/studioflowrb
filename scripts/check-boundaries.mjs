@@ -12,6 +12,23 @@ export const RULE_RAW_LEGACY_UI_CLASS = "app -> raw legacy ui-* class";
 export const RULE_PERMISSION_VOCABULARY = "permission vocabulary SSOT";
 export const RULE_ROUTE_OWNERSHIP = "app route ownership";
 export const RULE_DUPLICATE_PRIMITIVE = "app-local duplicate primitive";
+export const RULE_SHELL_TO_APP_INTERNAL = "shell -> app/<internal>";
+export const RULE_DOMAIN_TO_PERSISTENCE = "app domain -> persistence";
+export const RULE_DATABASE_OWNERSHIP = "database ownership";
+
+/**
+ * App layers a composition/shell file (anything under `src/app` or
+ * `src/application` that no app owns) may import. Everything else in an app is
+ * private: the shell wires apps together through their public contract, their
+ * server runtime composition, and their own route lane, never their internals.
+ */
+export const SHELL_ALLOWED_APP_LAYERS = new Set(["public", "runtime", "route"]);
+
+/**
+ * Route groups outside `(platform)` whose first segment names the owning app,
+ * e.g. `src/app/(document)/studioflow/**` belongs to the studioflow app.
+ */
+export const APP_ROUTE_GROUPS = ["(platform)", "(document)"];
 
 /**
  * App-owned files where a raw `Intl.DateTimeFormat` display primitive is
@@ -188,6 +205,13 @@ export async function listAppsInDir(appsRoot) {
 }
 
 export function routeLaneApp(filePath, projectRoot, apps, routeOwners = PLATFORM_ROUTE_OWNERS) {
+  for (const group of APP_ROUTE_GROUPS) {
+    if (group === "(platform)") continue;
+    const groupRel = relative(join(resolve(projectRoot), "src", "app", group), filePath);
+    if (groupRel.startsWith("..") || isAbsolute(groupRel)) continue;
+    const first = groupRel.split(sep)[0];
+    if (apps.includes(first)) return first;
+  }
   const routePlatformRoot = join(resolve(projectRoot), "src", "app", "(platform)");
   const rel = relative(routePlatformRoot, filePath);
   if (rel.startsWith("..") || isAbsolute(rel)) return null;
@@ -405,6 +429,20 @@ function importDeclares(source, declaredName, fromModule) {
   return false;
 }
 
+function domainAppOf(file, appsRoot) {
+  const segments = relative(appsRoot, file).split(sep);
+  return segments.length >= 3 && segments[1] === "domain" ? segments[0] : null;
+}
+
+function importsPersistence(specifier, targetPath, srcDir) {
+  if (specifier === "@prisma/client" || specifier.startsWith("@prisma/client/")) return true;
+  if (!targetPath) return false;
+  return (
+    isEqualToOrInside(join(srcDir, "generated"), targetPath) ||
+    isEqualToOrInside(join(srcDir, "platform", "infrastructure"), targetPath)
+  );
+}
+
 export async function collectBoundaryViolations({ projectRoot = process.cwd(), srcDir, routeOwners = PLATFORM_ROUTE_OWNERS } = {}) {
   projectRoot = resolve(projectRoot);
   srcDir = srcDir ? resolve(srcDir) : join(projectRoot, "src");
@@ -421,15 +459,41 @@ export async function collectBoundaryViolations({ projectRoot = process.cwd(), s
 
   for (const file of files) {
     const importer = classifyImporter(file, projectRoot, apps, routeOwners);
-    if (importer.kind !== "app" && importer.kind !== "platform") continue;
+    const shell =
+      importer.kind === "other" && (isInside(join(srcDir, "app"), file) || isInside(join(srcDir, "application"), file));
+    if (importer.kind !== "app" && importer.kind !== "platform" && !shell) continue;
     const source = await readFile(file, "utf8");
+    const importerDomainApp = importer.kind === "app" && !importer.lane ? domainAppOf(file, appsRoot) : null;
     const importerCore =
       importer.kind === "platform" && isInside(platformRoot, file) && relative(platformRoot, file).split(sep)[0] === "core";
 
     for (const specifier of extractImportSpecifiers(source, file)) {
       const targetPath = resolveSpecifier(specifier, file, aliasMap, projectRoot);
+
+      if (importerDomainApp && !/\.(test|spec)\.[jt]sx?$/.test(file) && importsPersistence(specifier, targetPath, srcDir)) {
+        violations.push({
+          rule: RULE_DOMAIN_TO_PERSISTENCE,
+          file: file,
+          specifier,
+          detail: `app "${importerDomainApp}" domain code imports persistence (${specifier}). Domain stays pure; queries belong to the app's services.`,
+        });
+      }
+
       if (!targetPath) continue;
       const target = classifyTarget(targetPath, projectRoot, apps, routeOwners);
+
+      if (shell && target.kind === "app" && !SHELL_ALLOWED_APP_LAYERS.has(target.layer.replace(/.[jt]sx?$/, ""))) {
+        violations.push({
+          rule: RULE_SHELL_TO_APP_INTERNAL,
+          file: file,
+          specifier,
+          targetApp: target.app,
+          targetLayer: target.layer,
+          detail: `composition/shell file imports app "${target.app}" internal layer "${target.layer}" via "${specifier}". Shell files may reach an app only through "public", "runtime", or its route lane.`,
+        });
+        continue;
+      }
+      if (shell) continue;
 
       if (
         importer.kind === "app" &&
@@ -686,12 +750,143 @@ export async function collectDuplicatePrimitiveViolations({
   return violations;
 }
 
+/**
+ * Prisma delegate receivers a service can hold: `prisma.x`, `db.x`, `tx.x`,
+ * `this.db.x`, `ports.prisma.x` ... Only the property name is compared against
+ * the model list, so an unrelated `foo.vendor` is not flagged.
+ */
+const DB_RECEIVER_NAMES = new Set(["prisma", "db", "tx", "client", "dbClient", "transaction", "database"]);
+
+export function parsePrismaOwnership(schemaSource) {
+  const models = new Map();
+  for (const block of schemaSource.matchAll(/^model\s+(\w+)\s*\{([\s\S]*?)^\}/gm)) {
+    const schema = /@@schema\("([^"]+)"\)/.exec(block[2])?.[1];
+    if (schema) models.set(block[1], schema);
+  }
+  const relations = [];
+  for (const block of schemaSource.matchAll(/^model\s+(\w+)\s*\{([\s\S]*?)^\}/gm)) {
+    for (const line of block[2].split("\n")) {
+      const field = /^\s*(\w+)\s+(\w+)(?:\[\])?\??\s.*@relation\(/.exec(line);
+      if (field && models.has(field[2])) relations.push({ model: block[1], field: field[1], target: field[2] });
+    }
+  }
+  const declared = /schemas\s*=\s*\[([^\]]*)\]/.exec(schemaSource)?.[1] ?? "";
+  const schemas = [...declared.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  return { models, relations, schemas };
+}
+
+function receiverName(expression) {
+  if (ts.isIdentifier(expression)) return expression.text;
+  if (ts.isPropertyAccessExpression(expression)) return expression.name.text;
+  return null;
+}
+
+function literalTexts(node) {
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return [node.text];
+  if (ts.isTemplateExpression(node)) return [node.head.text, ...node.templateSpans.map((span) => span.literal.text)];
+  return [];
+}
+
+/**
+ * Database ownership: each Prisma schema (`@@schema`) is owned by the app of the
+ * same name (`master_data` -> masterdata) or by the platform. A file may touch a
+ * model, or name a schema in raw SQL, only when it belongs to the owner. Shell
+ * files (`src/app`, `src/application`) count as platform. Tests are exempt:
+ * they seed and inspect across ownership on purpose. Independently of any file,
+ * a Prisma `@relation` may not join models of two different schemas.
+ */
+export async function collectDatabaseOwnershipViolations({ projectRoot = process.cwd(), srcDir } = {}) {
+  projectRoot = resolve(projectRoot);
+  srcDir = srcDir ? resolve(srcDir) : join(projectRoot, "src");
+  let schemaSource;
+  try {
+    schemaSource = await readFile(join(projectRoot, "prisma", "schema.prisma"), "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") return [];
+    throw error;
+  }
+  const { models, relations, schemas } = parsePrismaOwnership(schemaSource);
+  if (models.size === 0) return [];
+
+  const violations = [];
+  // A relation is a foreign key; it may not cross a schema, so no app can be
+  // migrated or deleted into by another app's tables (cross-app FKs are forbidden).
+  for (const { model, field, target } of relations) {
+    if (models.get(model) === models.get(target)) continue;
+    violations.push({
+      rule: RULE_DATABASE_OWNERSHIP,
+      file: join(projectRoot, "prisma", "schema.prisma"),
+      specifier: `${model}.${field} -> ${target}`,
+      detail: `Prisma relation ${model}.${field} points from schema "${models.get(model)}" to ${target} in schema "${models.get(target)}". Store a plain id (and a label snapshot when history matters), not a cross-schema foreign key.`,
+    });
+  }
+
+  const apps = await listAppsInDir(join(srcDir, "apps"));
+  const ownerOfSchema = (schema) => {
+    const owner = schema.replace(/_/g, "");
+    return owner === "platform" || apps.includes(owner) ? owner : null;
+  };
+  const delegates = new Map([...models].map(([model, schema]) => [model[0].toLowerCase() + model.slice(1), { model, schema }]));
+  const modelNames = [...models.keys()].sort((a, b) => b.length - a.length);
+  const modelOfTypeName = (name) => modelNames.find((model) => name === model || (name.startsWith(model) && /[A-Z]/.test(name[model.length])));
+  const schemaPattern = schemas.length > 0 ? new RegExp(`"(${schemas.join("|")})"\\s*\\.\\s*"`) : null;
+
+  for (const file of await walkSources(srcDir)) {
+    if (/\.(test|spec)\.[jt]sx?$/.test(file)) continue;
+    const importer = classifyImporter(file, projectRoot, apps);
+    let fileOwner;
+    if (importer.kind === "app") fileOwner = importer.app;
+    else if (importer.kind === "platform") fileOwner = "platform";
+    else if (isInside(join(srcDir, "app"), file) || isInside(join(srcDir, "application"), file)) fileOwner = "platform";
+    else continue;
+
+    const source = await readFile(file, "utf8");
+    const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, scriptKindFor(file));
+    const report = (token, ownerApp, what) =>
+      violations.push({
+        rule: RULE_DATABASE_OWNERSHIP,
+        file,
+        specifier: token,
+        detail: `${fileOwner === "platform" ? "platform/shell" : `app "${fileOwner}"`} code touches ${what}, which is owned by "${ownerApp}". Reach it through the owner's public contract, not through the shared Prisma client.`,
+      });
+    const check = (token, schema, what) => {
+      const owner = ownerOfSchema(schema);
+      if (owner && owner !== fileOwner) report(token, owner, what);
+    };
+
+    const visit = (node) => {
+      if (ts.isPropertyAccessExpression(node)) {
+        const receiver = receiverName(node.expression);
+        const hit = receiver && DB_RECEIVER_NAMES.has(receiver) ? delegates.get(node.name.text) : undefined;
+        if (hit) check(`${receiver}.${node.name.text}`, hit.schema, `model "${hit.model}" (schema "${hit.schema}")`);
+        if (ts.isIdentifier(node.expression) && node.expression.text === "Prisma") {
+          const model = modelOfTypeName(node.name.text);
+          if (model) check(`Prisma.${node.name.text}`, models.get(model), `model "${model}" (schema "${models.get(model)}")`);
+        }
+      } else if (ts.isQualifiedName(node) && ts.isIdentifier(node.left) && node.left.text === "Prisma") {
+        const model = modelOfTypeName(node.right.text);
+        if (model) check(`Prisma.${node.right.text}`, models.get(model), `model "${model}" (schema "${models.get(model)}")`);
+      }
+      if (schemaPattern) {
+        for (const text of literalTexts(node)) {
+          const match = schemaPattern.exec(text);
+          if (match) check(`"${match[1]}"."...`, match[1], `schema "${match[1]}" in raw SQL`);
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+  }
+  return violations;
+}
+
 export async function collectAllViolations(options = {}) {
   const boundary = await collectBoundaryViolations(options);
   const permission = await collectPermissionVocabularyViolations(options);
   const route = await collectRouteOwnershipViolations(options);
   const duplicate = await collectDuplicatePrimitiveViolations(options);
-  return { boundary, permission, route, duplicate };
+  const database = await collectDatabaseOwnershipViolations(options);
+  return { boundary, permission, route, duplicate, database };
 }
 
 async function main() {
@@ -710,6 +905,7 @@ async function main() {
     ["Permission vocabulary (SSOT)", all.permission],
     ["App route ownership", all.route],
     ["Duplicate display primitives", all.duplicate],
+    ["Database ownership", all.database],
   ];
   let count = 0;
   for (const [title, list] of sections) {

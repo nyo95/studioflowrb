@@ -582,6 +582,13 @@ was fixed in R8.165._
   owner decision on where the promotion command surface lives. Do not fix this by
   adding a runtime re-export.
 
+  **Partly addressed 2026-09-28 (R8.168):** the *checker-blindness* half is
+  closed. `RULE_SHELL_TO_APP_INTERNAL` now reads every file under `src/app` and
+  `src/application` that no app owns and allows only an app's `public`, `runtime`,
+  and route lane. That codifies today's wiring (`promotion-runtime.ts` -> `runtime`)
+  without moving anything. Whether the command surface should live in `public`
+  remains the open owner decision above; nothing was re-exported.
+
 - [ ] [BUG] **KB-037b - 30 platform-lane files still classify as
   `{ kind: "other" }` and are skipped by every boundary rule.**
   R8.165 added `PLATFORM_ROUTE_OWNERS` for app-owned route groups, so the six
@@ -601,6 +608,12 @@ was fixed in R8.165._
   `contextSlot`. That is an architecture decision, not a checker fix. Verified
   safe to reclassify: none of the 34 files construct `Intl.DateTimeFormat`, so
   `collectDuplicatePrimitiveViolations` loses no coverage by narrowing.
+
+  **Partly addressed 2026-09-28 (R8.168):** these files are no longer skipped by the
+  import rules - `RULE_SHELL_TO_APP_INTERNAL` covers them and `(document)/<app>`
+  route groups are now owned by their app. The lane-root layout's per-app nav
+  imports are allowed as layer `route`. Reclassifying the lane root as `platform`
+  for `RULE_PLATFORM_TO_APP`, and the nav-slot decision above, are still open.
 
 - [ ] [CLEANUP] **`CHANGELOG.md` has no entry for R8.163 (`ee9e09e`).**
   The "Revision state" block still read R8.162 as current after that commit
@@ -711,7 +724,7 @@ was fixed in R8.165._
   classified lane (KB-037). Fix: widen the rule to the whole `Intl` display
   surface, then converge both call sites.
 
-- [ ] [BUG] **KB-041 - No checker reads `prisma/schema.prisma`, so the
+- [x] [BUG] **KB-041 - No checker reads `prisma/schema.prisma`, so the
   cross-app-foreign-key rule is entirely unenforced.** `check-boundaries.mjs:397,533`
   and `check-legacy-runtime.mjs:120-123` walk `srcDir` and root config files
   only. `AGENTS.md` names cross-app database foreign keys as forbidden. The
@@ -722,6 +735,14 @@ was fixed in R8.165._
   `master_data` schemas would pass both checks and `tsc` silently. Fix: parse
   the schema and fail when a relation's target model lives in another app schema;
   add a deliberate-violation fixture.
+
+  **Fixed 2026-09-28 (R8.168):** `collectDatabaseOwnershipViolations` parses the
+  schema and fails on any `@relation` between models of different schemas (fixture
+  included). The same parse now also fails foreign Prisma model/type access and
+  foreign-schema raw SQL. Its first run found two real violations, both fixed:
+  StudioFlow's project History read and MasterData's latest-actor query queried the
+  platform `AuditEvent` table directly; both now use `listAuditEvents` /
+  `latestAuditActorLabels` in `@platform/core/audit/persistence`.
 
 - [ ] [BUG] **KB-042 - Argon2id hashing runs inside the serializable
   transaction, pinning a pooled connection for ~40 ms of CPU per call.**
