@@ -313,6 +313,34 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       });
     },
 
+    /** Bounded header search; directory readers retain their full projections. */
+    async quickSearch(input: ReadContext & { search: string; limit?: number }) {
+      requireRead(input.grants);
+      const search = input.search.trim();
+      const limit = input.limit ?? 6;
+      const [projects, clients] = await Promise.all([
+        db.sfProject.findMany({
+          where: {
+            archived_at: null,
+            ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" as const } }, { client: { name: { contains: search, mode: "insensitive" as const } } }] } : {}),
+          },
+          orderBy: [{ priority: "asc" }, { name: "desc" }],
+          take: limit,
+          select: { id: true, name: true, client: { select: { name: true } } },
+        }),
+        db.sfClient.findMany({
+          where: { archived_at: null, ...(search ? { name: { contains: search, mode: "insensitive" as const } } : {}) },
+          orderBy: { name: "asc" },
+          take: limit,
+          select: { id: true, name: true },
+        }),
+      ]);
+      return {
+        projects: projects.map((project) => ({ id: project.id, name: project.name, clientName: project.client?.name ?? null })),
+        clients,
+      };
+    },
+
     // ── Projects ───────────────────────────────────────────────────────────
     async listProjects(input: ReadContext & {
       status?: ProjectStatus | "ALL";
@@ -487,6 +515,9 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           const next = looksFormatted(readable) ? readable : parsed ? `${parsed.code} ${readable}` : readable;
           const nextParsed = parseProjectName(next);
           if (!nextParsed) throw invalid("PROJECT_NAME_FORMAT", "Project name must use the format: [YYYY]-[Number] [Name].");
+          if (looksFormatted(readable) && nextParsed.code !== project.project_code) {
+            throw invalid("PROJECT_CODE_IMMUTABLE", "The project number cannot be changed.");
+          }
           // R2.5D: Normal editing preserves project_code; only the readable name changes.
           track("name", project.name, next, () => { data.name = next; });
         }

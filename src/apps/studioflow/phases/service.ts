@@ -38,7 +38,7 @@ import {
   type StudioFlowPorts,
   type TxClient,
 } from "../shared";
-import { readBlockerCounts, readBlockerItems } from "./blocker-query";
+import { readBlockerCounts, readBlockerCountsBatch, readBlockerItems } from "./blocker-query";
 
 type PhaseRow = Awaited<ReturnType<TxClient["sfPhase"]["findUniqueOrThrow"]>>;
 type ProjectRow = Awaited<ReturnType<TxClient["sfProject"]["findUniqueOrThrow"]>>;
@@ -545,6 +545,15 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     };
   }
 
+  async function readRevisionActivities(revisionId: string) {
+    const rows = await db.sfActivity.findMany({
+      where: { revision_id: revisionId },
+      orderBy: { created_at: "asc" },
+      select: { id: true, content: true, mode: true, status: true, assigned_to_id: true, due_at: true, deferred_from_version: true, revision_id: true, phase_id: true, created_at: true },
+    });
+    return rows.map(activityView);
+  }
+
   function phaseSnapshot(phase: { name_snapshot: string; prefix_snapshot: string; seat_snapshot: string }): PhaseSnapshot {
     return { nameSnapshot: phase.name_snapshot, prefixSnapshot: phase.prefix_snapshot, seatSnapshot: phase.seat_snapshot as PhaseSeat };
   }
@@ -566,8 +575,9 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       });
       const project = await db.sfProject.findUnique({ where: { id: input.projectId }, select: { status: true, archived_at: true } });
       const results = [];
+      const countsByPhase = await readBlockerCountsBatch(db, phases.map((phase) => phase.id));
       for (const phase of phases) {
-        const counts = await readBlockerCounts(db, phase.id);
+        const counts = countsByPhase.get(phase.id)!;
         const status = phase.status as PhaseStatus;
         const previous = phases.find((p) => p.order_index === phase.order_index - 1) ?? null;
         const canStart = canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null);
@@ -612,17 +622,18 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         orderBy: { order_index: "asc" },
         select: { id: true, definition_id: true, name_snapshot: true, status: true },
       });
-      const counts: number[] = await Promise.all(
-        phases.map((p) =>
-          db.sfChecklistItem.count({ where: { phase_id: p.id, parent_id: null, is_checked: false } }),
-        ),
-      );
-      return phases.map((p, i) => ({
+      const grouped = await db.sfChecklistItem.groupBy({
+        by: ["phase_id"],
+        where: { phase_id: { in: phases.map((phase) => phase.id) }, parent_id: null, is_checked: false },
+        _count: { _all: true },
+      });
+      const counts = new Map(grouped.map((row) => [row.phase_id, row._count._all]));
+      return phases.map((p) => ({
         id: p.id,
         definitionId: p.definition_id,
         label: p.name_snapshot,
         status: p.status as PhaseStatus,
-        openCount: counts[i] ?? 0,
+        openCount: counts.get(p.id) ?? 0,
       }));
     },
 
@@ -639,7 +650,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
             orderBy: [{ major: "desc" }, { minor: "desc" }],
             select: {
               id: true, major: true, minor: true, status: true, created_at: true, closed_at: true,
-              activities: { orderBy: { created_at: "asc" }, select: { id: true, content: true, mode: true, status: true, assigned_to_id: true, due_at: true, deferred_from_version: true, revision_id: true, phase_id: true, created_at: true } },
+              _count: { select: { activities: true } },
             },
           },
         },
@@ -650,6 +661,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       const previous = await db.sfPhase.findFirst({ where: { project_id: phase.project_id, order_index: phase.order_index - 1 }, select: { name_snapshot: true, prefix_snapshot: true, seat_snapshot: true, status: true, order_index: true } });
       const canStart = canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null);
       const active = phase.revisions.find((rev) => rev.status === "ACTIVE") ?? null;
+      const activeActivities = active ? await readRevisionActivities(active.id) : [];
       const archived = phase.project.archived_at !== null;
       const commands = archived ? [] : availablePhaseCommands({ status, isLocked: phase.is_locked, legacySupervision: isLegacySupervisionDefinition(phase.definition_id) }).filter((command) => {
         if (command === "activate") return canStart && phase.project.status === "ACTIVE";
@@ -685,15 +697,22 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         blockers: fullBlockers(counts, blockerItems),
         todoBlockers: todoBlockers(counts),
         warnings: { optionalOpen, deliverableStatus: computeDeliverableStatus(deliverables, refRevisionId) },
-        activeRevision: active ? { id: active.id, label: revisionLabel(active, snap.prefixSnapshot), createdAt: active.created_at, activities: active.activities.map(activityView) } : null,
+        activeRevision: active ? { id: active.id, label: revisionLabel(active, snap.prefixSnapshot), createdAt: active.created_at, activities: activeActivities } : null,
         history: phase.revisions.filter((rev) => rev.status !== "ACTIVE").map((rev) => ({
           id: rev.id,
           label: revisionLabel(rev, snap.prefixSnapshot),
           createdAt: rev.created_at,
           closedAt: rev.closed_at,
-          activities: rev.activities.map(activityView),
+          activityCount: rev._count.activities,
         })),
       };
+    },
+
+    async getRevisionActivities(input: ReadContext & { revisionId: string }) {
+      requireRead(input.grants);
+      const revision = await db.sfRevision.findUnique({ where: { id: input.revisionId }, select: { id: true } });
+      if (!revision) throw notFound("revision");
+      return readRevisionActivities(revision.id);
     },
 
     capabilities(grants: ReadContext["grants"]) {

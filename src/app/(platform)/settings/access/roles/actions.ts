@@ -92,10 +92,12 @@ export async function replaceRoleGrantsAction(
 export async function archiveRoleAction(roleId: string): Promise<ActionResult<{ changed: boolean }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
+    const parsed = z.string().uuid().safeParse(roleId);
+    if (!parsed.success) throw validationError(parsed.error);
     const result = await platformAccess.archiveRole({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      roleId,
+      roleId: parsed.data,
     });
     revalidateRoles();
     return result;

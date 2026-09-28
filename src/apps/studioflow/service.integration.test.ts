@@ -16,6 +16,8 @@ import { dateToDateOnly } from "./domain/dates";
 import { LEGACY_PHASE_DEFINITION_IDS as LEGACY } from "./domain/phase";
 import { STUDIOFLOW_PERMISSIONS as P } from "./permissions";
 import { createStudioFlowService, type StudioFlowService } from "./service";
+import { readBlockerCounts, readBlockerCountsBatch } from "./phases/blocker-query";
+import { fullBlockers } from "./domain/blockers";
 
 const ALL = [...Object.values(P)];
 const DRAFTER_GRANTS = [P.access, P.projectRead, P.phaseWork, P.taskManage];
@@ -111,6 +113,120 @@ async function phaseOf(projectId: string, legacy: keyof typeof LEGACY) {
 async function revisions(phaseId: string) {
   return (await testDb.prisma.sfRevision.findMany({ where: { phase_id: phaseId }, orderBy: [{ major: "asc" }, { minor: "asc" }] })).map((r) => `v${r.major}.${r.minor}:${r.status}`);
 }
+
+describe("WO-BE-01 backend regressions", () => {
+  it("allocates distinct stored project codes for concurrent creates", async () => {
+    const results = await Promise.all(["Concurrent A", "Concurrent B"].map((name) => sf.projects.createProject({
+      ...as(designer), name, picDesignerId: designer.id, picDrafterId: drafter.id,
+    })));
+    const projects = await testDb.prisma.sfProject.findMany({ where: { id: { in: results.map((r) => r.projectId) } } });
+    assert.equal(projects.length, 2);
+    assert.deepEqual(projects.map((p) => p.project_code).sort(), ["2026-001", "2026-002"]);
+    for (const project of projects) assert.ok(project.name.startsWith(`${project.project_code} `));
+  });
+
+  it("rejects a changed typed project number without writes, while retaining valid rename behavior", async () => {
+    const { projectId } = await newProject();
+    const before = await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: projectId } });
+    const auditBefore = await testDb.prisma.auditEvent.count();
+    await rejectsWith(sf.projects.updateProject({ ...as(designer), projectId, name: "2027-999 Changed", address: "Must not persist" }), "PROJECT_CODE_IMMUTABLE");
+    assert.deepEqual(await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: projectId } }), before);
+    assert.equal(await testDb.prisma.auditEvent.count(), auditBefore);
+    await sf.projects.updateProject({ ...as(designer), projectId, name: `${before.project_code} Same number` });
+    await sf.projects.updateProject({ ...as(designer), projectId, name: "Readable rename" });
+    const after = await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: projectId } });
+    assert.equal(after.project_code, before.project_code);
+    assert.equal(after.name, `${before.project_code} Readable rename`);
+  });
+
+  it("batched blockers equal single-phase counts and nav retains warning-only root items", async () => {
+    const { projectId } = await newProject();
+    const db = testDb.prisma;
+    const phases = await db.sfPhase.findMany({ where: { project_id: projectId }, orderBy: { order_index: "asc" } });
+    for (const [index, phase] of phases.slice(0, 2).entries()) {
+      await db.sfPhase.update({ where: { id: phase.id }, data: { status: "IN_PROGRESS" } });
+      const active = await db.sfRevision.findFirst({ where: { phase_id: phase.id, status: "ACTIVE" } }) ?? await db.sfRevision.create({ data: { phase_id: phase.id } });
+      const closed = await db.sfRevision.create({ data: { phase_id: phase.id, major: 0, status: "COMPLETED" } });
+      await db.sfActivity.createMany({ data: [
+        ...Array.from({ length: index + 1 }, (_, n) => ({ project_id: projectId, phase_id: phase.id, revision_id: active.id, content: `Open ${n}` })),
+        { project_id: projectId, phase_id: phase.id, revision_id: active.id, content: "Done", status: "COMPLETED" as const },
+        { project_id: projectId, phase_id: phase.id, revision_id: closed.id, content: "Closed revision open item" },
+        { project_id: projectId, phase_id: phase.id, revision_id: null, content: "Deferred" },
+      ] });
+      const root = await db.sfChecklistItem.create({ data: { project_id: projectId, phase_id: phase.id, label: "Blocking" } });
+      await db.sfChecklistItem.createMany({ data: [
+        { project_id: projectId, phase_id: phase.id, label: "Warning", is_blocking: false },
+        { project_id: projectId, phase_id: phase.id, label: "Checked", is_checked: true },
+        { project_id: projectId, phase_id: phase.id, label: "Child", parent_id: root.id },
+      ] });
+    }
+    await db.sfChecklistItem.create({ data: { project_id: projectId, label: "General" } });
+    const batch = await readBlockerCountsBatch(db, phases.map((phase) => phase.id));
+    assert.equal(batch.size, phases.length);
+    assert.deepEqual(await readBlockerCountsBatch(db, []), new Map());
+    const list = await sf.phases.listProjectPhases({ grants: ALL, projectId });
+    const attention = await sf.today.listPhaseAttention({ grants: ALL });
+    const nav = await sf.phases.listNavPhases({ grants: ALL, projectId });
+    assert.deepEqual(list.map((p) => p.id), phases.map((p) => p.id));
+    assert.deepEqual(nav.map((p) => p.id), phases.map((p) => p.id));
+    for (const [index, phase] of phases.entries()) {
+      const single = await readBlockerCounts(db, phase.id);
+      assert.deepEqual(batch.get(phase.id), single);
+      assert.deepEqual(single, { openRevisionActivities: index < 2 ? index + 1 : 0, openRootChecklistItems: index < 2 ? 1 : 0 });
+      assert.deepEqual(list[index].blockers, fullBlockers(single));
+      if (index < 2) assert.deepEqual(attention.find((p) => p.phaseId === phase.id)?.blockers, fullBlockers(single));
+      assert.equal(nav[index].openCount, index < 2 ? 2 : 0);
+    }
+  });
+
+  it("quick-search equals the old directory projection with limits, matching and archives", async () => {
+    const db = testDb.prisma;
+    for (let index = 0; index < 9; index++) {
+      const { clientId } = await sf.projects.createClient({ ...as(designer), name: `Needle Client ${index}` });
+      const { projectId } = await sf.projects.createProject({ ...as(designer), name: `Project ${index}`, clientId, picDesignerId: designer.id, picDrafterId: drafter.id, priority: index % 2 ? "URGENT" : "NORMAL" });
+      if (index === 0) await db.sfProject.update({ where: { id: projectId }, data: { archived_at: clock } });
+      if (index === 1) await db.sfClient.update({ where: { id: clientId }, data: { archived_at: clock } });
+    }
+    await sf.projects.createProject({ ...as(designer), name: "Needle without client", picDesignerId: designer.id, picDrafterId: drafter.id });
+    for (const search of ["  nEeDlE  ", "Project", "missing", ""]) {
+      const projects = await sf.projects.listProjects({ grants: ALL, search });
+      const clients = await sf.projects.listClients({ grants: ALL, search });
+      for (const limit of [undefined, 2]) {
+        const actual = await sf.projects.quickSearch({ grants: ALL, search, limit });
+        assert.deepEqual(actual, {
+          projects: projects.slice(0, limit ?? 6).map((p) => ({ id: p.id, name: p.name, clientName: p.client?.name ?? null })),
+          clients: clients.slice(0, limit ?? 6).map((c) => ({ id: c.id, name: c.name })),
+        });
+      }
+    }
+    await rejectsWith(sf.projects.quickSearch({ grants: [P.access], search: "needle" }), "PERMISSION_DENIED");
+    await rejectsWith(sf.projects.quickSearch({ grants: [P.projectRead], search: "needle" }), "PERMISSION_DENIED");
+  });
+
+  it("returns closed revision counts and loads the unchanged activity projection on demand", async () => {
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "moodboard");
+    const db = testDb.prisma;
+    const active = await db.sfRevision.findFirstOrThrow({ where: { phase_id: phase.id, status: "ACTIVE" } });
+    const closed = await db.sfRevision.create({ data: { phase_id: phase.id, major: 0, status: "COMPLETED", closed_at: clock } });
+    const empty = await db.sfRevision.create({ data: { phase_id: phase.id, major: 0, minor: 1, status: "COMPLETED", closed_at: clock } });
+    const first = await db.sfActivity.create({ data: { project_id: projectId, phase_id: phase.id, revision_id: closed.id, content: "First", status: "COMPLETED", assigned_to_id: designer.id, due_at: new Date("2026-09-16"), deferred_from_version: "v0.0", created_at: new Date(clock.getTime() - 1000) } });
+    const second = await db.sfActivity.create({ data: { project_id: projectId, phase_id: phase.id, revision_id: closed.id, content: "Second", created_at: clock } });
+    const live = await db.sfActivity.create({ data: { project_id: projectId, phase_id: phase.id, revision_id: active.id, content: "Live" } });
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: phase.id });
+    assert.deepEqual(detail.activeRevision?.activities.map((a) => a.id), [live.id]);
+    assert.deepEqual(detail.history.map((r) => [r.id, r.activityCount]), [[empty.id, 0], [closed.id, 2]]);
+    for (const revision of detail.history) assert.equal("activities" in revision, false);
+    const activities = await sf.phases.getRevisionActivities({ grants: ALL, revisionId: closed.id });
+    assert.deepEqual(activities, [first, second].map((row) => ({
+      id: row.id, content: row.content, mode: "FEEDBACK", done: row.status === "COMPLETED", assigneeId: row.assigned_to_id,
+      dueDate: dateToDateOnly(row.due_at), deferredFrom: row.deferred_from_version, revisionId: row.revision_id, phaseId: row.phase_id, createdAt: row.created_at,
+    })));
+    assert.deepEqual(await sf.phases.getRevisionActivities({ grants: ALL, revisionId: empty.id }), []);
+    await rejectsWith(sf.phases.getRevisionActivities({ grants: [], revisionId: closed.id }), "PERMISSION_DENIED");
+    await rejectsWith(sf.phases.getRevisionActivities({ grants: ALL, revisionId: randomUUID() }), "REVISION_NOT_FOUND");
+  });
+});
 
 describe("SF-R1 bootstrap and naming", () => {
   it("creates the legacy project skeleton with auto naming and template seeding", async () => {

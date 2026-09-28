@@ -5,13 +5,65 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.172**
-- Next local revision: **R8.173**
+- Current revision after this entry is committed: **R8.173**
+- Next local revision: **R8.174**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.173 | 2026-09-28 | fix(backend): complete WO-BE-01 correctness and bounded reads
+
+Backend Executor implementation of `PLAN.md` WO-BE-01. Starting evidence: `main` at
+`c8bae89359a06bfc9ee2acab8e2b611a9059fae4` (R8.172), remote-tracking `origin/main` at
+`aa182d2e1c83e233749f4c0a55fb22ef5501c9c6` (R8.171), published baseline R8;
+R8.173 was the next unused ledger revision. No push.
+
+- A1 / KB-042: all four password hashes finish before their transaction begins, after
+  existing non-transactional permission/input checks. Current-password verification stays
+  inside the account transaction; isolation, audit and return contracts are unchanged.
+- A2 / KB-049: canonical password verification returns false for corrupt PHC hashes;
+  login and account password changes retain their generic failure codes. **Not reproducible
+  subfinding:** `auth/login.ts` already used canonical `verifyPassword`, including the dummy
+  hash for unknown users, so that file is unchanged.
+- A3 / KB-048: archive-role action validates the UUID before calling the service.
+- A4 / KB-044: five fake-client transaction-runner tests cover return, callback failure,
+  successful P2034 retry, exhausted retry and non-P2034 failure. A concurrent StudioFlow
+  integration test proves two distinct stored project codes. No transaction-runner changes.
+- B1 / SF-08: reject a typed project number differing from stored `project_code` with
+  `VALIDATION / PROJECT_CODE_IMMUTABLE`; preserve same-code and readable-name edits.
+- B2 / SF-09: APP-OWNED batch blocker reader uses one revision read and two grouped counts;
+  project phases and Today consume it. Nav uses one grouped open-root-checklist count,
+  including warning-only roots as before. Transactional single-phase reads remain intact.
+- B3 / SF-10: quick-search uses two limited, minimal database projections and the existing
+  permissions, ordering, matching and archive semantics. Directory readers are unchanged.
+- B4 / SF-15: closed revisions expose `activityCount`; one revision's activities load through
+  a permission-checked service/action on details-open. Active revision activities retain their
+  projection. Existing revision-history markup/classes remain, with loading/error lines only.
+- Classification: REUSE canonical auth/validation/transaction infrastructure; EXTEND the
+  existing StudioFlow read services with APP-OWNED queries. No dependency, schema, migration,
+  Master Data or BQ source/test changes.
+
+**Verification.** Full mandatory gate passed: `npm test` **548/548** (0 failed, skipped or
+cancelled); `npm run typecheck`; `npm run lint`; `npm run check:boundaries`;
+`npm run check:legacy-runtime`; `npm run build`; unstaged and staged `git diff --check`.
+New tests cover all changed items, including multi-phase count equivalence, bounded query
+shape, directory/quick-search equivalence and lazy revision projection/permissions.
+Database target verified before testing: ignored `.env.test.local` selects rebuild-only
+`masterdata_test` on local `masterdata-db` at port 5433; `STUDIOFLOW_LOCATION=rumah`.
+The repository dev-server processes were stopped before the successful build.
+
+**Limits / handoff.** Reviewer acceptance is pending; four browser checks were added to
+`docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md` (overview, phase history, search, project rename).
+The Lead retains edit-dialog hint and history presentation follow-up. Existing backlog items
+remain open for end-to-end Reviewer verification. `next-env.d.ts` was restored byte-for-byte
+after build and is not staged. Pre-existing unrelated files preserved: `next-env.d.ts`,
+`.claude/launch.local-untracked.json`, `docs/PROJECT-REBUILD-FOUNDATION-REFERENCE.md`,
+`docs/STUDIOFLOW-RECOVERY-REFERENCE.md`,
+`docs/apps/studioflow/STUDIOFLOW-PRODUCT-MENTAL-MODEL-PHASE-V2-DRAFT.md`, `opencode.json`,
+`public/uploads/brand-marks/22e07e06-00d2-45c0-894b-7b11c736a545.png`, `scripts/dev-seed.ts`,
+and `scripts/work-orders/UIUX-APPLE-MINIMALIST.md`.
 
 ## R8.172 | 2026-09-28 | docs(plan): WO-BE-01 backend correctness pass — first Work Order for the Backend Executor
 

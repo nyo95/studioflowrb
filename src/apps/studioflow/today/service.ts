@@ -14,7 +14,7 @@ import {
   type PhaseStatus,
 } from "../domain/phase";
 import { P, hasPermission, nowOf, requireCommand, requireRead, type CommandContext, type Db, type ReadContext, type StudioFlowPorts } from "../shared";
-import { readBlockerCounts } from "../phases/blocker-query";
+import { readBlockerCountsBatch } from "../phases/blocker-query";
 import { ITEM_ORDER, ITEM_SELECT, toItemView } from "../tasks/service";
 
 /** Checked checklist rows older than this drop out of Today (legacy retention). */
@@ -143,10 +143,10 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
         },
       });
 
-      const rows: PhaseAttentionRow[] = await Promise.all(
-        phases.map(async (phase) => {
+      const countsByPhase = await readBlockerCountsBatch(db, phases.map((phase) => phase.id));
+      const rows: PhaseAttentionRow[] = phases.map((phase) => {
           const status = phase.status as PhaseStatus;
-          const counts = await readBlockerCounts(db, phase.id);
+          const counts = countsByPhase.get(phase.id)!;
           const commands = availablePhaseCommands({
             status,
             isLocked: phase.is_locked,
@@ -166,8 +166,7 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
             commands,
             blockers: fullBlockers(counts),
           };
-        }),
-      );
+        });
 
       return rows;
     },

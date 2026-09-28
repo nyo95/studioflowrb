@@ -418,6 +418,7 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
       const displayName = parseDisplayName(input.displayName);
       const password = parsePassword(input.password);
       const roleIds = [...new Set(input.roleIds ?? [])];
+      const passwordHash = await hashPassword(password);
 
       return runTransaction(async (tx) => {
         if (roleIds.length > 0) {
@@ -426,7 +427,6 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
             throw new AppError("VALIDATION", "ROLE_NOT_ASSIGNABLE", "One or more selected roles cannot be assigned.");
           }
         }
-        const passwordHash = await hashPassword(password);
         let user;
         try {
           user = await tx.user.create({
@@ -496,10 +496,10 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
       userActorContext(input.actor);
       const { hashPassword } = await import("../auth/password");
       const password = parsePassword(input.password);
+      const passwordHash = await hashPassword(password);
       return runTransaction(async (tx) => {
         const user = await tx.user.findUnique({ where: { id: input.userId }, select: { id: true, status: true } });
         if (!user) throw new AppError("NOT_FOUND", "USER_NOT_FOUND", "This user no longer exists.");
-        const passwordHash = await hashPassword(password);
         await tx.user.update({ where: { id: user.id }, data: { password_hash: passwordHash } });
         await tx.session.updateMany({
           where: { user_id: user.id, revoked_at: null },

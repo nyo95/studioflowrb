@@ -72,6 +72,7 @@ export function createPlatformAccountService(ports: AccountPorts) {
       newPassword: string;
     }): Promise<{ rotated: CreatedSession }> {
       const newPassword = parsePassword(input.newPassword);
+      const passwordHash = await hashPassword(newPassword);
       const committed = await runTransaction(async (tx) => {
         const user = await tx.user.findUnique({
           where: { id: input.userId },
@@ -84,7 +85,6 @@ export function createPlatformAccountService(ports: AccountPorts) {
         if (!verified) {
           throw new AppError("VALIDATION", "CURRENT_PASSWORD_INCORRECT", "Your current password is incorrect.");
         }
-        const passwordHash = await hashPassword(newPassword);
         await tx.user.update({ where: { id: user.id }, data: { password_hash: passwordHash } });
         const revoked = await tx.session.updateMany({
           where: { user_id: user.id, revoked_at: null },

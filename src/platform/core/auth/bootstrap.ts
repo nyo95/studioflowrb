@@ -57,6 +57,7 @@ export async function bootstrapFirstOwner(
   }
 
   const { runTransaction, auditWriter, now, generateId } = ports;
+  const passwordHash = await hashPassword(password);
 
   const result = await runTransaction(async (tx) => {
     const activeUsers = await tx.user.count({ where: { status: "ACTIVE" } });
@@ -84,7 +85,6 @@ export async function bootstrapFirstOwner(
       });
     }
 
-    const passwordHash = await hashPassword(password);
     const user = await tx.user.create({
       data: {
         id: generateId(),

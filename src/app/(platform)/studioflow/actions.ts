@@ -967,13 +967,13 @@ export async function globalSearchAction(query: string): Promise<ActionResult<Gl
   return runSafeAction(async () => {
     const ctx = await context();
     const q = parse(SearchQuery, query);
-    const [projects, clients] = await Promise.all([
-      studioFlow.projects.listProjects({ ...ctx, search: q }),
-      studioFlow.projects.listClients({ ...ctx, search: q }),
-    ]);
-    return {
-      projects: projects.slice(0, 6).map((p) => ({ id: p.id, name: p.name, clientName: p.client?.name ?? null })),
-      clients: clients.slice(0, 6).map((c) => ({ id: c.id, name: c.name })),
-    };
+    return studioFlow.projects.quickSearch({ ...ctx, search: q });
+  });
+}
+
+export async function getRevisionActivitiesAction(revisionId: string) {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    return studioFlow.phases.getRevisionActivities({ ...ctx, revisionId: parse(Id, revisionId) });
   });
 }

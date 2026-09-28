@@ -39,8 +39,12 @@ export function hashPassword(password: string): Promise<string> {
 }
 
 /** Verifies a candidate password against an encoded PHC hash. */
-export function verifyPassword(encodedHash: string, password: string): Promise<boolean> {
-  return argon2Verify(encodedHash, password, ARGON2_OPTIONS);
+export async function verifyPassword(encodedHash: string, password: string): Promise<boolean> {
+  try {
+    return await argon2Verify(encodedHash, password, ARGON2_OPTIONS);
+  } catch {
+    return false;
+  }
 }
 
 /**
