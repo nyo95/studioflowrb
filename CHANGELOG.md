@@ -5,13 +5,35 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.174**
-- Next local revision: **R8.175**
+- Current revision after this entry is committed: **R8.175**
+- Next local revision: **R8.176**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.175 | 2026-09-28 | docs(plan): WO-BE-02 archived-project file retention — second Work Order for the Backend Executor
+
+Lead-side preparation only; no code, schema, or dependency change.
+
+- Root `PLAN.md` is now **WO-BE-02** (READY, target **R8.176**), replacing WO-BE-01, which R8.174 accepted.
+- Outcome (owner decision of 2026-09-28): a project's own files are kept for a retention window (90 days,
+  provisional, adjustable 7 to 730 in studio settings) after archive, then a claim-based, audited sweep removes
+  them. Restore inside the window changes nothing. Scope is exactly `SfDeliverable`, `SfMomImage` and
+  `SfScheduleOption.image_key`; client logos, studio templates and Master Data files are never touched.
+- Backend contract locks an additive migration (`archive_retention_days`, `assets_purged_at`), the purge use case,
+  a manual command for the Lead's button, and an in-process 24-hour sweep started from `src/instrumentation.ts`
+  (default off outside production, `STUDIOFLOW_ASSET_SWEEP`). UI (settings field, dialog copy, archived-project
+  line, button) stays with the Lead.
+- `docs/BACKLOG.md` points the purge entry at the Work Order.
+- Queued next, not yet written as Work Orders: SF-PRESENTATION backend (defaults confirmed; plan in
+  `docs/apps/studioflow/SF-PRESENTATION-PLAN.md` must be re-cut into backend and Lead-UI halves) and the Master
+  Data workbook import/export (approved approach; needs a spreadsheet dependency).
+
+**Checks.** `git diff --check` clean. No tests run: documentation only.
+
+**Limits.** WO-BE-02 was not executed; it is the handoff. Location "rumah" is inferred from `.env.rumah`.
 
 ## R8.174 | 2026-09-28 | fix(lead): review verdict on R8.173, dialog hint, dead barrel, role-list exposure, ledger
 
