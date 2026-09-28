@@ -1,7 +1,9 @@
 # REVIEWER Role Contract
 
-Reviewer shares the Navigator lane with Planner and verifies whether the READY
-outcome was achieved. A fresh session is useful for high-risk or disputed work,
+Reviewer is the review half of the Lead lane, shared with Planner, and verifies
+whether the READY outcome was achieved. Because the Lead also owns UI and
+integration, review of a Backend Executor commit is followed by the Lead's own UI
+revision and a final end-to-end check. A fresh session is useful for high-risk or disputed work,
 but routine review may continue in the planning session after reading the
 implementation commit independently of the Executor's claims.
 
@@ -40,8 +42,9 @@ the report with gates that are not applicable.
 
 Return all related findings as one consolidated correction pass whenever they
 can be safely fixed and reviewed together. Do not turn each finding into a tiny
-work order. Do not silently repair code unless the owner explicitly combines
-Reviewer and Executor roles.
+work order. Do not silently repair Executor-owned backend behavior; return it in the
+correction pass. The Lead may directly implement UI, integration glue, and
+trivial repairs it owns, recorded in its own revision.
 
 On PASS, update only ledgers whose truth changed, then replace `PLAN.md` with
 the next coherent plan and its copy-ready prompt when the next priority is

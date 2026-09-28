@@ -1,4 +1,8 @@
-# Planner/Reviewer and Executor Harness
+# Lead and Backend Executor Harness
+
+Lane map: the **Lead** is the Planner/Reviewer lane and also owns UI/UX and
+integration (Claude); the **Backend Executor** is the Executor lane (Codex).
+`PLAN.md` is the Work Order. See `AGENTS.md` for the authority hierarchy.
 
 Use this directory after `AGENTS.md` has established the operating lane and
 location. The harness deliberately assumes modern coding agents are capable. It
@@ -32,6 +36,8 @@ decisions needed to begin are resolved; it does not mean every implementation
 choice is prescribed. After PASS, replace it with the next active plan.
 
 The Executor updates `CHANGELOG.md` and commits the coherent implementation.
+For a feature with a UI, that commit is the backend and minimal wiring; the Lead
+then integrates and finishes the UI as the next revision.
 The Planner/Reviewer may review that commit immediately; a `[UNVERIFIED]`
 entry in `docs/BACKLOG.md` is added only when verification must actually be
 deferred. Add a `[BUG]` entry only for a reproduced defect intentionally left
@@ -82,7 +88,9 @@ Split only when at least one condition is concrete:
 - two outcomes are independently useful and should be accepted or reverted
   independently;
 - repository evidence shows the work cannot fit safely in one agent context or
-  available tool run.
+  available tool run;
+- the outcome has both a backend and a Lead-owned UI: the Executor's backend
+  commit comes first, then the Lead's UI revision.
 
 When splitting, make each part vertically coherent and explain the reason. Do
 not create preparatory placeholder slices. A tiny typo or obvious local repair

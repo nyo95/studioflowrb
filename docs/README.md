@@ -29,10 +29,10 @@ tests, and migrations prove implemented state.
 | [`BACKLOG.md`](BACKLOG.md) | Consolidated worklist — every open `[PLANNED]`/`[UNVERIFIED]`/`[BUG]`/`[CLEANUP]` item across every app, in one file. Replaces `roadmap.md`/`review.md`/`knownbug.md` (archived 2026-09-22). |
 | ~~`roadmap.md`~~ / ~~`review.md`~~ / ~~`knownbug.md`~~ | **Superseded 2026-09-22** — merged into `BACKLOG.md`; full historical record at [`archive/roadmap-2026-09-22.md`](archive/roadmap-2026-09-22.md), [`archive/review-2026-09-22.md`](archive/review-2026-09-22.md), [`archive/knownbug-2026-09-22.md`](archive/knownbug-2026-09-22.md). |
 | [`REVISION-LEDGER-NOTES.md`](REVISION-LEDGER-NOTES.md) | Historical missing/skipped revision labels and how to interpret them |
-| [`SESSION-HANDOFF-PROMPT.md`](SESSION-HANDOFF-PROMPT.md) | Compact continuation prompts for Planner/Reviewer and Executor sessions |
-| [`agent/README.md`](agent/README.md) | Two-lane AI harness: coherent work sizing, handoff loop, context, and revision rules |
-| [`agent/PLANNER.md`](agent/PLANNER.md) | Planning half of the Planner/Reviewer Navigator lane |
-| [`agent/EXECUTOR.md`](agent/EXECUTOR.md) | Autonomous implementation within a READY plan's locked boundaries |
+| [`SESSION-HANDOFF-PROMPT.md`](SESSION-HANDOFF-PROMPT.md) | Compact continuation prompts for Lead and Backend Executor sessions |
+| [`agent/README.md`](agent/README.md) | Lead + Backend Executor harness: lane map, coherent work sizing, handoff loop, context, and revision rules |
+| [`agent/PLANNER.md`](agent/PLANNER.md) | Planning half of the Lead lane; `PLAN.md` is the Work Order |
+| [`agent/EXECUTOR.md`](agent/EXECUTOR.md) | Backend-only implementation within a READY plan's locked boundaries; `BLOCKED / CONFLICT` protocol |
 | [`agent/REVIEWER.md`](agent/REVIEWER.md) | Risk-shaped verification and next-plan preparation |
 | [`agent/BROWSER-ACCEPTANCE-BACKLOG.md`](agent/BROWSER-ACCEPTANCE-BACKLOG.md) | Reviewer-run browser acceptance queue, batched at phase gate close |
 

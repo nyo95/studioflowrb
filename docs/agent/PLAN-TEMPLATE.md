@@ -6,8 +6,9 @@ sections that do not help the Executor.
 ```markdown
 # Active Plan
 
-Plan ID: <stable identifier>
+Plan ID: <stable identifier — the Work Order ID>
 Scope: <bounded product/technical area>
+Target revision: R<N>.<NN>
 Status: DRAFT | READY | BLOCKED
 Priority: P0 | P1 | P2 | P3 | PARKED
 Owner: <owner or decision authority>
@@ -26,6 +27,20 @@ Last updated: YYYY-MM-DD
 <Product/domain/ownership/schema/security/dependency decisions the Executor
 must preserve.>
 
+## Business Rules and Architecture Constraints
+
+<Domain rules, app boundaries, capability REUSE/EXTEND/ADD, database ownership.>
+
+## Backend Contract
+
+<Public/service contract, validation, permissions, data meaning. Outcome, not a
+file recipe.>
+
+## UI Contract
+
+<What the backend must expose; the minimal wiring the Executor may add. Layout
+and UX are the Lead's and are not specified for the Executor.>
+
 ## Boundaries and Non-goals
 
 ## Acceptance Criteria
@@ -41,17 +56,17 @@ must preserve.>
 <Post-commit browser scenarios when user-facing behavior needs them; omit for
 server-only, documentation-only, or pure utility outcomes.>
 
-## Risks and Recovery
+## Regression Risks and Recovery
 
 ## Executor Prompt
 
-You are the Executor. Location: <rumah|kantor>. Read `AGENTS.md`,
+You are the Backend Executor. Location: <rumah|kantor>. Read `AGENTS.md`,
 `docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY
-outcome. Inspect current repository evidence, preserve unrelated owner work,
+backend outcome and nothing beyond it. Inspect current repository evidence, preserve unrelated owner work,
 make sound in-scope implementation decisions, run the required checks, update
 `CHANGELOG.md`, and create the target local revision commit. Stop only for a
-material locked-decision conflict or unsafe boundary; otherwise finish the
-coherent outcome and report the commit, checks, limitations, and remaining
+material locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT
+report; otherwise finish the coherent outcome and report the commit, checks, limitations, and remaining
 unrelated dirty files.
 ```
 

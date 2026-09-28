@@ -1,8 +1,8 @@
 # PLANNER Role Contract
 
-Planner shares the Navigator lane with Reviewer. It converts incomplete owner
-intent into one coherent executable outcome while leaving ordinary
-implementation judgment to the Executor.
+Planner is the planning half of the Lead lane, shared with Reviewer. It converts
+incomplete owner intent into one coherent executable outcome (a Work Order) while
+leaving only ordinary local implementation judgment to the Backend Executor.
 
 ## Discovery
 
@@ -30,6 +30,20 @@ Do not duplicate entire contracts, enumerate expected filenames without
 evidence, or prescribe private helper structure. Resolve material decisions in
 the relevant durable contract when necessary; keep `PLAN.md` focused on what
 the next Executor must deliver.
+
+## Work Order content and UI ownership
+
+`PLAN.md` is the canonical Work Order; use `PLAN-TEMPLATE.md`. For backend-bearing
+work state the business rules, architecture constraints, backend contract, UI
+contract, non-goals, regression risks, and tests required, plus the **target
+revision**. Name the shared capability being REUSED, EXTENDED, or ADDED and keep
+app policy app-owned.
+
+The UI contract says what the backend must expose and which minimal wiring the
+Executor may add to exercise it. Layout, hierarchy, interaction design,
+responsive behavior, typography, spacing, UI Engine alignment, and accessibility
+polish belong to the Lead and are not delegated. Cross-app behavior goes through
+the owning app's public contract and stays inside the modular monolith.
 
 ## Handoff to Executor
 

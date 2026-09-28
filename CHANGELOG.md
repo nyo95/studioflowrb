@@ -5,13 +5,42 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.170**
-- Next local revision: **R8.171**
+- Current revision after this entry is committed: **R8.171**
+- Next local revision: **R8.172**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.171 | 2026-09-28 | docs(agents): Lead + Backend Executor operating model (Claude leads, Codex executes backend)
+
+Owner instruction of 2026-09-28: Claude is the single Engineering Lead and UI owner; Codex is a narrow Backend
+Executor working from a Work Order; ChatGPT (web) is a second opinion outside the hierarchy. The repo already had a
+Planner/Reviewer + Executor harness, so this folds the model into it instead of adding a parallel one.
+
+- `AGENTS.md`: new "Operating model and session handshake" (hierarchy; lanes follow the tool; the setup question is
+  now only home/office) and "Lead-led execution" (Executor implements the smallest correct change and never
+  reinterprets the plan; `BLOCKED / CONFLICT` protocol; backend commit first, then the Lead's UI revision; Claude and
+  Codex work serially in this checkout and never overlap uncommitted files). Legacy isolation, database safety,
+  revision/commit protocol, and the no-push rule are unchanged.
+- `docs/agent/EXECUTOR.md`: backend-only scope and an explicit must-not-own list (product behavior, UX, visual
+  design, new abstractions, scope); refactors only inside the plan; conflict report replaced by `BLOCKED / CONFLICT`
+  (expected, actual, conflict, options A/B/C, recommendation).
+- `docs/agent/PLANNER.md`, `REVIEWER.md`, `README.md`: Lead lane, `PLAN.md` is the Work Order, UI ownership stays
+  with the Lead, the Lead may fix UI/integration glue directly but returns Executor-owned backend defects.
+- `docs/agent/PLAN-TEMPLATE.md`: adds Target revision, Business Rules and Architecture Constraints, Backend Contract,
+  UI Contract, and Regression Risks sections; the Executor prompt now names the backend scope and the conflict report.
+- `docs/README.md`, `docs/SESSION-HANDOFF-PROMPT.md`: index and session prompts renamed to Lead / Backend Executor.
+
+No code, schema, or dependency change.
+
+**Checks.** `npm run check` OK (typecheck, boundaries, legacy-runtime); `git diff --check` clean. No tests were run: documentation only.
+
+**Limits.** The active `PLAN.md` (SF-PRESENTATION) was left as written and does not yet use the new template sections.
+`CORE.md:19` and `scripts/work-orders/*` still name the old navigator/OpenCode roles; they are historical Foundation
+records. The current instruction to hold BQ work is not written into repo docs; every Work Order must state it as a
+non-goal until the owner lifts it.
 
 ## R8.170 | 2026-09-28 | fix(ui-engine): green the two failing UI Engine tests (radius lock, app-neutral tokens)
 

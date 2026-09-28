@@ -2,49 +2,85 @@
 
 This is the bootstrap and invariant contract for every AI session in this checkout. Identify role and scope first, then load only the authority needed for that work.
 
-## Session handshake and operating lane
+## Operating model and session handshake
 
-At the start of a new computer/session, ask one compact setup question, omitting facts already known from the active session/environment:
+```text
+OWNER (Product Owner)
+ └─ CLAUDE — Engineering Lead (PLANNER/REVIEWER + UI owner)
+     └─ CODEX — Backend Executor
+```
 
-> Lane-nya Planner/Reviewer atau Executor, dan ini kerja di rumah atau kantor?
+ChatGPT (web) is a second opinion the owner may consult and is not part of this
+hierarchy. Its conclusions bind nothing until the owner brings them to the Lead.
 
-The model or tool does not determine authority. When no lane is assigned, work
-as **PLANNER/REVIEWER** until the owner assigns another lane. The owner may
-explicitly combine lanes for one session; state the transition before changing
-from planning/review into implementation.
+The owner owns business workflow, product behavior, priorities, scope, feature
+acceptance, and any architectural direction whose trade-off changes the product.
+Never reinterpret an explicit owner decision. When a technical constraint
+conflicts with a product requirement, explain the conflict and propose options;
+do not silently change the requirement.
 
-- **PLANNER/REVIEWER** — read `docs/agent/PLANNER.md` and
-  `docs/agent/REVIEWER.md`; clarify intent, prepare one coherent implementation
-  plan and copy-ready executor prompt, then verify the resulting commit and
-  prepare the next plan.
-- **EXECUTOR** — read `docs/agent/EXECUTOR.md`; own the implementation details
-  needed to complete the whole READY plan within its locked boundaries.
+Lanes follow the tool unless the owner says otherwise in the session: a Claude
+session is the **LEAD**, a Codex session is the **BACKEND EXECUTOR**. At the
+start of a new computer/session ask one compact setup question, omitting facts
+already known from the active session/environment:
+
+> Ini kerja di rumah atau kantor?
+
+Ask which lane only when the tool does not imply it or the owner may be
+combining lanes; state the transition before changing from planning/review into
+implementation. Model or tool choice never widens authority beyond the lane.
+
+- **LEAD (PLANNER/REVIEWER)** — read `docs/agent/PLANNER.md` and
+  `docs/agent/REVIEWER.md`. Owns requirements, repository inspection,
+  architecture, plans and Work Orders, sequencing, backend and frontend
+  contracts, **all UI/UX and UI implementation** (UI Engine alignment),
+  integration and regression review, the accept/correct decision on Executor
+  output, and final verification. The Lead keeps the whole-codebase mental model
+  and may edit code directly for UI, integration glue, and small repairs; larger
+  backend changes go to the Executor through a plan.
+- **BACKEND EXECUTOR** — read `docs/agent/EXECUTOR.md`. Implements exactly the
+  READY plan: schema and migrations, repositories, services, server actions,
+  public contracts, validation, RBAC wiring, backend tests, the minimal UI wiring
+  needed to exercise the backend, and the changelog. It owns no product behavior,
+  UX, visual design, or new architecture.
 
 Read `docs/agent/README.md` to select scoped context. Never load every app contract, roadmap section, or legacy artifact merely because it exists.
 
-## Planner-led execution
+## Lead-led execution
 
-Planner/Reviewer is the PM/TL and product-and-architecture navigator. It locks
-material product, domain, ownership, schema meaning, calculation, security, and
-dependency decisions, then delegates a coherent outcome rather than a list of
-tiny file edits. Executor is a capable implementation agent: it may inspect the
-repository, choose ordinary code structure, refactor locally, add the necessary
-tests, and complete mechanical follow-through without asking the Planner to
-decide every implementation detail.
+The Lead locks material product, domain, ownership, schema meaning, calculation,
+security, and dependency decisions and records them in `PLAN.md` — the canonical
+Work Order — with a target revision. The Executor implements that contract with
+the smallest correct change. It does not redefine the plan, expand scope, add
+abstraction layers, or turn a backend task into a general refactor. It may
+inspect the repository, choose ordinary local structure, and complete the
+mechanical follow-through the plan needs (types, callers, exports, tests,
+changelog).
 
-Executor stops only when completing the outcome would require changing a locked
-decision, inventing product behavior, crossing an ownership/security boundary,
-adding an unapproved dependency, performing an unauthorized destructive or
-remote action, or overwriting unrelated owner work. Reviewer records PASS, one
-consolidated correction pass, or a precise blocker. Corrections use the next
-local revision, never a silent rewrite of an accepted commit.
+The Executor stops, using the `BLOCKED / CONFLICT` report in
+`docs/agent/EXECUTOR.md`, when completing the outcome would require changing a
+locked decision, inventing product behavior or UX, crossing an ownership/security
+boundary, adding an unapproved dependency or abstraction, performing an
+unauthorized destructive or remote action, overwriting unrelated owner work, or
+when the plan contradicts the repository. It never silently reinterprets the
+plan. The Lead records PASS, one consolidated correction pass, or a precise
+blocker. Corrections use the next local revision, never a silent rewrite of an
+accepted commit.
 
-Codex, Claude, and OpenCode may hand off or take over work, but they work
-serially on the same branch and must not overlap uncommitted files. Use the
-strongest reasoning model available for genuinely ambiguous planning or risky
-review. A faster capable coding model is normal for READY execution; escalate
-because of demonstrated risk or context pressure, not because the Executor
-label implies weak judgment.
+A feature that needs both usually splits in two: the Executor delivers the
+backend plus minimal functional wiring as one commit; the Lead then inspects it,
+integrates, finishes the UI/UX, and verifies the whole feature as the next
+revision. UI-only work needs no Executor.
+
+Claude and Codex work **serially in this checkout**, on the same branch, and
+never overlap uncommitted files. The Lead hands off from a committed tree and
+does not edit while the Executor runs; the Executor commits locally and returns
+before the Lead resumes. Any other agent works only under a lane the owner
+assigns explicitly, under the Executor contract. Use the strongest reasoning
+model available for genuinely ambiguous planning or risky review. A faster
+capable coding model is normal for READY execution; escalate because of
+demonstrated risk or context pressure, not because the Executor label implies
+weak judgment.
 
 ## Global authority and communication
 
