@@ -1238,17 +1238,24 @@ function EntryPanelContent({
                       )}
                       {specLine(option) ? <span className="text-xs text-ink-tertiary">{specLine(option)}</span> : null}
                       {option.notes ? <span className="whitespace-pre-wrap text-xs text-ink-secondary">{option.notes}</span> : null}
-                      {/* Set final button on card face */}
-                      {!option.isFinal && canEdit ? (
-                        <div className="mt-1.5">
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            pending={isPending(`${entry.id}-opt-${option.id}`)}
-                            onClick={() => void run(`${entry.id}-opt-${option.id}`, () => markScheduleFinalAction({ projectId, optionId: option.id }))}
-                          >
-                            Set final
-                          </Button>
+                      {/* Set final / Request sample buttons on card face — visible actions, not buried in the ⋯ menu */}
+                      {canEdit && (!option.isFinal || option.sampleRequest?.status !== "REQUESTED") ? (
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {!option.isFinal ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              pending={isPending(`${entry.id}-opt-${option.id}`)}
+                              onClick={() => void run(`${entry.id}-opt-${option.id}`, () => markScheduleFinalAction({ projectId, optionId: option.id }))}
+                            >
+                              Set final
+                            </Button>
+                          ) : null}
+                          {option.sampleRequest?.status !== "REQUESTED" ? (
+                            <Button size="sm" variant="secondary" onClick={() => setSampleFor(option)}>
+                              {option.sampleRequest ? "Request sample again" : "Request sample"}
+                            </Button>
+                          ) : null}
                         </div>
                       ) : null}
                       {option.sampleRequest ? (
@@ -1270,9 +1277,9 @@ function EntryPanelContent({
                           { label: "Edit", onSelect: () => setInlineEdit(option.id) },
                           { label: option.imageUrl ? "Change photo" : "Add photo", onSelect: () => { setPhotoFor(option.id); } },
                           ...(option.imageUrl ? [{ label: "Remove photo", onSelect: () => void removePhoto(option) }] : []),
-                          option.sampleRequest?.status === "REQUESTED"
-                            ? { label: "Mark sample received", separatorBefore: true, onSelect: () => void run(`${entry.id}-opt-${option.id}`, () => receiveScheduleSampleAction({ projectId, requestId: option.sampleRequest!.id })) }
-                            : { label: "Request sample", separatorBefore: true, onSelect: () => setSampleFor(option) },
+                          ...(option.sampleRequest?.status === "REQUESTED"
+                            ? [{ label: "Mark sample received", separatorBefore: true, onSelect: () => void run(`${entry.id}-opt-${option.id}`, () => receiveScheduleSampleAction({ projectId, requestId: option.sampleRequest!.id })) }]
+                            : []),
                           { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeOption(option) },
                         ]}
                       />

@@ -5,11 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.166**
-- Next local revision: **R8.167**
-- Ledger gap: R8.163 (`ee9e09e`) and R8.164 (`b2421de`) shipped without a
-  changelog entry. R8.164 is backfilled below; R8.163 is not, because that
-  commit is not mine to describe. Tracked in `docs/BACKLOG.md`.
+- Current revision after this entry is committed: **R8.167**
+- Next local revision: **R8.168**
+- Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
+  (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
+  by hash. R8.167 is the merge that joins them; no number is reused.
+- Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
+  was not backfilled is superseded.
+
+## R8.167 | 2026-09-28 | chore(merge): join local R8.164–R8.166 with origin/main R8.164 and the PLAN/BACKLOG chores
+
+Integrated `origin/main` (`b4cdf3e`) into local `main` (`67afe21`) after both diverged from `ee9e09e`.
+
+- Incoming: R8.164 `5acc67d` (Product Schedule print/export crash; `print-format-values.ts` split out of a
+  `"use client"` module; sample-request affordance), plus `PLAN.md` and `docs/BACKLOG.md` chores
+  (`e7e4a8f`, `8839596`, `b4cdf3e`).
+- Only `CHANGELOG.md` conflicted; resolved by keeping both sides. Source files merged cleanly.
+- Branch review: `claude/shared-export-utilities-error-0s43z9` and `claude/loving-carson-th2hpm` are fully
+  contained in `origin/main`; `claude/optimistic-euler-bmhz8u` (R8.145/R8.146) is already re-landed in `main`
+  (PhaseGate and `ProjectPhasesNav` present); `codex/quarantine-unapproved-20260823` is 472 commits behind
+  and deliberately not merged.
+- The working tree held a stale R3-era snapshot (104 tracked files, pre-`services/*` masterdata monolith);
+  it was saved to a stash and not applied. Owner-preserved files were left untouched.
 
 ## R8.166 | 2026-09-26 | fix(ui): the project rail's document links shared one empty React key
 
@@ -97,12 +114,43 @@ tracked as KB-045 and KB-046, unchanged by this pass. `typecheck`, `lint`,
 signing tests cover the signer, expiry, and key binding; a signed-URL round trip
 through the running app was not exercised here.
 
-## R8.164 | 2026-09-26 | docs(backlog): record 32 verified audit findings from full-repo logic + UI/UX pass
+## R8.164 (local, `b2421de`) | 2026-09-26 | docs(backlog): record 32 verified audit findings from full-repo logic + UI/UX pass
 
 A full-repo read of the logic and UI/UX surfaces at `ee9e09e`, recorded as 1 P0,
 3 P1, 13 P2, 15 P3, and 2 currently-failing guard tests in `docs/BACKLOG.md`
 under "Full-repo logic + UI/UX audit". Backfilled here because the audit commit
 touched the backlog but not this ledger.
+
+## R8.164 (remote, `5acc67d`) | 2026-09-25 | fix(sf,ui-engine): Product Schedule print/export crashed server-side; sample request was buried in a kebab menu
+
+Owner report: `/print` (the shared UI Engine print view) "works in MOM, errors in Product Schedule," and separately the Product Schedule "request sample" action was unclear how to use.
+
+**Print/export crash — root cause found and reproduced.** Provisioned a disposable local Postgres, ran `prisma migrate deploy`, bootstrapped an owner, seeded a project/schedule entry/MOM doc through the real `studioFlow` service, and drove the running app with a headless-Chromium Playwright session (login → both print routes). MOM's print route returned 200 with no console errors. Schedule's print route returned HTTP 500: `Attempted to call printFormatFromSearchParams() from the server but printFormatFromSearchParams is on the client.`
+
+`printFormatFromSearchParams` is a plain, hook-free function, but it lived in `patterns/print-format.tsx`, which carries a file-level `"use client"` directive for the co-located `PrintFormatPicker` component. Next.js's RSC boundary treats every export of a `"use client"` module as an opaque client reference, so the schedule print page (a Server Component, the only one of the two print routes that calls this function — MOM's print route never did) crashed the instant it tried to invoke it as a normal function. This was never caught because no test exercises either print route end-to-end, and `docs/BACKLOG.md` already carried both as `[UNVERIFIED]`.
+
+Fix: split the pure value/function (`DEFAULT_PRINT_FORMAT`, `printFormatFromSearchParams`) into a new non-`"use client"` module, `patterns/print-format-values.ts`; `print-format.tsx` now exports only the client `PrintFormatPicker` component. Both are re-exported from the same `@/platform/ui_engine` barrel, so the only import path (`schedule/page.tsx`) needed no changes. Re-verified via the same Playwright session after the fix: schedule print route returns 200, cards render, and toggling `?paper=LETTER&orientation=landscape` correctly reflects in both the on-screen preview and the injected `@page` rule — no console/page errors on either print route.
+
+**Sample request discoverability.** "Request sample" only ever existed as one entry in an option's `⋯` row-action menu, inside the entry detail drawer, with no visible affordance anywhere else — matching the owner's "not clear how to use." `schedule-board.tsx`: added a visible "Request sample" button on the option card face (same pattern as the existing "Set final" button), shown whenever the option has no pending request; it reads "Request sample again" once a prior request has been received, matching the existing re-request rule (a new request is blocked only while one is `REQUESTED`). The now-redundant "Request sample" kebab-menu entry was removed; "Mark sample received" stays in the kebab menu as the follow-up action once a request is outstanding. Verified live: button visible on the option card immediately after opening an entry, dialog opens with its existing title/description/fields, submitting creates the request and the card immediately shows the "Sample requested" badge and vendor name.
+
+**Checks:** `tsc --noEmit` clean; `eslint .` clean; `node scripts/check-boundaries.mjs` OK; full suite 519/521 (see `[BUG]` entry below for the 2 pre-existing, unrelated failures); browser-verified live via headless Chromium against a disposable local Postgres (not `.env.kantor`/`.env.rumah` — this container has neither; `studioflow_rebuild`/`studioflow_rebuild_test` were created fresh for this session's local verification only and are not the owner's persistent local database).
+
+**Ledger correction.** This entry was drafted as "R8.163" against this file's own stated "Next local revision: R8.163", but `git log` showed R8.163 already used by commit `ee9e09e` ("account avatar, rail section heads, phase dot to prototype spec"), which never got a `CHANGELOG.md` entry or a header bump — the header was simply stale. Renumbered this entry to R8.164 and backfilled the missing R8.163 entry below instead of silently skipping past the gap.
+
+## R8.163 | 2026-09-25 | fix(ui): account avatar, rail section heads, phase dot to prototype spec
+
+Backfilled 2026-09-25 during the R8.164 audit — commit `ee9e09e` shipped this without a changelog entry; transcribed from its commit message, not re-verified beyond what it already states.
+
+Four gaps found by measuring the running app against the prototype's CSS, not by eye.
+
+- `initialsOf()` gave a one-word name a single letter: it took the first letter of each whitespace-separated word, so "Berkah" rendered as a lone "B" rattling around a 24px circle. A mononym now takes its first two letters; multi-word names are unchanged. Same defect class as the top-bar mark in R8.158, and this one is shared — it feeds every person chip.
+- Account menu trigger is the prototype's `.a-av`: a 24px filled circle (bg-action / text-action-ink, 9.5px bold, .02em) instead of a 124px-wide avatar + name + chevron button. The name is not lost — it still labels the control for assistive tech and now heads the menu, where it has room to be read rather than truncated at 180px.
+- `ContextNavHeading` is `.a-railhead`: 10px sans, .11em tracking, 600. It was `text-label`, the mono identity utility — right for a data label, too mechanical for a rail's section heads (PROJECT / PHASES / DOCUMENTS).
+- Phase accent dot 8px → 7px, per `.a-nav .dot`.
+
+Verified: typecheck and eslint clean. Browser confirmation of the rendered result was still owed at commit time (the pane's safety classifier was timing out) — the measured before/after was code-level only for this one.
+
+Measured but NOT changed, because it is a design call rather than a defect: content measure. The project workspace applies `PageShell measure="wide"` (1440px) to every page; the prototype uses `.a-measure` 800px for ordinary content and `.a-wide` 1040px only for the schedule/timeline. With 268px already spent on the two rails, 1440px gives very long lines. Splitting it per page means moving `PageShell` out of the project layout into the six project pages, as R8.156 did for the seven top-level ones.
 
 ## R8.162 | 2026-09-25 | fix(ui): H2 asked a 400-weight serif for bold, so the browser faked it
 
