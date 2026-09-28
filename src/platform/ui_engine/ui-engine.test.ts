@@ -214,7 +214,7 @@ describe("UI Engine foundation", () => {
 
   it("locks token source, action radius, widths, and horizontal overflow", () => {
     const css = readFileSync(new URL("./tokens/tokens.css", import.meta.url), "utf8");
-    assert.match(css, /--ui-radius-action:\s*4px/);
+    assert.match(css, /--ui-radius-action:\s*7px/);
     assert.match(css, /--ui-dialog-sm:\s*420px/);
     assert.match(css, /--ui-dialog-full:\s*1180px/);
     assert.match(css, /--ui-dialog-max-height:\s*90dvh/);

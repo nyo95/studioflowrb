@@ -513,7 +513,7 @@ explored direction. No access-check changes. See `CHANGELOG.md` R8.110.
   `archiveProject()` currently skips object deletion; owner decision is to
   purge on archive (see "Decision gates" above). Deferred until the storage
   layer (`PLATFORM-ASSET-STORAGE-ROADMAP.md`) is in place.
-- [ ] [BUG] `ui-engine.test.ts` ("UI Engine foundation") has 2 pre-existing,
+- [x] [BUG] `ui-engine.test.ts` ("UI Engine foundation") has 2 pre-existing,
   unrelated failures found while running the full suite for R8.164 (out of
   scope for that change, left open per the proportionate-checks rule):
   (1) "locks token source, action radius, widths, and horizontal overflow"
@@ -523,6 +523,9 @@ explored direction. No access-check changes. See `CHANGELOG.md` R8.110.
   sources" — `tokens/tokens.css` has two comments naming the app "BQ"
   (`--ui-page-wide-max` and the "BQ compact density stamp" section header),
   violating UI Engine's app-neutral-source rule.
+
+  **Fixed 2026-09-28 (R8.170):** owner chose 7px; see KB-045 and KB-046. Both
+  assertions pass (`ui-engine.test.ts` 42/42).
 
 ### Cleanup / dead code (confirmed unreachable, not a behavioral defect)
 
@@ -811,7 +814,7 @@ was fixed in R8.165._
 
 ### P3 - record and batch
 
-- [ ] [BUG] **KB-045 - The design-token lock test is stale, so token values are
+- [x] [BUG] **KB-045 - The design-token lock test is stale, so token values are
   effectively unlocked (CURRENTLY FAILING).**
   `src/platform/ui_engine/ui-engine.test.ts:217` asserts
   `--ui-radius-action: 4px`; the token is `7px` (`tokens.css:99`), and
@@ -820,7 +823,10 @@ was fixed in R8.165._
   by `globals.css:80` and `tokens/index.ts:35` - so only the test is wrong. The
   same test also locks dialog widths. Fix: update the assertion to 7px.
 
-- [ ] [CLEANUP] **KB-046 - App vocabulary inside the shared token file (CURRENTLY
+  **Fixed 2026-09-28 (R8.170):** assertion now `--ui-radius-action: 7px`, on the
+  owner's decision that 7px is correct. No token value changed.
+
+- [x] [CLEANUP] **KB-046 - App vocabulary inside the shared token file (CURRENTLY
   FAILING).** `ui-engine.test.ts:646-654` exists to keep app internals and domain
   vocabulary out of shared UI sources and currently fails on two comments in
   `src/platform/ui_engine/tokens/tokens.css`: line 110 `/* full-bleed (BQ, print) */`
@@ -829,6 +835,10 @@ was fixed in R8.165._
   - but a shared file naming a specific app is exactly the ownership break the
   guard exists to prevent, and it leaves the guard red. Fix: reword to a neutral
   description and keep the selector.
+
+  **Fixed 2026-09-28 (R8.170):** the two comments are reworded ("dense
+  workspaces", "Compact density stamp (opt in with data-density=\"compact\")");
+  the `[data-density="compact"]` selector and every value are untouched.
 
 - [ ] [BUG] **KB-047 - `listAssignableRoles` exposes the full role-to-permission
   matrix under the weaker `platform.user.read` grant.**

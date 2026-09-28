@@ -5,13 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.169**
-- Next local revision: **R8.170**
+- Current revision after this entry is committed: **R8.170**
+- Next local revision: **R8.171**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.170 | 2026-09-28 | fix(ui-engine): green the two failing UI Engine tests (radius lock, app-neutral tokens)
+
+Both failures predate this work: they fail identically on `b4cdf3e`, the previous GitHub head, and came in with
+the R8.145 design-tokens-v2 rework, which changed values and comments without updating the guards.
+
+- **Radius lock (KB-045).** `ui-engine.test.ts` asserted `--ui-radius-action: 4px`; the live token is 7px and the
+  owner confirmed 7px is intended. The assertion now says 7px. No token value changed.
+- **App-neutral tokens (KB-046).** `tokens.css` named the BQ app in two comments (`--ui-page-wide-max` and the
+  compact-density banner), which the app-vocabulary guard rejects. Reworded to neutral text; the
+  `[data-density="compact"]` selector and all values are unchanged.
+- Scope: shared UI Engine files only. No BQ app code, route, or test was touched, per the owner's instruction to
+  hold BQ work until requested.
+
+**Checks.** `ui-engine.test.ts` 42/42; `eslint .` clean; `npm run check` OK; full `npm test` against `masterdata_test` 532/532 (first fully green run since R8.145). Not run: `npm run build` and a browser pass (comment-only CSS change and a test assertion).
 
 ## R8.169 | 2026-09-28 | docs(changelog): record the browser pass that R8.168 listed as not done
 

@@ -107,7 +107,7 @@
   --ui-page-narrow:  720px;   /* forms, settings              */
   --ui-page-content: 1100px;  /* Today, Overview, phase canvas */
   --ui-page-max:     1440px;  /* schedule, timeline (wide)    */
-  --ui-page-wide-max:1920px;  /* full-bleed (BQ, print)       */
+  --ui-page-wide-max:1920px;  /* full-bleed (dense workspaces, print) */
 
   /* ── Shell layout ────────────────────────────────────────────────────────  */
   /* --ui-rail-width is the live column width: 48px at rest, overridden to
@@ -169,7 +169,7 @@
   --ui-border-default:#DED7CD;
 }
 
-/* ── BQ compact density stamp ────────────────────────────────────────────── */
+/* ── Compact density stamp (opt in with data-density="compact") ──────────── */
 [data-density="compact"] {
   --ui-row-y:              6px;
   --ui-control-height-sm: 24px;
