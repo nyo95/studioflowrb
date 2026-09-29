@@ -155,7 +155,7 @@ function SupplierLinksEditor({ links, snapshot, onLinksChange, onSnapshotChange,
               <div key={link.url} className="flex items-center gap-2 text-sm">
                 <span className="text-label text-ink-tertiary shrink-0">{link.kind}</span>
                 <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-action underline wrap-anywhere flex-1 min-w-0">{link.label || link.url}</a>
-                {canManage ? <IconButton label="Remove link" icon={<X size={12} />} size="sm" className="!h-5 !w-5 !min-h-5 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!text-ink-danger shrink-0" onClick={() => handleRemove(idx)} /> : null}
+                {canManage ? <IconButton label="Remove link" icon={<X size={12} />} size="sm" className="!h-5 !w-5 !min-h-5 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!text-danger shrink-0" onClick={() => handleRemove(idx)} /> : null}
               </div>
             ))}
           </div>
@@ -654,7 +654,7 @@ export function VendorDirectory({
                   title="Remove"
                   icon={<X size={14} />}
                   size="sm"
-                  className="absolute right-2 top-2 !h-6 !w-6 !min-h-6 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!bg-transparent hover:!text-ink-danger"
+                  className="absolute right-2 top-2 !h-6 !w-6 !min-h-6 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!bg-transparent hover:!text-danger"
                 />
                 <Field label="Contact name" className="col-span-2 sm:col-span-1">
                   <Input
@@ -802,7 +802,7 @@ export function VendorDirectory({
                             title="Remove"
                             icon={<X size={14} />}
                             size="sm"
-                            className="absolute right-2 top-2 !h-6 !w-6 !min-h-6 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!bg-transparent hover:!text-ink-danger"
+                            className="absolute right-2 top-2 !h-6 !w-6 !min-h-6 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!bg-transparent hover:!text-danger"
                           />
                           <Field label="Contact name" className="col-span-2 sm:col-span-1">
                             <Input

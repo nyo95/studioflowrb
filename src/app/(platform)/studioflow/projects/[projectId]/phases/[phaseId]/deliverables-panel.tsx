@@ -105,7 +105,7 @@ export function DeliverablesPanel({
                 download={d.name}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="shrink-0 text-ink-muted transition-colors hover:text-ink"
+                className="shrink-0 text-ink-tertiary transition-colors hover:text-ink"
                 aria-label={`Download ${d.name}`}
               >
                 <FileDown className="size-4" />
@@ -115,7 +115,7 @@ export function DeliverablesPanel({
                   type="button"
                   disabled={pendingId === d.id && isPending}
                   onClick={() => remove(d)}
-                  className="shrink-0 text-ink-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 focus:opacity-100"
+                  className="shrink-0 text-ink-tertiary opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 focus:opacity-100"
                   aria-label={`Delete ${d.name}`}
                 >
                   <Trash2 className="size-3.5" />
@@ -144,7 +144,7 @@ export function DeliverablesPanel({
             {isPending ? "Uploading…" : "Upload file"}
           </label>
           {uploadError ? <p className="mt-1.5 text-xs text-danger">{uploadError}</p> : null}
-          <p className="mt-1 text-xs text-ink-muted">PDF, PNG, JPEG, WebP, ZIP — max 25 MB</p>
+          <p className="mt-1 text-xs text-ink-tertiary">PDF, PNG, JPEG, WebP, ZIP — max 25 MB</p>
         </div>
       ) : null}
     </SectionCard>

@@ -29,6 +29,8 @@ export type DialogProps = {
 
 const DIALOG_FRAME_CLASSES =
   "fixed z-[51] flex flex-col overflow-hidden rounded-card bg-surface-raised shadow-elevated animate-ui-dialog-in";
+const DRAWER_FRAME_CLASSES =
+  "fixed z-[51] flex flex-col overflow-hidden rounded-card bg-surface-raised shadow-elevated animate-ui-fade-in";
 const DIALOG_HEADER_CLASSES = "flex shrink-0 items-start justify-between gap-4 px-4 py-3.5 border-b border-line";
 const DIALOG_FOOTER_CLASSES = "flex shrink-0 items-center justify-end gap-4 px-4 py-3.5 border-t border-line";
 
@@ -54,7 +56,7 @@ function DialogFrame({
         <RDialog.Overlay className="fixed inset-0 z-50 bg-[rgb(28_26_24/0.36)] backdrop-blur-[2px] animate-ui-fade-in" />
         <RDialog.Content
           className={cx(
-            DIALOG_FRAME_CLASSES,
+            drawer ? DRAWER_FRAME_CLASSES : DIALOG_FRAME_CLASSES,
             drawer
               ? cx(
                   // The size token has to reach the drawer too: without a width

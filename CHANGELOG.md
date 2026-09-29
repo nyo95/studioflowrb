@@ -5,13 +5,30 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.188**
-- Next local revision: **R8.189**
+- Current revision after this entry is committed: **R8.189**
+- Next local revision: **R8.190**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.189 | 2026-09-29 | fix(ui): converge stale token classes and drawer entrance
+
+Closes five small backlog UI defects whose fixes were already locked by the token inventory and UI Engine contract:
+
+- **KB-038:** deliverable download/delete affordances and the upload hint now use `text-ink-tertiary` instead of the
+  nonexistent `text-ink-muted`, restoring the intended quiet resting state while keeping the existing hover colors.
+- **SF-11:** the Schedule List/Board toggle now uses `min-h-(--ui-control-height-sm)`, matching the valid token syntax
+  already used by neighboring controls.
+- **MD-01:** supplier remove controls now hover to `text-danger` instead of the nonexistent `text-ink-danger`.
+- **SF-14:** final option chips now use the bridged success foreground token `text-success`.
+- **KB-050:** drawers now use the fade-in animation instead of the centered dialog entrance, so the drawer frame no
+  longer inherits the dialog's translate-from-center keyframe.
+
+**Checks.** `tsc --noEmit` 0 errors; `eslint .` clean; `check:boundaries` OK; `check:legacy-runtime` OK; full
+`npm test` 628/628; production build exit 0. No browser pass was run; these fixes are static token/class corrections
+covered by the UI Engine source checks and production CSS compilation.
 
 ## R8.188 | 2026-09-29 | fix(sf): Request sample was reachable only from inside the full item-editor dialog
 

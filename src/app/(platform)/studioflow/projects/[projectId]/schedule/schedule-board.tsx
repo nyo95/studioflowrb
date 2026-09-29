@@ -470,8 +470,8 @@ export function ScheduleBoard({
             </FilterChip>
           ))}
           <span className="mx-1 h-5 w-px bg-line-subtle" aria-hidden="true" />
-          <button type="button" onClick={() => setViewMode("list")} className={`inline-flex min-h-[--ui-control-height-sm] items-center gap-1 rounded-control px-2 text-xs font-medium transition-colors ${viewMode === "list" ? "bg-surface-muted text-ink" : "text-ink-secondary hover:bg-surface-muted hover:text-ink"}`} aria-pressed={viewMode === "list"}>List</button>
-          <button type="button" onClick={() => setViewMode("board")} className={`inline-flex min-h-[--ui-control-height-sm] items-center gap-1 rounded-control px-2 text-xs font-medium transition-colors ${viewMode === "board" ? "bg-surface-muted text-ink" : "text-ink-secondary hover:bg-surface-muted hover:text-ink"}`} aria-pressed={viewMode === "board"}>Board</button>
+          <button type="button" onClick={() => setViewMode("list")} className={`inline-flex min-h-(--ui-control-height-sm) items-center gap-1 rounded-control px-2 text-xs font-medium transition-colors ${viewMode === "list" ? "bg-surface-muted text-ink" : "text-ink-secondary hover:bg-surface-muted hover:text-ink"}`} aria-pressed={viewMode === "list"}>List</button>
+          <button type="button" onClick={() => setViewMode("board")} className={`inline-flex min-h-(--ui-control-height-sm) items-center gap-1 rounded-control px-2 text-xs font-medium transition-colors ${viewMode === "board" ? "bg-surface-muted text-ink" : "text-ink-secondary hover:bg-surface-muted hover:text-ink"}`} aria-pressed={viewMode === "board"}>Board</button>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
@@ -1208,7 +1208,7 @@ function EntryPanelContent({
                 onClick={() => document.getElementById(`opt-${opt.id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" })}
                 className={`inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full px-2 text-xs font-semibold transition-colors ${
                   opt.isFinal
-                    ? "border border-success-line bg-success-surface text-success-ink"
+                    ? "border border-success-line bg-success-surface text-success"
                     : "border border-line bg-surface-muted text-ink-secondary hover:border-line-subtle hover:text-ink"
                 }`}
               >

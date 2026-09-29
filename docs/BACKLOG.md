@@ -728,31 +728,6 @@ was fixed in R8.165._
   wire to show 12 rows. Fix: `take: 6` on the search path with a narrow
   projection, leaving the full directory query for the Projects page.
 
-- [ ] [BUG] **KB-038 - `text-ink-muted` does not exist, so 3 classes emit
-  nothing and the resting state is wrong.** `globals.css` bridges only `ink`,
-  `ink-2`, `ink-3`, `ink-inverse`, `ink-secondary`, `ink-tertiary`; `tokens.css`
-  has no `--ui-text-muted` at all. Used at
-  `src/app/(platform)/studioflow/projects/[projectId]/phases/[phaseId]/deliverables-panel.tsx:108,118,147`
-  - the download icon, the delete icon, and the "PDF, PNG, JPEG, WebP, ZIP - max
-  25 MB" hint. Each falls back to inherited full-strength ink, while
-  `hover:text-ink` / `hover:text-danger` DO resolve - so the resting state is
-  wrong and the hover is correct, the exact inverse of the intent. Fix:
-  `text-ink-tertiary` at all three sites.
-
-- [ ] [BUG] **SF-11 - Schedule List/Board toggle renders at half its intended
-  height from an invalid CSS declaration.** `schedule-board.tsx:450-451` uses
-  `min-h-[--ui-control-height-sm]`. The bare bracket form is not a valid CSS
-  variable reference and compiles to `min-height: --ui-control-height-sm`, which
-  the browser discards, so the buttons get no minimum height. The correct form,
-  used 113 times elsewhere in this repo, is `min-h-(--ui-control-height-sm)`.
-  The token is 32px light / 24px dark (`tokens.css:123,175`), and the
-  neighbouring "Print / PDF" (`:458`) and "Template settings" (`:466`) already
-  use the valid form, so the row reads as visibly broken. Only these 2 sites plus
-  `src/platform/ui_engine/layouts/shells.tsx:204` (`bg-[--ui-border-subtle]` in
-  the currently-unused `NavSeparator`) are value-position uses; the 5 other
-  `[--x:VALUE]` occurrences are valid Tailwind property definitions, not defects.
-  Fix: `min-h-(--ui-control-height-sm)`.
-
 - [ ] [CLEANUP] **KB-039 - `CORE.md`'s app-layer contract names directories that
   no app has, while the boundary tool reports OK.**
   `CORE.md:47-51` states that app `infrastructure/` owns Prisma queries and app
@@ -925,19 +900,6 @@ was fixed in R8.165._
   and a misleading UX state where "your current password is incorrect" is
   expected. Fix: wrap `verify` and treat a throw as `verified = false`.
 
-- [ ] [BUG] **MD-01 - Destructive remove buttons have no hover feedback.**
-  `src/app/(platform)/masterdata/vendors/vendor-directory.tsx:158,657,805` use
-  `hover:!text-ink-danger`, an undefined token, so no rule is emitted. The
-  surrounding `!bg-transparent` / `!border-0` are `!important` and defeat the
-  `secondary` variant's hover background and border, and `!text-ink-tertiary` is
-  `!important` so the resting colour survives too - nothing changes on hover at
-  all. Fix: `hover:!text-danger`.
-
-- [ ] [BUG] **SF-14 - Final-option chip loses its success colour.**
-  `schedule-board.tsx:1173` uses `text-success-ink`, which is not bridged
-  (`--ui-success-fg` is bridged as `--color-success`). The chip keeps
-  `bg-success-surface` but its label inherits default ink. Fix: `text-success`.
-
 - [x] [BUG] **SF-15 - Project overview ships a phase's entire revision history,
   with every activity of every closed revision, on every render.**
   `src/apps/studioflow/phases/service.ts:638-644` selects all revisions with no
@@ -947,15 +909,6 @@ was fixed in R8.165._
   Unbounded in both dimensions and growing for the life of the phase. The visible
   summary needs only label, timestamps, and an activity count. Fix: return
   `_count` and load activities on demand.
-
-- [ ] [BUG] **KB-050 - `Drawer` uses the centred-dialog entrance keyframe.**
-  `src/platform/ui_engine/layouts/overlays.tsx:30-31` applies
-  `animate-ui-dialog-in` to drawers; the keyframe translates
-  `translate(-50%, calc(-50% + 8px))`, and CSS animations outrank the drawer's
-  `[transform:none]`, so an edge-anchored panel starts half its width left and
-  half its height up for 140 ms. Cosmetic and currently confined to the
-  component showcase - `Drawer` has one call site, `/ui-engine`, which is
-  deliberately public. Fix: use `animate-ui-fade-in` for drawers.
 
 - [ ] [CLEANUP] **KB-051 - Allow list and documentation point at a route tree
   that was deleted.** `scripts/check-boundaries.mjs:26-28` has three allow-list
