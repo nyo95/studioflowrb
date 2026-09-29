@@ -1,0 +1,86 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+
+import { requirePrincipalGrants } from "@platform/core/auth";
+import { runSafeAction, type ActionResult } from "@platform/core/actions";
+import { validationError } from "@platform/core/validation";
+
+import { sampleRequestCoordinator } from "@/app/sample-request-runtime";
+import { MASTERDATA_ROUTES } from "@/apps/masterdata/public";
+
+function revalidateSampleRequests(): void {
+  revalidatePath(MASTERDATA_ROUTES.sampleRequests);
+}
+
+const QuoteInputSchema = z.object({
+  quotedAmount: z.string().max(32).optional().nullable().or(z.literal("")),
+  quotedCurrency: z.string().max(8).optional().nullable().or(z.literal("")),
+  staffNote: z.string().max(1000).optional().nullable().or(z.literal("")),
+});
+
+function actorOf(principal: { userId: string; displayName: string }) {
+  return { kind: "USER" as const, userId: principal.userId, label: principal.displayName };
+}
+
+function normalize(value: string | null | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+export async function takeSampleRequestAction(sourceRequestId: string): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const result = await sampleRequestCoordinator.take({ grants, actor: actorOf(principal), sourceRequestId });
+    revalidateSampleRequests();
+    return result;
+  });
+}
+
+export async function recordSampleQuoteAction(intakeId: string, input: unknown): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = QuoteInputSchema.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    const result = await sampleRequestCoordinator.recordQuote({
+      grants,
+      actor: actorOf(principal),
+      intakeId,
+      quotedAmount: normalize(parsed.data.quotedAmount) ?? null,
+      quotedCurrency: normalize(parsed.data.quotedCurrency) ?? null,
+      staffNote: normalize(parsed.data.staffNote) ?? null,
+    });
+    revalidateSampleRequests();
+    return result;
+  });
+}
+
+export async function markSampleRequestPricedAction(intakeId: string, input: unknown): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = QuoteInputSchema.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    const result = await sampleRequestCoordinator.markPriced({
+      grants,
+      actor: actorOf(principal),
+      intakeId,
+      quotedAmount: normalize(parsed.data.quotedAmount) ?? null,
+      quotedCurrency: normalize(parsed.data.quotedCurrency) ?? null,
+      staffNote: normalize(parsed.data.staffNote) ?? null,
+    });
+    revalidateSampleRequests();
+    return result;
+  });
+}
+
+export async function declineSampleRequestAction(intakeId: string, reason: string): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = z.string().trim().min(1, "A reason is required").max(1000).safeParse(reason);
+    if (!parsed.success) throw validationError(parsed.error);
+    const result = await sampleRequestCoordinator.decline({ grants, actor: actorOf(principal), intakeId, reason: parsed.data });
+    revalidateSampleRequests();
+    return result;
+  });
+}

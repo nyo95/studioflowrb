@@ -2,6 +2,8 @@ import { AccountMenu } from "./account-menu";
 
 import { DisplaySettingsProvider } from "./display-settings";
 
+import { NotificationBell } from "./notification-bell";
+
 import Link from "next/link";
 
 import type { ReactNode } from "react";
@@ -98,6 +100,7 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
         <HeaderApplicationNavigation apps={apps} />
         {contextSlot}
         <span className="flex-1" aria-hidden="true" />
+        <NotificationBell />
         <AccountMenu
           name={principal.displayName}
           logoutAction={logoutAction}

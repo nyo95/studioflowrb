@@ -38,7 +38,13 @@ The previous plan, WO-BE-03 (executed in R8.181, awaiting independent review), i
 - **R8.184 (done):** platform notifications (`platform.Notification`, additive migration `20260929010000_platform_notifications`,
   writer port, per-user center, actions) and the two events: StudioFlow tells sample-request staff of a new request; Master Data
   tells the requester when it is priced or declined (both through optional notifier ports, written inside the event's transaction).
-- **Next:** the Master Data "Sample requests" screen with its actions; the notification bell and inbox.
+- **R8.185 (done):** Master Data's "Sample requests" screen (`(platform)/masterdata/sample-requests`) — queue table sourced from
+  the coordinator's `listQueue`, Take / Record quote / Mark priced / Decline actions, a "Show finished" toggle; nav link gated on
+  `masterdata.sample-request.manage` (kept off the shared rail otherwise, same as Deletions). Platform-wide notification bell
+  (`authenticated-shell/notification-bell.tsx`) in the top bar: unread badge, polls every 60s and on route change, inbox popover,
+  mark one/all read.
+- **Next:** vendor/SKU/material-price linking on the quote (currently amount + currency only, which already satisfies "must
+  state a price"); owner veto window on the R8.183 Lead defaults is still open.
 
 ## Risks
 

@@ -25,4 +25,5 @@ export const MASTERDATA_NAV_LINKS: readonly MasterDataNavLink[] = [
   { href: "/masterdata/brands", label: "Brands" },
   { href: "/masterdata/vendors", label: "Suppliers" },
   { href: "/masterdata/pricing", label: "Pricing" },
+  { href: "/masterdata/sample-requests", label: "Sample requests" },
 ];

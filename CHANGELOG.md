@@ -5,13 +5,50 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.184**
-- Next local revision: **R8.185**
+- Current revision after this entry is committed: **R8.185**
+- Next local revision: **R8.186**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.185 | 2026-09-29 | feat(masterdata,shell): sample requests screen and the notification bell
+
+Continues WO-SR-01's "Next" from R8.184: the two pieces the queue and inbox backend still needed a face.
+
+- **Master Data.** `(platform)/masterdata/sample-requests`: queue table built on the coordinator's `listQueue`
+  (`src/application/sample-request-coordinator.ts`), a "Show finished" toggle, and dialogs for Take / Record quote / Mark
+  priced / Decline, wired through new `actions.ts` (`takeSampleRequestAction`, `recordSampleQuoteAction`,
+  `markSampleRequestPricedAction`, `declineSampleRequestAction`) that authorize via `requirePrincipalGrants` and never accept
+  a user id from the browser. Nav link added to `MASTERDATA_NAV_LINKS`, but only rendered when the viewer holds
+  `masterdata.sample-request.manage` (`MasterDataNav` now takes `canManageSampleRequests`, computed in
+  `(platform)/layout.tsx`) — kept off the shared rail otherwise, same convention as Deletions. `recordSampleQuote` already
+  accepts `vendorId`/`skuId`/`priceMaterialId` by id; this pass ships amount + currency + staff note only, which already
+  satisfies "must state a price" — the linking pickers are a follow-up (`docs/BACKLOG.md`), not a blocker.
+- **Platform shell.** `authenticated-shell/notification-bell.tsx`: a bell in the top bar for every signed-in user (platform-
+  wide, not app-scoped, unlike the StudioFlow header search beside it) — unread badge, popover inbox, mark one/mark all read,
+  polls `getUnreadNotificationCountAction` every 60s and again on route change, matching the polling delivery `PLAN.md`
+  already committed to.
+- Tests: 5 new action-layer unit tests (`sample-requests/actions.test.ts`) mirroring the `notifications/actions.test.ts`
+  pattern — authorization scoping, quote-field normalization, decline-reason validation, signed-out rejection.
+- `PLAN.md` and `docs/BACKLOG.md` updated.
+
+- **Tooling fix, same revision.** `scripts/run-tests.mjs` now passes `--test-concurrency=1`. `npm test` hung indefinitely on
+  this machine before this fix: up to 7 of the 11 disposable-DB test files (`test-support.ts`) start concurrently — Node's
+  default file concurrency is `os.availableParallelism()`, 32 here — and race for the shared advisory lock that serializes
+  their `TRUNCATE`s; the first holder went idle mid-suite and never released it, blocking the rest for 18+ minutes until
+  killed from outside (reproduced twice, in `platform/core/notifications/notifications.integration.test.ts`'s suite both
+  times). Confirmed root cause by running the same 66 files with `--test-concurrency=1`: 623/623 pass in 53s, no hang.
+  Recorded in `docs/BACKLOG.md` as fixed, since another agent hitting this on a similarly wide machine would otherwise lose
+  a session to it.
+
+**Checks.** `tsc --noEmit` 0 errors; `eslint .` clean on touched files; `npm run check:boundaries` and `check:legacy-runtime`
+OK; new action tests 5/5; full `npm test` 623/623 (after the concurrency fix above). Not run: browser acceptance (per
+standing instruction, the owner tests UI changes themselves) and production build.
+
+**Limits.** Vendor/SKU/material-price linking on the quote dialog is not built (amount + currency only). Read notifications
+still have no retention rule. Not independently reviewed.
 
 ## R8.184 | 2026-09-29 | feat(notifications): platform in-app inbox and the two sample-request events (executed by the Lead)
 

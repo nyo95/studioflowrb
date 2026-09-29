@@ -82,14 +82,27 @@ Rules carried over unchanged from the prior trackers:
 
 ## Platform Foundation
 
+- [x] [BUG][P2] **Fixed 2026-09-29 (R8.185). `npm test` hung indefinitely on at least one Windows dev machine.** The 11
+  disposable-DB test files (`src/platform/core/db/test-support.ts`'s `createTestDb`/`requireDisposableTestDatabaseUrl`)
+  share one Postgres advisory lock key to serialize their `TRUNCATE`s. Node's default test-file concurrency here is
+  `os.availableParallelism()` (32 on this machine), so up to 7 of those files started at once and raced for the lock; the
+  first holder (`platform/core/notifications/notifications.integration.test.ts`) went idle mid-suite and never released
+  it, blocking the rest for 18+ minutes until the connection was killed from outside (`pg_stat_activity`: several backends
+  stuck on `wait_event advisory`, the holder `idle`/`ClientRead`). Reproduced twice, then confirmed by running the same
+  files with `--test-concurrency=1`: 623/623 pass in 53s, no hang. **Fix:** `scripts/run-tests.mjs` now passes
+  `--test-concurrency=1`. `R8.184`'s changelog reports "full npm test 618/618" from wherever that was run, so this may
+  have been Windows/wide-core-count-specific rather than universal; the fix costs a slower `npm test` (files run one at a
+  time) in exchange for it actually finishing.
 - [ ] [PLANNED] Execute `apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md`:
   storage port/test seam, provider adapter, Brand mark migration, then
   approved future consumers.
-- [ ] [PLANNED] **Notifications (platform) — backend built in R8.184; the bell and inbox screens are still to build.** In-app
-  inbox only (`core/notifications`, table `platform.Notification`, actions in `(platform)/notifications/actions.ts`); first
-  workflow is sample requests (staff told of a new request, the requester told when it is priced or declined). Delivery is
-  polling. Email, push, preferences, and digests stay deferred; old read notifications are not cleaned up yet (no retention
-  rule was requested). Private user-to-user messaging below is separate and still blocked.
+- [ ] [PLANNED] **Notifications (platform) — bell and inbox built in R8.185.** In-app inbox only (`core/notifications`, table
+  `platform.Notification`, actions in `(platform)/notifications/actions.ts`, popover in `authenticated-shell/notification-bell.tsx`
+  in the top bar for every signed-in user); first workflow is sample requests (staff told of a new request, the requester told
+  when it is priced or declined). Delivery is polling (60s and on route change), no real-time channel. Email, push, preferences,
+  and digests stay deferred; old read notifications are not cleaned up yet (no retention rule was requested); no browser
+  acceptance recorded yet (owner tests UI changes themselves). Private user-to-user messaging below is separate and still
+  blocked.
 - [ ] [PLANNED] Redesign the top-header/sidebar boundary. Design input already
   captured in `apps/platform/GLOBAL-MENU-DESIGN-BRIEF.md` (owner feedback,
   2026-09-16). Preserve the approved semantic colors. **Partially executed
@@ -158,19 +171,17 @@ invitation to make unrequested drive-by changes.
 
 - [ ] [PLANNED] Define media/file behavior after shared storage exists.
 
-- [ ] [PLANNED] **UNBLOCKED 2026-09-29 (see Decision gates); backend built in R8.183, screen still to build.** **Incoming Sample Requests screen (owner roadmap review,
-  2026-09-26).** StudioFlow will add a public read port exposing pending
-  physical-sample requests (`SfScheduleSampleRequest`, see mirrored entry
-  under **StudioFlow** above for the full evidence trail). This entry is the
-  Master Data side: a staff-facing queue to read those requests, record a
-  vendor's quoted price, and create/update the real `Sku` + `PriceMaterial`
-  rows — ported in spirit from legacy's `sample-request-actions.ts`
-  (`VendorFollowUpInput.syncToMaterialPrice`), which is where the actual
-  Master Data write always lived (never StudioFlow). This is real Master
-  Data domain work, not a small add-on: StudioFlow's `requestedFrom` is
-  free text today, not a `Vendor`/`Party` FK, and `Sku.base_unit_id` is a
-  required FK — so "create pricing from a request" means resolving or
-  creating real `Vendor`/`Unit` records too, not just copying two fields.
+- [ ] [PLANNED] **Screen built in R8.185 (queue, Take/Record quote/Mark priced/Decline); vendor/SKU/`PriceMaterial` linking on
+  the quote is still to build.** **Incoming Sample Requests screen (owner roadmap review, 2026-09-26).** StudioFlow's public
+  read port exposes pending physical-sample requests (`SfScheduleSampleRequest`, see mirrored entry under **StudioFlow** above
+  for the full evidence trail). The Master Data side is a staff-facing queue (`(platform)/masterdata/sample-requests`) to read
+  those requests and record a vendor's quoted price. **Still open:** creating/updating the real `Sku` + `PriceMaterial` rows from
+  a request — ported in spirit from legacy's `sample-request-actions.ts` (`VendorFollowUpInput.syncToMaterialPrice`), which is
+  where the actual Master Data write always lived (never StudioFlow). This is real Master Data domain work, not a small add-on:
+  StudioFlow's `requestedFrom` is free text today, not a `Vendor`/`Party` FK, and `Sku.base_unit_id` is a required FK — so
+  "create pricing from a request" means resolving or creating real `Vendor`/`Unit` records too, not just copying two fields.
+  The service (`recordSampleQuote`) already accepts `vendorId`/`skuId`/`priceMaterialId` by id — only the picker UI is missing,
+  and "must state a price" is already satisfied by amount + currency alone, so this is additive, not blocking.
   **Do not start this from a general "clean up Master Data" pass** — the
   standing rule directly above (owner, 2026-09-24) requires an explicit new
   owner request, and the two questions on the StudioFlow-side mirror entry

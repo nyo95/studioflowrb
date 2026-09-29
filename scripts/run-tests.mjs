@@ -39,9 +39,14 @@ async function discoverTests(directory) {
 
 await discoverTests("src");
 
+// Serialized: several files share one disposable Postgres database and a single advisory lock
+// (test-support.ts) to keep their TRUNCATEs from colliding. Node's default file concurrency is
+// os.availableParallelism(), so on a many-core machine most of those files start at once and race
+// for that lock; whichever holds it can starve for a Postgres connection behind the others' blocked
+// clients and never release it, hanging the whole run. Capping concurrency avoids the race entirely.
 const result = spawnSync(
   process.execPath,
-  ["--import", "tsx", "--test", ...testFiles, ...fixtureSuites],
+  ["--import", "tsx", "--test", "--test-concurrency=1", ...testFiles, ...fixtureSuites],
   { stdio: "inherit", env: testEnvironment },
 );
 
