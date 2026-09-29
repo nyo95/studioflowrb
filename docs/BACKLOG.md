@@ -278,7 +278,11 @@ and "direct hard-delete resolves a pre-existing pending request…".
   yet visually confirmed against the real app shell chrome (topbar height,
   z-index stacking, the `xl:` breakpoint that hides the rail). **R8.192 adds:**
   the Assembly picker's new recipe-preview panel (fetch/loading/empty/error
-  states) has not been exercised in a browser either.
+  states) has not been exercised in a browser either. **R8.193 adds:** the BQ
+  Library Items tab's new search box, KATEGORI/Status Promosi filters, and
+  Status Promosi column have not been exercised in a browser either. This
+  closes the R8.190–R8.193 BQ UI/UX redesign pass — a full browser walkthrough
+  of the whole pass, not just individual pieces, is still owed.
 **Fixed 2026-09-23 (R8.119):** `markupL1Pct` was engine-active but
 UI-invisible for a standalone (childless) Work Item — `calculation-engine.ts`
 applies `markupL1Pct` for every L1 regardless of children, but

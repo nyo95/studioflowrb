@@ -2,16 +2,168 @@
 import { IconButton } from "@/platform/ui_engine";
 import { DraftDialog,useFormDraftGuard } from "@/platform/ui_engine";
 
-import { Copy,Pencil,Plus,Trash2 } from "lucide-react";
+import { Copy,Library,Pencil,Plus,Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef,useState,useTransition,type FormEvent } from "react";
+import { useMemo,useRef,useState,useTransition,type FormEvent } from "react";
 
 import type { BqAssemblyLineRead,BqAssemblyTemplateDetail,BqAssemblyTemplateRead,BqLibItemRead,BqTemplateRead } from "@/apps/bq/public";
 import type { UnitRead } from "@/apps/masterdata/public";
-import { Button,ConfirmDialog,Field,FormActions,InlineError,Input,RowActionMenu,Select,Textarea } from "@/platform/ui_engine";
+import { Badge,Button,ConfirmDialog,DataTable,DirectoryShell,EmptyState,Field,FormActions,InlineError,Input,RowActionMenu,SearchField,Select,TableBody,TableCell,TableHead,TableHeader,TableRow,TableToolbar,Textarea } from "@/platform/ui_engine";
+import { createMoney,formatMoney } from "@platform/utilities/money";
+import { formatInstant } from "@platform/utilities/date";
 import { addAssemblyLineAction,createAssemblyAction,deleteAssemblyAction,deleteAssemblyLineAction,getAssemblyDetailAction,libraryItemAction,templateAction,updateAssemblyAction,updateAssemblyLineAction } from "./actions";
+import { PromotionRequestButton } from "./promotion-controls";
 
 type ItemType = BqLibItemRead["type"];
+
+const KATEGORI_LABEL: Record<string, string> = {
+  MATERIAL: "Material",
+  UPAH: "Labor",
+  MATERIAL_UPAH: "Material + Labor",
+  BIAYA_UMUM: "Biaya Umum",
+  TRANSPORTASI_AKOMODASI: "Transportasi",
+  ALAT: "Alat",
+};
+
+const KATEGORI_TONE: Record<string, "neutral" | "success" | "warning" | "danger"> = {
+  MATERIAL: "neutral",
+  UPAH: "success",
+  MATERIAL_UPAH: "warning",
+  BIAYA_UMUM: "warning",
+  TRANSPORTASI_AKOMODASI: "warning",
+  ALAT: "neutral",
+};
+
+const PROMOTION_LABEL: Record<string, string> = {
+  DRAFT: "Draft",
+  REQUESTED: "Requested",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+};
+
+const PROMOTION_TONE: Record<string, "neutral" | "success" | "warning" | "danger"> = {
+  DRAFT: "neutral",
+  REQUESTED: "warning",
+  APPROVED: "success",
+  REJECTED: "danger",
+};
+
+/** Only these three library types have a Master Data counterpart (bq-contract §4/K-11);
+ *  a Custom item's `promotionStatus` is always "DRAFT" and never changes, so it is
+ *  presented as "not applicable" rather than a Draft badge that implies a pending step. */
+const PROMOTABLE_TYPES = new Set<ItemType>(["material", "labor", "material_labor"]);
+
+/**
+ * Items tab: search + KATEGORI/promotion-status filters over the full list
+ * (client-side, matching this codebase's directory-table convention — see
+ * e.g. `unit-directory.tsx`), plus promotion status as a real column instead
+ * of only a conditional row action.
+ */
+export function LibraryItemsPanel({
+  items,
+  units,
+  canManage,
+  canPromote,
+  locale,
+  timeZone,
+}: {
+  items: BqLibItemRead[];
+  units: UnitRead[];
+  canManage: boolean;
+  canPromote: boolean;
+  locale: string;
+  timeZone: string;
+}) {
+  const [query, setQuery] = useState("");
+  const [kategoriFilter, setKategoriFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+
+  const kategoriOptions = useMemo(
+    () => Array.from(new Set(items.map((item) => item.kategori))).sort(),
+    [items],
+  );
+
+  const filtered = items.filter((item) => {
+    if (query && !item.name.toLowerCase().includes(query.trim().toLowerCase())) return false;
+    if (kategoriFilter && item.kategori !== kategoriFilter) return false;
+    if (statusFilter && item.promotionStatus !== statusFilter) return false;
+    return true;
+  });
+
+  return (
+    <DirectoryShell
+      surface
+      fill
+      toolbar={
+        <TableToolbar framed={false}>
+          <SearchField value={query} onChange={(e) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Cari nama item..." />
+          <Select aria-label="Filter kategori" value={kategoriFilter} onChange={(e) => setKategoriFilter(e.target.value)}>
+            <option value="">Semua kategori</option>
+            {kategoriOptions.map((k) => <option key={k} value={k}>{KATEGORI_LABEL[k] ?? k}</option>)}
+          </Select>
+          <Select aria-label="Filter status promosi" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">Semua status promosi</option>
+            <option value="DRAFT">Draft</option>
+            <option value="REQUESTED">Requested</option>
+            <option value="APPROVED">Approved</option>
+            <option value="REJECTED">Rejected</option>
+          </Select>
+        </TableToolbar>
+      }
+    >
+      {items.length === 0 ? (
+        <EmptyState icon={Library} title="Belum ada library items" description="Mulai dengan menambahkan item baru." />
+      ) : filtered.length === 0 ? (
+        <EmptyState title="Tidak ada yang cocok" description="Coba ubah kata kunci pencarian atau filter." />
+      ) : (
+        <DataTable framed={false} density="compact" stickyHeader fill minWidth={860}>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nama</TableHead>
+              <TableHead>Unit</TableHead>
+              <TableHead align="end">Harga</TableHead>
+              <TableHead>KATEGORI</TableHead>
+              <TableHead>Status Promosi</TableHead>
+              {canManage || canPromote ? <TableHead align="end">Actions</TableHead> : null}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.map((item) => (
+              <TableRow key={item.id}>
+                <TableCell>
+                  <div className="grid gap-0.5">
+                    <span className="font-medium">{item.name}</span>
+                    <span className="text-xs text-ink-tertiary">Updated {formatInstant(item.updatedAt, { locale, timeZone, style: "date" })}</span>
+                  </div>
+                </TableCell>
+                <TableCell>{item.purchaseUnit}</TableCell>
+                <TableCell align="end">{formatMoney(createMoney(item.harga, item.currency), { locale })}</TableCell>
+                <TableCell>
+                  <Badge tone={KATEGORI_TONE[item.kategori] ?? "neutral"}>{KATEGORI_LABEL[item.kategori] ?? item.kategori}</Badge>
+                </TableCell>
+                <TableCell>
+                  {PROMOTABLE_TYPES.has(item.type) ? (
+                    <Badge tone={PROMOTION_TONE[item.promotionStatus] ?? "neutral"}>{PROMOTION_LABEL[item.promotionStatus] ?? item.promotionStatus}</Badge>
+                  ) : (
+                    <span className="text-ink-tertiary">—</span>
+                  )}
+                </TableCell>
+                {canManage || canPromote ? (
+                  <TableCell align="end">
+                    <div className="flex flex-wrap items-center justify-end gap-1">
+                      {canPromote ? <PromotionRequestButton item={item} /> : null}
+                      {canManage ? <LibraryItemActions item={item} units={units} /> : null}
+                    </div>
+                  </TableCell>
+                ) : null}
+              </TableRow>
+            ))}
+          </TableBody>
+        </DataTable>
+      )}
+    </DirectoryShell>
+  );
+}
 function useCommand() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();

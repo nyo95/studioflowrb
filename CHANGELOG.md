@@ -5,13 +5,42 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.192**
-- Next local revision: **R8.193**
+- Current revision after this entry is committed: **R8.193**
+- Next local revision: **R8.194**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.193 | 2026-09-29 | feat(bq): search/filter and a real Status Promosi column on BQ Library Items
+
+Fourth and last slice of the BQ UI/UX redesign pass (previous three: R8.190–R8.192).
+
+- **New `LibraryItemsPanel`** (`src/app/(platform)/bq/library/library-controls.tsx`), extracted from the Items
+  tab's inline JSX in `page.tsx`. Adds a search box (by name) plus KATEGORI and Status Promosi `<Select>` filters
+  above the table, all filtering the already-fetched `items` array client-side — the same convention this
+  codebase's masterdata directory tables already use (e.g. `unit-directory.tsx`), not a new pattern. The Items tab
+  previously had no search or filter at all; as the library grows past a page or two this was the one BQ screen
+  with no way to find anything.
+- **Status Promosi is now a table column** (`DRAFT`/`REQUESTED`/`APPROVED`/`REJECTED`, badge-styled like KATEGORI),
+  not only an implicit state that gated whether the row-menu's "Ajukan Promosi" action was visible. A Custom
+  item's `promotionStatus` is always `DRAFT` and can never change (bq-contract §8.2 — only Material/Labor/
+  Material+Labor are ever `REQUESTED`), so it renders as a plain "—" rather than a `Draft` badge that would
+  wrongly imply a pending step.
+- `page.tsx` shrank to composing tabs; all Items-tab markup, state, and the KATEGORI/promotion label-tone maps
+  moved into the new client component alongside the (also newly added) `PROMOTABLE_TYPES` check reused from
+  `promotion-controls.tsx`'s existing rule.
+
+**Checks.** `tsc --noEmit` 0 errors; `eslint src/apps/bq "src/app/(platform)/bq"` clean; `check:boundaries` OK;
+`check:legacy-runtime` OK; full `npm test` 628/628; production build exit 0. No browser pass was run (owner tests
+BQ in-browser themselves); added to the same `[UNVERIFIED]` BQ scope in `docs/BACKLOG.md`.
+
+This closes the four-slice BQ UI/UX redesign pass (R8.190–R8.193) proposed as an owner-facing mockup earlier this
+session. Deliberately out of scope throughout, and not silently added: any change to the calculation engine,
+schema, RBAC, or editability rules; a per-section money subtotal (would require server-side calculation, not
+attempted client-side — see R8.191); an "estimated assembly cost" total (see R8.192, same reason); redesigning
+Project List, the "new project" form, or the Template Editor (judged already adequate, not touched).
 
 ## R8.192 | 2026-09-29 | feat(bq): Assembly picker shows the L2+L3 recipe before applying
 
