@@ -72,7 +72,7 @@ export default async function SchedulePrintPage({
         <header className="flex items-start justify-between gap-6 border-b-2 border-black pb-4">
           <div className="min-w-0">
             <p className={LABEL}>Product Schedule</p>
-            <h1 className="mt-1 font-serif text-3xl font-bold uppercase leading-tight">{project.name}</h1>
+            <h1 className="mt-1 font-ui-sans text-3xl font-black uppercase leading-tight">{project.name}</h1>
             {project.client ? <p className="mt-1 text-sm">{project.client.name}</p> : null}
           </div>
           <div className="shrink-0 text-right">

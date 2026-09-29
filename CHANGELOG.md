@@ -5,13 +5,36 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.186**
-- Next local revision: **R8.187**
+- Current revision after this entry is committed: **R8.187**
+- Next local revision: **R8.188**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.187 | 2026-09-29 | fix(ui): print headings faked serif bold instead of using the fixed sans-black pattern
+
+Found while answering the owner's question about a font "artifact" on the printed Product Schedule title. `tsc --noEmit`
+found nothing because this is a Tailwind class string, not a type error.
+
+- Both print/PDF headings (`(document)/studioflow/print/projects/[projectId]/schedule/page.tsx`,
+  `.../mom/[momId]/page.tsx`) hand-rolled their own `<h1>` instead of the shared `Heading` primitive, so they never
+  picked up the R8.148/R8.162 fix: `font-serif font-bold` requests weight 700 on Instrument Serif, which ships only
+  weight 400 (Regular/Italic — `layout.tsx`), so the browser synthesized the bold by smearing the 400 outlines (thin,
+  slack look). A second, separate defect stacked on top: `font-serif` is Tailwind's own built-in default utility, not
+  this app's `font-ui-serif` design token (`globals.css` `@theme inline` maps `--font-ui-serif` to the actual Instrument
+  Serif variable) — so the custom face wasn't even being requested; the computed font-family resolved to the browser's
+  generic system serif, not Instrument Serif and not any "Lora"-like face.
+- Both now use `font-ui-sans font-black` (Schibsted Grotesk, a real variable font over weights 400-900), matching the
+  pattern `Heading`'s H1/H2 already use. Verified live: computed `font-family` is now `"Schibsted Grotesk", ...` at
+  `font-weight: 900`, no synthesis.
+- No other file uses the bare `font-serif` Tailwind utility (checked app-wide).
+
+**Checks.** `tsc --noEmit` 0 errors; `eslint .` clean; `check:boundaries` OK; verified live via computed styles and a
+screenshot of the rendered print page (no MOM document existed in the fixture project to screenshot that page too, but
+it is byte-identical markup to the schedule heading now confirmed working). No test added — a static className string,
+not a behavior a unit test would catch; the R8.162 precedent didn't add one either.
 
 ## R8.186 | 2026-09-29 | fix(studioflow,masterdata): asset-cleanup deletes retry instead of leaking, price amount always has a currency
 

@@ -45,7 +45,7 @@ export default async function MomPrintPage({ params }: { params: Promise<{ proje
         <header className="flex items-start justify-between gap-6 border-b-2 border-black pb-4">
           <div className="min-w-0">
             <p className={LABEL}>Minutes of meeting</p>
-            <h1 className="mt-1 font-serif text-3xl font-bold uppercase leading-tight">{doc.topic}</h1>
+            <h1 className="mt-1 font-ui-sans text-3xl font-black uppercase leading-tight">{doc.topic}</h1>
             <p className="mt-1 text-sm">{project.name}</p>
             {project.client ? <p className="text-xs uppercase tracking-[0.14em] text-neutral-500">{project.client.name}</p> : null}
           </div>
