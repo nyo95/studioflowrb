@@ -5,13 +5,26 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.198**
-- Next local revision: **R8.199**
+- Current revision after this entry is committed: **R8.199**
+- Next local revision: **R8.200**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.199 | 2026-09-29 | feat(platform): add quick messenger popup
+
+- Replaces the topbar messenger link with a bottom-right quick-message popup opened from the same icon/badge. The
+  popup consumes the existing messenger actions/service from R8.198: list conversations/people, read conversation,
+  send text/files, resolve attachment links, and poll unread counts.
+- Keeps `/messenger` as the full-screen view via an expand icon in the popup. No new schema, storage policy,
+  permissions, or delivery channel; polling and expiring private attachments remain the R8.198 behavior.
+- The popup supports existing conversation chips, a "New" recipient picker, a compact message list, attachment open
+  buttons, and the same server-action composer used by the main module.
+
+**Checks.** `tsc --noEmit` clean; `eslint .` 0 errors with the two pre-existing Presentation `<img>` warnings.
+Full mandatory suite continues from R8.198's backend checks; browser acceptance for the messenger remains open.
 
 ## R8.198 | 2026-09-29 | feat(platform): add private messenger with expiring attachments
 

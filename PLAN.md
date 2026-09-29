@@ -1,8 +1,8 @@
 # Active Plan
 
-Plan ID: WO-PLATFORM-MESSENGER-01
-Scope: Platform private 1:1 messenger with expiring attachments
-Target revision: R8.198
+Plan ID: WO-PLATFORM-MESSENGER-02
+Scope: Platform quick messenger popup
+Target revision: R8.199
 Status: IMPLEMENTED - awaiting reviewer acceptance
 Priority: P2
 Owner: owner (Product Owner)
@@ -10,7 +10,7 @@ Last updated: 2026-09-29
 
 ## Outcome
 
-Signed-in users can exchange private 1:1 messages with other active platform users across the whole web app. The inbox updates by polling, unread counts are stored on the server, and attached files are private temporary objects that become unavailable after their expiry window.
+Signed-in users can exchange quick private 1:1 messages from a bottom-right popup without leaving their current screen. The popup consumes the R8.198 messenger backend/actions and keeps `/messenger` as the full-screen view.
 
 ## Context and Evidence
 

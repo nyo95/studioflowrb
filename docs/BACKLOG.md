@@ -119,10 +119,10 @@ Rules carried over unchanged from the prior trackers:
   treatment beyond generic truncation, and per-app icons, remain undecided —
   not blocking, no icon field exists in the apps registry yet.
 
-- [ ] [UNVERIFIED] **Private user-to-user messaging, cross-app — backend and minimal UI built in R8.198.**
+- [ ] [UNVERIFIED] **Private user-to-user messaging, cross-app — backend and minimal UI built in R8.198; quick popup added in R8.199.**
   Owner chose polling on 2026-09-29 and requested expiring attachments after a legacy check. Implemented as a
   platform-owned private 1:1 messenger, not StudioFlow project discussion: server-side read cursors/unread counts,
-  `/messenger`, topbar badge, private ObjectStorage attachments expiring after 30 minutes, and cleanup that removes
+  `/messenger`, topbar quick-message popup/badge, private ObjectStorage attachments expiring after 30 minutes, and cleanup that removes
   bytes while preserving message history. Legacy evidence was read-only from `D:\Misc\ProjectsHUB\studioflow` at
   `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`: keep the temporary attachment expiry/cleanup concept; fix public
   storage and localStorage unread; purge project-scoped shared chat behavior for this slice. Browser acceptance still

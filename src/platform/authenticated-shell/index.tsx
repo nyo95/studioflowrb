@@ -3,7 +3,7 @@ import { AccountMenu } from "./account-menu";
 import { DisplaySettingsProvider } from "./display-settings";
 
 import { NotificationBell } from "./notification-bell";
-import { MessengerLink } from "./messenger-link";
+import { QuickMessenger } from "./quick-messenger";
 
 import Link from "next/link";
 
@@ -101,7 +101,7 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
         <HeaderApplicationNavigation apps={apps} />
         {contextSlot}
         <span className="flex-1" aria-hidden="true" />
-        <MessengerLink />
+        <QuickMessenger />
         <NotificationBell />
         <AccountMenu
           name={principal.displayName}
