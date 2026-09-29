@@ -47,8 +47,10 @@ Core must not own app workflows, entity CRUD, pricing policy, BQ calculation sem
 ### Layer access
 
 - App `domain/` never imports Prisma or DB types.
-- App `infrastructure/` owns Prisma queries for that app's data.
-- App `application/` orchestrates infrastructure ports/use cases and transaction scope.
+- App data access and transaction scope live in the app's service modules (`service.ts`, `services/*`, and per-feature
+  service folders such as StudioFlow's `projects/`, `phases/`, `mom/`), composed once in the app's `runtime.ts`. No app has
+  separate `infrastructure/` or `application/` directories; do not create them without a Planner-approved layer split.
+  Enforced by `check-boundaries`: `domain/` stays pure and a file touches only its own schema's models.
 - Cross-app reads/writes go through the owning app's `public/` contract. A shared Prisma client does not authorize direct access to another app's models. The full ownership, dependency, and enforcement rules are in [`docs/MODULE-BOUNDARIES.md`](docs/MODULE-BOUNDARIES.md).
 - Core provides no generic repository or active-record abstraction.
 
@@ -529,10 +531,10 @@ strictly read-only repository and PostgreSQL isolation rules in `AGENTS.md`.
 | `src/lib/action-wrapper.ts#createAction`, `src/lib/result.ts` | **MERGE + FIX** | Preserve typed result/unwrap ergonomics; remove raw unknown error leakage and bundled auth/DB/transaction/revalidation/app role policy. |
 | `src/lib/revalidation.ts#invalidateCache` and route tag registry | **APP-OWNED / DEFER** | Revalidation mechanics may later be shared, but app route/tag policy never enters Core. |
 
-Current rebuild evidence:
+Current rebuild evidence (verified 2026-09-29):
 
-- `src/platform/core/db`, `errors`, `validation`, `rbac`, `audit`, and provider-neutral `auth` are useful pure/mechanical baselines;
-- `src/apps/masterdata/infrastructure/request-context.ts#configuredOperatorContext` is explicitly non-production and must be removed after real identity wiring;
-- there are no persisted User/Role/UserRole/RolePermission/Session or Platform General Settings models/routes yet;
-- `src/platform/core/events`, `files`, `src/platform/dictionary`, generic `format`, and generic `id` are empty/speculative and are not a finished foundation;
-- the current `SessionPrincipal.roleId` and app request contexts must migrate to multi-role live grant resolution without weakening existing permission checks.
+- `src/platform/core/db`, `errors`, `validation`, `rbac`, `audit`, `auth`, `settings`, `notifications`, and `messenger` are
+  the shared baselines; persisted User/Role/UserRole/RolePermission/Session and Platform General Settings models, routes and
+  integration tests exist, and sessions resolve multi-role live grants (`SessionPrincipal.roleIds` is context only);
+- no app has a non-production operator context left;
+- the speculative `events`, `files`, `dictionary`, generic `format` and generic `id` folders no longer exist.

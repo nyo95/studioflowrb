@@ -5,13 +5,37 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.208**
-- Next local revision: **R8.209**
+- Current revision after this entry is committed: **R8.209**
+- Next local revision: **R8.210**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.209 | 2026-09-29 | fix(platform,docs): harden the architecture harness, clear the backlog to planned-only, verify in the browser
+
+- **Checker harness (KB-040, KB-053, KB-054, KB-051 follow-up).** The duplicate-primitive rule now also catches
+  `Intl.RelativeTimeFormat` and `toLocaleDateString`/`toLocaleTimeString`; the two live bypasses
+  (`masterdata/page.tsx`, print/schedule) now use `formatInstant`. New rules: an unscanned file under `src` (extensionless,
+  `.mts`, `.fuse_hidden*`) fails; a **ratchet** for generic machinery (`APP_DUPLICATE_MACHINERY`: private `runRowAction`, private
+  page-count math) that fails on any new copy and on any baseline entry that no longer matches. The legacy-reference scan now also
+  covers `scripts/`, `prisma/`, `public/` (plus `.sql`/`.prisma`) and absolute paths into a checkout named `studioflow`.
+  Fixtures for every new rule.
+- **Docs (KB-039, KB-052, KB-055a).** `CORE.md` now describes the real shape (service modules + `runtime.ts`, no per-app
+  `infrastructure/`/`application/`) and its stale "current evidence" block is rewritten; the checker table in
+  `docs/UTILITY-INVENTORY.md` states the widened rule. R8.83's "pill radius 3px" note was stale (token was always 999px).
+- **UI fixes found in the walkthrough.** PipelineStrip (UI Engine) scrolls horizontally instead of truncating phase names at
+  ~840 px and stacking tall at 375 px; "Add feedback" no longer clips at 375 px.
+- **Backlog is planned/blocked only.** All `[UNVERIFIED]`, `[BUG]` and `[CLEANUP]` entries were closed or moved: browser checks that
+  still need a second user, real hardware, or Master Data prices are one PENDING item in
+  `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`; KB-043 and KB-055b became `WO-CLEANUP-01` in `PLAN.md` (READY, for Codex, R8.210).
+- **Browser verified (dev server, 2026-09-29).** Quick messenger anchoring at desktop and 375 px; Deliverables upload/download/delete;
+  archive and restore with a real file; Product Schedule settings (add/edit/delete a prefix row), add-option with photo, Set final,
+  option delete, board and list; Presentation board pins; print pages (200, converged date) and the SF-13 error fallback with retry
+  (forced error, reverted); BQ end to end (see R8.208). Test rows left in the dev DB are listed in R8.208.
+
+**Checks.** `npm run check`, `test:boundaries`, `test:legacy-runtime`, eslint, full `npm test`.
 
 ## R8.208 | 2026-09-29 | fix(bq,platform): late-sorting BQ price lookup, production storage-folder guard, checker rules, mobile project menu
 

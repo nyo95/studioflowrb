@@ -5,7 +5,13 @@ import ts from "typescript";
 
 export const RULE_LEGACY_RUNTIME_REFERENCE = "runtime-reference-to-legacy-repo";
 
-const LEGACY_PATH_PATTERN = /\.\.[\\/]+studioflow(?![\w-])/g;
+// A relative sibling checkout (`../studioflow`) or an absolute path into a checkout
+// named exactly `studioflow` (`D:\Projects\studioflow\...`, `/home/x/studioflow/...`).
+const LEGACY_PATH_PATTERN = /\.\.[\\/]+studioflow(?![\w-])|[A-Za-z]:[\\/](?:[\w .-]+[\\/])*studioflow(?=[\\/])|\/(?:home|Users|mnt|opt|srv)\/(?:[\w .-]+\/)*studioflow(?=\/)/g;
+// The checkers' own fixtures name legacy paths on purpose.
+const SELF_TEST_FILES = new Set(["scripts/test-legacy-runtime-checker.mjs", "scripts/check-legacy-runtime.mjs"]);
+const EXTRA_SCAN_DIRECTORIES = ["scripts", "prisma", "public"];
+const RAW_TEXT_EXTENSIONS = new Set([".prisma", ".sql"]);
 const TOKEN_END = new Set(['"', "'", "`", " ", "\t", ")", ";", "]", ","]);
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
@@ -63,6 +69,25 @@ async function walkSources(dir, skipDirectories = SKIP_DIRECTORIES, root = dir) 
   return files.sort();
 }
 
+async function walkRawText(dir) {
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const files = [];
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (!SKIP_DIRECTORIES.has(entry.name)) files.push(...(await walkRawText(path)));
+    } else if (RAW_TEXT_EXTENSIONS.has(extname(entry.name))) {
+      files.push(path);
+    }
+  }
+  return files.sort();
+}
+
 function extendTokenFromMatch(line, startIndex) {
   let begin = startIndex;
   while (begin > 0 && /[./\\]/.test(line[begin - 1])) begin--;
@@ -110,7 +135,8 @@ function collectActiveEnvValues(content) {
   const values = [];
   const lines = content.split("\n");
   for (let index = 0; index < lines.length; index++) {
-    if (lines[index].trim().startsWith("#")) continue;
+    const trimmed = lines[index].trim();
+    if (trimmed.startsWith("#") || trimmed.startsWith("//") || trimmed.startsWith("--")) continue;
     values.push({ text: lines[index], line: index + 1 });
   }
   return values;
@@ -120,8 +146,14 @@ export async function collectLegacyRuntimeReferences({ projectRoot = process.cwd
   projectRoot = resolve(projectRoot);
   srcDir = srcDir ? resolve(srcDir) : join(projectRoot, "src");
 
+  const extraDirs = srcDir === join(projectRoot, "src") ? EXTRA_SCAN_DIRECTORIES.map((d) => join(projectRoot, d)) : [];
+  const extraFiles = [];
+  for (const dir of extraDirs) {
+    extraFiles.push(...(await walkSources(dir)), ...(await walkRawText(dir)));
+  }
   const candidates = [
     ...(await walkSources(srcDir)),
+    ...extraFiles.filter((file) => !SELF_TEST_FILES.has(relative(projectRoot, file).replaceAll("\\", "/"))),
     ...(await listRootConfigFiles(projectRoot)).map((name) => join(projectRoot, name)),
   ];
 
@@ -133,7 +165,7 @@ export async function collectLegacyRuntimeReferences({ projectRoot = process.cwd
     } catch {
       continue;
     }
-    const isEnvFile = basename(file).startsWith(".env");
+    const isEnvFile = basename(file).startsWith(".env") || RAW_TEXT_EXTENSIONS.has(extname(file));
     const activeValues = isEnvFile
       ? collectActiveEnvValues(content)
       : collectActiveStringValues(file, content);

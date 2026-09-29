@@ -7,6 +7,10 @@ import {
   collectBoundaryViolations,
   collectDatabaseOwnershipViolations,
   collectDuplicatePrimitiveViolations,
+  collectUnscannedFileViolations,
+  collectDuplicateMachineryViolations,
+  RULE_DUPLICATE_MACHINERY,
+  RULE_UNSCANNED_FILE,
   collectPermissionVocabularyViolations,
   collectRouteOwnershipViolations,
   RULE_APP_TO_OTHER_APP_INTERNAL,
@@ -222,6 +226,13 @@ const FOUNDATION_FILES = {
   "src/apps/ven/indexes.tsx": `import { Text } from "@/platform/ui_engine";\nexport const E = () => <span className="font-ui-mono">x</span>;\n`,
   "src/apps/ven/format.ts": `export const stamp = (d: Date) => new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" }).format(d);\n`,
   "src/apps/ven/allowed.ts": `export const stamp = (d: Date) => new Intl.DateTimeFormat("en-CA", { dateStyle: "short" }).format(d);\n`,
+  "src/apps/ven/.fuse_hidden0001": `export const debris = 1;
+`,
+  "src/apps/ven/logo.png": "x",
+  "src/apps/ven/row.tsx": `export function F() { const runRowAction = () => 1; return runRowAction; }
+`,
+  "src/apps/ven/row-baselined.tsx": `export function G() { const runRowAction = () => 2; return runRowAction; }
+`,
   "src/apps/ven/generated/nested.ts": `export const f = new Intl.DateTimeFormat("id-ID");
 `,
 
@@ -278,9 +289,9 @@ try {
   assert.deepEqual(
     duplicates.map((v) => violationKey(foundationRoot, v)).sort(),
     [
-      `src/apps/ven/format.ts | ${RULE_DUPLICATE_PRIMITIVE} | new Intl.DateTimeFormat(...)`,
-      `src/apps/ven/allowed.ts | ${RULE_DUPLICATE_PRIMITIVE} | new Intl.DateTimeFormat(...)`,
-      `src/apps/ven/generated/nested.ts | ${RULE_DUPLICATE_PRIMITIVE} | new Intl.DateTimeFormat(...)`,
+      `src/apps/ven/format.ts | ${RULE_DUPLICATE_PRIMITIVE} | Intl/toLocale date display`,
+      `src/apps/ven/allowed.ts | ${RULE_DUPLICATE_PRIMITIVE} | Intl/toLocale date display`,
+      `src/apps/ven/generated/nested.ts | ${RULE_DUPLICATE_PRIMITIVE} | Intl/toLocale date display`,
     ].sort(),
   );
 
@@ -291,8 +302,8 @@ try {
   assert.deepEqual(
     duplicatesWithAllow.map((v) => violationKey(foundationRoot, v)).sort(),
     [
-      `src/apps/ven/format.ts | ${RULE_DUPLICATE_PRIMITIVE} | new Intl.DateTimeFormat(...)`,
-      `src/apps/ven/generated/nested.ts | ${RULE_DUPLICATE_PRIMITIVE} | new Intl.DateTimeFormat(...)`,
+      `src/apps/ven/format.ts | ${RULE_DUPLICATE_PRIMITIVE} | Intl/toLocale date display`,
+      `src/apps/ven/generated/nested.ts | ${RULE_DUPLICATE_PRIMITIVE} | Intl/toLocale date display`,
     ],
   );
 
@@ -305,7 +316,28 @@ try {
     "an allow-list entry pointing at a missing file must fail",
   );
 
-  const combined = await collectAllViolations({ projectRoot: foundationRoot, allowList: [] });
+  const unscanned = await collectUnscannedFileViolations({ projectRoot: foundationRoot });
+  assert.deepEqual(
+    unscanned.map((v) => violationKey(foundationRoot, v)).sort(),
+    [`src/apps/ven/.fuse_hidden0001 | ${RULE_UNSCANNED_FILE} | .fuse_hidden0001`],
+  );
+
+  const machineryFixture = [{
+    name: "runRowAction",
+    pattern: /\bconst\s+runRowAction\b/,
+    canonical: "shared hook",
+    baseline: ["src/apps/ven/row-baselined.tsx", "src/apps/ven/gone.tsx"],
+  }];
+  const machinery = await collectDuplicateMachineryViolations({ projectRoot: foundationRoot, machinery: machineryFixture });
+  assert.deepEqual(
+    machinery.map((v) => violationKey(foundationRoot, v)).sort(),
+    [
+      `src/apps/ven/row.tsx | ${RULE_DUPLICATE_MACHINERY} | runRowAction`,
+      `src/apps/ven/gone.tsx | ${RULE_STALE_ALLOW_LIST} | runRowAction`,
+    ].sort(),
+  );
+
+  const combined = await collectAllViolations({ projectRoot: foundationRoot, allowList: [], machinery: machineryFixture });
   assert.equal(combined.boundary.length, boundary.length);
   assert.equal(combined.permission.length, permission.length);
   assert.equal(combined.route.length, route.length);

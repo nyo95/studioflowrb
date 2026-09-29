@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.208] Remaining browser checks that need a second person, real hardware, or data the dev database lacks
+- Surface: messenger (`/messenger`, topbar popup), BQ Cost Component picker, StudioFlow archive/cleanup, Deliverables
+- Fixture: needs (a) a second signed-in user, (b) Master Data with at least one supplier price, (c) an archived project past its retention date, (d) a real device
+- Viewport: desktop and 375 px
+- Steps: 1. Two users exchange text and one small attachment; unread badge appears and clears (R8.198/R8.199). 2. Real file dialog, OS file drag, and a real IME in the quick popup (R8.207). 3. In BQ add a Master Data material price, including one whose SKU sorts past the 200th (R8.208 fix), a Master Data labor/material+labor price, and a BQ Library item; try promotion review controls and the calculator on an inline numeric cell. 4. Run cleanup a second time (no-op), run it as a user without project-manage (refused), and confirm a shared schedule image survives; restore a MOM revision after a purge. 5. Upload an image deliverable, reach OUTDATED, and confirm a missing deliverable never blocks approval.
+- Acceptance: each step behaves as its contract in `docs/BACKLOG.md`/`CHANGELOG.md` says.
+- Status: PENDING
+
 ### [R8.201] QuickMessenger popup stays viewport-anchored
 - Surface: authenticated shell topbar / QuickMessenger
 - Fixture: authenticated user with access to the platform shell

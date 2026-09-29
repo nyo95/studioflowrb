@@ -191,8 +191,8 @@ export function PipelineStrip({
   return (
     <ol
       aria-label={label}
-      className={cx("m-0 grid list-none gap-px bg-line-subtle p-0 max-[720px]:grid-cols-1!", className)}
-      style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}
+      className={cx("m-0 grid list-none gap-px overflow-x-auto bg-line-subtle p-0", className)}
+      style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(7.5rem, 1fr))` }}
       {...props}
     >
       {steps.map((step) => {

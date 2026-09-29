@@ -1,6 +1,6 @@
 # Consolidated Backlog
 
-Status: active, reconciled through **R8.106** on 2026-09-22, plus a full-repo
+Status: active (only `[PLANNED]` and `[BLOCKED]` items remain as of R8.208; pending browser checks live in `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`), reconciled through **R8.106** on 2026-09-22, plus a full-repo
 logic + UI/UX audit at `ee9e09e` on 2026-09-26 (see "Full-repo logic + UI/UX
 audit" below; that pass found 1 P0, 3 P1, 13 P2, 15 P3, and 2 currently-failing
 guard tests). R8.165 closed that P0 and those three P1s; the two residuals of the
@@ -93,6 +93,12 @@ Rules carried over unchanged from the prior trackers:
   `--test-concurrency=1`. `R8.184`'s changelog reports "full npm test 618/618" from wherever that was run, so this may
   have been Windows/wide-core-count-specific rather than universal; the fix costs a slower `npm test` (files run one at a
   time) in exchange for it actually finishing.
+- [ ] [PLANNED] **WO-CLEANUP-01 - small structural leftovers, for the Backend Executor (Codex).** Written up in `PLAN.md`
+  (READY). Two items: (1) converge the seven private `runRowAction` wrappers and the private page-count math onto one
+  canonical UI Engine hook / `usePagination` (KB-043) and empty `APP_DUPLICATE_MACHINERY` in `scripts/check-boundaries.mjs`;
+  (2) drop the unused `SfActivityMode.TODO` enum member after confirming no row uses it (KB-055b). The harness added in
+  R8.208 already fails on any new copy and on any baseline entry that is no longer needed, so the list can only shrink.
+  Browser checks still owed after any change of this kind live in `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`.
 - [ ] [PLANNED] Execute `apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md`:
   storage port/test seam, provider adapter, Brand mark migration, then
   approved future consumers.
@@ -119,30 +125,9 @@ Rules carried over unchanged from the prior trackers:
   treatment beyond generic truncation, and per-app icons, remain undecided —
   not blocking, no icon field exists in the apps registry yet.
 
-- [ ] [UNVERIFIED] **Private user-to-user messaging, cross-app — backend and minimal UI built in R8.198; quick popup added in R8.199.**
-  Owner chose polling on 2026-09-29 and requested expiring attachments after a legacy check. Implemented as a
-  platform-owned private 1:1 messenger, not StudioFlow project discussion: server-side read cursors/unread counts,
-  `/messenger`, topbar quick-message popup/badge, private ObjectStorage attachments expiring after 30 minutes, and cleanup that removes
-  bytes while preserving message history. Legacy evidence was read-only from `D:\Misc\ProjectsHUB\studioflow` at
-  `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`: keep the temporary attachment expiry/cleanup concept; fix public
-  storage and localStorage unread; purge project-scoped shared chat behavior for this slice. Browser acceptance still
-  needed: two signed-in users exchange text, observe polling/unread badge, open to clear unread, upload one small
-  attachment and open it before expiry. Expiry itself is covered by service tests and need not wait 30 minutes in the
-  browser.
-
-- [ ] [UNVERIFIED] **Quick Messenger composer refinement — built in R8.207 and browser-checked with synthetic events.**
-  Popup collapse on outside press/focus/Escape with retained drafts, Enter/Shift/Alt+Enter/IME handling, plain-text
-  list continuation, compact `+`/send composer and drag-drop shipped and verified in the browser (desktop and 375 px,
-  new-message and open-conversation states). Still needs real-device evidence: a native file dialog, an OS file
-  drag, and a real IME composition (browser tests dispatched synthetic events). Picked files are memory-only, so
-  they do not survive a full page reload (text drafts do, via `sessionStorage`).
-
 ## UI Engine and Shared Utilities
 
-- [ ] [UNVERIFIED] Browser walk of Badge/FilterChip/Avatar/Switch/multi-select
-  tags/empty-state panel/sidebar at desktop and 840 px (Round 3 design system
-  pass, R8.83: sharper chip edges, `--ui-radius-pill` 3px, darker sidebar,
-  circular avatars) — `tsc --noEmit` was clean, no browser evidence recorded.
+No open items. (The pill-radius note from R8.83 was stale: `--ui-radius-pill` has always been 999px in this repository; badges are fully round.)
 
 ## Master Data
 
@@ -265,13 +250,6 @@ and "direct hard-delete resolves a pre-existing pending request…".
   reference.
 - [ ] [PLANNED] Add reorder for Sections/L1/L2/L3 inside a project.
 - [ ] [PLANNED] Add a unit-conversion helper for `purchase_to_base_factor`.
-- [ ] [UNVERIFIED] BQ browser walkthrough — mostly done 2026-09-29 (R8.208): project create, section,
-  Work Item, custom Cost Component, inline Rate edit with server-recomputed totals, an unpriced item
-  not blanking the document ("Belum lengkap"), outline rail + sticky Grand Total (and rail hidden at
-  375 px), Assembly picker recipe preview, Library search/Status Promosi filter and column. Still not
-  walked: the Master Data price and BQ Library sources for a Cost Component (the dev database has no
-  Master Data prices, so the >200-price fix is covered by an integration test only), promotion
-  review controls, calculator input from inline cells, and the picker's loading/error states.
 **Fixed 2026-09-23 (R8.119):** `markupL1Pct` was engine-active but
 UI-invisible for a standalone (childless) Work Item — `calculation-engine.ts`
 applies `markupL1Pct` for every L1 regardless of children, but
@@ -384,25 +362,6 @@ recorded here. Terminology note settled the same session: this rebuild has no
 Data/BQ, peers) → feature module inside an app (MOM, Schedule, Presentation,
 etc., all StudioFlow modules, no sub-tier between them).
 
-- [ ] [UNVERIFIED] **SF-PRESENTATION — Presentation Manager module.** Implemented in R8.194; browser acceptance remains open. QUEUED plan
-  in `apps/studioflow/SF-PRESENTATION-PLAN.md` (moved out of `PLAN.md` on
-  2026-09-28; must be re-cut into a backend Work Order plus a Lead UI revision
-  and its two defaults confirmed before it runs) — not started. A
-  project-scoped StudioFlow module: `Board` → many `Slide` (bulk-imported
-  images) → many pinned `Annotation` per slide, each pin optionally linked to
-  a Product Schedule entry (same-app, resolved live so labels can never
-  drift), exportable via the shared UI Engine print view (third consumer,
-  after MOM and Schedule). Ports legacy `RenderBoard`/`RenderAnnotation`
-  (`studioflow-schedule-contract.md` §8: `RenderAnnotation on schedule
-  entries | DEFER | Not contracted`), expanded from legacy's one-image-per-
-  board to many-slides-per-board per owner request ("bulk import gambar").
-  Confirmed no functional dependency on the deferred SketchUp integration
-  (D-SF-06) — legacy's own action file is plain CRUD. Two defaults locked in
-  `PLAN.md`: export is PDF via the existing print pattern (not real `.pptx`
-  generation), bulk import is local multi-file upload only (not pulling from
-  Deliverables/Schedule photos). Flag to the owner before Executor starts if
-  either default is wrong. **Both defaults confirmed by the owner 2026-09-28.**
-
 - [ ] [PLANNED] **UNBLOCKED 2026-09-29 (see Decision gates); the read port is built in R8.183.** **Sample request → Master Data "incoming requests" queue.**
   Owner confirmed the shape: StudioFlow only requests; a Master Data staff
   member processes it manually (contacts vendor, gets a price, creates the
@@ -485,24 +444,8 @@ etc., all StudioFlow modules, no sub-tier between them).
   the host machine, vs. a manual "file arrived" trigger from the UI);
   confirm hardware once it exists.
 
-### Verification backlog (code done, needs a browser walk to close)
+### Verified work (recorded here so the fixes stay traceable)
 
-- [ ] [UNVERIFIED] Deliverables panel — upload, signed download (200) and delete verified in the browser
-  2026-09-29 (R8.208); status flips No deliverable/Current correctly. Not walked: OUTDATED state, an image
-  upload, and that a missing deliverable never blocks approval.
-- [ ] [UNVERIFIED] Schedule P0 split-view — desktop split-view layout, stat bar
-  counts, chip nav scrolls to option, Set final button on card face. Desktop +
-  375 px.
-- [ ] [UNVERIFIED] Full 375 px pass across StudioFlow (V2-A–V2-D scope):
-  Overview (hero, stat cards, pipeline strip, phase cards with inline
-  actions), Today, History.
-- [ ] [UNVERIFIED] KB-032/KB-033 Product Schedule settings + add-option photo
-  flow — settings dictionaries rebuilt as tables with inline add rows/row
-  actions (R8.81); `Add option`/`Edit option` dialogs gained the 4:5 image
-  workspace and existing option cards show visible `Change photo` actions
-  (R8.86). Needs a browser walk of both: settings tables (create/edit/reorder)
-  and the option photo upload/crop/save round trip. Close both KB numbers
-  together once verified — same feature area.
 **Fixed 2026-09-25 (R8.164):** Product Schedule print/export (R8.132) —
 browser-verified via headless Chromium against a disposable local Postgres:
 `/studioflow/print/projects/:id/schedule` had never actually worked — it
@@ -520,11 +463,6 @@ whose only option is not final still showing its product, "From past project"
 no longer returning reserved rows, and (R8.112) the merged Item-details/card-
 fields checklist ticking and saving correctly at both desktop and 375px. See
 `CHANGELOG.md` R8.111/R8.112.
-
-- [ ] [UNVERIFIED] SF-R4 phase accent palette (R8.84) — browser walk of
-  project overview, project rail, and Today at desktop and 840 px: phase
-  colors visible but restrained, status still readable without relying on
-  color alone.
 
 ### Parity gaps (legacy behavior the rebuild does not have yet)
 
@@ -731,44 +669,6 @@ was fixed in R8.165._
   wire to show 12 rows. Fix: `take: 6` on the search path with a narrow
   projection, leaving the full directory query for the Projects page.
 
-- [ ] [CLEANUP] **KB-039 - `CORE.md`'s app-layer contract names directories that
-  no app has, while the boundary tool reports OK.**
-  `CORE.md:47-51` states that app `infrastructure/` owns Prisma queries and app
-  `application/` owns transaction scope. Neither directory exists in any of the
-  three apps; every Prisma query, `runTransaction` call, and raw statement lives
-  directly in service modules (`src/apps/masterdata/service.ts:20`,
-  `bq/service.ts`, `studioflow/service.ts`). Only the third rule - `domain/`
-  never imports Prisma - actually holds (verified clean). `AGENTS.md` also
-  requires every feature to classify its capability as REUSE/EXTEND/ADD/
-  APP-OWNED/PURGE, which is unimplementable as written against layers that do not
-  exist. This is a Planner decision: either amend `CORE.md` to sanction the
-  actual `service.ts` + `runtime.ts` shape, or schedule the layer split. What
-  must not persist is a contract that describes absent directories while an audit
-  tool reports "Architecture boundaries OK".
-
-- [ ] [BUG] **KB-040 - The duplicate-primitive rule matches one syntactic form of
-  `Intl` display, and two live date-formatting bypasses sit in the hole.**
-  `scripts/check-boundaries.mjs:38` matches only
-  `/new\s+Intl\.DateTimeFormat\s*\(/`. `toLocaleDateString` produces the same
-  user-visible date display and is matched by nothing. `docs/UTILITY-INVENTORY.md:26`
-  classifies date/time display as REUSE onto `formatInstant`/`formatDateOnly` and
-  forbids private substitutes, yet
-  `src/app/(platform)/masterdata/page.tsx:22` and
-  `src/app/(document)/studioflow/print/projects/[projectId]/schedule/page.tsx:80`
-  both use `toLocaleDateString("id-ID", ...)`. Neither appears in the recorded
-  deferral table (`UTILITY-INVENTORY.md:71-78`) nor the allow list. The
-  `(document)` site is doubly invisible: wrong syntax AND outside every
-  classified lane (KB-037). Fix: widen the rule to the whole `Intl` display
-  surface, then converge both call sites.
-
-  **A third, undocumented instance was found and fixed 2026-09-29 (R8.203):**
-  `src/app/(document)/studioflow/print/projects/[projectId]/presentation/[boardId]/page.tsx`
-  used `new Date().toLocaleDateString("id-ID", ...)` for its printed date, same bypass,
-  same invisible `(document)` lane. Converged onto `formatInstant`. The two original
-  instances above (`masterdata/page.tsx`, print/schedule) and the checker-rule widening
-  are still open — this fix only closed the one found live while verifying today's
-  browser-acceptance pass, not the class of bug.
-
 - [x] [BUG] **KB-041 - No checker reads `prisma/schema.prisma`, so the
   cross-app-foreign-key rule is entirely unenforced.** `check-boundaries.mjs:397,533`
   and `check-legacy-runtime.mjs:120-123` walk `srcDir` and root config files
@@ -802,28 +702,6 @@ was fixed in R8.165._
   checks (KB-035, fixed in R8.165) relative to commit. Fix: hoist
   `const passwordHash = await hashPassword(...)` above the
   `runTransaction(...)` call; the value is transaction-independent.
-
-- [ ] [UNVERIFIED] **SF-13 - Print route recovery state.** Implemented in R8.196:
-  the `(document)` route segment now supplies the localized loading state and a
-  client recovery boundary with retry for Schedule, MOM, and Presentation print
-  pages. An authenticated browser walk verified a normal Schedule document
-  renders; a nonexistent project correctly reaches `notFound()`. The generic
-  unexpected-error fallback was not artificially induced against the disposable
-  database, so its browser proof remains open.
-
-- [ ] [CLEANUP] **KB-043 - Generic directory machinery is copy-pasted instead of
-  shared.** Seven byte-identical ~10-line `runRowAction` pending/error/success
-  wrappers: `masterdata/{brand,category,sku,unit,vendor}-directory.tsx` and
-  `settings/access/{roles,users}-directory.tsx`. Ten private re-implementations of
-  the filter/sort/paginate pipeline across the same set plus `deletion-directory`,
-  `supplier-category-directory`, `vendor-type-directory`. `AGENTS.md` requires one
-  canonical implementation for a generic capability, and `CORE.md:428` assigns
-  generic interaction state to UI ENGINE. Note the existing record is slightly
-  wrong: `docs/UTILITY-INVENTORY.md:86-90` classifies the pagination copies as
-  PURGE-merging because `pageCount` is `1` vs canonical `0` and the local clamp
-  differs - that is a two-line behavioural difference, not a different
-  capability, so the right move is to EXTEND `buildPageMeta`/`usePagination` and
-  converge, not to leave ten copies on record as unreconciled.
 
 - [x] [BUG] **KB-044 - `runTransaction` has no dedicated test.**
   `src/platform/core/db/transactions.ts` has no `transactions.test.ts`, though
@@ -929,40 +807,6 @@ was fixed in R8.165._
   this route family: `get_page_text`/`read_page` returned stale/incorrect DOM
   state for this exact bug in this session — screenshots were the only
   reliable check.)
-
-- [ ] [CLEANUP] **KB-052 - `CORE.md`'s "current rebuild evidence" block is stale
-  on two of its four claims.** `CORE.md:534-537`. Line 535 references
-  `src/apps/masterdata/infrastructure/request-context.ts#configuredOperatorContext`
-  as pending removal - no `infrastructure` directory exists under any app and the
-  symbol has 0 hits, so the removal already happened. Line 536 says no persisted
-  User/Role/UserRole/RolePermission/Session/Platform General Settings models
-  exist yet - all six do, with routes and integration tests. `AGENTS.md` ranks
-  `CORE.md` second in authority, so a trusting reader concludes the auth
-  foundation is unwired.
-
-- [ ] [CLEANUP] **KB-053 - (partly fixed R8.208) Both checkers still allow-list source
-  extensions.** The directory-name skip is fixed: only the top-level `src/generated`
-  is skipped now, so a `generated` folder inside an app is scanned. Still open: 15
-  extensionless files in this checkout are invisible to both checkers (see the
-  working-tree note below), and skipped paths are not reported.
-
-- [ ] [CLEANUP] **KB-054 - The legacy-reference scan covers a narrow slice.**
-  `scripts/check-legacy-runtime.mjs:120-123` scans `src/` plus root config files
-  only - not `prisma/`, `scripts/`, `docs/`, or `public/`, which is where a legacy
-  connection string or migration would most plausibly land. Its pattern
-  (`LEGACY_PATH_PATTERN`, line 8) matches only a relative `../studioflow` token,
-  missing absolute paths and other checkout names. Fix: scan the whole repo
-  except `node_modules`/`.next` and match on content signals too.
-
-- [ ] [CLEANUP] **KB-055 - Two lower-risk structural notes, recorded so the
-  categories are not reported as unexamined.** (a) `docs/UTILITY-INVENTORY.md:103,109`
-  overstates checker coverage: line 109 reads as "route ownership is enforced"
-  when `settings/**` and `(document)/**` are unowned by any check (KB-037).
-  (b) `SfActivityMode.TODO` (`prisma/schema.prisma:1126-1132`) is retained for
-  "legacy rows" with zero application references - but its justification points
-  at rows in the REBUILD database, which `AGENTS.md` treats as implemented-state
-  evidence rather than a place to park legacy compatibility. Confirm no rows use
-  it, then drop the member.
 
 - [x] [BUG] **KB-056 - Archive-retention purge never touched Presentation
   slides, so the owner-approved "files removed after 90 days" promise

@@ -104,4 +104,4 @@ to unbundle the raw call.
 | `app -> raw legacy ui-* class` | collected for app `.tsx` classes | no legacy `ui-*` token can bypass a canonical component |
 | permission vocabulary SSOT | collected for `*_PERMISSIONS` maps, registrations, and consumption literals | disjoint, appId-prefix-owned vocabulary; composition root imports maps from app public via `Object.values(...)` |
 | app route ownership | collected for `nav.ts`, `app-registrations.ts`, and `src/app/(platform)/<app>` | every app owns `/app` route root, client-safe nav constants, and a matching registration |
-| app-local duplicate primitive | collected for raw `new Intl.DateTimeFormat(` in app-owned files | new raw display formatters fail the build unless explicitly allow-listed here |
+| app-local duplicate primitive | collected for raw `new Intl.DateTimeFormat(`, `Intl.RelativeTimeFormat`, `toLocaleDateString`/`toLocaleTimeString` in app-owned files (allow-list entries must exist) | new raw display formatters fail the build unless explicitly allow-listed here |

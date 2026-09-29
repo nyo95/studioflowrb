@@ -89,7 +89,7 @@ export function ActivityList({
       )}
       {canEdit ? (
         <form className="flex flex-wrap items-center gap-2" onSubmit={(event) => { event.preventDefault(); void add(); }}>
-          <Input aria-label="New feedback" density="compact" className="min-w-48 flex-1" placeholder="Record a feedback point…" value={draft} maxLength={2000} onChange={(e) => setDraft(e.target.value)} />
+          <Input aria-label="New feedback" density="compact" className="min-w-32 flex-1" placeholder="Record a feedback point…" value={draft} maxLength={2000} onChange={(e) => setDraft(e.target.value)} />
           <Button type="submit" size="sm" pending={pendingKey === "add"} disabled={!draft.trim()}>Add feedback</Button>
         </form>
       ) : null}

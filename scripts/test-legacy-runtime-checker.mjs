@@ -16,6 +16,8 @@ const FILES = {
   "src/apps/masterdata/intra-repo-sibling-shaped.ts": `import { something } from "../../studioflow/public";\nexport const s = something;\n`,
   "src/apps/masterdata/domain/clean.ts": `import { helper } from "./helper";\nexport const c = helper;\n`,
   "src/apps/masterdata/domain/helper.ts": `export const helper = () => "ok";\n`,
+  "scripts/tool.mjs": `export const p = "D:\\\\Projects\\\\studioflow\\\\pricing";\n`,
+  "prisma/seed.sql": `-- ../studioflow/commented\nCOPY x FROM '../../studioflow/dump.csv';\n`,
   "src/generated/prisma/must-be-ignored.ts": `import { legacy } from "../../studioflow/generated-legacy";\nexport const l = legacy;\n`,
 };
 
@@ -39,6 +41,8 @@ try {
     "src/apps/bq/offender.ts:1",
     "src/apps/bq/active-string-legacy.ts:1",
     "next.config.mjs:2",
+    "scripts/tool.mjs:1",
+    "prisma/seed.sql:2",
     ".env.example:3",
   ].sort();
 

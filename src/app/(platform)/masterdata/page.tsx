@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
+import { formatInstant } from "@platform/utilities/date";
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
 import { masterDataService } from "@/apps/masterdata/runtime";
 import { PageHeader, PageShell, SectionCard, MetricValue, Text, Heading, Badge, buttonClasses } from "@/platform/ui_engine";
@@ -19,7 +20,7 @@ function relativeTime(date: Date): string {
   if (hours < 1) return `${min}m ago`;
   if (days < 1) return `${hours}h ago`;
   if (days < 30) return `${days}d ago`;
-  return date.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+  return formatInstant(date, { style: "date" });
 }
 
 function formatCount(n: number): string {

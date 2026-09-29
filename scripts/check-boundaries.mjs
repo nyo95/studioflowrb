@@ -1,5 +1,5 @@
 import { readdir, readFile, stat } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
@@ -16,6 +16,8 @@ export const RULE_SHELL_TO_APP_INTERNAL = "shell -> app/<internal>";
 export const RULE_DOMAIN_TO_PERSISTENCE = "app domain -> persistence";
 export const RULE_DATABASE_OWNERSHIP = "database ownership";
 export const RULE_STALE_ALLOW_LIST = "stale allow-list entry";
+export const RULE_UNSCANNED_FILE = "unscanned file under src";
+export const RULE_DUPLICATE_MACHINERY = "app-local copy of generic machinery";
 
 /**
  * App layers a composition/shell file (anything under `src/app` or
@@ -63,12 +65,49 @@ const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]
 // (`src/generated`), so a directory of that name inside an app stays scanned.
 const SKIP_DIRECTORIES = new Set(["node_modules", ".next"]);
 const GENERATED_ROOT_DIRECTORY = "generated";
+// Non-source files that may live under src. Anything else there (extensionless
+// files, `.mts`, `.fuse_hidden*` sync debris) is invisible to every rule above.
+const NON_SOURCE_EXTENSIONS = new Set([".css", ".woff", ".woff2", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico", ".json", ".md", ".txt"]);
 
 const PERMISSION_LITERAL_PATTERN = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)?$/;
 const PERMISSION_CONSUMPTION_FUNCTIONS = new Set(["hasPermission", "hasAnyPermission", "hasAllPermissions", "requirePermission"]);
 const LEGACY_UI_CLASS_PATTERN =
   /\b(?:ui-button|ui-btn|ui-card|ui-table|ui-input|ui-select|ui-toolbar|ui-dialog|ui-modal|ui-form|ui-menu|ui-nav|ui-tab|ui-badge|ui-pill|ui-switch|ui-radio|ui-checkbox|ui-dropdown|ui-accordion|ui-alert|ui-avatar|ui-breadcrumb|ui-pagination|ui-search|ui-stat|ui-progress|ui-stepper|ui-tag|ui-toggle|ui-tooltip)\b/;
-const INT_DATETIME_FORMAT_PATTERN = /new\s+Intl\.DateTimeFormat\s*\(/;
+/**
+ * Generic interaction/pagination machinery that must have ONE canonical
+ * implementation (AGENTS.md "Foundation and ownership invariants"). Each entry is
+ * a ratchet: `baseline` lists the files that still carry a private copy today.
+ * A new copy fails the build; a listed file that no longer matches must be
+ * removed from the baseline, so the list can only shrink toward empty. Converge
+ * the copies onto the named canonical API, then delete the entry.
+ */
+export const APP_DUPLICATE_MACHINERY = [
+  {
+    name: "runRowAction (pending/error/success wrapper for a table row command)",
+    pattern: /\b(?:const|function)\s+runRowAction\b/,
+    canonical: "one shared hook in @/platform/ui_engine (not yet built - EXTEND, KB-043)",
+    baseline: [
+      "src/app/(platform)/masterdata/brands/brand-directory.tsx",
+      "src/app/(platform)/masterdata/categories/category-directory.tsx",
+      "src/app/(platform)/masterdata/skus/sku-directory.tsx",
+      "src/app/(platform)/masterdata/units/unit-directory.tsx",
+      "src/app/(platform)/masterdata/vendors/vendor-directory.tsx",
+      "src/app/(platform)/settings/access/roles/roles-directory.tsx",
+      "src/app/(platform)/settings/access/users/users-directory.tsx",
+    ],
+  },
+  {
+    name: "private page-count math (const pageCount = Math.max(1, Math.ceil(...)))",
+    pattern: /\bconst\s+pageCount\s*=\s*Math\.max\(\s*1\s*,\s*Math\.ceil\(/,
+    canonical: "buildPageMeta / usePagination from @platform/utilities/pagination and the UI Engine pagination pattern",
+    baseline: [
+      "src/app/(platform)/bq/page.tsx",
+      "src/app/(platform)/masterdata/pricing/pricing-directory.tsx",
+    ],
+  },
+];
+
+const INT_DATETIME_FORMAT_PATTERN = /new\s+Intl\.(?:DateTimeFormat|RelativeTimeFormat)\s*\(|\.toLocale(?:Date|Time)String\s*\(/;
 
 export function stripJsonComments(text) {
   let out = "";
@@ -758,8 +797,8 @@ export async function collectDuplicatePrimitiveViolations({
       violations.push({
         rule: RULE_DUPLICATE_PRIMITIVE,
         file: file,
-        specifier: "new Intl.DateTimeFormat(...)",
-        detail: `App file uses the raw Intl.DateTimeFormat display primitive. Use the canonical "formatInstant" from "@platform/utilities/date"; converge or record an explicit deferral in docs/UTILITY-INVENTORY.md.`,
+        specifier: "Intl/toLocale date display",
+        detail: `App file formats dates with a raw Intl.DateTimeFormat / toLocale*String call. Use the canonical "formatInstant" from "@platform/utilities/date"; converge or record an explicit deferral in docs/UTILITY-INVENTORY.md.`,
       });
     }
   }
@@ -897,13 +936,90 @@ export async function collectDatabaseOwnershipViolations({ projectRoot = process
   return violations;
 }
 
+export async function collectDuplicateMachineryViolations({
+  projectRoot = process.cwd(),
+  srcDir,
+  machinery = APP_DUPLICATE_MACHINERY,
+} = {}) {
+  projectRoot = resolve(projectRoot);
+  srcDir = srcDir ? resolve(srcDir) : join(projectRoot, "src");
+  const violations = [];
+  const apps = await listAppsInDir(join(srcDir, "apps"));
+  const matched = new Map(machinery.map((entry) => [entry, new Set()]));
+
+  for (const file of await walkSources(srcDir)) {
+    if (/\.test\.[cm]?[jt]sx?$/.test(file)) continue;
+    // Apps and the shell lanes under src/app; the platform layer owns the canonical copies.
+    if (classifyImporter(file, projectRoot, apps).kind === "platform") continue;
+    const source = await readFile(file, "utf8");
+    for (const entry of machinery) {
+      if (!entry.pattern.test(source)) continue;
+      matched.get(entry).add(file);
+      if (!entry.baseline.some((p) => resolve(projectRoot, p) === file)) {
+        violations.push({
+          rule: RULE_DUPLICATE_MACHINERY,
+          file,
+          specifier: entry.name,
+          detail: `New private copy. Use the canonical implementation: ${entry.canonical}.`,
+        });
+      }
+    }
+  }
+  for (const entry of machinery) {
+    for (const path of entry.baseline) {
+      if (matched.get(entry).has(resolve(projectRoot, path))) continue;
+      violations.push({
+        rule: RULE_STALE_ALLOW_LIST,
+        file: resolve(projectRoot, path),
+        specifier: entry.name,
+        detail: "Baseline entry no longer matches (converged or deleted). Remove it from APP_DUPLICATE_MACHINERY.",
+      });
+    }
+  }
+  return violations;
+}
+
+async function walkAllFiles(dir, root = dir) {
+  const files = [];
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (SKIP_DIRECTORIES.has(entry.name) || (dir === root && entry.name === GENERATED_ROOT_DIRECTORY)) continue;
+      files.push(...(await walkAllFiles(path, root)));
+    } else {
+      files.push(path);
+    }
+  }
+  return files.sort();
+}
+
+/** Files under src that no rule can read: they would silently opt out of every check. */
+export async function collectUnscannedFileViolations({ projectRoot = process.cwd(), srcDir } = {}) {
+  projectRoot = resolve(projectRoot);
+  srcDir = srcDir ? resolve(srcDir) : join(projectRoot, "src");
+  const violations = [];
+  for (const file of await walkAllFiles(srcDir)) {
+    const ext = extname(basename(file));
+    if (SOURCE_EXTENSIONS.has(ext) || NON_SOURCE_EXTENSIONS.has(ext)) continue;
+    violations.push({
+      rule: RULE_UNSCANNED_FILE,
+      file,
+      specifier: ext || "(no extension)",
+      detail: "File is neither scanned source nor a known asset, so no boundary rule can see it. Delete it or rename it to a scanned extension.",
+    });
+  }
+  return violations;
+}
+
 export async function collectAllViolations(options = {}) {
   const boundary = await collectBoundaryViolations(options);
   const permission = await collectPermissionVocabularyViolations(options);
   const route = await collectRouteOwnershipViolations(options);
   const duplicate = await collectDuplicatePrimitiveViolations(options);
   const database = await collectDatabaseOwnershipViolations(options);
-  return { boundary, permission, route, duplicate, database };
+  const unscanned = await collectUnscannedFileViolations(options);
+  const machinery = await collectDuplicateMachineryViolations(options);
+  return { boundary, permission, route, duplicate, database, unscanned, machinery };
 }
 
 async function main() {
@@ -923,6 +1039,8 @@ async function main() {
     ["App route ownership", all.route],
     ["Duplicate display primitives", all.duplicate],
     ["Database ownership", all.database],
+    ["Unscanned files", all.unscanned],
+    ["Duplicated generic machinery", all.machinery],
   ];
   let count = 0;
   for (const [title, list] of sections) {

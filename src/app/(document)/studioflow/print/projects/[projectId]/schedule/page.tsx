@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { AppError } from "@platform/core/errors";
+import { formatInstant } from "@platform/utilities/date";
 import {
   SCHEDULE_SECTION_LABEL,
   SCHEDULE_SECTIONS,
@@ -77,7 +78,7 @@ export default async function SchedulePrintPage({
           </div>
           <div className="shrink-0 text-right">
             <p className={LABEL}>Printed</p>
-            <p className="mt-1 text-sm font-semibold">{new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</p>
+            <p className="mt-1 text-sm font-semibold">{formatInstant(new Date(), { style: "date" })}</p>
           </div>
         </header>
 
