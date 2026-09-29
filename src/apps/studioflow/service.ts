@@ -2,6 +2,7 @@ import { createLibraryService } from "./library/service";
 import { createMomService } from "./mom/service";
 import { STUDIOFLOW_PERMISSIONS } from "./permissions";
 import { createPhaseService } from "./phases/service";
+import { createPresentationService } from "./presentation/service";
 import { createProjectService } from "./projects/service";
 import { createScheduleService } from "./schedule/service";
 import type { Db, StudioFlowPorts } from "./shared";
@@ -17,6 +18,7 @@ export function createStudioFlowService(db: Db, ports: StudioFlowPorts) {
     today: createTodayService(db, ports),
     mom: createMomService(db, ports),
     schedule: createScheduleService(db, ports),
+    presentation: createPresentationService(db, ports),
     library: createLibraryService(ports),
   };
 }

@@ -40,6 +40,9 @@ export async function removeUnreferenced(db: Db, storage: ObjectStorage, keys: r
         db.sfScheduleOption.count({ where: { image_key: key } }),
         db.sfScheduleTemplateItem.count({ where: { image_key: key } }),
         db.sfClient.count({ where: { logo_storage_key: key } }),
+        // Older isolated storage tests deliberately provide only the pre-Presentation
+        // delegate subset. Runtime Prisma always has this delegate after the migration.
+        ...(db.sfPresentationSlide ? [db.sfPresentationSlide.count({ where: { image_key: key } })] : []),
       ]);
       if (references.some((count) => count > 0)) { result.blobsKeptShared++; continue; }
       await storage.remove(key);

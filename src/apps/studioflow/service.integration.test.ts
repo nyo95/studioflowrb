@@ -77,7 +77,7 @@ async function reset() {
     "sf_schedule_option", "sf_schedule_entry", "sf_schedule_template_item", "sf_schedule_template_category", "sf_schedule_prefix",
     "sf_mom_image", "sf_mom_item", "sf_mom_document",
     "sf_checklist_item_label", "sf_checklist_label", "sf_checklist_filter_view", "sf_checklist_item", "sf_checklist_template",
-    "sf_deliverable",
+    "sf_deliverable", "sf_asset_cleanup_failure",
     "sf_activity", "sf_revision", "sf_phase",
     "sf_phase_definition", "sf_phase_template",
     "sf_project", "sf_client", "sf_project_sequence", "sf_settings",

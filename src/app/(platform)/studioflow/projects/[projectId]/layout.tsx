@@ -25,6 +25,7 @@ function extensionsSkeleton(projectId: string) {
   return [
     { href: STUDIOFLOW_ROUTES.projectMom(projectId), label: "MOM", exact: false, marker: null, detail: null },
     { href: STUDIOFLOW_ROUTES.projectSchedule(projectId), label: "Schedule", exact: false, marker: null, detail: null },
+    { href: STUDIOFLOW_ROUTES.projectPresentation(projectId), label: "Presentation", exact: false, marker: null, detail: null },
     { href: STUDIOFLOW_ROUTES.projectHistory(projectId), label: "History", exact: false, marker: null, detail: null },
   ];
 }
@@ -243,9 +244,10 @@ async function ProjectExtensionsNav({
   grants: PermissionGrants;
   projectId: string;
 }) {
-  const [momDocuments, scheduleEntries] = await Promise.all([
+  const [momDocuments, scheduleEntries, presentationBoards] = await Promise.all([
     studioFlow.mom.listDocuments({ grants, projectId }),
     studioFlow.schedule.listSchedule({ grants, projectId }),
+    studioFlow.presentation.listBoards({ grants, projectId }),
   ]);
   return (
     <ProjectNavLinks
@@ -261,6 +263,12 @@ async function ProjectExtensionsNav({
           label: "Schedule",
           marker: null,
           detail: scheduleEntries.length > 0 ? String(scheduleEntries.length) : null,
+        },
+        {
+          href: STUDIOFLOW_ROUTES.projectPresentation(projectId),
+          label: "Presentation",
+          marker: null,
+          detail: presentationBoards.length > 0 ? String(presentationBoards.length) : null,
         },
         {
           href: STUDIOFLOW_ROUTES.projectHistory(projectId),

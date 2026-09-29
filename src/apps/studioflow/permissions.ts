@@ -13,6 +13,7 @@ export const STUDIOFLOW_PERMISSIONS = {
   settingsManage: "studioflow.settings.manage",
   momManage: "studioflow.mom.manage",
   scheduleManage: "studioflow.schedule.manage",
+  presentationManage: "studioflow.presentation.manage",
 } as const;
 
 export type StudioFlowPermission = (typeof STUDIOFLOW_PERMISSIONS)[keyof typeof STUDIOFLOW_PERMISSIONS];

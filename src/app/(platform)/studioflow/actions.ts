@@ -561,6 +561,118 @@ function refreshSchedule(projectId: string) {
   revalidatePath(`/studioflow/projects/${projectId}`, "layout");
 }
 
+// ── Presentation ───────────────────────────────────────────────────────────
+
+function refreshPresentation(projectId: string) {
+  revalidatePath(`/studioflow/projects/${projectId}`, "layout");
+}
+
+const PresentationBoardInput = z.strictObject({ projectId: Id, boardId: Id.optional(), title: z.string().min(1).max(200) });
+export async function createPresentationBoardAction(input: z.infer<typeof PresentationBoardInput>): Promise<ActionResult<{ boardId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(PresentationBoardInput, input);
+    const result = await studioFlow.presentation.createBoard({ ...ctx, projectId: data.projectId, title: data.title });
+    refreshPresentation(data.projectId);
+    return result;
+  });
+}
+
+export async function updatePresentationBoardAction(input: z.infer<typeof PresentationBoardInput>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(PresentationBoardInput, input);
+    if (!data.boardId) throw new AppError("VALIDATION", "PRESENTATION_BOARD_REQUIRED", "Choose a presentation board.");
+    const result = await studioFlow.presentation.updateBoard({ ...ctx, projectId: data.projectId, boardId: data.boardId, title: data.title });
+    refreshPresentation(data.projectId);
+    return result;
+  });
+}
+
+const PresentationBoardRef = z.strictObject({ projectId: Id, boardId: Id });
+export async function deletePresentationBoardAction(input: z.infer<typeof PresentationBoardRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(PresentationBoardRef, input);
+    await studioFlow.presentation.deleteBoard({ ...ctx, ...data });
+    refreshPresentation(data.projectId);
+    return {};
+  });
+}
+
+const PresentationSlidesOrder = z.strictObject({ projectId: Id, boardId: Id, orderedIds: z.array(Id).min(1).max(500) });
+export async function reorderPresentationSlidesAction(input: z.infer<typeof PresentationSlidesOrder>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(PresentationSlidesOrder, input);
+    await studioFlow.presentation.reorderSlides({ ...ctx, ...data });
+    refreshPresentation(data.projectId);
+    return {};
+  });
+}
+
+export async function addPresentationSlidesAction(formData: FormData): Promise<ActionResult<{ slideIds: string[] }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const projectId = parse(Id, formData.get("projectId"));
+    const boardId = parse(Id, formData.get("boardId"));
+    const files = formData.getAll("files").filter((value): value is File => value instanceof File);
+    const result = await studioFlow.presentation.addSlides({
+      ...ctx,
+      projectId,
+      boardId,
+      files: await Promise.all(files.map(async (file) => ({ body: new Uint8Array(await file.arrayBuffer()), contentType: file.type }))),
+    });
+    refreshPresentation(projectId);
+    return result;
+  });
+}
+
+const PresentationSlideRef = z.strictObject({ projectId: Id, slideId: Id });
+export async function deletePresentationSlideAction(input: z.infer<typeof PresentationSlideRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(PresentationSlideRef, input);
+    await studioFlow.presentation.deleteSlide({ ...ctx, ...data });
+    refreshPresentation(data.projectId);
+    return {};
+  });
+}
+
+const PresentationAnnotationInput = z.strictObject({ projectId: Id, slideId: Id.optional(), annotationId: Id.optional(), pinX: z.number().min(0).max(100).optional(), pinY: z.number().min(0).max(100).optional(), scheduleEntryId: Id.nullish(), labelSide: z.enum(["auto", "left", "right"]).optional(), note: OptionalText });
+export async function addPresentationAnnotationAction(input: z.infer<typeof PresentationAnnotationInput>): Promise<ActionResult<{ annotationId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(PresentationAnnotationInput, input);
+    if (!data.slideId || data.pinX === undefined || data.pinY === undefined) throw new AppError("VALIDATION", "PRESENTATION_PIN_REQUIRED", "Choose a slide and pin position.");
+    const result = await studioFlow.presentation.addAnnotation({ ...ctx, projectId: data.projectId, slideId: data.slideId, pinX: data.pinX, pinY: data.pinY, scheduleEntryId: data.scheduleEntryId, labelSide: data.labelSide, note: data.note });
+    refreshPresentation(data.projectId);
+    return result;
+  });
+}
+
+export async function updatePresentationAnnotationAction(input: z.infer<typeof PresentationAnnotationInput>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(PresentationAnnotationInput, input);
+    if (!data.annotationId) throw new AppError("VALIDATION", "PRESENTATION_PIN_REQUIRED", "Choose a pin.");
+    await studioFlow.presentation.updateAnnotation({ ...ctx, projectId: data.projectId, annotationId: data.annotationId, pinX: data.pinX, pinY: data.pinY, scheduleEntryId: data.scheduleEntryId, labelSide: data.labelSide, note: data.note });
+    refreshPresentation(data.projectId);
+    return {};
+  });
+}
+
+const PresentationAnnotationRef = z.strictObject({ projectId: Id, annotationId: Id });
+export async function deletePresentationAnnotationAction(input: z.infer<typeof PresentationAnnotationRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(PresentationAnnotationRef, input);
+    await studioFlow.presentation.deleteAnnotation({ ...ctx, ...data });
+    refreshPresentation(data.projectId);
+    return {};
+  });
+}
+
 const ScheduleSection = z.enum(["MATERIAL", "FIXTURE"]);
 const ScheduleSnapshot = z.strictObject({
   brandId: Id.nullish(),

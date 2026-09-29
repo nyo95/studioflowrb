@@ -1291,6 +1291,7 @@ model SfProject {
   checklist_items  SfChecklistItem[]
   mom_documents    SfMomDocument[]
   schedule_entries SfScheduleEntry[]
+  presentation_boards SfPresentationBoard[]
   deliverables     SfDeliverable[]
 
   @@index([status, archived_at])
@@ -1735,11 +1736,77 @@ model SfScheduleEntry {
   project       SfProject               @relation(fields: [project_id], references: [id], onDelete: Cascade)
   template_item SfScheduleTemplateItem? @relation(fields: [template_item_id], references: [id], onDelete: SetNull)
   options       SfScheduleOption[]
+  presentation_annotations SfPresentationAnnotation[]
 
   @@unique([project_id, section, prefix, increment], map: "sf_schedule_entry_code_key")
   @@index([project_id, section, category_key, sort_order])
   @@index([template_item_id])
   @@map("sf_schedule_entry")
+  @@schema("studioflow")
+}
+
+enum SfPresentationLabelSide {
+  AUTO  @map("auto")
+  LEFT  @map("left")
+  RIGHT @map("right")
+
+  @@map("sf_presentation_label_side")
+  @@schema("studioflow")
+}
+
+/// A project-owned presentation document. Each board holds several rendered-image slides.
+model SfPresentationBoard {
+  id            String   @id @default(uuid())
+  project_id    String
+  title         String
+  sort_order    Int
+  created_by_id String
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  project SfProject               @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  slides  SfPresentationSlide[]
+
+  @@index([project_id, sort_order])
+  @@map("sf_presentation_board")
+  @@schema("studioflow")
+}
+
+model SfPresentationSlide {
+  id          String   @id @default(uuid())
+  board_id    String
+  image_key   String   @unique
+  image_ratio Float?
+  sort_order  Int
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  board       SfPresentationBoard        @relation(fields: [board_id], references: [id], onDelete: Cascade)
+  annotations SfPresentationAnnotation[]
+
+  @@index([board_id, sort_order])
+  @@map("sf_presentation_slide")
+  @@schema("studioflow")
+}
+
+model SfPresentationAnnotation {
+  id                String                  @id @default(uuid())
+  slide_id          String
+  schedule_entry_id String?
+  pin_x             Float
+  pin_y             Float
+  label_side        SfPresentationLabelSide @default(AUTO)
+  note              String?
+  sort_order        Int
+  created_at        DateTime                @default(now())
+  updated_at        DateTime                @updatedAt
+
+  slide          SfPresentationSlide @relation(fields: [slide_id], references: [id], onDelete: Cascade)
+  schedule_entry SfScheduleEntry?    @relation(fields: [schedule_entry_id], references: [id], onDelete: SetNull)
+
+  @@index([slide_id, sort_order])
+  @@index([schedule_entry_id])
+  @@map("sf_presentation_annotation")
   @@schema("studioflow")
 }
 

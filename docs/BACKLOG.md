@@ -395,7 +395,7 @@ recorded here. Terminology note settled the same session: this rebuild has no
 Data/BQ, peers) → feature module inside an app (MOM, Schedule, Presentation,
 etc., all StudioFlow modules, no sub-tier between them).
 
-- [ ] [PLANNED] **SF-PRESENTATION — Presentation Manager module.** QUEUED plan
+- [ ] [UNVERIFIED] **SF-PRESENTATION — Presentation Manager module.** Implemented in R8.194; browser acceptance remains open. QUEUED plan
   in `apps/studioflow/SF-PRESENTATION-PLAN.md` (moved out of `PLAN.md` on
   2026-09-28; must be re-cut into a backend Work Order plus a Lead UI revision
   and its two defaults confirmed before it runs) — not started. A

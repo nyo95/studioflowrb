@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.193**
-- Next local revision: **R8.194**
+- Current revision after this entry is committed: **R8.194**
+- Next local revision: **R8.195**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.194 | 2026-09-29 | feat(studioflow): add project Presentation boards
+
+- Adds StudioFlow Presentation boards with private multi-image slides, editable blank or Schedule-linked pins, project-scoped permission, audit history, and reference-aware image cleanup.
+- Adds project navigation, functional board editor, and the existing print/PDF route for one slide per page.
+- Applies additive migration `20260929063847_sf_presentation_manager` to the kantor development and disposable test databases.
+
+**Checks.** `npm test` 628/628; `tsc --noEmit` clean; `eslint .` clean with two existing-style signed-image warnings; boundary and legacy-runtime checks clean; production build passed. Browser acceptance for Presentation remains open. Sample-request acceptance remains separately open and unchanged.
 
 ## R8.193 | 2026-09-29 | feat(bq): search/filter and a real Status Promosi column on BQ Library Items
 
