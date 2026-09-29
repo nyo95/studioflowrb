@@ -1,12 +1,13 @@
 "use client";
 
-import { Download, Expand, MessageCircle, Send, X } from "lucide-react";
+import { Download, Expand, MessageCircle, Plus, Send, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
+import type { ChangeEvent, ClipboardEvent, DragEvent, FormEvent, KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 
-import { Button, EmptyState, Input, Text, Textarea } from "@/platform/ui_engine";
+import { EmptyState, IconButton, Text, Textarea } from "@/platform/ui_engine";
 import {
   getUnreadMessengerCountAction,
   listMessengerConversationsAction,
@@ -15,6 +16,8 @@ import {
   resolveMessengerAttachmentAction,
   sendMessengerMessageAction,
 } from "@/app/(platform)/messenger/actions";
+
+import { continueList, insertNewline, mergeFiles, QUICK_MESSENGER_MAX_FILES } from "./quick-messenger-composer";
 
 type Person = { id: string; displayName: string };
 type Conversation = {
@@ -32,13 +35,22 @@ type Message = {
   createdAt: Date;
   attachments: Array<{ id: string; filename: string; bytes: number; available: boolean; readUrl: string | null }>;
 };
+type Draft = { text: string; files: File[] };
 
 const POLL_INTERVAL_MS = 60_000;
+const NEW_DRAFT_KEY = "new";
+const EMPTY_DRAFT: Draft = { text: "", files: [] };
+const DRAFT_STORAGE_KEY = "quick-messenger:drafts:v1";
+const MAX_COMPOSER_HEIGHT_PX = 120;
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function hasFiles(event: DragEvent): boolean {
+  return Array.from(event.dataTransfer.types).includes("Files");
 }
 
 export function QuickMessenger() {
@@ -52,8 +64,26 @@ export function QuickMessenger() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const formRef = useRef<HTMLFormElement>(null);
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [draftsLoaded, setDraftsLoaded] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const recipientRef = useRef<HTMLSelectElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const sendingRef = useRef(false);
+  const dragDepthRef = useRef(0);
+  const pendingCaretRef = useRef<number | null>(null);
+
+  const draftKey = activeId ?? NEW_DRAFT_KEY;
+  const draft = drafts[draftKey] ?? EMPTY_DRAFT;
+  const canSend = (draft.text.trim() !== "" || draft.files.length > 0) && Boolean(activeId || recipientId);
+
+  const updateDraft = useCallback((key: string, change: (current: Draft) => Draft) => {
+    setDrafts((current) => ({ ...current, [key]: change(current[key] ?? EMPTY_DRAFT) }));
+  }, []);
 
   const refreshUnread = useCallback(() => {
     void getUnreadMessengerCountAction().then((result) => {
@@ -113,20 +143,185 @@ export function QuickMessenger() {
     return () => clearInterval(interval);
   }, [activeId, open, openConversation]);
 
-  const send = (formData: FormData) => {
-    setError(null);
-    if (activeId) formData.set("conversationId", activeId);
-    else if (recipientId) formData.set("recipientUserId", recipientId);
-    startTransition(async () => {
-      const result = await sendMessengerMessageAction(formData);
-      if (!result.ok) {
-        setError(result.error.safeMessage);
-        return;
+  // Text drafts also survive a page reload within the tab; picked files cannot
+  // be serialised, so they live in memory for as long as the shell stays mounted.
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(window.sessionStorage.getItem(DRAFT_STORAGE_KEY) ?? "{}") as Record<string, unknown>;
+      const restored: Record<string, Draft> = {};
+      for (const [key, value] of Object.entries(stored)) {
+        if (typeof value === "string" && value !== "") restored[key] = { text: value, files: [] };
       }
-      formRef.current?.reset();
-      setRecipientId("");
-      openConversation(result.data.conversationId);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage exists only in the browser, so it cannot be read during render
+      setDrafts((current) => ({ ...restored, ...current }));
+    } catch {
+      // Storage can be blocked; the in-memory draft still works.
+    }
+    setDraftsLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!draftsLoaded) return;
+    try {
+      const texts: Record<string, string> = {};
+      for (const [key, value] of Object.entries(drafts)) if (value.text !== "") texts[key] = value.text;
+      window.sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(texts));
+    } catch {
+      // Ignore blocked storage.
+    }
+  }, [drafts, draftsLoaded]);
+
+  // Collapse on a press or focus landing outside the popup, and on Escape.
+  // The toggle button is exempt so its own click still toggles cleanly.
+  useEffect(() => {
+    if (!open) return;
+    const isInside = (target: EventTarget | null) =>
+      target instanceof Node && Boolean(panelRef.current?.contains(target) || toggleRef.current?.contains(target));
+    const onPointerDown = (event: PointerEvent) => {
+      if (!isInside(event.target)) setOpen(false);
+    };
+    const onFocusIn = (event: FocusEvent) => {
+      if (!isInside(event.target)) setOpen(false);
+    };
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape" || event.isComposing) return;
+      setOpen(false);
+      toggleRef.current?.focus();
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  // Land the caret where the user will type: the composer, or the recipient
+  // picker when no conversation is chosen yet.
+  useEffect(() => {
+    if (!open) return;
+    (activeId ? composerRef.current : recipientRef.current)?.focus();
+  }, [open, activeId]);
+
+  // Grow with the text up to a cap, and restore the caret after a scripted edit.
+  useLayoutEffect(() => {
+    const element = composerRef.current;
+    if (!element) return;
+    element.style.height = "auto";
+    element.style.height = `${Math.min(element.scrollHeight, MAX_COMPOSER_HEIGHT_PX)}px`;
+    if (pendingCaretRef.current !== null) {
+      element.setSelectionRange(pendingCaretRef.current, pendingCaretRef.current);
+      pendingCaretRef.current = null;
+    }
+  }, [draft.text, open, activeId]);
+
+  const send = () => {
+    if (sendingRef.current || !canSend) return;
+    sendingRef.current = true;
+    setError(null);
+    const key = draftKey;
+    const formData = new FormData();
+    formData.set("body", draft.text);
+    for (const file of draft.files) formData.append("files", file);
+    if (activeId) formData.set("conversationId", activeId);
+    else formData.set("recipientUserId", recipientId);
+    startTransition(async () => {
+      try {
+        const result = await sendMessengerMessageAction(formData);
+        if (!result.ok) {
+          setError(result.error.safeMessage);
+          return;
+        }
+        updateDraft(key, () => EMPTY_DRAFT);
+        setRecipientId("");
+        openConversation(result.data.conversationId);
+      } catch {
+        setError("The message could not be sent. Check your connection and try again.");
+      } finally {
+        sendingRef.current = false;
+      }
     });
+  };
+
+  const addFiles = (incoming: File[]) => {
+    if (incoming.length === 0) return;
+    const selection = mergeFiles(draft.files, incoming);
+    updateDraft(draftKey, (current) => ({ ...current, files: selection.files }));
+    setError(selection.error);
+  };
+
+  const removeFile = (index: number) => {
+    setError(null);
+    updateDraft(draftKey, (current) => ({ ...current, files: current.files.filter((_, at) => at !== index) }));
+  };
+
+  const applyEdit = (edit: { value: string; caret: number }) => {
+    pendingCaretRef.current = edit.caret;
+    updateDraft(draftKey, (current) => ({ ...current, text: edit.value }));
+  };
+
+  const onComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Enter") return;
+    // Enter that confirms an IME candidate must never send.
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+    const { value, selectionStart, selectionEnd } = event.currentTarget;
+    if (event.altKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      applyEdit(insertNewline(value, selectionStart, selectionEnd));
+      return;
+    }
+    if (event.shiftKey) return; // the browser inserts the newline itself
+    event.preventDefault();
+    if (event.ctrlKey || event.metaKey) {
+      send();
+      return;
+    }
+    const edit = continueList(value, selectionStart, selectionEnd);
+    if (edit) applyEdit(edit);
+    else send();
+  };
+
+  const onFilesPicked = (event: ChangeEvent<HTMLInputElement>) => {
+    addFiles(Array.from(event.target.files ?? []));
+    event.target.value = "";
+  };
+
+  const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const pasted = Array.from(event.clipboardData.files);
+    if (pasted.length === 0) return;
+    event.preventDefault();
+    addFiles(pasted);
+  };
+
+  const onDragEnter = (event: DragEvent) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    dragDepthRef.current += 1;
+    setDragging(true);
+  };
+  const onDragOver = (event: DragEvent) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  };
+  const onDragLeave = (event: DragEvent) => {
+    if (!hasFiles(event)) return;
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setDragging(false);
+  };
+  const onDrop = (event: DragEvent) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    dragDepthRef.current = 0;
+    setDragging(false);
+    addFiles(Array.from(event.dataTransfer.files));
+  };
+
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    send();
   };
 
   const openAttachment = (attachmentId: string) => {
@@ -144,7 +339,9 @@ export function QuickMessenger() {
   return (
     <>
       <button
+        ref={toggleRef}
         type="button"
+        aria-expanded={open}
         aria-label={unread > 0 ? `Messenger, ${unread} unread` : "Messenger"}
         onClick={() => setOpen((value) => !value)}
         className="relative grid h-6 w-6 shrink-0 place-items-center rounded-full border-0 bg-transparent text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus"
@@ -163,7 +360,7 @@ export function QuickMessenger() {
           and landed off the top of the screen instead of above the bottom-right
           corner of the viewport. */}
       {open ? createPortal(
-        <aside className="fixed bottom-4 right-4 z-[70] grid h-[min(680px,calc(100dvh-32px))] w-[min(420px,calc(100vw-24px))] grid-rows-[auto_auto_1fr_auto] overflow-hidden rounded-control border border-line bg-surface-raised shadow-elevated">
+        <aside ref={panelRef} aria-label="Quick message" className="fixed bottom-4 right-4 z-[70] grid h-[min(680px,calc(100dvh-32px))] w-[min(420px,calc(100vw-24px))] grid-rows-[auto_auto_1fr_auto] overflow-hidden rounded-control border border-line bg-surface-raised shadow-elevated">
           <div className="flex items-center gap-2 border-b border-line-subtle px-3 py-2">
             <MessageCircle size={16} aria-hidden="true" />
             <Text weight="semibold" size="sm" className="min-w-0 flex-1 truncate">
@@ -205,7 +402,7 @@ export function QuickMessenger() {
               <div className="grid gap-3">
                 <label className="grid gap-1 text-sm">
                   <span className="font-medium text-ink">To</span>
-                  <select value={recipientId} onChange={(event) => setRecipientId(event.target.value)} className="h-9 rounded-control border border-line bg-surface px-3 text-sm">
+                  <select ref={recipientRef} value={recipientId} onChange={(event) => setRecipientId(event.target.value)} className="h-9 rounded-control border border-line bg-surface px-3 text-sm">
                     <option value="">Choose a person</option>
                     {people.map((person) => <option key={person.id} value={person.id}>{person.displayName}</option>)}
                   </select>
@@ -219,7 +416,7 @@ export function QuickMessenger() {
                 {messages.map((message) => (
                   <div key={message.id} className="grid gap-1 rounded-control bg-surface-muted p-2.5">
                     <Text weight="semibold" size="sm">{message.authorName}</Text>
-                    {message.body ? <Text as="p" size="sm">{message.body}</Text> : null}
+                    {message.body ? <Text as="p" size="sm" className="whitespace-pre-wrap break-words">{message.body}</Text> : null}
                     {message.attachments.map((attachment) => (
                       <button
                         key={attachment.id}
@@ -239,14 +436,63 @@ export function QuickMessenger() {
             )}
           </div>
 
-          <form ref={formRef} action={send} className="grid gap-2 border-t border-line-subtle p-3">
-            {error ? <Text size="sm" className="text-danger">{error}</Text> : null}
-            <Textarea name="body" placeholder="Write a message..." rows={2} />
-            <Input name="files" type="file" multiple />
-            <Button type="submit" size="sm" variant="primary" pending={pending} disabled={!activeId && !recipientId}>
-              <Send size={14} aria-hidden="true" />
-              Send
-            </Button>
+          <form
+            onSubmit={onSubmit}
+            onDragEnter={onDragEnter}
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+            className={`grid gap-1.5 border-t p-3 transition-colors ${dragging ? "border-line-focus bg-surface-muted" : "border-line-subtle"}`}
+          >
+            {error ? <Text size="sm" className="text-danger" role="alert">{error}</Text> : null}
+            {draft.files.length > 0 ? (
+              <ul className="m-0 flex list-none flex-wrap gap-1 p-0" aria-label="Attached files">
+                {draft.files.map((file, index) => (
+                  <li key={`${file.name}-${file.size}-${index}`} className="flex max-w-full items-center gap-1 rounded-action border border-line bg-surface py-0.5 pl-2 pr-0.5 text-xs text-ink">
+                    <span className="min-w-0 truncate">{file.name} · {formatBytes(file.size)}</span>
+                    <button type="button" onClick={() => removeFile(index)} aria-label={`Remove ${file.name}`} className="grid h-5 w-5 shrink-0 place-items-center rounded-action border-0 bg-transparent text-ink-tertiary hover:bg-surface-muted hover:text-ink">
+                      <X size={12} aria-hidden="true" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <div className={`flex items-end gap-1 rounded-control border bg-surface p-1 transition-[border-color,box-shadow] focus-within:border-line-focus focus-within:shadow-[0_0_0_3px_rgb(87_83_78/0.12)] ${dragging ? "border-dashed border-line-focus" : "border-line"}`}>
+              <IconButton
+                label="Attach files"
+                icon={<Plus aria-hidden="true" />}
+                variant="ghost"
+                size="sm"
+                disabled={draft.files.length >= QUICK_MESSENGER_MAX_FILES}
+                onClick={() => fileInputRef.current?.click()}
+              />
+              <input ref={fileInputRef} type="file" multiple hidden tabIndex={-1} onChange={onFilesPicked} />
+              <Textarea
+                ref={composerRef}
+                density="compact"
+                rows={1}
+                value={draft.text}
+                onChange={(event) => updateDraft(draftKey, (current) => ({ ...current, text: event.target.value }))}
+                onKeyDown={onComposerKeyDown}
+                onPaste={onPaste}
+                placeholder={dragging ? "Drop files to attach" : "Write a message..."}
+                aria-label="Message"
+                aria-describedby="quick-messenger-hint"
+                className="!min-h-7 !resize-none !border-0 !bg-transparent !py-1 focus:!shadow-none"
+              />
+              <IconButton
+                label="Send message"
+                icon={<Send aria-hidden="true" />}
+                variant="primary"
+                size="sm"
+                type="submit"
+                pending={pending}
+                disabled={!canSend}
+              />
+            </div>
+            <p id="quick-messenger-hint" className="m-0 text-[10px] text-ink-tertiary">
+              Enter sends · Shift+Enter new line · Ctrl+Enter sends a list · 5 files, 10 MB
+            </p>
           </form>
         </aside>,
         document.body,

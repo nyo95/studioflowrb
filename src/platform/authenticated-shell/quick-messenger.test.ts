@@ -13,7 +13,7 @@ describe("QuickMessenger portal regression", () => {
     );
 
     const portalIndex = source.indexOf("createPortal(");
-    const fixedPanelIndex = source.indexOf('<aside className="fixed bottom-4 right-4');
+    const fixedPanelIndex = source.search(/<aside[^>]*className="fixed bottom-4 right-4/);
     const documentBodyIndex = source.indexOf("document.body", fixedPanelIndex);
 
     assert.notEqual(portalIndex, -1, "QuickMessenger popup should be rendered through createPortal");
@@ -24,7 +24,7 @@ describe("QuickMessenger portal regression", () => {
     );
     assert.doesNotMatch(
       source,
-      /\{open\s+\?\s+\(\s*<aside className="fixed bottom-4 right-4/,
+      /\{open\s+\?\s+\(\s*<aside[^>]*className="fixed bottom-4 right-4/,
       "fixed popup panel must not be rendered as a plain child of the topbar subtree",
     );
   });

@@ -5,13 +5,37 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.206**
-- Next local revision: **R8.207**
+- Current revision after this entry is committed: **R8.207**
+- Next local revision: **R8.208**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.207 | 2026-09-29 | feat(platform): refine the quick messenger composer
+
+- **Popup only; `/messenger` and the messenger backend contract are unchanged.** The popup collapses on a press or
+  keyboard focus outside it and on Escape (focus returns to the topbar button), never while interacting inside.
+  Unsent text and picked files are kept per conversation across collapse/reopen; text also survives a reload through
+  `sessionStorage` (files are memory-only).
+- **Composer.** Enter sends; Shift+Enter and Alt+Enter insert a newline; Enter during IME composition is ignored; a
+  ref guard plus the pending state prevent a double send. `- `, `* ` and `1. ` lists continue on Enter and exit on an
+  empty item (Ctrl/Cmd+Enter sends a list message); storage and rendering stay plain text (messages now keep their
+  line breaks). Compact `+` picker and small send button use UI Engine `IconButton`/`Textarea`; picker, drag-and-drop
+  and paste share one selection path with client-side 5-file / 10 MB checks and an accessible error, while the server
+  stays the authority. Pure rules live in `quick-messenger-composer.ts` with unit tests.
+- **Config fix proven in the browser.** `next.config.ts` server-action body limit raised 4 MB → 52 MB: a 6 MB
+  attachment failed to send at the old limit though the contract allows 10 MB × 5. After the change a 9 MB file sent.
+- No migration, no dependency. `PLAN.md` replaced by this UI work order (IMPLEMENTED); the backlog item is now
+  `[UNVERIFIED]` for real-device evidence only.
+
+**Checks.** `tsc --noEmit`, `npm run lint` (0 errors; 2 existing unrelated warnings), `check:boundaries`,
+`check:legacy-runtime`, `npm test` 645/645. `npm run build` was not run. Browser (`http://localhost:3001`): Escape,
+outside click and outside focus collapse with the draft restored on reopen; list continue/exit for `-` and `1.`;
+Shift/Alt+Enter newlines; synthetic IME Enter did not send; double Enter sent one message; drag-drop, picker,
+over-10 MB and over-5-file errors; text + attachment send; 375 px viewport with no horizontal scroll. A test message
+and two test attachments were sent to the existing dev conversation.
 
 ## R8.206 | 2026-09-29 | docs(platform): plan quick messenger composer refinement
 

@@ -7,7 +7,9 @@ const nextConfig: NextConfig = {
   experimental: {
     // Brand marks are explicitly permitted up to 2 MB by Platform Settings,
     // with additional request body headroom for multipart form metadata and boundaries.
-    serverActions: { bodySizeLimit: "4mb" },
+    // Private messenger messages may carry 5 files of 10 MB each (50 MB); the
+    // messenger service re-checks those limits, and this only lets the request through.
+    serverActions: { bodySizeLimit: "52mb" },
     // Default (0s) means every revisit of a dynamic page (e.g. leaving a
     // project and coming back) refetches the whole layout chain from
     // scratch — including the app shell (rail, StudioFlow nav) above it —
