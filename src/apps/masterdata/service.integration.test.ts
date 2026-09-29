@@ -1170,6 +1170,17 @@ describe("Sample request intake (Master Data side of StudioFlow sample requests)
     assert.ok(declined.resolvedAt instanceof Date);
   });
 
+  it("offers active suppliers to sample-request staff without vendor-directory permission", async () => {
+    const later = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Beta Supplier" });
+    const first = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Alpha Supplier" });
+    const archived = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Archived Supplier" });
+    await service.archiveVendor({ grants: GRANTS, actor: ACTOR, vendorId: archived.vendorId });
+
+    const choices = await service.listSampleRequestVendorChoices({ grants: [MASTERDATA_PERMISSIONS.sampleRequestManage] });
+    assert.deepEqual(choices, [{ id: first.vendorId, name: "Alpha Supplier" }, { id: later.vendorId, name: "Beta Supplier" }]);
+    await rejectsWithCode(service.listSampleRequestVendorChoices({ grants: GRANTS.filter((grant) => grant !== MASTERDATA_PERMISSIONS.sampleRequestManage) }), "PERMISSION_DENIED");
+  });
+
   it("lists by status and source id, newest first, within a clamped limit", async () => {
     const a = await start("request-a");
     const b = await start("request-b");

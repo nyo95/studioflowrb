@@ -5,6 +5,7 @@ import { hasPermission } from "@platform/core/rbac";
 import { ErrorState, PageHeader, SectionCard } from "@/platform/ui_engine";
 
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
+import { masterDataService } from "@/apps/masterdata/runtime";
 import { sampleRequestCoordinator } from "@/app/sample-request-runtime";
 
 import { SampleRequestDirectory } from "./sample-request-directory";
@@ -27,12 +28,15 @@ export default async function SampleRequestsPage() {
     );
   }
 
-  const queue = await sampleRequestCoordinator.listQueue({ grants, includeFinished: true });
+  const [queue, vendors] = await Promise.all([
+    sampleRequestCoordinator.listQueue({ grants, includeFinished: true }),
+    masterDataService.listSampleRequestVendorChoices({ grants }),
+  ]);
 
   return (
     <>
       <PageHeader title="Sample requests" divider />
-      <SampleRequestDirectory rows={queue} />
+      <SampleRequestDirectory rows={queue} vendors={vendors} />
     </>
   );
 }

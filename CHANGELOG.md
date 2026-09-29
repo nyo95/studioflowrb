@@ -5,13 +5,32 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.203**
-- Next local revision: **R8.204**
+- Current revision after this entry is committed: **R8.204**
+- Next local revision: **R8.205**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.204 | 2026-09-29 | feat(masterdata): link a supplier while recording a sample quote
+
+- The sample-request quote dialog can now associate an existing active supplier with a quote. This completes the
+  locked intake contract's existing optional `vendorId` link without creating suppliers or changing StudioFlow's
+  request state.
+- Supplier choices expose only an id and name, omit archived suppliers, and require
+  `masterdata.sample-request.manage` rather than the broader supplier-directory permission. The server action still
+  validates the selected UUID; the Master Data service independently confirms that the supplier remains active before
+  writing it.
+- Tests cover the narrow read permission, archived-supplier exclusion, server-action forwarding, and existing quote
+  invariants.
+
+**Prisma sync.** After fast-forwarding from R8.184 to R8.203, deployed the three incoming additive migrations
+(`20260929035510_studioflow_asset_cleanup_failure`, `20260929063847_sf_presentation_manager`, and
+`20260929090000_platform_messenger`) to the verified local rebuild databases `masterdata` and `masterdata_test`.
+Regenerated the Prisma client. No migration was authored in this revision.
+
+**Checks.** TypeScript and targeted sample-request coverage pass. Full mandatory checks are recorded with the commit.
 
 ## R8.203 | 2026-09-29 | fix(studioflow): stop project sub-pages hanging on a deleted project, close a presentation-asset purge gap
 

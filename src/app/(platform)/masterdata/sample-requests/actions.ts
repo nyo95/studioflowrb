@@ -15,6 +15,7 @@ function revalidateSampleRequests(): void {
 }
 
 const QuoteInputSchema = z.object({
+  vendorId: z.string().uuid().optional().nullable().or(z.literal("")),
   quotedAmount: z.string().max(32).optional().nullable().or(z.literal("")),
   quotedCurrency: z.string().max(8).optional().nullable().or(z.literal("")),
   staffNote: z.string().max(1000).optional().nullable().or(z.literal("")),
@@ -47,6 +48,7 @@ export async function recordSampleQuoteAction(intakeId: string, input: unknown):
       grants,
       actor: actorOf(principal),
       intakeId,
+      vendorId: normalize(parsed.data.vendorId) ?? null,
       quotedAmount: normalize(parsed.data.quotedAmount) ?? null,
       quotedCurrency: normalize(parsed.data.quotedCurrency) ?? null,
       staffNote: normalize(parsed.data.staffNote) ?? null,
@@ -65,6 +67,7 @@ export async function markSampleRequestPricedAction(intakeId: string, input: unk
       grants,
       actor: actorOf(principal),
       intakeId,
+      vendorId: normalize(parsed.data.vendorId) ?? null,
       quotedAmount: normalize(parsed.data.quotedAmount) ?? null,
       quotedCurrency: normalize(parsed.data.quotedCurrency) ?? null,
       staffNote: normalize(parsed.data.staffNote) ?? null,

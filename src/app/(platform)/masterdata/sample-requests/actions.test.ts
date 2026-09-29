@@ -57,10 +57,11 @@ it("acts as the signed-in staff member, never an id the browser sends", async ()
   assert.deepEqual(calls, [["take", { grants, actor, sourceRequestId: "req-1" }]]);
 });
 
-it("normalizes blank quote fields to null and forwards a trimmed note", async () => {
+it("normalizes blank quote fields to null and forwards the selected supplier", async () => {
   const { exports, calls, grants } = load();
-  await exports.recordSampleQuoteAction!("intake-1", { quotedAmount: "150000", quotedCurrency: "idr", staffNote: "  ok  " });
-  assert.deepEqual(calls, [["recordQuote", { grants, actor, intakeId: "intake-1", quotedAmount: "150000", quotedCurrency: "idr", staffNote: "ok" }]]);
+  const vendorId = "d6c241dc-b6aa-4d31-ab7f-d8db45b98fc6";
+  await exports.recordSampleQuoteAction!("intake-1", { vendorId, quotedAmount: "150000", quotedCurrency: "idr", staffNote: "  ok  " });
+  assert.deepEqual(calls, [["recordQuote", { grants, actor, intakeId: "intake-1", vendorId, quotedAmount: "150000", quotedCurrency: "idr", staffNote: "ok" }]]);
 });
 
 it("rejects a quote payload that fails schema validation, before touching the coordinator", async () => {

@@ -279,6 +279,22 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
       return rows.map(toRead);
     },
 
+    /**
+     * A narrow supplier reference for the sample-quote form. It deliberately
+     * requires the sample-request permission, not the broader vendor-screen
+     * permission: staff can link an existing supplier but cannot inspect or
+     * administer supplier records from this workflow.
+     */
+    async listSampleRequestVendorChoices(input: { grants: PermissionGrants }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.sampleRequestManage);
+      return db.vendor.findMany({
+        where: { deleted_at: null },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+        select: { id: true, name: true },
+        take: MAX_LIST_LIMIT,
+      });
+    },
+
     async getSampleRequestIntake(input: { grants: PermissionGrants; intakeId: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.sampleRequestManage);
       const row = await db.sampleRequestIntake.findUnique({ where: { id: input.intakeId } });

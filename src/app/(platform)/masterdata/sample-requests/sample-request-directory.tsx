@@ -17,6 +17,7 @@ import {
   Pagination,
   RowActionMenu,
   SearchField,
+  Select,
   StatusBadge,
   Switch,
   TableBody,
@@ -69,13 +70,14 @@ function statusBadge(row: SampleQueueRow) {
 
 type ActionResultLike = { ok: boolean; error?: { safeMessage?: string } };
 
-export function SampleRequestDirectory({ rows }: { rows: SampleQueueRow[] }) {
+export function SampleRequestDirectory({ rows, vendors }: { rows: SampleQueueRow[]; vendors: readonly { id: string; name: string }[] }) {
   const [query, setQuery] = useState("");
   const [showFinished, setShowFinished] = useState(false);
   const [detail, setDetail] = useState<SampleQueueRow | null>(null);
   const [quoteTarget, setQuoteTarget] = useState<SampleQueueRow | null>(null);
   const [quoteAmount, setQuoteAmount] = useState("");
   const [quoteCurrency, setQuoteCurrency] = useState("IDR");
+  const [quoteVendorId, setQuoteVendorId] = useState("");
   const [quoteNote, setQuoteNote] = useState("");
   const [declineTarget, setDeclineTarget] = useState<SampleQueueRow | null>(null);
   const [declineReason, setDeclineReason] = useState("");
@@ -123,6 +125,7 @@ export function SampleRequestDirectory({ rows }: { rows: SampleQueueRow[] }) {
   function openQuote(row: SampleQueueRow) {
     setQuoteAmount(row.intake?.quotedAmount ?? "");
     setQuoteCurrency(row.intake?.quotedCurrency ?? "IDR");
+    setQuoteVendorId(row.intake?.vendorId ?? "");
     setQuoteNote(row.intake?.staffNote ?? "");
     setQuoteTarget(row);
   }
@@ -221,6 +224,12 @@ export function SampleRequestDirectory({ rows }: { rows: SampleQueueRow[] }) {
               <Field label="Quoted amount"><Input value={quoteAmount} onChange={(event) => setQuoteAmount(event.target.value)} placeholder="0" inputMode="decimal" /></Field>
               <Field label="Currency"><Input value={quoteCurrency} onChange={(event) => setQuoteCurrency(event.target.value.toUpperCase())} maxLength={3} /></Field>
             </div>
+            <Field label="Supplier" description="Optional. Link the supplier who gave this quote.">
+              <Select value={quoteVendorId} onChange={(event) => setQuoteVendorId(event.target.value)}>
+                <option value="">No supplier linked</option>
+                {vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}
+              </Select>
+            </Field>
             <Field label="Staff note" description="Optional context for this quote."><Textarea value={quoteNote} onChange={(event) => setQuoteNote(event.target.value)} /></Field>
             <FormActions>
               <Button data-dialog-cancel variant="ghost" onClick={() => setQuoteTarget(null)}>Cancel</Button>
@@ -229,7 +238,7 @@ export function SampleRequestDirectory({ rows }: { rows: SampleQueueRow[] }) {
                 disabled={pendingId !== null}
                 onClick={() => {
                   const target = quoteTarget;
-                  const input = { quotedAmount: quoteAmount || null, quotedCurrency: quoteCurrency || null, staffNote: quoteNote || null };
+                  const input = { vendorId: quoteVendorId || null, quotedAmount: quoteAmount || null, quotedCurrency: quoteCurrency || null, staffNote: quoteNote || null };
                   run(target.sourceRequestId, () => recordSampleQuoteAction(target.intake!.id, input), () => setQuoteTarget(null));
                 }}
               >
@@ -239,7 +248,7 @@ export function SampleRequestDirectory({ rows }: { rows: SampleQueueRow[] }) {
                 disabled={pendingId !== null}
                 onClick={() => {
                   const target = quoteTarget;
-                  const input = { quotedAmount: quoteAmount || null, quotedCurrency: quoteCurrency || null, staffNote: quoteNote || null };
+                  const input = { vendorId: quoteVendorId || null, quotedAmount: quoteAmount || null, quotedCurrency: quoteCurrency || null, staffNote: quoteNote || null };
                   run(target.sourceRequestId, () => markSampleRequestPricedAction(target.intake!.id, input), () => setQuoteTarget(null));
                 }}
               >
