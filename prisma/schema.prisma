@@ -246,6 +246,72 @@ model Notification {
   @@schema("platform")
 }
 
+/// Platform-wide private 1:1 messenger conversation. The pair key is the two
+/// participant ids sorted and joined by the service, so the same two people
+/// always resolve to one conversation regardless of who starts it.
+model MessengerConversation {
+  id         String   @id @default(uuid())
+  pair_key   String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  participants MessengerParticipant[]
+  messages     MessengerMessage[]
+
+  @@index([updated_at])
+  @@schema("platform")
+}
+
+/// Per-user membership/read cursor for a private conversation. User ids are
+/// plain platform ids rather than foreign keys so chat history never blocks
+/// user lifecycle changes.
+model MessengerParticipant {
+  id              String    @id @default(uuid())
+  conversation_id String
+  user_id         String
+  last_read_at    DateTime?
+  created_at      DateTime  @default(now())
+
+  conversation MessengerConversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
+  @@unique([conversation_id, user_id])
+  @@index([user_id, conversation_id])
+  @@schema("platform")
+}
+
+model MessengerMessage {
+  id              String   @id @default(uuid())
+  conversation_id String
+  author_user_id  String
+  body            String?
+  created_at      DateTime @default(now())
+
+  conversation MessengerConversation  @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  attachments  MessengerAttachment[]
+
+  @@index([conversation_id, created_at])
+  @@index([author_user_id, created_at])
+  @@schema("platform")
+}
+
+model MessengerAttachment {
+  id               String    @id @default(uuid())
+  message_id        String
+  storage_key       String?   @unique
+  filename          String
+  content_type      String
+  bytes             Int
+  expires_at        DateTime
+  purged_at         DateTime?
+  created_at        DateTime  @default(now())
+
+  message MessengerMessage @relation(fields: [message_id], references: [id], onDelete: Cascade)
+
+  @@index([message_id])
+  @@index([expires_at, purged_at])
+  @@schema("platform")
+}
+
 // ============================================================================
 // MASTER DATA — curated first application scope
 // ============================================================================

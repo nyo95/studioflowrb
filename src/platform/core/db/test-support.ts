@@ -74,6 +74,10 @@ const PLATFORM_TABLES = [
   "Session",
   "PlatformGeneralSettings",
   "LoginRateLimit",
+  "MessengerConversation",
+  "MessengerParticipant",
+  "MessengerMessage",
+  "MessengerAttachment",
 ].map((table) => `"platform"."${table}"`);
 
 const AUDIT_TABLES = [`"platform"."AuditEvent"`];

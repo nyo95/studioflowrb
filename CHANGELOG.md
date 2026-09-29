@@ -5,13 +5,36 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.197**
-- Next local revision: **R8.198**
+- Current revision after this entry is committed: **R8.198**
+- Next local revision: **R8.199**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.198 | 2026-09-29 | feat(platform): add private messenger with expiring attachments
+
+- Adds a platform-owned private 1:1 messenger: server-side conversations, participant read cursors, messages, unread
+  counts, and temporary attachments in the `platform` schema. The implementation is cross-app and uses the existing
+  signed private ObjectStorage boundary; it does not resurrect StudioFlow's legacy project discussion or write through
+  `platform.Notification`.
+- Legacy evidence was checked read-only from `D:\Misc\ProjectsHUB\studioflow` at
+  `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`: KEEP the 30-minute temporary attachment expiry and cleanup concept;
+  FIX public-upload storage and localStorage unread state; PURGE the project-scoped shared chat UI behavior for this
+  private messenger slice.
+- Adds `/messenger` as minimal functional wiring plus a topbar messenger badge. Delivery is polling, messages are
+  permanent for both participants in this slice, and attachments become unavailable after 30 minutes while message
+  history remains.
+- Adds additive migration `20260929090000_platform_messenger` and focused service tests for stable 1:1 conversation
+  identity, server-side unread state, non-participant denial, attachment expiry, and cleanup.
+- Applied the migration to both kantor local databases used this session: `studioflow_rebuild` and
+  `studioflow_rebuild_test`.
+
+**Checks.** Focused messenger integration test passed; `npm test` 632/632; `tsc --noEmit` clean; `eslint .` 0 errors
+with the two pre-existing Presentation `<img>` warnings; `check:boundaries` and `check:legacy-runtime` clean;
+production build passed with `STUDIOFLOW_LOCATION=kantor`. Browser acceptance for the new messenger remains open, so
+the backlog item is now `[UNVERIFIED]`.
 
 ## R8.197 | 2026-09-29 | feat(sf): cancel a mistaken sample request before anyone acts on it
 

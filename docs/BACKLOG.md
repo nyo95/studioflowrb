@@ -119,34 +119,16 @@ Rules carried over unchanged from the prior trackers:
   treatment beyond generic truncation, and per-app icons, remain undecided —
   not blocking, no icon field exists in the apps registry yet.
 
-- [ ] [BLOCKED] **Private user-to-user messaging, cross-app (owner roadmap
-  review, 2026-09-26).** Owner confirmed scope: "kayak live collab tapi
-  lebih privat antar user diseluruh web (cross app)" — private 1:1, not a
-  shared project feed, and platform-wide (any user to any user), not
-  StudioFlow-scoped. This is a **new decision**, not an activation of the
-  already-ratified `D-SF-05` (StudioFlow-global/general, *temporary*
-  project collaboration) — D-SF-05 explicitly chose "temporary... not a
-  permanent Project record"; this request is private and presumably
-  persistent, the opposite framing. Legacy has no precedent for this
-  (`extensions/live-collaboration` was a shared, 24-hour-window project
-  `Comment` feed with client-only "unread," `setInterval` polling — not
-  1:1 mail; read-only-verified in this session against
-  `github.com/nyo95/studioflow` @ `c4b0c466...`). Placement: platform/Core,
-  not app-owned — reuse the existing cross-app People Directory (already
-  used for assignment pickers) as the recipient source; per `CORE.md` §14's
-  placement test, a generic message store has no app-specific meaning.
-  **Folds in the `CORE.md` §15 deferred "notification delivery" port as its
-  first consumer** — but keep it minimal: an unread badge can be computed
-  directly from the message table's own `readAt IS NULL`, so do **not**
-  build a separate generic `Notification` entity/port in the same slice;
-  only promote to a shared notification primitive once a second, unrelated
-  event type (e.g. the Master Data sample-request item above) genuinely
-  needs to share one inbox/bell with mail.
-  **Questions the owner must answer before a `PLAN.md` can be written:**
-  1. Delivery: client polling (legacy's own pattern, simplest) is enough,
-     or does this need to feel closer to real-time?
-  2. Can either side delete/hide a conversation on their end only, or are
-     messages permanent for both parties forever?
+- [ ] [UNVERIFIED] **Private user-to-user messaging, cross-app — backend and minimal UI built in R8.198.**
+  Owner chose polling on 2026-09-29 and requested expiring attachments after a legacy check. Implemented as a
+  platform-owned private 1:1 messenger, not StudioFlow project discussion: server-side read cursors/unread counts,
+  `/messenger`, topbar badge, private ObjectStorage attachments expiring after 30 minutes, and cleanup that removes
+  bytes while preserving message history. Legacy evidence was read-only from `D:\Misc\ProjectsHUB\studioflow` at
+  `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`: keep the temporary attachment expiry/cleanup concept; fix public
+  storage and localStorage unread; purge project-scoped shared chat behavior for this slice. Browser acceptance still
+  needed: two signed-in users exchange text, observe polling/unread badge, open to clear unread, upload one small
+  attachment and open it before expiry. Expiry itself is covered by service tests and need not wait 30 minutes in the
+  browser.
 
 ## UI Engine and Shared Utilities
 

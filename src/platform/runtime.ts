@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { createAuditEventWriter } from "@platform/core/audit/persistence";
 import { createNotificationCenter, createNotificationWriter } from "@platform/core/notifications/persistence";
+import { createMessengerService } from "@platform/core/messenger";
 import { prisma, runSerializableTransaction } from "@platform/core/db";
 import { createPlatformAccessService } from "@platform/core/rbac/services";
 import { createPeopleDirectory } from "@platform/core/rbac/people";
@@ -43,6 +44,8 @@ const publicRootDir = path.join(storageRoot, "public-assets");
 export const objectStorage = createLocalFilesystemStorage(privateRootDir);
 /** Public Brand marks use a separate storage root; mutation remains server-only. */
 export const brandMarkStorage = createLocalPublicFilesystemStorage(publicRootDir);
+
+export const messenger = createMessengerService(prisma, objectStorage);
 
 export const platformAccess = createPlatformAccessService({
   db: prisma,
