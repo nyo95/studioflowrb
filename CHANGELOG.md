@@ -5,13 +5,43 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.190**
-- Next local revision: **R8.191**
+- Current revision after this entry is committed: **R8.191**
+- Next local revision: **R8.192**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.191 | 2026-09-29 | feat(bq): Section outline rail + sticky Grand Total footer on Project Detail
+
+Second slice of the BQ UI/UX redesign pass (first slice: R8.190). Scoped again to presentation only, inside
+`src/app/(platform)/bq/[id]/project-editor.tsx`; nothing server-computed changed.
+
+- **Section outline rail.** A sticky left-hand nav (`SectionOutline`, `xl:` breakpoint and up — hidden on
+  narrower viewports so it never further squeezes the already-wide ledger table) lists every Section with its
+  Work Item count and jumps to it on click via a plain `#bq-section-<id>` anchor (each `SectionCard` now carries
+  that `id`). Long documents — many Sections, one continuous scroll — previously had no way to jump around or see
+  structure without scrolling past everything. Deliberately **does not** show a per-section money subtotal:
+  bq-contract §2/§6.0 reserve all money arithmetic for the server ("Tidak ada kalkulasi di client"), and no
+  per-section subtotal is in the current read shape (`BqSectionDetail` has no `subtotal` field) — inventing one
+  client-side by summing `item.total` strings would be exactly the kind of client-side money math the contract
+  forbids. The rail only counts array lengths (Work Items per Section), which is structural, not calculated.
+  Also does not track/highlight the currently-scrolled-into-view Section (would need a scroll-spy/
+  IntersectionObserver); scoped out to keep this slice small. Confirmed the app shell's own scroll container
+  (`<main>` in `shells.tsx`, fixed `h-[calc(100dvh-var(--ui-topbar-height))]` with `overflow-auto`) is what
+  `position: sticky` resolves against here, so no layout/flex-chain change was needed elsewhere.
+- **Sticky Grand Total footer.** The Grand Total (and the R8.190 pricing-completeness line) moved out of the top
+  action bar into its own bar with `sticky bottom-0`, staying visible while scrolling a long project instead of
+  requiring a scroll back to the top to check the running total. The top bar keeps only the Lock/Archive/Restore/
+  status controls, now on a single row.
+
+**Checks.** `tsc --noEmit` 0 errors; `eslint src/apps/bq "src/app/(platform)/bq"` clean; `check:boundaries` OK;
+`check:legacy-runtime` OK; full `npm test` 628/628; production build exit 0. No browser pass was run (owner tests
+BQ in-browser themselves) — sticky positioning is CSS-only and code-reviewable, but visually confirming it against
+the real app shell chrome (topbar height, z-index stacking with any other sticky/portal elements) is worth an
+explicit look next time BQ is opened in-browser; not blocking, added to the existing `[UNVERIFIED]` BQ
+browser-walkthrough entry's scope in `docs/BACKLOG.md`.
 
 ## R8.190 | 2026-09-29 | feat(bq): split Koef./Markup columns, unify Cost Component entry points, show pricing completeness
 

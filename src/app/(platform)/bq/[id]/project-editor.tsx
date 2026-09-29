@@ -31,6 +31,7 @@ import type {
   BqItemDetail,
   BqLineItemDetail,
   BqProjectDetail,
+  BqSectionDetail,
   BqSubObjectDetail,
 } from "@/apps/bq/public";
 import type { UnitRead } from "@/apps/masterdata/public";
@@ -115,6 +116,38 @@ function countPriceCompleteness(sections: BqProjectDetail["sections"]) {
   return { total, priced };
 }
 
+/** Structural Work Item count per Section, for the outline rail's quick scan.
+ *  Counts array lengths only — bq-contract §2/§6.0 reserve money arithmetic
+ *  for the server, so this never touches a price, rate, or total. */
+function workItemCount(section: BqSectionDetail) {
+  return section.items.length + section.subsections.reduce((sum, subsection) => sum + subsection.items.length, 0);
+}
+
+function SectionOutline({ sections }: { sections: readonly BqSectionDetail[] }) {
+  if (sections.length === 0) return null;
+  return (
+    <nav
+      aria-label="Navigasi Section"
+      className="sticky top-0 hidden w-[196px] shrink-0 flex-col gap-0.5 self-start py-1 xl:flex"
+    >
+      <Text tone="tertiary" size="sm" meta className="px-2.5 pb-1">Outline</Text>
+      {sections.map((section) => {
+        const count = workItemCount(section);
+        return (
+          <a
+            key={section.id}
+            href={`#bq-section-${section.id}`}
+            className="flex items-center justify-between gap-2 rounded-control px-2.5 py-1.5 text-sm text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink"
+          >
+            <span className="truncate">{section.name}</span>
+            {count > 0 ? <span className="shrink-0 text-xs tabular-nums text-ink-tertiary">{count}</span> : null}
+          </a>
+        );
+      })}
+    </nav>
+  );
+}
+
 export function ProjectEditor({
   project: initialProject,
   canManage,
@@ -188,23 +221,10 @@ export function ProjectEditor({
       {error ? <InlineError>{error}</InlineError> : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface px-4 py-3">
-        <div className="grid gap-0.5">
-          <Text tone="secondary" size="sm">Grand total</Text>
-          <span className="text-2xl font-semibold tabular-nums text-ink">
-            {project.grandTotal === null
-              ? <span className="text-base font-normal text-ink-tertiary">Belum lengkap — ada item tanpa harga</span>
-              : formatMoney(createMoney(project.grandTotal, "IDR"))}
-          </span>
-          {pricingTotal > 0 ? (
-            <Text
-              tone="tertiary"
-              size="sm"
-              className={pricingPriced === pricingTotal ? undefined : "text-warning"}
-            >
-              {pricingPriced} dari {pricingTotal} Cost Component sudah ada harga
-            </Text>
-          ) : null}
-        </div>
+        <Text tone="secondary" size="sm">
+          {project.sections.length} section
+          {canManage && project.status === "ACTIVE" ? " · dapat diedit" : null}
+        </Text>
         <div className="flex flex-wrap items-center gap-2">
           {canManage && project.status === "ACTIVE" ? <>
             <Button variant="secondary" leadingIcon={<Lock aria-hidden="true" />} onClick={() => setLockOpen(true)} disabled={pending}>Lock project</Button>
@@ -221,17 +241,20 @@ export function ProjectEditor({
         </div>
       </div>
 
-      {project.sections.length === 0 ? (
-        <SectionCard>
-          <EmptyState
-            title="Belum ada section"
-            description={editable ? "Tambahkan section untuk mulai menyusun BQ." : "Project ini belum memiliki section."}
-          />
-        </SectionCard>
-      ) : null}
+      <div className="flex items-start gap-5">
+        <SectionOutline sections={project.sections} />
+        <div className="grid min-w-0 flex-1 gap-4">
+          {project.sections.length === 0 ? (
+            <SectionCard>
+              <EmptyState
+                title="Belum ada section"
+                description={editable ? "Tambahkan section untuk mulai menyusun BQ." : "Project ini belum memiliki section."}
+              />
+            </SectionCard>
+          ) : null}
 
-      {project.sections.map((section) => (
-        <SectionCard key={section.id} className="grid gap-3">
+          {project.sections.map((section) => (
+        <SectionCard key={section.id} id={`bq-section-${section.id}`} className="grid gap-3">
           <div className="flex items-center">
             {editable ? (
               <InlineEdit
@@ -333,7 +356,29 @@ export function ProjectEditor({
             </div>
           ) : null}
         </SectionCard>
-      ))}
+          ))}
+        </div>
+      </div>
+
+      <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface/95 px-4 py-3 shadow-plane backdrop-blur-sm">
+        {pricingTotal > 0 ? (
+          <Text
+            tone="tertiary"
+            size="sm"
+            className={pricingPriced === pricingTotal ? undefined : "text-warning"}
+          >
+            {pricingPriced} dari {pricingTotal} Cost Component sudah ada harga
+          </Text>
+        ) : <span />}
+        <div className="flex items-baseline gap-2">
+          <Text tone="secondary" size="sm">Grand total</Text>
+          <span className="text-xl font-semibold tabular-nums text-ink">
+            {project.grandTotal === null
+              ? <span className="text-sm font-normal text-ink-tertiary">Belum lengkap — ada item tanpa harga</span>
+              : formatMoney(createMoney(project.grandTotal, "IDR"))}
+          </span>
+        </div>
+      </div>
 
       {importTarget ? (
         <ImportDialog
