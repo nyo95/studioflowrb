@@ -5,13 +5,47 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.185**
-- Next local revision: **R8.186**
+- Current revision after this entry is committed: **R8.186**
+- Next local revision: **R8.187**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.186 | 2026-09-29 | fix(studioflow,masterdata): asset-cleanup deletes retry instead of leaking, price amount always has a currency
+
+Two owner-prioritized items from the R8.184 debt review (`kerjakan dalam 1 session run`), both pre-existing and untouched
+by R8.183-185: a leaked storage key on delete failure, and a data-integrity gap on the sample-quote price.
+
+- **Asset cleanup retry (`docs/BACKLOG.md` #1, was the top priority).** `purgeExpiredArchivedAssets` and every schedule-
+  image delete already removed the owning DB row before attempting the storage delete; a failed `storage.remove` was
+  only ever counted (`blobFailures`), never recorded, so the key was unrecoverable — no DB row referenced it anymore,
+  and the count in the audit event's metadata isn't the key itself. New model `SfAssetCleanupFailure` (additive
+  migration `20260929035510_studioflow_asset_cleanup_failure`, applied to `studioflow_rebuild` and
+  `studioflow_rebuild_test` after verifying both are the rebuild's local databases) records the key on failure and
+  clears it on a later success. `retryFailedAssetCleanup` (`asset-cleanup.ts`) retries every unresolved failure and
+  runs at the start of every `purgeExpiredArchivedAssets` call — so both the existing daily scheduled sweep
+  (`asset-sweep.ts`, unchanged) and a manual "Run cleanup now" now retry old failures before doing new work, with no
+  new scheduling surface. `previousFailuresResolved`/`previousFailuresStillFailing` added to the cleanup summary; the
+  settings UI (`archive-retention-settings.tsx`) reports resolved-from-earlier-run separately and reworded the still-
+  failing notice ("cleanup will keep retrying automatically") instead of implying permanent loss.
+- **Sample-quote currency invariant (`docs/BACKLOG.md` #2).** `recordSampleQuote`'s currency-only branch
+  (`sample-request.service.ts`) let `{ quotedCurrency: null }` clear the currency while leaving a non-null amount in
+  place — a price with no currency. Clearing the currency alone now cascades to clear the amount too, the same rule
+  the amount branch already applied in the other direction, so `amount` and `currency` stay both-set or both-null.
+- Tests: 4 new unit tests for `removeUnreferenced`/`retryFailedAssetCleanup` (records on failure, clears on a later
+  success, a bookkeeping failure never masks the real delete outcome, retry partially resolves and keeps counting
+  repeats), 1 new real-database integration test exercising the full retry cycle through `purgeExpiredArchivedAssets`
+  twice, 1 new integration assertion for the currency/amount cascade.
+
+**Checks.** `tsc --noEmit` 0 errors; `eslint .` clean on touched files; `check:boundaries` and `check:legacy-runtime` OK;
+full `npm test` 628/628 (623 before, +4 `asset-cleanup.test.ts`, +1 retry-cycle integration test).
+
+**Limits.** No independent review (same standing gap as R8.181-185; still open). `previewAssetCleanup`'s "nothing to
+clean up" state doesn't surface pending retries separately, so a manual "Review cleanup…" run with zero newly-eligible
+projects gives no visible way to trigger a retry-only pass early — it still happens on the next scheduled sweep. No
+browser acceptance recorded (owner tests UI changes themselves).
 
 ## R8.185 | 2026-09-29 | feat(masterdata,shell): sample requests screen and the notification bell
 

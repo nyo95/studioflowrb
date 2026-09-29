@@ -1217,6 +1217,22 @@ model SfSettings {
   @@schema("studioflow")
 }
 
+/// A storage key that failed to delete during cleanup (archive purge or a schedule
+/// image being replaced/removed). By the time a delete is attempted the DB row that
+/// referenced the key is already gone, so this is the only remaining record of what
+/// leaked; the cleanup sweep retries against it until the delete finally succeeds.
+model SfAssetCleanupFailure {
+  id              String    @id @default(uuid())
+  storage_key     String    @unique
+  first_failed_at DateTime  @default(now())
+  last_attempt_at DateTime  @default(now())
+  attempts        Int       @default(1)
+  resolved_at     DateTime?
+
+  @@map("sf_asset_cleanup_failure")
+  @@schema("studioflow")
+}
+
 /// Per-year project sequence used by auto naming ("2026-007 Name").
 model SfProjectSequence {
   year        Int @id

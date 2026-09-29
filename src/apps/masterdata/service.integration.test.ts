@@ -1100,6 +1100,11 @@ describe("Sample request intake (Master Data side of StudioFlow sample requests)
     assert.equal(cleared.quotedAmount, null);
     assert.equal(cleared.quotedCurrency, null, "clearing the amount clears its currency");
 
+    await service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: intake.id, quotedAmount: "50000", quotedCurrency: "IDR" });
+    const currencyCleared = await service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: intake.id, quotedCurrency: null });
+    assert.equal(currencyCleared.quotedCurrency, null);
+    assert.equal(currencyCleared.quotedAmount, null, "clearing the currency alone also clears the amount, so a price can never be stored without one");
+
     const noop = await eventsFor(intake.id);
     await service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: intake.id });
     assert.equal((await eventsFor(intake.id)).length, noop.length, "a call that changes nothing writes no audit event");

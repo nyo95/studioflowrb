@@ -142,8 +142,12 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
         data.quoted_currency = requiredCurrency(currency);
       }
     } else if (input.quotedCurrency !== undefined) {
-      if (input.quotedCurrency === null) data.quoted_currency = null;
-      else {
+      if (input.quotedCurrency === null) {
+        // An amount without a currency is meaningless, so clearing the currency alone
+        // clears the amount too — the same invariant the amount branch above already keeps.
+        data.quoted_currency = null;
+        data.quoted_amount = null;
+      } else {
         if (current.quoted_amount === null) throw new AppError("VALIDATION", "SAMPLE_AMOUNT_REQUIRED", "Enter the amount before its currency.");
         data.quoted_currency = requiredCurrency(input.quotedCurrency);
       }

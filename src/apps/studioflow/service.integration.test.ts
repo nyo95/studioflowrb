@@ -7,7 +7,7 @@ import { closeTestDb, createTestDb, requireDisposableTestDatabaseUrl, truncatePl
 import { AppError } from "@platform/core/errors";
 import { createPeopleDirectory } from "@platform/core/rbac/people";
 import { initializePermissionRegistry } from "@platform/core/rbac/registry";
-import { FakeObjectStorage } from "@platform/core/storage";
+import { FakeObjectStorage, type ObjectStorage } from "@platform/core/storage";
 import { createMasterDataPublicRead, MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
 import { createNotificationWriter } from "@platform/core/notifications/persistence";
 import { createSampleRequestNotifier } from "./sample-request-notifier";
@@ -165,7 +165,7 @@ describe("WO-BE-02 archived asset retention", () => {
     await db.sfClient.update({ where: { id: client.id }, data: { logo_storage_key: "client-logo" } });
     await db.sfScheduleTemplateItem.create({ data: { section: "MATERIAL", category: "Floor", category_key: "floor", product_name: "Template", image_key: "template-photo" } });
     const result = await retention().purgeExpiredArchivedAssets();
-    assert.deepEqual(result, { projectsPurged: 1, deliverables: 1, momImages: 1, momSnapshotImages: 2, optionPhotos: 1, blobsRemoved: 4, blobsKeptShared: 0, blobFailures: 0, unparseableRevisions: 0 });
+    assert.deepEqual(result, { projectsPurged: 1, deliverables: 1, momImages: 1, momSnapshotImages: 2, optionPhotos: 1, blobsRemoved: 4, blobsKeptShared: 0, blobFailures: 0, unparseableRevisions: 0, previousFailuresResolved: 0, previousFailuresStillFailing: 0 });
     for (const key of Object.values(expired.keys)) assert.equal(storage.objects.has(key), false);
     for (const kept of [inside, boundary, live]) {
       for (const key of Object.values(kept.keys)) assert.ok(storage.objects.has(key));
@@ -194,6 +194,35 @@ describe("WO-BE-02 archived asset retention", () => {
       const event = await db.auditEvent.findFirstOrThrow({ where: { entity_id: projectId, action: "studioflow.project.restored" } });
       assert.equal((event.metadata as { assetsPurged: boolean }).assetsPurged, assetsPurged);
     }
+  });
+
+  it("retries a delete that failed in an earlier run before starting new work, instead of losing the key", async () => {
+    const db = testDb.prisma;
+    const expired = await fixture("Flaky delete", 91);
+    const flakyKey = expired.keys.deliverable;
+    let failNext = true;
+    const flaky: ObjectStorage = {
+      put: (input) => storage.put(input),
+      createSignedReadUrl: (key, expiresIn) => storage.createSignedReadUrl(key, expiresIn),
+      async remove(key: string) {
+        if (key === flakyKey && failNext) { failNext = false; throw new Error("disk unavailable"); }
+        return storage.remove(key);
+      },
+    };
+
+    const first = await retention({ storage: flaky }).purgeExpiredArchivedAssets();
+    assert.equal(first.blobFailures, 1);
+    assert.equal(first.previousFailuresResolved, 0);
+    assert.ok(storage.objects.has(flakyKey), "the failed delete left the object in place, not silently dropped");
+    const failure = await db.sfAssetCleanupFailure.findUniqueOrThrow({ where: { storage_key: flakyKey } });
+    assert.equal(failure.resolved_at, null);
+    assert.equal(failure.attempts, 1);
+
+    const second = await retention().purgeExpiredArchivedAssets();
+    assert.equal(second.previousFailuresResolved, 1);
+    assert.equal(second.previousFailuresStillFailing, 0);
+    assert.equal(storage.objects.has(flakyKey), false, "the retry finally removed the leaked object");
+    assert.ok((await db.sfAssetCleanupFailure.findUniqueOrThrow({ where: { storage_key: flakyKey } })).resolved_at instanceof Date);
   });
 
   it("keeps shared keys, leaves malformed snapshots untouched and preserves legacy snapshot text", async () => {

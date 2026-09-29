@@ -20,6 +20,8 @@ type CleanupSummary = {
   blobsRemoved: number;
   blobsKeptShared: number;
   blobFailures: number;
+  previousFailuresResolved: number;
+  previousFailuresStillFailing: number;
 };
 
 type Stage =
@@ -188,9 +190,15 @@ function CleanupResult({ summary }: { summary: CleanupSummary }) {
         {plural(summary.blobsRemoved, "file was", "files were")} deleted.
         {summary.blobsKeptShared > 0 ? ` ${plural(summary.blobsKeptShared, "file was", "files were")} kept because something else still uses ${summary.blobsKeptShared === 1 ? "it" : "them"}.` : ""}
       </Notice>
-      {summary.blobFailures > 0 ? (
+      {summary.previousFailuresResolved > 0 ? (
+        <Notice tone="success" title="Also cleared earlier failures">
+          {plural(summary.previousFailuresResolved, "file", "files")} that could not be deleted in an earlier run {summary.previousFailuresResolved === 1 ? "was" : "were"} removed now.
+        </Notice>
+      ) : null}
+      {summary.blobFailures > 0 || summary.previousFailuresStillFailing > 0 ? (
         <Notice tone="warning" title="Some files could not be deleted">
-          {plural(summary.blobFailures, "file", "files")} could not be deleted from disk. They are no longer linked to any project.
+          {plural(summary.blobFailures + summary.previousFailuresStillFailing, "file", "files")} could not be deleted from disk. They are no
+          longer linked to any project; cleanup will keep retrying automatically.
         </Notice>
       ) : null}
       {more ? <Text size="sm" tone="secondary">More projects may be waiting. Run the cleanup again to continue.</Text> : null}

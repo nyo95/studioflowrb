@@ -1,6 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { momSnapshotImageKeys, parseMomSnapshot } from "../domain/mom";
-import { removeUnreferenced } from "../asset-cleanup";
+import { removeUnreferenced, retryFailedAssetCleanup } from "../asset-cleanup";
 import { invalid, nowOf, P, requireCommand, writeAudit, type CommandContext, type Db, type StudioFlowPorts } from "../shared";
 
 export function createAssetRetentionService(db: Db, ports: StudioFlowPorts) {
@@ -18,8 +18,16 @@ export function createAssetRetentionService(db: Db, ports: StudioFlowPorts) {
     const limit = input.limit ?? 25;
     if (!Number.isInteger(limit) || limit < 1) throw invalid("PURGE_LIMIT_INVALID", "Cleanup limit must be a positive whole number.");
     const { eligible } = await eligibility(now);
+    // Retry deletes that failed in an earlier run before starting new work: the owning
+    // row was already gone when a key first failed, so this is the only remaining chance
+    // to reclaim it, and it should not wait for a fresh batch of projects to become eligible.
+    const retry = await retryFailedAssetCleanup(db, ports.storage);
     const projects = await db.sfProject.findMany({ where: eligible, orderBy: { archived_at: "asc" }, take: limit, select: { id: true } });
-    const summary = { projectsPurged: 0, deliverables: 0, momImages: 0, momSnapshotImages: 0, optionPhotos: 0, blobsRemoved: 0, blobsKeptShared: 0, blobFailures: 0, unparseableRevisions: 0 };
+    const summary = {
+      projectsPurged: 0, deliverables: 0, momImages: 0, momSnapshotImages: 0, optionPhotos: 0,
+      blobsRemoved: 0, blobsKeptShared: 0, blobFailures: 0, unparseableRevisions: 0,
+      previousFailuresResolved: retry.resolved, previousFailuresStillFailing: retry.stillFailing,
+    };
     const actor = { kind: "SYSTEM" as const, label: "StudioFlow asset retention" };
     for (const project of projects) {
       const claimed = await ports.runTransaction(async (tx) => {
