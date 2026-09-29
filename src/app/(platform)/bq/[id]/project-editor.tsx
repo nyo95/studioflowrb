@@ -1,7 +1,7 @@
 "use client";
 
-import { Archive, ArchiveRestore, ChevronDown, ChevronRight, Download, Lock, LockOpen, Plus, RotateCcw, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { Archive, ArchiveRestore, ChevronDown, ChevronRight, Lock, LockOpen, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { useState, useTransition } from "react";
 
 import {
   Badge,
@@ -84,6 +84,37 @@ function money(amount: string | null, currency = "IDR") {
   return <>{formatMoney(createMoney(amount, currency))}</>;
 }
 
+/** Counts every terminal cost line (L1-only Work Items and L3 Cost
+ *  Components) so the header can show "X dari Y sudah ada harga" instead of
+ *  only revealing incompleteness once the Grand Total goes blank. */
+function countPriceCompleteness(sections: BqProjectDetail["sections"]) {
+  let total = 0;
+  let priced = 0;
+
+  const countLine = (line: BqLineItemDetail) => {
+    total += 1;
+    if (line.hargaSnapshot !== null) priced += 1;
+  };
+
+  const countItem = (item: BqItemDetail) => {
+    const hasChildren = item.subObjects.length > 0 || item.lineItems.length > 0;
+    if (!hasChildren) {
+      total += 1;
+      if (item.hargaSnapshot !== null) priced += 1;
+      return;
+    }
+    item.lineItems.forEach(countLine);
+    item.subObjects.forEach((subObject) => subObject.lineItems.forEach(countLine));
+  };
+
+  for (const section of sections) {
+    section.items.forEach(countItem);
+    section.subsections.forEach((subsection) => subsection.items.forEach(countItem));
+  }
+
+  return { total, priced };
+}
+
 export function ProjectEditor({
   project: initialProject,
   canManage,
@@ -103,7 +134,6 @@ export function ProjectEditor({
   const [assemblyTarget, setAssemblyTarget] = useState<AssemblyTarget | null>(null);
   const [lockOpen, setLockOpen] = useState(false);
   const [lifecycleConfirm, setLifecycleConfirm] = useState<"archive" | "restore" | "delete" | null>(null);
-  const [transientAdd, setTransientAdd] = useState<{ kind: "item" | "subObject"; id: string } | null>(null);
 
   const locked = project.status === "LOCKED" || project.status === "ARCHIVED";
   const editable = canManage && !locked;
@@ -150,7 +180,8 @@ export function ProjectEditor({
     return run(action, { id, field, value: resolved });
   };
 
-  const totalColumns = 7;
+  const totalColumns = 8;
+  const { total: pricingTotal, priced: pricingPriced } = countPriceCompleteness(project.sections);
 
   return (
     <div className="grid gap-4">
@@ -164,6 +195,15 @@ export function ProjectEditor({
               ? <span className="text-base font-normal text-ink-tertiary">Belum lengkap — ada item tanpa harga</span>
               : formatMoney(createMoney(project.grandTotal, "IDR"))}
           </span>
+          {pricingTotal > 0 ? (
+            <Text
+              tone="tertiary"
+              size="sm"
+              className={pricingPriced === pricingTotal ? undefined : "text-warning"}
+            >
+              {pricingPriced} dari {pricingTotal} Cost Component sudah ada harga
+            </Text>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {canManage && project.status === "ACTIVE" ? <>
@@ -217,8 +257,6 @@ export function ProjectEditor({
             commitNum={commitNum}
             onImport={setImportTarget}
             onApplyAssembly={(itemId) => setAssemblyTarget({ via: "item", itemId })}
-            transientAdd={transientAdd}
-            onTransientAdd={setTransientAdd}
             columns={totalColumns}
           />
 
@@ -248,8 +286,6 @@ export function ProjectEditor({
                 commitNum={commitNum}
                 onImport={setImportTarget}
                 onApplyAssembly={(itemId) => setAssemblyTarget({ via: "item", itemId })}
-                transientAdd={transientAdd}
-                onTransientAdd={setTransientAdd}
                 columns={totalColumns}
               />
               {editable ? (
@@ -379,8 +415,6 @@ function ItemTable({
   commitNum,
   onImport,
   onApplyAssembly,
-  transientAdd,
-  onTransientAdd,
   columns,
 }: {
   items: readonly BqItemDetail[];
@@ -394,8 +428,6 @@ function ItemTable({
   commitNum: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   onImport: (target: { itemId?: string; subObjectId?: string }) => void;
   onApplyAssembly?: (itemId: string) => void;
-  transientAdd: { kind: "item" | "subObject"; id: string } | null;
-  onTransientAdd: (v: { kind: "item" | "subObject"; id: string } | null) => void;
   columns: number;
 }) {
   if (items.length === 0) {
@@ -403,14 +435,15 @@ function ItemTable({
   }
 
   return (
-    <DataTable minWidth="880px" density="compact">
+    <DataTable minWidth="960px" density="compact">
       <TableHeader>
         <TableRow>
           <TableHead className="w-[36px]" aria-label="Expand" />
           <TableHead>Uraian</TableHead>
           <TableHead align="end" className="w-[90px]">Qty</TableHead>
           <TableHead className="w-[80px]">Unit</TableHead>
-          <TableHead align="end" className="w-[110px]">Koef.</TableHead>
+          <TableHead align="end" className="w-[90px]">Koef.</TableHead>
+          <TableHead align="end" className="w-[90px]">Markup</TableHead>
           <TableHead align="end" className="w-[130px]">Rate</TableHead>
           <TableHead align="end" className="w-[140px]">Total</TableHead>
           {editable ? <TableHead align="end" className="w-[80px]" aria-label="Actions" /> : null}
@@ -436,8 +469,6 @@ function ItemTable({
               commitNum={commitNum}
               onImport={onImport}
               onApplyAssembly={onApplyAssembly}
-              transientAdd={transientAdd}
-              onTransientAdd={onTransientAdd}
               columns={columns + (editable ? 1 : 0)}
             />
           );
@@ -461,8 +492,6 @@ function ItemRows({
   commitNum,
   onImport,
   onApplyAssembly,
-  transientAdd,
-  onTransientAdd,
   columns,
 }: {
   item: BqItemDetail;
@@ -478,8 +507,6 @@ function ItemRows({
   commitNum: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   onImport: (target: { itemId?: string; subObjectId?: string }) => void;
   onApplyAssembly?: (itemId: string) => void;
-  transientAdd: { kind: "item" | "subObject"; id: string } | null;
-  onTransientAdd: (v: { kind: "item" | "subObject"; id: string } | null) => void;
   columns: number;
 }) {
   return (
@@ -501,17 +528,24 @@ function ItemRows({
           <InlineEdit label="Quantity" align="end" inputMode="decimal" value={item.qty} disabled={!editable} onCommit={commitNum(updateItemAction, item.id, "qty")} />
         </TableCell>
         <TableCell>{editable ? <Select aria-label="Work Item unit" value={item.unit} disabled={pending} onChange={(event) => void commit(updateItemAction, item.id, "unit")(event.target.value).catch(() => undefined)}>{units.some((unit) => unit.code === item.unit) ? null : <option value={item.unit} disabled>{item.unit} (inactive snapshot)</option>}{units.map((unit) => <option key={unit.id} value={unit.code}>{unit.code}</option>)}</Select> : item.unit}</TableCell>
+        {/* Koef. and Markup are two fixed columns rather than one cell that
+            switches meaning: an L1 with children takes its cost from them, so
+            its own coefficient is dormant (shown "—"); a childless L1 has no
+            markup of its own (zeroed automatically — zeroMarkupIfChildless). */}
         <TableCell align="end">
-          {/* An L1 with children takes its cost from them; its own coefficient
-              is dormant, so showing it as editable would be a lie. */}
           {hasChildren ? (
-            <Tooltip content="Work Item markup (%). Coefficient is used only when this Work Item has no breakdown.">
-              <span className="inline-block">
-                <InlineEdit label="Markup percent" align="end" inputMode="decimal" value={item.markupL1Pct} disabled={!editable} onCommit={commitNum(updateItemAction, item.id, "markupL1Pct")} />
-              </span>
-            </Tooltip>
+            <Text tone="tertiary" size="sm">—</Text>
           ) : (
             <InlineEdit label="Coefficient" align="end" inputMode="decimal" value={item.koefisien} disabled={!editable} onCommit={commitNum(updateItemAction, item.id, "koefisien")} />
+          )}
+        </TableCell>
+        <TableCell align="end">
+          {hasChildren ? (
+            <InlineEdit label="Markup percent" align="end" inputMode="decimal" value={item.markupL1Pct} disabled={!editable} onCommit={commitNum(updateItemAction, item.id, "markupL1Pct")} />
+          ) : (
+            <Tooltip content="Markup tidak berlaku untuk Work Item tanpa breakdown — nilainya otomatis 0.">
+              <span className="inline-block"><Text tone="tertiary" size="sm">—</Text></span>
+            </Tooltip>
           )}
         </TableCell>
         <TableCell align="end">
@@ -556,8 +590,6 @@ function ItemRows({
               commit={commit}
               commitNum={commitNum}
               onImport={onImport}
-              transientAdd={transientAdd}
-              onTransientAdd={onTransientAdd}
               columns={columns}
             />
           ))}
@@ -574,16 +606,6 @@ function ItemRows({
               commitNum={commitNum}
             />
           ))}
-          {transientAdd?.kind === "item" && transientAdd.id === item.id ? (
-            <TransientLineItemRow
-              itemId={item.id}
-              depth={1}
-              columns={columns}
-              pending={pending}
-              run={run}
-              onDismiss={() => onTransientAdd(null)}
-            />
-          ) : null}
 
           {editable ? (
             <TableRow>
@@ -601,18 +623,9 @@ function ItemRows({
                     variant="ghost"
                     leadingIcon={<Plus aria-hidden="true" />}
                     disabled={pending}
-                    onClick={() => onTransientAdd({ kind: "item", id: item.id })}
-                  >
-                    Custom Cost Component
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    leadingIcon={<Download aria-hidden="true" />}
-                    disabled={pending}
                     onClick={() => onImport({ itemId: item.id })}
                   >
-                    Add Cost Component
+                    + Tambah Cost Component
                   </Button>
                   {onApplyAssembly ? (
                     <Button
@@ -644,8 +657,6 @@ function SubObjectRows({
   commit,
   commitNum,
   onImport,
-  transientAdd,
-  onTransientAdd,
   columns,
 }: {
   subObject: BqSubObjectDetail;
@@ -657,8 +668,6 @@ function SubObjectRows({
   commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   commitNum: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   onImport: (target: { itemId?: string; subObjectId?: string }) => void;
-  transientAdd: { kind: "item" | "subObject"; id: string } | null;
-  onTransientAdd: (v: { kind: "item" | "subObject"; id: string } | null) => void;
   columns: number;
 }) {
   const open = expanded.has(subObject.id);
@@ -682,6 +691,9 @@ function SubObjectRows({
           <InlineEdit label="Quantity per Work Item" align="end" inputMode="decimal" value={subObject.qtyPerL1} disabled={!editable} onCommit={commitNum(updateSubObjectAction, subObject.id, "qtyPerL1")} />
         </TableCell>
         <TableCell><Text tone="tertiary" size="sm">per Work Item</Text></TableCell>
+        <TableCell align="end">
+          <Text tone="tertiary" size="sm">—</Text>
+        </TableCell>
         <TableCell align="end">
           <Tooltip content="Component Group markup (%) — applies only to Cost Components in this group.">
             <span className="inline-block">
@@ -707,16 +719,6 @@ function SubObjectRows({
           {subObject.lineItems.map((line) => (
             <LineItemRow key={line.id} line={line} depth={2} editable={editable} pending={pending} run={run} commit={commit} commitNum={commitNum} />
           ))}
-          {transientAdd?.kind === "subObject" && transientAdd.id === subObject.id ? (
-            <TransientLineItemRow
-              subObjectId={subObject.id}
-              depth={2}
-              columns={columns}
-              pending={pending}
-              run={run}
-              onDismiss={() => onTransientAdd(null)}
-            />
-          ) : null}
           {editable ? (
             <TableRow>
               <TableCell />
@@ -727,18 +729,9 @@ function SubObjectRows({
                     variant="ghost"
                     leadingIcon={<Plus aria-hidden="true" />}
                     disabled={pending}
-                    onClick={() => onTransientAdd({ kind: "subObject", id: subObject.id })}
-                  >
-                    Custom Cost Component
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    leadingIcon={<Download aria-hidden="true" />}
-                    disabled={pending}
                     onClick={() => onImport({ subObjectId: subObject.id })}
                   >
-                    Add Cost Component
+                    + Tambah Cost Component
                   </Button>
                 </div>
               </TableCell>
@@ -749,69 +742,6 @@ function SubObjectRows({
     </>
   );
 }
-
-function TransientLineItemRow({
-  itemId,
-  subObjectId,
-  depth,
-  columns,
-  pending,
-  run,
-  onDismiss,
-}: {
-  itemId?: string;
-  subObjectId?: string;
-  depth: 1 | 2;
-  columns: number;
-  pending: boolean;
-  run: (action: Mutation, fields: Record<string, string | undefined>) => Promise<void>;
-  onDismiss: () => void;
-}) {
-  const [title, setTitle] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  const indent = depth === 1 ? "pl-4" : "pl-10";
-
-  async function submit() {
-    const t = title.trim();
-    if (!t) { onDismiss(); return; }
-    await run(addLineItemAction, {
-      ...(itemId ? { itemId } : { subObjectId }),
-      sourceType: "CUSTOM",
-      title: t,
-    }).catch(() => undefined);
-    onDismiss();
-  }
-
-  return (
-    <TableRow>
-      <TableCell />
-      <TableCell colSpan={columns - 1}>
-        <div className={`flex items-center gap-2 ${indent}`}>
-          <Input
-            ref={inputRef}
-            type="text"
-            density="compact"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") { e.preventDefault(); void submit(); }
-              if (e.key === "Escape") { e.preventDefault(); onDismiss(); }
-            }}
-            placeholder="Nama baris…"
-            className="min-w-0 flex-1"
-            disabled={pending}
-          />
-        </div>
-      </TableCell>
-    </TableRow>
-  );
-}
-
 
 function LineItemRow({
   line,
@@ -866,6 +796,9 @@ function LineItemRow({
       </TableCell>
       <TableCell align="end">
         <InlineEdit label="Coefficient" align="end" inputMode="decimal" value={line.koefisien} disabled={!editable} onCommit={commitNum(updateLineItemAction, line.id, "koefisien")} />
+      </TableCell>
+      <TableCell align="end">
+        <Text tone="tertiary" size="sm">—</Text>
       </TableCell>
       <TableCell align="end">
         <InlineEdit

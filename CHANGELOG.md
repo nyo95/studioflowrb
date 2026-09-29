@@ -5,13 +5,44 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.189**
-- Next local revision: **R8.190**
+- Current revision after this entry is committed: **R8.190**
+- Next local revision: **R8.191**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.190 | 2026-09-29 | feat(bq): split Koef./Markup columns, unify Cost Component entry points, show pricing completeness
+
+First slice of a UI/UX redesign pass on the BQ project editor (`src/app/(platform)/bq/[id]/project-editor.tsx`),
+scoped to changes that touch presentation only — no calculation-engine, schema, or editability-rule change. A
+proposal for the remaining screens (Project Detail navigation/sticky chrome, a unified Quick-Add popover, an
+Assembly-apply preview, and BQ Library search/filter) was designed first as an owner-facing mockup and is not yet
+implemented; scoping the rest is next.
+
+- **Koef. and Markup are now two fixed columns instead of one cell that changes meaning.** Previously the same
+  cell showed an editable coefficient for a childless Work Item and, once it gained children, silently switched to
+  an editable markup percentage — distinguishable only by a hover tooltip. Now both columns are always present;
+  whichever does not apply to that row (Koef. for a Work Item with children, Markup for a childless Work Item or
+  a Cost Component, both for a Component Group's Koef.) shows a plain "—". No calculation, storage field, or
+  editability rule changed — `zeroMarkupIfChildless` (R8.119) still applies; this is presentation only.
+- **One entry point for adding a Cost Component, not three.** Removed the inline "Custom Cost Component" quick-add
+  row (`TransientLineItemRow`), which took only a title and silently defaulted `kategori` to `MATERIAL`
+  (`actions.ts:372`, `value.kategori ?? "MATERIAL"`) without asking. The existing Import dialog already has a full
+  Custom tab that asks for type/kategori explicitly, so both "Custom Cost Component" and "Add Cost Component"
+  buttons at the Work Item and Component Group level are now a single "+ Tambah Cost Component" button opening
+  that dialog. Applying an Assembly stays a separate action (it fills many lines at once, not one).
+- **Pricing completeness is now visible before the Grand Total goes blank.** A new "`X` dari `Y` Cost Component
+  sudah ada harga" line under the Grand Total (client-side count over every terminal L1-only Work Item and L3 Cost
+  Component's `hargaSnapshot`), turning warning-colored once anything is unpriced — previously the only signal was
+  the Grand Total itself rendering as "Belum lengkap" with no indication of which or how many items were missing a
+  price.
+
+**Checks.** `tsc --noEmit` 0 errors; `eslint src/apps/bq "src/app/(platform)/bq"` clean; `check:boundaries` OK;
+`check:legacy-runtime` OK; full `npm test` 628/628; production build exit 0. No browser pass was run (owner tests
+BQ in-browser themselves); this remains covered by the existing `[UNVERIFIED]` BQ browser-walkthrough entry in
+`docs/BACKLOG.md`.
 
 ## R8.189 | 2026-09-29 | fix(ui): converge stale token classes and drawer entrance
 
