@@ -18,6 +18,10 @@ export async function register(): Promise<void> {
     "@platform/infrastructure/storage/asset-signing"
   );
   assertAssetSigningConfigured();
+  // The folder holds the only copy of every upload; refuse to start on a
+  // fallback, relative, or in-checkout location rather than lose files later.
+  const { assertStorageRootConfigured } = await import("@platform/infrastructure/storage/storage-root");
+  await assertStorageRootConfigured();
   const { initializePermissionRegistry } = await import("@platform/core/rbac/registry");
   const { APP_REGISTRATIONS } = await import("./app/app-registrations");
   initializePermissionRegistry(APP_REGISTRATIONS);

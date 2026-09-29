@@ -9,6 +9,7 @@ import { createPeopleDirectory } from "@platform/core/rbac/people";
 import { createPlatformSettingsService } from "@platform/core/settings";
 import { createPlatformAccountService } from "@platform/core/auth/account";
 import path from "node:path";
+import { resolveStorageRoot } from "@platform/infrastructure/storage/storage-root";
 import { createLocalFilesystemStorage, createLocalPublicFilesystemStorage } from "@platform/infrastructure/storage/filesystem";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -36,7 +37,7 @@ export const auditWriter = commonPorts.auditWriter;
 /** Apps write notifications inside their own transaction; people read their own inbox through the center. */
 export const notificationWriter = createNotificationWriter();
 export const notificationCenter = createNotificationCenter(prisma);
-const storageRoot = process.env.STUDIOFLOW_STORAGE_ROOT || path.join(process.cwd(), ".storage");
+const storageRoot = resolveStorageRoot();
 const privateRootDir = path.join(storageRoot, "private-assets");
 const publicRootDir = path.join(storageRoot, "public-assets");
 

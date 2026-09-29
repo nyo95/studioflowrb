@@ -9,7 +9,9 @@ const LEGACY_PATH_PATTERN = /\.\.[\\/]+studioflow(?![\w-])/g;
 const TOKEN_END = new Set(['"', "'", "`", " ", "\t", ")", ";", "]", ","]);
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
-const SKIP_DIRECTORIES = new Set(["node_modules", ".next", "generated"]);
+// `generated` is skipped only as the top-level folder of the walked root (src/generated).
+const SKIP_DIRECTORIES = new Set(["node_modules", ".next"]);
+const GENERATED_ROOT_DIRECTORY = "generated";
 const CONFIG_EXTENSIONS = /\.(json|ts|tsx|js|jsx|mjs|cjs)$/i;
 const LOCK_FILES = new Set([
   "package-lock.json",
@@ -41,7 +43,7 @@ async function listRootConfigFiles(projectRoot) {
     .sort();
 }
 
-async function walkSources(dir, skipDirectories = SKIP_DIRECTORIES) {
+async function walkSources(dir, skipDirectories = SKIP_DIRECTORIES, root = dir) {
   let entries;
   try {
     entries = await readdir(dir, { withFileTypes: true });
@@ -52,7 +54,8 @@ async function walkSources(dir, skipDirectories = SKIP_DIRECTORIES) {
   for (const entry of entries) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (!skipDirectories.has(entry.name)) files.push(...(await walkSources(path, skipDirectories)));
+      const generatedRoot = dir === root && entry.name === GENERATED_ROOT_DIRECTORY;
+      if (!skipDirectories.has(entry.name) && !generatedRoot) files.push(...(await walkSources(path, skipDirectories, root)));
     } else if (SOURCE_EXTENSIONS.has(extname(entry.name))) {
       files.push(path);
     }

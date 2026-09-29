@@ -770,6 +770,11 @@ describe("Master Data service", () => {
     assert.equal(matOptions.length, 1);
     assert.equal(matOptions[0].amount, "185000");
 
+    const byId = await publicRead.getMaterialPriceOption(matOptions[0].id);
+    assert.equal(byId?.id, matOptions[0].id);
+    assert.equal(byId?.amount, "185000");
+    assert.equal(await publicRead.getMaterialPriceOption("00000000-0000-0000-0000-000000000000"), null);
+
     const workPrices = await publicRead.listWorkPricesRead({ categoryId: workCat.categoryId });
     assert.equal(workPrices.length, 2);
     assert.equal(workPrices.some((w) => w.id === mlPrice.priceMaterialLaborId && w.kind === "material-labor"), true);

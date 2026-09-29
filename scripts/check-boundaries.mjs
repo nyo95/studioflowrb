@@ -15,6 +15,7 @@ export const RULE_DUPLICATE_PRIMITIVE = "app-local duplicate primitive";
 export const RULE_SHELL_TO_APP_INTERNAL = "shell -> app/<internal>";
 export const RULE_DOMAIN_TO_PERSISTENCE = "app domain -> persistence";
 export const RULE_DATABASE_OWNERSHIP = "database ownership";
+export const RULE_STALE_ALLOW_LIST = "stale allow-list entry";
 
 /**
  * App layers a composition/shell file (anything under `src/app` or
@@ -39,10 +40,6 @@ export const APP_ROUTE_GROUPS = ["(platform)", "(document)"];
  */
 export const APP_DUPLICATE_PRIMITIVE_ALLOW_LIST = [
   "src/app/(platform)/bq/project-deletion-review.tsx",
-  // Archived rebuild StudioFlow code — deactivated by SF-R1 (R8.71), custom formatters preserved as-is.
-  "src/app/(platform)/studioflow/projects/_legacy_project_id/page.tsx",
-  "src/app/(platform)/studioflow/projects/_legacy_project_id/files/page.tsx",
-  "src/app/(platform)/studioflow/projects/_legacy_project_id/mom/[momId]/page.tsx",
 ];
 
 /**
@@ -61,7 +58,11 @@ export const PLATFORM_ROUTE_OWNERS = [
 ];
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
-const SKIP_DIRECTORIES = new Set(["node_modules", ".next", "generated"]);
+// Skipped at any depth: dependency and build output only. Generated code is
+// skipped solely as the top-level `generated` folder of the walked root
+// (`src/generated`), so a directory of that name inside an app stays scanned.
+const SKIP_DIRECTORIES = new Set(["node_modules", ".next"]);
+const GENERATED_ROOT_DIRECTORY = "generated";
 
 const PERMISSION_LITERAL_PATTERN = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)?$/;
 const PERMISSION_CONSUMPTION_FUNCTIONS = new Set(["hasPermission", "hasAnyPermission", "hasAllPermissions", "requirePermission"]);
@@ -165,13 +166,14 @@ export function resolveSpecifier(specifier, importerFile, aliasMap, projectRoot)
   return null;
 }
 
-export async function walkSources(dir, skipDirectories = SKIP_DIRECTORIES) {
+export async function walkSources(dir, skipDirectories = SKIP_DIRECTORIES, root = dir) {
   const entries = await readdir(dir, { withFileTypes: true });
   const files = [];
   for (const entry of entries) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (!skipDirectories.has(entry.name)) files.push(...(await walkSources(path, skipDirectories)));
+      const generatedRoot = dir === root && entry.name === GENERATED_ROOT_DIRECTORY;
+      if (!skipDirectories.has(entry.name) && !generatedRoot) files.push(...(await walkSources(path, skipDirectories, root)));
     } else if (SOURCE_EXTENSIONS.has(extname(entry.name))) {
       files.push(path);
     }
@@ -731,6 +733,21 @@ export async function collectDuplicatePrimitiveViolations({
   const violations = [];
   const apps = await listAppsInDir(join(srcDir, "apps"));
   const allowed = new Set(allowList.map((p) => resolve(projectRoot, p)));
+
+  // An allow-list entry that no longer resolves is indistinguishable from a
+  // working exemption, so it must be removed rather than left to rot.
+  for (const entry of allowList) {
+    try {
+      await stat(resolve(projectRoot, entry));
+    } catch {
+      violations.push({
+        rule: RULE_STALE_ALLOW_LIST,
+        file: resolve(projectRoot, entry),
+        specifier: entry,
+        detail: "Allow-list entry points at a file that does not exist. Delete the entry.",
+      });
+    }
+  }
 
   for (const file of await walkSources(srcDir)) {
     if (allowed.has(file)) continue;

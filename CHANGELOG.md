@@ -5,13 +5,35 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.207**
-- Next local revision: **R8.208**
+- Current revision after this entry is committed: **R8.208**
+- Next local revision: **R8.209**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.208 | 2026-09-29 | fix(bq,platform): late-sorting BQ price lookup, production storage-folder guard, checker rules, mobile project menu
+
+- **BQ price bug closed.** Adding a Master Data material price re-read a 200-row search window, so a price whose SKU
+  sorted past 200 was wrongly refused. Master Data's public read now has `getMaterialPriceOption(id)` (same live-price
+  rules); `addLineItemAction` uses it. Integration test covers found / not found.
+- **Production storage-folder guard.** New `platform/infrastructure/storage/storage-root.ts`; `instrumentation.ts`
+  refuses to start in production unless `STUDIOFLOW_STORAGE_ROOT` is set, absolute, not a drive root, outside the app
+  folder, and writable (write probe). Development keeps the `.storage` fallback. `.env.example` documents it.
+- **Checker fixes (KB-051, part of KB-053).** The duplicate-primitive allow list now fails on entries that point at a
+  missing file; the three deleted `_legacy_project_id` entries and doc rows are removed. Both checkers skip only the
+  top-level `src/generated`, not any folder named `generated`. Fixture tests added. KB-054 left open.
+- **Mobile project menu (owner feedback).** At 840 px and below the project side menu was a ~500 px block above the
+  content; it is now a slim horizontally scrolling strip (`projects/[projectId]/layout.tsx`).
+- **Browser walkthroughs (dev server).** BQ, deliverables, and archive/restore with a real file recorded in
+  `docs/BACKLOG.md` and `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`. Test data left in the dev DB: BQ project
+  "Walkthrough Test BQ", library item "Keramik Uji", assembly "Assembly Uji", StudioFlow project "2026-999 Uji Retensi".
+- No migration, no dependency.
+
+**Checks.** `tsc --noEmit`, `check:boundaries`, `check:legacy-runtime`, `test:boundaries`, `test:legacy-runtime`,
+eslint on touched paths, and the storage-root + Master Data integration tests pass. Full `npm test` 648/648 (the instrumentation test now also mocks the storage-root import).
+Not walked: quick messenger anchoring, Master Data price source, repeat/unauthorized cleanup.
 
 ## R8.207 | 2026-09-29 | feat(platform): refine the quick messenger composer
 

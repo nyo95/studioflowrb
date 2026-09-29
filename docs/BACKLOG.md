@@ -255,19 +255,6 @@ and "direct hard-delete resolves a pre-existing pending request…".
   valid swap does not collide mid-update. Both rebuild databases had zero
   pre-existing duplicate groups before the migration, and concurrency plus
   reorder regression tests cover the failure mode.
-- [ ] [BUG] `addLineItemAction`'s MASTERDATA/material branch
-  (`src/app/(platform)/bq/[id]/actions.ts:386`) calls
-  `masterDataRead.listMaterialPriceOptions({ limit: 200 })` with no `search`
-  term to re-validate a selected price, then `.find()`s it by id.
-  `listMaterialPriceOptions` orders by `sku.name asc` and caps `take` at 200,
-  so a valid price whose SKU sorts past position 200 falls outside the
-  window and the action wrongly throws "no longer available" even though the
-  source picker (which does pass `search`) just found it. Found and verified
-  2026-09-24. Not fixed in that pass: the clean fix needs a by-id lookup in
-  Master Data's public read port, and Master Data is locked (see its section
-  above) — needs an explicit owner request to touch it, or a workaround
-  entirely on the BQ side (e.g. carry the picked option's snapshot through
-  the form instead of re-fetching by id).
 - [ ] [PLANNED] Add Quotation PDF output and Terms & Conditions.
 - [ ] [PLANNED] Add price modes TBC and By Owner. Owner-confirmed, 2026-09-23:
   both modes mean the price is left blank/not counted toward the total — a
@@ -278,21 +265,13 @@ and "direct hard-delete resolves a pre-existing pending request…".
   reference.
 - [ ] [PLANNED] Add reorder for Sections/L1/L2/L3 inside a project.
 - [ ] [PLANNED] Add a unit-conversion helper for `purchase_to_base_factor`.
-- [ ] [UNVERIFIED] Full browser walkthrough of BQ-F1..F5 (inline editing at
-  every level, all three L3 sources, live server-recomputed totals, one
-  unpriced item not blanking the document, calculator input from inline
-  numeric cells, promotion status/review controls in BQ Library/Master Data).
-  No `InlineEdit` browser interaction evidence recorded yet. **R8.191 adds to
-  this scope:** the new Section outline rail and sticky Grand Total footer on
-  `/bq/[id]` are CSS-only (`position: sticky`) and reviewed in code, but not
-  yet visually confirmed against the real app shell chrome (topbar height,
-  z-index stacking, the `xl:` breakpoint that hides the rail). **R8.192 adds:**
-  the Assembly picker's new recipe-preview panel (fetch/loading/empty/error
-  states) has not been exercised in a browser either. **R8.193 adds:** the BQ
-  Library Items tab's new search box, KATEGORI/Status Promosi filters, and
-  Status Promosi column have not been exercised in a browser either. This
-  closes the R8.190–R8.193 BQ UI/UX redesign pass — a full browser walkthrough
-  of the whole pass, not just individual pieces, is still owed.
+- [ ] [UNVERIFIED] BQ browser walkthrough — mostly done 2026-09-29 (R8.208): project create, section,
+  Work Item, custom Cost Component, inline Rate edit with server-recomputed totals, an unpriced item
+  not blanking the document ("Belum lengkap"), outline rail + sticky Grand Total (and rail hidden at
+  375 px), Assembly picker recipe preview, Library search/Status Promosi filter and column. Still not
+  walked: the Master Data price and BQ Library sources for a Cost Component (the dev database has no
+  Master Data prices, so the >200-price fix is covered by an integration test only), promotion
+  review controls, calculator input from inline cells, and the picker's loading/error states.
 **Fixed 2026-09-23 (R8.119):** `markupL1Pct` was engine-active but
 UI-invisible for a standalone (childless) Work Item — `calculation-engine.ts`
 applies `markupL1Pct` for every L1 regardless of children, but
@@ -508,9 +487,9 @@ etc., all StudioFlow modules, no sub-tier between them).
 
 ### Verification backlog (code done, needs a browser walk to close)
 
-- [ ] [UNVERIFIED] Deliverables panel (phase workspace) — upload PDF/image
-  ≤ 25 MB, download link works, delete removes file; MISSING/CURRENT/OUTDATED
-  status shown; does not block approval. Desktop + 375 px.
+- [ ] [UNVERIFIED] Deliverables panel — upload, signed download (200) and delete verified in the browser
+  2026-09-29 (R8.208); status flips No deliverable/Current correctly. Not walked: OUTDATED state, an image
+  upload, and that a missing deliverable never blocks approval.
 - [ ] [UNVERIFIED] Schedule P0 split-view — desktop split-view layout, stat bar
   counts, chip nav scrolls to option, Set final button on card face. Desktop +
   375 px.
@@ -575,7 +554,11 @@ explored direction. No access-check changes. See `CHANGELOG.md` R8.110.
   `archiveProject()` currently skips object deletion; owner decision is to
   purge on archive (see "Decision gates" above). Deferred until the storage
   layer (`PLATFORM-ASSET-STORAGE-ROADMAP.md`) is in place.
-  **Needs owner answers before a Work Order (2026-09-28):** the storage layer is
+  **Screens built (R8.182) and browser-walked 2026-09-29 (R8.208):** the retention settings, archive and
+  restore dialogs, archived-row "files kept until" line and the manual cleanup control all work; a real
+  deliverable survives archive and restore inside the window. Not walked: repeat cleanup run, a user without
+  project-manage, shared-file safety (integration tests cover them; the dev machine has one user and no expired project).
+  **(Historical) Needs owner answers before a Work Order (2026-09-28):** the storage layer is
   now in place (`SfDeliverable`, `SfMomImage`, schedule option photos and the client
   logo all hold storage keys), but `restoreProject` exists, so purging on archive
   makes a later restore return a project whose files are gone. (1) Is that
@@ -947,15 +930,6 @@ was fixed in R8.165._
   state for this exact bug in this session — screenshots were the only
   reliable check.)
 
-- [ ] [CLEANUP] **KB-051 - Allow list and documentation point at a route tree
-  that was deleted.** `scripts/check-boundaries.mjs:26-28` has three allow-list
-  entries and `docs/UTILITY-INVENTORY.md:76-78` three doc rows for
-  `src/app/(platform)/studioflow/projects/_legacy_project_id/`, which no longer
-  exists (purged in R8.109, recorded at `docs/BACKLOG.md:348`). An allow-list
-  entry pointing at a missing file is indistinguishable from a working exemption.
-  Fix: delete the entries and make the checker fail on allow-list paths that do
-  not resolve.
-
 - [ ] [CLEANUP] **KB-052 - `CORE.md`'s "current rebuild evidence" block is stale
   on two of its four claims.** `CORE.md:534-537`. Line 535 references
   `src/apps/masterdata/infrastructure/request-context.ts#configuredOperatorContext`
@@ -966,14 +940,11 @@ was fixed in R8.165._
   `CORE.md` second in authority, so a trusting reader concludes the auth
   foundation is unwired.
 
-- [ ] [CLEANUP] **KB-053 - Both checkers skip by directory NAME and allow-list
-  extensions, so code can opt out of every rule.** `check-boundaries.mjs:32`
-  `SKIP_DIRECTORIES = new Set(["node_modules", ".next", "generated"])` matches
-  `generated` at ANY depth, and `SOURCE_EXTENSIONS` is an allow list, so a
-  developer can neutralise every boundary rule by placing code in a directory
-  called `generated` inside an app. 15 extensionless files in this checkout are
-  invisible to both checkers (see the working-tree note below). Fix: skip only
-  known generated roots (`src/generated/`, `.next/`) and report skipped paths.
+- [ ] [CLEANUP] **KB-053 - (partly fixed R8.208) Both checkers still allow-list source
+  extensions.** The directory-name skip is fixed: only the top-level `src/generated`
+  is skipped now, so a `generated` folder inside an app is scanned. Still open: 15
+  extensionless files in this checkout are invisible to both checkers (see the
+  working-tree note below), and skipped paths are not reported.
 
 - [ ] [CLEANUP] **KB-054 - The legacy-reference scan covers a narrow slice.**
   `scripts/check-legacy-runtime.mjs:120-123` scans `src/` plus root config files

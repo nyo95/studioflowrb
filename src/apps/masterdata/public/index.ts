@@ -258,6 +258,25 @@ export function createMasterDataPublicRead(db: PrismaClient) {
       return prices.map(toMaterialPriceOption);
     },
 
+    /**
+     * Re-read one live material price by id. A consumer that already holds the
+     * id (e.g. re-validating a picked option) must not page through the
+     * search window, which caps at 200 rows and would miss late-sorting SKUs.
+     */
+    async getMaterialPriceOption(priceId: string): Promise<MaterialPriceOption | null> {
+      const price = await db.priceMaterial.findFirst({
+        where: {
+          id: priceId,
+          deleted_at: null,
+          sku: { deleted_at: null },
+          supplier_vendor: { deleted_at: null },
+          unit: { status: "ACTIVE" },
+        },
+        select: MATERIAL_PRICE_OPTION_SELECT,
+      });
+      return price ? toMaterialPriceOption(price) : null;
+    },
+
     async getSkuPricingOptions(skuId: string): Promise<MaterialPriceOption[]> {
       const prices = await db.priceMaterial.findMany({
         where: {

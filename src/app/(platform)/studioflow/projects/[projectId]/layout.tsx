@@ -53,7 +53,7 @@ export default async function ProjectLayout({
       {/* Secondary rail — prototype `.a-rail`: 220px, flush to the icon rail,
           its own scroll so it stays put while content moves. */}
       <aside
-        className="flex w-(--ui-secondary-width) shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-line-subtle bg-rail px-[9px] py-3 max-[840px]:w-full max-[840px]:border-r-0 max-[840px]:border-b"
+        className="flex w-(--ui-secondary-width) shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-line-subtle bg-rail px-[9px] py-3 max-[840px]:w-full max-[840px]:flex-row max-[840px]:items-center max-[840px]:gap-1 max-[840px]:overflow-x-auto max-[840px]:overflow-y-hidden max-[840px]:border-r-0 max-[840px]:border-b max-[840px]:py-2 max-[840px]:[&>*]:shrink-0 max-[840px]:[&>*]:whitespace-nowrap"
         aria-label="Project navigation"
       >
         {/* Back to all projects — instant, no data */}
@@ -71,7 +71,7 @@ export default async function ProjectLayout({
           <ProjectRailMeta grants={grants} projectId={projectId} />
         </Suspense>
 
-        <ContextNavHeading>Project</ContextNavHeading>
+        <ContextNavHeading className="max-[840px]:hidden">Project</ContextNavHeading>
         <ProjectNavLinks
           items={[
             {
@@ -87,7 +87,7 @@ export default async function ProjectLayout({
           <ProjectPhasesNav grants={grants} projectId={projectId} />
         </Suspense>
 
-        <ContextNavHeading>Documents</ContextNavHeading>
+        <ContextNavHeading className="max-[840px]:hidden">Documents</ContextNavHeading>
         <Suspense
           fallback={<ProjectNavLinks items={extensionsSkeleton(projectId)} />}
         >
@@ -125,7 +125,7 @@ async function ProjectRailMeta({
     });
 
   return (
-    <div className="pb-3 mb-1 border-b border-line-subtle">
+    <div className="pb-3 mb-1 border-b border-line-subtle max-[840px]:hidden">
       <div className="text-sm font-semibold text-ink leading-snug truncate">{project.name}</div>
       <div className="mt-0.5 text-xs text-ink-tertiary truncate">
         {project.client?.name ?? "No client"} · {PROJECT_STATUS_LABEL[project.status]}
@@ -184,7 +184,7 @@ async function ProjectContextBar({
 
 function ProjectRailSkeleton() {
   return (
-    <div className="pb-3 mb-1 border-b border-line-subtle" aria-hidden="true">
+    <div className="pb-3 mb-1 border-b border-line-subtle max-[840px]:hidden" aria-hidden="true">
       <div className="h-4 w-40 animate-pulse rounded bg-surface-muted" />
       <div className="mt-1.5 h-3 w-24 animate-pulse rounded bg-surface-muted" />
     </div>
@@ -222,7 +222,7 @@ async function ProjectPhasesNav({
   if (phases.length === 0) return null;
   return (
     <>
-      <ContextNavHeading>Phases</ContextNavHeading>
+      <ContextNavHeading className="max-[840px]:hidden">Phases</ContextNavHeading>
       <ProjectNavLinks
         items={phases.map((phase) => ({
           href: STUDIOFLOW_ROUTES.projectPhase(projectId, phase.id),

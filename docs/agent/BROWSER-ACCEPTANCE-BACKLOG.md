@@ -44,7 +44,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop
 - Steps: 1. Set retention to a valid value. 2. Archive the project. 3. Check retained files. 4. Try settings outside 7–730 whole days.
 - Acceptance: files remain inside the window; invalid settings are rejected; archive copy states the configured retention.
-- Status: PARTIAL (Lead, 2026-09-29). Verified in the browser: settings accept only whole days 7 to 730 (5 was refused, 91 saved and was restored to 90), the archive dialog states the configured retention, and the archived row and banner show the kept-until date. NOT verified in the browser: files staying present inside the window; the disposable project had no files (integration tests cover it).
+- Status: PASS (2026-09-29, R8.208). Settings accept only whole days 7 to 730; the archive dialog states the retention; the archived row shows the kept-until date (28 Dec 2026 for 90 days); a real uploaded deliverable stayed on disk and downloadable after archive.
 
 ### [R8.178] Manual cleanup respects permissions and shared files
 - Surface: StudioFlow manual cleanup button (Lead UI follow-up)
@@ -60,7 +60,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop
 - Steps: 1. Restore inside retention and inspect files. 2. Purge the expired project, restore it, and restore a MOM revision with different text.
 - Acceptance: inside-window files remain; after purge the removed date is visible, project restore succeeds, and MOM revision restores text without missing-image references; restore audit records assetsPurged correctly.
-- Status: PARTIAL (Lead, 2026-09-29). Verified: restoring after the purge shows "Files cannot be brought back" with the removal date, succeeds, records assetsPurged true, and archiving the project again clears the marker so a new cycle can purge. NOT verified in the browser: restoring inside the window with real files, and restoring a MOM revision after a purge.
+- Status: PARTIAL (Lead, 2026-09-29). Verified: restoring after the purge shows "Files cannot be brought back" with the removal date, succeeds, records assetsPurged true, and archiving the project again clears the marker so a new cycle can purge. 2026-09-29 (R8.208): restoring inside the window with a real file also verified (dialog says files are safe; file still downloads with 200). NOT verified: restoring a MOM revision after a purge.
 
 ### [R8.173] Project overview revision history loads on demand
 - Surface: `/studioflow/projects/[projectId]`

@@ -16,6 +16,7 @@ import {
   RULE_DATABASE_OWNERSHIP,
   RULE_DOMAIN_TO_PERSISTENCE,
   RULE_DUPLICATE_PRIMITIVE,
+  RULE_STALE_ALLOW_LIST,
   RULE_PERMISSION_VOCABULARY,
   RULE_PLATFORM_TO_APP,
   RULE_RAW_LEGACY_UI_CLASS,
@@ -221,6 +222,8 @@ const FOUNDATION_FILES = {
   "src/apps/ven/indexes.tsx": `import { Text } from "@/platform/ui_engine";\nexport const E = () => <span className="font-ui-mono">x</span>;\n`,
   "src/apps/ven/format.ts": `export const stamp = (d: Date) => new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" }).format(d);\n`,
   "src/apps/ven/allowed.ts": `export const stamp = (d: Date) => new Intl.DateTimeFormat("en-CA", { dateStyle: "short" }).format(d);\n`,
+  "src/apps/ven/generated/nested.ts": `export const f = new Intl.DateTimeFormat("id-ID");
+`,
 
   "src/app/app-registrations.ts": `import type { AppPermissionRegistrationInput } from "@platform/core/rbac/registry";\nimport { SUN_PERMISSIONS } from "@/apps/sun/public";\nimport { MOON_PERMISSIONS } from "@/apps/moon/public";\nimport { VEN_PERMISSIONS } from "@/apps/ven/public";\n\nexport const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [\n  { appId: "sun", name: "Sun", rootPath: "/sun", permissions: Object.values(SUN_PERMISSIONS) },\n  { appId: "moon", name: "Moon", rootPath: "/moon", permissions: Object.values(MOON_PERMISSIONS) },\n  { appId: "ven", name: "Ven", rootPath: "/ven", permissions: Object.values(VEN_PERMISSIONS) },\n];\n`,
 
@@ -271,12 +274,13 @@ try {
     ].sort(),
   );
 
-  const duplicates = await collectDuplicatePrimitiveViolations({ projectRoot: foundationRoot });
+  const duplicates = await collectDuplicatePrimitiveViolations({ projectRoot: foundationRoot, allowList: [] });
   assert.deepEqual(
     duplicates.map((v) => violationKey(foundationRoot, v)).sort(),
     [
       `src/apps/ven/format.ts | ${RULE_DUPLICATE_PRIMITIVE} | new Intl.DateTimeFormat(...)`,
       `src/apps/ven/allowed.ts | ${RULE_DUPLICATE_PRIMITIVE} | new Intl.DateTimeFormat(...)`,
+      `src/apps/ven/generated/nested.ts | ${RULE_DUPLICATE_PRIMITIVE} | new Intl.DateTimeFormat(...)`,
     ].sort(),
   );
 
@@ -286,10 +290,22 @@ try {
   });
   assert.deepEqual(
     duplicatesWithAllow.map((v) => violationKey(foundationRoot, v)).sort(),
-    [`src/apps/ven/format.ts | ${RULE_DUPLICATE_PRIMITIVE} | new Intl.DateTimeFormat(...)`],
+    [
+      `src/apps/ven/format.ts | ${RULE_DUPLICATE_PRIMITIVE} | new Intl.DateTimeFormat(...)`,
+      `src/apps/ven/generated/nested.ts | ${RULE_DUPLICATE_PRIMITIVE} | new Intl.DateTimeFormat(...)`,
+    ],
   );
 
-  const combined = await collectAllViolations({ projectRoot: foundationRoot });
+  const staleAllow = await collectDuplicatePrimitiveViolations({
+    projectRoot: foundationRoot,
+    allowList: ["src/apps/ven/allowed.ts", "src/apps/ven/deleted.ts"],
+  });
+  assert.ok(
+    staleAllow.some((v) => violationKey(foundationRoot, v) === `src/apps/ven/deleted.ts | ${RULE_STALE_ALLOW_LIST} | src/apps/ven/deleted.ts`),
+    "an allow-list entry pointing at a missing file must fail",
+  );
+
+  const combined = await collectAllViolations({ projectRoot: foundationRoot, allowList: [] });
   assert.equal(combined.boundary.length, boundary.length);
   assert.equal(combined.permission.length, permission.length);
   assert.equal(combined.route.length, route.length);

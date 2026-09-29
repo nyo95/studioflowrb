@@ -384,8 +384,7 @@ export async function addLineItemAction(
         throw new AppError("VALIDATION", "bq.line-item.source-required", "Select a Master Data price");
       }
       if (value.sourceKind === "material") {
-        const options = await masterDataRead.listMaterialPriceOptions({ limit: 200 });
-        const option = options.find((candidate) => candidate.id === value.sourceRefId);
+        const option = await masterDataRead.getMaterialPriceOption(value.sourceRefId);
         if (!option) throw new AppError("NOT_FOUND", "bq.source.not-found", "That material price is no longer available");
         snapshot = snapshotFromMaterialPrice(option);
       } else {
