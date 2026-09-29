@@ -70,3 +70,13 @@ export function buildPageMeta(page: number, pageSize: number, total: number): Pa
 export function normalizeSortDirection(value: unknown): "asc" | "desc" {
   return value === "desc" ? "desc" : "asc";
 }
+
+/**
+ * One page of an in-memory list, with the requested page clamped into range and an
+ * empty list reported as one page. Pure, so server and client callers share it.
+ */
+export function getPaginationSlice<T>(rows: readonly T[], requestedPage: number, pageSize: number) {
+  const pageCount = Math.max(1, buildPageMeta(1, pageSize, rows.length).pageCount);
+  const page = Math.min(requestedPage, pageCount);
+  return { rows: rows.slice(calcOffset(page, pageSize), page * pageSize), page, pageCount };
+}

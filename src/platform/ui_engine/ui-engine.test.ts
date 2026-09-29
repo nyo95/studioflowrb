@@ -68,7 +68,6 @@ describe("UI Engine foundation", () => {
       "InlineError",
       "RowActionMenu",
       "useRowAction",
-      "getPaginationSlice",
       "FilterBar",
       "SelectionBar",
       "Combobox",
@@ -171,10 +170,6 @@ describe("UI Engine foundation", () => {
     assert.match(actions, /if \(pendingId\) return/);
     assert.match(actions, /safeMessage \?\? "The action could not be completed\."/);
     assert.match(actions, /Please try again\./);
-    const pagination = readFileSync(new URL("./patterns/pagination.ts", import.meta.url), "utf8");
-    assert.match(pagination, /export function getPaginationSlice/);
-    assert.match(pagination, /Math\.max\(1, buildPageMeta/);
-    assert.match(pagination, /Math\.min\(requestedPage, pageCount\)/);
   });
 
   it("marks filter chip selection for assistive technology", () => {

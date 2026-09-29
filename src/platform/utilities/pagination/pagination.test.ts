@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   buildPageMeta,
+  getPaginationSlice,
   calcOffset,
   normalizePage,
   normalizePageSize,
@@ -91,5 +92,21 @@ describe("normalizeSortDirection", () => {
     assert.equal(normalizeSortDirection("DESC"), "asc");
     assert.equal(normalizeSortDirection(undefined), "asc");
     assert.equal(normalizeSortDirection("descending"), "asc");
+  });
+});
+
+describe("getPaginationSlice", () => {
+  const rows = Array.from({ length: 7 }, (_, i) => i + 1);
+
+  it("slices the requested page", () => {
+    assert.deepEqual(getPaginationSlice(rows, 2, 3), { rows: [4, 5, 6], page: 2, pageCount: 3 });
+  });
+
+  it("clamps a page beyond the last one", () => {
+    assert.deepEqual(getPaginationSlice(rows, 9, 3), { rows: [7], page: 3, pageCount: 3 });
+  });
+
+  it("reports an empty list as one empty page", () => {
+    assert.deepEqual(getPaginationSlice([], 4, 25), { rows: [], page: 1, pageCount: 1 });
   });
 });

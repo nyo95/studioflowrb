@@ -93,12 +93,6 @@ Rules carried over unchanged from the prior trackers:
   `--test-concurrency=1`. `R8.184`'s changelog reports "full npm test 618/618" from wherever that was run, so this may
   have been Windows/wide-core-count-specific rather than universal; the fix costs a slower `npm test` (files run one at a
   time) in exchange for it actually finishing.
-- [ ] [PLANNED] **WO-CLEANUP-01 - small structural leftovers, for the Backend Executor (Codex).** Written up in `PLAN.md`
-  (READY). Two items: (1) converge the seven private `runRowAction` wrappers and the private page-count math onto one
-  canonical UI Engine hook / `usePagination` (KB-043) and empty `APP_DUPLICATE_MACHINERY` in `scripts/check-boundaries.mjs`;
-  (2) drop the unused `SfActivityMode.TODO` enum member after confirming no row uses it (KB-055b). The harness added in
-  R8.208 already fails on any new copy and on any baseline entry that is no longer needed, so the list can only shrink.
-  Browser checks still owed after any change of this kind live in `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`.
 - [ ] [PLANNED] Execute `apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md`:
   storage port/test seam, provider adapter, Brand mark migration, then
   approved future consumers.
@@ -170,17 +164,12 @@ reference, same pattern as `brand_name`); when received, the designer sees a
 writes to Master Data — its public contract is read-only by design — a
 Master Data user adds the SKU/price themselves. See `CHANGELOG.md` R8.123,
 `STUDIOFLOW-REWORK-CONTRACT.md` §11.11.
-- [ ] [PLANNED] Workbook import/export. Owner-scoped 2026-09-23: bulk
-  import/export of SKU + pricing via Excel/CSV, similar in spirit to the
-  existing vendor-catalog import. Error-reporting policy (partial-failure
-  behavior, per-row error surfacing) still needs to be designed — not started.
-  **Blocked on two things (2026-09-28):** Master Data is LOCKED by the owner
-  (2026-09-24) until an explicit new request names it, and the design questions
-  are unanswered: all-or-nothing vs partial import, per-row error report format,
-  and whether import may create missing vendors/units/categories or must reject
-  unknown references.
-  **Answered 2026-09-28:** the Master Data lock is lifted and the approach is decided (see
-  Decision gates). Ready to be written as a Work Order.
+- [ ] [PLANNED] **Workbook import/export (SKU + material pricing) - approved approach, READY as `WO-MD-IMPORT-01` in `PLAN.md`.**
+  Edit in Excel and re-import with a preview first, all-or-nothing apply, per-row error report, unknown vendors/units/categories rejected
+  (Decision gates, 2026-09-28). Backend first (Codex, R8.212); the import/export screens follow as a Lead UI revision.
+- [ ] [PLANNED] **Harness: catch "server code calls a function that lives in a `"use client"` module".** R8.210 shipped exactly this
+  (`/bq` crashed) and neither `npm test` nor `next build` failed. Add a `check-boundaries` rule (or a route smoke test that renders every
+  server page once) so this class fails before review. Same failure as R8.164.
 - [x] [CLEANUP][P2] KB-025 — `src/apps/masterdata/services/index.ts` exports
   many internal-implementation helpers with no external consumer found. Not a
   current coupling problem; narrow the barrel when consumers and the public
@@ -488,28 +477,6 @@ only from a separate account-menu "Administration" submenu; that submenu was
 slimmed to a single "Settings" entry per `GLOBAL-MENU-DESIGN-BRIEF.md`'s own
 explored direction. No access-check changes. See `CHANGELOG.md` R8.110.
 
-- [ ] [PLANNED] Purge STORED file assets on project archive —
-  `archiveProject()` currently skips object deletion; owner decision is to
-  purge on archive (see "Decision gates" above). Deferred until the storage
-  layer (`PLATFORM-ASSET-STORAGE-ROADMAP.md`) is in place.
-  **Screens built (R8.182) and browser-walked 2026-09-29 (R8.208):** the retention settings, archive and
-  restore dialogs, archived-row "files kept until" line and the manual cleanup control all work; a real
-  deliverable survives archive and restore inside the window. Not walked: repeat cleanup run, a user without
-  project-manage, shared-file safety (integration tests cover them; the dev machine has one user and no expired project).
-  **(Historical) Needs owner answers before a Work Order (2026-09-28):** the storage layer is
-  now in place (`SfDeliverable`, `SfMomImage`, schedule option photos and the client
-  logo all hold storage keys), but `restoreProject` exists, so purging on archive
-  makes a later restore return a project whose files are gone. (1) Is that
-  acceptable, or should restore be blocked or warn? (2) Which assets purge: only
-  the project's own (deliverables, MOM images, schedule photos) and never the client
-  logo? (3) Is the purge immediate and irreversible, or does it need a confirmation
-  step in the archive dialog?
-  **Answered 2026-09-28:** keep 90 days (provisional, adjustable), never immediate; see Decision
-  gates. **Backend implemented in R8.178 (WO-BE-02, reviewed by the Lead, verdict CORRECTION
-  REQUIRED for one lifecycle defect).** The correction plus the reads and actions the retention UI needs is
-  WO-BE-03, implemented in R8.181 by the Lead (Codex was at its limit) and
-  awaiting independent review. The retention screens (settings field, archive-dialog copy,
-  archived-project line, cleanup control) are the Lead's and not built yet.
 - [x] [BUG] `ui-engine.test.ts` ("UI Engine foundation") has 2 pre-existing,
   unrelated failures found while running the full suite for R8.164 (out of
   scope for that change, left open per the proportionate-checks rule):

@@ -5,13 +5,29 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.210**
-- Next local revision: **R8.211**
+- Current revision after this entry is committed: **R8.211**
+- Next local revision: **R8.212**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.211 | 2026-09-29 | fix(bq,platform): review correction for R8.210 (BQ list crash), show estimator name
+
+- **Verdict on R8.210 (WO-CLEANUP-01): CORRECTION REQUIRED, corrected here.** The refactor, migration (both databases up to date, no TODO rows)
+  and directory hooks are sound and were re-run independently. One regression: `getPaginationSlice` lived in a `"use client"` UI Engine file
+  but the server page `bq/page.tsx` called it, so `/bq` crashed ("Attempted to call getPaginationSlice() from the server"). Neither `npm test`
+  nor `next build` caught it (same class as the R8.164 print bug). The pure function now lives in `@platform/utilities/pagination` (server and client
+  share it), the UI Engine copy and its source-regex test were removed, and a behavior test (slice, clamp, empty) was added.
+- **Estimator column.** The BQ project list showed the raw user id in "Estimator"; it now resolves the name through the platform people directory
+  (raw label kept for non-user actors). Pre-existing defect found in the walkthrough.
+- **Browser (dev server).** Master Data units archive and restore through the shared row-action hook (dialog closes, row state changes, PCS restored),
+  and users, roles, brands, categories, SKUs, vendors, pricing and BQ list render without errors.
+- Follow-up for the harness: no rule yet catches "server component calls a function from a `"use client"` module"; recorded in `BACKLOG.md` under the
+  harness item (`WO` list in `BACKLOG.md`: "Harness: catch server code calling a `"use client"` function").
+
+**Checks.** `tsc`, eslint (0 errors), `check:boundaries`, focused pagination + UI Engine tests (58/58); full `npm test` below.
 
 ## R8.210 | 2026-09-29 | refactor(platform,studioflow): converge row actions and pagination, remove retired activity mode
 
