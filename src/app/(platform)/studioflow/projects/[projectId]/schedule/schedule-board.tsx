@@ -174,7 +174,7 @@ function SampleRequestDialog({
       open
       onOpenChange={(value) => { if (!value) onClose(); }}
       title={`Request sample — ${option.productName}`}
-      description="Tracked in StudioFlow only; adding the SKU and price to Master Data once the sample arrives is a separate, manual step."
+      description="Master Data staff are told so they can get a quote. Mark it received here when it arrives."
       size="sm"
       dismissible={!isPending(pendingKey)}
     >
@@ -183,10 +183,10 @@ function SampleRequestDialog({
         const ok = await run(pendingKey, () => requestScheduleSampleAction({ projectId, optionId: option.id, requestedFrom, note: note || undefined }));
         if (ok) onClose();
       }}>
-        <Field label="Requested from" required description="Vendor or supplier name">
-          <Input autoFocus value={requestedFrom} maxLength={200} onChange={(e) => setRequestedFrom(e.target.value)} />
+        <Field label="Requested from" required>
+          <Input autoFocus value={requestedFrom} maxLength={200} placeholder="Vendor or supplier name" onChange={(e) => setRequestedFrom(e.target.value)} />
         </Field>
-        <Field label="Note (optional)"><Textarea rows={2} value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} /></Field>
+        <Field label="Note (optional)"><Input value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} /></Field>
         {error ? <InlineError>{error}</InlineError> : null}
         <FormActions>
           <Button type="button" onClick={onClose} disabled={isPending(pendingKey)}>Cancel</Button>
@@ -324,7 +324,7 @@ function BoardView({
                     ) : null}
                   </span>
                   {shown ? (
-                    <span className="font-display text-sm font-semibold uppercase leading-tight text-ink">{shown.productName}</span>
+                    <span className="font-ui-sans text-sm font-semibold uppercase leading-tight text-ink">{shown.productName}</span>
                   ) : (
                     <span className="text-sm italic text-ink-tertiary">Reserved — no product yet</span>
                   )}

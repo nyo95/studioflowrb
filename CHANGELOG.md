@@ -5,13 +5,26 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.211**
-- Next local revision: **R8.212**
+- Current revision after this entry is committed: **R8.212**
+- Next local revision: **R8.213**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.212 | 2026-09-29 | fix(studioflow,docs): refine sample request copy and record walkthrough follow-ups
+
+- **Schedule refinement.** The sample-request dialog now explains that Master Data staff receive the request to obtain a
+  quote and that physical receipt is recorded back in StudioFlow. The vendor hint is a field placeholder rather than
+  redundant field copy; the optional note uses the compact single-line input. Product codes on Schedule cards use the
+  normal UI typeface, removing the unintended display-font artifact.
+- **Owner walkthrough backlog.** Added KB-060 (create/select Supplier while recording a quote), KB-061 (mark the physical
+  sample received from Schedule), and KB-062 (bring New Project naming, client creation, project type, and opening-date /
+  Timeline behaviour back in line with the confirmed legacy workflow). These remain planned Lead-owned work; none is
+  claimed complete in this revision.
+
+**Checks.** Full repository verification recorded with the local commit. No migration or dependency.
 
 ## R8.211 | 2026-09-29 | fix(bq,platform): review correction for R8.210 (BQ list crash), show estimator name
 
