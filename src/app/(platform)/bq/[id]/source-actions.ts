@@ -6,6 +6,7 @@ import { AppError } from "@platform/core/errors";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { bqPublicRead, masterDataRead } from "@/apps/bq/runtime";
 import { BQ_PERMISSIONS } from "@/apps/bq/public";
+import type { BqAssemblyLineRead } from "@/apps/bq/public";
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
 
 async function authorize() {
@@ -92,5 +93,24 @@ export async function listLineItemSourcesAction(query: string): Promise<ActionRe
     }
 
     return options.slice(0, 80);
+  });
+}
+
+/**
+ * Read-only preview for the Assembly picker: lets the estimator see the L2 +
+ * L3 recipe (name, qty, koefisien, harga) before applying it, instead of
+ * applying blind based on the assembly's name alone. Gated by the same
+ * project read/manage check as the rest of this route rather than the
+ * Library's `bq.library.read`, since it is reached from inside the project
+ * editor.
+ */
+export async function getAssemblyLinesAction(assemblyId: string): Promise<ActionResult<BqAssemblyLineRead[]>> {
+  return runSafeAction(async () => {
+    await authorize();
+    const detail = await bqPublicRead.getAssemblyTemplateDetail(assemblyId);
+    if (!detail) {
+      throw new AppError("NOT_FOUND", "BQ_ASSEMBLY_NOT_FOUND", "This assembly no longer exists.");
+    }
+    return detail.lines;
   });
 }

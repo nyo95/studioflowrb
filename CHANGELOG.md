@@ -5,13 +5,37 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.191**
-- Next local revision: **R8.192**
+- Current revision after this entry is committed: **R8.192**
+- Next local revision: **R8.193**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.192 | 2026-09-29 | feat(bq): Assembly picker shows the L2+L3 recipe before applying
+
+Third slice of the BQ UI/UX redesign pass (first two: R8.190, R8.191).
+
+- **New read-only action** `getAssemblyLinesAction` (`src/app/(platform)/bq/[id]/source-actions.ts`), gated by the
+  same project read/manage check as the rest of this route (not the Library's `bq.library.read`, since it's
+  reached from inside the project editor). Calls the existing `bqPublicRead.getAssemblyTemplateDetail` public read
+  port — no new backend capability, that port already returned `lines: BqAssemblyLineRead[]` but nothing in the
+  project editor called it.
+- **`AssemblyPickerDialog`** (`src/app/(platform)/bq/[id]/assembly-picker-dialog.tsx`) now shows a live preview
+  panel next to the Assembly/Quantity fields — each line's name, kategori, qty + unit, koefisien, and harga —
+  fetched (via `useEffect` + `useTransition`, after render, same pattern R4.57 fixed for the Import dialog) whenever
+  the selected assembly changes. Previously the dialog was one dropdown and one qty field with no way to see what
+  the assembly actually contained before applying it — the estimator had to already know the recipe by name.
+  **Deliberately does not show a computed "estimated group cost"** the way the original mockup sketched: summing
+  the previewed lines' `harga` client-side would be exactly the client-side money arithmetic bq-contract §2/§6.0
+  reserve for the server (and the calculation isn't even this simple — L2 markup, `qty_per_l1`, and the engine's
+  truncate-to-2-decimals rounding policy all apply before a real subtotal exists). The preview stays descriptive
+  (what's in the recipe), not a second, unofficial calculator.
+
+**Checks.** `tsc --noEmit` 0 errors; `eslint src/apps/bq "src/app/(platform)/bq"` clean; `check:boundaries` OK;
+`check:legacy-runtime` OK; full `npm test` 628/628; production build exit 0. No browser pass was run (owner tests
+BQ in-browser themselves); added to the same `[UNVERIFIED]` BQ scope in `docs/BACKLOG.md` as R8.190/R8.191.
 
 ## R8.191 | 2026-09-29 | feat(bq): Section outline rail + sticky Grand Total footer on Project Detail
 

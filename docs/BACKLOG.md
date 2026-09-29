@@ -276,7 +276,9 @@ and "direct hard-delete resolves a pre-existing pending request…".
   this scope:** the new Section outline rail and sticky Grand Total footer on
   `/bq/[id]` are CSS-only (`position: sticky`) and reviewed in code, but not
   yet visually confirmed against the real app shell chrome (topbar height,
-  z-index stacking, the `xl:` breakpoint that hides the rail).
+  z-index stacking, the `xl:` breakpoint that hides the rail). **R8.192 adds:**
+  the Assembly picker's new recipe-preview panel (fetch/loading/empty/error
+  states) has not been exercised in a browser either.
 **Fixed 2026-09-23 (R8.119):** `markupL1Pct` was engine-active but
 UI-invisible for a standalone (childless) Work Item — `calculation-engine.ts`
 applies `markupL1Pct` for every L1 regardless of children, but
