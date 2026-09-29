@@ -5,13 +5,31 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.194**
-- Next local revision: **R8.195**
+- Current revision after this entry is committed: **R8.195**
+- Next local revision: **R8.196**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.195 | 2026-09-29 | fix(bq): Assembly picker used a bare native select instead of the searchable-picker pattern
+
+Owner spotted this while testing R8.192's new Assembly picker dialog: the "Assembly" field
+(`assembly-picker-dialog.tsx`) was a plain `<Select>` with every assembly template dumped into a native dropdown.
+Assembly templates are a growable catalog (BQ Library has an "Add assembly" button, same shape as Vendor/Brand/SKU),
+not a short fixed vocabulary — the app's own established pattern for that (used for Vendor/Brand/Category pickers in
+`pricing-directory.tsx`, `sku-directory.tsx`, `category-directory.tsx`) is `Combobox` (search-as-you-type), not a bare
+select. The one other `<Select>` in BQ (`project-editor.tsx:575`) is for **unit**, a genuinely short fixed list —
+that one is correctly a native select and was left alone.
+
+- `assembly-picker-dialog.tsx`: swapped `<Select>` for `<Combobox>` (no `onCreate` — assemblies are created from BQ
+  Library, not inline here), options built from `{id, label: name, description: "N baris"}`. Verified live: opening
+  the picker on a project with zero assembly templates shows the search field and the correct empty state
+  ("Assembly tidak ditemukan"), matching the dialog's existing Indonesian copy.
+
+**Checks.** `tsc --noEmit` 0 errors; `eslint .` clean; `check:boundaries` OK; full `npm test` 628/628. Browser-verified:
+combobox opens, search field renders, empty state is correct for a project with no assembly templates yet.
 
 ## R8.194 | 2026-09-29 | feat(studioflow): add project Presentation boards
 

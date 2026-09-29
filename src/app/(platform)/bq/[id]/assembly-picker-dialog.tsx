@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 
-import { Button, Dialog, Field, FormActions, Input, InlineError, Select, Spinner, Text } from "@/platform/ui_engine";
+import { Button, Combobox, Dialog, Field, FormActions, Input, InlineError, Spinner, Text } from "@/platform/ui_engine";
 import { createMoney, formatMoney } from "@platform/utilities/money";
 import type { BqAssemblyLineRead, BqAssemblyTemplateRead } from "@/apps/bq/public";
 import { getAssemblyLinesAction } from "./source-actions";
@@ -59,11 +59,15 @@ export function AssemblyPickerDialog({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-4">
           <Field label="Assembly">
-            <Select value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
-              {assemblies.map((a) => (
-                <option key={a.id} value={a.id}>{a.name} ({a.lineCount} baris)</option>
-              ))}
-            </Select>
+            <Combobox
+              label="Assembly"
+              options={assemblies.map((a) => ({ id: a.id, label: a.name, description: `${a.lineCount} baris` }))}
+              value={selectedId}
+              onValueChange={setSelectedId}
+              placeholder="Pilih assembly…"
+              searchPlaceholder="Cari assembly…"
+              emptyLabel="Assembly tidak ditemukan"
+            />
           </Field>
           <Field label="Quantity per Work Item">
             <Input inputMode="decimal" value={qtyPerL1} onChange={(e) => setQtyPerL1(e.target.value)} />
