@@ -251,7 +251,24 @@ section-padding-y
 section-gap
 shadow-card
 shadow-elevated
+motion-fast
+motion-base
+motion-slow
+ease-standard
+ease-exit
+icon-xs
+icon-sm
+icon-md
+icon-lg
 ```
+
+Motion and icon size are part of this list as of R8.202. They were the two
+scales the contract had opinions about but no tokens for, so every component
+picked its own number: nine icon sizes between 10px and 20px, and durations
+chosen one at a time. `DESIGN.md` §4.1 and §13.1 hold the values and the rule
+for each. Durations are applied as `duration-[var(--ui-motion-fast)]` — the
+`duration-(--token)` shorthand is not guaranteed to emit a rule, and this file
+already records what a silently-empty utility costs (see `NavSeparator`).
 
 CSS custom properties are the single runtime source of token values. TypeScript exports may provide semantic class/property mappings, but must reference those variables and must not duplicate their literal values. Typography roles follow the same rule.
 

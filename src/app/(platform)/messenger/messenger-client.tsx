@@ -168,7 +168,7 @@ export function MessengerClient() {
                             onClick={() => openAttachment(attachment.id)}
                             className="inline-flex w-fit items-center gap-1.5 rounded-action border border-line bg-surface px-2 py-1 text-xs text-ink disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            <Download size={13} aria-hidden="true" />
+                            <Download size={14} aria-hidden="true" />
                             {attachment.filename} · {formatBytes(attachment.bytes)}
                             {!attachment.available ? " · expired" : ""}
                           </button>
@@ -186,7 +186,7 @@ export function MessengerClient() {
             <Textarea name="body" placeholder="Write a message..." rows={3} />
             <Input name="files" type="file" multiple />
             <Button type="submit" variant="primary" pending={pending} disabled={!activeId && !recipientId}>
-              <Send size={15} aria-hidden="true" />
+              <Send size={14} aria-hidden="true" />
               Send
             </Button>
           </form>

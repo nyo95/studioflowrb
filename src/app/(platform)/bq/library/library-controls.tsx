@@ -268,9 +268,9 @@ export function TemplateActions({ template }: { template: BqTemplateRead }) {
     command.startTransition(async () => { const result = await templateAction(null, data); if (result.ok === false) command.setError(result.error.safeMessage); else { setDeleteOpen(false); command.router.refresh(); } });
   };
   return <div className="flex flex-wrap gap-1">
-    <IconButton type="button" size="sm" variant="ghost"   onClick={() => setEditOpen(true)} label="Edit template" icon={<Pencil size={15} aria-hidden="true" />} />
-    <IconButton type="button" size="sm" variant="ghost"   onClick={() => run("duplicate")} disabled={command.pending} label="Duplicate template" icon={<Copy size={15} aria-hidden="true" />} />
-    <IconButton type="button" size="sm" variant="ghost"   onClick={() => setDeleteOpen(true)} disabled={command.pending} label="Delete template" icon={<Trash2 size={15} aria-hidden="true" />} />
+    <IconButton type="button" size="sm" variant="ghost"   onClick={() => setEditOpen(true)} label="Edit template" icon={<Pencil size={14} aria-hidden="true" />} />
+    <IconButton type="button" size="sm" variant="ghost"   onClick={() => run("duplicate")} disabled={command.pending} label="Duplicate template" icon={<Copy size={14} aria-hidden="true" />} />
+    <IconButton type="button" size="sm" variant="ghost"   onClick={() => setDeleteOpen(true)} disabled={command.pending} label="Delete template" icon={<Trash2 size={14} aria-hidden="true" />} />
     {command.error ? <InlineError>{command.error}</InlineError> : null}
     <TemplateDialog template={template} open={editOpen} onOpenChange={setEditOpen} />
     <ConfirmDialog open={deleteOpen} onOpenChange={setDeleteOpen} title={`Delete ${template.name}?`} error={command.error} description={"This template and its scaffold sections will be permanently removed."} confirmLabel="Delete" tone="danger" pending={command.pending} onConfirm={() => run("delete")} />
@@ -480,8 +480,8 @@ function AssemblyLineRow({ line, assemblyId: _assemblyId, pending, onDelete, onS
         <div className="text-sm font-medium truncate">{line.title}</div>
         <div className="text-xs text-ink-secondary">{line.purchaseUnit} · qty {line.qty} · koef {line.koefisien} · {line.harga}</div>
       </div>
-      <IconButton type="button" size="sm" variant="ghost"  onClick={() => { setError(null); setEditOpen(true); }} label="Edit baris" icon={<Pencil size={13} aria-hidden="true" />} />
-      <IconButton type="button" size="sm" variant="ghost"  onClick={() => setDeleteOpen(true)} disabled={pending} label="Hapus baris" icon={<Trash2 size={13} aria-hidden="true" />} />
+      <IconButton type="button" size="sm" variant="ghost"  onClick={() => { setError(null); setEditOpen(true); }} label="Edit baris" icon={<Pencil size={14} aria-hidden="true" />} />
+      <IconButton type="button" size="sm" variant="ghost"  onClick={() => setDeleteOpen(true)} disabled={pending} label="Hapus baris" icon={<Trash2 size={14} aria-hidden="true" />} />
 
       {editOpen ? <div className="basis-full border-t border-line pt-3">
         <form ref={formRef} onChange={draft.onFormChange} className="grid gap-3" onSubmit={save}>

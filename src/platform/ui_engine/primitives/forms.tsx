@@ -33,7 +33,7 @@ const CONTROL_DENSITY_CLASSES: Record<ControlDensity, string> = {
 /* Shared control chrome. Hover/focus/invalid/disabled states mirror the locked
    interaction contract: warm border ladder, soft focus ring, no surprise. */
 const CONTROL_CLASSES =
-  "w-full rounded-control border border-line bg-surface text-ink transition-[border-color,box-shadow] duration-[120ms] placeholder:text-ink-tertiary enabled:hover:border-line-strong focus:border-line-focus focus:outline-0 focus:shadow-[0_0_0_3px_rgb(87_83_78/0.12)] aria-invalid:border-danger disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-ink-tertiary";
+  "w-full rounded-control border border-line bg-surface text-ink transition-[border-color,box-shadow] duration-[var(--ui-motion-fast)] placeholder:text-ink-tertiary enabled:hover:border-line-strong focus:border-line-focus focus:outline-0 focus:shadow-[0_0_0_3px_rgb(87_83_78/0.12)] aria-invalid:border-danger disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-ink-tertiary";
 
 export const Input = forwardRef<
   HTMLInputElement,
@@ -83,7 +83,7 @@ export const Select = forwardRef<
         aria-hidden="true"
         className={cx(
           "pointer-events-none absolute top-1/2 -translate-y-1/2 text-ink-tertiary",
-          density === "compact" ? "right-1.5 h-3 w-3" : "right-2.5 h-[15px] w-[15px]",
+          density === "compact" ? "right-1.5 h-3 w-3" : "right-2.5 h-3.5 w-3.5",
         )}
       />
     </span>
@@ -201,7 +201,7 @@ export function Switch({ id, label, className, ...props }: SwitchProps) {
         className="inline-flex h-5 w-[34px] shrink-0 rounded-full border-0 bg-line-strong p-0.5 data-[state=checked]:bg-action"
         {...props}
       >
-        <RSwitch.Thumb className="block h-4 w-4 rounded-full bg-surface transition-transform duration-[120ms] data-[state=checked]:translate-x-[14px]" />
+        <RSwitch.Thumb className="block h-4 w-4 rounded-full bg-surface transition-transform duration-[var(--ui-motion-fast)] data-[state=checked]:translate-x-[14px]" />
       </RSwitch.Root>
       {label ? <span>{label}</span> : null}
     </label>

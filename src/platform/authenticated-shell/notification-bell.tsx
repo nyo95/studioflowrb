@@ -90,7 +90,7 @@ export function NotificationBell() {
           aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
           className="relative grid h-6 w-6 shrink-0 place-items-center rounded-full border-0 bg-transparent text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus"
         >
-          <Bell size={15} aria-hidden="true" />
+          <Bell size={14} aria-hidden="true" />
           {unread > 0 ? (
             <span className="absolute -right-0.5 -top-0.5 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-danger px-[3px] text-[9px] font-bold leading-none text-ink-inverse">
               {unread > 9 ? "9+" : unread}

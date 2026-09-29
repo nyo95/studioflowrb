@@ -61,11 +61,11 @@ export default async function MasterDataPage() {
         actions={
           <div className="flex shrink-0 items-center gap-2">
             <Link href="/masterdata/brands" className={buttonClasses("secondary")}>
-              <Tags size={15} aria-hidden="true" />
+              <Tags size={14} aria-hidden="true" />
               <span>Brand</span>
             </Link>
             <Link href="/masterdata/pricing" className={buttonClasses("primary")}>
-              <Plus size={15} aria-hidden="true" />
+              <Plus size={14} aria-hidden="true" />
               <span>Price</span>
             </Link>
           </div>
@@ -84,7 +84,7 @@ export default async function MasterDataPage() {
                 </span>
                 {delta > 0 && (
                   <Badge tone="neutral">
-                    <Plus size={10} aria-hidden="true" />
+                    <Plus size={12} aria-hidden="true" />
                     <span>{delta}</span>
                   </Badge>
                 )}
@@ -93,7 +93,7 @@ export default async function MasterDataPage() {
                 <MetricValue size="lg">{formatCount(count)}</MetricValue>
                 <Text as="p" tone="secondary" size="sm" className="mt-1 flex items-center gap-1">
                   {label}
-                  <ArrowUpRight size={13} aria-hidden="true" className="text-ink-tertiary transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                  <ArrowUpRight size={14} aria-hidden="true" className="text-ink-tertiary transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                 </Text>
               </div>
             </SectionCard>

@@ -62,7 +62,7 @@ export function HeaderApplicationNavigation({ apps }: { apps: readonly ShellAppL
             className="inline-flex h-[26px] min-w-0 shrink-0 items-center gap-1.5 rounded-action border border-line-subtle bg-rail-soft px-2.5 text-[12.5px] font-semibold text-ink transition-colors hover:bg-surface-muted"
           >
             {activeApp ? <span className="truncate font-semibold text-ink">{activeApp.name}</span> : null}
-            {apps.length > 1 ? <ChevronDown size={10} aria-hidden="true" className="shrink-0 text-ink-tertiary" /> : null}
+            {apps.length > 1 ? <ChevronDown size={12} aria-hidden="true" className="shrink-0 text-ink-tertiary" /> : null}
           </button>
         </Popover.Trigger>
         <Popover.Portal>

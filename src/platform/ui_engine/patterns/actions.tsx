@@ -52,7 +52,7 @@ export function RowActionMenu({
                 <DropdownMenu.Separator className="-mx-px my-1 h-px bg-line" />
               ) : null}
               <DropdownMenu.Item
-                className="flex min-h-8 cursor-pointer items-center gap-2 rounded-action px-2 py-1.5 text-sm text-ink outline-0 [&_svg]:h-[15px] [&_svg]:w-[15px] [&_svg]:text-ink-tertiary data-[danger=true]:text-danger data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-surface-muted"
+                className="flex min-h-8 cursor-pointer items-center gap-2 rounded-action px-2 py-1.5 text-sm text-ink outline-0 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:text-ink-tertiary data-[danger=true]:text-danger data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-surface-muted"
                 data-danger={item.danger || undefined}
                 disabled={item.disabled}
                 onSelect={item.onSelect}
@@ -94,7 +94,7 @@ export function ButtonMenu({
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <Button variant={variant} trailingIcon={<ChevronDown className="h-[14px] w-[14px]" aria-hidden="true" />}>
+        <Button variant={variant} trailingIcon={<ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />}>
           {label}
         </Button>
       </DropdownMenu.Trigger>
@@ -149,7 +149,7 @@ export function FilterBar({
       data-active={active || undefined}
       {...props}
     >
-      <Filter aria-hidden="true" className="h-[15px] w-[15px] text-ink-tertiary" />
+      <Filter aria-hidden="true" className="h-3.5 w-3.5 text-ink-tertiary" />
       <div className="flex flex-wrap items-center gap-1.5">{children}</div>
       {active && onClear ? (
         <Button

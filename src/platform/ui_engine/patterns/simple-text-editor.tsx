@@ -55,9 +55,9 @@ export const SimpleTextEditor = forwardRef<HTMLTextAreaElement, SimpleTextEditor
   return (
     <div className="overflow-hidden rounded-control border border-line bg-surface focus-within:border-line-focus focus-within:shadow-[0_0_0_3px_rgb(87_83_78/0.12)]">
       <div className="flex items-center gap-1 border-b border-line-subtle bg-surface-muted px-1.5 py-1" aria-label={toolbarLabel} role="toolbar">
-        <IconButton size="sm" variant="ghost" label="Bold" icon={<Bold aria-hidden="true" size={15} />} onClick={() => wrapSelection("**")} />
-        <IconButton size="sm" variant="ghost" label="Italic" icon={<Italic aria-hidden="true" size={15} />} onClick={() => wrapSelection("*")} />
-        <IconButton size="sm" variant="ghost" label="Bullet list" icon={<List aria-hidden="true" size={15} />} onClick={toggleBullets} />
+        <IconButton size="sm" variant="ghost" label="Bold" icon={<Bold aria-hidden="true" size={14} />} onClick={() => wrapSelection("**")} />
+        <IconButton size="sm" variant="ghost" label="Italic" icon={<Italic aria-hidden="true" size={14} />} onClick={() => wrapSelection("*")} />
+        <IconButton size="sm" variant="ghost" label="Bullet list" icon={<List aria-hidden="true" size={14} />} onClick={toggleBullets} />
       </div>
       <Textarea ref={setRefs} className="min-h-[116px] rounded-none border-0 shadow-none focus:border-0 focus:shadow-none" {...props} />
     </div>

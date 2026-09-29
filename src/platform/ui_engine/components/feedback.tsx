@@ -136,7 +136,7 @@ function State({
             kind === "error" ? "border-danger-line bg-surface text-danger" : "border-line bg-surface-muted text-ink-tertiary",
           )}
         >
-          <Icon className="h-[18px] w-[18px]" />
+          <Icon className="h-5 w-5" />
         </span>
       ) : null}
       {title ? <Heading level={3}>{title}</Heading> : null}

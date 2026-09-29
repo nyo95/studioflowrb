@@ -1,6 +1,6 @@
 # DESIGN.md — StudioFlow Rebuild Design Contract
 
-Status: **LOCKED — canonical minimalist shared visual contract (PM/TL, revised by owner direction 2026-08-25)**
+Status: **LOCKED — canonical minimalist shared visual contract (PM/TL, revised by owner direction 2026-08-25; foundations pass under owner direction 2026-09-29, R8.202)**
 Scope: Shared visual language for StudioFlow, Master Data, BQ, and future subapps.
 Source basis: current owner direction plus the legacy UI engine, design tokens, shared shells/components, and proven app workflows. Every visual migration must record the exact legacy commit and distinguish committed evidence from working-tree-only evidence; no moving branch or prose summary is an implicit design authority.
 
@@ -9,7 +9,7 @@ Authority: this is the single shared visual contract. Product/domain policy rema
 ## 1. Design Intent
 
 StudioFlow uses a quiet, restrained professional UI:
-- warm-neutral palette with near-black ink;
+- one neutral light-grey ground, carrying warm near-black ink;
 - white working surfaces over a light canvas;
 - compact, information-dense layouts;
 - serif typography for major page headings;
@@ -51,24 +51,40 @@ Type scale — five sizes, no others:
 
 Three planes in a fixed depth order: **ground → content → emphasis**.
 
-**Ground** (`--ui-canvas`, `#F0F0F0`): the page behind everything. At 1.13:1 under white it is a real plane — visible, not a hint. Nothing sits on it directly except spacing. Three ground ramps are defined and switch via `[data-ground]` on `<html>`: `gray`, `clay` (`#F5EFE7`), `ivory` (`#F3F2EE`). **No attribute is set today**, so the live ground is the neutral `:root` value; the warm ramps are available but dormant.
+**Ground** (`--ui-canvas`, `#F0F0F0`): the page behind everything. At 1.13:1 under white it is a real plane — visible, not a hint. Nothing sits on it directly except spacing. There is **one** ground, chosen by the owner and neutral on purpose; the warmth in this product comes from the ink, not the paper. Alternate ground ramps and the `[data-ground]` switch were removed in R8.202 rather than left dormant — a contract that documents options nobody ships is how a contract starts drifting.
 
 **Planes** (`--ui-surface`, `#FFFFFF`): cards, tables, toolbars, topbar — everything the operator reads or acts on. Shadow-carried hairlines define the edge (`--ui-shadow-plane`). The ground is deep enough that shadow alone separates white planes from it; drawn borders are retained only where a shadow would be invisible (structural rail dividers, focus rings).
 
-**Rail** (`--ui-rail`, `#E3E3E3` at `:root`, `#E8E3DB` on the `gray` ramp): recesses below the ground — it reads as application chrome, not a content card. A rail darker than the ground is deliberate: it says "this is the machine, not the work."
-
-Known deviation: `AppShell`'s primary rail does not use this token. It computes `color-mix(in srgb, var(--ui-surface-muted) 52%, var(--ui-surface))` (≈`#F5F5F5`), which sits *above* the ground rather than below it, while the StudioFlow project secondary rail does use `--ui-rail`. The two rails therefore do not match. Resolving this is a pending visual decision, not an accident to fix silently.
+**Rail** (`--ui-rail`, `#E3E3E3`): recesses below the ground — it reads as application chrome, not a content card. A rail darker than the ground is deliberate: it says "this is the machine, not the work." Both rails use this one token: the application rail in `AppShell` and the record workspace rail beside it, so the two never drift apart.
 
 **Emphasis** (`--ui-action-primary`, `#231F1C`): constant graphite. It never changes per screen. "The dark button is the one that commits" is true everywhere.
 
-**Phase hues** — five identity marks, shapes only:
-- Moodboard `--ph-mood` `#6F7D45`
-- Layout Plan `--ph-layout` `#B6782F`
-- 3D Design `--ph-3d` `#9B5F55`
-- Construction Doc `--ph-cd` `#466F88`
-- Supervision `--ph-sup` `#695B8A`
+**Phase marks** — five steps of **one** hue family, shapes only:
 
-Phase hues appear as filled bars, dots, rings, meter fills, and Gantt segments. **Never as text colour, never on a button.** `--ui-mark` holds the active phase hue and is set by JS on phase entry. A deep ramp (`--ph-*-deep`) is available for phase labels that must sit on ground or surface at 4.5:1+.
+| Phase | Token | Light | L\* | Dark | L\* |
+|---|---|---|---|---|---|
+| Moodboard | `--ph-mood` | `#888177` | 54.3 | `#827B72` | 52.0 |
+| Layout Plan | `--ph-layout` | `#746E66` | 46.7 | `#9B9287` | 61.0 |
+| 3D Design | `--ph-3d` | `#615B55` | 39.0 | `#B4AA9D` | 70.1 |
+| Construction Doc | `--ph-cd` | `#4E4A44` | 31.7 | `#CDC2B4` | 79.0 |
+| Supervision | `--ph-sup` | `#3C3934` | 24.1 | `#E8DBCB` | 88.0 |
+
+Lightness is the channel, not hue. Five hues at one lightness — the previous set
+spanned only 14 L\* — are one palette to a reader who separates hues easily and
+one flat smear to a reader who does not, and a 7px dot on a Gantt row gives
+colour no help from a label. These steps are ~7.6 L\* apart in light and ~9 in
+dark, and every one clears 3:1 against surface, canvas and rail in both themes.
+`design-contract.test.ts` asserts both properties; do not add a sixth phase
+without re-spacing the ramp.
+
+The ramp also carries meaning the old hues could not: it runs from the ground
+outward, so Moodboard sits closest to the page and Supervision furthest from it.
+A Gantt row reads as sequence with no legend.
+
+Marks appear as filled bars, dots, rings, meter fills, and Gantt segments.
+**Never as text colour, never on a button.** A phase *label* is ordinary ink —
+that is why there is no deep ramp. `--ui-mark` holds the active phase mark and is
+set by JS on phase entry.
 
 **Ink:** warm near-black (`#1A1714`), not blue-black. Secondary `#57504A`, tertiary `#6A635C`. Every text token clears WCAG AA (4.5:1) against both surface and canvas. Do not lighten tertiary — it carries table headers, eyebrows, placeholders, and disabled labels, all at small sizes.
 
@@ -99,6 +115,25 @@ Elevation model — shadow-carried hairlines replace drawn borders on content pl
 `--ui-shadow-plane`: a 0.5px hairline ring + 1px micro shadow. This replaces the `1px border` on cards and tables. Structural dividers (sidebar separator, header bottom) keep a drawn border because a shadow would be invisible against an adjacent surface.
 
 Do not stack cards inside cards. One elevation depth per screen section.
+
+## 4.1 Iconography
+
+Four sizes, no others. Icons are line icons at a consistent stroke; they label an
+action, they are not decoration.
+
+| Name | Size | Token | Use |
+|---|---|---|---|
+| xs | 12px | `--ui-icon-xs` | Inline marks inside a text line — breadcrumb and rail chevrons, separators |
+| sm | 14px | `--ui-icon-sm` | Inside controls, table rows, menu items, trailing affordances |
+| md | 16px | `--ui-icon-md` | The default — nav entries, toolbar buttons, section heads |
+| lg | 20px | `--ui-icon-lg` | Empty states and page-level marks |
+
+Before R8.202 the product used nine sizes between 10px and 20px, each chosen at
+the moment of writing. The cost is not one icon looking wrong; it is a row of
+icons that should align and does not. Pick the nearest size on the scale rather
+than introducing a tenth.
+
+An icon-only control still needs an accessible name and a tooltip (§14).
 
 ## 5. Spacing & Density
 
@@ -313,6 +348,28 @@ reachable in both expanded and collapsed desktop presentations.
 - blur commits only when the owning pattern explicitly enables it;
 - drag/reorder shows source/target clearly;
 - no hidden automatic mutation across domain boundaries.
+
+## 13.1 Motion
+
+Three durations and two easings. Everything else is a one-off waiting to spread.
+
+| Token | Value | Use |
+|---|---|---|
+| `--ui-motion-fast` | 120ms | Colour and opacity under the pointer — hover, focus, press |
+| `--ui-motion-base` | 160ms | Size and position — rail collapse, disclosure, reorder |
+| `--ui-motion-slow` | 240ms | An overlay arriving — dialog, drawer, menu |
+| `--ui-ease-standard` | `cubic-bezier(.2, 0, 0, 1)` | Anything entering or settling |
+| `--ui-ease-exit` | `cubic-bezier(.4, 0, 1, 1)` | Anything leaving |
+
+Nothing animates longer than `slow`. This is an operational tool used all day;
+motion confirms that something happened, it does not perform. Durations are
+applied as `duration-[var(--ui-motion-fast)]`, because Tailwind has no duration
+namespace to register these against — the bare `duration-(--token)` form is not
+guaranteed to emit a rule, and a motion token that silently emits nothing is
+worse than a hard-coded value.
+
+`@media (prefers-reduced-motion: reduce)` collapses all of it in the engine base
+layer; no component repeats that rule.
 
 ## 14. Content Economy
 

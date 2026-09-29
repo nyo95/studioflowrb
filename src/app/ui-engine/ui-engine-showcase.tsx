@@ -158,10 +158,10 @@ export function UiEngineShowcase() {
       navigationLabel="UI Engine showcase navigation"
       navigation={
         <div className="grid gap-1">
-          <NavItem href="#shell" icon={<LayoutGrid size={17} />}>Shell</NavItem>
-          <NavItem href="#directory" icon={<Filter size={17} />}>Directory</NavItem>
-          <NavItem href="#forms" icon={<Sparkles size={17} />}>Forms</NavItem>
-          <NavItem href="#overlays" icon={<CircleAlert size={17} />}>Overlays</NavItem>
+          <NavItem href="#shell" icon={<LayoutGrid size={16} />}>Shell</NavItem>
+          <NavItem href="#directory" icon={<Filter size={16} />}>Directory</NavItem>
+          <NavItem href="#forms" icon={<Sparkles size={16} />}>Forms</NavItem>
+          <NavItem href="#overlays" icon={<CircleAlert size={16} />}>Overlays</NavItem>
         </div>
       }
       utility={
@@ -302,14 +302,14 @@ export function UiEngineShowcase() {
                             size="sm"
                             variant="ghost"
                             label={`Edit ${row.name}`}
-                            icon={<Pencil size={15} aria-hidden="true" />}
+                            icon={<Pencil size={14} aria-hidden="true" />}
                             onClick={() => { setDialogOpen(true); setLastAction(`Edit: ${row.name}`); }}
                           />
                           <IconButton
                             size="sm"
                             variant="ghost"
                             label={`Delete ${row.name}`}
-                            icon={<Trash2 size={15} aria-hidden="true" />}
+                            icon={<Trash2 size={14} aria-hidden="true" />}
                             onClick={() => setConfirmDeleteTarget(row)}
                           />
                         </div>

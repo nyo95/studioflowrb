@@ -59,7 +59,7 @@ export function PromotionRequestButton({ item }: { item: BqLibItemRead }) {
         disabled={pending}
         onClick={() => run(requestPromotionAction, { type: item.type, libItemId: item.id })}
       >
-        <ArrowUpRight size={15} aria-hidden="true" />
+        <ArrowUpRight size={14} aria-hidden="true" />
       </Button>
       {error ? <InlineError>{error}</InlineError> : null}
     </>

@@ -81,7 +81,7 @@ export function StudioFlowHeaderSearch() {
           it's the only element that opens/closes on click. */}
       <Popover.Anchor asChild>
         <div className="flex h-[27px] min-w-0 max-w-[300px] flex-1 items-center gap-[7px] rounded-action border border-line-subtle bg-rail-soft px-[9px] transition-colors focus-within:border-line-focus max-[560px]:max-w-none">
-          <Search size={13} aria-hidden="true" className="shrink-0 text-ink-tertiary" />
+          <Search size={14} aria-hidden="true" className="shrink-0 text-ink-tertiary" />
           <input
             ref={inputRef}
             type="search"

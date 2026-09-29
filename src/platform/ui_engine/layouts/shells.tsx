@@ -92,7 +92,7 @@ export function AppShell({
         </header>
         <div
           className={cx(
-            "grid min-h-[calc(100dvh-var(--ui-topbar-height))] overflow-x-clip transition-[grid-template-columns] duration-[160ms] motion-reduce:transition-none",
+            "grid min-h-[calc(100dvh-var(--ui-topbar-height))] overflow-x-clip transition-[grid-template-columns] duration-[var(--ui-motion-base)] motion-reduce:transition-none",
             railVisible
               ? "grid-cols-[var(--ui-rail-width)_minmax(0,1fr)] max-[840px]:grid-cols-1 max-[840px]:block"
               : "grid-cols-1",
@@ -110,11 +110,13 @@ export function AppShell({
             ? ({ "--ui-rail-width": "var(--ui-rail-expanded-width)" } as CSSProperties)
             : undefined}
         >
-          {/* Warm chrome and a drawn rule separate navigation from the work area. */}
+          {/* Recessed chrome: the rail sits BELOW the ground, not above it, so it
+              reads as the machine rather than another sheet of work. It shares
+              --ui-rail with the record workspace rail beside it. */}
           {railVisible ? <aside
             className={cx(
               "group relative sticky top-(--ui-topbar-height) flex h-[calc(100dvh-var(--ui-topbar-height))] max-w-screen min-w-0 flex-col overflow-hidden border-r border-line-subtle",
-              "bg-[color-mix(in_srgb,var(--ui-surface-muted)_52%,var(--ui-surface))]",
+              "bg-rail",
               "max-[840px]:static max-[840px]:h-auto max-[840px]:border-b max-[840px]:border-r-0",
             )}
             aria-label={navigationLabel}
@@ -148,7 +150,7 @@ export function AppShell({
                 aria-expanded={!isCollapsed}
                 onClick={toggle}
               >
-                {isCollapsed ? <ChevronRight aria-hidden="true" size={13} /> : <ChevronLeft aria-hidden="true" size={13} />}
+                {isCollapsed ? <ChevronRight aria-hidden="true" size={14} /> : <ChevronLeft aria-hidden="true" size={14} />}
               </button>
             ) : null}
           </aside> : null}
@@ -246,7 +248,7 @@ export function NavItem({ icon, active = false, disabled = false, badge, childre
 
   const content = (
     <>
-      {icon ? <span className="inline-flex shrink-0 [&_svg]:h-[18px] [&_svg]:w-[18px]" aria-hidden="true">{icon}</span> : null}
+      {icon ? <span className="inline-flex shrink-0 [&_svg]:h-4 [&_svg]:w-4" aria-hidden="true">{icon}</span> : null}
       <span className={labelClasses}>{children}</span>
       {trailing}
     </>

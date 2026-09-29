@@ -62,7 +62,7 @@ export default async function ProjectLayout({
           prefetch={false}
           className="inline-flex items-center gap-1 rounded-action px-2 py-1 text-xs text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
         >
-          <ChevronLeft size={11} aria-hidden="true" />
+          <ChevronLeft size={12} aria-hidden="true" />
           All projects
         </Link>
 

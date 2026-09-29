@@ -5,13 +5,42 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.201**
-- Next local revision: **R8.202**
+- Current revision after this entry is committed: **R8.202**
+- Next local revision: **R8.203**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.202 | 2026-09-29 | fix(ui): give the visual foundations the scales they were missing
+
+Owner direction 2026-09-29 approved this foundations pass under DESIGN.md §16.
+
+- **One ground, neutral on purpose.** `DESIGN.md` opened by promising a "warm-neutral palette" while the product
+  shipped neutral grey, and three alternate ground ramps (`clay` `#F5EFE7`, `ivory` `#F3F2EE`, `gray` `#F0F0F0`
+  with rail `#E8E3DB`) sat behind a `[data-ground]` switch no code ever set. The owner confirmed neutral light
+  grey is the intent, so the contract now says so and the dormant ramps are removed rather than documented. Their
+  values are recorded in this entry if they are ever wanted back.
+- **The rail is a recess again.** `AppShell` computed its own rail colour as `color-mix(surface-muted 52%, surface)`
+  (≈`#F5F5F5`), which sits *above* the `#F0F0F0` ground — the opposite of the contract's "this is the machine, not
+  the work" — while the record workspace rail beside it used `--ui-rail`. Both now use `--ui-rail` `#E3E3E3`.
+- **Phase marks are monotone.** The five phase hues differed almost only in hue, spanning 14 L\* in light and 11 in
+  dark; Moodboard olive and 3D rose sat 3.4 L\* apart, which is the red/green pair at one lightness that the
+  contract's own checklist warns against, and on a 7px Gantt dot colour is the only channel. Replaced with five
+  steps of one hue family ~7.6 L\* apart (light) and ~9 (dark), each clearing 3:1 against surface, canvas and rail
+  in both themes. The ramp runs ground-outward, so a Gantt row now reads as sequence without a legend. The unused
+  `--ph-*-deep` ramp is gone: a phase label is ink.
+- **A motion scale.** Three durations (120/160/240ms) and two easings, replacing durations picked one at a time in
+  components. Applied as `duration-[var(--ui-motion-fast)]`; the `duration-(--token)` shorthand is not guaranteed
+  to emit a rule, and this repo has already paid for one silently-empty utility.
+- **An icon scale.** Nine sizes between 10px and 20px collapsed to four (12/14/16/20) across 35 call sites, plus
+  the off-scale `[&_svg]` and `h-[15px]`/`h-[13px]`/`h-[18px]` overrides. The nav entry's 18px icon is now 16px.
+- `DESIGN.md` gains §4.1 Iconography and §13.1 Motion; §1 and §3 are rewritten to match what ships.
+  `UI_ENGINE.md` §5 adds the motion and icon tokens to the canonical list.
+
+**Checks.** `tsc --noEmit` clean; `eslint .` 0 errors with the two pre-existing Presentation `<img>` warnings;
+boundary and legacy-runtime checks OK; whitespace clean staged and unstaged.
 
 ## R8.201 | 2026-09-29 | test(platform): guard quick messenger portal
 

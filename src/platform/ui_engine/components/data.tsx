@@ -208,7 +208,7 @@ export function TableHead({
         <Indicator
           aria-hidden="true"
           className={cx(
-            "h-[13px] w-[13px] shrink-0 transition-opacity duration-[120ms] motion-reduce:transition-none",
+            "h-3.5 w-3.5 shrink-0 transition-opacity duration-[var(--ui-motion-fast)] motion-reduce:transition-none",
             sortDirection ? "opacity-100" : "opacity-40 group-hover:opacity-85",
           )}
         />
@@ -377,7 +377,7 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(functi
     <div className={cx("relative w-[min(100%,260px)] max-[720px]:w-full", className)}>
       <Search
         aria-hidden="true"
-        className="pointer-events-none absolute left-2.5 top-1/2 z-[1] h-[15px] w-[15px] -translate-y-1/2 text-ink-tertiary"
+        className="pointer-events-none absolute left-2.5 top-1/2 z-[1] h-3.5 w-3.5 -translate-y-1/2 text-ink-tertiary"
       />
       <Input
         ref={ref}

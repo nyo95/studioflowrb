@@ -91,7 +91,7 @@ export function Spinner({
 }) {
   return (
     <span
-      className={cx("inline-flex text-ink-secondary [&_svg]:h-[18px] [&_svg]:w-[18px] [&_svg]:animate-ui-spin", className)}
+      className={cx("inline-flex text-ink-secondary [&_svg]:h-4 [&_svg]:w-4 [&_svg]:animate-ui-spin", className)}
       role={decorative ? undefined : "status"}
       aria-label={decorative ? undefined : label}
       aria-hidden={decorative || undefined}

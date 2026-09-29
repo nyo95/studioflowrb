@@ -24,7 +24,7 @@ export function BqNav() {
         return (
           <NavItem
             key={href}
-            icon={<Icon size={17} />}
+            icon={<Icon size={16} />}
             active={isActive}
             href={href}
             prefetch={false}

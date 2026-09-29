@@ -31,6 +31,12 @@
   --color-rail:          var(--ui-rail);
   --color-rail-soft:     var(--ui-rail-soft);
 
+  /* Motion — `ease-standard` / `ease-exit`; durations use the explicit
+     var() form on the component, because Tailwind has no duration namespace
+     to register these against. */
+  --ease-standard: var(--ui-ease-standard);
+  --ease-exit:     var(--ui-ease-exit);
+
   /* Borders / lines */
   --color-line-subtle:   var(--ui-border-subtle);
   --color-line:          var(--ui-border-default);

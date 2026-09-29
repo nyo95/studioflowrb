@@ -133,7 +133,7 @@ export function Combobox({
           sideOffset={5}
           align="start"
         >
-          <div className="relative border-b border-line-subtle p-[7px] [&>svg]:absolute [&>svg]:left-[17px] [&>svg]:top-1/2 [&>svg]:z-[1] [&>svg]:h-[15px] [&>svg]:w-[15px] [&>svg]:-translate-y-1/2 [&>svg]:text-ink-tertiary">
+          <div className="relative border-b border-line-subtle p-[7px] [&>svg]:absolute [&>svg]:left-[17px] [&>svg]:top-1/2 [&>svg]:z-[1] [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:-translate-y-1/2 [&>svg]:text-ink-tertiary">
             <Search aria-hidden="true" />
             <Input
               value={activeQuery}

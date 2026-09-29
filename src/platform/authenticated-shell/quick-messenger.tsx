@@ -149,7 +149,7 @@ export function QuickMessenger() {
         onClick={() => setOpen((value) => !value)}
         className="relative grid h-6 w-6 shrink-0 place-items-center rounded-full border-0 bg-transparent text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus"
       >
-        <MessageCircle size={15} aria-hidden="true" />
+        <MessageCircle size={14} aria-hidden="true" />
         {unread > 0 ? (
           <span className="absolute -right-0.5 -top-0.5 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-danger px-[3px] text-[9px] font-bold leading-none text-ink-inverse">
             {unread > 9 ? "9+" : unread}
@@ -173,7 +173,7 @@ export function QuickMessenger() {
               <Expand size={14} aria-hidden="true" />
             </Link>
             <button type="button" onClick={() => setOpen(false)} className="grid h-7 w-7 place-items-center rounded-action border-0 bg-transparent text-ink-tertiary hover:bg-surface-muted hover:text-ink" aria-label="Close messenger">
-              <X size={15} aria-hidden="true" />
+              <X size={14} aria-hidden="true" />
             </button>
           </div>
 
@@ -226,7 +226,7 @@ export function QuickMessenger() {
                         onClick={() => openAttachment(attachment.id)}
                         className="inline-flex w-fit items-center gap-1.5 rounded-action border border-line bg-surface px-2 py-1 text-xs text-ink disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        <Download size={13} aria-hidden="true" />
+                        <Download size={14} aria-hidden="true" />
                         {attachment.filename} · {formatBytes(attachment.bytes)}
                         {!attachment.available ? " · expired" : ""}
                       </button>

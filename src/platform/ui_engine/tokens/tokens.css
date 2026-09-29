@@ -16,9 +16,6 @@
   --ui-rail:            #E3E3E3;  /* recessed chrome (sidebar rail)            */
   --ui-rail-soft:       #EBEBEB;  /* softer rail accent                        */
 
-  /* ── Ground ramps (switchable via [data-ground] on <html>) ──────────────  */
-  /* default (gray-warm) defined above; override blocks below switch it       */
-
   /* ── Borders ─────────────────────────────────────────────────────────────
      Shadow-carried hairlines are the primary edge. Keep border tokens for
      components that still use drawn borders (structural dividers, focus).    */
@@ -58,19 +55,20 @@
   /* ── Phase hues (StudioFlow identity marks) ──────────────────────────────
      Used ONLY for shapes: strips, dots, rings, meter fills, Gantt segments.
      Never for text colour, buttons, or actionable elements.
-     --ui-mark is set by JS when the user enters a phase context.             */
-  --ph-mood:       #6F7D45;  /* Moodboard        */
-  --ph-layout:     #B6782F;  /* Layout Plan      */
-  --ph-3d:         #9B5F55;  /* 3D Design        */
-  --ph-cd:         #466F88;  /* Construction Doc */
-  --ph-sup:        #695B8A;  /* Supervision      */
+     --ui-mark is set by JS when the user enters a phase context.
 
-  /* Deep ramp — cleared to 4.5:1 for phase labels on ground/surface         */
-  --ph-mood-deep:    #636F3D;
-  --ph-layout-deep:  #926026;
-  --ph-3d-deep:      #955B52;
-  --ph-cd-deep:      #3C6079;
-  --ph-sup-deep:     #5E4F7C;
+     ONE hue family, five lightness steps ~7.6 L* apart (light) / ~9 (dark).
+     Phase order reads as progression: Moodboard sits closest to the page,
+     Supervision furthest from it, so a Gantt row shows sequence without a
+     legend. Lightness, not hue, is the channel — a hue-only set fails for
+     the readers who cannot separate the hues. Every step clears 3:1 against
+     surface, canvas and rail in both themes; the guard test proves it.
+     A phase label is ink, never the mark colour, so there is no deep ramp.
+  --ph-mood:       #888177;  /* Moodboard        L* 54.3 */
+  --ph-layout:     #746E66;  /* Layout Plan      L* 46.7 */
+  --ph-3d:         #615B55;  /* 3D Design        L* 39.0 */
+  --ph-cd:         #4E4A44;  /* Construction Doc L* 31.7 */
+  --ph-sup:        #3C3934;  /* Supervision      L* 24.1 */
 
   /* Aliases for legacy code that uses --ui-phase-* names                    */
   --ui-phase-moodboard:   var(--ph-mood);
@@ -118,6 +116,25 @@
   --ui-topbar-height:        46px;   /* global top bar (brand + app switch)  */
   --ui-header-height:        44px;   /* sticky context bar                   */
 
+  /* ── Motion ──────────────────────────────────────────────────────────────
+     fast = colour/opacity under the pointer · base = size and position
+     slow = an overlay arriving. Nothing in this product animates longer.    */
+  --ui-motion-fast: 120ms;
+  --ui-motion-base: 160ms;
+  --ui-motion-slow: 240ms;
+  --ui-ease-standard: cubic-bezier(.2, 0, 0, 1);
+  --ui-ease-exit:     cubic-bezier(.4, 0, 1, 1);
+
+  /* ── Icon sizes ──────────────────────────────────────────────────────────
+     xs inline marks inside a text line (chevrons, separators)
+     sm inside controls, table rows, menu items, trailing affordances
+     md the default: nav entries, toolbar buttons, section heads
+     lg empty states and page-level marks                                    */
+  --ui-icon-xs: 12px;
+  --ui-icon-sm: 14px;
+  --ui-icon-md: 16px;
+  --ui-icon-lg: 20px;
+
   /* ── Controls ────────────────────────────────────────────────────────────  */
   --ui-row-y:              9px;   /* comfortable density row padding        */
   --ui-control-height-sm: 32px;
@@ -140,33 +157,6 @@
   --ui-shadow-over:     0 0 0 .5px rgb(26 23 20 / .10),  0 22px 50px rgb(26 23 20 / .16), 0 4px 12px rgb(26 23 20 / .07);
   /* Legacy alias */
   --ui-shadow-elevated: var(--ui-shadow-over);
-}
-
-/* ── Ground ramp: Clay ───────────────────────────────────────────────────── */
-[data-ground="clay"] {
-  --ui-canvas:       #F5EFE7;
-  --ui-rail:         #EDE3D5;
-  --ui-rail-soft:    #F3EAE0;
-  --ui-border-subtle:#EDE5D9;
-  --ui-border-default:#E0D4C4;
-}
-
-/* ── Ground ramp: Ivory ──────────────────────────────────────────────────── */
-[data-ground="ivory"] {
-  --ui-canvas:       #F3F2EE;
-  --ui-rail:         #EDE8DC;
-  --ui-rail-soft:    #F3F0E7;
-  --ui-border-subtle:#EDEADF;
-  --ui-border-default:#DED8CC;
-}
-
-/* ── Ground ramp: Gray (default alias, explicit for completeness) ─────────── */
-[data-ground="gray"] {
-  --ui-canvas:       #F0F0F0;
-  --ui-rail:         #E8E3DB;
-  --ui-rail-soft:    #EFEBE4;
-  --ui-border-subtle:#ECE7DF;
-  --ui-border-default:#DED7CD;
 }
 
 /* ── Compact density stamp (opt in with data-density="compact") ──────────── */
@@ -216,16 +206,11 @@
     --ui-warning-fg:      #D4975A;
     --ui-warning-bg:      #1E1800;
     --ui-warning-border:  #78350F;
-    --ph-mood:       #A0B069;
-    --ph-layout:     #D3954B;
-    --ph-3d:         #C28079;
-    --ph-cd:         #6D98B2;
-    --ph-sup:        #9482BD;
-    --ph-mood-deep:    #A0B069;
-    --ph-layout-deep:  #D3954B;
-    --ph-3d-deep:      #C28079;
-    --ph-cd-deep:      #6D98B2;
-    --ph-sup-deep:     #9482BD;
+    --ph-mood:       #827B72;  /* L* 52.0 */
+    --ph-layout:     #9B9287;  /* L* 61.0 */
+    --ph-3d:         #B4AA9D;  /* L* 70.1 */
+    --ph-cd:         #CDC2B4;  /* L* 79.0 */
+    --ph-sup:        #E8DBCB;  /* L* 88.0 */
     --ui-mark:            var(--ph-mood);
     --ui-table-header-bg: var(--ui-surface-raised);
     --ui-table-header-fg: var(--ui-text-secondary);
@@ -266,16 +251,11 @@
   --ui-warning-fg:      #D4975A;
   --ui-warning-bg:      #1E1800;
   --ui-warning-border:  #78350F;
-  --ph-mood:       #A0B069;
-  --ph-layout:     #D3954B;
-  --ph-3d:         #C28079;
-  --ph-cd:         #6D98B2;
-  --ph-sup:        #9482BD;
-  --ph-mood-deep:    #A0B069;
-  --ph-layout-deep:  #D3954B;
-  --ph-3d-deep:      #C28079;
-  --ph-cd-deep:      #6D98B2;
-  --ph-sup-deep:     #9482BD;
+  --ph-mood:       #827B72;  /* L* 52.0 */
+  --ph-layout:     #9B9287;  /* L* 61.0 */
+  --ph-3d:         #B4AA9D;  /* L* 70.1 */
+  --ph-cd:         #CDC2B4;  /* L* 79.0 */
+  --ph-sup:        #E8DBCB;  /* L* 88.0 */
   --ui-mark:            var(--ph-mood);
   --ui-table-header-bg: var(--ui-surface-raised);
   --ui-table-header-fg: var(--ui-text-secondary);

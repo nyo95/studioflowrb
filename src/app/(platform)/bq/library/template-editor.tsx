@@ -49,7 +49,7 @@ export function TemplateSectionsButton({
         title="Edit sections"
         onClick={() => setOpen(true)}
       >
-        <LayoutList size={15} aria-hidden="true" />
+        <LayoutList size={14} aria-hidden="true" />
       </Button>
       <TemplateSectionsDialog template={template} libraryItems={libraryItems} open={open} onOpenChange={setOpen} />
     </>
