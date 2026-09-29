@@ -6,7 +6,7 @@ import { toDecimalString } from "@platform/utilities/decimal";
 import { BQ_PERMISSIONS, requireKategori, requirePositiveCoefficient, type BqServiceContext } from "./context";
 
 export function createAssemblyService(ctx: BqServiceContext) {
-  const { db, runTransaction, auditWriter, requireEditableProjectForItem } = ctx;
+  const { db, runTransaction, runAutomaticSortTransaction, auditWriter, requireEditableProjectForItem } = ctx;
 
 async function createAssemblyTemplate(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; name: string; description?: string }) {
   requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
@@ -25,7 +25,7 @@ async function addAssemblyCustomLine(input: { grants: PermissionGrants; actor: {
   // at sort_order 2); MAX+1 never reuses a still-occupied slot. Read and
   // reserve it atomically — two near-simultaneous adds could otherwise both
   // read the same MAX and collide.
-  const line = await runTransaction(async (tx) => {
+  const line = await runAutomaticSortTransaction(async (tx) => {
     const maxSortOrder = await tx.bqAssemblyLine.aggregate({ where: { assembly_template_id: input.assemblyId }, _max: { sort_order: true } });
     const nextSortOrder = (maxSortOrder._max.sort_order ?? -1) + 1;
     return tx.bqAssemblyLine.create({ data: { assembly_template_id: assembly.id, source_type: "CUSTOM", title_snapshot: input.title, purchase_unit_snapshot: input.purchaseUnit ?? "ls", harga_snapshot: input.harga ?? "0", currency_snapshot: input.currency ?? "IDR", kategori: requireKategori(input.kategori ?? "MATERIAL"), qty: input.qty ?? "1", koefisien, sort_order: nextSortOrder } });

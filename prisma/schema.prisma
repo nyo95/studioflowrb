@@ -1006,7 +1006,7 @@ model BqTemplateRecommendation {
   lib_custom_item         BqLibCustomItem?      @relation(fields: [lib_custom_item_id], references: [id])
 
   @@map("bq_template_recommendation")
-  @@index([template_section_id])
+  @@unique([template_section_id, sort_order])
   @@schema("bq")
 }
 
@@ -1046,7 +1046,7 @@ model BqAssemblyLine {
   updated_at                          DateTime           @updatedAt
 
   @@map("bq_assembly_line")
-  @@index([assembly_template_id, sort_order])
+  @@unique([assembly_template_id, sort_order])
   @@schema("bq")
 }
 
@@ -1103,7 +1103,7 @@ model BqSection {
   items       BqItem[]       // L1 items langsung di section (tanpa subsection)
 
   @@map("bq_section")
-  @@index([project_id, sort_order])
+  @@unique([project_id, sort_order])
   @@schema("bq")
 }
 
@@ -1118,7 +1118,7 @@ model BqSubsection {
   items       BqItem[]
 
   @@map("bq_subsection")
-  @@index([section_id, sort_order])
+  @@unique([section_id, sort_order])
   @@schema("bq")
 }
 
@@ -1167,7 +1167,7 @@ model BqSubObject {
   line_items    BqLineItem[]
 
   @@map("bq_sub_object")
-  @@index([item_id, sort_order])
+  @@unique([item_id, sort_order])
   @@schema("bq")
 }
 

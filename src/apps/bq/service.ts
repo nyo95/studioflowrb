@@ -68,13 +68,31 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
   // CORE.md §2: a command that writes records plus its audit event runs in one
   // transaction; simple independent reads do not open one.
   const readOnlyOperations = new Set<string>(["getTemplateWithSections", "listPromotionRequests", "listProjectDeletionRequests"]);
+  const automaticSortOperations = new Set<string>([
+    "addTemplateSection",
+    "addTemplateRecommendation",
+    "addAssemblyCustomLine",
+    "addSection",
+    "addSubsection",
+    "addItem",
+    "addSubObject",
+    "addLineItem",
+  ]);
 
   return Object.fromEntries(
     Object.entries(operations).map(([name, operation]) => [
       name,
       readOnlyOperations.has(name)
         ? operation
-        : (...args: unknown[]) => ctx.runTransaction(() => (operation as (...values: unknown[]) => Promise<unknown>)(...args)),
+        : (...args: unknown[]) => {
+          const firstArgument = args[0];
+          const shouldRetryAutomaticSort = automaticSortOperations.has(name)
+            && typeof firstArgument === "object"
+            && firstArgument !== null
+            && (firstArgument as { sortOrder?: unknown }).sortOrder === undefined;
+          const execute = () => (operation as (...values: unknown[]) => Promise<unknown>)(...args);
+          return shouldRetryAutomaticSort ? ctx.runAutomaticSortTransaction(execute) : ctx.runTransaction(execute);
+        },
     ]),
   ) as typeof operations;
 }

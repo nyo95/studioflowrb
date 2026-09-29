@@ -6,6 +6,7 @@
     "dev": "prisma generate && next dev --hostname 0.0.0.0 --port 3001",
     "build": "prisma generate && next build",
     "start": "next start",
+    "cleanup:messenger": "tsx scripts/cleanup-messenger-attachments.ts",
     "lint": "eslint .",
     "postinstall": "prisma generate",
     "test": "node scripts/run-tests.mjs",

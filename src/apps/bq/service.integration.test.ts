@@ -264,6 +264,13 @@ describe("BQ R6.1 invariants", () => {
     assert.equal(sectionA.sort_order, 0);
     assert.equal(sectionB.sort_order, 1, "a second top-level section must not collide with the first at sort_order 0");
 
+    await service.reorderTemplateSections({ grants: GRANTS, actor: ACTOR, templateId: template.id, orderedIds: [sectionB.id, sectionA.id] });
+    assert.deepEqual(
+      (await testDb.prisma.bqTemplateSection.findMany({ where: { template_id: template.id, parent_id: null }, orderBy: { sort_order: "asc" } })).map((section) => section.id),
+      [sectionB.id, sectionA.id],
+      "reordering swaps positions through a temporary range so the unique sibling-order index is never violated",
+    );
+
     const recA = await service.addTemplateRecommendation({ grants: GRANTS, actor: ACTOR, templateSectionId: sectionA.id, libItemType: "material", libItemId: material.id });
     const recB = await service.addTemplateRecommendation({ grants: GRANTS, actor: ACTOR, templateSectionId: sectionA.id, libItemType: "material", libItemId: material.id });
     assert.equal(recA.sort_order, 0);
@@ -412,6 +419,19 @@ describe("BQ R6.1 invariants", () => {
     // An explicit sortOrder from the caller is still honored, not overridden.
     const item3 = await service.addItem({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Explicit", qty: "1", unit: "PCS", sortOrder: 9 });
     assert.equal(item3.sort_order, 9);
+  });
+
+  it("retries concurrent automatic sibling appends instead of persisting duplicate positions", async () => {
+    const project = await service.createProject({ grants: GRANTS, actor: ACTOR, title: "Concurrent order", clientName: "RAD" });
+    const created = await Promise.all(
+      ["One", "Two", "Three"].map((name) => service.addSection({ grants: GRANTS, actor: ACTOR, projectId: project.id, name })),
+    );
+    assert.deepEqual(created.map((section) => section.sort_order).sort((a, b) => a - b), [0, 1, 2]);
+    assert.equal(
+      await testDb.prisma.bqSection.count({ where: { project_id: project.id } }),
+      3,
+      "each concurrent request is retained exactly once",
+    );
   });
 
   it("guards concurrent project archive attempts against a lost-update race", async () => {

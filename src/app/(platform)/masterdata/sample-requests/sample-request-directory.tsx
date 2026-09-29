@@ -7,6 +7,7 @@ import { formatInstant } from "@platform/utilities/date";
 import { createMoney, formatMoney } from "@platform/utilities/money";
 import {
   Button,
+  Combobox,
   DirectoryShell,
   DraftDialog,
   EmptyState,
@@ -17,7 +18,6 @@ import {
   Pagination,
   RowActionMenu,
   SearchField,
-  Select,
   StatusBadge,
   Switch,
   TableBody,
@@ -225,10 +225,16 @@ export function SampleRequestDirectory({ rows, vendors }: { rows: SampleQueueRow
               <Field label="Currency"><Input value={quoteCurrency} onChange={(event) => setQuoteCurrency(event.target.value.toUpperCase())} maxLength={3} /></Field>
             </div>
             <Field label="Supplier" description="Optional. Link the supplier who gave this quote.">
-              <Select value={quoteVendorId} onChange={(event) => setQuoteVendorId(event.target.value)}>
-                <option value="">No supplier linked</option>
-                {vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}
-              </Select>
+              <Combobox
+                label="Supplier"
+                options={[{ id: "", label: "No supplier linked" }, ...vendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))]}
+                value={quoteVendorId}
+                onValueChange={setQuoteVendorId}
+                placeholder="No supplier linked"
+                searchPlaceholder="Search suppliers…"
+                emptyLabel="No suppliers match this search."
+                className="w-full"
+              />
             </Field>
             <Field label="Staff note" description="Optional context for this quote."><Textarea value={quoteNote} onChange={(event) => setQuoteNote(event.target.value)} /></Field>
             <FormActions>

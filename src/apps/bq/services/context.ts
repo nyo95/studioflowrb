@@ -71,6 +71,8 @@ export type BqServiceDeps = {
 export type BqServiceContext = {
   db: PrismaClient;
   runTransaction: <T>(work: (tx: PrismaClient) => Promise<T>) => Promise<T>;
+  /** Retries only a database-enforced sibling-order collision from an automatic append. */
+  runAutomaticSortTransaction: <T>(work: (tx: PrismaClient) => Promise<T>) => Promise<T>;
   auditWriter: (input: AuditInput) => Promise<void>;
   requireEditableProject: (projectId: string) => Promise<void>;
   requireEditableProjectForSection: (sectionId: string) => Promise<void>;
@@ -94,6 +96,31 @@ export function createBqServiceContext(rootDb: PrismaClient, deps: BqServiceDeps
     return current
       ? work(current)
       : deps.runTransaction((tx) => transactionStore.run(tx, () => work(tx)));
+  };
+  const runAutomaticSortTransaction = async <T>(work: (tx: PrismaClient) => Promise<T>): Promise<T> => {
+    // A unique sibling-order index is the authority. A concurrent automatic
+    // append can lose that race; retrying re-reads MAX(sort_order) and appends
+    // after the winner. Explicit caller-supplied positions must fail instead
+    // of being silently moved, so only automatic appends use this runner.
+    const current = transactionStore.getStore();
+    if (current) return work(current);
+    for (let attempt = 1; attempt <= 8; attempt += 1) {
+      try {
+        // Do not route through runTransaction here: a database unique error
+        // is caught while AsyncLocalStorage still exposes the failed
+        // transaction, and a retry through that wrapper would reuse its
+        // aborted PostgreSQL connection (25P02).
+        return await deps.runTransaction((tx) => transactionStore.run(tx, () => work(tx)));
+      } catch (error) {
+        const isUniqueCollision = typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+        if (!isUniqueCollision || attempt === 8) throw error;
+        // Let the winning transaction commit before re-reading its position.
+        // The short bounded delay prevents a thundering herd of retries from
+        // repeatedly taking the same still-uncommitted MAX(sort_order).
+        await new Promise<void>((resolve) => setTimeout(resolve, attempt * 10));
+      }
+    }
+    throw new Error("Unreachable BQ sort-order retry state");
   };
   const auditWriter = async (input: AuditInput): Promise<void> => {
     const tx = transactionStore.getStore();
@@ -180,6 +207,7 @@ export function createBqServiceContext(rootDb: PrismaClient, deps: BqServiceDeps
   return {
     db,
     runTransaction,
+    runAutomaticSortTransaction,
     auditWriter,
     requireEditableProject,
     requireEditableProjectForSection,

@@ -215,7 +215,7 @@ and "direct hard-delete resolves a pre-existing pending request…".
 
 ## BQ
 
-- [ ] [BUG] `nextSortOrder` (`project-tree.ts`) reads `MAX(sort_order)` and
+- [x] [BUG] `nextSortOrder` (`project-tree.ts`) reads `MAX(sort_order)` and
   inserts in two separate, non-transactional calls on the plain `db` client
   (not `tx`) — used by `addSection`/`addSubsection`/`addItem`/`addSubObject`/
   `addLineItem`. Two near-simultaneous adds under the same parent (double
@@ -239,6 +239,15 @@ and "direct hard-delete resolves a pre-existing pending request…".
   (partial indexes, since the sort scope is nullable/dual-parent across the
   five affected tables) with retry-on-conflict — a schema-level decision out
   of scope for this pass.
+
+  **Fixed 2026-09-29 (R8.205).** Additive unique indexes now enforce one
+  sibling position for every BQ tree/template/assembly scope (including
+  nullable dual-parent scopes). Automatic appends retry a unique collision and
+  recompute the next position; explicit positions remain strict. Template
+  reordering uses a temporary range before assigning the final sequence, so a
+  valid swap does not collide mid-update. Both rebuild databases had zero
+  pre-existing duplicate groups before the migration, and concurrency plus
+  reorder regression tests cover the failure mode.
 - [ ] [BUG] `addLineItemAction`'s MASTERDATA/material branch
   (`src/app/(platform)/bq/[id]/actions.ts:386`) calls
   `masterDataRead.listMaterialPriceOptions({ limit: 200 })` with no `search`
@@ -1034,7 +1043,7 @@ was fixed in R8.165._
   messages to a deactivated account is a product decision, not part of this
   fix.
 
-- [ ] [CLEANUP] **KB-059 - `cleanupExpiredAttachments` (messenger) has zero
+- [x] [CLEANUP] **KB-059 - `cleanupExpiredAttachments` (messenger) has zero
   callers outside its own test.** Found 2026-09-29 (R8.203), not fixed.
   `platform/core/messenger/index.ts:286` is only ever invoked by
   `messenger.integration.test.ts:83`. Not a correctness bug -
@@ -1050,6 +1059,11 @@ was fixed in R8.165._
   needs an owner/Lead call on the actual opportunistic trigger (e.g. called
   from `sendMessage` every Nth send, or from `readConversation`, or left as a
   manual admin action) before an Executor should wire one in.
+
+  **Fixed 2026-09-29 (R8.205).** The owner chose a future always-on local PC,
+  so cleanup is now a bounded short-lived command (`npm run cleanup:messenger`)
+  intended for one daily Windows Task Scheduler task. It does not depend on a
+  browser session or `next dev`, and the operational runbook records the setup.
 
 ### Closed 2026-09-29 (R8.196)
 

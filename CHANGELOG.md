@@ -5,13 +5,38 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.204**
-- Next local revision: **R8.205**
+- Current revision after this entry is committed: **R8.205**
+- Next local revision: **R8.206**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.205 | 2026-09-29 | fix(bq,platform): make sibling ordering durable and schedule local messenger cleanup
+
+- **BQ sibling order.** Additive migration `20260929100000_bq_sibling_sort_order_uniqueness` enforces one
+  `sort_order` per actual sibling scope, including the nullable dual-parent scopes for work items, cost components,
+  and template sections. Before deployment, both local rebuild databases were checked and had no duplicate sibling
+  positions. Automatic appends now retry only a database unique collision and recompute their position; explicit
+  positions remain strict. Template reordering moves rows through a temporary unused range before its final order, so
+  a legitimate swap cannot violate the unique index midway. Regression tests cover concurrent automatic appends and a
+  position swap.
+- **Sample-request supplier.** The quote form now uses the UI Engine searchable `Combobox`, as the Master Data
+  contract requires for a live supplier dictionary. It preserves the optional no-supplier state and the existing
+  server-side active-supplier validation.
+- **Messenger cleanup for a local PC.** New `npm run cleanup:messenger` is a short-lived, location-aware command for
+  expired private attachment bytes. It uses the same selected local database and private storage root as the app,
+  keeps chat history, drains at most 2,000 attachments per run, and closes its database connection afterward. The new
+  local-PC scheduler runbook documents a daily Windows Task Scheduler task; no in-app timer or hosting-provider lock-in
+  was added. Ran it against the rumah rebuild database: zero expired attachments needed removal.
+
+**Prisma sync.** Applied the additive BQ sibling-order migration to verified `masterdata` and `masterdata_test`
+rebuild databases, then regenerated the Prisma client.
+
+**Checks.** Focused BQ concurrency coverage (20/20) and the full suite (636/636) pass. TypeScript, architecture and
+legacy-runtime checks, and the production build pass. ESLint has two pre-existing presentation-image warnings and no
+errors.
 
 ## R8.204 | 2026-09-29 | feat(masterdata): link a supplier while recording a sample quote
 

@@ -5,7 +5,7 @@ import { AppError } from "@platform/core/errors";
 import { BQ_PERMISSIONS, type BqServiceContext } from "./context";
 
 export function createTemplateService(ctx: BqServiceContext) {
-  const { db, runTransaction, auditWriter } = ctx;
+  const { db, runTransaction, runAutomaticSortTransaction, auditWriter } = ctx;
 
 async function createTemplate(input: {
   grants: PermissionGrants;
@@ -199,7 +199,7 @@ async function addTemplateSection(input: {
   // gave every section the same sort_order — unstable display order that
   // also propagates into real projects via createProject's verbatim copy.
   // Read and reserve it atomically so two near-simultaneous adds can't collide.
-  const section = await runTransaction(async (tx) => {
+  const section = await (input.sortOrder === undefined ? runAutomaticSortTransaction : runTransaction)(async (tx) => {
     const nextSortOrder = input.sortOrder ?? (await tx.bqTemplateSection.aggregate({
       where: { template_id: input.templateId, parent_id: input.parentId ?? null },
       _max: { sort_order: true },
@@ -267,7 +267,7 @@ async function reorderTemplateSections(input: {
     // explicit: without it any section ID reorders inside another template.
     const owned = await tx.bqTemplateSection.findMany({
       where: { id: { in: input.orderedIds }, template_id: input.templateId },
-      select: { id: true, sort_order: true },
+      select: { id: true, parent_id: true, sort_order: true },
     });
     if (owned.length !== input.orderedIds.length) {
       throw new AppError(
@@ -278,6 +278,29 @@ async function reorderTemplateSections(input: {
     }
     const sortOrderById = new Map(owned.map((section) => [section.id, section.sort_order]));
     if (input.orderedIds.every((id, index) => sortOrderById.get(id) === index)) return false;
+    const parentId = owned[0].parent_id;
+    if (owned.some((section) => section.parent_id !== parentId)) {
+      throw new AppError(
+        "VALIDATION",
+        "bq.template-section.reorder-mixed-parent",
+        "Every reordered section must be siblings under the same parent",
+      );
+    }
+    // A unique sibling-order index correctly rejects a direct 0↔1 swap. Move
+    // every selected row into an unused negative range first, then assign the
+    // requested positions. Find the range across all siblings, not only the
+    // chosen rows, so an explicit negative order cannot collide midway.
+    const siblingOrders = await tx.bqTemplateSection.aggregate({
+      where: { template_id: input.templateId, parent_id: parentId },
+      _min: { sort_order: true },
+    });
+    const temporaryStart = Math.min(siblingOrders._min.sort_order ?? 0, 0) - input.orderedIds.length - 1;
+    for (let i = 0; i < input.orderedIds.length; i++) {
+      await tx.bqTemplateSection.update({
+        where: { id: input.orderedIds[i] },
+        data: { sort_order: temporaryStart + i },
+      });
+    }
     for (let i = 0; i < input.orderedIds.length; i++) {
       await tx.bqTemplateSection.update({
         where: { id: input.orderedIds[i] },
@@ -323,7 +346,7 @@ async function addTemplateRecommendation(input: {
   }
 
   // Read and reserve sort_order atomically so two near-simultaneous adds can't collide.
-  const rec = await runTransaction(async (tx) => {
+  const rec = await (input.sortOrder === undefined ? runAutomaticSortTransaction : runTransaction)(async (tx) => {
     const nextSortOrder = input.sortOrder ?? (await tx.bqTemplateRecommendation.aggregate({
       where: { template_section_id: input.templateSectionId },
       _max: { sort_order: true },

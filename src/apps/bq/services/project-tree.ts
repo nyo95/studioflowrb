@@ -17,6 +17,7 @@ export function createProjectTreeService(ctx: BqServiceContext) {
   const {
     db,
     runTransaction,
+    runAutomaticSortTransaction,
     auditWriter,
     requireEditableProject,
     requireEditableProjectForSection,
@@ -61,7 +62,7 @@ async function addSection(input: {
   await requireEditableProject(input.projectId);
   // Sibling sort_order must be read and reserved atomically — two near-simultaneous
   // adds under the same parent could otherwise both read the same MAX and collide.
-  const section = await runTransaction(async (tx) => {
+  const section = await (input.sortOrder === undefined ? runAutomaticSortTransaction : runTransaction)(async (tx) => {
     const sortOrder = input.sortOrder ?? (await nextSortOrder(() => tx.bqSection.aggregate({
       where: { project_id: input.projectId },
       _max: { sort_order: true },
@@ -93,7 +94,7 @@ async function addSubsection(input: {
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
   await requireEditableProjectForSection(input.sectionId);
-  const subsection = await runTransaction(async (tx) => {
+  const subsection = await (input.sortOrder === undefined ? runAutomaticSortTransaction : runTransaction)(async (tx) => {
     const sortOrder = input.sortOrder ?? (await nextSortOrder(() => tx.bqSubsection.aggregate({
       where: { section_id: input.sectionId },
       _max: { sort_order: true },
@@ -186,7 +187,7 @@ async function updateSubsection(input: {
   if (input.sectionId) await requireEditableProjectForSection(input.sectionId);
   else await requireEditableProjectForSubsection(input.subsectionId!);
 
-  const item = await runTransaction(async (tx) => {
+  const item = await (input.sortOrder === undefined ? runAutomaticSortTransaction : runTransaction)(async (tx) => {
     const sortOrder = input.sortOrder ?? (await nextSortOrder(() => tx.bqItem.aggregate({
       where: input.sectionId ? { section_id: input.sectionId } : { subsection_id: input.subsectionId },
       _max: { sort_order: true },
@@ -302,7 +303,7 @@ async function addSubObject(input: {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
   await requireEditableProjectForItem(input.itemId);
 
-  const subObject = await runTransaction(async (tx) => {
+  const subObject = await (input.sortOrder === undefined ? runAutomaticSortTransaction : runTransaction)(async (tx) => {
     const sortOrder = input.sortOrder ?? (await nextSortOrder(() => tx.bqSubObject.aggregate({
       where: { item_id: input.itemId },
       _max: { sort_order: true },
@@ -427,7 +428,7 @@ async function addLineItem(input: {
   if (input.subObjectId) await requireEditableProjectForSubObject(input.subObjectId);
   else await requireEditableProjectForItem(input.itemId!);
 
-  const lineItem = await runTransaction(async (tx) => {
+  const lineItem = await (input.sortOrder === undefined ? runAutomaticSortTransaction : runTransaction)(async (tx) => {
     const sortOrder = input.sortOrder ?? (await nextSortOrder(() => tx.bqLineItem.aggregate({
       where: input.subObjectId ? { sub_object_id: input.subObjectId } : { item_id: input.itemId },
       _max: { sort_order: true },
