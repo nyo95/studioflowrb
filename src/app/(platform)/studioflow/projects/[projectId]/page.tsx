@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { notFound } from "next/navigation";
 
 import { AppError } from "@platform/core/errors";
 import { hasPermission } from "@platform/core/rbac";
@@ -41,7 +42,10 @@ export default async function ProjectOverviewPage({
   const { grants } = await pageSession();
 
   const [project, phases, people] = await Promise.all([
-    studioFlow.projects.getProject({ grants, projectId }),
+    studioFlow.projects.getProject({ grants, projectId }).catch((error) => {
+      if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
+      throw error;
+    }),
     studioFlow.phases.listProjectPhases({ grants, projectId }),
     studioFlow.projects.listAssignablePeople({ grants }),
   ]);

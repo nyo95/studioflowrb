@@ -1,3 +1,6 @@
+import { notFound } from "next/navigation";
+
+import { AppError } from "@platform/core/errors";
 import { hasPermission } from "@platform/core/rbac";
 import { STUDIOFLOW_PERMISSIONS, STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
@@ -12,7 +15,10 @@ export default async function PresentationPage({ params }: { params: Promise<{ p
   const { projectId } = await params;
   const { grants } = await pageSession();
   const [project, boards] = await Promise.all([
-    studioFlow.projects.getProject({ grants, projectId }),
+    studioFlow.projects.getProject({ grants, projectId }).catch((error) => {
+      if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
+      throw error;
+    }),
     studioFlow.presentation.listBoards({ grants, projectId }),
   ]);
   const canEdit = hasPermission(grants, STUDIOFLOW_PERMISSIONS.presentationManage) && project.archivedAt === null;

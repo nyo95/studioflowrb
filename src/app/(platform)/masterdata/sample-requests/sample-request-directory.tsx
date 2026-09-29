@@ -48,11 +48,23 @@ function specOf(row: SampleQueueRow): string {
     .join(" · ");
 }
 
+/** Staff is still working a request the designer already marked received directly in StudioFlow. */
+function alreadyReceived(row: SampleQueueRow): boolean {
+  return row.state === "IN_PROGRESS" && row.sourceStatus === "RECEIVED";
+}
+
 function statusBadge(row: SampleQueueRow) {
-  if (row.state === "NEW") return <StatusBadge tone="warning">New</StatusBadge>;
-  if (row.state === "IN_PROGRESS") return <StatusBadge tone="neutral">In progress · {row.intake?.handledBy.label}</StatusBadge>;
-  if (row.state === "PRICED") return <StatusBadge tone="success">Priced</StatusBadge>;
-  return <StatusBadge tone="danger">Declined</StatusBadge>;
+  const primary = row.state === "NEW" ? <StatusBadge tone="warning">New</StatusBadge>
+    : row.state === "IN_PROGRESS" ? <StatusBadge tone="neutral">In progress · {row.intake?.handledBy.label}</StatusBadge>
+    : row.state === "PRICED" ? <StatusBadge tone="success">Priced</StatusBadge>
+    : <StatusBadge tone="danger">Declined</StatusBadge>;
+  if (!alreadyReceived(row)) return primary;
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {primary}
+      <StatusBadge tone="danger">Already received</StatusBadge>
+    </div>
+  );
 }
 
 type ActionResultLike = { ok: boolean; error?: { safeMessage?: string } };
@@ -179,6 +191,9 @@ export function SampleRequestDirectory({ rows }: { rows: SampleQueueRow[] }) {
         <DraftDialog open onOpenChange={(open) => !open && setDetail(null)} title={detail.product.name} description={detail.project.name}>
           <div className="grid gap-3 text-sm">
             {specOf(detail) ? <Text tone="secondary">{specOf(detail)}</Text> : null}
+            {alreadyReceived(detail) ? (
+              <InlineError>The designer already marked this sample as received directly in StudioFlow. Confirm it is still needed before pricing it.</InlineError>
+            ) : null}
             <Text><strong>Requested from:</strong> {detail.requestedFrom}</Text>
             <Text><strong>Requested by:</strong> {detail.requestedBy.name}</Text>
             <Text><strong>Requested:</strong> {formatInstant(detail.requestedAt, { locale, timeZone: timezone, style: "datetime" })}</Text>

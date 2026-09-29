@@ -165,7 +165,7 @@ describe("WO-BE-02 archived asset retention", () => {
     await db.sfClient.update({ where: { id: client.id }, data: { logo_storage_key: "client-logo" } });
     await db.sfScheduleTemplateItem.create({ data: { section: "MATERIAL", category: "Floor", category_key: "floor", product_name: "Template", image_key: "template-photo" } });
     const result = await retention().purgeExpiredArchivedAssets();
-    assert.deepEqual(result, { projectsPurged: 1, deliverables: 1, momImages: 1, momSnapshotImages: 2, optionPhotos: 1, blobsRemoved: 4, blobsKeptShared: 0, blobFailures: 0, unparseableRevisions: 0, previousFailuresResolved: 0, previousFailuresStillFailing: 0 });
+    assert.deepEqual(result, { projectsPurged: 1, deliverables: 1, momImages: 1, momSnapshotImages: 2, optionPhotos: 1, presentationSlides: 0, blobsRemoved: 4, blobsKeptShared: 0, blobFailures: 0, unparseableRevisions: 0, previousFailuresResolved: 0, previousFailuresStillFailing: 0 });
     for (const key of Object.values(expired.keys)) assert.equal(storage.objects.has(key), false);
     for (const kept of [inside, boundary, live]) {
       for (const key of Object.values(kept.keys)) assert.ok(storage.objects.has(key));
@@ -181,7 +181,7 @@ describe("WO-BE-02 archived asset retention", () => {
     const events = await db.auditEvent.findMany({ where: { entity_id: expired.projectId, action: { startsWith: "studioflow.project.assets_" } }, orderBy: { occurred_at: "asc" } });
     assert.deepEqual(events.map((event) => event.action), ["studioflow.project.assets_purged", "studioflow.project.assets_purge_completed"]);
     assert.ok(events.every((event) => event.actor_kind === "SYSTEM"));
-    assert.deepEqual(events[0].metadata, { projectId: expired.projectId, deliverables: 1, momImages: 1, momSnapshotImages: 2, optionPhotos: 1, unparseableRevisions: 0, keysCollected: 4 });
+    assert.deepEqual(events[0].metadata, { projectId: expired.projectId, deliverables: 1, momImages: 1, momSnapshotImages: 2, optionPhotos: 1, presentationSlides: 0, unparseableRevisions: 0, keysCollected: 4 });
     assert.deepEqual(events[1].metadata, { projectId: expired.projectId, blobsRemoved: 4, blobsKeptShared: 0, blobFailures: 0 });
     assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0);
     await sf.projects.restoreProject({ ...as(designer), projectId: inside.projectId });
@@ -194,6 +194,21 @@ describe("WO-BE-02 archived asset retention", () => {
       const event = await db.auditEvent.findFirstOrThrow({ where: { entity_id: projectId, action: "studioflow.project.restored" } });
       assert.equal((event.metadata as { assetsPurged: boolean }).assetsPurged, assetsPurged);
     }
+  });
+
+  it("purges presentation slides and their images too, deleting the row not just the key", async () => {
+    const db = testDb.prisma;
+    const expired = await fixture("Presentation expired", 91);
+    const board = await db.sfPresentationBoard.create({ data: { project_id: expired.projectId, title: "Board", sort_order: 0, created_by_id: designer.id } });
+    const slideKey = `${expired.projectId}/slide`;
+    await storage.put({ key: slideKey, body: new Uint8Array([1]), bytes: 1, contentType: "image/png" });
+    const slide = await db.sfPresentationSlide.create({ data: { board_id: board.id, image_key: slideKey, sort_order: 0 } });
+    const result = await retention().purgeExpiredArchivedAssets();
+    assert.equal(result.projectsPurged, 1);
+    assert.equal(result.presentationSlides, 1);
+    assert.equal(storage.objects.has(slideKey), false, "the slide's image is removed once unreferenced");
+    assert.equal(await db.sfPresentationSlide.count({ where: { id: slide.id } }), 0, "the slide row itself is deleted, not just its image key");
+    assert.equal(await db.sfPresentationBoard.count({ where: { id: board.id } }), 1, "the board itself is kept; only its slides are purged");
   });
 
   it("retries a delete that failed in an earlier run before starting new work, instead of losing the key", async () => {

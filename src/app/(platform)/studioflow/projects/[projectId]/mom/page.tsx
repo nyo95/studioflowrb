@@ -1,3 +1,6 @@
+import { notFound } from "next/navigation";
+
+import { AppError } from "@platform/core/errors";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { SectionCard } from "@/platform/ui_engine";
 
@@ -10,7 +13,10 @@ export default async function ProjectMomPage({ params }: { params: Promise<{ pro
   const { projectId } = await params;
   const { grants } = await pageSession();
   const [project, documents] = await Promise.all([
-    studioFlow.projects.getProject({ grants, projectId }),
+    studioFlow.projects.getProject({ grants, projectId }).catch((error) => {
+      if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
+      throw error;
+    }),
     studioFlow.mom.listDocuments({ grants, projectId }),
   ]);
   const canEdit = studioFlow.mom.canManage(grants) && project.archivedAt === null;

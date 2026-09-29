@@ -1,3 +1,6 @@
+import { notFound } from "next/navigation";
+
+import { AppError } from "@platform/core/errors";
 import { hasPermission } from "@platform/core/rbac";
 import { STUDIOFLOW_PERMISSIONS as P, STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
@@ -12,7 +15,10 @@ export default async function ProjectSchedulePage({ params }: { params: Promise<
   const { projectId } = await params;
   const { grants } = await pageSession();
   const [project, entries, brands] = await Promise.all([
-    studioFlow.projects.getProject({ grants, projectId }),
+    studioFlow.projects.getProject({ grants, projectId }).catch((error) => {
+      if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
+      throw error;
+    }),
     studioFlow.schedule.listSchedule({ grants, projectId }),
     studioFlow.schedule.listBrandChoices({ grants }),
   ]);

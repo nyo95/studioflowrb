@@ -5,13 +5,57 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.202**
-- Next local revision: **R8.203**
+- Current revision after this entry is committed: **R8.203**
+- Next local revision: **R8.204**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.203 | 2026-09-29 | fix(studioflow): stop project sub-pages hanging on a deleted project, close a presentation-asset purge gap
+
+Owner request: verify Codex's recently-completed work live in the browser, re-check the known-bug backlog for
+remaining logic debt, and audit for business-logic/UI-UX defects. Details in `docs/BACKLOG.md` (SF-16, KB-040 third
+instance, KB-056 through KB-059, and the `nextSortOrder` race re-classification).
+
+- **SF-16 (BUG, fixed).** Every `studioflow/projects/[projectId]/*` sub-page except the overview
+  (`mom`/`schedule`/`presentation`/`presentation/[boardId]`/`history`) hung forever on "Memuat halaman" for a
+  deleted/nonexistent project instead of 404ing, because none of them converted StudioFlow's `NOT_FOUND` `AppError`
+  into Next's `notFound()` — the pattern `layout.tsx` already used correctly. Separately, no `not-found.tsx` existed
+  anywhere under `src/app/(platform)/`, so even a correct `notFound()` call (layout.tsx, and the project overview once
+  fixed) had nothing to render into. Added `src/app/(platform)/not-found.tsx`; applied the established
+  catch-and-convert pattern to all five sibling pages. Verified live for all six routes via browser screenshot against
+  a nonexistent project id.
+- **KB-056 (BUG, fixed).** Archive-asset retention purge never touched `sfPresentationSlide`, so the owner-approved
+  "files removed after 90 days" promise was false for presentation images — the row's `image_key` stayed referenced
+  forever, and the shared-key safety check in `removeUnreferenced` correctly refused to ever delete the blob. Purge
+  now also collects slide keys and deletes the slide rows (boards are kept, annotations cascade). New regression test
+  in `service.integration.test.ts`.
+- **KB-057 (BUG, fixed).** Master Data's sample-request queue already computed `sourceStatus` (StudioFlow's live
+  status for the source request) but never showed it, so staff could keep pricing a sample the designer already
+  marked received directly in StudioFlow. Added an "Already received" badge and detail-dialog warning in
+  `sample-request-directory.tsx`, reading the field that was already correct and already unit-tested.
+- **KB-058 (BUG, fixed).** Neither messenger surface (`/messenger`, the topbar quick-messenger popup) showed
+  `otherUser.active`, so staff had no signal when continuing a conversation with a deactivated account. Added a
+  "Deactivated" badge to both surfaces.
+- **KB-040 third instance (BUG, fixed).** The presentation print page (`print/projects/[projectId]/presentation/[boardId]/page.tsx`)
+  used `toLocaleDateString` instead of the canonical `formatInstant`, same bypass class as the two already-open
+  KB-040 instances (still open). Converged onto `formatInstant`.
+- **`nextSortOrder` race (BUG, re-classified — partially mitigated, not closed).** Wrapped all five original BQ call
+  sites plus two undocumented sibling instances (`assemblies.ts`, `templates.ts`) in `runTransaction`
+  (Serializable + retry-on-P2034). This closes a real secondary atomicity gap in `applyAssemblyTemplate`, but a
+  purpose-built concurrency test proved the `MAX()`-then-`INSERT` race itself is not reliably caught even under
+  Serializable isolation — PostgreSQL's predicate locking does not treat that pattern as a detectable conflict. A full
+  fix needs a DB-level unique constraint (partial indexes; schema-level, out of scope here). Documented honestly in
+  `docs/BACKLOG.md` rather than claimed fixed.
+- **KB-059 (CLEANUP, documented, not fixed).** `cleanupExpiredAttachments` (messenger) has no caller outside its own
+  test — a slow storage leak, not a correctness bug (reads already gate on `expires_at`/`purged_at` independently).
+  `PLAN.md:79` locks messenger cleanup to manual/opportunistic, not a background timer; the exact opportunistic
+  trigger is left for an owner/Lead decision rather than invented here.
+
+Checks: `tsc --noEmit` clean, `eslint` clean on touched files, full `npm test` 634/634 pass (was 633 before the new
+purge regression test), `STUDIOFLOW_LOCATION=kantor npm run build` clean. No schema/migration changes.
 
 ## R8.202 | 2026-09-29 | fix(ui): give the visual foundations the scales they were missing
 

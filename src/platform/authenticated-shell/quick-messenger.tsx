@@ -168,6 +168,7 @@ export function QuickMessenger() {
             <MessageCircle size={16} aria-hidden="true" />
             <Text weight="semibold" size="sm" className="min-w-0 flex-1 truncate">
               {activeConversation ? activeConversation.otherUser.displayName : "Quick message"}
+              {activeConversation && !activeConversation.otherUser.active ? <span className="ml-1.5 text-[10px] font-normal text-ink-tertiary">(Deactivated)</span> : null}
             </Text>
             <Link href="/messenger" className="grid h-7 w-7 place-items-center rounded-action text-ink-tertiary hover:bg-surface-muted hover:text-ink" aria-label="Open full messenger">
               <Expand size={14} aria-hidden="true" />
@@ -192,7 +193,8 @@ export function QuickMessenger() {
                 onClick={() => openConversation(conversation.id)}
                 className={`flex max-w-36 shrink-0 items-center gap-1 rounded-action px-2 py-1 text-xs ${conversation.id === activeId ? "bg-surface-muted text-ink" : "text-ink-secondary hover:bg-surface-muted"}`}
               >
-                <span className="truncate">{conversation.otherUser.displayName}</span>
+                {!conversation.otherUser.active ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ink-tertiary" aria-hidden="true" /> : null}
+                <span className="truncate" title={conversation.otherUser.active ? undefined : "This person's account is deactivated"}>{conversation.otherUser.displayName}</span>
                 {conversation.unread > 0 ? <span className="rounded-full bg-danger px-1 text-[9px] font-bold text-ink-inverse">{conversation.unread}</span> : null}
               </button>
             ))}

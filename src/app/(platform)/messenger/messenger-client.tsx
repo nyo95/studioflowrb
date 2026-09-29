@@ -3,7 +3,7 @@
 import { Download, Send } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
-import { Button, EmptyState, Field, Input, SectionCard, Text, Textarea } from "@/platform/ui_engine";
+import { Button, EmptyState, Field, Input, SectionCard, StatusBadge, Text, Textarea } from "@/platform/ui_engine";
 import {
   listMessengerConversationsAction,
   listMessengerPeopleAction,
@@ -127,7 +127,10 @@ export function MessengerClient() {
               className={`grid gap-1 rounded-action border-0 px-2.5 py-2 text-left ${conversation.id === activeId ? "bg-surface-muted text-ink" : "bg-transparent text-ink hover:bg-surface-muted"}`}
             >
               <span className="flex items-center justify-between gap-2">
-                <span className="truncate font-medium">{conversation.otherUser.displayName}</span>
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate font-medium">{conversation.otherUser.displayName}</span>
+                  {!conversation.otherUser.active ? <StatusBadge tone="neutral">Deactivated</StatusBadge> : null}
+                </span>
                 {conversation.unread > 0 ? <span className="rounded-full bg-danger px-1.5 py-0.5 text-[10px] font-bold text-ink-inverse">{conversation.unread}</span> : null}
               </span>
               <span className="truncate text-xs text-ink-tertiary">{conversation.lastMessage || "Attachment"}</span>
@@ -136,7 +139,14 @@ export function MessengerClient() {
         </div>
       </SectionCard>
 
-      <SectionCard title={activeConversation ? activeConversation.otherUser.displayName : "New message"}>
+      <SectionCard
+        title={activeConversation ? (
+          <span className="flex items-center gap-1.5">
+            {activeConversation.otherUser.displayName}
+            {!activeConversation.otherUser.active ? <StatusBadge tone="neutral">Deactivated</StatusBadge> : null}
+          </span>
+        ) : "New message"}
+      >
         <div className="grid gap-4">
           {!activeId ? (
             <Field label="To">

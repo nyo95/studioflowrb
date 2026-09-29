@@ -221,12 +221,24 @@ and "direct hard-delete resolves a pre-existing pending request…".
   `addLineItem`. Two near-simultaneous adds under the same parent (double
   submit, or two collaborators) can both read the same MAX and insert with
   the same `sort_order`; there is no unique constraint to catch it. Found and
-  verified 2026-09-24 in a logic audit; not fixed in that pass because a
-  correct fix means wrapping each of five call sites in a transaction (and
-  deciding whether `requireEditableProject*` guards move inside it too) —
-  broader surgery than warranted to rush. The narrower `count()`-vs-`MAX+1`
-  sibling bugs in `assemblies.ts`/`templates.ts` were fixed in the same audit
-  (R8.134) since those were single-line swaps; this one needs its own pass.
+  verified 2026-09-24 in a logic audit.
+  **Partially mitigated, not closed, R8.203.** All five call sites (plus two
+  undocumented sibling instances found in the same pass — `addAssemblyCustomLine`
+  and `applyAssemblyTemplate` in `assemblies.ts`, and `addTemplateSection`/
+  `addTemplateRecommendation` in `templates.ts`) are now wrapped in
+  `runTransaction` (Serializable isolation + retry-on-P2034, the same
+  machinery proven correct for the promotion/archive/deletion lost-update
+  races elsewhere in this codebase). This closes a real secondary atomicity
+  gap in `applyAssemblyTemplate` (a `createMany` failure after a bare
+  `subObject.create()` could previously strand an empty sub-object) but a
+  purpose-built regression test (10 concurrent inserts under one parent,
+  removed after confirming the result rather than kept flaky) still produced
+  duplicate `sort_order` values — PostgreSQL's predicate locking does not
+  reliably treat a `MAX()`-aggregate-then-`INSERT` as a detectable conflict
+  even under `Serializable`. **A full fix needs a DB-level unique constraint**
+  (partial indexes, since the sort scope is nullable/dual-parent across the
+  five affected tables) with retry-on-conflict — a schema-level decision out
+  of scope for this pass.
 - [ ] [BUG] `addLineItemAction`'s MASTERDATA/material branch
   (`src/app/(platform)/bq/[id]/actions.ts:386`) calls
   `masterDataRead.listMaterialPriceOptions({ limit: 200 })` with no `search`
@@ -750,6 +762,14 @@ was fixed in R8.165._
   classified lane (KB-037). Fix: widen the rule to the whole `Intl` display
   surface, then converge both call sites.
 
+  **A third, undocumented instance was found and fixed 2026-09-29 (R8.203):**
+  `src/app/(document)/studioflow/print/projects/[projectId]/presentation/[boardId]/page.tsx`
+  used `new Date().toLocaleDateString("id-ID", ...)` for its printed date, same bypass,
+  same invisible `(document)` lane. Converged onto `formatInstant`. The two original
+  instances above (`masterdata/page.tsx`, print/schedule) and the checker-rule widening
+  are still open — this fix only closed the one found live while verifying today's
+  browser-acceptance pass, not the class of bug.
+
 - [x] [BUG] **KB-041 - No checker reads `prisma/schema.prisma`, so the
   cross-app-foreign-key rule is entirely unenforced.** `check-boundaries.mjs:397,533`
   and `check-legacy-runtime.mjs:120-123` walk `srcDir` and root config files
@@ -884,6 +904,33 @@ was fixed in R8.165._
   summary needs only label, timestamps, and an activity count. Fix: return
   `_count` and load activities on demand.
 
+- [x] [BUG] **SF-16 - Every project sub-page except the overview hung on
+  "Memuat halaman" forever for a deleted/nonexistent project instead of
+  showing a 404, and even the overview's `notFound()` had nowhere to render.**
+  Found and fixed 2026-09-29 (R8.203) during a Codex-work verification pass.
+  Two compounding causes: (1) `src/app/(platform)/studioflow/projects/[projectId]/{mom,schedule,presentation,presentation/[boardId],history}/page.tsx`
+  each fetched `getProject` (and, for the board page, `getBoard`) with no
+  `.catch()` converting `AppError({kind:"NOT_FOUND"})` into `notFound()` — the
+  established pattern already used correctly by `layout.tsx`'s two Suspense
+  sub-components (`ProjectRailMeta`, `ProjectContextBar`) and by `page.tsx`
+  itself. An unconverted `NOT_FOUND` just rejected the page's data promise,
+  which Next surfaces as the nearest `error.tsx`/an infinite loading state
+  under `force-dynamic`, not a 404. (2) Even where `notFound()` WAS already
+  being called correctly (layout.tsx, and `page.tsx` once fixed), no
+  `not-found.tsx` existed anywhere in the app — `src/app/(platform)/` had
+  none — so a correct `notFound()` call had no boundary to render into.
+  Fixed: added `src/app/(platform)/not-found.tsx` (mirrors the existing
+  `error.tsx`'s branded `ErrorState` styling) and applied the
+  `.catch((error) => { if (error instanceof AppError && error.kind ===
+  "NOT_FOUND") notFound(); throw error; })` conversion to all five remaining
+  sibling pages. Verified live for all six routes (overview, mom, schedule,
+  presentation, presentation/[boardId], history) via browser screenshot
+  against a nonexistent project id — each now renders the branded "Halaman
+  tidak ditemukan" page instead of hanging. (Note for future verification of
+  this route family: `get_page_text`/`read_page` returned stale/incorrect DOM
+  state for this exact bug in this session — screenshots were the only
+  reliable check.)
+
 - [ ] [CLEANUP] **KB-051 - Allow list and documentation point at a route tree
   that was deleted.** `scripts/check-boundaries.mjs:26-28` has three allow-list
   entries and `docs/UTILITY-INVENTORY.md:76-78` three doc rows for
@@ -929,6 +976,80 @@ was fixed in R8.165._
   at rows in the REBUILD database, which `AGENTS.md` treats as implemented-state
   evidence rather than a place to park legacy compatibility. Confirm no rows use
   it, then drop the member.
+
+- [x] [BUG] **KB-056 - Archive-retention purge never touched Presentation
+  slides, so the owner-approved "files removed after 90 days" promise
+  (Decision gates, 2026-09-28) was false for one asset type.** Found and fixed
+  2026-09-29 (R8.203). `src/apps/studioflow/projects/asset-retention.ts`'s
+  `purgeExpiredArchivedAssets` deleted/cleared `sfDeliverable`, `sfMomImage`,
+  `sfScheduleOption.image_key`, and MOM snapshot image references, but never
+  queried or deleted `sfPresentationSlide` rows (added later, R8.194, and the
+  purge was never updated to match). Consequence: a slide's `image_key`
+  (`String @unique`, not nullable) stayed referenced in the DB forever, so
+  `removeUnreferenced`'s shared-key safety check correctly refused to ever
+  delete the underlying blob either - a silent, permanent storage leak that
+  contradicted the UI/owner-facing claim that an archived project's files are
+  gone. Fixed: the purge transaction now also collects slide `image_key`s
+  into the same candidate-blob set and `deleteMany`s the project's
+  `sfPresentationSlide` rows (their `SfPresentationAnnotation` children cascade
+  at the DB level); boards themselves are kept, matching the existing
+  pattern where MOM's `document`/`item` rows and Schedule's `option` rows
+  survive their images being cleared. New `presentationSlides` field added to
+  the purge summary/audit metadata. Regression test added:
+  "purges presentation slides and their images too, deleting the row not just
+  the key" (`service.integration.test.ts`).
+
+- [x] [BUG] **KB-057 - Master Data's sample-request queue computes the
+  cross-app reconciliation signal but never shows it to staff.** Found and
+  fixed 2026-09-29 (R8.203). `sample-request-coordinator.ts` has always
+  computed `sourceStatus` (StudioFlow's live status for the source request:
+  `"REQUESTED" | "RECEIVED" | null`) alongside Master Data's own `state`, and
+  it is exercised by `sample-request-coordinator.test.ts` (the "gone"/"arrived"
+  cases: `state: "IN_PROGRESS"`, `sourceStatus: "RECEIVED"`), but
+  `sample-request-directory.tsx` never read the field. Consequence: when a
+  designer marks a sample received directly in StudioFlow (or the source
+  request otherwise moves on) while Master Data staff are still mid-quote on
+  it, staff had no signal and could keep pricing a sample that is already
+  resolved. Fixed: added an `alreadyReceived(row)` helper
+  (`state === "IN_PROGRESS" && sourceStatus === "RECEIVED"`) that renders a
+  second "Already received" `StatusBadge` next to the row's normal status in
+  the table, and a warning line in the row detail dialog. No change to the
+  coordinator or its data contract - UI-only, reading a field that was already
+  correct and already tested.
+
+- [x] [BUG] **KB-058 - No visual signal when continuing a private-messenger
+  conversation with a deactivated user.** Found and fixed 2026-09-29 (R8.203).
+  `MessengerConversationSummary.otherUser.active` has always been computed
+  (`platform/core/messenger/index.ts:197`, `other?.status === "ACTIVE"`) but
+  neither `messenger-client.tsx` (full `/messenger` page) nor
+  `quick-messenger.tsx` (topbar popup, added R8.198-201) rendered it -
+  `sendMessage` itself does not check the recipient's status for an existing
+  conversation either, so staff could keep writing to someone who can no
+  longer sign in with no indication. Fixed (UI-only, both surfaces): the full
+  messenger's conversation list and open-conversation header now show a
+  neutral "Deactivated" `StatusBadge`; the compact popup (tighter width, chip
+  list) shows a small dot marker plus a native tooltip on the conversation
+  chip and "(Deactivated)" text in the panel header. Sending itself is left
+  unchanged - whether an existing conversation should still allow new
+  messages to a deactivated account is a product decision, not part of this
+  fix.
+
+- [ ] [CLEANUP] **KB-059 - `cleanupExpiredAttachments` (messenger) has zero
+  callers outside its own test.** Found 2026-09-29 (R8.203), not fixed.
+  `platform/core/messenger/index.ts:286` is only ever invoked by
+  `messenger.integration.test.ts:83`. Not a correctness bug -
+  `resolveAttachment` and `buildMessageView` both independently gate on
+  `expires_at`/`purged_at`, so an unpurged expired attachment is already
+  correctly treated as unavailable everywhere it is read - but the underlying
+  30-minute-TTL storage blob is never actually deleted, a slow leak.
+  `PLAN.md:79` (WO-PLATFORM-MESSENGER-02, locked) is explicit: "Do not add
+  background job infrastructure. Cleanup is exposed as a bounded
+  service/action and may be run manually or opportunistically" - so wiring it
+  into the existing `startAssetSweep`-style timer (`instrumentation.ts`) would
+  cross that decision, not honor it. Left undecided rather than invented:
+  needs an owner/Lead call on the actual opportunistic trigger (e.g. called
+  from `sendMessage` every Nth send, or from `readConversation`, or left as a
+  manual admin action) before an Executor should wire one in.
 
 ### Closed 2026-09-29 (R8.196)
 

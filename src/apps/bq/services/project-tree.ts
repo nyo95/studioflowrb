@@ -16,6 +16,7 @@ import {
 export function createProjectTreeService(ctx: BqServiceContext) {
   const {
     db,
+    runTransaction,
     auditWriter,
     requireEditableProject,
     requireEditableProjectForSection,
@@ -58,16 +59,20 @@ async function addSection(input: {
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
   await requireEditableProject(input.projectId);
-  const sortOrder = input.sortOrder ?? (await nextSortOrder(() => db.bqSection.aggregate({
-    where: { project_id: input.projectId },
-    _max: { sort_order: true },
-  })));
-  const section = await db.bqSection.create({
-    data: {
-      project_id: input.projectId,
-      name: input.name,
-      sort_order: sortOrder,
-    },
+  // Sibling sort_order must be read and reserved atomically — two near-simultaneous
+  // adds under the same parent could otherwise both read the same MAX and collide.
+  const section = await runTransaction(async (tx) => {
+    const sortOrder = input.sortOrder ?? (await nextSortOrder(() => tx.bqSection.aggregate({
+      where: { project_id: input.projectId },
+      _max: { sort_order: true },
+    })));
+    return tx.bqSection.create({
+      data: {
+        project_id: input.projectId,
+        name: input.name,
+        sort_order: sortOrder,
+      },
+    });
   });
   await auditWriter({
     appId: "bq",
@@ -88,16 +93,18 @@ async function addSubsection(input: {
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
   await requireEditableProjectForSection(input.sectionId);
-  const sortOrder = input.sortOrder ?? (await nextSortOrder(() => db.bqSubsection.aggregate({
-    where: { section_id: input.sectionId },
-    _max: { sort_order: true },
-  })));
-  const subsection = await db.bqSubsection.create({
-    data: {
-      section_id: input.sectionId,
-      name: input.name,
-      sort_order: sortOrder,
-    },
+  const subsection = await runTransaction(async (tx) => {
+    const sortOrder = input.sortOrder ?? (await nextSortOrder(() => tx.bqSubsection.aggregate({
+      where: { section_id: input.sectionId },
+      _max: { sort_order: true },
+    })));
+    return tx.bqSubsection.create({
+      data: {
+        section_id: input.sectionId,
+        name: input.name,
+        sort_order: sortOrder,
+      },
+    });
   });
   await auditWriter({
     appId: "bq",
@@ -179,24 +186,26 @@ async function updateSubsection(input: {
   if (input.sectionId) await requireEditableProjectForSection(input.sectionId);
   else await requireEditableProjectForSubsection(input.subsectionId!);
 
-  const sortOrder = input.sortOrder ?? (await nextSortOrder(() => db.bqItem.aggregate({
-    where: input.sectionId ? { section_id: input.sectionId } : { subsection_id: input.subsectionId },
-    _max: { sort_order: true },
-  })));
+  const item = await runTransaction(async (tx) => {
+    const sortOrder = input.sortOrder ?? (await nextSortOrder(() => tx.bqItem.aggregate({
+      where: input.sectionId ? { section_id: input.sectionId } : { subsection_id: input.subsectionId },
+      _max: { sort_order: true },
+    })));
 
-  const item = await db.bqItem.create({
-    data: {
-      section_id: input.sectionId ?? null,
-      subsection_id: input.subsectionId ?? null,
-      name: input.name,
-      qty: input.qty,
-      unit: input.unit,
-      harga_snapshot: input.hargaSnapshot ?? null,
-      koefisien: requirePositiveCoefficient(input.koefisien ?? "1"),
-      markup_l1_pct: input.markupL1Pct ?? "0",
-      sort_order: sortOrder,
-      notes: input.notes ?? null,
-    },
+    return tx.bqItem.create({
+      data: {
+        section_id: input.sectionId ?? null,
+        subsection_id: input.subsectionId ?? null,
+        name: input.name,
+        qty: input.qty,
+        unit: input.unit,
+        harga_snapshot: input.hargaSnapshot ?? null,
+        koefisien: requirePositiveCoefficient(input.koefisien ?? "1"),
+        markup_l1_pct: input.markupL1Pct ?? "0",
+        sort_order: sortOrder,
+        notes: input.notes ?? null,
+      },
+    });
   });
 
   await auditWriter({
@@ -293,20 +302,22 @@ async function addSubObject(input: {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
   await requireEditableProjectForItem(input.itemId);
 
-  const sortOrder = input.sortOrder ?? (await nextSortOrder(() => db.bqSubObject.aggregate({
-    where: { item_id: input.itemId },
-    _max: { sort_order: true },
-  })));
+  const subObject = await runTransaction(async (tx) => {
+    const sortOrder = input.sortOrder ?? (await nextSortOrder(() => tx.bqSubObject.aggregate({
+      where: { item_id: input.itemId },
+      _max: { sort_order: true },
+    })));
 
-  const subObject = await db.bqSubObject.create({
-    data: {
-      item_id: input.itemId,
-      name: input.name,
-      qty_per_l1: input.qtyPerL1,
-      markup_l2_pct: input.markupL2Pct ?? "0",
-      sort_order: sortOrder,
-      notes: input.notes ?? null,
-    },
+    return tx.bqSubObject.create({
+      data: {
+        item_id: input.itemId,
+        name: input.name,
+        qty_per_l1: input.qtyPerL1,
+        markup_l2_pct: input.markupL2Pct ?? "0",
+        sort_order: sortOrder,
+        notes: input.notes ?? null,
+      },
+    });
   });
   // bq-contract §6.2: the L1-only harga_snapshot is simply unused while the
   // item has children. Clearing it here destroyed the estimator's price and
@@ -416,31 +427,33 @@ async function addLineItem(input: {
   if (input.subObjectId) await requireEditableProjectForSubObject(input.subObjectId);
   else await requireEditableProjectForItem(input.itemId!);
 
-  const sortOrder = input.sortOrder ?? (await nextSortOrder(() => db.bqLineItem.aggregate({
-    where: input.subObjectId ? { sub_object_id: input.subObjectId } : { item_id: input.itemId },
-    _max: { sort_order: true },
-  })));
+  const lineItem = await runTransaction(async (tx) => {
+    const sortOrder = input.sortOrder ?? (await nextSortOrder(() => tx.bqLineItem.aggregate({
+      where: input.subObjectId ? { sub_object_id: input.subObjectId } : { item_id: input.itemId },
+      _max: { sort_order: true },
+    })));
 
-  const lineItem = await db.bqLineItem.create({
-    data: {
-      sub_object_id: input.subObjectId ?? null,
-      item_id: input.itemId ?? null,
-      source_type: input.sourceType,
-      source_ref_id: input.sourceRefId ?? null,
-      source_imported_at: input.sourceImportedAt ?? null,
-      title_snapshot: input.titleSnapshot,
-      purchase_unit_snapshot: input.purchaseUnitSnapshot,
-      base_unit_snapshot: input.baseUnitSnapshot ?? null,
-      purchase_to_base_factor_snapshot: input.purchaseToBaseFactorSnapshot ?? null,
-      source_price_snapshot: input.sourceType === "CUSTOM" ? null : input.hargaSnapshot,
-      harga_snapshot: input.hargaSnapshot,
-      currency_snapshot: input.currencySnapshot ?? "IDR",
-      kategori: requireKategori(input.kategori),
-      qty: input.qty,
-      koefisien: requirePositiveCoefficient(input.koefisien ?? "1"),
-      sort_order: sortOrder,
-      notes: input.notes ?? null,
-    },
+    return tx.bqLineItem.create({
+      data: {
+        sub_object_id: input.subObjectId ?? null,
+        item_id: input.itemId ?? null,
+        source_type: input.sourceType,
+        source_ref_id: input.sourceRefId ?? null,
+        source_imported_at: input.sourceImportedAt ?? null,
+        title_snapshot: input.titleSnapshot,
+        purchase_unit_snapshot: input.purchaseUnitSnapshot,
+        base_unit_snapshot: input.baseUnitSnapshot ?? null,
+        purchase_to_base_factor_snapshot: input.purchaseToBaseFactorSnapshot ?? null,
+        source_price_snapshot: input.sourceType === "CUSTOM" ? null : input.hargaSnapshot,
+        harga_snapshot: input.hargaSnapshot,
+        currency_snapshot: input.currencySnapshot ?? "IDR",
+        kategori: requireKategori(input.kategori),
+        qty: input.qty,
+        koefisien: requirePositiveCoefficient(input.koefisien ?? "1"),
+        sort_order: sortOrder,
+        notes: input.notes ?? null,
+      },
+    });
   });
   await auditWriter({
     appId: "bq",

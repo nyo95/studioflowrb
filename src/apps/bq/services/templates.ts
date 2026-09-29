@@ -198,19 +198,22 @@ async function addTemplateSection(input: {
   // No caller supplies sortOrder today, so the `?? 0` fallback previously
   // gave every section the same sort_order — unstable display order that
   // also propagates into real projects via createProject's verbatim copy.
-  const nextSortOrder = input.sortOrder ?? (await db.bqTemplateSection.aggregate({
-    where: { template_id: input.templateId, parent_id: input.parentId ?? null },
-    _max: { sort_order: true },
-  }).then((result) => (result._max.sort_order ?? -1) + 1));
+  // Read and reserve it atomically so two near-simultaneous adds can't collide.
+  const section = await runTransaction(async (tx) => {
+    const nextSortOrder = input.sortOrder ?? (await tx.bqTemplateSection.aggregate({
+      where: { template_id: input.templateId, parent_id: input.parentId ?? null },
+      _max: { sort_order: true },
+    }).then((result) => (result._max.sort_order ?? -1) + 1));
 
-  const section = await db.bqTemplateSection.create({
-    data: {
-      template_id: input.templateId,
-      name: input.name,
-      parent_id: input.parentId ?? null,
-      sort_order: nextSortOrder,
-      created_by: input.actor.userId ?? "system",
-    },
+    return tx.bqTemplateSection.create({
+      data: {
+        template_id: input.templateId,
+        name: input.name,
+        parent_id: input.parentId ?? null,
+        sort_order: nextSortOrder,
+        created_by: input.actor.userId ?? "system",
+      },
+    });
   });
 
   await auditWriter({
@@ -319,12 +322,14 @@ async function addTemplateRecommendation(input: {
     throw new AppError("NOT_FOUND", "bq.lib-item.not-found", "Library item not found for the selected type");
   }
 
-  const nextSortOrder = input.sortOrder ?? (await db.bqTemplateRecommendation.aggregate({
-    where: { template_section_id: input.templateSectionId },
-    _max: { sort_order: true },
-  }).then((result) => (result._max.sort_order ?? -1) + 1));
+  // Read and reserve sort_order atomically so two near-simultaneous adds can't collide.
+  const rec = await runTransaction(async (tx) => {
+    const nextSortOrder = input.sortOrder ?? (await tx.bqTemplateRecommendation.aggregate({
+      where: { template_section_id: input.templateSectionId },
+      _max: { sort_order: true },
+    }).then((result) => (result._max.sort_order ?? -1) + 1));
 
-  const rec = await db.bqTemplateRecommendation.create({
+    return tx.bqTemplateRecommendation.create({
     data: {
       template_section_id: input.templateSectionId,
       sort_order: nextSortOrder,
@@ -332,7 +337,8 @@ async function addTemplateRecommendation(input: {
       lib_labor_id: input.libItemType === "labor" ? input.libItemId : null,
       lib_material_labor_id: input.libItemType === "material_labor" ? input.libItemId : null,
       lib_custom_item_id: input.libItemType === "custom" ? input.libItemId : null,
-    },
+      },
+    });
   });
   await auditWriter({
     appId: "bq",
