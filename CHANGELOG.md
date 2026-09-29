@@ -5,13 +5,42 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.187**
-- Next local revision: **R8.188**
+- Current revision after this entry is committed: **R8.188**
+- Next local revision: **R8.189**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.188 | 2026-09-29 | fix(sf): Request sample was reachable only from inside the full item-editor dialog
+
+Follow-up to the owner's question about how to request a sample: the action existed (R8.123) and worked, but was three
+levels deep (open the entry → scroll past Item details and What shows on the card → Spec options) in both List and
+Board view, with no status visible until you got there.
+
+- **Board view** (`schedule-board.tsx` `BoardView`): the card now shows a `Sample requested`/`Sample received` badge
+  right under the product name, and a `Request sample`/`Request sample again` quick-link next to it when nothing is
+  pending — no need to open the item editor first. Same nested-interactive pattern the existing "+ Add photo" overlay
+  already used (`role="button"` span with `stopPropagation`, not a real `<button>`, since the whole card is already
+  one), so the click doesn't also trigger the card's own open-entry handler.
+- **List view** (inline in `ScheduleBoard`): the row now shows the same status badge, and the row's `⋯` menu gained
+  `Request sample` / `Request sample again` and `Mark sample received` — previously that menu only had Open, Save as
+  template, Move up/down, Move to category, and Delete; there was no path to a sample request from this view at all.
+- Both open the same existing `SampleRequestDialog` and call the same existing `requestScheduleSampleAction` /
+  `receiveScheduleSampleAction` — no new backend, no schema change. `ScheduleBoard` now owns a lifted `sampleFor` state
+  so the dialog can be triggered from the top-level card/row, independent of the full item editor's own instance of the
+  same dialog (unchanged, still reachable the original way too).
+
+**Checks.** `tsc --noEmit` 0 errors; `eslint .` clean; `check:boundaries` and `check:legacy-runtime` OK. Verified live
+in the browser end to end on both views: Board quick-link → dialog → badge appears → List row's menu → Mark sample
+received → badge updates, no page reload needed (existing `revalidatePath` in the actions). No new automated test —
+this reuses existing, already-tested actions and an existing dialog component; nothing new to unit-test at the service
+layer, and this file has no existing test harness for its client-rendered markup.
+
+**Note for the owner:** verifying this created a real "Toko Cat Jaya" sample request (then marked received) on
+project 2026-536's PT-01 Paint 1 option in the dev database — harmless dev data, but flagging since it wasn't a
+disposable fixture project.
 
 ## R8.187 | 2026-09-29 | fix(ui): print headings faked serif bold instead of using the fixed sans-black pattern
 

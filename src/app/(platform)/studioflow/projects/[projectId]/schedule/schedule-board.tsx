@@ -238,6 +238,7 @@ function BoardView({
   onDelete,
   onReorder,
   onOpenPhoto,
+  onRequestSample,
 }: {
   projectId: string;
   groups: Array<{ category: string; rows: ScheduleEntryView[] }>;
@@ -249,6 +250,7 @@ function BoardView({
   onDelete: (entry: ScheduleEntryView) => void;
   onReorder: (rows: ScheduleEntryView[], draggedId: string, targetId: string) => void;
   onOpenPhoto: (entry: ScheduleEntryView, option: ScheduleOptionView) => void;
+  onRequestSample: (option: ScheduleOptionView) => void;
 }) {
   const { draggingId, dragOverId, start, end, over, leave } = useRowDrag();
   return (
@@ -323,6 +325,26 @@ function BoardView({
                   ) : (
                     <span className="text-sm italic text-ink-tertiary">Reserved — no product yet</span>
                   )}
+                  {shown ? (
+                    <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                      {shown.sampleRequest ? (
+                        <Badge tone={shown.sampleRequest.status === "RECEIVED" ? "success" : "warning"}>
+                          {shown.sampleRequest.status === "RECEIVED" ? "Sample received" : "Sample requested"}
+                        </Badge>
+                      ) : null}
+                      {canEdit && shown.sampleRequest?.status !== "REQUESTED" ? (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(event) => { event.stopPropagation(); onRequestSample(shown); }}
+                          onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); onRequestSample(shown); } }}
+                          className="cursor-pointer text-xs font-medium text-ink-secondary hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus"
+                        >
+                          {shown.sampleRequest ? "Request sample again" : "Request sample"}
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : null}
                   <span className="mt-2 grid">
                     {details.map(([label, value]) => value ? (
                       <span key={label} className="flex items-start justify-between gap-3 border-t border-line py-1">
@@ -381,6 +403,7 @@ export function ScheduleBoard({
   const [openId, setOpenId] = useState<string | null>(null);
   const [autoPhotoOptionId, setAutoPhotoOptionId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<null | "add" | "import" | { move: ScheduleEntryView }>(null);
+  const [sampleFor, setSampleFor] = useState<ScheduleOptionView | null>(null);
   const listDrag = useRowDrag();
 
   /** Every path that opens the entry panel goes through here, so a stale
@@ -484,7 +507,7 @@ export function ScheduleBoard({
 
       <StatBar entries={entries} section={section} />
 
-      {error && !open && !dialog ? <InlineError className="px-(--ui-section-px) pt-2">{error}</InlineError> : null}
+      {error && !open && !dialog && !sampleFor ? <InlineError className="px-(--ui-section-px) pt-2">{error}</InlineError> : null}
 
       {groups.length === 0 ? (
         <EmptyState
@@ -507,6 +530,7 @@ export function ScheduleBoard({
                 onDelete={removeEntry}
                 onReorder={reorderGroup}
                 onOpenPhoto={(entry, option) => openEntry(entry.id, option.id)}
+                onRequestSample={(option) => setSampleFor(option)}
               />
             ) : (
               <div className="grid">
@@ -562,6 +586,11 @@ export function ScheduleBoard({
                               <span className="hidden w-28 shrink-0 truncate text-sm text-ink-secondary sm:block">{entry.location ?? ""}</span>
                               <span className="hidden w-20 shrink-0 text-right text-sm tabular-nums text-ink-secondary sm:block">{entry.qty ? `${entry.qty} ${entry.unit ?? ""}` : ""}</span>
                               {entry.options.length > 1 ? <Badge>{entry.options.length} options</Badge> : null}
+                              {shown?.sampleRequest ? (
+                                <Badge tone={shown.sampleRequest.status === "RECEIVED" ? "success" : "warning"}>
+                                  {shown.sampleRequest.status === "RECEIVED" ? "Sample received" : "Sample requested"}
+                                </Badge>
+                              ) : null}
                             </button>
                             {canEdit || canManageTemplates ? (
                               <RowActionMenu
@@ -571,6 +600,12 @@ export function ScheduleBoard({
                                   { label: "Open", onSelect: () => openEntry(entry.id) },
                                   ...(canManageTemplates && templateSourceOf(entry)
                                     ? [{ label: "Save as template item", onSelect: () => void run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })) }]
+                                    : []),
+                                  ...(canEdit && shown && shown.sampleRequest?.status !== "REQUESTED"
+                                    ? [{ label: shown.sampleRequest ? "Request sample again" : "Request sample", separatorBefore: true, onSelect: () => setSampleFor(shown) }]
+                                    : []),
+                                  ...(canEdit && shown?.sampleRequest?.status === "REQUESTED"
+                                    ? [{ label: "Mark sample received", separatorBefore: true, onSelect: () => void run(`${entry.id}-sample-receive`, () => receiveScheduleSampleAction({ projectId, requestId: shown.sampleRequest!.id })) }]
                                     : []),
                                   ...(canEdit ? [
                                     { label: "Move up", icon: <ArrowUp className="h-3.5 w-3.5" />, disabled: index === 0, separatorBefore: true, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "up" })) },
@@ -613,6 +648,9 @@ export function ScheduleBoard({
       {dialog === "import" ? <ImportDialog projectId={projectId} section={section} command={command} onClose={() => setDialog(null)} /> : null}
       {dialog && typeof dialog === "object" ? (
         <MoveDialog projectId={projectId} entry={dialog.move} categories={categories} command={command} onClose={() => setDialog(null)} />
+      ) : null}
+      {sampleFor ? (
+        <SampleRequestDialog projectId={projectId} option={sampleFor} command={command} onClose={() => setSampleFor(null)} />
       ) : null}
       {confirm.dialog}
     </div>
