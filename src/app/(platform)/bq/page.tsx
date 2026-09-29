@@ -24,6 +24,7 @@ import {
   TableRow,
   Tabs,
   FormattedInstant,
+  getPaginationSlice,
 } from "@/platform/ui_engine";
 import { createMoney, formatMoney } from "@platform/utilities/money";
 import { ProjectDeletionReview } from "./project-deletion-review";
@@ -78,9 +79,7 @@ export default async function BqProjectsPage({
 
   const directory = (rows: typeof projects, tab: View, empty: { title: string; description: string }) => {
     if (rows.length === 0) return <SectionCard><EmptyState icon={FileText} title={empty.title} description={empty.description} /></SectionCard>;
-    const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
-    const page = tab === view ? Math.min(requestedPage, pageCount) : 1;
-    const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    const { pageCount, page, rows: pageRows } = getPaginationSlice(rows, tab === view ? requestedPage : 1, PAGE_SIZE);
     return <DirectoryShell surface fill pagination={<Pagination page={page} pageCount={pageCount} total={rows.length} pageSize={PAGE_SIZE} getHref={(nextPage) => listHref(tab, nextPage)} label={tab === "archived" ? "Archived project pages" : "Project pages"} />}><DataTable framed={false} density="compact" stickyHeader fill minWidth={640}>
       <TableHeader><TableRow><TableHead>Project</TableHead><TableHead>Client</TableHead><TableHead>Estimator</TableHead><TableHead align="end">Grand Total</TableHead><TableHead>Created</TableHead></TableRow></TableHeader>
       <TableBody>{pageRows.map((project) => <TableRow key={project.id}><TableCell><EntityPrimaryCell tone={project.status === "ACTIVE" ? "success" : project.status === "ARCHIVED" ? "danger" : "warning"} statusLabel={project.status} name={<Link href={`/bq/${project.id}`} className="font-medium text-action hover:underline">{project.title}</Link>} secondary={<>{project.status === "LOCKED" ? "Locked · " : null}{pendingDeletion.has(project.id) ? "Deletion requested · " : null}Updated <FormattedInstant value={project.updatedAt} locale={settings.locale} timeZone={settings.timezone} /></>} /></TableCell><TableCell>{project.clientName}</TableCell><TableCell>{project.createdBy}</TableCell><TableCell align="end">{project.grandTotal === null ? "—" : formatMoney(createMoney(project.grandTotal, "IDR"), { locale: settings.locale })}</TableCell><TableCell><FormattedInstant value={project.createdAt} locale={settings.locale} timeZone={settings.timezone} /></TableCell></TableRow>)}</TableBody>

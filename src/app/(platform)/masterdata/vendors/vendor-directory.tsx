@@ -17,7 +17,8 @@ import {
 
 
 import { Plus,UserPlus,X } from "lucide-react";
-import { useRef,useState,useTransition } from "react";
+import { useRef,useState } from "react";
+import { useRowAction } from "@/platform/ui_engine";
 
 import { Badge,Button,Combobox,ConfirmDialog,CreatableMultiSelect,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,HelpHint,IconButton,InlineError,Input,Notice,SearchField,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,useFormDraftGuard,useOptionOverlay } from "@/platform/ui_engine";
 import {
@@ -246,9 +247,7 @@ export function VendorDirectory({
   const [confirmRestore, setConfirmRestore] = useState<VendorRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<VendorRow | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
-  const [rowError, setRowError] = useState<string | null>(null);
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const { pendingId, rowError, runRowAction } = useRowAction();
 
   // Form sub-collections
   const [contactsList, setContactsList] = useState<ContactDraft[]>([]);
@@ -324,22 +323,6 @@ export function VendorDirectory({
   const visibleRows = orderedRows.slice(paging.offset, paging.offset + 25);
   const pageFooter = <div className="grid gap-2"><Text tone="secondary" size="sm">{orderedRows.length ? paging.offset + 1 : 0}–{Math.min(paging.offset + 25, orderedRows.length)} of {orderedRows.length} records</Text>{paging.pageCount > 1 ? <Pagination page={paging.page} pageCount={paging.pageCount} onPageChange={paging.setPage} /> : null}</div>;
 
-
-  const runRowAction = (id: string, command: () => Promise<unknown>, onSuccess?: () => void) => {
-    if (pendingId) return;
-    setPendingId(id); setRowError(null);
-    startTransition(async () => {
-      try {
-        const result = await command();
-        if (result && typeof result === "object" && "ok" in result && result.ok === false) {
-          const failure = result as { error?: { safeMessage?: string } };
-          setRowError(failure.error?.safeMessage ?? "The action could not be completed."); return;
-        }
-        onSuccess?.();
-      } catch { setRowError("The action could not be completed. Please try again."); }
-      finally { setPendingId(null); }
-    });
-  };
 
   const checkSimilarName = (name: string, excludeId?: string): string | null => {
     if (name.trim().length < 3) return null;

@@ -80,11 +80,10 @@ to unbundle the raw call.
 
 ### Examined and classified APP-OWNED or PURGE (no canonical merge)
 
-- **Client-side pagination duplicates** in brand/vendor/category directories
-  and pricing: their semantics differ from the canonical `buildPageMeta`
-  (`pageCount` is `1` for an empty set here versus `0` canonical; local
-  `min(page, pageCount)` clamp). **PURGE** merging; recorded instead. The
-  canonical pagination surface remains `ui_engine/patterns/pagination.ts`.
+- **Client-side pagination copies** were converged in R8.210: the UI Engine
+  pagination pattern now owns the one-page empty-state and local clamp that
+  directory pages require, while `buildPageMeta` retains its neutral zero-page
+  representation for callers that need it.
 - **Number/area/byte formatting** via `Intl.Collator`, `toLocaleString`, and
   `.toString` in app rows: app-owned display with no canonical equivalent.
 - **Audit `action` strings and `AppError` codes** (e.g. `studioflow.project.not-found`)

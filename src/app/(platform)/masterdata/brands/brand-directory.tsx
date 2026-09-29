@@ -7,7 +7,8 @@ import { DirectoryShell,DraftDialog,Pagination,RowActionMenu,RowActionsCell,RowA
 ﻿
 
 import { Plus } from "lucide-react";
-import { useRef,useState,useTransition } from "react";
+import { useRef,useState } from "react";
+import { useRowAction } from "@/platform/ui_engine";
 
 import { Button,ConfirmDialog,CreatableMultiSelect,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,InlineError,Input,Notice,SearchField,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,useFormDraftGuard,useOptionOverlay } from "@/platform/ui_engine";
 import { VendorQuickCreateDialog } from "../vendor-quick-create-dialog";
@@ -83,9 +84,7 @@ export function BrandDirectory({
   const [confirmRestore, setConfirmRestore] = useState<BrandRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BrandRow | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
-  const [rowError, setRowError] = useState<string | null>(null);
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const { pendingId, rowError, runRowAction } = useRowAction();
 
   // Form links state for create/edit
   const [linksList, setLinksList] = useState<BrandLinkDraft[]>([]);
@@ -151,22 +150,6 @@ export function BrandDirectory({
   const visibleRows = orderedRows.slice(paging.offset, paging.offset + 25);
   const pageFooter = <div className="grid gap-2"><Text tone="secondary" size="sm">{orderedRows.length ? paging.offset + 1 : 0}–{Math.min(paging.offset + 25, orderedRows.length)} of {orderedRows.length} records</Text>{paging.pageCount > 1 ? <Pagination page={paging.page} pageCount={paging.pageCount} onPageChange={paging.setPage} /> : null}</div>;
 
-
-  const runRowAction = (id: string, command: () => Promise<unknown>, onSuccess?: () => void) => {
-    if (pendingId) return;
-    setPendingId(id); setRowError(null);
-    startTransition(async () => {
-      try {
-        const result = await command();
-        if (result && typeof result === "object" && "ok" in result && result.ok === false) {
-          const failure = result as { error?: { safeMessage?: string } };
-          setRowError(failure.error?.safeMessage ?? "The action could not be completed."); return;
-        }
-        onSuccess?.();
-      } catch { setRowError("The action could not be completed. Please try again."); }
-      finally { setPendingId(null); }
-    });
-  };
 
   const checkSimilarBrandName = (name: string, excludeId?: string): string | null => {
     if (name.trim().length < 3) return null;

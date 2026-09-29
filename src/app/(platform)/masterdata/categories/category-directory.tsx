@@ -5,7 +5,8 @@ import { ConfirmDialog,DirectoryShell,DraftDialog,Pagination,RowActionMenu,Text,
 
 
 import { Plus } from "lucide-react";
-import { useState,useTransition } from "react";
+import { useState } from "react";
+import { useRowAction } from "@/platform/ui_engine";
 
 import { Badge,Button,Combobox,DataTable,EmptyState,EntityPrimaryCell,Field,FormActions,InlineError,Input,SearchField,Select,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar } from "@/platform/ui_engine";
 import {
@@ -48,9 +49,7 @@ export function CategoryDirectory({
   const [confirmDeactivate, setConfirmDeactivate] = useState<CategoryRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CategoryRow | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
-  const [rowError, setRowError] = useState<string | null>(null);
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const { pendingId, rowError, runRowAction } = useRowAction();
 
   const [createError, setCreateError] = useState<string | null>(null);
   const [createPending, setCreatePending] = useState(false);
@@ -78,22 +77,6 @@ export function CategoryDirectory({
   const visibleRows = orderedRows.slice(paging.offset, paging.offset + 25);
   const pageFooter = <div className="grid gap-2"><Text tone="secondary" size="sm">{orderedRows.length ? paging.offset + 1 : 0}–{Math.min(paging.offset + 25, orderedRows.length)} of {orderedRows.length} records</Text>{paging.pageCount > 1 ? <Pagination page={paging.page} pageCount={paging.pageCount} onPageChange={paging.setPage} /> : null}</div>;
 
-
-  const runRowAction = (id: string, command: () => Promise<unknown>, onSuccess?: () => void) => {
-    if (pendingId) return;
-    setPendingId(id); setRowError(null);
-    startTransition(async () => {
-      try {
-        const result = await command();
-        if (result && typeof result === "object" && "ok" in result && result.ok === false) {
-          const failure = result as { error?: { safeMessage?: string } };
-          setRowError(failure.error?.safeMessage ?? "The action could not be completed."); return;
-        }
-        onSuccess?.();
-      } catch { setRowError("The action could not be completed. Please try again."); }
-      finally { setPendingId(null); }
-    });
-  };
 
   return (
     <DirectoryShell fill header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (

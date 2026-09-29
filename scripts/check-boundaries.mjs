@@ -81,31 +81,7 @@ const LEGACY_UI_CLASS_PATTERN =
  * removed from the baseline, so the list can only shrink toward empty. Converge
  * the copies onto the named canonical API, then delete the entry.
  */
-export const APP_DUPLICATE_MACHINERY = [
-  {
-    name: "runRowAction (pending/error/success wrapper for a table row command)",
-    pattern: /\b(?:const|function)\s+runRowAction\b/,
-    canonical: "one shared hook in @/platform/ui_engine (not yet built - EXTEND, KB-043)",
-    baseline: [
-      "src/app/(platform)/masterdata/brands/brand-directory.tsx",
-      "src/app/(platform)/masterdata/categories/category-directory.tsx",
-      "src/app/(platform)/masterdata/skus/sku-directory.tsx",
-      "src/app/(platform)/masterdata/units/unit-directory.tsx",
-      "src/app/(platform)/masterdata/vendors/vendor-directory.tsx",
-      "src/app/(platform)/settings/access/roles/roles-directory.tsx",
-      "src/app/(platform)/settings/access/users/users-directory.tsx",
-    ],
-  },
-  {
-    name: "private page-count math (const pageCount = Math.max(1, Math.ceil(...)))",
-    pattern: /\bconst\s+pageCount\s*=\s*Math\.max\(\s*1\s*,\s*Math\.ceil\(/,
-    canonical: "buildPageMeta / usePagination from @platform/utilities/pagination and the UI Engine pagination pattern",
-    baseline: [
-      "src/app/(platform)/bq/page.tsx",
-      "src/app/(platform)/masterdata/pricing/pricing-directory.tsx",
-    ],
-  },
-];
+export const APP_DUPLICATE_MACHINERY = [];
 
 const INT_DATETIME_FORMAT_PATTERN = /new\s+Intl\.(?:DateTimeFormat|RelativeTimeFormat)\s*\(|\.toLocale(?:Date|Time)String\s*\(/;
 

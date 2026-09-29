@@ -11,3 +11,10 @@ export function usePagination(total: number, pageSize: number, scope: string) {
   if (state.scope !== scope || state.page !== page) setState({ scope, page });
   return { page, pageCount, offset: calcOffset(page, pageSize), setPage: (next: number) => setState({ scope, page: Math.max(1, Math.min(next, pageCount)) }) };
 }
+
+/** Server-rendered counterpart to `usePagination`, preserving the one-page empty state and page clamp. */
+export function getPaginationSlice<T>(rows: readonly T[], requestedPage: number, pageSize: number) {
+  const pageCount = Math.max(1, buildPageMeta(1, pageSize, rows.length).pageCount);
+  const page = Math.min(requestedPage, pageCount);
+  return { rows: rows.slice(calcOffset(page, pageSize), page * pageSize), page, pageCount };
+}

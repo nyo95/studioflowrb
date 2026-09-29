@@ -6,7 +6,8 @@ import { DirectoryShell,DraftDialog,Pagination,Text,usePagination } from "@/plat
 
 
 import { UserPlus } from "lucide-react";
-import { useActionState,useState,useTransition } from "react";
+import { useActionState,useState } from "react";
+import { useRowAction } from "@/platform/ui_engine";
 
 import { Button,Checkbox,ConfirmDialog,DataTable,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Select,Spinner,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar } from "@/platform/ui_engine";
 import {
@@ -46,29 +47,11 @@ export function UsersDirectory({
   const [passwordTarget, setPasswordTarget] = useState<UserRow | null>(null);
   const [confirmDisable, setConfirmDisable] = useState<UserRow | null>(null);
   const [confirmRemoveRole, setConfirmRemoveRole] = useState<{ user: UserRow; roleId: string; roleName: string } | null>(null);
-  const [rowError, setRowError] = useState<string | null>(null);
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const { pendingId, rowError, runRowAction } = useRowAction();
 
   const [createState, createAction, createPending] = useActionState(async (previous: Parameters<typeof createUserAction>[0], data: FormData) => { const result = await createUserAction(previous, data); if (result.ok) { setCreateOpen(false); } return result; }, null);
   const [editState, editAction, editPending] = useActionState(async (previous: Parameters<typeof updateUserDisplayNameAction>[0], data: FormData) => { const result = await updateUserDisplayNameAction(previous, data); if (result.ok) { setEditTarget(null); } return result; }, null);
   const [passwordState, passwordAction, passwordPending] = useActionState(async (previous: Parameters<typeof setUserPasswordAction>[0], data: FormData) => { const result = await setUserPasswordAction(previous, data); if (result.ok) { setPasswordTarget(null); } return result; }, null);
-
-  const runRowAction = (id: string, command: () => Promise<unknown>, onSuccess?: () => void) => {
-    if (pendingId) return;
-    setPendingId(id); setRowError(null);
-    startTransition(async () => {
-      try {
-        const result = await command();
-        if (result && typeof result === "object" && "ok" in result && result.ok === false) {
-          const failure = result as { error?: { safeMessage?: string } };
-          setRowError(failure.error?.safeMessage ?? "The action could not be completed."); return;
-        }
-        onSuccess?.();
-      } catch { setRowError("The action could not be completed. Please try again."); }
-      finally { setPendingId(null); }
-    });
-  };
 
 
   const { locale } = useDisplaySettings();

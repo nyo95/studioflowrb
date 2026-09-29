@@ -2,7 +2,7 @@
 
 import { ChevronDown,Filter,MoreHorizontal,X } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
-import { Fragment,type HTMLAttributes,type ReactNode } from "react";
+import { Fragment,type HTMLAttributes,type ReactNode,useState,useTransition } from "react";
 
 import { cx } from "../internal/cx";
 import { Button,IconButton,type ButtonVariant } from "../primitives";
@@ -15,6 +15,40 @@ export type RowActionItem = {
   disabled?: boolean;
   separatorBefore?: boolean;
 };
+
+type RowActionFailure = { error?: { safeMessage?: string } };
+
+/**
+ * Runs a single row command at a time and exposes its generic UI state.
+ * Callers retain their own command, success follow-up, and displayed placement.
+ */
+export function useRowAction() {
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [rowError, setRowError] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
+  const runRowAction = (id: string, command: () => Promise<unknown>, onSuccess?: () => void) => {
+    if (pendingId) return;
+    setPendingId(id);
+    setRowError(null);
+    startTransition(async () => {
+      try {
+        const result = await command();
+        if (result && typeof result === "object" && "ok" in result && result.ok === false) {
+          setRowError((result as RowActionFailure).error?.safeMessage ?? "The action could not be completed.");
+          return;
+        }
+        onSuccess?.();
+      } catch {
+        setRowError("The action could not be completed. Please try again.");
+      } finally {
+        setPendingId(null);
+      }
+    });
+  };
+
+  return { pendingId, rowError, runRowAction };
+}
 
 export function RowActionMenu({
   items,

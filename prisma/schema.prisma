@@ -1256,7 +1256,6 @@ enum SfRevisionStatus {
 }
 
 enum SfActivityMode {
-  TODO
   FEEDBACK
 
   @@map("sf_activity_mode")
@@ -1429,7 +1428,7 @@ model SfActivity {
   /// Null = deferred (detached from its revision but still phase-tagged).
   revision_id           String?
   content               String
-  // V2-D1: FEEDBACK is the only valid mode going forward; TODO kept in enum for legacy rows
+  // V2-D1: feedback-only; checklist items own to-dos.
   mode                  SfActivityMode   @default(FEEDBACK)
   status                SfActivityStatus @default(OPEN)
   assigned_to_id        String?

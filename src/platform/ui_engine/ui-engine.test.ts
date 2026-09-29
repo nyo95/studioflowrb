@@ -67,6 +67,8 @@ describe("UI Engine foundation", () => {
       "ErrorState",
       "InlineError",
       "RowActionMenu",
+      "useRowAction",
+      "getPaginationSlice",
       "FilterBar",
       "SelectionBar",
       "Combobox",
@@ -161,6 +163,18 @@ describe("UI Engine foundation", () => {
       renderToStaticMarkup(createElement(ui.Pagination, { page: 1, pageCount: 3, onPageChange: () => {} })),
       /Page 1 of 3/,
     );
+  });
+
+  it("keeps generic row-action state and directory pagination in the UI Engine", () => {
+    const actions = readFileSync(new URL("./patterns/actions.tsx", import.meta.url), "utf8");
+    assert.match(actions, /export function useRowAction/);
+    assert.match(actions, /if \(pendingId\) return/);
+    assert.match(actions, /safeMessage \?\? "The action could not be completed\."/);
+    assert.match(actions, /Please try again\./);
+    const pagination = readFileSync(new URL("./patterns/pagination.ts", import.meta.url), "utf8");
+    assert.match(pagination, /export function getPaginationSlice/);
+    assert.match(pagination, /Math\.max\(1, buildPageMeta/);
+    assert.match(pagination, /Math\.min\(requestedPage, pageCount\)/);
   });
 
   it("marks filter chip selection for assistive technology", () => {

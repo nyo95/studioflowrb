@@ -5,13 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.209**
-- Next local revision: **R8.210**
+- Current revision after this entry is committed: **R8.210**
+- Next local revision: **R8.211**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.210 | 2026-09-29 | refactor(platform,studioflow): converge row actions and pagination, remove retired activity mode
+
+- **Shared machinery (KB-043, KB-055b).** Added the domain-neutral UI Engine `useRowAction` hook, then moved the seven
+  Master Data and Settings directory row-action wrappers to it without changing their pending, safe-error, retry-error, or
+  success-callback handling. BQ and pricing now share the UI Engine page slice helper, preserving the existing one-page empty
+  state and last-page clamp. `APP_DUPLICATE_MACHINERY` is empty after convergence.
+- **StudioFlow activity mode.** Removed the retired `SfActivityMode.TODO` value. Confirmed zero TODO rows in both isolated
+  rebuild databases before creating the enum-replacement migration, deployed it to `masterdata` and `masterdata_test`, and
+  regenerated Prisma Client. `FEEDBACK` remains the only valid value.
+- **Evidence.** Updated `docs/UTILITY-INVENTORY.md` with the converged pagination verdict and added UI Engine coverage for the
+  public hook/page helper surface.
+
+**Checks.** `npm run check`; `npm run test:boundaries`; `npm run test:legacy-runtime`; `npx eslint src scripts`; full
+`npm test` against `masterdata_test`; focused `ui-engine.test.ts`; `npm run build`; staged/unstaged whitespace checks.
 
 ## R8.209 | 2026-09-29 | fix(platform,docs): harden the architecture harness, clear the backlog to planned-only, verify in the browser
 

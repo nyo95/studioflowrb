@@ -2,7 +2,7 @@
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { UpdatedCell } from "../updated-cell";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
-import { DirectoryShell,RowActionMenu,RowActionsCell,RowActionsHead } from "@/platform/ui_engine";
+import { DirectoryShell,getPaginationSlice,RowActionMenu,RowActionsCell,RowActionsHead } from "@/platform/ui_engine";
 
 import { Button,ButtonMenu,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,Text,Tooltip,useFormDraftGuard,useOptionOverlay,type SortDirection } from "@/platform/ui_engine";
 import { VendorQuickCreateDialog } from "../vendor-quick-create-dialog";
@@ -55,7 +55,7 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
     const compared = sort.key === "amount" ? compareDecimals(leftValue as DecimalString, rightValue as DecimalString) : leftValue.localeCompare(rightValue, "id");
     return sort.direction === "asc" ? compared : -compared;
   });
-  const paginate = <T,>(rows: T[]) => { const pageCount = Math.max(1, Math.ceil(rows.length / PRICE_PAGE_SIZE)); const currentPage = Math.min(page, pageCount); return { rows: rows.slice((currentPage - 1) * PRICE_PAGE_SIZE, currentPage * PRICE_PAGE_SIZE), currentPage, pageCount }; };
+  const paginate = <T,>(rows: T[]) => { const result = getPaginationSlice(rows, page, PRICE_PAGE_SIZE); return { rows: result.rows, currentPage: result.page, pageCount: result.pageCount }; };
   const changeSort = (key: PriceSortKey) => (direction: SortDirection) => { setSort({ key, direction }); setPage(1); };
   const sortableHead = (key: PriceSortKey, label: string, align: "start" | "end" = "start") => <TableHead align={align} sortable sortDirection={sort.key === key ? sort.direction : null} onSortChange={changeSort(key)} sortLabel={(direction) => `${label}, sort ${direction}`}>{label}</TableHead>;
   const pagination = (currentPage: number, pageCount: number) => pageCount > 1 ? <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} label="Pricing pages" /> : null;
