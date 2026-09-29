@@ -1034,6 +1034,33 @@ describe("SF-R3 Product Schedule", () => {
     assert.equal(updated.options[0].sampleRequest?.requestedFrom, "PT Sumber Jaya (again)");
   });
 
+  it("cancels a mistaken sample request while it is still pending, but never a received one", async () => {
+    const db = testDb.prisma;
+    const { projectId } = await newProject();
+    const { entryId } = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "Cancel-me paint" } });
+    const entry = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((e) => e.id === entryId)!;
+    const optionId = entry.options[0].id;
+
+    const { requestId } = await sf.schedule.requestSample({ ...as(designer), projectId, optionId, requestedFrom: "Toko Cat Jaya" });
+    await sf.schedule.cancelSample({ ...as(designer), projectId, requestId });
+
+    const afterCancel = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((e) => e.id === entry.id)!;
+    assert.equal(afterCancel.options[0].sampleRequest, null, "the cancelled request is gone, not just marked resolved");
+    assert.equal(await db.sfScheduleSampleRequest.count({ where: { id: requestId } }), 0);
+
+    const events = await db.auditEvent.findMany({ where: { entity_id: optionId, action: "studioflow.schedule.sample-request-cancelled" } });
+    assert.equal(events.length, 1);
+    assert.equal((events[0].metadata as { requestedFrom?: string }).requestedFrom, "Toko Cat Jaya");
+
+    // A cancelled request never blocks asking again.
+    const { requestId: secondRequestId } = await sf.schedule.requestSample({ ...as(designer), projectId, optionId, requestedFrom: "Toko Cat Baru" });
+
+    // Cancelling an already-cancelled (now deleted) request, and cancelling a received one, both fail cleanly.
+    await rejectsWith(sf.schedule.cancelSample({ ...as(designer), projectId, requestId }), "SCHEDULE_ITEM_NOT_FOUND");
+    await sf.schedule.receiveSample({ ...as(designer), projectId, requestId: secondRequestId, note: null });
+    await rejectsWith(sf.schedule.cancelSample({ ...as(designer), projectId, requestId: secondRequestId }), "SAMPLE_NOT_PENDING");
+  });
+
   it("applies templates idempotently and snapshots Master Data Brand through the public port", async () => {
     const tag = randomUUID().slice(0, 8);
     const brand = await testDb.prisma.brand.create({ data: { id: randomUUID(), name: `TACO ${tag}`, slug: `taco-${tag}` } });

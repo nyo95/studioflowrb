@@ -5,13 +5,43 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.196**
-- Next local revision: **R8.197**
+- Current revision after this entry is committed: **R8.197**
+- Next local revision: **R8.198**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.197 | 2026-09-29 | feat(sf): cancel a mistaken sample request before anyone acts on it
+
+Owner request: once a sample request exists, the only transition was "Mark sample received" — there was no way to
+undo a mistaken request (wrong vendor typed, wrong option clicked) before Master Data's queue or anyone else acted
+on it.
+
+- **Backend.** `schedule/service.ts`: new `cancelSample` command, permission-gated same as `requestSample`/
+  `receiveSample` (`P.scheduleManage`). Only allowed while `status === "REQUESTED"` — a `RECEIVED` sample is a
+  real-world fact and is not undoable here (`SAMPLE_NOT_PENDING`, same error the receive path already uses for that
+  case). Hard-deletes the `SfScheduleSampleRequest` row rather than adding a `CANCELLED` status — it never happened,
+  not "happened then stopped" — so no migration was needed. Writes an audit event
+  (`studioflow.schedule.sample-request-cancelled`) with the vendor name it was asked of, since the row itself won't
+  exist to look at afterward. Master Data's queue reads StudioFlow's `listPendingSampleRequests` (status `REQUESTED`
+  only), so a cancelled request disappears from it automatically — no coordinator or Master Data change needed.
+- **Actions.** `cancelScheduleSampleAction({ projectId, requestId })` in `(platform)/studioflow/actions.ts`, same
+  shape as the sibling request/receive actions.
+- **UI.** Added everywhere R8.188 put "Request sample"/"Mark sample received": the Board card's quick-link row (now
+  shows "Cancel" next to the "Sample requested" badge), the List row's `⋯` menu, and the full item-editor's per-option
+  menu. All three confirm first (`useConfirm`, danger tone, "This cannot be undone") before deleting — this is a hard
+  delete, unlike "Mark received" which is just a status change.
+- Tests: 1 new integration test — cancel while pending removes the row and re-allows a fresh request, cancelling an
+  already-cancelled (now nonexistent) request or a received one both fail cleanly, and the audit event carries the
+  vendor name.
+
+**Checks.** `tsc --noEmit` 0 errors; `eslint .` clean; `check:boundaries` and `check:legacy-runtime` OK; full
+`npm test` 629/629 (628 before, +1). Browser-verified end to end: cancelled a real test sample request
+(the "berkah" one from testing R8.188/189) from the Board card's quick-link, confirmed the dialog showed the correct
+vendor name, and confirmed the card fell back to the earlier resolved "Sample received" state afterward — exactly
+the intended behavior.
 
 ## R8.196 | 2026-09-29 | fix(studioflow): make Today scope links valid and protect print routes
 

@@ -817,6 +817,17 @@ export async function receiveScheduleSampleAction(input: z.infer<typeof Schedule
   });
 }
 
+const ScheduleSampleCancel = z.strictObject({ projectId: Id, requestId: Id });
+export async function cancelScheduleSampleAction(input: z.infer<typeof ScheduleSampleCancel>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleSampleCancel, input);
+    const result = await studioFlow.schedule.cancelSample({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
 export async function saveScheduleEntryAsTemplateAction(input: z.infer<typeof ScheduleEntryRef>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();

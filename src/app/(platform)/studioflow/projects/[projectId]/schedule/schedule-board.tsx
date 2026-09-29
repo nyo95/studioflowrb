@@ -46,6 +46,7 @@ import {
 
 import {
   applyScheduleTemplatesAction,
+  cancelScheduleSampleAction,
   copyReusableScheduleOptionAction,
   createScheduleEntryAction,
   createScheduleOptionAction,
@@ -239,6 +240,7 @@ function BoardView({
   onReorder,
   onOpenPhoto,
   onRequestSample,
+  onCancelSample,
 }: {
   projectId: string;
   groups: Array<{ category: string; rows: ScheduleEntryView[] }>;
@@ -251,6 +253,7 @@ function BoardView({
   onReorder: (rows: ScheduleEntryView[], draggedId: string, targetId: string) => void;
   onOpenPhoto: (entry: ScheduleEntryView, option: ScheduleOptionView) => void;
   onRequestSample: (option: ScheduleOptionView) => void;
+  onCancelSample: (entryId: string, option: ScheduleOptionView) => void;
 }) {
   const { draggingId, dragOverId, start, end, over, leave } = useRowDrag();
   return (
@@ -341,6 +344,17 @@ function BoardView({
                           className="cursor-pointer text-xs font-medium text-ink-secondary hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus"
                         >
                           {shown.sampleRequest ? "Request sample again" : "Request sample"}
+                        </span>
+                      ) : null}
+                      {canEdit && shown.sampleRequest?.status === "REQUESTED" ? (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(event) => { event.stopPropagation(); onCancelSample(entry.id, shown); }}
+                          onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); onCancelSample(entry.id, shown); } }}
+                          className="cursor-pointer text-xs font-medium text-ink-tertiary hover:text-danger hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus"
+                        >
+                          Cancel
                         </span>
                       ) : null}
                     </span>
@@ -442,6 +456,16 @@ export function ScheduleBoard({
     if (await run(`${entry.id}-delete`, () => deleteScheduleEntryAction({ projectId, entryId: entry.id }))) setOpenId(null);
   };
 
+  const cancelSample = async (entryId: string, option: ScheduleOptionView) => {
+    const ok = await confirm.confirm({
+      title: "Cancel this sample request?",
+      description: `${option.sampleRequest?.requestedFrom} will not be asked further. This cannot be undone.`,
+      confirmLabel: "Cancel request",
+      tone: "danger",
+    });
+    if (ok) await run(`${entryId}-sample-cancel`, () => cancelScheduleSampleAction({ projectId, requestId: option.sampleRequest!.id }));
+  };
+
   /** Reorder within one category group (one code prefix); drag targets never span groups. */
   const reorderGroup = (rows: ScheduleEntryView[], draggedId: string, targetId: string) => {
     if (draggedId === targetId) return;
@@ -531,6 +555,7 @@ export function ScheduleBoard({
                 onReorder={reorderGroup}
                 onOpenPhoto={(entry, option) => openEntry(entry.id, option.id)}
                 onRequestSample={(option) => setSampleFor(option)}
+                onCancelSample={cancelSample}
               />
             ) : (
               <div className="grid">
@@ -605,7 +630,10 @@ export function ScheduleBoard({
                                     ? [{ label: shown.sampleRequest ? "Request sample again" : "Request sample", separatorBefore: true, onSelect: () => setSampleFor(shown) }]
                                     : []),
                                   ...(canEdit && shown?.sampleRequest?.status === "REQUESTED"
-                                    ? [{ label: "Mark sample received", separatorBefore: true, onSelect: () => void run(`${entry.id}-sample-receive`, () => receiveScheduleSampleAction({ projectId, requestId: shown.sampleRequest!.id })) }]
+                                    ? [
+                                        { label: "Mark sample received", separatorBefore: true, onSelect: () => void run(`${entry.id}-sample-receive`, () => receiveScheduleSampleAction({ projectId, requestId: shown.sampleRequest!.id })) },
+                                        { label: "Cancel sample request", danger: true, onSelect: () => void cancelSample(entry.id, shown) },
+                                      ]
                                     : []),
                                   ...(canEdit ? [
                                     { label: "Move up", icon: <ArrowUp className="h-3.5 w-3.5" />, disabled: index === 0, separatorBefore: true, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "up" })) },
@@ -1039,6 +1067,16 @@ function EntryPanelContent({
     if (ok) await run(`${entry.id}-opt-${option.id}`, () => removeScheduleOptionImageAction({ projectId, optionId: option.id }));
   };
 
+  const cancelSample = async (option: ScheduleOptionView) => {
+    const ok = await confirm({
+      title: "Cancel this sample request?",
+      description: `${option.sampleRequest?.requestedFrom} will not be asked further. This cannot be undone.`,
+      confirmLabel: "Cancel request",
+      tone: "danger",
+    });
+    if (ok) await run(`${entry.id}-opt-${option.id}`, () => cancelScheduleSampleAction({ projectId, requestId: option.sampleRequest!.id }));
+  };
+
   const removeOption = async (option: ScheduleOptionView) => {
     const ok = await confirm({
       title: `Delete option ${option.label}?`,
@@ -1316,7 +1354,10 @@ function EntryPanelContent({
                           { label: option.imageUrl ? "Change photo" : "Add photo", onSelect: () => { setPhotoFor(option.id); } },
                           ...(option.imageUrl ? [{ label: "Remove photo", onSelect: () => void removePhoto(option) }] : []),
                           ...(option.sampleRequest?.status === "REQUESTED"
-                            ? [{ label: "Mark sample received", separatorBefore: true, onSelect: () => void run(`${entry.id}-opt-${option.id}`, () => receiveScheduleSampleAction({ projectId, requestId: option.sampleRequest!.id })) }]
+                            ? [
+                                { label: "Mark sample received", separatorBefore: true, onSelect: () => void run(`${entry.id}-opt-${option.id}`, () => receiveScheduleSampleAction({ projectId, requestId: option.sampleRequest!.id })) },
+                                { label: "Cancel sample request", danger: true, onSelect: () => void cancelSample(option) },
+                              ]
                             : []),
                           { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeOption(option) },
                         ]}

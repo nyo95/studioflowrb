@@ -766,6 +766,19 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       });
     },
 
+    /** Undoes a mistaken request before anyone acts on it — a hard delete, not a status. Once RECEIVED the
+     *  physical sample is a real-world fact and cannot be cancelled here. */
+    async cancelSample(input: CommandContext & { projectId: string; requestId: string }) {
+      requireCommand(input, P.scheduleManage);
+      return runTransaction(async (tx) => {
+        const request = await loadSampleRequest(tx, input.projectId, input.requestId, true);
+        if (request.status !== "REQUESTED") throw conflict("SAMPLE_NOT_PENDING", "This sample request was already resolved.");
+        await tx.sfScheduleSampleRequest.delete({ where: { id: request.id } });
+        await writeAudit(ports, tx, { action: "studioflow.schedule.sample-request-cancelled", entityType: OPTION_ENTITY, entityId: request.option_id, actor: input.actor, metadata: { projectId: input.projectId, entryId: request.option.entry_id, label: request.option.label, requestedFrom: request.requested_from } });
+        return { requestId: request.id };
+      });
+    },
+
     async searchReusableOptions(input: ReadContext & { projectId: string; query: string; section?: string; limit?: number }) {
       requireRead(input.grants);
       const query = input.query.trim().toLocaleLowerCase("id-ID");
