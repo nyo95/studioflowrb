@@ -154,22 +154,7 @@ export function UiEngineShowcase() {
   return (
     <AppShell
       collapsible
-      brand={
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="grid h-8 w-8 place-items-center rounded-card border border-line bg-surface shadow-sm">
-            <Sparkles className="h-4 w-4 text-ink" aria-hidden="true" />
-          </div>
-          <div className="min-w-0">
-            <Text as="span" className="block font-semibold leading-none">
-              UI Engine
-            </Text>
-            <Text as="span" tone="tertiary" size="sm" className="block truncate">
-              UI-F1 showcase
-            </Text>
-          </div>
-        </div>
-      }
-      collapsedBrand={<Text as="span" className="font-semibold">UI</Text>}
+      brand={<Text as="span" className="font-semibold">UI</Text>}
       navigationLabel="UI Engine showcase navigation"
       navigation={
         <div className="grid gap-1">

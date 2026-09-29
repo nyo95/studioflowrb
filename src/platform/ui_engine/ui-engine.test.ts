@@ -296,7 +296,7 @@ describe("UI Engine foundation", () => {
     assert.equal(getEffectiveRailCollapsed(false, false, true), false);
 
     const shells = readFileSync(new URL("./layouts/shells.tsx", import.meta.url), "utf8");
-    assert.match(shells, /collapsible && railPresentation !== "compact" && !narrowNavigation/);
+    assert.match(shells, /collapsible && !narrowNavigation/);
   });
 
   it("removes the rail when a surface has no application navigation", () => {

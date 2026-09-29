@@ -51,11 +51,13 @@ Type scale — five sizes, no others:
 
 Three planes in a fixed depth order: **ground → content → emphasis**.
 
-**Ground** (`--ui-canvas`, `#F1EEE9`): the page behind everything. At 1.13:1 under white it is a real plane — visible, not a hint. Nothing sits on it directly except spacing. Switch between the three ground ramps via `[data-ground]` on `<html>`: `gray` (default), `clay`, `ivory`.
+**Ground** (`--ui-canvas`, `#F0F0F0`): the page behind everything. At 1.13:1 under white it is a real plane — visible, not a hint. Nothing sits on it directly except spacing. Three ground ramps are defined and switch via `[data-ground]` on `<html>`: `gray`, `clay` (`#F5EFE7`), `ivory` (`#F3F2EE`). **No attribute is set today**, so the live ground is the neutral `:root` value; the warm ramps are available but dormant.
 
 **Planes** (`--ui-surface`, `#FFFFFF`): cards, tables, toolbars, topbar — everything the operator reads or acts on. Shadow-carried hairlines define the edge (`--ui-shadow-plane`). The ground is deep enough that shadow alone separates white planes from it; drawn borders are retained only where a shadow would be invisible (structural rail dividers, focus rings).
 
-**Rail** (`--ui-rail`, `#E8E3DB`): recesses below the ground — it reads as application chrome, not a content card. The rail being darker than the ground is deliberate: it says "this is the machine, not the work."
+**Rail** (`--ui-rail`, `#E3E3E3` at `:root`, `#E8E3DB` on the `gray` ramp): recesses below the ground — it reads as application chrome, not a content card. A rail darker than the ground is deliberate: it says "this is the machine, not the work."
+
+Known deviation: `AppShell`'s primary rail does not use this token. It computes `color-mix(in srgb, var(--ui-surface-muted) 52%, var(--ui-surface))` (≈`#F5F5F5`), which sits *above* the ground rather than below it, while the StudioFlow project secondary rail does use `--ui-rail`. The two rails therefore do not match. Resolving this is a pending visual decision, not an accident to fix silently.
 
 **Emphasis** (`--ui-action-primary`, `#231F1C`): constant graphite. It never changes per screen. "The dark button is the one that commits" is true everywhere.
 

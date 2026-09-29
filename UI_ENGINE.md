@@ -265,15 +265,17 @@ Feature-specific globals such as `--ui-brand-table-col-*`, `--ui-pricing-materia
 Owns global navigation frame, content viewport, and responsive shell behavior. Apps provide navigation configuration.
 
 The expanded rail is warm application chrome rather than a white content card.
-The sticky topbar aligns to the page content and carries app-supplied context/status.
-Platform shells may opt into `railPresentation="compact"` when the product uses
-the legacy single-header concept: the full brand header remains at the wider
-brand width while the desktop rail below is icon-only. The engine owns the
-label hiding and tooltip behavior; apps only provide navigation data.
-Active navigation uses a bordered white plane plus the retained leading ink rule;
-hover remains a lighter transient state.
+The sticky topbar is one fixed 46px line: its height, width and content never
+depend on the rail state, and it is the shell's only brand position — the rail
+carries no brand block of its own. `brand` is therefore a compact mark (a
+monogram or small logo), never a wordmark, which would repeat the application
+name already shown by the app chip beside it. The engine owns the label hiding
+and tooltip behavior; apps only provide navigation data.
+Active navigation lifts off the recessed rail as a white plane with the shadow
+that plane casts plus heavier type; hover remains a lighter transient state.
 
-**Collapsible rail.** `collapsible` opts the rail into a 232px <-> 60px icon rail.
+**Collapsible rail.** `collapsible` opts the rail into a 212px <-> 48px icon rail
+(`--ui-rail-expanded-width` / `--ui-rail-width`).
 State is controlled (`collapsed` + `onCollapsedChange`) or uncontrolled
 (`defaultCollapsed`). UI Engine owns the affordance, the widths, the transition,
 and `aria-expanded`; it does not persist the choice — persistence is app state.
@@ -284,18 +286,18 @@ is not shown, and the stored state resumes only when the viewport widens.
 
 | Prop | Type | Default | Notes |
 | --- | --- | --- | --- |
+| `brand` | `ReactNode` | — | The top bar's compact mark; required |
+| `topbar` | `ReactNode` | — | Top bar content right of the mark; required |
 | `collapsible` | `boolean` | `false` | Off by default, so existing shells are unchanged |
-| `railPresentation` | `"expanded" | "compact"` | `"expanded"` | Compact keeps the desktop rail icon-only while preserving the full header brand area |
 | `collapsed` | `boolean` | — | Controlled state; omit to let the shell manage it |
-| `defaultCollapsed` | `boolean` | `false` | Uncontrolled initial state |
-| `onCollapsedChange` | `(collapsed: boolean) => void` | — | Fires on toggle in both modes |
-| `collapsedBrand` | `ReactNode` | falls back to `brand` | Compact mark for the 60px rail |
+| `defaultCollapsed` | `boolean` | `true` | Uncontrolled initial state — the rail opens collapsed |
+| `onCollapsedChange` | `(collapsed: boolean) => void` | — | Fires on toggle |
 | `expandLabel` / `collapseLabel` | `string` | "Expand/Collapse navigation" | Accessible name for the toggle |
+| `railVisible` | `boolean` | `true` | Drops the rail column on surfaces with no application navigation |
 
-The `brand` fallback is backward compatibility only. A product that enables
-collapse must pass a mark that inherently fits the 60px rail. The rail clips its
-own visual contents and must never create document-level horizontal overflow;
-utility navigation stays mounted and reachable when collapsed.
+The rail clips its own visual contents and must never create document-level
+horizontal overflow; utility navigation stays mounted and reachable when
+collapsed.
 
 Apps group entries by user workflow rather than mirroring entity tables. Secondary
 governance destinations may be supplied in the persistent rail utility area, but
@@ -320,10 +322,11 @@ three times will drift three ways.
 The app decides *what* is current (route, pathname, scroll position). The engine
 decides how current *looks and announces*.
 
-Active is marked on **three channels at once** — an ink rule, a muted fill, and
-heavier ink-coloured type. This is deliberate: hover already owns the muted fill,
-so a fill-only active state is indistinguishable from "my cursor happens to be
-here". Never reduce it to fill alone.
+Active is marked on **three channels at once** — a white plane fill, the
+`--ui-shadow-plane` hairline that plane casts, and heavier ink-coloured type.
+This is deliberate: hover already owns a muted fill, so a fill-only active state
+is indistinguishable from "my cursor happens to be here". Never reduce it to
+fill alone.
 
 Collapsed behaviour is handled by the engine: the label is hidden *visually* —
 never with `display: none`, which would strip it from the accessibility tree and

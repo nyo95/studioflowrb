@@ -4,6 +4,7 @@ import { Download, Expand, MessageCircle, Send, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 
 import { Button, EmptyState, Input, Text, Textarea } from "@/platform/ui_engine";
 import {
@@ -155,7 +156,13 @@ export function QuickMessenger() {
           </span>
         ) : null}
       </button>
-      {open ? (
+      {/* Portalled to the body on purpose. The top bar carries
+          `backdrop-blur-[12px]`, and a backdrop-filter makes its element the
+          containing block for every `position: fixed` descendant — so rendered
+          in place, this panel anchored `bottom-4 right-4` of a 46px-tall header
+          and landed off the top of the screen instead of above the bottom-right
+          corner of the viewport. */}
+      {open ? createPortal(
         <aside className="fixed bottom-4 right-4 z-[70] grid h-[min(680px,calc(100dvh-32px))] w-[min(420px,calc(100vw-24px))] grid-rows-[auto_auto_1fr_auto] overflow-hidden rounded-control border border-line bg-surface-raised shadow-elevated">
           <div className="flex items-center gap-2 border-b border-line-subtle px-3 py-2">
             <MessageCircle size={16} aria-hidden="true" />
@@ -239,7 +246,8 @@ export function QuickMessenger() {
               Send
             </Button>
           </form>
-        </aside>
+        </aside>,
+        document.body,
       ) : null}
     </>
   );

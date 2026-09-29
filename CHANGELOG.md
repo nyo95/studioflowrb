@@ -5,13 +5,35 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.199**
-- Next local revision: **R8.200**
+- Current revision after this entry is committed: **R8.200**
+- Next local revision: **R8.201**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.200 | 2026-09-29 | fix(ui): straighten the app shell and portal the quick messenger
+
+- Removes the AppShell brand path that never ran. The rail's brand block was gated on `!topbar`, but every consumer
+  passes a topbar, so that block, the `railBrand` local, and the `collapsedBrand` prop were dead. `topbar` is now
+  required, the geometry that depended on it (`min-h`, rail `top-`, `<main>` height) no longer branches, and a single
+  `brand` prop carries the compact top-bar mark it always rendered.
+- Drops `railPresentation="compact"`. Its documented behavior — a full brand header above an icon-only rail — depends
+  on the rail brand block that no longer exists, and no consumer set it.
+- Fixes `NavSeparator`: `bg-[--ui-border-subtle]` emitted no rule under Tailwind v4, which dropped the implicit
+  `var()` wrap for the `[--token]` form. Now `bg-line-subtle`, the bridged theme utility used elsewhere in the file.
+- Portals the R8.199 quick messenger panel to `document.body`. The topbar carries `backdrop-blur-[12px]`, and a
+  backdrop-filter makes its element the containing block for every `position: fixed` descendant, so the panel
+  anchored `bottom-4 right-4` of the 46px header and rendered off the top of the viewport. The blur is intended;
+  portalling is the fix. R8.199 is not at fault — `PLAN.md` reserved UI composition for the Lead.
+- Syncs `UI_ENGINE.md` and `DESIGN.md` to the code: rail widths 212/48px (not 232/60), `defaultCollapsed` `true`,
+  the AppShell prop table, the NavItem active state as it is actually built (white plane + `--ui-shadow-plane` +
+  heavier type, no ink rule), the neutral `#F0F0F0` ground with the warm ramps recorded as defined but dormant, and
+  the primary-rail `color-mix` recorded as a known deviation from `--ui-rail` pending a visual decision.
+
+**Checks.** `tsc --noEmit` clean; `eslint .` 0 errors with the two pre-existing Presentation `<img>` warnings;
+boundary and legacy-runtime checks OK; whitespace clean staged and unstaged.
 
 ## R8.199 | 2026-09-29 | feat(platform): add quick messenger popup
 

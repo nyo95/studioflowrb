@@ -27,23 +27,25 @@ function useNarrowNavigation(): boolean {
 }
 
 export type AppShellProps = {
+  /**
+   * The mark in the top bar. That bar is one 46px line and the app chip beside
+   * it already names the application, so this is a monogram or a small logo —
+   * never a wordmark, which read "StudioFlow StudioFlow" next to the chip.
+   */
   brand: ReactNode;
   navigation: ReactNode;
   utility?: ReactNode;
-  topbar?: ReactNode;
+  /** Top bar content to the right of the mark. */
+  topbar: ReactNode;
   children: ReactNode;
   navigationLabel?: string;
   className?: string;
   /** Show the rail collapse control. Off by default so existing shells are unchanged. */
   collapsible?: boolean;
-  /** Keep the desktop rail icon-only while retaining the full brand header. */
-  railPresentation?: "expanded" | "compact";
   /** Controlled collapsed state. Omit to let the shell manage it. */
   collapsed?: boolean;
   defaultCollapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
-  /** Compact mark rendered in place of `brand` while collapsed. Falls back to `brand`. */
-  collapsedBrand?: ReactNode;
   expandLabel?: string;
   collapseLabel?: string;
   /** Remove the application rail when the current surface has no navigation. */
@@ -59,21 +61,18 @@ export function AppShell({
   navigationLabel = "Application navigation",
   className,
   collapsible = false,
-  railPresentation = "expanded",
   collapsed,
   defaultCollapsed = true,
   onCollapsedChange,
-  collapsedBrand,
   expandLabel = "Expand navigation",
   collapseLabel = "Collapse navigation",
   railVisible = true,
 }: AppShellProps) {
   const [internalCollapsed, setInternalCollapsed] = useState(defaultCollapsed);
   const narrowNavigation = useNarrowNavigation();
-  const storedCollapsed = railPresentation === "compact" ? true : collapsed ?? internalCollapsed;
   // Narrow layouts always retain visible labels. The desktop preference remains
   // untouched and returns when the viewport widens again.
-  const isCollapsed = railVisible && getEffectiveRailCollapsed(collapsible, narrowNavigation, storedCollapsed);
+  const isCollapsed = railVisible && getEffectiveRailCollapsed(collapsible, narrowNavigation, collapsed ?? internalCollapsed);
 
   const toggle = () => {
     const next = !isCollapsed;
@@ -81,28 +80,22 @@ export function AppShell({
     onCollapsedChange?.(next);
   };
 
-  const railBrand = railPresentation === "compact" ? brand : isCollapsed ? (collapsedBrand ?? brand) : brand;
-
   return (
     <RailContext.Provider value={{ collapsed: isCollapsed }}>
       <div className={cx("min-h-dvh overflow-x-clip", className)} data-collapsed={isCollapsed || undefined}>
-        {/* The top bar is one fixed line: its width and content never depend on the rail state. */}
-        {topbar ? (
-          <header className="sticky top-0 z-20 flex h-(--ui-topbar-height) items-center gap-2.5 border-b border-line-subtle bg-surface/82 px-3.5 backdrop-blur-[12px] max-[840px]:px-3">
-            {/* Always the compact mark. The top bar is one 46px line and the app
-                chip beside it already names the application, so the full wordmark
-                here read "StudioFlow StudioFlow" whenever the rail was expanded. */}
-            <div className="flex shrink-0 items-center">{collapsedBrand ?? brand}</div>
-            <div className="flex min-w-0 flex-1 items-center gap-2.5">{topbar}</div>
-          </header>
-        ) : null}
+        {/* One fixed line. Its height, width and content never depend on the rail
+            state, so the mark is the compact one in both states — the rail owns
+            no brand block of its own. */}
+        <header className="sticky top-0 z-20 flex h-(--ui-topbar-height) items-center gap-2.5 border-b border-line-subtle bg-surface/82 px-3.5 backdrop-blur-[12px] max-[840px]:px-3">
+          <div className="flex shrink-0 items-center">{brand}</div>
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">{topbar}</div>
+        </header>
         <div
           className={cx(
-            "grid overflow-x-clip transition-[grid-template-columns] duration-[160ms] motion-reduce:transition-none",
+            "grid min-h-[calc(100dvh-var(--ui-topbar-height))] overflow-x-clip transition-[grid-template-columns] duration-[160ms] motion-reduce:transition-none",
             railVisible
               ? "grid-cols-[var(--ui-rail-width)_minmax(0,1fr)] max-[840px]:grid-cols-1 max-[840px]:block"
               : "grid-cols-1",
-            topbar ? "min-h-[calc(100dvh-var(--ui-topbar-height))]" : "min-h-dvh",
           )}
           /* The expanded width is set inline, not as a `[--ui-rail-width:…]`
              utility. Tailwind emits no rule for that arbitrary-property form
@@ -122,25 +115,11 @@ export function AppShell({
             className={cx(
               "group relative sticky top-(--ui-topbar-height) flex h-[calc(100dvh-var(--ui-topbar-height))] max-w-screen min-w-0 flex-col overflow-hidden border-r border-line-subtle",
               "bg-[color-mix(in_srgb,var(--ui-surface-muted)_52%,var(--ui-surface))]",
-              !topbar && "top-0 h-screen",
               "max-[840px]:static max-[840px]:h-auto max-[840px]:border-b max-[840px]:border-r-0",
             )}
             aria-label={navigationLabel}
             data-collapsed={isCollapsed || undefined}
           >
-
-            {!topbar ? (
-              <div
-                className={cx(
-                  "flex min-h-[72px] items-center justify-between gap-2 px-4 py-3.5 max-[840px]:min-h-[52px]",
-                  isCollapsed && "flex-col justify-center gap-1.5 px-2 py-2.5",
-                )}
-              >
-                <div className={cx("min-w-0 overflow-hidden", isCollapsed && "grid place-items-center")}>
-                  {railBrand}
-                </div>
-              </div>
-            ) : null}
             <nav
               className={cx(
                 "min-w-0 flex-1 overflow-auto px-[9px] pt-2 pb-2",
@@ -155,7 +134,7 @@ export function AppShell({
                 icons (prototype `.a-rail-toggle`). It was a 16px sliver pinned to
                 the rail's outer edge at mid-height — an easy thing to hit by
                 accident and a hard thing to find on purpose. */}
-            {collapsible && railPresentation !== "compact" && !narrowNavigation ? (
+            {collapsible && !narrowNavigation ? (
               <button
                 type="button"
                 className={cx(
@@ -201,7 +180,7 @@ export function NavSeparator() {
   return (
     <div
       role="separator"
-      className="mx-0.5 my-2 h-px bg-[--ui-border-subtle] group-data-collapsed:hidden max-[840px]:hidden"
+      className="mx-0.5 my-2 h-px bg-line-subtle group-data-collapsed:hidden max-[840px]:hidden"
     />
   );
 }

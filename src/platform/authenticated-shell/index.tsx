@@ -12,8 +12,6 @@ import type { ReactNode } from "react";
 
 /* eslint-disable @next/next/no-img-element -- brand mark accepts a local path or owner-configured host. */
 
-import { Text } from "@/platform/ui_engine";
-
 import type { SessionPrincipal } from "@platform/core/auth";
 
 import type { PlatformGeneralSettings } from "@platform/core/settings";
@@ -39,13 +37,12 @@ function brandMark(name: string): string {
   return initials.slice(0, 3).toUpperCase();
 }
 
-export function AuthenticatedShell({ principal, grants, settings, apps, logoutAction, appName, appAbbreviation, domainNavigation, domainUtilityNavigation, contextSlot, children }: {
+export function AuthenticatedShell({ principal, grants, settings, apps, logoutAction, appAbbreviation, domainNavigation, domainUtilityNavigation, contextSlot, children }: {
   principal: SessionPrincipal;
   grants: readonly string[];
   settings: PlatformGeneralSettings;
   apps: readonly ShellAppLink[];
   logoutAction: () => Promise<void>;
-  appName?: string;
   appAbbreviation?: string;
   domainNavigation?: ReactNode;
   domainUtilityNavigation?: ReactNode;
@@ -59,32 +56,19 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
     ? settings.organizationName
     : settings.appTitle;
   const productMark = brandMark(markSource) || "SF";
-  const subtitle = appName ?? settings.organizationName;
   const { showSettings } = getSettingsMenuVisibility(grants);
   return (
     <DisplaySettingsProvider value={{ locale: settings.locale, timezone: settings.timezone }}><RouteAwareAppShell
       appRootPaths={apps.map((app) => app.rootPath)}
+      /* The top bar is one 46px line and the app chip beside it already names
+         the application, so the mark stays compact in both rail states: the
+         configured brand image, or a mono monogram on its own baseline —
+         no chip, no box. */
       brand={settings.brandMarkUrl ? (
-        <Link href="/" aria-label={`Open ${settings.appTitle} home`} className="flex min-w-0 items-center rounded-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
-          <img src={settings.brandMarkUrl} alt={settings.appTitle} className="h-7 max-w-[150px] shrink-0 object-contain object-left" />
-        </Link>
-      ) : (
-        <Link href="/" aria-label={`Open ${settings.appTitle} home`} className="flex min-w-0 items-center gap-2.5 rounded-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
-          <div className="min-w-0">
-            <Text as="span" className="block truncate font-semibold">{settings.appTitle}</Text>
-            {subtitle !== settings.appTitle ? (
-              <Text as="span" tone="tertiary" size="sm" className="block truncate">{subtitle}</Text>
-            ) : null}
-          </div>
-        </Link>
-      )}
-      collapsedBrand={settings.brandMarkUrl ? (
         <Link href="/" aria-label={`Open ${settings.appTitle} home`} className="flex items-center rounded-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
           <img src={settings.brandMarkUrl} alt={settings.appTitle} className="h-6 w-auto max-w-24 object-contain" />
         </Link>
       ) : (
-        /* The top bar's mark is a mono monogram on its own baseline — no chip,
-           no box. Sized to sit on one 46px line beside the app chip. */
         <Link href="/" aria-label={`Open ${settings.appTitle} home`} className="flex items-center rounded-action px-0.5 font-ui-mono text-xs font-medium tracking-[0.16em] text-ink no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
           {appAbbreviation ?? productMark}
         </Link>
