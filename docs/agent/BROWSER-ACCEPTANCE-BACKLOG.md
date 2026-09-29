@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.201] QuickMessenger popup stays viewport-anchored
+- Surface: authenticated shell topbar / QuickMessenger
+- Fixture: authenticated user with access to the platform shell
+- Viewport: desktop and 375 px
+- Steps: 1. Open the messenger from the topbar icon. 2. Repeat at 375 px.
+- Acceptance: the panel sits at the bottom-right of the viewport and is fully visible at both viewports.
+- Status: PENDING
+
 ### [R8.178] Archive retains files inside the configured window
 - Surface: StudioFlow project archive dialog and settings (Lead UI follow-up)
 - Fixture: disposable project with deliverable, MOM current/revision images and schedule photos; settings manager

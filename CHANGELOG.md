@@ -5,13 +5,25 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.200**
-- Next local revision: **R8.201**
+- Current revision after this entry is committed: **R8.201**
+- Next local revision: **R8.202**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.201 | 2026-09-29 | test(platform): guard quick messenger portal
+
+- Adds a source regression test for `QuickMessenger` requiring the fixed popup panel to render through
+  `createPortal(..., document.body)` rather than as a plain topbar descendant. This preserves the R8.200 fix for
+  backdrop-filter containing-block behavior.
+- Adds the pending browser acceptance item for desktop and 375 px verification that the popup stays bottom-right and
+  fully visible.
+
+**Checks.** `npm test` 633/633; `tsc --noEmit` clean; `eslint .` 0 errors with the two pre-existing
+Presentation `<img>` warnings; boundary and legacy-runtime checks OK; production build passed with
+`STUDIOFLOW_LOCATION=kantor`; whitespace clean staged and unstaged.
 
 ## R8.200 | 2026-09-29 | fix(ui): straighten the app shell and portal the quick messenger
 
