@@ -5,13 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.205**
-- Next local revision: **R8.206**
+- Current revision after this entry is committed: **R8.206**
+- Next local revision: **R8.207**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.206 | 2026-09-29 | docs(platform): plan quick messenger composer refinement
+
+- Recorded the owner's UI/UX work order for Claude: safe outside dismissal that retains the session draft, Enter-send
+  with Shift/Alt+Enter newline and IME protection, plain-text list continuation, and compact attachment picker/drop
+  support. The plan preserves the completed platform Messenger backend and its attachment/security contract; it makes
+  no product-code change.
+
+**Checks.** Documentation-only change; whitespace check passes.
 
 ## R8.205 | 2026-09-29 | fix(bq,platform): make sibling ordering durable and schedule local messenger cleanup
 

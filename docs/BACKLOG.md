@@ -130,6 +130,32 @@ Rules carried over unchanged from the prior trackers:
   attachment and open it before expiry. Expiry itself is covered by service tests and need not wait 30 minutes in the
   browser.
 
+- [PLANNED] **Quick Messenger composer usability refinement — UI/UX (Claude).** Owner request, 2026-09-29. Refine
+  only the bottom-right quick-messenger popup; `/messenger` remains unchanged in this slice. Preserve the current
+  platform messenger service, server actions, private-storage flow, attachment limits (five files, 10 MB each), and
+  plain-text message contract—no rich-text schema, new dependency, or alternate upload path.
+
+  - **Dismissal and draft safety.** Collapse the popup when pointer or keyboard focus moves outside it, and on Escape.
+    Do not dismiss while interacting with its recipient picker, composer, file picker, attachment controls, or other
+    popup content. Collapsing must retain an unsent text draft and selected attachments for that browser session;
+    reopening restores them. Explicit close may use the same retained-draft behavior.
+  - **Keyboard send.** Enter sends a valid message. Shift+Enter and Alt+Enter insert a newline. Ignore Enter while
+    an IME composition is in progress. Keep the existing disabled/pending protections so blank messages cannot send
+    and a request is never sent twice.
+  - **Plain-text list continuation.** In the composer only, pressing Enter after a line beginning `- `, `* `, or an
+    ordered prefix such as `1. ` continues that prefix on the next line. Enter on an empty list line exits the list.
+    This is an editor convenience only: message storage and rendering remain ordinary plain text.
+  - **Compact composer and files.** Use the UI Engine's established controls/icons to place a small send control at
+    the right edge and a `+` attachment control beside the composer. Accept dropping files onto the composer as the
+    same client-side selection path as the `+` picker, show the selected-file state/error accessibly, and preserve
+    the current server-side validation as the authority. Make the drop target and keyboard focus state visible without
+    obscuring message history.
+
+  **Acceptance evidence (Lead/Reviewer).** Verify mouse and keyboard dismissal without data loss; Enter/newline and
+  IME behavior; unordered and ordered continuation/exit; picker and drag-drop uploads; the five-file/10-MB failure
+  states; and an ordinary text-only send. Check both an empty quick-message state and an already-open conversation,
+  at desktop and a narrow viewport.
+
 ## UI Engine and Shared Utilities
 
 - [ ] [UNVERIFIED] Browser walk of Badge/FilterChip/Avatar/Switch/multi-select
