@@ -6,7 +6,7 @@ import { readPlatformGeneralSettings } from "@platform/core/settings";
 import { currentDateOnly } from "@platform/utilities/date";
 import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
-import { FilterChip, PageHeader, PageShell } from "@/platform/ui_engine";
+import { filterChipClasses, PageHeader, PageShell } from "@/platform/ui_engine";
 
 import { pageSession } from "./_components/session";
 import { PhaseAttentionSection } from "./_components/phase-attention";
@@ -49,8 +49,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         description={today.scope === "mine" ? `${firstName}, ${summary.toLowerCase()}` : `${summary} across running projects`}
         actions={canSeeAll ? (
           <div className="flex gap-1.5" role="group" aria-label="Scope">
-            <Link href="/studioflow" prefetch={false}><FilterChip selected={today.scope === "mine"}>My projects</FilterChip></Link>
-            <Link href="/studioflow?scope=all" prefetch={false}><FilterChip selected={today.scope === "all"}>All projects</FilterChip></Link>
+            <Link href="/studioflow" prefetch={false} className={filterChipClasses(today.scope === "mine")} aria-current={today.scope === "mine" ? "page" : undefined}>My projects</Link>
+            <Link href="/studioflow?scope=all" prefetch={false} className={filterChipClasses(today.scope === "all")} aria-current={today.scope === "all" ? "page" : undefined}>All projects</Link>
           </div>
         ) : undefined}
         divider

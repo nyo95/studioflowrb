@@ -5,13 +5,27 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.195**
-- Next local revision: **R8.196**
+- Current revision after this entry is committed: **R8.196**
+- Next local revision: **R8.197**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.196 | 2026-09-29 | fix(studioflow): make Today scope links valid and protect print routes
+
+- Today scope choices now use the existing filter-chip link styling directly, with `aria-current` for the selected
+  destination. This removes the invalid interactive button inside each link without changing scope URLs or filtering.
+- The authenticated document route segment now supplies localized loading and unexpected-error/retry states for the
+  existing Schedule, MOM, and Presentation print pages.
+
+**Checks.** `npm test` 628/628; `tsc --noEmit` clean; `eslint .` 0 errors with two pre-existing Presentation image
+warnings; boundary and legacy-runtime checks clean; production build passed. Browser verification on disposable
+`studioflow_rebuild_test`: Today navigates by keyboard between both scopes, exposes one `aria-current` link, and contains
+no nested buttons; an authorized Schedule print route renders its document and print controls. A nonexistent print
+project correctly returns 404. The generic unexpected-error fallback was not deliberately induced, so SF-13 remains
+`[UNVERIFIED]` for that one browser state. Sample-request and Presentation acceptance records remain open.
 
 ## R8.195 | 2026-09-29 | fix(bq): Assembly picker used a bare native select instead of the searchable-picker pattern
 

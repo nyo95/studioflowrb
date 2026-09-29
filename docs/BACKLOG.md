@@ -802,31 +802,13 @@ was fixed in R8.165._
   `const passwordHash = await hashPassword(...)` above the
   `runTransaction(...)` call; the value is transaction-independent.
 
-- [ ] [BUG] **SF-12 - Today scope chips nest a `<button>` inside a `<Link>`,
-  which is invalid HTML and breaks the engine's own ARIA contract.**
-  `src/app/(platform)/studioflow/page.tsx:45-46` wraps `<FilterChip>` in
-  `<Link>`, but `FilterChip` renders a real
-  `<button type="button" aria-pressed={selected}>`
-  (`src/platform/ui_engine/primitives/actions.tsx:115-127`). The engine documents
-  the intended contract in `primitives/button-classes.ts` - the caller sets
-  `aria-pressed` for the button form OR `aria-current` for the link form - and
-  `FILTER_CHIP_BASE_CLASSES` even includes `no-underline` and `cursor-pointer` so
-  the chip can BE the anchor. Result: a toggle button announced inside a link,
-  whose `aria-pressed` describes a state that activation cannot change (it
-  navigates). NOT YET CONFIRMED in a browser whether a mouse click still
-  navigates - the code does not prove it either way. Fix: apply
-  `filterChipClasses(selected)` to the `Link` itself with `aria-current`.
-
-- [ ] [BUG] **SF-13 - Print routes have no error or loading boundary.**
-  `src/app/(document)/` has no sibling `error.tsx` or `loading.tsx`. The schedule
-  print page converts only `NOT_FOUND`/`FORBIDDEN` to `notFound()` and rethrows
-  everything else
-  (`src/app/(document)/studioflow/print/projects/[projectId]/schedule/page.tsx:47-50`),
-  which lands on Next's built-in unstyled English error page instead of the app's
-  branded one at `src/app/(platform)/error.tsx:8-11`. There is no loading state
-  either, so a new print tab is blank while the database is queried. Reachable
-  from Schedule "Print / PDF" (`schedule-board.tsx:454-461`) and the MOM print
-  link. Fix: add `(document)/error.tsx` and `loading.tsx`.
+- [ ] [UNVERIFIED] **SF-13 - Print route recovery state.** Implemented in R8.196:
+  the `(document)` route segment now supplies the localized loading state and a
+  client recovery boundary with retry for Schedule, MOM, and Presentation print
+  pages. An authenticated browser walk verified a normal Schedule document
+  renders; a nonexistent project correctly reaches `notFound()`. The generic
+  unexpected-error fallback was not artificially induced against the disposable
+  database, so its browser proof remains open.
 
 - [ ] [CLEANUP] **KB-043 - Generic directory machinery is copy-pasted instead of
   shared.** Seven byte-identical ~10-line `runRowAction` pending/error/success
@@ -965,6 +947,13 @@ was fixed in R8.165._
   at rows in the REBUILD database, which `AGENTS.md` treats as implemented-state
   evidence rather than a place to park legacy compatibility. Confirm no rows use
   it, then drop the member.
+
+### Closed 2026-09-29 (R8.196)
+
+- **SF-12** Today scope controls are links styled with `filterChipClasses`, not
+  buttons inside links. Browser-verified in R8.196: keyboard activation moves
+  between `scope=all` and the default scope, exactly one current link is exposed,
+  and neither link contains a button.
 
 ### Closed 2026-09-28 (R8.173 Backend Executor, R8.174 Lead)
 
