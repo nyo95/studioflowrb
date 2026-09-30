@@ -24,7 +24,7 @@ function intake(sourceRequestId: string, status: SampleRequestIntakeStatus, over
     id: `intake-${sourceRequestId}`, status, sourceRequestId, sourceProjectId: "p1", sourceProjectName: "2026-506 Test", sourceOptionId: `option-${sourceRequestId}`,
     productName: `Product ${sourceRequestId}`, brandName: "Brand", color: "Oak", pattern: null, finishing: null, dimension: null, requestedFrom: "Toko Kayu",
     requestNote: null, requesterUserId: "designer-1", requesterLabel: "Dina", requestedAt: new Date("2026-09-10T03:00:00Z"), vendorId: null,
-    quotedAmount: null, quotedCurrency: null, staffNote: null, skuId: null, priceMaterialId: null, handledBy: { id: "staff-1", label: "Sari Staff" },
+    quotedAmount: null, quotedCurrency: null, staffNote: null, skuId: null, priceMaterialId: null, linkedSkuName: null, linkedSkuCode: null, linkedPriceAmount: null, handledBy: { id: "staff-1", label: "Sari Staff" },
     startedAt: new Date("2026-09-11T03:00:00Z"), resolvedAt: status === "IN_PROGRESS" ? null : new Date("2026-09-12T03:00:00Z"), ...over,
   };
 }
@@ -41,6 +41,7 @@ function setup(state: { pending?: SampleRequestRead[]; sources?: SampleRequestRe
       async startSampleRequestIntake({ snapshot }) { calls.push("md.start"); started.push(snapshot); return intake(snapshot.sourceRequestId, "IN_PROGRESS"); },
       async recordSampleQuote({ intakeId }) { calls.push(`md.quote:${intakeId}`); return intake("x", "IN_PROGRESS"); },
       async markSampleRequestPriced({ intakeId }) { calls.push(`md.priced:${intakeId}`); return intake("x", "PRICED"); },
+      async syncSampleQuoteToPrice({ intakeId }) { calls.push(`md.sync:${intakeId}`); return intake("x", "PRICED"); },
       async declineSampleRequest({ intakeId }) { calls.push(`md.decline:${intakeId}`); return intake("x", "DECLINED"); },
       async listSampleRequestIntakes({ status, sourceRequestIds }) {
         calls.push(`md.list:${status ?? (sourceRequestIds ? "ids" : "all")}`);

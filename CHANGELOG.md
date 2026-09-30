@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.233**
-- Next local revision: **R8.234**
+- Current revision after this entry is committed: **R8.234**
+- Next local revision: **R8.235**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.234 | 2026-09-30 | feat(masterdata): sync a sample quote to the material price list
+
+- **Sample quote price sync.** Master Data now exposes `syncSampleQuoteToPrice`: a staff member holding both the sample-request and material-price manage grants can create or update the matching live SKU/supplier material price from a complete quoted amount and currency. The request is linked to that price, existing price notes are retained with the sample-request note appended, and a repeated matching sync is a no-op.
+- **Safety and audit.** Declined or incomplete requests are refused with plain errors; live SKU, supplier capability, currency, amount, derived unit, and price rules continue through the existing pricing service. One combined `masterdata.sample-request.price-synced` audit event records the result; the underlying pricing audit is suppressed.
+- **Read contract and tests.** Sample-request reads now include the linked SKU name/code and price amount through batched lookups. Integration coverage proves create/update, note preservation, idempotency, dual permissions, incomplete and declined requests.
+- **Dependencies and migrations.** None.
+- **Verification.** `npm test` passed; `npx tsc --noEmit` passed; `npm run check` passed; `npx eslint .` completed with 2 pre-existing StudioFlow `<img>` warnings and no errors; `npm run build` passed. The running owner dev server rendered `/masterdata/sample-requests` and `/masterdata/pricing`; both safely redirect anonymous visitors to `/login`. Browser acceptance is queued in `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`.
 
 ## R8.233 | 2026-09-30 | refactor(platform): one Prisma schema file per app, migration isolation rule, BQ index drift fixed
 

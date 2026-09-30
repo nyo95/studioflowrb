@@ -22,6 +22,7 @@ type SampleRequestCoordinatorDependencies = {
     startSampleRequestIntake(input: { grants: PermissionGrants; actor: Actor; snapshot: SampleRequestSnapshot }): Promise<SampleRequestIntakeRead>;
     recordSampleQuote(input: { grants: PermissionGrants; actor: Actor; intakeId: string } & SampleQuoteInput): Promise<SampleRequestIntakeRead>;
     markSampleRequestPriced(input: { grants: PermissionGrants; actor: Actor; intakeId: string } & SampleQuoteInput): Promise<SampleRequestIntakeRead>;
+    syncSampleQuoteToPrice(input: { grants: PermissionGrants; actor: Actor; intakeId: string }): Promise<SampleRequestIntakeRead>;
     declineSampleRequest(input: { grants: PermissionGrants; actor: Actor; intakeId: string; reason: string }): Promise<SampleRequestIntakeRead>;
     listSampleRequestIntakes(input: { grants: PermissionGrants; status?: SampleRequestIntakeStatus; sourceRequestIds?: readonly string[]; limit?: number }): Promise<SampleRequestIntakeRead[]>;
   };

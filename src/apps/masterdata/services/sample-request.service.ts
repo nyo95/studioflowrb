@@ -4,6 +4,7 @@ import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
 import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, actorIsUsable, requiredAmount, requiredCurrency, writeAudit } from "./shared";
+import { createPricingService } from "./pricing.service";
 
 const ENTITY = "sample_request_intake";
 const TEXT_MAX = 300;
@@ -50,6 +51,9 @@ export type SampleRequestIntakeRead = SampleRequestSnapshot & {
   staffNote: string | null;
   skuId: string | null;
   priceMaterialId: string | null;
+  linkedSkuName: string | null;
+  linkedSkuCode: string | null;
+  linkedPriceAmount: string | null;
   handledBy: { id: string; label: string };
   startedAt: Date;
   resolvedAt: Date | null;
@@ -57,7 +61,7 @@ export type SampleRequestIntakeRead = SampleRequestSnapshot & {
 
 type Row = Awaited<ReturnType<PrismaClient["sampleRequestIntake"]["findUniqueOrThrow"]>>;
 
-function toRead(row: Row): SampleRequestIntakeRead {
+function toRead(row: Row, links: { skuName: string | null; skuCode: string | null; priceAmount: string | null } = { skuName: null, skuCode: null, priceAmount: null }): SampleRequestIntakeRead {
   return {
     id: row.id,
     status: row.status,
@@ -82,10 +86,29 @@ function toRead(row: Row): SampleRequestIntakeRead {
     staffNote: row.staff_note,
     skuId: row.sku_id,
     priceMaterialId: row.price_material_id,
+    linkedSkuName: links.skuName,
+    linkedSkuCode: links.skuCode,
+    linkedPriceAmount: links.priceAmount,
     handledBy: { id: row.handled_by_user_id, label: row.handled_by_label },
     startedAt: row.started_at,
     resolvedAt: row.resolved_at,
   };
+}
+
+async function enrichIntakes(db: PrismaClient, rows: readonly Row[]): Promise<SampleRequestIntakeRead[]> {
+  const skuIds = [...new Set(rows.flatMap((row) => row.sku_id ? [row.sku_id] : []))];
+  const priceIds = [...new Set(rows.flatMap((row) => row.price_material_id ? [row.price_material_id] : []))];
+  const [skus, prices] = await Promise.all([
+    skuIds.length ? db.sku.findMany({ where: { id: { in: skuIds } }, select: { id: true, name: true, code: true } }) : [],
+    priceIds.length ? db.priceMaterial.findMany({ where: { id: { in: priceIds } }, select: { id: true, amount: true } }) : [],
+  ]);
+  const skuById = new Map(skus.map((sku) => [sku.id, sku]));
+  const priceById = new Map(prices.map((price) => [price.id, price]));
+  return rows.map((row) => {
+    const sku = row.sku_id ? skuById.get(row.sku_id) : undefined;
+    const price = row.price_material_id ? priceById.get(row.price_material_id) : undefined;
+    return toRead(row, { skuName: sku?.name ?? null, skuCode: sku?.code ?? null, priceAmount: price?.amount.toString() ?? null });
+  });
 }
 
 function text(value: string | null | undefined, max: number, code: string, label: string, required = false): string | null {
@@ -108,6 +131,14 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
     if (!row) throw notFound();
     if (row.status !== "IN_PROGRESS") throw new AppError("CONFLICT", "SAMPLE_INTAKE_NOT_OPEN", "This sample request was already finished.");
     return row;
+  }
+
+  function samplePriceNote(row: Row): string {
+    return `From sample request: ${row.product_name} (${row.source_project_name})`;
+  }
+
+  function appendNote(existing: string | null, note: string): string {
+    return existing?.includes(note) ? existing : [existing, note].filter(Boolean).join("\n");
   }
 
   /** Validates the quote fields against live Master Data and returns only the columns the caller actually set. */
@@ -199,7 +230,7 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
         if (existing) {
           if (existing.status !== "IN_PROGRESS") throw new AppError("CONFLICT", "SAMPLE_INTAKE_ALREADY_RESOLVED", "This sample request was already finished.");
           // The same person pressing Take twice is not an error; a different person is.
-          if (existing.handled_by_user_id === input.actor.userId) return toRead(existing);
+          if (existing.handled_by_user_id === input.actor.userId) return (await enrichIntakes(tx as PrismaClient, [existing]))[0];
           throw new AppError("CONFLICT", "SAMPLE_INTAKE_ALREADY_TAKEN", `${existing.handled_by_label} already took this request.`);
         }
         let row: Row;
@@ -212,7 +243,7 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
           throw error;
         }
         await writeAudit(ports, tx, { action: "masterdata.sample-request.started", entityType: ENTITY, entityId: row.id, actor: input.actor, metadata: { sourceRequestId: row.source_request_id, sourceProjectId: row.source_project_id } });
-        return toRead(row);
+        return (await enrichIntakes(tx as PrismaClient, [row]))[0];
       });
     },
 
@@ -223,10 +254,10 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
       return runTransaction(async (tx) => {
         const current = await openIntake(tx, input.intakeId);
         const data = await quoteData(tx, current, input);
-        if (Object.keys(data).length === 0) return toRead(current);
+        if (Object.keys(data).length === 0) return (await enrichIntakes(tx as PrismaClient, [current]))[0];
         const row = await tx.sampleRequestIntake.update({ where: { id: current.id }, data });
         await writeAudit(ports, tx, { action: "masterdata.sample-request.quote-recorded", entityType: ENTITY, entityId: row.id, actor: input.actor, changes: changesOf(current, data), metadata: { sourceRequestId: row.source_request_id } });
-        return toRead(row);
+        return (await enrichIntakes(tx as PrismaClient, [row]))[0];
       });
     },
 
@@ -245,7 +276,7 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
         const row = await tx.sampleRequestIntake.update({ where: { id: current.id }, data: { ...data, status: "PRICED", resolved_at: new Date() } });
         await writeAudit(ports, tx, { action: "masterdata.sample-request.priced", entityType: ENTITY, entityId: row.id, actor: input.actor, changes: changesOf(current, data), metadata: { sourceRequestId: row.source_request_id, sourceProjectId: row.source_project_id } });
         await ports.sampleRequestNotifier?.resolved(tx, { outcome: "priced", intake: toRead(row) });
-        return toRead(row);
+        return (await enrichIntakes(tx as PrismaClient, [row]))[0];
       });
     },
 
@@ -259,7 +290,53 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
         const row = await tx.sampleRequestIntake.update({ where: { id: current.id }, data: { status: "DECLINED", staff_note: reason, resolved_at: new Date() } });
         await writeAudit(ports, tx, { action: "masterdata.sample-request.declined", entityType: ENTITY, entityId: row.id, actor: input.actor, metadata: { sourceRequestId: row.source_request_id, sourceProjectId: row.source_project_id } });
         await ports.sampleRequestNotifier?.resolved(tx, { outcome: "declined", intake: toRead(row) });
-        return toRead(row);
+        return (await enrichIntakes(tx as PrismaClient, [row]))[0];
+      });
+    },
+
+    /** Copies a complete sample quote to the matching SKU/supplier material price in one audited operation. */
+    async syncSampleQuoteToPrice(input: { grants: PermissionGrants; actor: AuditActor; intakeId: string }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.sampleRequestManage);
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
+      actorIsUsable(input.actor);
+      return runTransaction(async (tx) => {
+        const current = await tx.sampleRequestIntake.findUnique({ where: { id: input.intakeId } });
+        if (!current) throw notFound();
+        if (current.status === "DECLINED") throw new AppError("CONFLICT", "SAMPLE_INTAKE_DECLINED", "A declined sample request cannot be added to the price list.");
+        const missing = [
+          !current.vendor_id ? "supplier" : null,
+          !current.sku_id ? "SKU" : null,
+          current.quoted_amount === null ? "quoted amount" : null,
+          !current.quoted_currency ? "currency" : null,
+        ].filter(Boolean);
+        if (missing.length) throw new AppError("VALIDATION", "SAMPLE_PRICE_SYNC_INCOMPLETE", `Add the ${missing.join(", ")} before adding this quote to the price list.`);
+        const amount = current.quoted_amount!;
+        const currency = current.quoted_currency!;
+
+        const linked = current.price_material_id
+          ? await tx.priceMaterial.findFirst({ where: { id: current.price_material_id, deleted_at: null }, select: { id: true, amount: true, currency: true } })
+          : null;
+        if (linked && linked.amount.toString() === amount.toString() && linked.currency === currency) {
+          return (await enrichIntakes(tx as PrismaClient, [current]))[0];
+        }
+
+        const existing = await tx.priceMaterial.findFirst({
+          where: { sku_id: current.sku_id!, supplier_vendor_id: current.vendor_id!, deleted_at: null },
+          select: { id: true, notes: true },
+        });
+        const pricing = createPricingService(tx as PrismaClient, { ...ports, runTransaction: async (work) => work(tx) });
+        const note = samplePriceNote(current);
+        const action = existing ? "updated" as const : "created" as const;
+        const priceMaterialId = existing
+          ? (await pricing.updatePriceMaterial({ grants: input.grants, actor: input.actor, priceMaterialId: existing.id, amount: amount.toString(), currency, notes: appendNote(existing.notes, note), suppressAudit: true })).priceMaterialId
+          : (await pricing.createPriceMaterial({ grants: input.grants, actor: input.actor, skuId: current.sku_id!, supplierVendorId: current.vendor_id!, amount: amount.toString(), currency, notes: note, suppressAudit: true })).priceMaterialId;
+        const row = await tx.sampleRequestIntake.update({ where: { id: current.id }, data: { price_material_id: priceMaterialId } });
+        await writeAudit(ports, tx, {
+          action: "masterdata.sample-request.price-synced", entityType: ENTITY, entityId: row.id, actor: input.actor,
+          changes: { priceMaterialId: { from: current.price_material_id, to: priceMaterialId }, action: { from: null, to: action }, amount: { from: null, to: amount.toString() }, currency: { from: null, to: currency } },
+          metadata: { sourceRequestId: row.source_request_id, skuId: current.sku_id, vendorId: current.vendor_id },
+        });
+        return (await enrichIntakes(tx as PrismaClient, [row]))[0];
       });
     },
 
@@ -276,7 +353,7 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
         orderBy: [{ started_at: "desc" }, { id: "asc" }],
         take: limit,
       });
-      return rows.map(toRead);
+      return enrichIntakes(db, rows);
     },
 
     /**
@@ -299,7 +376,7 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.sampleRequestManage);
       const row = await db.sampleRequestIntake.findUnique({ where: { id: input.intakeId } });
       if (!row) throw notFound();
-      return toRead(row);
+      return (await enrichIntakes(db, [row]))[0];
     },
   };
 }

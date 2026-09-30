@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.234] Sample quote to material price list
+- Surface: `/masterdata/sample-requests` and `/masterdata/pricing`
+- Fixture: staff with sample-request and material-price manage grants; an in-progress sample request with a supplier, SKU, amount, and currency
+- Viewport: desktop (default)
+- Steps: 1. Open the sample-request queue and record a complete quote with a linked SKU. 2. Use the Lead-owned Add to price list action once it is wired. 3. Open Pricing and locate the matching SKU and supplier. 4. Repeat the action.
+- Acceptance: the price appears or updates with the quoted amount and currency; the sample request shows its linked SKU and price; existing notes remain and the repeat changes nothing.
+- Status: PENDING
+
 ### [R8.225] StudioFlow CD List phase canvas
 - Surface: `/studioflow/projects/[projectId]/phases/[phaseId]` on a drafter-seat Construction Drawing phase
 - Fixture: designer PIC, drafter PIC, unassigned phase worker, and a project with a Construction Drawing phase

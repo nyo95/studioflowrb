@@ -14,6 +14,7 @@ export const masterDataPublicCommands = {
   startSampleRequestIntake: masterDataService.startSampleRequestIntake,
   recordSampleQuote: masterDataService.recordSampleQuote,
   markSampleRequestPriced: masterDataService.markSampleRequestPriced,
+  syncSampleQuoteToPrice: masterDataService.syncSampleQuoteToPrice,
   declineSampleRequest: masterDataService.declineSampleRequest,
   listSampleRequestIntakes: masterDataService.listSampleRequestIntakes,
   listPromotionReferences: masterDataService.listPromotionReferences,

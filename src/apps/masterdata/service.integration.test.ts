@@ -1312,6 +1312,52 @@ describe("Sample request intake (Master Data side of StudioFlow sample requests)
     await rejectsWithCode(service.listSampleRequestVendorChoices({ grants: GRANTS.filter((grant) => grant !== MASTERDATA_PERMISSIONS.sampleRequestManage) }), "PERMISSION_DENIED");
   });
 
+  it("copies a complete quote to pricing once, preserves notes, and requires both permissions", async () => {
+    const context = await createMaterialContext();
+    const { skuId } = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Sample sync SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1000", currency: "IDR" }] });
+    const existing = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: skuId, supplier_vendor_id: context.vendorId } });
+    await testDb.prisma.priceMaterial.update({ where: { id: existing.id }, data: { notes: "Existing note" } });
+    const intake = await start("request-sync");
+    await service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: intake.id, vendorId: context.vendorId, skuId, quotedAmount: "2500.50", quotedCurrency: "IDR" });
+
+    await rejectsWithCode(service.syncSampleQuoteToPrice({ grants: GRANTS.filter((grant) => grant !== MASTERDATA_PERMISSIONS.sampleRequestManage), actor: STAFF, intakeId: intake.id }), "PERMISSION_DENIED");
+    await rejectsWithCode(service.syncSampleQuoteToPrice({ grants: GRANTS.filter((grant) => grant !== MASTERDATA_PERMISSIONS.priceMaterialManage), actor: STAFF, intakeId: intake.id }), "PERMISSION_DENIED");
+
+    const synced = await service.syncSampleQuoteToPrice({ grants: GRANTS, actor: STAFF, intakeId: intake.id });
+    assert.equal(synced.priceMaterialId, existing.id);
+    assert.equal(synced.linkedSkuName, "Sample sync SKU");
+    assert.equal(synced.linkedPriceAmount, "2500.5");
+    const price = await testDb.prisma.priceMaterial.findUniqueOrThrow({ where: { id: existing.id } });
+    assert.equal(price.amount.toString(), "2500.5");
+    assert.equal(price.notes, "Existing note\nFrom sample request: Oak Panel (2026-506 Test Project)");
+    const events = await eventsFor(intake.id);
+    assert.equal(events.filter((event) => event.action === "masterdata.sample-request.price-synced").length, 1);
+    assert.equal(events.filter((event) => event.action === "price-material.updated").length, 0);
+
+    await service.syncSampleQuoteToPrice({ grants: GRANTS, actor: STAFF, intakeId: intake.id });
+    assert.equal((await eventsFor(intake.id)).filter((event) => event.action === "masterdata.sample-request.price-synced").length, 1, "a matching linked price is idempotent");
+
+    const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    const secondVendor = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Supplier Two" });
+    await testDb.prisma.vendorVendorType.create({ data: { id: crypto.randomUUID(), vendor_id: secondVendor.vendorId, vendor_type_id: supplierType.id } });
+    const createIntake = await start("request-sync-create");
+    await service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: createIntake.id, vendorId: secondVendor.vendorId, skuId, quotedAmount: "3000", quotedCurrency: "IDR" });
+    const created = await service.syncSampleQuoteToPrice({ grants: GRANTS, actor: STAFF, intakeId: createIntake.id });
+    assert.ok(created.priceMaterialId);
+    assert.equal(await testDb.prisma.priceMaterial.count({ where: { sku_id: skuId, supplier_vendor_id: secondVendor.vendorId, deleted_at: null } }), 1);
+    const createdEvent = (await eventsFor(createIntake.id)).find((event) => event.action === "masterdata.sample-request.price-synced");
+    assert.ok(createdEvent);
+    assert.equal(JSON.stringify(createdEvent.changes).includes("created"), true);
+  });
+
+  it("rejects incomplete and declined quote syncs", async () => {
+    const intake = await start("request-incomplete");
+    await rejectsWithCode(service.syncSampleQuoteToPrice({ grants: GRANTS, actor: STAFF, intakeId: intake.id }), "SAMPLE_PRICE_SYNC_INCOMPLETE");
+    const declined = await start("request-declined-sync");
+    await service.declineSampleRequest({ grants: GRANTS, actor: STAFF, intakeId: declined.id, reason: "No stock" });
+    await rejectsWithCode(service.syncSampleQuoteToPrice({ grants: GRANTS, actor: STAFF, intakeId: declined.id }), "SAMPLE_INTAKE_DECLINED");
+  });
+
   it("lists by status and source id, newest first, within a clamped limit", async () => {
     const a = await start("request-a");
     const b = await start("request-b");
