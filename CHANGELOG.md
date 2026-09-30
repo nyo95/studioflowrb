@@ -21,6 +21,14 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 **Checks.** `npm test`; `npx tsc --noEmit`; `npm run check`; `npm run lint`; focused preference and storage-report tests. `npm run build` is not run when the owner dev server occupies port 3001. Browser acceptance is queued for the Reviewer.
 
+## R8.253 | 2026-09-30 | fix(studioflow): card editor follows the typography rule; Brand no longer overflows
+
+- **Browser acceptance of R8.252 (Lead, dev server, the owner's session).** The dev server was restarted first (the R8.249 Prisma model needed a regenerated client; the running server still had the old one and every page failed on the preferences read). Checked on the PT-01 item: the card table opens as a dialog; editing Color and saving persists (reload shows it); turning the Pattern slot on, adding option B, selecting it, editing it and option A, then Save once saved both; a dirty close asks "Discard changes?"; the option menu offers Add photo and Delete option and delete asks for confirmation; at phone width the card comes first. All test data was restored (option B deleted, colour back to Pink, Pattern slot off). Not checked: read-only view for an account without edit rights, Set as final, sample request, photo change (these touch other data), Fixture item.
+- **Two defects the owner spotted in the screenshots, fixed.** (1) The card title, option letters and hand-card titles used the serif; DESIGN.md limits Instrument Serif to large display moments (H1/H2, document titles, MOM) and keeps it out of operational surfaces, so they are now Schibsted Grotesk. (2) The Brand plate text ran past its box; the placeholder is now the short "Tap to add" like the other plates and the plate clips and sizes its control.
+- **Note.** The design concept on the canvas also used the serif for card titles; the built editor no longer does.
+
+**Checks.** `npm test` 696/696, `tsc --noEmit`, eslint on the schedule screen.
+
 ## R8.252 | 2026-09-30 | feat(studioflow): Product Schedule item editor as a card table
 
 - **Owner request:** edit a schedule card like a card game (Yu-Gi-Oh / Clash Royale / capsa), but keep the app's own look. The concept was reviewed on a design canvas and made more minimal at the owner's request; this builds it.

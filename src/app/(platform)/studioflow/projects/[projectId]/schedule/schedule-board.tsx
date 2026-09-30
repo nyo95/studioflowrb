@@ -886,7 +886,7 @@ const PLATE_INPUT = "h-7 w-full rounded-[6px] border border-transparent bg-trans
 
 function CardPlate({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-control border border-line-subtle bg-surface px-2.5 pb-1 pt-1.5 ${className}`}>
+    <div className={`min-w-0 overflow-hidden rounded-control border border-line-subtle bg-surface px-2.5 pb-1 pt-1.5 ${className}`}>
       <div className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-tertiary">{label}</div>
       {children}
     </div>
@@ -1154,7 +1154,7 @@ function EntryPanelContent({
                 disabled={disabled}
                 maxLength={200}
                 placeholder="Type, e.g. Nude Pro - ATS 1132 M"
-                className="h-11 w-full rounded-[6px] border border-transparent bg-transparent px-0 font-ui-serif text-[1.75rem] leading-tight text-ink placeholder:font-sans placeholder:text-sm placeholder:text-ink-tertiary hover:border-line-subtle focus:border-line-focus focus:bg-surface focus:px-1.5 focus:outline-none"
+                className="h-11 w-full rounded-[6px] border border-transparent bg-transparent px-0 text-xl font-medium leading-tight tracking-tight text-ink placeholder:text-sm placeholder:font-normal placeholder:text-ink-tertiary hover:border-line-subtle focus:border-line-focus focus:bg-surface focus:px-1.5 focus:outline-none"
               />
 
               <div className="relative">
@@ -1181,12 +1181,12 @@ function EntryPanelContent({
                       onValueChange={handleBrandChange}
                       onCreate={(text) => text}
                       createLabel={(text) => `Use "${text}" (not in Master Data)`}
-                      placeholder="Search or type a brand"
+                      placeholder="Tap to add"
                       searchPlaceholder="Search brands…"
                       emptyLabel="No brands found"
                       allowClear
                       disabled={disabled}
-                      className="w-full"
+                      className="w-full min-w-0 !h-7 !min-h-7 !border-transparent !bg-transparent !px-0 !text-sm !font-medium"
                     />
                   </CardPlate>
                 ) : null}
@@ -1229,7 +1229,7 @@ function EntryPanelContent({
 
               <div className="mt-1 flex items-center justify-between">
                 <span className="flex items-center gap-2 text-xs text-ink-tertiary">
-                  <span className="grid h-7 w-7 place-items-center rounded-full bg-surface-raised font-ui-serif text-base text-ink-secondary">{selected?.label ?? "A"}</span>
+                  <span className="grid h-7 w-7 place-items-center rounded-full bg-surface-raised text-sm font-medium text-ink-secondary">{selected?.label ?? "A"}</span>
                   {selected ? `Option ${selected.label} of ${entry.options.length}` : "No option yet"}
                 </span>
                 {selected?.isFinal ? (
@@ -1271,11 +1271,11 @@ function EntryPanelContent({
                         style={{ width: HAND_CARD, left: Math.round(handStart + index * handStep), bottom: isSelected ? 26 : 6, transform: `rotate(${rotate}deg)`, zIndex: isSelected ? 30 : index + 1 }}
                       >
                         <span className="flex items-center justify-between">
-                          <span className="grid h-5 w-5 place-items-center rounded-full bg-surface-raised font-ui-serif text-sm text-ink-secondary">{option.label}</span>
+                          <span className="grid h-5 w-5 place-items-center rounded-full bg-surface-raised text-xs font-medium text-ink-secondary">{option.label}</span>
                           {option.isFinal ? <Crown aria-hidden="true" className="h-3.5 w-3.5" style={{ color: "var(--ui-warning-fg)" }} /> : null}
                         </span>
                         <Thumb url={option.imageUrl} alt="" className="mt-1.5 h-14 w-full" />
-                        <span className="mt-1 line-clamp-2 font-ui-serif text-[0.95rem] leading-tight text-ink">{option.productName || "Untitled"}</span>
+                        <span className="mt-1 line-clamp-2 text-[0.8rem] font-medium leading-tight text-ink">{option.productName || "Untitled"}</span>
                       </button>
                     );
                   })}
