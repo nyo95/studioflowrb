@@ -1,9 +1,9 @@
 "use client";
 
-import { AlertTriangle, CalendarCheck2, MessageSquareText, MoreHorizontal, Plus } from "lucide-react";
+import { AlertTriangle, CalendarCheck2, ChevronDown, ChevronRight, MessageSquareText, MoreHorizontal, Plus } from "lucide-react";
 import Link from "next/link";
 import { Popover } from "radix-ui";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 
 import {
   applyChecklistFilter,
@@ -63,6 +63,31 @@ function filterTree(tasks: FeedTask[], keep: (task: FeedTask) => boolean): FeedT
   });
 }
 
+const COLLAPSED_KEY = "studioflow.today.collapsed";
+const collapsedListeners = new Set<() => void>();
+let collapsedMemory: string | null = null;
+
+function readCollapsed(): string {
+  if (collapsedMemory !== null) return collapsedMemory;
+  try { return window.localStorage.getItem(COLLAPSED_KEY) ?? "[]"; } catch { return "[]"; }
+}
+
+function subscribeCollapsed(listener: () => void): () => void {
+  collapsedListeners.add(listener);
+  window.addEventListener("storage", listener);
+  return () => { collapsedListeners.delete(listener); window.removeEventListener("storage", listener); };
+}
+
+function parseCollapsed(raw: string): string[] {
+  try { const value = JSON.parse(raw); return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : []; } catch { return []; }
+}
+
+function writeCollapsed(next: string[]): void {
+  collapsedMemory = JSON.stringify(next);
+  try { window.localStorage.setItem(COLLAPSED_KEY, collapsedMemory); } catch { /* storage unavailable: kept for this visit only */ }
+  collapsedListeners.forEach((listener) => listener());
+}
+
 export function TodayView({ groups, addTargets, people, currentUserId, labels, savedFilters, canWork, canManageTasks }: Props) {
   const { timezone } = useDisplaySettings();
   const today = currentDateOnly({ timeZone: timezone });
@@ -71,6 +96,11 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
   const [labelFilter, setLabelFilter] = useState<string>("");
   const [quickAdd, setQuickAdd] = useState(false);
   const [saveName, setSaveName] = useState("");
+  // Collapsed project cards are a per-viewer convenience: remembered in this browser only.
+  const collapsedRaw = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => "[]");
+  const collapsed = useMemo(() => parseCollapsed(collapsedRaw), [collapsedRaw]);
+  const updateCollapsed = writeCollapsed;
+  const toggleGroup = (projectId: string) => updateCollapsed(collapsed.includes(projectId) ? collapsed.filter((id) => id !== projectId) : [...collapsed, projectId]);
   const { run, pendingKey, error } = useCommand();
   const personById = new Map(people.map((p) => [p.id, p]));
 
@@ -150,6 +180,11 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
             </Select></div>
           ) : null}
           <FilterChip selected={showCompleted} onClick={() => setShowCompleted(!showCompleted)}>Show done</FilterChip>
+          {groups.length > 1 ? (
+            <Button type="button" size="sm" variant="ghost" onClick={() => updateCollapsed(groups.every((group) => collapsed.includes(group.project.id)) ? [] : groups.map((group) => group.project.id))}>
+              {groups.every((group) => collapsed.includes(group.project.id)) ? "Expand all" : "Collapse all"}
+            </Button>
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           {savedFilters.length > 0 ? (
@@ -195,16 +230,29 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
           <SectionCard
             key={group.project.id}
             padded
-            title={<Link href={STUDIOFLOW_ROUTES.project(group.project.id)} prefetch={false} className="hover:underline">{group.project.name}</Link>}
+            title={(
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  aria-expanded={!collapsed.includes(group.project.id)}
+                  aria-label={`${collapsed.includes(group.project.id) ? "Expand" : "Collapse"} ${group.project.name}`}
+                  onClick={() => toggleGroup(group.project.id)}
+                  className="inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-action text-ink-tertiary hover:bg-surface-muted hover:text-ink"
+                >
+                  {collapsed.includes(group.project.id) ? <ChevronRight size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
+                </button>
+                <Link href={STUDIOFLOW_ROUTES.project(group.project.id)} prefetch={false} className="truncate hover:underline">{group.project.name}</Link>
+              </span>
+            )}
             count={<CountBadge>{countOpen(group.tasks)} open</CountBadge>}
             action={group.project.isUrgent ? <Badge tone="danger">Urgent</Badge> : undefined}
           >
-            {group.tasks.length === 0 ? (
+            {collapsed.includes(group.project.id) ? null : group.tasks.length === 0 ? (
               <Text tone="tertiary" size="sm">Nothing open on this project.</Text>
             ) : (
               <ul className="m-0 grid list-none gap-px p-0">{group.tasks.map((task) => renderTask(task))}</ul>
             )}
-            {canManageTasks ? (
+            {canManageTasks && !collapsed.includes(group.project.id) ? (
               <InlineAddRow projectId={group.project.id} targets={addTargets.find((t) => t.projectId === group.project.id)?.targets ?? null} />
             ) : null}
           </SectionCard>
