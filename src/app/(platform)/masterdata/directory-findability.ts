@@ -17,3 +17,20 @@ export function lowestPriceByCurrencyUnit<T extends { amount: unknown; currency:
     return lowest;
   }, null);
 }
+
+export function suppliedByNames(owner: { name: string } | null, suppliers: readonly { name: string }[]): string[] {
+  return [...(owner ? [`${owner.name} (owner)`] : []), ...suppliers.map((supplier) => supplier.name)];
+}
+
+export function groupLowestRows<T extends { id: string; amount: unknown; currency: string; unit: { code: string }; deleted_at: Date | null }>(rows: readonly T[]): Set<string> {
+  const active = rows.filter((row) => row.deleted_at === null);
+  if (active.length < 2) return new Set();
+  const keys = new Set(active.map((row) => `${row.currency}|${row.unit.code}`));
+  if (keys.size !== 1) return new Set();
+  const amount = Math.min(...active.map((row) => Number(String(row.amount))));
+  return new Set(active.filter((row) => Number(String(row.amount)) === amount).map((row) => row.id));
+}
+
+export function lowestPricesByCurrencyUnit<T extends { amount: unknown; currency: string; unit: { code: string } }>(rows: readonly T[]): T[] {
+  return [...new Map(rows.map((row) => [`${row.currency}|${row.unit.code}`, row] as const)).entries()].map(([key]) => lowestPriceByCurrencyUnit(rows.filter((row) => `${row.currency}|${row.unit.code}` === key))!).filter(Boolean);
+}

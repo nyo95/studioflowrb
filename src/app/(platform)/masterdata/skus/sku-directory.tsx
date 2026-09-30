@@ -1,7 +1,7 @@
 "use client";
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
-import { lowestPriceByCurrencyUnit, matchesDirectoryStatus, type DirectoryStatus } from "../directory-findability";
+import { lowestPricesByCurrencyUnit, matchesDirectoryStatus, type DirectoryStatus } from "../directory-findability";
 import { DirectoryShell,DraftDialog,EntityPrimaryCell,Pagination,RowActionMenu,Text,usePagination } from "@/platform/ui_engine";
 
 
@@ -153,7 +153,7 @@ export function SkuDirectory({
             {visibleRows.map((sku) => {
               const isPending = pendingId === sku.id;
               const isArchived = sku.deleted_at !== null;
-              const primaryPrice = lowestPriceByCurrencyUnit(sku.material_prices);
+              const lowestPrices = lowestPricesByCurrencyUnit(sku.material_prices);
 
               return (
                 <TableRow key={sku.id}>
@@ -193,10 +193,10 @@ export function SkuDirectory({
                     />
                   </TableCell>
                   <TableCell>
-                    {primaryPrice ? (
+                    {lowestPrices.length ? (
                       <TableCellContent
-                        primary={<span><span className="font-semibold">{formatMoney(createMoney(String(primaryPrice.amount), primaryPrice.currency))}</span><span className="text-ink-secondary"> / {primaryPrice.unit.code}</span></span>}
-                        secondary={<span className="truncate max-w-[140px]">{sku.material_prices.length} price{sku.material_prices.length === 1 ? "" : "s"} · {primaryPrice.supplier_vendor.name}</span>}
+                        primary={<span>{lowestPrices.map((price, index) => <span key={`${price.currency}-${price.unit.code}`}>{index ? " · " : ""}<span className="font-semibold">from {formatMoney(createMoney(String(price.amount), price.currency))}</span><span className="text-ink-secondary"> / {price.unit.code}</span></span>)}</span>}
+                        secondary={<span className="truncate max-w-[140px]">{sku.material_prices.length} price{sku.material_prices.length === 1 ? "" : "s"}</span>}
                       />
                     ) : (
                       <span className="text-xs text-ink-tertiary">No price</span>

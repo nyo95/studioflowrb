@@ -260,6 +260,7 @@ export function VendorDirectory({
   const [capabilityFilter, setCapabilityFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
+  const [productCategoryFilter, setProductCategoryFilter] = useState<string>("ALL");
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<VendorRow | null>(null);
   const [confirmArchive, setConfirmArchive] = useState<VendorRow | null>(null);
@@ -319,6 +320,7 @@ export function VendorDirectory({
     if (!matchesDirectoryStatus(v.deleted_at, statusFilter)) return false;
     if (typeFilter !== "ALL" && !v.types.some((t) => t.vendor_type.id === typeFilter)) return false;
     if (categoryFilter !== "ALL" && !v.supplier_categories.some((c) => c.supplier_category.id === categoryFilter)) return false;
+    if (productCategoryFilter !== "ALL" && !v.brand_suppliers.some((item) => item.brand.categories?.some((category) => category.category.id === productCategoryFilter && category.category.status === "ACTIVE"))) return false;
     if (brandFilter !== "ALL" && !v.brand_suppliers.some((item) => item.brand.id === brandFilter) && !v.owned_brands.some((item) => item.id === brandFilter)) return false;
     if (capabilityFilter === "MATERIAL" && !v.types.some((item) => item.vendor_type.can_supply_material)) return false;
     if (capabilityFilter === "LABOR" && !v.types.some((item) => item.vendor_type.can_supply_labor)) return false;
@@ -343,7 +345,8 @@ export function VendorDirectory({
     const result = typeof left === "number" && typeof right === "number" ? left - right : collator.compare(String(left), String(right));
     return (sortDirection === "asc" ? result : -result) || a.id.localeCompare(b.id);
   });
-  const paging = usePagination(orderedRows.length, 25, JSON.stringify([query, statusFilter, typeFilter, categoryFilter, brandFilter, capabilityFilter, sortKey, sortDirection]));
+  const productCategoryOptions = [...new Map(vendors.flatMap((vendor) => vendor.brand_suppliers.flatMap((item) => (item.brand.categories ?? []).filter((category) => category.category.status === "ACTIVE").map((category) => [category.category.id, category.category.name] as const)))).entries()].map(([id, name]) => ({ id, name }));
+  const paging = usePagination(orderedRows.length, 25, JSON.stringify([query, statusFilter, typeFilter, categoryFilter, productCategoryFilter, brandFilter, capabilityFilter, sortKey, sortDirection]));
   const visibleRows = orderedRows.slice(paging.offset, paging.offset + 25);
   const pageFooter = <div className="grid gap-2"><Text tone="secondary" size="sm">{orderedRows.length ? paging.offset + 1 : 0}–{Math.min(paging.offset + 25, orderedRows.length)} of {orderedRows.length} records</Text>{paging.pageCount > 1 ? <Pagination page={paging.page} pageCount={paging.pageCount} onPageChange={paging.setPage} /> : null}</div>;
 
@@ -464,6 +467,7 @@ export function VendorDirectory({
             ))}
           </Select>
         </div>
+        <Select value={productCategoryFilter} onChange={(e) => setProductCategoryFilter(e.target.value)}><option value="ALL">All product categories</option>{productCategoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select>
         <Select value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)}><option value="ALL">All brands</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</Select>
         <Select value={capabilityFilter} onChange={(e) => setCapabilityFilter(e.target.value)}><option value="ALL">Any capability</option><option value="MATERIAL">Material</option><option value="LABOR">Labor</option></Select>
         <Button type="button" variant="ghost" size="sm" onClick={() => { setQuery(""); setStatusFilter("ACTIVE"); setTypeFilter("ALL"); setCategoryFilter("ALL"); setBrandFilter("ALL"); setCapabilityFilter("ALL"); }}>Clear filters</Button><Text size="sm" tone="secondary">{filtered.length} of {vendors.length}</Text>
@@ -493,6 +497,7 @@ export function VendorDirectory({
               <TableHead>Supplier</TableHead>
               <TableHead>Types &amp; Capabilities</TableHead>
               <TableHead>Categories</TableHead>
+              <TableHead sortable sortDirection={sortKey === "Brands" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Brands"); setSortDirection(direction); }}>Brands</TableHead>
               <TableHead>Contacts</TableHead>
               <TableHead align="end">Prices</TableHead>
               <TableHead>Updated</TableHead>
@@ -518,6 +523,7 @@ export function VendorDirectory({
                       secondary={vendor.address ? <span className="text-xs text-ink-secondary">{vendor.address}</span> : undefined}
                     />
                   </TableCell>
+                  <TableCell><span className="text-xs text-ink-secondary" title={vendor.brand_suppliers.map((item) => item.brand.name).join(", ")}>{vendor.brand_suppliers.slice(0, 3).map((item) => item.brand.name).join(", ") || "—"}{vendor.brand_suppliers.length > 3 ? ` +${vendor.brand_suppliers.length - 3}` : ""}</span></TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1 items-center max-w-xs">
                       {vendor.types.map((t) => (
@@ -569,7 +575,7 @@ export function VendorDirectory({
                     </div>
                   </TableCell>
                   <TableCell align="end">
-                    <TableCellContent align="end" primary={totalPriceCount.toLocaleString()} />
+                    <TableCellContent align="end" primary={totalPriceCount.toLocaleString()} secondary={<span title={`M ${vendor._count.material_prices} · M+L ${vendor._count.material_labor_prices} · L ${vendor._count.labor_prices}`}>M {vendor._count.material_prices} · M+L {vendor._count.material_labor_prices} · L {vendor._count.labor_prices}</span>} />
                   </TableCell>
                   <UpdatedCell at={vendor.updated_at} by={vendor.updated_by_label} />
                   <RowActionsCell>

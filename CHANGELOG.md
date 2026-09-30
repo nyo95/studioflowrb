@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.257**
-- Next local revision: **R8.258**
+- Current revision after this entry is committed: **R8.259**
+- Next local revision: **R8.260**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -20,6 +20,14 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Migration `20260930210000_platform_user_preferences` was applied to the office development and disposable test databases. No dependencies.
 
 **Checks.** `npm test`; `npx tsc --noEmit`; `npm run check`; `npm run lint`; focused preference and storage-report tests. `npm run build` is not run when the owner dev server occupies port 3001. Browser acceptance is queued for the Reviewer.
+
+## R8.259 | 2026-09-30 | fix(masterdata): correct directory price comparisons
+
+- SKU price summaries now find the lowest existing price separately for each currency and unit, so a value in another currency or measurement unit can never be presented as cheaper. The list now says “from amount / unit” and preserves the total price count.
+- Supplier discovery now includes active product-category filtering from carried Brands, a concise Brands column, and a price-type breakdown. Pricing exposes the planned Group by item control and additional in-list sort keys; these remain display-only.
+- Expanded pure display-helper coverage for supplied-by ordering, phone normalization, status, and comparable-price edge cases. No schema, migration, server action, permission, validation, audit, or other business behavior changed.
+
+**Checks.** `npm test`; `npm run typecheck`; `npm run check`; `npm run lint`. Production build was not run because the owner development server is using port 3001.
 
 ## R8.257 | 2026-09-30 | feat(masterdata): improve directory findability
 
