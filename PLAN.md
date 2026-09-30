@@ -1,75 +1,94 @@
 # Active Plan
 
-Plan ID: WO-MD-SAMPLEPRICE-01
-Scope: Master Data — put a sample request's quoted price into the material price list (server command, audit, tests). Backend only; the Lead builds the SKU picker and the "Add to price list" action afterwards.
-Target revision: R8.234
-Status: COMPLETE (implemented R8.234, reviewed PASS at R8.235; no active plan until the next Work Order is written)
+Plan ID: WO-PLAT-TABULAR-01
+Scope: Platform utilities — one shared tabular export (Excel, CSV, PDF) and import (Excel, CSV, downloadable template) capability, and the two existing consumers moved onto it. Backend/utility only; the Lead redesigns the Master Data workbook page and the download UI afterwards.
+Target revision: R8.238
+Status: READY
 Priority: P2
-Owner: owner (Product Owner). Continuation of the sample-request workflow approved 2026-09-29 ("lanjut 2", 2026-09-30); details below are Lead defaults from legacy evidence and are open to the owner's veto.
+Owner: owner (Product Owner). Approved 2026-09-30: shared utility; export as Excel or PDF; import as Excel or CSV "like Product Schedule"; templates built where needed; PDF is a simple table for now, and each app/module must be able to customize its PDF model later.
 Last updated: 2026-09-30
 
 ## Outcome
 
-Master Data staff work a sample request: they record the supplier's quote (supplier, amount, currency) and, when the product exists in the catalogue, pick its SKU.
-One command then writes that quote into the real material price list for that SKU and supplier, and links the request to the resulting price. Today the queue stores
-the quote and the ids but never touches `PriceMaterial`; staff re-type the price by hand in Pricing.
+Any app can hand a small description of a table (title, columns, rows) to one shared utility and get back an `.xlsx`, `.csv` or `.pdf` file. Any app can hand an uploaded `.xlsx` or `.csv`
+to one shared utility and get back clean rows keyed by column, with the header matching, size limits and "which columns are missing or unknown" reporting done once. A blank import template
+(headers, an optional example row, short notes) comes from the same column description, so the template and the importer can never disagree.
+
+Today the Excel code lives only inside Master Data's SKU price workbook, and Product Schedule has a private CSV parser. After this plan both use the shared utility, so there is one
+implementation.
 
 ## Context and Evidence
 
-- Rebuild today: `SampleRequestIntake` already stores `vendor_id`, `quoted_amount`, `quoted_currency`, `sku_id`, `price_material_id`, `staff_note`; `recordSampleQuote`,
-  `markSampleRequestPriced`, `declineSampleRequest` in `src/apps/masterdata/services/sample-request.service.ts`. `createPriceMaterial` / `updatePriceMaterial` in
-  `services/pricing.service.ts` own price validation, the derived unit, permissions and audit (REUSE them, do not write `PriceMaterial` directly).
-- Legacy (read-only, `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`): `src/subapps/master-data/actions/sample-request-actions.ts` `VendorFollowUpInput.syncToMaterialPrice` /
-  `syncSkuPrice`: the price sync required an existing SKU (`SKU_REQUIRED` otherwise: "every price hangs off a SKU") and recorded the actor and a note; it never created a SKU.
-- Boundary: Master Data only. StudioFlow is untouched (it only requests).
+- Master Data: `src/apps/masterdata/services/sku-price-workbook.service.ts` uses `exceljs` directly (export `exportSkuPriceWorkbook`, preview/apply import, `HEADERS`, 5 MB / 2000-row limits, strict header-row match). Action: `src/app/(platform)/masterdata/workbook/actions.ts` returns `{ filename, base64 }`.
+- StudioFlow: `parseLegacyScheduleCsv` in `src/apps/studioflow/domain/schedule.ts` (generic CSV → header-keyed rows, lowercases headers with `id-ID`) is the only generic part; `parseLegacyScheduleSheet` (Google Sheets layout) and `schedule/service.ts` `importCsv` (two formats: "gsheets" and "simple") are schedule semantics and stay app-owned.
+- `exceljs` is already a dependency. No PDF library exists. `src/platform/utilities/*` has the pure helpers (date, money, …); registry and rules: `docs/UTILITY-INVENTORY.md`, enforced by `scripts/check-boundaries.mjs`.
 
 ## Locked Decisions
 
-- **Command:** `syncSampleQuoteToPrice({ grants, actor, intakeId })` on the Master Data service (module `sample-request.service.ts` or a small sibling), exposed through the existing
-  service object. Allowed while the intake is `IN_PROGRESS` or `PRICED` (staff often mark priced first); a `DECLINED` intake is rejected (`SAMPLE_INTAKE_DECLINED`).
-- **Permissions:** the caller must hold BOTH `masterdata.sample-request.manage` and the material-price manage permission (`priceMaterialManage`). Neither alone is enough.
-- **Preconditions (all must be set on the intake, otherwise `SAMPLE_PRICE_SYNC_INCOMPLETE` with a plain message naming what is missing):** a supplier (`vendor_id`), a live SKU (`sku_id`),
-  a quoted amount and currency. **It never creates a SKU or a supplier** (legacy parity, and the reference-data rule of the workbook import). No SKU means: create the SKU first, then link it.
-- **Effect:** if a live `PriceMaterial` already exists for the same SKU and supplier, UPDATE it (amount, currency; unit stays the SKU's derived unit) through the existing update rules;
-  otherwise CREATE one. Set `intake.price_material_id` to it. Price notes: `From sample request: <product name> (<project name>)`, appended without overwriting an existing note.
-  Use the existing price services so their validation (supplier must be material-capable, SKU live, currency, amount) applies; suppress their own audit and write one combined event.
-- **Idempotent:** if the intake is already linked to a live price whose amount and currency equal the quote, the command changes nothing and returns it.
-- **Audit:** one event `masterdata.sample-request.price-synced`, entity `sample_request_intake`, changes `{ priceMaterialId, action: "created" | "updated", amount, currency }`, metadata `{ sourceRequestId, skuId, vendorId }`. No notification change.
-- **Read model:** the intake read (`toRead`) already exposes `skuId`, `vendorId`, `priceMaterialId`; also expose the linked SKU's display name and code and the price's amount for the UI (small additive fields, no new query per row).
-- **Errors** use `AppError` with plain messages; a mismatch such as an archived SKU or supplier surfaces the existing price-service errors.
+- **Home:** `src/platform/utilities/tabular/` with public exports only through its `index.ts` (import path `@platform/utilities/tabular`). Server-side only (it depends on Node libraries); it must not import any app code.
+- **Disposition:** ADD in `docs/UTILITY-INVENTORY.md`, with the consumer matrix (Master Data SKU price workbook, StudioFlow schedule import). Add a boundary rule so an app file may not import `exceljs` (or the PDF library) directly; the two existing app consumers are migrated in this plan, so the rule starts with no exceptions.
+- **Column description is the single source:** one `TableColumn` list drives export, template and import matching: `{ key, header, aliases?: string[], type?: "text" | "number" | "date" | "money", width?, required?, example?, note? }`. Header matching is case/space-insensitive on `header` and `aliases`.
+- **Formats:** export `xlsx | csv | pdf`. Import `xlsx | csv` (by file name/type; unreadable or wrong type gives a plain `AppError`). CSV export is UTF-8 with BOM (opens correctly in Excel), quoted per RFC 4180. CSV import accepts BOM, quoted fields, embedded newlines, and `,` or `;` delimiters (detected from the header line).
+- **Dependency (owner-visible):** add exactly ONE PDF library. Recommended: `pdf-lib` (pure JavaScript, no bundler/font-file problems in Next). The Executor may pick another only if it proves `pdf-lib` cannot meet the acceptance criteria, and must say so. Whatever is chosen must not crash on characters outside plain Latin (replace them safely or embed a font); Indonesian text, `×`, `–` and currency symbols must render or degrade gracefully, never throw.
+- **PDF model is customizable by data, per caller:** a `PdfTableTemplate` plain object with defaults: `{ pageSize: "A4" | "Letter", orientation: "portrait" | "landscape", title?, subtitle?, headerText?, footerText?, showPageNumbers, showGeneratedAt, accentColor?, zebraRows, columnWidths? }`. Callers pass overrides; the utility ships one sensible default template. Layout-as-code (custom drawing functions) is explicitly out of scope now; the template object is the seam so a later plan can let an app register named templates without changing callers.
+- **Import stays two-stage:** the utility returns rows and column diagnostics only. Domain validation, preview/apply, permissions and audit stay in the app service (Master Data keeps its existing preview/apply and hash-based flow).
+- **Money/dates:** cells are written as real Excel numbers/dates for `number`/`money`/`date` columns when the value parses; amounts remain decimal strings on the way in (no float arithmetic in the utility; reuse `@platform/utilities/decimal` / `money` for formatting in PDF/CSV).
 
 ## Business Rules and Architecture Constraints
 
-- Master Data only; no StudioFlow, BQ or platform RBAC changes; no schema change (all needed columns exist — verify before starting; if a migration turns out to be needed, stop with BLOCKED / CONFLICT). No new dependency.
-- Money as decimal strings through the existing helpers. One transaction. Follow the module's existing patterns (`openIntake`, `quoteData`, `writeAudit`).
-- Keep the Master Data operational-override ledger in `docs/apps/masterdata/masterdata.md` section 4.3 accurate: if this command relaxes any locked rule, add an entry; if not, say so in the report.
+- REUSE `@platform/utilities/decimal`, `money`, `date` for formatting; do not add a second formatter.
+- Limits are caller-supplied with safe defaults (default 5 MB, 5000 rows); over-limit gives a plain error naming the limit. Guard against formula injection on export: a text cell beginning with `=`, `+`, `-`, `@` is written as text (xlsx string cell) and prefixed with `'` in CSV/PDF-neutral form only where the format would otherwise evaluate it.
+- Import rejects a file with no readable rows, duplicate header names, or a required column missing; unknown extra columns are reported, not fatal (the caller decides).
+- The utility never touches the database, sessions, permissions or audit.
+
+## Backend Contract
+
+Public surface (names are the contract; signatures may be refined by the Executor within the same meaning):
+
+- `exportTable({ format, filename, sheetName?, title?, columns, rows, pdf?: Partial<PdfTableTemplate> })` → `{ filename, mimeType, data: Buffer }`.
+- `parseTabularFile({ data, filename, mimeType?, columns, maxBytes?, maxRows?, sheetName? })` → `{ format, rows: Array<{ row: number; values: Record<key, string> }>, missingRequired: string[], unknownHeaders: string[] }`. `row` is the 1-based spreadsheet row number for error messages.
+- `buildImportTemplate({ format: "xlsx" | "csv", filename, sheetName?, columns, includeExample?: boolean, notes?: string[] })` → `{ filename, mimeType, data }`.
+
+Migrations (in this plan):
+
+1. **Master Data:** `exportSkuPriceWorkbook` and the workbook parser use the utility for the file layer. The exported `.xlsx` must stay import-compatible with the previous export (same sheet name, header order and cell meaning); existing preview/apply tests stay green. Add `format: "xlsx" | "csv" | "pdf"` to the export command (default `xlsx`; only `xlsx` and `csv` are re-importable, the PDF is read-only) and a template download for the workbook import. The PDF export of the price list uses a sensible template (landscape, title "SKU price list").
+2. **StudioFlow schedule:** `importCsv` accepts `.xlsx` as well as CSV through the shared parser; the app-owned Google-Sheets layout detection and "simple" format keep their exact current behavior for CSV input (regression test: the current CSV fixtures give identical results). Remove the private generic CSV parser and use the shared one. Provide the "simple" schedule import template (category, brand, product, … exactly the columns the simple format reads today) from `buildImportTemplate`.
+
+## UI Contract
+
+Server actions the Lead's UI will call: a Master Data export action taking `format`, an import-template action, and the schedule import action taking a file (base64 + filename) in addition to the current pasted-CSV path. The Executor adds only the minimum wiring so these are callable and tested; the download/import screens, the redesign of the Master Data workbook page, and the Product Schedule dialog layout are the Lead's next revision.
 
 ## Boundaries and Non-goals
 
-No UI (Lead). No SKU creation from a request. No bulk sync. No change to who receives notifications. No automatic sync on "Mark priced". No push.
+- No change to Master Data prices/SKU meaning, no new permissions, no schema or migration, no other app exports (BQ, StudioFlow reports) yet.
+- No styled/branded PDF reports, images/logos, charts or multi-table PDFs (later, through the template seam).
+- No Google Sheets layout support in the shared utility (schedule-specific).
+- Do not touch legacy or any legacy database. Do not add a second PDF or spreadsheet library.
 
 ## Acceptance Criteria
 
-- With supplier + SKU + amount + currency set, the command creates the price when none exists, updates it when one exists, links the intake, and writes exactly one audit event; running it twice changes nothing the second time.
-- Missing supplier, SKU, or amount each fail with `SAMPLE_PRICE_SYNC_INCOMPLETE`; a declined intake is rejected; an archived SKU or a non-material supplier is rejected by the existing price rules.
-- A caller with only the sample-request permission, or only the price permission, is denied.
-- The price appears in the normal Pricing list for that SKU and supplier and the update path keeps the previous notes.
+- Round trip: `exportTable(xlsx)` → `parseTabularFile` returns the same values; the same for CSV, including commas, quotes, newlines, `;` delimiter, BOM, and Indonesian text.
+- `exportTable(pdf)` returns a valid PDF (starts with `%PDF`, opens page count ≥ 1) for empty, small, and multi-page tables; long cells wrap or truncate without overflow errors; unusual characters never throw; the default template and an overridden template (landscape, custom title/footer) both work.
+- Import diagnostics: missing required column, duplicate header, unknown column, empty file, oversize file, wrong type, unreadable xlsx each give the specified plain outcome.
+- Formula-injection cells are neutralized in xlsx and csv.
+- Master Data: a workbook exported before this change (fixture) still imports with identical preview results; new csv/pdf exports and the template download work; permissions unchanged.
+- StudioFlow: existing schedule CSV tests unchanged and passing; an `.xlsx` with the simple columns imports the same rows as the equivalent CSV.
+- Boundary check fails if an app file imports `exceljs` or the PDF library; passes now. `docs/UTILITY-INVENTORY.md` lists the utility with its consumers.
 
 ## Verification
 
-`npm test`, `npx tsc --noEmit`, `npm run check`, eslint, `npm run build`. Render `/masterdata/sample-requests` and `/masterdata/pricing` once in `next dev` (a dev server may already be running on port 3001, started by the owner or a previous agent; check its process before assuming you may restart it, and if a restart is needed for a Prisma change say so instead of killing it). STUDIOFLOW_LOCATION=kantor. Databases: only `studioflow_rebuild` (dev) and `studioflow_rebuild_test` on localhost:5433 (container `studioflowrb-gateb-test-db`); never any legacy database.
+Executor: unit tests for the utility (formats, diagnostics, PDF validity, injection), Master Data and StudioFlow integration tests for the two migrations, `npx tsc --noEmit`, `npm run check`, `npm test`, eslint on touched folders. Record any skipped check as not passed.
 
 ## Reviewer Acceptance
 
-The Lead reviews the diff, then adds a SKU picker to the quote dialog and an "Add to price list" action, and checks the flow in the browser without changing the owner's real data.
+Lead after the commit: export each format from the Master Data workbook page and open the files (Excel/PDF viewer); import the exported xlsx back through preview; import an xlsx and a csv into a Product Schedule.
 
 ## Regression Risks and Recovery
 
-Low: one new command reusing tested price services. Recovery: revert the single commit (no migration).
+- Master Data workbook compatibility is the main risk; a fixture built from the pre-change export guards it.
+- Bundling: the chosen PDF library must work inside the Next server build (`npm run build` must pass).
+- Recovery: revert the single revision; no data or schema changed.
 
 ## Executor Prompt
 
-You are the Backend Executor. Location: kantor. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY backend
-outcome and nothing beyond it. Inspect current repository evidence, preserve unrelated owner work, make sound in-scope implementation decisions, run the
-required checks (including opening the touched routes in `next dev`), update `CHANGELOG.md`, and create the target local revision commit R8.234. Stop only for
-a material locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT report. Report the commit, checks, limitations, and remaining unrelated dirty files.
+You are the Backend Executor. Location: kantor. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY backend outcome and nothing beyond it. Inspect current repository evidence, preserve unrelated owner work, make sound in-scope implementation decisions, run the required checks, update `CHANGELOG.md` (next revision R8.238), and create the target local revision commit. Stop only for a material locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT report; otherwise finish the coherent outcome and report the commit, checks, limitations, and remaining unrelated dirty files.

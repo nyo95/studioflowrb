@@ -5,13 +5,20 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.236**
-- Next local revision: **R8.237**
+- Current revision after this entry is committed: **R8.237**
+- Next local revision: **R8.238**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.237 | 2026-09-30 | docs(platform): WO-PLAT-TABULAR-01 ready
+
+- **Work Order written, no code.** `PLAN.md` now holds WO-PLAT-TABULAR-01 (target R8.238): one shared utility for exporting a table as Excel, CSV or PDF and importing Excel or CSV with a generated template, then moving the Master Data SKU price workbook and the StudioFlow schedule import onto it. PDF is a simple table with a per-caller template object as the customization seam. One PDF library is the only new dependency (`pdf-lib` recommended).
+- **Also this session:** R8.236 (role editor Position row) was the owner-approved poin 3; the workbook page redesign (poin 1) is the Lead's revision after R8.238.
+
+**Checks.** Documentation only; not run.
 
 ## R8.236 | 2026-09-30 | feat(platform,studioflow): role editor lists app positions apart from permissions
 
