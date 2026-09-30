@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.240] StudioFlow deliverable file lifecycle
+- Surface: `/studioflow/projects/[projectId]/phases/[phaseId]`
+- Fixture: designer PIC and project manager; active writable phase; a PDF above 52 MB if local storage permits
+- Viewport: desktop (default)
+- Steps: 1. Upload a large PDF and download it. 2. Upload three same-named working versions, mark one Final, then upload two more. 3. Extend a working file near expiry and inspect its Final/expiry text. 4. Try the controls as an unassigned user and on an archived project.
+- Acceptance: large upload completes and downloads; Final is retained while only the two newest working versions remain; extend re-arms expiry; unauthorized and archived writes fail without a file.
+- Status: PENDING
+
 ### [R8.234] Sample quote to material price list
 - Surface: `/masterdata/sample-requests` and `/masterdata/pricing`
 - Fixture: staff with sample-request and material-price manage grants; an in-progress sample request with a supplier, SKU, amount, and currency

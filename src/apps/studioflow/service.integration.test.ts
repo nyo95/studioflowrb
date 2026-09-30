@@ -101,6 +101,7 @@ before(async () => {
     auditWriter: createAuditEventWriter(),
     people: createPeopleDirectory(db),
     storage,
+    notificationWriter: createNotificationWriter(),
     masterData: createMasterDataPublicRead(db),
     now: () => clock,
   });
@@ -270,6 +271,7 @@ describe("WO-BE-02 archived asset retention", () => {
     let failNext = true;
     const flaky: ObjectStorage = {
       put: (input) => storage.put(input),
+      putStream: (input) => storage.putStream(input),
       createSignedReadUrl: (key, expiresIn) => storage.createSignedReadUrl(key, expiresIn),
       async remove(key: string) {
         if (key === flakyKey && failNext) { failNext = false; throw new Error("disk unavailable"); }
@@ -366,7 +368,7 @@ describe("WO-BE-02 archived asset retention", () => {
     const writer = createAuditEventWriter();
     try {
       const result = await retention({
-        storage: { put: (input) => storage.put(input), createSignedReadUrl: (key, seconds) => storage.createSignedReadUrl(key, seconds), remove: async (key) => {
+        storage: { put: (input) => storage.put(input), putStream: (input) => storage.putStream(input), createSignedReadUrl: (key, seconds) => storage.createSignedReadUrl(key, seconds), remove: async (key) => {
           assert.equal(await testDb.prisma.sfDeliverable.count({ where: { project_id: expired.projectId } }), 0);
           if (key === expired.keys.deliverable) throw Error("secret filename");
           await storage.remove(key);
@@ -1743,6 +1745,40 @@ describe("Deliverable reference revision", () => {
     await sf.phases.rejectPhase({ ...base, type: "INTERNAL" });
     const after = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
     assert.equal(after.status, "OUTDATED", "files belong to old revision after reject");
+  });
+
+  it("keeps two non-final versions per normalized slot, separately from a final", async () => {
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "moodboard");
+    const base = { ...as(designer), projectId, phaseId: phase.id };
+    for (const name of [" Design.PDF ", "design.pdf", "design.pdf"]) await sf.phases.uploadDeliverable({ ...base, name, file: { body: new Uint8Array([1]), contentType: "application/pdf" } });
+    let listed = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
+    assert.equal(listed.items.length, 2);
+    await sf.phases.setDeliverableFinal({ ...as(designer), projectId, deliverableId: listed.items[0].id, isFinal: true });
+    await sf.phases.uploadDeliverable({ ...base, name: "design.pdf", file: { body: new Uint8Array([2]), contentType: "application/pdf" } });
+    await sf.phases.uploadDeliverable({ ...base, name: "other.pdf", file: { body: new Uint8Array([3]), contentType: "application/pdf" } });
+    listed = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
+    assert.equal(listed.items.filter((item) => item.isFinal).length, 1);
+    assert.equal(listed.items.filter((item) => item.name.toLowerCase().trim() === "design.pdf").length, 3);
+    const newerDesign = listed.items.find((item) => item.name.toLowerCase().trim() === "design.pdf" && !item.isFinal)!;
+    await sf.phases.setDeliverableFinal({ ...as(designer), projectId, deliverableId: newerDesign.id, isFinal: true });
+    const afterNewFinal = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
+    assert.equal(afterNewFinal.items.filter((item) => item.name.toLowerCase().trim() === "design.pdf" && item.isFinal).length, 1, "a newer final clears the old final in its slot");
+  });
+
+  it("cleans expired non-finals and warns an uploader only once until extended", async () => {
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "moodboard");
+    const base = { ...as(designer), projectId, phaseId: phase.id };
+    await sf.phases.uploadDeliverable({ ...base, name: "expire.pdf", file: { body: new Uint8Array([1]), contentType: "application/pdf" } });
+    const row = await testDb.prisma.sfDeliverable.findFirstOrThrow({ where: { phase_id: phase.id } });
+    await testDb.prisma.sfDeliverable.update({ where: { id: row.id }, data: { expires_at: new Date(clock.getTime() + 3 * 86_400_000) } });
+    assert.equal((await sf.phases.sweepDeliverableExpiry()).warned, 1);
+    assert.equal((await sf.phases.sweepDeliverableExpiry()).warned, 0);
+    await sf.phases.extendDeliverableExpiry({ ...as(designer), projectId, deliverableId: row.id });
+    await testDb.prisma.sfDeliverable.update({ where: { id: row.id }, data: { expires_at: new Date(clock.getTime() - 1) } });
+    assert.equal((await sf.phases.sweepDeliverableExpiry()).deleted, 1);
+    assert.equal(storage.objects.has(row.storage_key), false);
   });
 });
 

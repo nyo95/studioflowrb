@@ -4,6 +4,7 @@ import { AppError, mapPrismaKnownError } from "@platform/core/errors";
 import { hasPermission, requirePermission, type PermissionGrants } from "@platform/core/rbac";
 import type { PeopleDirectory } from "@platform/core/rbac/people";
 import type { ObjectStorage } from "@platform/core/storage";
+import type { NotificationWriter } from "@platform/core/notifications";
 import type { createMasterDataPublicRead } from "@/apps/masterdata/public";
 
 import { STUDIOFLOW_PERMISSIONS } from "./permissions";
@@ -32,6 +33,8 @@ export type StudioFlowPorts = {
   masterData: ReturnType<typeof createMasterDataPublicRead>;
   /** Tells the people who work sample requests. Optional so the service runs, and is tested, without notifications. */
   sampleRequestNotifier?: { requested(tx: TxClient, event: SampleRequestedEvent): Promise<void> };
+  /** Optional because isolated service tests do not need the inbox adapter. */
+  notificationWriter?: NotificationWriter;
   now?: () => Date;
 };
 

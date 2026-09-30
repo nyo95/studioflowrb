@@ -1,7 +1,7 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 import { AppError } from "@platform/core/errors";
-import type { ObjectStorage, PutObjectInput, StoredObject } from "@platform/core/storage";
+import type { ObjectStorage, PutObjectInput, PutStreamInput, StoredObject } from "@platform/core/storage";
 import { signAssetRead } from "./asset-signing";
 
 export type PublicObjectStorage = ObjectStorage & {
@@ -67,14 +67,66 @@ export async function resolveSafePath(rootDir: string, key: string): Promise<str
   return targetPath;
 }
 
-export function createLocalFilesystemStorage(rootDir: string): ObjectStorage {
+export type LocalFilesystemStorageOptions = {
+  /** Test seam; production obtains the value from the filesystem volume. */
+  freeSpaceBytes?: (directory: string) => Promise<number>;
+  minFreeBytes?: number;
+};
+
+const DEFAULT_MIN_FREE_BYTES = 2 * 1024 * 1024 * 1024;
+
+function configuredMinFreeBytes(value = process.env.STORAGE_MIN_FREE_BYTES): number {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : DEFAULT_MIN_FREE_BYTES;
+}
+
+export function createLocalFilesystemStorage(rootDir: string, options: LocalFilesystemStorageOptions = {}): ObjectStorage {
   const root = path.resolve(rootDir);
+  const freeSpaceBytes = options.freeSpaceBytes ?? (async (directory: string) => {
+    const stat = await fs.statfs(directory);
+    return Number(stat.bavail) * Number(stat.bsize);
+  });
+  const minFreeBytes = options.minFreeBytes ?? configuredMinFreeBytes();
+  async function assertFreeSpace(directory: string, incomingBytes: number) {
+    if ((await freeSpaceBytes(directory)) - incomingBytes < minFreeBytes) {
+      throw new AppError("INFRASTRUCTURE", "storage.no-space", "The storage disk is nearly full.");
+    }
+  }
   return {
     async put(input: PutObjectInput): Promise<StoredObject> {
       const filePath = await resolveSafePath(root, input.key);
       await fs.mkdir(path.dirname(filePath), { recursive: true });
+      await assertFreeSpace(path.dirname(filePath), input.bytes);
       await fs.writeFile(filePath, Uint8Array.from(input.body));
       return { key: input.key, contentType: input.contentType, bytes: input.bytes };
+    },
+    async putStream(input: PutStreamInput): Promise<StoredObject> {
+      const filePath = await resolveSafePath(root, input.key);
+      await fs.mkdir(path.dirname(filePath), { recursive: true });
+      const reader = input.stream.getReader();
+      let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
+      let bytes = 0;
+      try {
+        handle = await fs.open(filePath, "wx");
+        for (;;) {
+          const next = await reader.read();
+          if (next.done) break;
+          bytes += next.value.byteLength;
+          if (bytes > input.maxBytes) throw new AppError("VALIDATION", "DELIVERABLE_SIZE", "File exceeds the allowed size.");
+          await assertFreeSpace(path.dirname(filePath), next.value.byteLength);
+          await handle.write(next.value);
+        }
+        if (bytes === 0) throw new AppError("VALIDATION", "DELIVERABLE_SIZE", "Choose a non-empty file.");
+        return { key: input.key, contentType: input.contentType, bytes };
+      } catch (error) {
+        await handle?.close().catch(() => undefined);
+        handle = undefined;
+        await fs.unlink(filePath).catch(() => undefined);
+        throw error;
+      } finally {
+        await handle?.close().catch(() => undefined);
+        reader.releaseLock();
+      }
     },
     async remove(key: string): Promise<void> {
       const filePath = await resolveSafePath(root, key);

@@ -5,13 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.239**
-- Next local revision: **R8.240**
+- Current revision after this entry is committed: **R8.240**
+- Next local revision: **R8.241**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.240 | 2026-09-30 | feat(studioflow): stream deliverables with version lifecycle
+
+- StudioFlow deliverables now stream through an authenticated PUT route (up to 500 MB by default, configurable with `STUDIOFLOW_DELIVERABLE_MAX_BYTES`) rather than loading the full upload in a Server Action. The local storage adapter has `putStream`, removes partial writes, and refuses writes that would leave less than 2 GB free (configurable with `STORAGE_MIN_FREE_BYTES`). Private reads stream from disk as well.
+- A deliverable tracks its normalized phase/name slot, Final state and expiry. One final version per slot is retained; uploads keep the two newest non-final versions; working files expire after 30 days, warn their uploader in the final seven days, and can be extended. The daily app-owned sweep deletes expired working rows before best-effort object cleanup. Existing deliverables receive a 30-day grace period in the additive migration; none become Final automatically.
+- Added minimal delivery-screen wiring for streamed upload, Final/expiry state, and Final/Extend commands. Browser acceptance is queued in `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`; visual polish remains Lead-owned.
+- Migrations: `20260930200000_sf_deliverable_file_lifecycle`, applied to the selected office dev and disposable test databases. Dependencies: none.
+
+**Checks.** `npm test` 686/686; `npx tsc --noEmit`; `npm run check`; `npm run lint`; focused storage and StudioFlow lifecycle tests passed. `npm run build` not run because the owner development server is active on port 3001. Browser acceptance deferred to the Reviewer backlog.
 
 ## R8.239 | 2026-09-30 | docs(studioflow): WO-SF-FILELIFE-01 ready
 

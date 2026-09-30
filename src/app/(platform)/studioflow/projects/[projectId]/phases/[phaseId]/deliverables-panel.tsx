@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { FileDown, Trash2, Upload, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 import { Badge, Button, SectionCard, Text } from "@/platform/ui_engine";
-import { deleteDeliverableAction, uploadDeliverableAction } from "../../../../actions";
+import { deleteDeliverableAction, extendDeliverableExpiryAction, setDeliverableFinalAction } from "../../../../actions";
 
 type Deliverable = {
   id: string;
@@ -13,6 +13,10 @@ type Deliverable = {
   fileSizeBytes: number | null;
   revisionId: string | null;
   createdAt: Date;
+  isFinal: boolean;
+  expiresAt: Date | null;
+  daysLeft: number | null;
+  versionNumber: number;
   url: string;
 };
 
@@ -67,15 +71,32 @@ export function DeliverablesPanel({
     if (!file) return;
     setUploadError(null);
     startTransition(async () => {
-      const fd = new FormData();
-      fd.set("projectId", projectId);
-      fd.set("phaseId", phaseId);
-      fd.set("name", file.name);
-      fd.set("file", file);
-      const result = await uploadDeliverableAction(fd);
-      if (!result.ok) setUploadError(result.error.safeMessage);
+      const response = await fetch("/api/studioflow/deliverables", {
+        method: "PUT",
+        headers: {
+          "content-type": file.type,
+          "content-length": String(file.size),
+          "x-studioflow-project-id": projectId,
+          "x-studioflow-phase-id": phaseId,
+          "x-studioflow-file-name": file.name,
+        },
+        body: file,
+      });
+      const result = await response.json() as { ok: boolean; error?: { safeMessage: string } };
+      if (!result.ok) setUploadError(result.error?.safeMessage ?? "Upload failed.");
+      else window.location.reload();
       if (fileRef.current) fileRef.current.value = "";
     });
+  }
+
+  function setFinal(d: Deliverable, isFinal: boolean) {
+    setPendingId(d.id);
+    startTransition(async () => { await setDeliverableFinalAction({ projectId, deliverableId: d.id, isFinal }); setPendingId(null); });
+  }
+
+  function extend(d: Deliverable) {
+    setPendingId(d.id);
+    startTransition(async () => { await extendDeliverableExpiryAction({ projectId, deliverableId: d.id }); setPendingId(null); });
   }
 
   return (
@@ -99,6 +120,7 @@ export function DeliverablesPanel({
                 {d.fileSizeBytes !== null ? (
                   <p className="text-xs text-ink-secondary">{formatBytes(d.fileSizeBytes)}</p>
                 ) : null}
+                <p className="text-xs text-ink-secondary">{d.isFinal ? "Final" : `Expires in ${d.daysLeft ?? 0} days`} · v{d.versionNumber}</p>
               </div>
               <a
                 href={d.url}
@@ -120,6 +142,14 @@ export function DeliverablesPanel({
                 >
                   <Trash2 className="size-3.5" />
                 </button>
+              ) : null}
+              {canWork || canManage ? (
+                <div className="flex gap-1">
+                  <Button type="button" size="sm" variant="ghost" disabled={pendingId === d.id && isPending} onClick={() => setFinal(d, !d.isFinal)}>
+                    {d.isFinal ? "Clear final" : "Mark final"}
+                  </Button>
+                  {!d.isFinal ? <Button type="button" size="sm" variant="ghost" disabled={pendingId === d.id && isPending} onClick={() => extend(d)}>Extend</Button> : null}
+                </div>
               ) : null}
             </li>
           ))}
@@ -144,7 +174,7 @@ export function DeliverablesPanel({
             {isPending ? "Uploading…" : "Upload file"}
           </label>
           {uploadError ? <p className="mt-1.5 text-xs text-danger">{uploadError}</p> : null}
-          <p className="mt-1 text-xs text-ink-tertiary">PDF, PNG, JPEG, WebP, ZIP — max 25 MB</p>
+          <p className="mt-1 text-xs text-ink-tertiary">PDF, PNG, JPEG, WebP, ZIP — max 500 MB</p>
         </div>
       ) : null}
     </SectionCard>

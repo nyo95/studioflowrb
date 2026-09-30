@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import fs from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { Readable } from "node:stream";
 import path from "node:path";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { verifyAssetRead } from "@platform/infrastructure/storage/asset-signing";
@@ -31,10 +33,13 @@ export async function GET(request: Request) {
 
     const filePath = await resolveSafePath(rootDir, key);
 
-    const data = await fs.readFile(filePath);
     const ext = path.extname(key).toLowerCase();
     const contentType =
-      ext === ".png"
+      ext === ".pdf"
+        ? "application/pdf"
+        : ext === ".zip"
+          ? "application/zip"
+        : ext === ".png"
         ? "image/png"
         : ext === ".jpg" || ext === ".jpeg"
           ? "image/jpeg"
@@ -42,7 +47,7 @@ export async function GET(request: Request) {
             ? "image/webp"
             : "application/octet-stream";
 
-    return new NextResponse(data, {
+    return new NextResponse(Readable.toWeb(createReadStream(filePath)) as ReadableStream<Uint8Array>, {
       status: 200,
       headers: {
         "Content-Type": contentType,

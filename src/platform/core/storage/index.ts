@@ -12,9 +12,16 @@ export type PutObjectInput = StoredObject & {
   body: Uint8Array;
 };
 
+export type PutStreamInput = Omit<StoredObject, "bytes"> & {
+  /** A web stream so route handlers never need to materialize a whole upload. */
+  stream: ReadableStream<Uint8Array>;
+  maxBytes: number;
+};
+
 /** Domain-neutral private-object boundary. Callers own file policy and keys. */
 export interface ObjectStorage {
   put(input: PutObjectInput): Promise<StoredObject>;
+  putStream(input: PutStreamInput): Promise<StoredObject>;
   remove(key: string): Promise<void>;
   createSignedReadUrl(key: string, expiresInSeconds: number): Promise<string>;
 }
@@ -38,6 +45,30 @@ export class FakeObjectStorage implements ObjectStorage {
   async put(input: PutObjectInput): Promise<StoredObject> {
     this.objects.set(input.key, { ...input, body: input.body.slice() });
     return { key: input.key, contentType: input.contentType, bytes: input.bytes };
+  }
+
+  async putStream(input: PutStreamInput): Promise<StoredObject> {
+    const reader = input.stream.getReader();
+    const chunks: Uint8Array[] = [];
+    let bytes = 0;
+    try {
+      for (;;) {
+        const next = await reader.read();
+        if (next.done) break;
+        bytes += next.value.byteLength;
+        if (bytes > input.maxBytes) {
+          throw new AppError("VALIDATION", "DELIVERABLE_SIZE", "File exceeds the allowed size.");
+        }
+        chunks.push(next.value);
+      }
+      if (bytes === 0) throw new AppError("VALIDATION", "DELIVERABLE_SIZE", "Choose a non-empty file.");
+      const body = new Uint8Array(bytes);
+      let offset = 0;
+      for (const chunk of chunks) { body.set(chunk, offset); offset += chunk.byteLength; }
+      return this.put({ key: input.key, contentType: input.contentType, bytes, body });
+    } finally {
+      reader.releaseLock();
+    }
   }
 
   async remove(key: string): Promise<void> {

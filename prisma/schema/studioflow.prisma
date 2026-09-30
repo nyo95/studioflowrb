@@ -403,6 +403,12 @@ model SfDeliverable {
   storage_key     String
   file_size_bytes Int?
   content_type    String?
+  slot_key        String    @default("")
+  is_final        Boolean   @default(false)
+  finalized_at    DateTime?
+  finalized_by_id String?
+  expires_at      DateTime?
+  expiry_warned_at DateTime?
   created_by_id   String?
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
@@ -412,6 +418,8 @@ model SfDeliverable {
   revision SfRevision? @relation(fields: [revision_id], references: [id], onDelete: SetNull)
 
   @@index([project_id, phase_id])
+  @@index([phase_id, slot_key, created_at, id])
+  @@index([expires_at])
   @@map("sf_deliverable")
   @@schema("studioflow")
 }

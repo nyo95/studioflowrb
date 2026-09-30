@@ -19,4 +19,11 @@ describe("shared object storage", () => {
     await storage.remove("mom/a.png");
     await assert.rejects(() => storage.createSignedReadUrl("mom/a.png", 60));
   });
+
+  it("accepts a web stream through the same fake seam", async () => {
+    const storage = new FakeObjectStorage();
+    const stream = new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(Uint8Array.from([1, 2])); controller.enqueue(Uint8Array.from([3])); controller.close(); } });
+    assert.equal((await storage.putStream({ key: "deliverables/a.pdf", contentType: "application/pdf", stream, maxBytes: 3 })).bytes, 3);
+    assert.equal(storage.objects.get("deliverables/a.pdf")?.body.byteLength, 3);
+  });
 });

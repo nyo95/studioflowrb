@@ -44,6 +44,7 @@ function unreferencedDb(failures: Map<string, FailureRow>) {
 function storageThatFails(failingKeys: ReadonlySet<string>): ObjectStorage {
   return {
     async put() { throw new Error("not used"); },
+    async putStream() { throw new Error("not used"); },
     async remove(key: string) { if (failingKeys.has(key)) throw new Error("disk unavailable"); },
     async createSignedReadUrl() { throw new Error("not used"); },
   };

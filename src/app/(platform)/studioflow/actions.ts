@@ -1153,6 +1153,27 @@ export async function deleteDeliverableAction(input: z.infer<typeof DeliverableR
   });
 }
 
+const DeliverableFinal = z.strictObject({ projectId: Id, deliverableId: Id, isFinal: z.boolean() });
+export async function setDeliverableFinalAction(input: z.infer<typeof DeliverableFinal>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(DeliverableFinal, input);
+    const result = await studioFlow.phases.setDeliverableFinal({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+export async function extendDeliverableExpiryAction(input: z.infer<typeof DeliverableRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(DeliverableRef, input);
+    const result = await studioFlow.phases.extendDeliverableExpiry({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
 const DeliverableUploadMeta = z.strictObject({ projectId: Id, phaseId: Id, name: z.string().min(1).max(200) });
 /** Multipart upload: `projectId`, `phaseId`, `name`, `file`. Size policy lives in the service. */
 export async function uploadDeliverableAction(formData: FormData): Promise<ActionResult<unknown>> {

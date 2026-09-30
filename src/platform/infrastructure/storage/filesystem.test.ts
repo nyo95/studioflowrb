@@ -80,4 +80,23 @@ describe("LocalFilesystemStorage adapter", () => {
     const url = storage.createPublicReadUrl("brand-marks/mark.png");
     assert.equal(url, "/api/platform/assets/public/brand-marks/mark.png");
   });
+
+  it("streams incrementally, cleans up a partial over-limit file, and honors the reserve", async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "studioflow-storage-"));
+    try {
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) { controller.enqueue(Uint8Array.from([1, 2])); controller.enqueue(Uint8Array.from([3, 4])); controller.close(); },
+      });
+      const storage = createLocalFilesystemStorage(tmpDir, { minFreeBytes: 0, freeSpaceBytes: async () => 1_000_000 });
+      assert.equal((await storage.putStream({ key: "test/stream.bin", contentType: "application/octet-stream", stream, maxBytes: 4 })).bytes, 4);
+      assert.deepEqual(await fs.readFile(path.join(tmpDir, "test", "stream.bin")), Buffer.from([1, 2, 3, 4]));
+
+      const tooLarge = new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(Uint8Array.from([1, 2, 3])); controller.enqueue(Uint8Array.from([4, 5])); controller.close(); } });
+      await assert.rejects(() => storage.putStream({ key: "test/partial.bin", contentType: "application/octet-stream", stream: tooLarge, maxBytes: 4 }));
+      await assert.rejects(() => fs.access(path.join(tmpDir, "test", "partial.bin")));
+
+      const guarded = createLocalFilesystemStorage(tmpDir, { minFreeBytes: 10, freeSpaceBytes: async () => 10 });
+      await assert.rejects(() => guarded.put({ key: "test/no-space.bin", contentType: "application/octet-stream", bytes: 1, body: Uint8Array.from([1]) }), { code: "storage.no-space" });
+    } finally { await fs.rm(tmpDir, { recursive: true, force: true }); }
+  });
 });

@@ -1,5 +1,5 @@
 import { AppError } from "@platform/core/errors";
-import type { ObjectStorage, PutObjectInput, StoredObject } from "@platform/core/storage";
+import type { ObjectStorage, PutObjectInput, PutStreamInput, StoredObject } from "@platform/core/storage";
 
 type SupabaseStorageConfig = { baseUrl: string; serviceRoleKey: string; bucket: string };
 
@@ -31,6 +31,24 @@ export function createSupabaseObjectStorage(config: SupabaseStorageConfig): Obje
       await requireSuccess(response);
       return { key: input.key, contentType: input.contentType, bytes: input.bytes };
     },
+    async putStream(input: PutStreamInput): Promise<StoredObject> {
+      const reader = input.stream.getReader();
+      const chunks: Uint8Array[] = [];
+      let bytes = 0;
+      try {
+        for (;;) {
+          const next = await reader.read();
+          if (next.done) break;
+          bytes += next.value.byteLength;
+          if (bytes > input.maxBytes) throw new AppError("VALIDATION", "DELIVERABLE_SIZE", "File exceeds the allowed size.");
+          chunks.push(next.value);
+        }
+      } finally { reader.releaseLock(); }
+      const body = new Uint8Array(bytes);
+      let offset = 0;
+      for (const chunk of chunks) { body.set(chunk, offset); offset += chunk.byteLength; }
+      return this.put({ key: input.key, contentType: input.contentType, bytes, body });
+    },
     async remove(key: string): Promise<void> {
       const response = await fetch(`${baseUrl}/storage/v1/object/${bucket}/${encodedKey(key)}`, { method: "DELETE", headers: headers(config) });
       await requireSuccess(response);
@@ -53,7 +71,7 @@ function configuredStorage(bucket: string): ObjectStorage | null {
 
 function unavailableStorage(): ObjectStorage {
   const unavailable = async (): Promise<never> => { throw new AppError("INFRASTRUCTURE", "storage.not-configured", "Image storage is not configured on this environment."); };
-  return { put: unavailable, remove: unavailable, createSignedReadUrl: unavailable };
+  return { put: unavailable, putStream: unavailable, remove: unavailable, createSignedReadUrl: unavailable };
 }
 
 /** Private bucket for MOM and future private assets. Read URLs are signed. */
