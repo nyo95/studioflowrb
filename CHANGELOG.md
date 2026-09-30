@@ -29,6 +29,14 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 **Checks.** `npm test`; `npm run typecheck`; `npm run check`; `npm run lint`. Browser acceptance is queued for the Reviewer.
 
+## R8.258 | 2026-09-30 | docs(masterdata): review of R8.257 — correction pass for WO-MD-FINDABILITY-01
+
+- **Review verdict, WO-MD-FINDABILITY-01 (R8.257): CORRECTION REQUIRED.** Scope was respected: the diff touches only Master Data screens and one small pure helper file (no schema, migration, action, permission, service or audit change), and the existing tests are untouched and green. About a third of the plan is delivered (status filter defaulting to Active on Brands, Suppliers and SKUs; Brands category and supplier filters, "Supplied by" and "Links"; Suppliers brand and capability filters, wider search, address line, clear button with count, tel and WhatsApp links; SKU "Has price" and supplier filters; Pricing supplier, brand and category filters). The rest is not: the shared filter bar, the Suppliers "Brands" column and product-category filter, the Pricing columns, sort keys, filtered tab counts and the "Group by item" / "Lowest" view, the helper test coverage.
+- **One defect found.** The SKU lowest-price helper compares prices across currencies and units and displays a supplier name instead of the "from <amount> / <unit>" summary the plan requires.
+- **Next.** `PLAN.md` now carries a "Correction pass" section listing exactly what remains and the defect (target R8.259). The browser acceptance of the finished screens waits for that revision; sample data will be loaded for it.
+
+**Checks.** Documentation only; not run. (Codex reported `npm test`, typecheck, `npm run check` and lint green for R8.257.)
+
 ## R8.256 | 2026-09-30 | docs(masterdata): WO-MD-FINDABILITY-01 ready
 
 - **Work Order written, no code.** `PLAN.md` holds WO-MD-FINDABILITY-01 (target R8.257), the outcome of the Lead's review of Brands, Suppliers, SKUs and Pricing from a head-of-interior-contractor's point of view. **Presentation only, by the owner's explicit confirmation:** no schema, permission, rule, validation, action, audit or import/export change; the only backend touch allowed is additive read-only fields on existing list reads.
