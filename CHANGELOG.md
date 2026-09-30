@@ -5,13 +5,20 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.238**
-- Next local revision: **R8.239**
+- Current revision after this entry is committed: **R8.239**
+- Next local revision: **R8.240**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.239 | 2026-09-30 | docs(studioflow): WO-SF-FILELIFE-01 ready
+
+- **Work Order written, no code.** `PLAN.md` holds WO-SF-FILELIFE-01 (target R8.240): large-file streaming upload for StudioFlow deliverables (default 500 MB), a Final flag, the "2 newest non-final versions per slot" rule, 30-day automatic expiry with a 7-day warning, and the storage-port streaming plus free-space guard they need. Chat expiry is unchanged. The Lead builds the deliverables screen and the image editor (HSB, crop, compress) afterwards.
+- **Numbers are Lead defaults** (500 MB, 2 versions, 30 days, 7-day warning, 2 GB free-space reserve) open to the owner's veto.
+
+**Checks.** Documentation only; not run.
 
 ## R8.238 | 2026-09-30 | feat(platform): shared tabular export/import (Excel, CSV, PDF) and template; Master Data and schedule use it
 
