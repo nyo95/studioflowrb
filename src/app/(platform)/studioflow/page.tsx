@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { prisma } from "@platform/core/db";
 import { hasPermission } from "@platform/core/rbac";
-import { readPlatformGeneralSettings } from "@platform/core/settings";
+import { userPreferences } from "@platform/runtime";
 import { currentDateOnly } from "@platform/utilities/date";
 import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
@@ -28,10 +28,10 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const firstName = displayName.split(" ")[0] ?? displayName;
 
   const allTasks = today.groups.flatMap((g) => g.tasks);
-  // Must match the timezone the client checklist and every DueLabel badge use,
+  // Must match the timezone the client checklist and every DueLabel badge use (the person's own, else the studio's),
   // or the header and the filter chips below it count the same tasks against two
   // different "today" values for the first hours of each local day.
-  const { timezone } = await readPlatformGeneralSettings(prisma);
+  const { timezone } = await userPreferences.resolveDisplay({ userId });
   const dateToday = currentDateOnly({ timeZone: timezone });
   const openTasks = allTasks.filter((t) => !t.isChecked);
   const overdue = openTasks.filter((t) => t.dueDate && t.dueDate < dateToday);

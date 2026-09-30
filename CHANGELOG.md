@@ -21,6 +21,14 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 **Checks.** `npm test`; `npx tsc --noEmit`; `npm run check`; `npm run lint`; focused preference and storage-report tests. `npm run build` is not run when the owner dev server occupies port 3001. Browser acceptance is queued for the Reviewer.
 
+## R8.250 | 2026-09-30 | fix(platform): personal timezone applies to every dated page; review of R8.249
+
+- **Review verdict, WO-PLAT-PREFS-01 (R8.249): CORRECTION REQUIRED, repaired here by the Lead.** Storage, validation (theme, locale, timezone, start page limited to apps the person can open), ownership (only the signed-in person), the cascade on user delete, the effective-display helper, the shell and account page use, and the storage usage report (60 s cache, symlinks skipped, truncation flag, permission-gated) all match the plan. One gap: three pages still read the studio-wide timezone directly, so a person with a personal timezone would see different dates there. The StudioFlow Today page computes "today" for its open/overdue/due-today counts and its own comment says it must equal the timezone the client badges use, which now follow the personal one; the two BQ pages format dates the same way.
+- **Repair.** `studioflow/page.tsx`, `bq/page.tsx` and `bq/library/page.tsx` now use the person's effective locale and timezone (`userPreferences.resolveDisplay`). The launcher page keeps the studio settings because it only reads the main-app choice. The login page has no signed-in person.
+- **Noted, not changed.** The layout now makes two extra small reads per request (preference row, settings again); the start page is validated when saved, so the redirect the Lead builds must re-check access when it is used.
+
+**Checks.** `npm test`, `npm run check`, `tsc --noEmit`, eslint on the touched pages.
+
 ## R8.248 | 2026-09-30 | docs(platform): WO-PLAT-PREFS-01 ready
 
 - **Work Order written, no code.** `PLAN.md` holds WO-PLAT-PREFS-01 (target R8.249): per-person preferences (theme, personal locale and timezone, start page) stored in a platform table with validation, the effective display settings for the signed-in person (personal value, else the studio General Settings), and a read-only storage usage report (total, free, reserve, and bytes by area) for administrators. The Lead builds the My Preferences screen, theme switching, start-page redirect and the Storage page afterwards.

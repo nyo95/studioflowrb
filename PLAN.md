@@ -3,7 +3,7 @@
 Plan ID: WO-PLAT-PREFS-01
 Scope: Platform — per-person preferences (theme, personal date/number locale and timezone, start page) with server-side storage and validation, the effective display settings for the signed-in person, and a read-only storage usage report for administrators. Backend and minimal wiring only; the Lead builds the "My Preferences" screen, theme switching, start-page redirect and the Storage page afterwards.
 Target revision: R8.249
-Status: READY
+Status: COMPLETE (implemented R8.249, reviewed R8.250 with one correction; browser acceptance in the acceptance backlog)
 Priority: P2
 Owner: owner (Product Owner). Settings structure approved 2026-09-30: "My Preferences (per user)", General Settings (Platform, then one group per app), each app keeps one Settings entry. The first content of My Preferences (theme, start page, personal timezone/date format) and a Storage page were proposed by the Lead and accepted ("setuju"). Details below are Lead defaults open to the owner's veto.
 Last updated: 2026-09-30

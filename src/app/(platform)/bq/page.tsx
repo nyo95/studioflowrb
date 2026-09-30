@@ -5,10 +5,9 @@ import { FileText } from "lucide-react";
 import { BQ_PERMISSIONS } from "@/apps/bq/service";
 import { bqPublicRead, bqService } from "@/apps/bq/runtime";
 import { prisma } from "@/platform/core/db";
-import { peopleDirectory } from "@platform/runtime";
+import { peopleDirectory, userPreferences } from "@platform/runtime";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasAnyPermission, hasPermission } from "@platform/core/rbac";
-import { readPlatformGeneralSettings } from "@platform/core/settings";
 import {
   DataTable,
   DirectoryShell,
@@ -67,7 +66,7 @@ export default async function BqProjectsPage({
   const parsedPage = Number.parseInt(firstParam(params.page), 10);
   const requestedPage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
   const requestedView = firstParam(params.view);
-  const settings = await readPlatformGeneralSettings(prisma);
+  const settings = await userPreferences.resolveDisplay({ userId: principalGrants.principal.userId });
   const canReadLibrary = hasAnyPermission(grants, [BQ_PERMISSIONS.libraryRead, BQ_PERMISSIONS.libraryManage]);
   const [projects, deletionRequests, templates] = await Promise.all([canRead ? bqPublicRead.listProjectSummaries() : [], canApproveDeletion ? bqService.listProjectDeletionRequests({ grants }) : [], canManage && canReadLibrary ? bqPublicRead.listTemplates() : Promise.resolve([])]);
 

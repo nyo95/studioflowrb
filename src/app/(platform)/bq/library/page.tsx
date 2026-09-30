@@ -1,5 +1,5 @@
 import { prisma } from "@/platform/core/db";
-import { readPlatformGeneralSettings } from "@platform/core/settings";
+import { userPreferences } from "@platform/runtime";
 
 import { redirect } from "next/navigation";
 
@@ -25,7 +25,7 @@ export default async function BqLibraryPage() {
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { grants } = principalGrants;
-  const settings = await readPlatformGeneralSettings(prisma);
+  const settings = await userPreferences.resolveDisplay({ userId: principalGrants.principal.userId });
 
   const canRead = hasAnyPermission(grants, [BQ_PERMISSIONS.libraryRead, BQ_PERMISSIONS.libraryManage]);
   const canManage = hasPermission(grants, BQ_PERMISSIONS.libraryManage);
