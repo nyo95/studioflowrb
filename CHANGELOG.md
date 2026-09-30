@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.223**
-- Next local revision: **R8.224**
+- Current revision after this entry is committed: **R8.224**
+- Next local revision: **R8.225**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.224 | 2026-09-30 | docs(masterdata): record the staff-driven overrides in the contracts
+
+- Contract and code are in sync for R8.223. `masterdata.md` gets section 4.3 "Operational overrides ledger" (OO-1 auto-link Brand from a scoped
+  contact, OO-2 Brand-side scoped contacts, OO-3 up to three phone numbers), each with the locked rule it overrides, the operational reason
+  (staff feedback, 2026-09-30), the implemented behavior and its code/test evidence. `vendor-contract.md` (section 4, dialog description,
+  migration ledger) and `brand-contract.md` (sections 4.2, 4.3, 7, 9, decisions summary) reference the ledger. Marked as overrides requested
+  operationally, not as reversals of the owner's design intent. No code changed. `PLAN.md` (CD List) target is now R8.225.
 
 ## R8.223 | 2026-09-30 | feat(masterdata): supplier contacts from staff feedback (auto-link Brand, Brand-side contacts, 3 phone numbers)
 

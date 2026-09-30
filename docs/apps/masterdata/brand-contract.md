@@ -141,6 +141,21 @@ The pair `(brand_id, vendor_id)` is unique. A linked Vendor must be live and hav
 at least one live VendorType with `can_supply_material = true`. Owner and supplier
 relations may point to the same Vendor, but neither relation implies the other.
 
+**Operational override OO-1** (`masterdata.md` section 4.3): besides the Brand workflow,
+a `BrandSupplier` row (`is_authorized = false`, no notes) is also created when a
+Supplier is saved with a contact scoped to this Brand and no relation exists yet.
+
+### 4.3 Brand-scoped supplier contacts (operational override OO-2)
+
+The Brand dialog manages the Brand's own scoped `VendorContact` rows (`brand_id`
+= this Brand) as one full set: rows are created, updated or deleted so the set
+equals what the form sends. Each contact belongs to the Brand's owner or one of
+its current suppliers (`CONTACT_VENDOR_NOT_BRAND_SUPPLIER` otherwise) and to a
+live Vendor. Fields and phone rules (up to three numbers, OO-3) follow
+`vendor-contract.md` section 4. Requires `masterdata.brand.manage`. The contacts
+also appear on that Supplier. Contacts of a Supplier that are not scoped to this
+Brand are never touched from the Brand.
+
 ## 5. External resources
 
 A Brand may have many ordered external resources. They attach directly to the
@@ -247,7 +262,8 @@ brand.deleted
 ```
 
 Category, hashtag, resource, owner, and supplier changes made in one Brand save
-are safe deltas inside one `brand.updated` event. No-op updates emit nothing.
+are safe deltas inside one `brand.updated` event; a Brand-scoped contact change adds a
+`contacts` count delta (OO-2). No-op updates emit nothing.
 Approved permanent deletion is represented by `brand.deleted` with request and
 approver metadata as defined by `masterdata.md` §4.2.
 
@@ -274,7 +290,9 @@ marker-style `StatusBadge`; category/hashtag values may use tags. Rows are not
 generic navigation targets. A trailing `RowActionMenu` provides edit, archive,
 restore, and deletion-request actions according to permission/state.
 
-Create/edit uses the shared Dialog form pattern. Category and hashtag entry use
+Create/edit uses the shared Dialog form pattern and includes a "Supplier contacts"
+section (OO-2) listing the Brand's scoped contacts with add, edit and remove.
+Category and hashtag entry use
 the activated accessible multi-value searchable/creatable UI Engine control;
 persistence, normalization, provenance, and permissions remain in Master Data.
 Archive/restore/deletion use shared confirmation mechanics and display cascade
@@ -388,4 +406,5 @@ evidence only; it does not authorize code changes.
 | Permanent delete | Staff request or direct execution by `masterdata.deletion.approve`; purges the archived Brand, branded SKUs, and their Material Prices atomically |
 | Historical BQ | Protected by consumer snapshots |
 | UI | Directory table, trailing action menu, Dialog edit, explicit confirmations |
-| Import/export | Deferred |
+| Import/export | Deferred for Brands (the SKU and material-price Excel workbook shipped separately, R8.216 to R8.218) |
+| Brand-scoped contacts | Also editable from the Brand dialog (operational override OO-2) |

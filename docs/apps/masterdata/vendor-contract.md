@@ -154,13 +154,13 @@ Renamed from `PartyContact`. Many contacts per Vendor. Structure:
 | `person_name` | String | Required |
 | `job_title` | String? | |
 | `phone` | String? | First phone number |
-| `extra_phones` | String[] | Up to two more numbers (max 3 in total, each ≤ 32 chars, de-duplicated) — owner-approved 2026-09-30 after staff asked for a 3rd number |
+| `extra_phones` | String[] | Operational override OO-3 (`masterdata.md` section 4.3): up to two more numbers (max 3 in total, each ≤ 32 chars, trimmed, de-duplicated) |
 | `email` | String? | |
 | `is_primary` | Boolean | Display preference, not uniqueness constraint |
 | `notes` | String? | |
 | `brand_id` | FK → Brand? | Optional brand scope. NULL = general contact |
 
-Brand-scoped contact validation: the Brand must be live, and the Vendor must own or supply it. **Changed 2026-09-30 (staff request):** when a Supplier is saved with a contact scoped to a Brand it does not yet carry, the missing `BrandSupplier` relation (not authorized, no notes) is created in the same transaction instead of rejecting the save — provided the Vendor is material-capable, otherwise `CONTACT_BRAND_NOT_RELATED` asks for a material Supplier Type first. The audit `changes` carry `brand_suppliers_added`. **Brand-side entry:** a Brand's Create/Edit dialog manages the Brand's own scoped contacts (owner or supplier as the contact's Vendor; `updateBrand`/`createBrand` `contacts`, full set, requires `brand.manage`); they are ordinary `VendorContact` rows and appear on that Supplier.
+Brand-scoped contact validation: the Brand must be live, and the Vendor must own or supply it. **Operational override OO-1** (`masterdata.md` section 4.3, staff request 2026-09-30): saving a Supplier with a contact scoped to a Brand it does not yet carry creates the missing `BrandSupplier` relation (not authorized, no notes) in the same transaction instead of rejecting the save, provided the Vendor is material-capable; otherwise `CONTACT_BRAND_NOT_RELATED` asks for a material Supplier Type first. The audit `changes` carry `brand_suppliers_added`. **OO-2:** a Brand's Create/Edit dialog also manages the Brand's own scoped contacts (`createBrand`/`updateBrand` `contacts`, full set, `masterdata.brand.manage`); they are ordinary `VendorContact` rows and appear on that Supplier.
 
 ---
 
@@ -423,9 +423,9 @@ Quick entry validates:
 **Edit dialog — Tabs (3 + read-only Brand Suppliers view):**
 
 1. **Profile & Types** — Vendor info (name, legal name, address, notes) and VendorType assignments (add/remove via searchable select from the controlled dictionary)
-2. **Contacts** — Contact list with CRUD. Each contact has: name, job title, phone, email, brand scope (optional), and a primary contact toggle. Brand-scoped contacts grouped under their brand header for readability.
+2. **Contacts** — Contact list with CRUD. Each contact has: name, job title, up to three phone numbers (OO-3), email, brand scope (optional, with a note when saving will also link the Brand, OO-1), and a primary contact toggle. Brand-scoped contacts grouped under their brand header for readability.
 3. **Links** — External references using the vendor-scoped `LinkKind` vocabulary (§5 — CATALOG excluded). Each link has: type, URL, optional display label, optional archive URL.
-4. **Brand Suppliers** (read-only, edit dialog only) — Displays BrandSupplier relationships for visibility. Management of these relations belongs to the Brand workflow.
+4. **Brand Suppliers** (read-only, edit dialog only) — Displays BrandSupplier relationships for visibility. Management of these relations belongs to the Brand workflow, except the automatic link created by a Brand-scoped contact (OO-1).
 
 BrandSupplier relations are managed from the Brand workflow, not from Vendor
 edit (R8.114 narrows this to *edit*: the Create dialog may add relations at
@@ -494,7 +494,7 @@ instruction.
 | `LinkKind` enum | Shared with BrandLink, unchanged |
 | `BrandSupplier` model | Retained (FK fixes in §14.4) |
 | `assertVendorCanBeDeleted()` | Logic retained from `assertPartyCanBeDeleted`, references updated |
-| `assertBrandScopedContactAllowed()` | Retained, references updated to Vendor |
+| `assertBrandScopedContactAllowed()` | Replaced by `ensureVendorBrandRelation()` (OO-1): same live-Brand and owner/supplier check, but it creates the missing relation instead of rejecting |
 | `mapLegacyPartyClassification()` | Updated to map to VendorType codes per §15 |
 | Partial unique indexes (name, slug) | Retained, renamed |
 

@@ -139,6 +139,10 @@ The following remain deferred and must not be inferred during implementation:
   contacts. Catalog-resource mutation belongs to Brand, not Supplier. Company information links (WEBSITE, INSTAGRAM, FACEBOOK, TIKTOK, YOUTUBE, LINKEDIN, WHATSAPP) are managed via the Edit Supplier dialog and committed atomically with the vendor profile — see vendor-contract.md §5.
 - A Supplier detail may show supplied Brands as a read-only projection. That
   projection does not transfer mutation authority from Brand.
+- **Operational overrides OO-1 and OO-2 (2026-09-30)** relax the two rules above
+  in two narrow ways requested by staff, both recorded in section 4.3: a Supplier
+  contact scoped to a Brand creates the missing `BrandSupplier` link, and the
+  Brand dialog edits the Brand's own scoped `VendorContact` rows.
 - Persisted `Vendor`, `VendorType`, and `vendor_id` names remain unchanged; all
   user-facing language is Supplier and Supplier Type.
 
@@ -158,6 +162,19 @@ The following remain deferred and must not be inferred during implementation:
   informational.
 - No cheapest, newest, preferred, or manufacturer fallback is inferred. When
   several eligible prices exist, the consumer selects one explicitly.
+
+### 4.3 Operational overrides ledger
+
+Some rules above were relaxed because daily use showed they cost staff more than
+they protect. Each override is deliberately narrow, delegated by the owner to the
+Lead, and written here so contract and code stay in sync. A later owner decision
+may revert it; until then the code named below is the implemented behavior.
+
+| ID | Date | Locked rule it overrides | Operational reason (source) | Implemented behavior | Evidence |
+|---|---|---|---|---|---|
+| OO-1 | 2026-09-30 | `vendor-contract.md` section 4: a Brand-scoped contact requires the Supplier to already own or supply the Brand; `BrandSupplier` is mutated only from Brand. | Staff had to leave Edit Supplier and open Brands just to link the Brand before entering a contact (staff message, 2026-09-30). | Saving a Supplier with a contact scoped to an unrelated Brand creates the `BrandSupplier` row (`is_authorized = false`, no notes) in the same transaction when the Supplier is material-capable; otherwise `CONTACT_BRAND_NOT_RELATED`. The dialog states this before saving. The audit change is `brand_suppliers_added`. | `ensureVendorBrandRelation` in `services/vendor-contact.ts`; `vendor.service.ts` `createVendor` / `updateVendor`; test "links the supplier to a Brand when a contact is scoped to it". |
+| OO-2 | 2026-09-30 | Supplier owns sales contacts (section 4.1); contacts are edited only from Supplier. | Staff wanted to enter the people to call while creating or editing a Brand (staff message, 2026-09-30). | Brand Create/Edit manages the Brand's own scoped `VendorContact` rows (full set: create, update, delete), each attached to the Brand's owner or one of its suppliers, with `masterdata.brand.manage`. Rows are ordinary `VendorContact` and appear on the Supplier. `brand.updated` carries a `contacts` count delta. | `syncBrandContacts` in `services/brand.service.ts`; `brands/brand-contacts-editor.tsx`; test "manages a Brand's supplier contacts from the Brand itself". |
+| OO-3 | 2026-09-30 | `VendorContact` has a single `phone`. | People often have two or three numbers; staff had been merging them into one field (staff message, 2026-09-30). | Up to three numbers per contact: first in `phone`, the rest in `extra_phones` (max 32 characters each, trimmed, de-duplicated). | Migration `20260930170000_md_contact_extra_phones`; `contactPhones` in `services/vendor-contact.ts`; test "keeps up to three phone numbers per contact". |
 
 ## 4. Shared lifecycle language
 
