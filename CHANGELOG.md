@@ -5,13 +5,19 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.244**
-- Next local revision: **R8.245**
+- Current revision after this entry is committed: **R8.245**
+- Next local revision: **R8.246**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.245 | 2026-09-30 | feat(masterdata): "Import & export" in the Master Data side menu
+
+- **Owner request:** the import/export page was hard to find (only a button on the SKU catalogue, shown only to people who may manage SKUs). It is now a menu item in the Master Data side menu, after Sample requests. It shows for anyone the page itself allows: read SKUs and material prices (export) or manage them (import). Same permission rule as the page; nothing else changes.
+
+**Checks.** `npm test`, `npm run check`, `tsc --noEmit`, eslint on the two files. Not exercised in the browser.
 
 ## R8.244 | 2026-09-30 | feat(masterdata): clearer import and export prices page
 
