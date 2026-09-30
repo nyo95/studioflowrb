@@ -3,7 +3,7 @@
 Plan ID: WO-MD-SAMPLEPRICE-01
 Scope: Master Data — put a sample request's quoted price into the material price list (server command, audit, tests). Backend only; the Lead builds the SKU picker and the "Add to price list" action afterwards.
 Target revision: R8.234
-Status: READY
+Status: COMPLETE (implemented R8.234, reviewed PASS at R8.235; no active plan until the next Work Order is written)
 Priority: P2
 Owner: owner (Product Owner). Continuation of the sample-request workflow approved 2026-09-29 ("lanjut 2", 2026-09-30); details below are Lead defaults from legacy evidence and are open to the owner's veto.
 Last updated: 2026-09-30

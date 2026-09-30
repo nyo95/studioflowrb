@@ -133,31 +133,6 @@ invitation to make unrequested drive-by changes.
 
 - [ ] [PLANNED] Define media/file behavior after shared storage exists.
 
-- [ ] [PLANNED] **Price sync from a quote: backend READY as `WO-MD-SAMPLEPRICE-01` in `PLAN.md` (2026-09-30), SKU picker and action to follow as a Lead revision.** Original entry: **Screen built in R8.185 (queue, Take/Record quote/Mark priced/Decline); vendor/SKU/`PriceMaterial` linking on
-  the quote is still to build.** **Incoming Sample Requests screen (owner roadmap review, 2026-09-26).** StudioFlow's public
-  read port exposes pending physical-sample requests (`SfScheduleSampleRequest`, see mirrored entry under **StudioFlow** above
-  for the full evidence trail). The Master Data side is a staff-facing queue (`(platform)/masterdata/sample-requests`) to read
-  those requests and record a vendor's quoted price. **Still open:** creating/updating the real `Sku` + `PriceMaterial` rows from
-  a request — ported in spirit from legacy's `sample-request-actions.ts` (`VendorFollowUpInput.syncToMaterialPrice`), which is
-  where the actual Master Data write always lived (never StudioFlow). This is real Master Data domain work, not a small add-on:
-  StudioFlow's `requestedFrom` is free text today, not a `Vendor`/`Party` FK, and `Sku.base_unit_id` is a required FK — so
-  "create pricing from a request" means resolving or creating real `Vendor`/`Unit` records too, not just copying two fields.
-  The service (`recordSampleQuote`) already accepts `vendorId`/`skuId`/`priceMaterialId` by id — only the picker UI is missing,
-  and "must state a price" is already satisfied by amount + currency alone, so this is additive, not blocking.
-  **Do not start this from a general "clean up Master Data" pass** — the
-  standing rule directly above (owner, 2026-09-24) requires an explicit new
-  owner request, and the two questions on the StudioFlow-side mirror entry
-  are still open.
-
-**Fixed 2026-09-23 (R8.123):** Physical Samples workflow — from a Product
-Schedule option, staff can request a physical sample from a vendor/supplier
-(`SfScheduleSampleRequest`, free-text `requestedFrom`, no live Master Data
-reference, same pattern as `brand_name`); when received, the designer sees a
-`Badge` on the option card, not a notification bell (that stays a separate,
-`DEFER`red Core-level capability per `CORE.md`). Receiving a sample never
-writes to Master Data — its public contract is read-only by design — a
-Master Data user adds the SKU/price themselves. See `CHANGELOG.md` R8.123,
-`STUDIOFLOW-REWORK-CONTRACT.md` §11.11.
 - [x] [CLEANUP][P2] KB-025 — `src/apps/masterdata/services/index.ts` exports
   many internal-implementation helpers with no external consumer found. Not a
   current coupling problem; narrow the barrel when consumers and the public

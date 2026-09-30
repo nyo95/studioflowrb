@@ -16,6 +16,7 @@ function revalidateSampleRequests(): void {
 
 const QuoteInputSchema = z.object({
   vendorId: z.string().uuid().optional().nullable().or(z.literal("")),
+  skuId: z.string().uuid().optional().nullable().or(z.literal("")),
   quotedAmount: z.string().max(32).optional().nullable().or(z.literal("")),
   quotedCurrency: z.string().max(8).optional().nullable().or(z.literal("")),
   staffNote: z.string().max(1000).optional().nullable().or(z.literal("")),
@@ -49,6 +50,7 @@ export async function recordSampleQuoteAction(intakeId: string, input: unknown):
       actor: actorOf(principal),
       intakeId,
       vendorId: normalize(parsed.data.vendorId) ?? null,
+      skuId: normalize(parsed.data.skuId) ?? null,
       quotedAmount: normalize(parsed.data.quotedAmount) ?? null,
       quotedCurrency: normalize(parsed.data.quotedCurrency) ?? null,
       staffNote: normalize(parsed.data.staffNote) ?? null,
@@ -68,6 +70,7 @@ export async function markSampleRequestPricedAction(intakeId: string, input: unk
       actor: actorOf(principal),
       intakeId,
       vendorId: normalize(parsed.data.vendorId) ?? null,
+      skuId: normalize(parsed.data.skuId) ?? null,
       quotedAmount: normalize(parsed.data.quotedAmount) ?? null,
       quotedCurrency: normalize(parsed.data.quotedCurrency) ?? null,
       staffNote: normalize(parsed.data.staffNote) ?? null,
@@ -84,6 +87,19 @@ export async function declineSampleRequestAction(intakeId: string, reason: strin
     if (!parsed.success) throw validationError(parsed.error);
     const result = await sampleRequestCoordinator.decline({ grants, actor: actorOf(principal), intakeId, reason: parsed.data });
     revalidateSampleRequests();
+    return result;
+  });
+}
+
+/** Copies the recorded quote to the material price list for the linked SKU and supplier. */
+export async function syncSampleQuoteToPriceAction(intakeId: string): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = z.string().uuid().safeParse(intakeId);
+    if (!parsed.success) throw validationError(parsed.error);
+    const result = await sampleRequestCoordinator.syncPrice({ grants, actor: actorOf(principal), intakeId: parsed.data });
+    revalidateSampleRequests();
+    revalidatePath("/masterdata/pricing");
     return result;
   });
 }

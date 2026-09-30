@@ -154,6 +154,9 @@ export function createSampleRequestCoordinator(deps: SampleRequestCoordinatorDep
     decline(input: { grants: PermissionGrants; actor: Actor; intakeId: string; reason: string }) {
       return deps.masterData.declineSampleRequest(input);
     },
+    syncPrice(input: { grants: PermissionGrants; actor: Actor; intakeId: string }) {
+      return deps.masterData.syncSampleQuoteToPrice(input);
+    },
   };
 }
 

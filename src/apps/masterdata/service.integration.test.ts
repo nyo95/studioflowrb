@@ -1312,6 +1312,25 @@ describe("Sample request intake (Master Data side of StudioFlow sample requests)
     await rejectsWithCode(service.listSampleRequestVendorChoices({ grants: GRANTS.filter((grant) => grant !== MASTERDATA_PERMISSIONS.sampleRequestManage) }), "PERMISSION_DENIED");
   });
 
+  it("syncs again when the supplier changes even if the amount stays the same, and lists SKUs for sample-request staff", async () => {
+    const context = await createMaterialContext();
+    const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    const other = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Other Supplier" });
+    await testDb.prisma.vendorVendorType.create({ data: { id: crypto.randomUUID(), vendor_id: other.vendorId, vendor_type_id: supplierType.id } });
+    const { skuId } = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Choice SKU", code: "CH-1", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "10", currency: "IDR" }] });
+    const choices = await service.listSampleRequestSkuChoices({ grants: [MASTERDATA_PERMISSIONS.sampleRequestManage] });
+    assert.ok(choices.some((choice) => choice.id === skuId && choice.name === "Choice SKU" && choice.code === "CH-1"));
+    await rejectsWithCode(service.listSampleRequestSkuChoices({ grants: GRANTS.filter((grant) => grant !== MASTERDATA_PERMISSIONS.sampleRequestManage) }), "PERMISSION_DENIED");
+
+    const intake = await start("request-sync-supplier-change");
+    await service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: intake.id, vendorId: context.vendorId, skuId, quotedAmount: "500", quotedCurrency: "IDR" });
+    const first = await service.syncSampleQuoteToPrice({ grants: GRANTS, actor: STAFF, intakeId: intake.id });
+    await service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: intake.id, vendorId: other.vendorId });
+    const second = await service.syncSampleQuoteToPrice({ grants: GRANTS, actor: STAFF, intakeId: intake.id });
+    assert.notEqual(second.priceMaterialId, first.priceMaterialId, "a different supplier gets its own price even at the same amount");
+    assert.equal(await testDb.prisma.priceMaterial.count({ where: { sku_id: skuId, supplier_vendor_id: other.vendorId, deleted_at: null } }), 1);
+  });
+
   it("copies a complete quote to pricing once, preserves notes, and requires both permissions", async () => {
     const context = await createMaterialContext();
     const { skuId } = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Sample sync SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1000", currency: "IDR" }] });

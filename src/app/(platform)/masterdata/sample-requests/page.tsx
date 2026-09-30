@@ -29,10 +29,11 @@ export default async function SampleRequestsPage() {
   }
 
   const canManageVendors = hasPermission(grants, MASTERDATA_PERMISSIONS.vendorManage);
-  const [queue, vendors, vendorTypes] = await Promise.all([
+  const [queue, vendors, vendorTypes, skus] = await Promise.all([
     sampleRequestCoordinator.listQueue({ grants, includeFinished: true }),
     masterDataService.listSampleRequestVendorChoices({ grants }),
     canManageVendors ? masterDataService.listVendorTypesForAssignment({ grants }) : [],
+    masterDataService.listSampleRequestSkuChoices({ grants }),
   ]);
 
   return (
@@ -41,6 +42,8 @@ export default async function SampleRequestsPage() {
       <SampleRequestDirectory
         rows={queue}
         vendors={vendors}
+        skus={skus}
+        canPrice={hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialManage)}
         canManageVendors={canManageVendors}
         vendorTypes={vendorTypes.filter((type) => type.can_supply_material).map((type) => ({ id: type.id, name: type.name }))}
       />

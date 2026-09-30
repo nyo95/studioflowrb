@@ -41,6 +41,7 @@ import {
   declineSampleRequestAction,
   markSampleRequestPricedAction,
   recordSampleQuoteAction,
+  syncSampleQuoteToPriceAction,
   takeSampleRequestAction,
 } from "./actions";
 
@@ -73,7 +74,19 @@ function statusBadge(row: SampleQueueRow) {
 
 type ActionResultLike = { ok: boolean; error?: { safeMessage?: string } };
 
-export function SampleRequestDirectory({ rows, vendors, canManageVendors, vendorTypes }: { rows: SampleQueueRow[]; vendors: readonly { id: string; name: string }[]; canManageVendors: boolean; vendorTypes: readonly VendorTypeOption[] }) {
+type SkuChoice = { id: string; name: string | null; code: string | null; brandName: string | null };
+
+function skuLabel(sku: SkuChoice): string {
+  return [sku.code, sku.name, sku.brandName ? `(${sku.brandName})` : null].filter(Boolean).join(" ") || "Unnamed SKU";
+}
+
+/** A quote can be added to the price list once it has a supplier, a SKU, and an amount with a currency. */
+function readyForPriceList(row: SampleQueueRow): boolean {
+  const intake = row.intake;
+  return Boolean(intake && intake.vendorId && intake.skuId && intake.quotedAmount && intake.quotedCurrency);
+}
+
+export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManageVendors, vendorTypes }: { rows: SampleQueueRow[]; vendors: readonly { id: string; name: string }[]; skus: readonly SkuChoice[]; canPrice: boolean; canManageVendors: boolean; vendorTypes: readonly VendorTypeOption[] }) {
   const [query, setQuery] = useState("");
   const [showFinished, setShowFinished] = useState(false);
   const [detail, setDetail] = useState<SampleQueueRow | null>(null);
@@ -81,6 +94,7 @@ export function SampleRequestDirectory({ rows, vendors, canManageVendors, vendor
   const [quoteAmount, setQuoteAmount] = useState("");
   const [quoteCurrency, setQuoteCurrency] = useState("IDR");
   const [quoteVendorId, setQuoteVendorId] = useState("");
+  const [quoteSkuId, setQuoteSkuId] = useState("");
   const [quoteNote, setQuoteNote] = useState("");
   const [createdVendors, setCreatedVendors] = useState<Array<{ id: string; name: string }>>([]);
   const [quickOpen, setQuickOpen] = useState(false);
@@ -154,6 +168,7 @@ export function SampleRequestDirectory({ rows, vendors, canManageVendors, vendor
     setQuoteAmount(row.intake?.quotedAmount ?? "");
     setQuoteCurrency(row.intake?.quotedCurrency ?? "IDR");
     setQuoteVendorId(row.intake?.vendorId ?? "");
+    setQuoteSkuId(row.intake?.skuId ?? "");
     setQuoteNote(row.intake?.staffNote ?? "");
     setQuoteTarget(row);
   }
@@ -190,6 +205,8 @@ export function SampleRequestDirectory({ rows, vendors, canManageVendors, vendor
               const busy = pendingId === row.sourceRequestId;
               const items = row.state === "NEW"
                 ? [{ label: "Take", onSelect: () => run(row.sourceRequestId, () => takeSampleRequestAction(row.sourceRequestId)), disabled: busy, danger: false, separatorBefore: false }]
+                : row.state === "PRICED" && canPrice && readyForPriceList(row) && !row.intake?.priceMaterialId
+                  ? [{ label: "Add to price list", onSelect: () => run(row.sourceRequestId, () => syncSampleQuoteToPriceAction(row.intake!.id)), disabled: busy, danger: false, separatorBefore: false }]
                 : row.state === "IN_PROGRESS"
                   ? [
                       { label: "Record quote", onSelect: () => openQuote(row), disabled: busy, danger: false, separatorBefore: false },
@@ -237,6 +254,12 @@ export function SampleRequestDirectory({ rows, vendors, canManageVendors, vendor
                   : "Linked material price"}
               </Text>
             ) : null}
+            {detail.intake?.skuId ? (
+              <Text>
+                <strong>Catalogue:</strong> {[detail.intake.linkedSkuCode, detail.intake.linkedSkuName].filter(Boolean).join(" ") || "Linked SKU"}
+                {detail.intake.priceMaterialId && detail.intake.linkedPriceAmount ? ` · price list: ${detail.intake.linkedPriceAmount} ${detail.intake.quotedCurrency ?? ""}`.trimEnd() : " · not on the price list yet"}
+              </Text>
+            ) : null}
             {detail.intake?.status === "DECLINED" ? <Text><strong>Decline reason:</strong> {detail.intake.staffNote}</Text> : null}
             {detail.intake?.staffNote && detail.intake.status !== "DECLINED" ? <Text><strong>Staff note:</strong> {detail.intake.staffNote}</Text> : null}
             <FormActions><Button variant="ghost" onClick={() => setDetail(null)}>Close</Button></FormActions>
@@ -266,6 +289,21 @@ export function SampleRequestDirectory({ rows, vendors, canManageVendors, vendor
                 className="w-full"
               />
             </Field>
+            <Field label="Product in the catalogue">
+              <div className="grid gap-1">
+              <CreatableSearch
+                label="SKU"
+                options={[{ id: "", label: "Not in the catalogue yet" }, ...skus.map((sku) => ({ id: sku.id, label: skuLabel(sku) }))]}
+                value={quoteSkuId}
+                onValueChange={setQuoteSkuId}
+                placeholder="Not in the catalogue yet"
+                searchPlaceholder="Search SKUs…"
+                emptyLabel="No SKU matches this search."
+                className="w-full"
+              />
+              <p className="text-xs text-ink-secondary">Pick the SKU to add this price to the price list. Not there yet? Create the SKU first in SKUs.</p>
+              </div>
+            </Field>
             <Field label="Staff note" description="Optional context for this quote."><Textarea value={quoteNote} onChange={(event) => setQuoteNote(event.target.value)} /></Field>
             <FormActions>
               <Button data-dialog-cancel variant="ghost" onClick={() => setQuoteTarget(null)}>Cancel</Button>
@@ -274,17 +312,34 @@ export function SampleRequestDirectory({ rows, vendors, canManageVendors, vendor
                 disabled={pendingId !== null}
                 onClick={() => {
                   const target = quoteTarget;
-                  const input = { vendorId: quoteVendorId || null, quotedAmount: quoteAmount || null, quotedCurrency: quoteCurrency || null, staffNote: quoteNote || null };
+                  const input = { vendorId: quoteVendorId || null, skuId: quoteSkuId || null, quotedAmount: quoteAmount || null, quotedCurrency: quoteCurrency || null, staffNote: quoteNote || null };
                   run(target.sourceRequestId, () => recordSampleQuoteAction(target.intake!.id, input), () => setQuoteTarget(null));
                 }}
               >
                 Save quote
               </Button>
+              {canPrice ? (
+                <Button
+                  variant="secondary"
+                  disabled={pendingId !== null || !quoteVendorId || !quoteSkuId || !quoteAmount.trim() || !quoteCurrency.trim()}
+                  onClick={() => {
+                    const target = quoteTarget;
+                    const input = { vendorId: quoteVendorId || null, skuId: quoteSkuId || null, quotedAmount: quoteAmount || null, quotedCurrency: quoteCurrency || null, staffNote: quoteNote || null };
+                    run(target.sourceRequestId, async () => {
+                      const saved = await recordSampleQuoteAction(target.intake!.id, input);
+                      if (!saved.ok) return saved;
+                      return syncSampleQuoteToPriceAction(target.intake!.id);
+                    }, () => setQuoteTarget(null));
+                  }}
+                >
+                  Save and add to price list
+                </Button>
+              ) : null}
               <Button
                 disabled={pendingId !== null}
                 onClick={() => {
                   const target = quoteTarget;
-                  const input = { vendorId: quoteVendorId || null, quotedAmount: quoteAmount || null, quotedCurrency: quoteCurrency || null, staffNote: quoteNote || null };
+                  const input = { vendorId: quoteVendorId || null, skuId: quoteSkuId || null, quotedAmount: quoteAmount || null, quotedCurrency: quoteCurrency || null, staffNote: quoteNote || null };
                   run(target.sourceRequestId, () => markSampleRequestPricedAction(target.intake!.id, input), () => setQuoteTarget(null));
                 }}
               >

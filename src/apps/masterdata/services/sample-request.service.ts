@@ -314,9 +314,10 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
         const currency = current.quoted_currency!;
 
         const linked = current.price_material_id
-          ? await tx.priceMaterial.findFirst({ where: { id: current.price_material_id, deleted_at: null }, select: { id: true, amount: true, currency: true } })
+          ? await tx.priceMaterial.findFirst({ where: { id: current.price_material_id, deleted_at: null }, select: { id: true, amount: true, currency: true, sku_id: true, supplier_vendor_id: true } })
           : null;
-        if (linked && linked.amount.toString() === amount.toString() && linked.currency === currency) {
+        // Already synced only when the linked price is for THIS SKU and supplier at this amount; a changed SKU or supplier must sync again.
+        if (linked && linked.sku_id === current.sku_id && linked.supplier_vendor_id === current.vendor_id && linked.amount.toString() === amount.toString() && linked.currency === currency) {
           return (await enrichIntakes(tx as PrismaClient, [current]))[0];
         }
 
@@ -362,6 +363,18 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
      * permission: staff can link an existing supplier but cannot inspect or
      * administer supplier records from this workflow.
      */
+    /** SKUs a Master Data worker can attach to a quote. Needs only the sample-request permission, like the supplier choices. */
+    async listSampleRequestSkuChoices(input: { grants: PermissionGrants }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.sampleRequestManage);
+      const rows = await db.sku.findMany({
+        where: { deleted_at: null },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+        select: { id: true, name: true, code: true, brand: { select: { name: true } } },
+        take: MAX_LIST_LIMIT,
+      });
+      return rows.map((sku) => ({ id: sku.id, name: sku.name, code: sku.code, brandName: sku.brand?.name ?? null }));
+    },
+
     async listSampleRequestVendorChoices(input: { grants: PermissionGrants }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.sampleRequestManage);
       return db.vendor.findMany({

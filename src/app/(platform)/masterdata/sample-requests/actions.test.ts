@@ -61,7 +61,7 @@ it("normalizes blank quote fields to null and forwards the selected supplier", a
   const { exports, calls, grants } = load();
   const vendorId = "d6c241dc-b6aa-4d31-ab7f-d8db45b98fc6";
   await exports.recordSampleQuoteAction!("intake-1", { vendorId, quotedAmount: "150000", quotedCurrency: "idr", staffNote: "  ok  " });
-  assert.deepEqual(calls, [["recordQuote", { grants, actor, intakeId: "intake-1", vendorId, quotedAmount: "150000", quotedCurrency: "idr", staffNote: "ok" }]]);
+  assert.deepEqual(calls, [["recordQuote", { grants, actor, intakeId: "intake-1", vendorId, skuId: null, quotedAmount: "150000", quotedCurrency: "idr", staffNote: "ok" }]]);
 });
 
 it("rejects a quote payload that fails schema validation, before touching the coordinator", async () => {

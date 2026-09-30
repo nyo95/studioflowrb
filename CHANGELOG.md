@@ -5,13 +5,25 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.234**
-- Next local revision: **R8.235**
+- Current revision after this entry is committed: **R8.235**
+- Next local revision: **R8.236**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.235 | 2026-09-30 | feat(masterdata): pick a SKU on a quote and add it to the price list; review PASS for R8.234
+
+- **Review verdict, WO-MD-SAMPLEPRICE-01 (R8.234): PASS with one Lead repair.** The command follows the plan (both permissions, complete-quote precondition, create or update through the existing price
+  services, one combined audit event, additive read fields). The idempotence check only compared the amount and currency of the linked price, so changing the supplier or SKU to one with the same amount
+  would have been skipped. Repaired here: the linked price must also match this SKU and supplier, otherwise it syncs again. New test covers it, plus `listSampleRequestSkuChoices`.
+- **Screen (Lead).** The quote dialog has a "Product in the catalogue" picker (all live SKUs, searchable; needs only the sample-request permission through `listSampleRequestSkuChoices`), a
+  "Save and add to price list" button (saves the quote, then syncs; shown to holders of the price permission, enabled once supplier, SKU, amount and currency are set), and a row action "Add to price
+  list" for a priced request that has all of them but no linked price. The request detail shows the linked SKU and price. Server action `syncSampleQuoteToPriceAction`; `skuId` now travels with quotes.
+- **Housekeeping.** `PLAN.md` marked complete; the backlog entry is removed (the browser check with a real request is queued).
+
+**Checks.** `npm test` 669/669, `npm run check`, `tsc --noEmit`, eslint on touched folders; dialog rendered in the browser (nothing saved).
 
 ## R8.234 | 2026-09-30 | feat(masterdata): sync a sample quote to the material price list
 
