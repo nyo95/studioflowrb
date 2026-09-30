@@ -5,13 +5,20 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.247**
-- Next local revision: **R8.248**
+- Current revision after this entry is committed: **R8.248**
+- Next local revision: **R8.249**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.248 | 2026-09-30 | docs(platform): WO-PLAT-PREFS-01 ready
+
+- **Work Order written, no code.** `PLAN.md` holds WO-PLAT-PREFS-01 (target R8.249): per-person preferences (theme, personal locale and timezone, start page) stored in a platform table with validation, the effective display settings for the signed-in person (personal value, else the studio General Settings), and a read-only storage usage report (total, free, reserve, and bytes by area) for administrators. The Lead builds the My Preferences screen, theme switching, start-page redirect and the Storage page afterwards.
+- **Numbers and content are Lead defaults** proposed with the settings structure and accepted by the owner ("setuju").
+
+**Checks.** Documentation only; not run.
 
 ## R8.247 | 2026-09-30 | feat(platform,studioflow,masterdata): one settings pattern everywhere
 
