@@ -24,7 +24,7 @@ export default async function PlatformLayout({ children }: { children: ReactNode
   const settings = await readPlatformGeneralSettings(prisma, (key) => brandMarkStorage.createPublicReadUrl(key));
   const apps = getPermissionRegistry().apps
     .filter((app) => grants.includes(app.accessPermission))
-    .map(({ appId, name, rootPath }) => ({ appId, name, rootPath }));
+    .map(({ appId, name, rootPath, icon }) => ({ appId, name, rootPath, icon }));
 
   const domainNavigation = <>
     {apps.some((app) => app.appId === "masterdata") ? <MasterDataNav canManageSampleRequests={hasPermission(grants, MASTERDATA_PERMISSIONS.sampleRequestManage)} /> : null}

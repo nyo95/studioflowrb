@@ -36,6 +36,8 @@ export type RegisteredApp = {
   name: string;
   /** App root route, always absolute. */
   rootPath: string;
+  /** Launcher icon key from the shell icon vocabulary (`authenticated-shell/app-icons.ts`); optional and presentational only. */
+  icon?: string;
   /** The `<appId>.access` permission gating app entry. */
   accessPermission: PermissionId;
   permissions: readonly PermissionId[];
@@ -45,6 +47,7 @@ export type AppPermissionRegistrationInput = {
   appId: string;
   name: string;
   rootPath: string;
+  icon?: string;
   permissions: readonly PermissionId[];
 };
 
@@ -73,7 +76,7 @@ export function composePermissionRegistry(
   const apps: RegisteredApp[] = [];
 
   for (const registration of registrations) {
-    const { appId, name, rootPath, permissions } = registration;
+    const { appId, name, rootPath, permissions, icon } = registration;
     if (!APP_ID_PATTERN.test(appId)) {
       throw new AppError("INVARIANT", "REGISTRY_INVALID_APP_ID", "An app registration is invalid.");
     }
@@ -104,6 +107,7 @@ export function composePermissionRegistry(
       appId,
       name: name.trim(),
       rootPath,
+      ...(typeof icon === "string" && icon.trim() ? { icon: icon.trim() } : {}),
       accessPermission,
       permissions: Object.freeze([...permissions]),
     });

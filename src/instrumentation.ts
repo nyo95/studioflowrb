@@ -31,4 +31,11 @@ export async function register(): Promise<void> {
   } catch {
     console.error("StudioFlow asset cleanup startup failed.");
   }
+  try {
+    const { startNotificationRetention } = await import("@platform/core/notifications/retention-sweep");
+    const { notificationRetention } = await import("@platform/runtime");
+    startNotificationRetention(() => notificationRetention.purgeReadNotifications());
+  } catch {
+    console.error("Notification retention startup failed.");
+  }
 }

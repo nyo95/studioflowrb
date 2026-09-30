@@ -6,7 +6,9 @@ import { usePathname } from "next/navigation";
 import { Popover } from "radix-ui";
 import { useEffect, useRef, useState } from "react";
 
-export type ShellAppLink = { appId: string; name: string; rootPath: string };
+import { AppIcon } from "./app-icons";
+
+export type ShellAppLink = { appId: string; name: string; rootPath: string; icon?: string };
 
 function activePath(pathname: string, href: string, includeChildren = true): boolean {
   if (href === "/") return pathname === "/";
@@ -61,6 +63,7 @@ export function HeaderApplicationNavigation({ apps }: { apps: readonly ShellAppL
             aria-label="Switch application"
             className="inline-flex h-[26px] min-w-0 shrink-0 items-center gap-1.5 rounded-action border border-line-subtle bg-rail-soft px-2.5 text-[12.5px] font-semibold text-ink transition-colors hover:bg-surface-muted"
           >
+            {activeApp ? <AppIcon icon={activeApp.icon} className="shrink-0 text-ink-secondary" /> : null}
             {activeApp ? <span className="truncate font-semibold text-ink">{activeApp.name}</span> : null}
             {apps.length > 1 ? <ChevronDown size={12} aria-hidden="true" className="shrink-0 text-ink-tertiary" /> : null}
           </button>
@@ -89,6 +92,7 @@ export function HeaderApplicationNavigation({ apps }: { apps: readonly ShellAppL
                     active ? "bg-surface-muted font-semibold text-ink" : "text-ink"
                   }`}
                 >
+                  <AppIcon icon={app.icon} size={16} className="shrink-0 text-ink-secondary" />
                   {app.name}
                 </Link>
               );

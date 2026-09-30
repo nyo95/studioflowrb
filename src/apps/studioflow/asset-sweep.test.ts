@@ -58,8 +58,8 @@ it("instrumentation starts cleanup only on Node and catches startup/import failu
       throw Error("private import failure details");
     } });
     await exports.register();
-    assert.equal(imports.length, runtime === "nodejs" ? 5 : 0);
-    assert.deepEqual(logs, runtime === "nodejs" ? ["StudioFlow asset cleanup startup failed."] : []);
+    assert.equal(imports.length, runtime === "nodejs" ? 6 : 0);
+    assert.deepEqual(logs, runtime === "nodejs" ? ["StudioFlow asset cleanup startup failed.", "Notification retention startup failed."] : []);
   }
 });
 

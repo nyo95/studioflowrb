@@ -18,18 +18,21 @@ export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [
     appId: "masterdata",
     name: "Master Data",
     rootPath: "/masterdata",
+    icon: "database",
     permissions: Object.values(MASTERDATA_PERMISSIONS),
   },
   {
     appId: "bq",
     name: "Bill of Quantity",
     rootPath: "/bq",
+    icon: "calculator",
     permissions: Object.values(BQ_PERMISSIONS),
   },
   {
     appId: "studioflow",
     name: "StudioFlow",
     rootPath: "/studioflow",
+    icon: "layout-dashboard",
     permissions: Object.values(STUDIOFLOW_PERMISSIONS),
   },
 ];

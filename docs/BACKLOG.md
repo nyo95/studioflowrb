@@ -93,16 +93,10 @@ Rules carried over unchanged from the prior trackers:
   `--test-concurrency=1`. `R8.184`'s changelog reports "full npm test 618/618" from wherever that was run, so this may
   have been Windows/wide-core-count-specific rather than universal; the fix costs a slower `npm test` (files run one at a
   time) in exchange for it actually finishing.
-- [ ] [PLANNED] Execute `apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md`:
-  storage port/test seam, provider adapter, Brand mark migration, then
-  approved future consumers.
-- [ ] [PLANNED] **Notifications (platform) — bell and inbox built in R8.185.** In-app inbox only (`core/notifications`, table
-  `platform.Notification`, actions in `(platform)/notifications/actions.ts`, popover in `authenticated-shell/notification-bell.tsx`
-  in the top bar for every signed-in user); first workflow is sample requests (staff told of a new request, the requester told
-  when it is priced or declined). Delivery is polling (60s and on route change), no real-time channel. Email, push, preferences,
-  and digests stay deferred; old read notifications are not cleaned up yet (no retention rule was requested); no browser
-  acceptance recorded yet (owner tests UI changes themselves). Private user-to-user messaging below is separate and still
-  blocked.
+- [ ] [PLANNED] Asset storage: phases 1-4 of `apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md` are delivered (port, local adapter, Brand mark, private StudioFlow assets, archive retention sweep); only
+  future file consumers (Master Data media, sample photos) remain, each through its own approved work order. Phase 5 (cloud profile) is parked.
+- [ ] [PLANNED] **Notifications (platform) — inbox built in R8.185, retention in R8.232.** Read notifications are removed 90 days after they were read (unread never); in-app inbox only, polling every 60 s while the tab is visible.
+  Email, push, preferences, and digests stay deferred. Private user-to-user messaging below is separate and still blocked.
 - [ ] [PLANNED] Redesign the top-header/sidebar boundary. Design input already
   captured in `apps/platform/GLOBAL-MENU-DESIGN-BRIEF.md` (owner feedback,
   2026-09-16). Preserve the approved semantic colors. **Partially executed

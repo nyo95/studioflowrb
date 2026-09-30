@@ -2,7 +2,7 @@
 
 Plan ID: WO-MD-SAMPLEPRICE-01
 Scope: Master Data — put a sample request's quoted price into the material price list (server command, audit, tests). Backend only; the Lead builds the SKU picker and the "Add to price list" action afterwards.
-Target revision: R8.232
+Target revision: R8.233
 Status: READY
 Priority: P2
 Owner: owner (Product Owner). Continuation of the sample-request workflow approved 2026-09-29 ("lanjut 2", 2026-09-30); details below are Lead defaults from legacy evidence and are open to the owner's veto.
@@ -71,5 +71,5 @@ Low: one new command reusing tested price services. Recovery: revert the single 
 
 You are the Backend Executor. Location: kantor. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY backend
 outcome and nothing beyond it. Inspect current repository evidence, preserve unrelated owner work, make sound in-scope implementation decisions, run the
-required checks (including opening the touched routes in `next dev`), update `CHANGELOG.md`, and create the target local revision commit R8.232. Stop only for
+required checks (including opening the touched routes in `next dev`), update `CHANGELOG.md`, and create the target local revision commit R8.233. Stop only for
 a material locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT report. Report the commit, checks, limitations, and remaining unrelated dirty files.

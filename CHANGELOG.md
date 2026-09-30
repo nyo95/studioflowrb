@@ -5,13 +5,27 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.231**
-- Next local revision: **R8.232**
+- Current revision after this entry is committed: **R8.232**
+- Next local revision: **R8.233**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.232 | 2026-09-30 | feat(platform): notification retention, app icons in the switcher, stale storage roadmap fixed
+
+- **Notification retention (owner, 2026-09-30: read items go after 90 days, unread never).** `createNotificationRetention(...).purgeReadNotifications()` deletes notifications read
+  more than 90 days ago (`READ_NOTIFICATION_RETENTION_DAYS`); `startNotificationRetention` runs it 15 s after boot and daily, on in production or with `NOTIFICATION_RETENTION=on`
+  (a development server deletes nothing), started from `instrumentation.ts`. Test: old read removed, recently read and old unread kept. The instrumentation guard test now expects the extra startup step.
+- **App icons (owner: yes, simple line icons).** App registrations carry an optional `icon` key (`layout-dashboard` StudioFlow, `database` Master Data, `calculator` BQ); the shell draws it
+  next to the app name in the switcher button and menu from a fixed vocabulary (`authenticated-shell/app-icons.tsx`), falling back to a neutral icon for an unknown key. A running dev server
+  keeps the registry it booted with, so icons appear after a restart (before that the fallback icon shows).
+- **Mobile check.** The shell at 375 px (top bar, horizontal app rail, Today) renders correctly; no change needed.
+- **Docs.** The asset storage roadmap and its backlog entry said "partially activated"; phases 1 to 4 are delivered (port, local adapter, Brand mark, private StudioFlow assets, archive sweep). Updated.
+  `PLAN.md` (sample price sync) moves to Executor target R8.233.
+
+**Checks.** `npm test` 666/666, `npm run check`, `tsc --noEmit`, eslint on touched folders.
 
 ## R8.231 | 2026-09-30 | docs(masterdata): WO-MD-SAMPLEPRICE-01 ready
 

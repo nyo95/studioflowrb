@@ -5,6 +5,10 @@ const DEFAULT_LIST_LIMIT = 30;
 const MAX_LIST_LIMIT = 100;
 const MAX_MARK_IDS = 100;
 
+/** Read notifications are removed this many days after they were read (owner, 2026-09-30). Unread ones are never removed automatically. */
+export const READ_NOTIFICATION_RETENTION_DAYS = 90;
+const DAY_MS = 86_400_000;
+
 /** Adapter for the platform Notification store. Writes only; reading is per user, below. */
 export function createNotificationWriter(): NotificationWriter {
   return {
@@ -63,6 +67,20 @@ export function createNotificationCenter(db: PrismaClient, options: { now?: () =
 
     async markAllRead(input: { userId: string }): Promise<number> {
       const result = await db.notification.updateMany({ where: { recipient_user_id: input.userId, read_at: null }, data: { read_at: now() } });
+      return result.count;
+    },
+  };
+}
+
+/** Housekeeping for the whole store (not one person's inbox): drops notifications that were read long enough ago. */
+export function createNotificationRetention(db: PrismaClient, options: { now?: () => Date; retentionDays?: number } = {}) {
+  const now = options.now ?? (() => new Date());
+  const retentionDays = options.retentionDays ?? READ_NOTIFICATION_RETENTION_DAYS;
+  return {
+    /** Deletes notifications read more than `retentionDays` ago and returns how many went. Unread items stay. */
+    async purgeReadNotifications(): Promise<number> {
+      const cutoff = new Date(now().getTime() - retentionDays * DAY_MS);
+      const result = await db.notification.deleteMany({ where: { read_at: { not: null, lt: cutoff } } });
       return result.count;
     },
   };

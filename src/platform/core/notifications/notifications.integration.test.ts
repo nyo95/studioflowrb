@@ -3,7 +3,7 @@ import { after, before, beforeEach, describe, it } from "node:test";
 
 import { closeTestDb, createTestDb, requireDisposableTestDatabaseUrl, type TestDb } from "@platform/core/db/test-support";
 
-import { createNotificationCenter, createNotificationWriter } from "./persistence";
+import { READ_NOTIFICATION_RETENTION_DAYS, createNotificationCenter, createNotificationRetention, createNotificationWriter } from "./persistence";
 
 let db: TestDb;
 let clock = new Date("2026-09-29T03:00:00Z");
@@ -112,5 +112,23 @@ describe("notification center", () => {
     assert.equal(await center().countUnread({ userId: "alice" }), 0);
     assert.equal(await center().countUnread({ userId: "bob" }), 1);
     assert.equal(await center().markAllRead({ userId: "alice" }), 0);
+  });
+});
+
+describe("notification retention", () => {
+  it("removes read notifications after 90 days and never touches unread ones", async () => {
+    await send({ title: "Old read" });
+    await send({ title: "Recently read" });
+    await send({ title: "Old unread" });
+    const rows = await db.prisma.notification.findMany({ orderBy: { title: "asc" } });
+    const byTitle = (title: string) => rows.find((row) => row.title === title)!;
+    const day = 86_400_000;
+    await db.prisma.notification.update({ where: { id: byTitle("Old read").id }, data: { created_at: new Date(clock.getTime() - 200 * day), read_at: new Date(clock.getTime() - (READ_NOTIFICATION_RETENTION_DAYS + 1) * day) } });
+    await db.prisma.notification.update({ where: { id: byTitle("Recently read").id }, data: { read_at: new Date(clock.getTime() - (READ_NOTIFICATION_RETENTION_DAYS - 1) * day) } });
+    await db.prisma.notification.update({ where: { id: byTitle("Old unread").id }, data: { created_at: new Date(clock.getTime() - 400 * day) } });
+
+    const removed = await createNotificationRetention(db.prisma, { now: () => clock }).purgeReadNotifications();
+    assert.equal(removed, 1);
+    assert.deepEqual((await db.prisma.notification.findMany({ orderBy: { title: "asc" } })).map((row) => row.title), ["Old unread", "Recently read"]);
   });
 });

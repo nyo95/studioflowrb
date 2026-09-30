@@ -2,7 +2,11 @@
 
 ## Status
 
-**PARTIALLY ACTIVATED in R7.52.** The provider-neutral Core port, fake seam,
+**PHASES 1-4 DELIVERED (reviewed 2026-09-30).** The provider-neutral Core port, fake seam,
+UI Engine ImageWorkspace, the LocalFilesystemStorage adapter, the managed Brand mark, and the
+private StudioFlow consumers (MOM images, schedule photos, deliverables) exist; archived-project
+files are removed by the retention sweep (`asset-sweep.ts`, run at startup and on demand from
+Studio Settings). Phase 5 (cloud profile) stays parked. Earlier status text: **PARTIALLY ACTIVATED in R7.52.** The provider-neutral Core port, fake seam,
 UI Engine ImageWorkspace, and StudioFlow MOM consumer exist. The final target
 is now self-hosted/local; PF-1 activates the LocalFilesystemStorage adapter.
 The Supabase adapter is optional parked infrastructure and is not a Foundation
