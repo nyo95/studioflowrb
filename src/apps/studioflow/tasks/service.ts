@@ -24,6 +24,7 @@ import {
   notFound,
   nowOf,
   requireCommand,
+  requireProjectAccess,
   requirePermission,
   requireRead,
   requiredText,
@@ -122,13 +123,14 @@ function parseDue(value: string | null | undefined): Date | null | undefined {
 export function createTaskService(db: Db, ports: StudioFlowPorts) {
   const { runTransaction } = ports;
 
-  async function loadItem(tx: TxClient, projectId: string, itemId: string) {
+  async function loadItem(tx: TxClient, projectId: string, itemId: string, access?: CommandContext) {
     const item = await tx.sfChecklistItem.findUnique({ where: { id: itemId }, include: { project: true, phase: true } });
     if (!item || item.project_id !== projectId) throw notFound("checklist item");
     if (item.project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
     if (item.phase && !isPhaseModifiable({ status: item.phase.status as PhaseStatus, isLocked: item.phase.is_locked })) {
       throw conflict("PHASE_LOCKED", "This phase is approved and locked. Reopen it first.");
     }
+    if (access?.actor.userId) await requireProjectAccess(tx, { grants: access.grants, actorId: access.actor.userId, projectId, phaseId: item.phase_id, kind: item.phase_id ? "content" : "document" });
     return item;
   }
 
@@ -180,6 +182,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
         const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true, archived_at: true } });
         if (!project) throw notFound("project");
         if (project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
+        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, phaseId: input.phaseId, kind: input.phaseId ? "content" : "document" });
         if (input.phaseId) {
           const phase = await tx.sfPhase.findUnique({ where: { id: input.phaseId }, select: { project_id: true, status: true, is_locked: true } });
           if (!phase || phase.project_id !== input.projectId) throw notFound("phase");
@@ -225,7 +228,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
       const due = parseDue(input.dueDate) ?? null;
       await assertAssignee(input.assignedToId);
       return runTransaction(async (tx) => {
-        const parent = await loadItem(tx, input.projectId, input.parentId);
+        const parent = await loadItem(tx, input.projectId, input.parentId, input);
         if (parent.parent_id !== null) throw invalid("CHECKLIST_DEPTH", "Subtasks cannot have subtasks of their own.");
         const last = await tx.sfChecklistItem.findFirst({ where: { parent_id: parent.id }, orderBy: { sort_order: "desc" }, select: { sort_order: true } });
         const id = randomUUID();
@@ -256,7 +259,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
       const priority = parsePriority(input.priority);
       const due = parseDue(input.dueDate);
       return runTransaction(async (tx) => {
-        const item = await loadItem(tx, input.projectId, input.itemId);
+        const item = await loadItem(tx, input.projectId, input.itemId, input);
         // Only a changed assignee is validated, so items kept on a former member stay editable.
         if (input.assignedToId !== undefined && (input.assignedToId ?? null) !== item.assigned_to_id) await assertAssignee(input.assignedToId);
         const data: Prisma.SfChecklistItemUncheckedUpdateInput = {};
@@ -288,7 +291,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
         throw new AppError("UNAUTHENTICATED", "ACTOR_REQUIRED", "An authenticated staff member is required.");
       }
       return runTransaction(async (tx) => {
-        const item = await loadItem(tx, input.projectId, input.itemId);
+        const item = await loadItem(tx, input.projectId, input.itemId, input);
         // A non-blocking root item is the merged "requirement" (warning-only, from the
         // deleted RequirementsPanel): toggling it only needs phase-work access, matching
         // that panel's own permission. Everything else still needs task-manage access.
@@ -310,7 +313,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
     async deleteItem(input: CommandContext & { projectId: string; itemId: string }) {
       requireCommand(input, P.taskManage);
       return runTransaction(async (tx) => {
-        const item = await loadItem(tx, input.projectId, input.itemId);
+        const item = await loadItem(tx, input.projectId, input.itemId, input);
         if (item.template_id !== null) throw conflict("CHECKLIST_TEMPLATE_ROW", "This item comes from a checklist template. Detach it from the template first.");
         const subtasks = await tx.sfChecklistItem.count({ where: { parent_id: item.id } });
         await tx.sfChecklistItem.delete({ where: { id: item.id } });
@@ -322,7 +325,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
     async detachFromTemplate(input: CommandContext & { projectId: string; itemId: string }) {
       requireCommand(input, P.taskManage);
       return runTransaction(async (tx) => {
-        const item = await loadItem(tx, input.projectId, input.itemId);
+        const item = await loadItem(tx, input.projectId, input.itemId, input);
         if (item.template_id === null) throw conflict("CHECKLIST_NOT_TEMPLATE", "This item is not linked to a template.");
         await tx.sfChecklistItem.update({ where: { id: item.id }, data: { template_id: null } });
         await writeAudit(ports, tx, { action: "studioflow.checklist.detached", entityType: "checklist-item", entityId: item.id, actor: input.actor, metadata: meta(item, { templateId: item.template_id }) });
@@ -336,7 +339,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
       if (input.orderedIds.length === 0) return { count: 0 };
       if (new Set(input.orderedIds).size !== input.orderedIds.length) throw invalid("REORDER_DUPLICATE", "Each task can appear only once.");
       return runTransaction(async (tx) => {
-        const first = await loadItem(tx, input.projectId, input.orderedIds[0]);
+        const first = await loadItem(tx, input.projectId, input.orderedIds[0], input);
         const siblings = await tx.sfChecklistItem.findMany({ where: { project_id: first.project_id, phase_id: first.phase_id, parent_id: first.parent_id }, select: { id: true } });
         const siblingIds = new Set(siblings.map((row) => row.id));
         if (siblings.length !== input.orderedIds.length || input.orderedIds.some((id) => !siblingIds.has(id))) {
@@ -356,7 +359,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
       const name = requiredText(input.name, "LABEL_NAME_REQUIRED", "Label", 40).toLowerCase();
       const color = input.color && (LABEL_COLORS as readonly string[]).includes(input.color) ? input.color : "neutral";
       return runTransaction(async (tx) => {
-        const item = await loadItem(tx, input.projectId, input.itemId);
+        const item = await loadItem(tx, input.projectId, input.itemId, input);
         const label = await tx.sfChecklistLabel.upsert({ where: { name }, create: { id: randomUUID(), name, color }, update: {} });
         await tx.sfChecklistItemLabel.upsert({ where: { item_id_label_id: { item_id: item.id, label_id: label.id } }, create: { item_id: item.id, label_id: label.id }, update: {} });
         await writeAudit(ports, tx, { action: "studioflow.checklist.label-attached", entityType: "checklist-item", entityId: item.id, actor: input.actor, metadata: meta(item, { label: name }) });
@@ -367,7 +370,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
     async detachLabel(input: CommandContext & { projectId: string; itemId: string; labelId: string }) {
       requireCommand(input, P.taskManage);
       return runTransaction(async (tx) => {
-        const item = await loadItem(tx, input.projectId, input.itemId);
+        const item = await loadItem(tx, input.projectId, input.itemId, input);
         const removed = await tx.sfChecklistItemLabel.deleteMany({ where: { item_id: item.id, label_id: input.labelId } });
         if (removed.count > 0) await writeAudit(ports, tx, { action: "studioflow.checklist.label-detached", entityType: "checklist-item", entityId: item.id, actor: input.actor, metadata: meta(item, { labelId: input.labelId }) });
         return { removed: removed.count };
@@ -482,6 +485,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
         const project = await tx.sfProject.findUnique({ where: { id: input.projectId } });
         if (!project) throw notFound("project");
         if (project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
+        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "document" });
         const created = await seedChecklistFromTemplates(tx, project.id, userId);
         if (created > 0) await writeAudit(ports, tx, { action: "studioflow.checklist.synced", entityType: "project", entityId: project.id, actor: input.actor, metadata: { projectId: project.id, created } });
         return { created };

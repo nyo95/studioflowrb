@@ -29,6 +29,7 @@ import {
   nowOf,
   optionalText,
   requireCommand,
+  requireProjectAccess,
   requireRead,
   requiredText,
   writeAudit,
@@ -93,6 +94,12 @@ function snapshotOf(row: DocumentTree): MomSnapshot {
 
 export function createMomService(db: Db, ports: StudioFlowPorts) {
   const { runTransaction, storage } = ports;
+
+  async function requireDocumentCommand(input: CommandContext & { projectId: string }): Promise<string> {
+    const userId = requireCommand(input, P.momManage);
+    await requireProjectAccess(db, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "document" });
+    return userId;
+  }
 
   async function loadDocument(tx: TxClient, projectId: string, documentId: string, write: boolean) {
     const document = await tx.sfMomDocument.findUnique({ where: { id: documentId } });
@@ -266,7 +273,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
 
     // ── Document ───────────────────────────────────────────────────────────
     async createDocument(input: CommandContext & { projectId: string; topic: string; timeZone?: string }) {
-      const userId = requireCommand(input, P.momManage);
+      const userId = await requireDocumentCommand(input);
       const topic = requiredText(input.topic, "MOM_TOPIC_REQUIRED", "Title", MOM_LIMITS.topic);
       return runTransaction(async (tx) => {
         await loadWritableProject(tx, input.projectId);
@@ -298,7 +305,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
       attendees?: string | null;
       preparedByName: string;
     }) {
-      requireCommand(input, P.momManage);
+      await requireDocumentCommand(input);
       const topic = requiredText(input.topic, "MOM_TOPIC_REQUIRED", "Topic", MOM_LIMITS.topic);
       const preparedBy = requiredText(input.preparedByName, "MOM_PREPARED_BY_REQUIRED", "Prepared by", MOM_LIMITS.preparedBy);
       if (!isDateOnlyString(input.meetingDate)) throw invalid("MOM_DATE_INVALID", "Choose a valid meeting date.");
@@ -327,7 +334,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
 
     /** Real delete (legacy); the audit event keeps a snapshot. */
     async deleteDocument(input: CommandContext & { projectId: string; documentId: string }) {
-      requireCommand(input, P.momManage);
+      await requireDocumentCommand(input);
       const keys = await runTransaction(async (tx) => {
         const existing = await loadDocument(tx, input.projectId, input.documentId, true);
         const images = await tx.sfMomImage.findMany({ where: { item: { document_id: existing.id } }, select: { storage_key: true } });
@@ -353,7 +360,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
 
     // ── Sections ───────────────────────────────────────────────────────────
     async addItem(input: CommandContext & { projectId: string; documentId: string }) {
-      requireCommand(input, P.momManage);
+      await requireDocumentCommand(input);
       return runTransaction(async (tx) => {
         const document = await loadDocument(tx, input.projectId, input.documentId, true);
         const ids = await itemIds(tx, document.id);
@@ -364,7 +371,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
     },
 
     async updateItem(input: CommandContext & { projectId: string; itemId: string; isTextOnly: boolean }) {
-      requireCommand(input, P.momManage);
+      await requireDocumentCommand(input);
       return runTransaction(async (tx) => {
         const item = await loadItem(tx, input.projectId, input.itemId);
         if (item.is_text_only === input.isTextOnly) return { itemId: item.id };
@@ -375,7 +382,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
     },
 
     async deleteItem(input: CommandContext & { projectId: string; itemId: string }) {
-      requireCommand(input, P.momManage);
+      await requireDocumentCommand(input);
       const keys = await runTransaction(async (tx) => {
         const item = await loadItem(tx, input.projectId, input.itemId);
         const images = await tx.sfMomImage.findMany({ where: { item_id: item.id }, select: { storage_key: true } });
@@ -393,7 +400,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
     },
 
     async reorderItems(input: CommandContext & { projectId: string; documentId: string; itemIds: string[] }) {
-      requireCommand(input, P.momManage);
+      await requireDocumentCommand(input);
       return runTransaction(async (tx) => {
         const document = await loadDocument(tx, input.projectId, input.documentId, true);
         if (!isPermutation(await itemIds(tx, document.id), input.itemIds)) throw invalid("MOM_REORDER_INVALID", "The section list changed. Refresh and try again.");
@@ -404,7 +411,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
     },
 
     async moveItem(input: CommandContext & { projectId: string; itemId: string; direction: "up" | "down" }) {
-      requireCommand(input, P.momManage);
+      await requireDocumentCommand(input);
       return runTransaction(async (tx) => {
         const item = await loadItem(tx, input.projectId, input.itemId);
         const next = moveId(await itemIds(tx, item.document_id), item.id, input.direction);
@@ -416,7 +423,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
     },
 
     async updateItemContent(input: CommandContext & { projectId: string; itemId: string; content: string }) {
-      requireCommand(input, P.momManage);
+      await requireDocumentCommand(input);
       const content = itemContentOf(input.content);
       return runTransaction(async (tx) => {
         const item = await loadItem(tx, input.projectId, input.itemId);
@@ -433,7 +440,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
      * empty lands in slot 0 (legacy order normalization).
      */
     async setImage(input: CommandContext & { projectId: string; itemId: string; slot: number; file: MomImageUpload }) {
-      requireCommand(input, P.momManage);
+      await requireDocumentCommand(input);
       if (!isImageSlot(input.slot)) throw invalid("MOM_IMAGE_LIMIT", "Each section holds at most two images.");
       const extension = MOM_IMAGE_TYPES[input.file.contentType];
       if (!extension) throw invalid("MOM_IMAGE_TYPE", "Use a PNG, JPEG, or WebP image.");
@@ -479,7 +486,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
     },
 
     async deleteImage(input: CommandContext & { projectId: string; imageId: string }) {
-      requireCommand(input, P.momManage);
+      await requireDocumentCommand(input);
       const key = await runTransaction(async (tx) => {
         const image = await tx.sfMomImage.findUnique({ where: { id: input.imageId }, include: { item: { include: { document: true } } } });
         if (!image || image.item.document.project_id !== input.projectId) throw scopeError();
@@ -500,7 +507,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
     // ── Revisions ──────────────────────────────────────────────────────────
     /** Freeze the working copy as the next version; the oldest beyond the limit is overwritten. */
     async saveRevision(input: CommandContext & { projectId: string; documentId: string; note?: string | null }) {
-      const userId = requireCommand(input, P.momManage);
+      const userId = await requireDocumentCommand(input);
       const note = optionalText(input.note, MOM_LIMITS.revisionNote);
       const { number, dropped } = await runTransaction(async (tx) => {
         const document = await loadDocument(tx, input.projectId, input.documentId, true);
@@ -521,7 +528,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
      * frozen as a new revision first, so a restore never loses work.
      */
     async restoreRevision(input: CommandContext & { projectId: string; documentId: string; revisionId: string }) {
-      const userId = requireCommand(input, P.momManage);
+      const userId = await requireDocumentCommand(input);
       const { number, orphaned } = await runTransaction(async (tx) => {
         const document = await loadDocument(tx, input.projectId, input.documentId, true);
         const target = await tx.sfMomRevision.findUnique({ where: { id: input.revisionId } });
@@ -568,7 +575,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
     },
 
     async swapImages(input: CommandContext & { projectId: string; itemId: string }) {
-      requireCommand(input, P.momManage);
+      await requireDocumentCommand(input);
       return runTransaction(async (tx) => {
         const item = await loadItem(tx, input.projectId, input.itemId);
         const images = await tx.sfMomImage.findMany({ where: { item_id: item.id }, orderBy: { slot: "asc" } });

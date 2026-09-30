@@ -29,10 +29,10 @@ permission. Reading stays open to everyone who has `studioflow.project.read`. Th
 
 - **Rule = base grant AND assignment.** Every mutating command keeps its current grant check and additionally passes the assignment gate below. The gate is a single
   shared helper in `src/apps/studioflow/shared.ts` (one implementation, unit-tested); services call it, nothing re-derives it.
-- **New permissions (registered, labelled in plain English for Platform Access):**
+- **New permissions (registered, labelled in plain English for Platform Access).** Platform RBAC accepts only three-part IDs (`app.area.action`, hyphens allowed), so the PIC permissions use `pic-designer` / `pic-drafter` (Lead decision 2026-09-30 after the Executor's BLOCKED report; option A):
   - `studioflow.project.override` — "Edit any project regardless of assignment" (replaces legacy "ADMIN always allowed"). Passes every gate below. Does not replace the base grant.
-  - `studioflow.project.pic.designer` — "Can be assigned as a project's designer (PIC)".
-  - `studioflow.project.pic.drafter` — "Can be assigned as a project's drafter (PIC)".
+  - `studioflow.project.pic-designer` — "Can be assigned as a project's designer (PIC)".
+  - `studioflow.project.pic-drafter` — "Can be assigned as a project's drafter (PIC)".
   - Keep `studioflow.phase.override` unchanged (it is the revision hard-reset command, a different thing).
 - **Gate rules** (`actor` = the signed-in user; `override` = holds `project.override`):
   1. Project data (edit fields, priority, status, archive/restore, set PICs, project dates): PIC designer, or `override`. Creating a project and client management keep the base `project.manage` only (no project exists yet).
@@ -41,7 +41,7 @@ permission. Reading stays open to everyone who has `studioflow.project.read`. Th
   4. Project-level documents and lists not tied to a phase (MOM, Product Schedule and its sample requests, Presentation, Library, project-level checklist/tasks): PIC designer OR PIC drafter, or `override`.
   5. Reading: unchanged. Anyone with `project.read` may read everything, including Today and search.
 - **Assignee rule unchanged:** tasks may still be assigned to any eligible staff (`phase.work` holders); this plan does not restrict assignment targets.
-- **PIC eligibility:** `assertPic("designer")` requires the person to hold `studioflow.project.pic.designer` (and remain active); `assertPic("drafter")` requires `project.pic.drafter`.
+- **PIC eligibility:** `assertPic("designer")` requires the person to hold `studioflow.project.pic-designer` (and remain active); `assertPic("drafter")` requires `studioflow.project.pic-drafter`.
   `listAssignablePeople` takes a `seat` argument and returns the matching holders. A project's existing PICs are never re-checked unless the PIC is being changed.
 - **Read model for the UI:** add `projects.getAccess({ grants, actor, projectId })` returning `{ override, isDesigner, isDrafter, canEditProject, canEditDocuments, phases: Array<{ phaseId, canTransition, canEditContent }> }`, computed by the same helper. The Lead's UI consumes only this; it must never re-derive rules.
 - **Existing data / deploy safety:** ship a data migration (no schema change if role grants are rows, otherwise the registry mechanism the repo already uses) so behavior does not silently lock people out: every role that currently holds `studioflow.phase.work` also receives both PIC permissions; every role that holds `studioflow.phase.override` receives `studioflow.project.override`. The owner tightens this afterwards in Platform Access. Inspect how grants are stored first; if grants are only configured in the UI and cannot be migrated safely, stop with BLOCKED / CONFLICT rather than guessing.

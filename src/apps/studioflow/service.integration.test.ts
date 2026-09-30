@@ -26,7 +26,7 @@ import { runSerializableTransaction } from "@platform/core/db/transactions";
 import type { StudioFlowPorts } from "./shared";
 
 const ALL = [...Object.values(P)];
-const DRAFTER_GRANTS = [P.access, P.projectRead, P.phaseWork, P.taskManage];
+const DRAFTER_GRANTS = [P.access, P.projectRead, P.phaseWork, P.taskManage, P.projectPicDrafter];
 
 let testDb: TestDb;
 let sf: StudioFlowService;
@@ -538,8 +538,41 @@ describe("SF-R1 bootstrap and naming", () => {
     const outsider = await seedUser("Outsider", [P.access, P.projectRead]);
     await rejectsWith(sf.projects.createProject({ ...as(designer), name: "X", picDesignerId: outsider.id, picDrafterId: drafter.id }), "PIC_NOT_ELIGIBLE");
     await rejectsWith(sf.projects.createProject({ ...as(drafter, DRAFTER_GRANTS), name: "X", picDesignerId: designer.id, picDrafterId: drafter.id }), "PERMISSION_DENIED");
-    const people = await sf.projects.listAssignablePeople({ grants: ALL });
-    assert.deepEqual(people.map((p) => p.displayName), ["Dina Designer", "Dodi Drafter"]);
+    const designers = await sf.projects.listAssignablePeople({ grants: ALL, seat: "designer" });
+    const drafters = await sf.projects.listAssignablePeople({ grants: ALL, seat: "drafter" });
+    assert.deepEqual(designers.map((p) => p.displayName), ["Dina Designer"]);
+    assert.deepEqual(drafters.map((p) => p.displayName), ["Dina Designer", "Dodi Drafter"]);
+  });
+
+  it("requires the assigned PIC for project mutations and exposes the shared access model", async () => {
+    const { projectId } = await newProject();
+    const unassignedGrants = ALL.filter((grant) => grant !== P.projectOverride);
+    const outsider = await seedUser("Unassigned", unassignedGrants);
+    const moodboard = await phaseOf(projectId, "moodboard");
+    const cd = await phaseOf(projectId, "cd");
+
+    await rejectsWith(sf.projects.setProjectPriority({ ...as(outsider, unassignedGrants), projectId, priority: "URGENT" }), "PERMISSION_DENIED");
+    await rejectsWith(sf.phases.submitForInternalReview({ ...as(outsider, unassignedGrants), projectId, phaseId: moodboard.id }), "PERMISSION_DENIED");
+    await rejectsWith(sf.tasks.createItem({ ...as(outsider, unassignedGrants), projectId, phaseId: null, label: "Denied" }), "PERMISSION_DENIED");
+    await rejectsWith(sf.mom.createDocument({ ...as(outsider, unassignedGrants), projectId, topic: "Denied" }), "PERMISSION_DENIED");
+    await rejectsWith(sf.schedule.createEntry({ ...as(outsider, unassignedGrants), projectId, section: "MATERIAL", category: "Panel" }), "PERMISSION_DENIED");
+    await rejectsWith(sf.presentation.createBoard({ ...as(outsider, unassignedGrants), projectId, title: "Denied" }), "PERMISSION_DENIED");
+
+    await sf.projects.setProjectPriority({ ...as(designer), projectId, priority: "URGENT" });
+    await sf.mom.createDocument({ ...as(drafter, [...DRAFTER_GRANTS, P.momManage]), projectId, topic: "Drafter can edit documents" });
+    await sf.phases.activatePhase({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id });
+    await sf.phases.addActivity({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id, content: "Drafter-seat content", mode: "FEEDBACK" });
+    const access = await sf.projects.getAccess({ grants: DRAFTER_GRANTS, actor: drafter.actor, projectId });
+    assert.deepEqual({ project: access.canEditProject, documents: access.canEditDocuments }, { project: false, documents: true });
+    assert.equal(access.phases.find((phase) => phase.phaseId === moodboard.id)?.canTransition, false);
+    assert.equal(access.phases.find((phase) => phase.phaseId === moodboard.id)?.canEditContent, false);
+    assert.equal(access.phases.find((phase) => phase.phaseId === cd.id)?.canTransition, true);
+    assert.equal(access.phases.find((phase) => phase.phaseId === cd.id)?.canEditContent, true);
+
+    const override = await seedUser("Override", ALL);
+    const overrideAccess = await sf.projects.getAccess({ grants: ALL, actor: override.actor, projectId });
+    assert.equal(overrideAccess.override, true);
+    await sf.projects.setProjectStatus({ ...as(override), projectId, status: "ON_HOLD" });
   });
 
   it("archives read-only and restores with audit", async () => {
@@ -626,7 +659,7 @@ describe("SF-R1 phase workflow (legacy parity)", () => {
     await sf.phases.submitForClientReview(base).catch(() => undefined);
     const [root] = await sf.tasks.listChecklist({ grants: ALL, projectId, phaseId: phase.id });
     await rejectsWith(sf.phases.submitForClientReview(base), "PHASE_APPROVAL_BLOCKED");
-    const sub = await sf.tasks.createSubtask({ ...as(drafter, DRAFTER_GRANTS), projectId, parentId: root.id, label: "Print A3" });
+    const sub = await sf.tasks.createSubtask({ ...as(designer), projectId, parentId: root.id, label: "Print A3" });
     await sf.tasks.setItemChecked({ ...as(designer), projectId, itemId: root.id, checked: true });
     const child = await testDb.prisma.sfChecklistItem.findUniqueOrThrow({ where: { id: sub.itemId } });
     assert.equal(child.is_checked, true, "parent cascades down");
@@ -640,7 +673,7 @@ describe("SF-R1 phase workflow (legacy parity)", () => {
     const { projectId } = await newProject();
     const layout = await phaseOf(projectId, "layout");
     const supervision = await phaseOf(projectId, "supervision");
-    await sf.phases.activatePhase({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: layout.id });
+    await sf.phases.activatePhase({ ...as(designer), projectId, phaseId: layout.id });
     await rejectsWith(sf.phases.activatePhase({ ...as(designer), projectId, phaseId: supervision.id }), "PHASE_SEQUENTIAL");
     // "Reopen" must not sidestep the start rules for a phase that has not started.
     await rejectsWith(sf.phases.reopenPhase({ ...as(designer), projectId, phaseId: supervision.id, intent: "INTERNAL", reason: "early" }), "PHASE_SEQUENTIAL");

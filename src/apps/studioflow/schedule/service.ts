@@ -34,6 +34,7 @@ import {
   notFound,
   optionalText,
   requireCommand,
+  requireProjectAccess,
   requireRead,
   requiredText,
   writeAudit,
@@ -121,6 +122,12 @@ function scopeError() {
 
 export function createScheduleService(db: Db, ports: StudioFlowPorts) {
   const { runTransaction, storage } = ports;
+
+  async function requireScheduleCommand(input: CommandContext & { projectId: string }): Promise<string> {
+    const userId = requireCommand(input, P.scheduleManage);
+    await requireProjectAccess(db, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "document" });
+    return userId;
+  }
 
   async function signedUrl(key: string | null): Promise<string | null> {
     if (!key) return null;
@@ -470,7 +477,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     },
 
     async applyTemplates(input: CommandContext & { projectId: string }) {
-      requireCommand(input, P.scheduleManage);
+      await requireScheduleCommand(input);
       return runTransaction(async (tx) => {
         await loadWritableProject(tx, input.projectId);
         const created = await seedScheduleFromTemplates(tx, input.projectId);
@@ -480,7 +487,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     },
 
     async createEntry(input: CommandContext & { projectId: string; section: string; category: string; qty?: string | null; unit?: string | null; location?: string | null; snapshot?: SnapshotInput | null }) {
-      requireCommand(input, P.scheduleManage);
+      await requireScheduleCommand(input);
       const section = sectionOf(input.section);
       const category = categoryOf(input.category);
       const brand = input.snapshot ? await brandSnapshot(ports, input.snapshot.brandId) : { brandId: null, brandName: null };
@@ -502,7 +509,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     },
 
     async updateEntry(input: CommandContext & { projectId: string; entryId: string; qty?: string | null; unit?: string | null; location?: string | null }) {
-      requireCommand(input, P.scheduleManage);
+      await requireScheduleCommand(input);
       return runTransaction(async (tx) => {
         const entry = await loadEntry(tx, input.projectId, input.entryId, true);
         // Only the fields that were sent change; omitted fields keep their value.
@@ -531,7 +538,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
      * choice and may be empty (photo, code and title only).
      */
     async updateEntryCardFields(input: CommandContext & { projectId: string; entryId: string; fields: string[] | null }) {
-      requireCommand(input, P.scheduleManage);
+      await requireScheduleCommand(input);
       const fields = input.fields === null
         ? null
         : orderCardFields([...new Set(input.fields)].filter((key) => isScheduleCardFieldKey(key)));
@@ -546,7 +553,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     },
 
     async deleteEntry(input: CommandContext & { projectId: string; entryId: string }) {
-      requireCommand(input, P.scheduleManage);
+      await requireScheduleCommand(input);
       const result = await runTransaction(async (tx) => {
         const entry = await loadEntry(tx, input.projectId, input.entryId, true);
         const images = await tx.sfScheduleOption.findMany({ where: { entry_id: entry.id }, select: { image_key: true } });
@@ -560,7 +567,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     },
 
     async reorderEntries(input: CommandContext & { projectId: string; section: string; prefix: string; orderedIds: string[] }) {
-      requireCommand(input, P.scheduleManage);
+      await requireScheduleCommand(input);
       const section = sectionOf(input.section);
       const prefix = prefixOf(input.prefix, "Item");
       return runTransaction(async (tx) => {
@@ -575,7 +582,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
 
     /** Move one row up/down inside its code group; codes stay gapless. */
     async moveEntry(input: CommandContext & { projectId: string; entryId: string; direction: "up" | "down" }) {
-      requireCommand(input, P.scheduleManage);
+      await requireScheduleCommand(input);
       return runTransaction(async (tx) => {
         const entry = await loadEntry(tx, input.projectId, input.entryId, true);
         const ids = await entryIds(tx, input.projectId, entry.section, entry.prefix);
@@ -591,7 +598,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
 
     /** Legacy "move to category": the row takes the target category's prefix and the next free number there. */
     async moveEntryToCategory(input: CommandContext & { projectId: string; entryId: string; category: string }) {
-      requireCommand(input, P.scheduleManage);
+      await requireScheduleCommand(input);
       const category = categoryOf(input.category);
       return runTransaction(async (tx) => {
         const entry = await loadEntry(tx, input.projectId, input.entryId, true);
@@ -618,7 +625,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
 
     /** Edit an option's snapshot (legacy inspector `updateScheduleOptionSnapshot`). */
     async updateOption(input: CommandContext & { projectId: string; optionId: string; snapshot: SnapshotInput }) {
-      requireCommand(input, P.scheduleManage);
+      await requireScheduleCommand(input);
       return runTransaction(async (tx) => {
         const option = await loadOption(tx, input.projectId, input.optionId, true);
         // Keep the stored brand when the same Master Data brand is sent again (it may have been archived since).
@@ -642,7 +649,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     },
 
     async createOption(input: CommandContext & { projectId: string; entryId: string; snapshot: SnapshotInput }) {
-      requireCommand(input, P.scheduleManage);
+      await requireScheduleCommand(input);
       const brand = await brandSnapshot(ports, input.snapshot.brandId);
       const snapshot = cleanSnapshot({ ...input.snapshot, ...brand, imageKey: null });
       return runTransaction(async (tx) => {
@@ -655,7 +662,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     },
 
     async markFinal(input: CommandContext & { projectId: string; optionId: string }) {
-      requireCommand(input, P.scheduleManage);
+      await requireScheduleCommand(input);
       return runTransaction(async (tx) => {
         const option = await loadOption(tx, input.projectId, input.optionId, true);
         await tx.sfScheduleOption.updateMany({ where: { entry_id: option.entry_id }, data: { is_final: false, status: "NOT_USED" } });
@@ -667,7 +674,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     },
 
     async deleteOption(input: CommandContext & { projectId: string; optionId: string }) {
-      requireCommand(input, P.scheduleManage);
+      await requireScheduleCommand(input);
       const result = await runTransaction(async (tx) => {
         const option = await loadOption(tx, input.projectId, input.optionId, true);
         const wasFinal = option.is_final;
@@ -683,7 +690,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
 
     /** Put the object first, then record it; the replaced object is released after commit. */
     async setOptionImage(input: CommandContext & { projectId: string; optionId: string; file: ScheduleImageUpload }) {
-      requireCommand(input, P.scheduleManage);
+      await requireScheduleCommand(input);
       const extension = validateImage(input.file);
       // Scope check before touching storage.
       const precheck = await db.sfScheduleOption.findUnique({ where: { id: input.optionId }, include: { entry: { select: { project_id: true } } } });
@@ -711,7 +718,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     },
 
     async removeOptionImage(input: CommandContext & { projectId: string; optionId: string }) {
-      requireCommand(input, P.scheduleManage);
+      await requireScheduleCommand(input);
       const result = await runTransaction(async (tx) => {
         const option = await loadOption(tx, input.projectId, input.optionId, true);
         if (!option.image_key) return { optionId: option.id, previousKey: null };
@@ -725,7 +732,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
 
     /** A childless-of-vendor-data option can have at most one open (REQUESTED) sample request at a time. */
     async requestSample(input: CommandContext & { projectId: string; optionId: string; requestedFrom: string; note?: string | null }) {
-      const userId = requireCommand(input, P.scheduleManage);
+      const userId = await requireScheduleCommand(input);
       const requestedFrom = requiredText(input.requestedFrom, "SAMPLE_VENDOR_REQUIRED", "Requested from", 200);
       const note = optionalText(input.note, 500);
       return runTransaction(async (tx) => {
@@ -752,7 +759,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
 
     /** Marks the sample received; does not touch Master Data — a Master Data user enters the SKU/price themselves. */
     async receiveSample(input: CommandContext & { projectId: string; requestId: string; note?: string | null }) {
-      const userId = requireCommand(input, P.scheduleManage);
+      const userId = await requireScheduleCommand(input);
       const receivedNote = optionalText(input.note, 500);
       return runTransaction(async (tx) => {
         const request = await loadSampleRequest(tx, input.projectId, input.requestId, true);
@@ -769,7 +776,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     /** Undoes a mistaken request before anyone acts on it — a hard delete, not a status. Once RECEIVED the
      *  physical sample is a real-world fact and cannot be cancelled here. */
     async cancelSample(input: CommandContext & { projectId: string; requestId: string }) {
-      requireCommand(input, P.scheduleManage);
+      await requireScheduleCommand(input);
       return runTransaction(async (tx) => {
         const request = await loadSampleRequest(tx, input.projectId, input.requestId, true);
         if (request.status !== "REQUESTED") throw conflict("SAMPLE_NOT_PENDING", "This sample request was already resolved.");
@@ -810,7 +817,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     },
 
     async copyReusableOption(input: CommandContext & { projectId: string; entryId: string; sourceOptionId: string }) {
-      requireCommand(input, P.scheduleManage);
+      await requireScheduleCommand(input);
       return runTransaction(async (tx) => {
         const entry = await loadEntry(tx, input.projectId, input.entryId, true);
         const source = await tx.sfScheduleOption.findUnique({ where: { id: input.sourceOptionId }, include: { entry: true } });
@@ -846,7 +853,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
      * `category,brand,product,…` sheet is accepted as a fallback.
      */
     async importCsv(input: CommandContext & { projectId: string; section: string; csv: string }) {
-      requireCommand(input, P.scheduleManage);
+      await requireScheduleCommand(input);
       const section = sectionOf(input.section);
       const sheet = parseLegacyScheduleSheet(input.csv, section);
       if (sheet) {

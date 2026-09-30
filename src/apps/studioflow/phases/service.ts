@@ -28,6 +28,7 @@ import {
   notFound,
   nowOf,
   requireCommand,
+  requireProjectAccess,
   requirePermission,
   requireRead,
   requiredText,
@@ -58,10 +59,11 @@ function resolvePhaseName(phase: { name_snapshot: string }): string {
 export function createPhaseService(db: Db, ports: StudioFlowPorts) {
   const { runTransaction } = ports;
 
-  async function loadPhase(tx: TxClient, projectId: string, phaseId: string): Promise<{ phase: PhaseRow; project: ProjectRow }> {
+  async function loadPhase(tx: TxClient, projectId: string, phaseId: string, access?: CommandContext): Promise<{ phase: PhaseRow; project: ProjectRow }> {
     const phase = await tx.sfPhase.findUnique({ where: { id: phaseId }, include: { project: true } });
     if (!phase || phase.project_id !== projectId) throw notFound("phase");
     if (phase.project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
+    if (access?.actor.userId) await requireProjectAccess(tx, { grants: access.grants, actorId: access.actor.userId, projectId, phaseId, kind: "transition" });
     const { project, ...rest } = phase;
     return { phase: rest, project };
   }
@@ -132,7 +134,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     async activatePhase(input: PhaseCommandInput) {
       requireCommand(input, P.phaseWork);
       return runTransaction(async (tx) => {
-        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId);
+        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
         if (phase.status !== "PENDING") throw invalidState("Only a phase that has not started can be started.");
         if (project.status !== "ACTIVE") throw conflict("PROJECT_NOT_ACTIVE", "The project must be active to start a phase.");
         const previous = await tx.sfPhase.findFirst({ where: { project_id: project.id, order_index: phase.order_index - 1 } });
@@ -152,7 +154,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       requireCommand(input, P.phaseReview);
       const reason = requiredText(input.reason, "BYPASS_REASON_REQUIRED", "A reason", 500);
       return runTransaction(async (tx) => {
-        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId);
+        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
         if (phase.status !== "PENDING") throw invalidState("Only a phase that has not started can be skipped.");
         if (project.status !== "ACTIVE") throw conflict("PROJECT_NOT_ACTIVE", "The project must be active to skip a phase.");
         const hasNext = await nextPhaseExists(tx, phase);
@@ -169,7 +171,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     async submitForInternalReview(input: PhaseCommandInput) {
       requireCommand(input, P.phaseWork);
       return runTransaction(async (tx) => {
-        const { phase } = await loadPhase(tx, input.projectId, input.phaseId);
+        const { phase } = await loadPhase(tx, input.projectId, input.phaseId, input);
         if (phase.is_locked) throw lockedError();
         if (phase.status !== "IN_PROGRESS") throw invalidState("Only a phase in progress can be sent for internal review.");
         if (!(await activeRevision(tx, phase.id))) throw invalidState("Start the phase first.");
@@ -184,7 +186,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     async approveInternal(input: PhaseCommandInput) {
       requireCommand(input, P.phaseReview);
       return runTransaction(async (tx) => {
-        const { phase } = await loadPhase(tx, input.projectId, input.phaseId);
+        const { phase } = await loadPhase(tx, input.projectId, input.phaseId, input);
         if (phase.is_locked) throw lockedError();
         if (phase.status !== "ON_REVIEW_INTERNAL") throw invalidState("Only a phase in internal review can be approved internally.");
         await assertFullyUnblocked(tx, phase.id);
@@ -197,7 +199,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     async submitForClientReview(input: PhaseCommandInput) {
       requireCommand(input, P.phaseReview);
       return runTransaction(async (tx) => {
-        const { phase } = await loadPhase(tx, input.projectId, input.phaseId);
+        const { phase } = await loadPhase(tx, input.projectId, input.phaseId, input);
         if (phase.is_locked) throw lockedError();
         const from = phase.status as PhaseStatus;
         if (!["IN_PROGRESS", "ON_REVIEW_INTERNAL", "APPROVED_INTERNAL"].includes(from)) throw invalidState("This phase cannot be sent to the client now.");
@@ -213,7 +215,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     async rejectPhase(input: PhaseCommandInput & { type: "INTERNAL" | "CLIENT" }) {
       requireCommand(input, P.phaseReview);
       return runTransaction(async (tx) => {
-        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId);
+        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
         if (phase.is_locked) throw lockedError();
         const from = phase.status as PhaseStatus;
         if (input.type === "INTERNAL" && from !== "ON_REVIEW_INTERNAL") throw invalidState("Only a phase in internal review can be sent back for internal changes.");
@@ -261,7 +263,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     async approveClient(input: PhaseCommandInput) {
       requireCommand(input, P.phaseReview);
       return runTransaction(async (tx) => {
-        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId);
+        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
         if (phase.is_locked) throw lockedError();
         if (phase.status !== "ON_REVIEW_CLIENT") throw invalidState("Only a phase with the client can be approved.");
         await assertFullyUnblocked(tx, phase.id);
@@ -278,7 +280,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       requireCommand(input, P.phaseReview);
       const reason = requiredText(input.reason, "REOPEN_REASON_REQUIRED", "A reason", 500);
       return runTransaction(async (tx) => {
-        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId);
+        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
         const from = phase.status as PhaseStatus;
         if (!phase.is_locked && from !== "PENDING") throw invalidState("Only an approved, finished, or not-started phase can be reopened.");
         if (from === "PENDING") {
@@ -304,7 +306,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     async completeSupervision(input: PhaseCommandInput) {
       requireCommand(input, P.phaseReview);
       return runTransaction(async (tx) => {
-        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId);
+        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
         if (!isLegacySupervisionDefinition(phase.definition_id) || phase.status !== "IN_PROGRESS" || phase.is_locked) throw invalidState("Only Supervision in progress can be finished.");
         await setPhase(tx, phase, { status: "COMPLETED", is_locked: true });
         const current = await activeRevision(tx, phase.id);
@@ -355,7 +357,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         }
       }
       return runTransaction(async (tx) => {
-        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId);
+        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
         const revisions = await tx.sfRevision.findMany({
           where: { phase_id: phase.id },
           orderBy: [{ major: "asc" }, { minor: "asc" }],
@@ -406,6 +408,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       }
       return runTransaction(async (tx) => {
         const project = await loadWritableProject(tx, input.projectId);
+        await requireProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: input.projectId, kind: "project" });
         const phase = await tx.sfPhase.findUnique({ where: { id: input.phaseId } });
         if (!phase || phase.project_id !== project.id) throw notFound("phase");
         const changes: Record<string, { from: unknown; to: unknown }> = {};
@@ -428,11 +431,12 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
 
   // ── Activities ──────────────────────────────────────────────────────────
 
-  async function loadActivity(tx: TxClient, projectId: string, activityId: string) {
+  async function loadActivity(tx: TxClient, projectId: string, activityId: string, access?: CommandContext) {
     const activity = await tx.sfActivity.findUnique({ where: { id: activityId }, include: { project: true, phase: true, revision: true } });
     if (!activity || activity.project_id !== projectId) throw notFound("item");
     if (activity.project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
     if (activity.phase && !isPhaseModifiable({ status: activity.phase.status as PhaseStatus, isLocked: activity.phase.is_locked })) throw lockedError();
+    if (access?.actor.userId) await requireProjectAccess(tx, { grants: access.grants, actorId: access.actor.userId, projectId, phaseId: activity.phase_id, kind: "content" });
     return activity;
   }
 
@@ -464,7 +468,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         let phaseId: string | null = null;
         let revisionId: string | null = null;
         if (input.phaseId) {
-          const { phase } = await loadPhase(tx, input.projectId, input.phaseId);
+          const { phase } = await loadPhase(tx, input.projectId, input.phaseId, input);
           if (!isPhaseModifiable({ status: phase.status as PhaseStatus, isLocked: phase.is_locked })) throw lockedError();
           const revision = await activeRevision(tx, phase.id);
           if (!revision) throw invalidState("Start this phase before recording feedback.");
@@ -485,7 +489,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       requireCommand(input, P.phaseWork);
       const due = parseDue(input.dueDate);
       return runTransaction(async (tx) => {
-        const activity = await loadActivity(tx, input.projectId, input.activityId);
+        const activity = await loadActivity(tx, input.projectId, input.activityId, input);
         // Only a changed assignee is validated, so items kept on a former member stay editable.
         if (input.assignedToId !== undefined && (input.assignedToId ?? null) !== activity.assigned_to_id) await assertAssignee(input.assignedToId);
         const data: { content?: string; due_at?: Date | null; assigned_to_id?: string | null } = {};
@@ -506,7 +510,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     async setActivityDone(input: CommandContext & { projectId: string; activityId: string; done: boolean }) {
       requireCommand(input, P.phaseWork);
       return runTransaction(async (tx) => {
-        const activity = await loadActivity(tx, input.projectId, input.activityId);
+        const activity = await loadActivity(tx, input.projectId, input.activityId, input);
         const next = input.done ? "COMPLETED" : "OPEN";
         if (activity.status === next) return { activityId: activity.id };
         await tx.sfActivity.update({ where: { id: activity.id }, data: { status: next, completed_at: input.done ? nowOf(ports) : null } });
@@ -518,7 +522,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     async deleteActivity(input: CommandContext & { projectId: string; activityId: string }) {
       requireCommand(input, P.phaseWork);
       return runTransaction(async (tx) => {
-        const activity = await loadActivity(tx, input.projectId, input.activityId);
+        const activity = await loadActivity(tx, input.projectId, input.activityId, input);
         await tx.sfActivity.delete({ where: { id: activity.id } });
         await writeAudit(ports, tx, { action: "studioflow.activity.deleted", entityType: "activity", entityId: activity.id, actor: input.actor, metadata: { projectId: activity.project_id, phaseId: activity.phase_id, content: activity.content, mode: activity.mode } });
         return { activityId: activity.id };
@@ -996,6 +1000,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       try {
         await runTransaction(async (tx) => {
           const phase = await loadWritablePhase(tx, input.projectId, input.phaseId);
+          await requireProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: input.projectId, phaseId: phase.id, kind: "content" });
           const revision = await activeRevision(tx, phase.id);
           if (!revision) throw invalid("ACTIVE_REVISION_REQUIRED", "Start this phase before uploading deliverables.");
           await tx.sfDeliverable.create({ data: { project_id: input.projectId, phase_id: input.phaseId, revision_id: revision.id, name, storage_key: key, file_size_bytes: bytes, content_type: input.file.contentType, created_by_id: input.actor.userId } });
@@ -1010,9 +1015,10 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     async deleteDeliverable(input: CommandContext & { projectId: string; deliverableId: string }) {
       requireCommand(input, P.projectManage);
       const key = await runTransaction(async (tx) => {
-        const d = await tx.sfDeliverable.findUnique({ where: { id: input.deliverableId }, select: { id: true, project_id: true, storage_key: true } });
+        const d = await tx.sfDeliverable.findUnique({ where: { id: input.deliverableId }, select: { id: true, project_id: true, phase_id: true, storage_key: true } });
         if (!d || d.project_id !== input.projectId) throw notFound("deliverable");
         await loadWritableProject(tx, input.projectId);
+        await requireProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: input.projectId, phaseId: d.phase_id, kind: "content" });
         await tx.sfDeliverable.delete({ where: { id: d.id } });
         return d.storage_key;
       });

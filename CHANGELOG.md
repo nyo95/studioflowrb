@@ -5,13 +5,31 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.219**
-- Next local revision: **R8.220**
+- Current revision after this entry is committed: **R8.220**
+- Next local revision: **R8.221**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.220 | 2026-09-30 | feat(studioflow): enforce PIC project edit access
+
+- **PIC-based server enforcement.** StudioFlow mutations retain their existing base permission and now also require the project's
+  designer PIC, the drafter PIC for drafter-seat phase work, or the new `studioflow.project.override` permission. This covers
+  project changes, phase transitions/content and deliverables, checklist tasks, MOM, Product Schedule, and Presentation; reading
+  remains unchanged. The shared access result now supplies the Lead-owned UI with project, document, and per-phase capabilities.
+- **PIC eligibility and safe rollout.** Designer and drafter picker eligibility now uses the distinct registered permissions
+  `studioflow.project.pic-designer` and `studioflow.project.pic-drafter`. Migration `20260930160000_sf_project_pic_access`
+  copies every existing `studioflow.phase.work` role grant to both PIC permissions and every `studioflow.phase.override` role
+  grant to `studioflow.project.override`; it was applied to the approved `studioflow_rebuild` and `studioflow_rebuild_test`
+  databases and verified not to leave a current role without its equivalent capability.
+- **Coverage.** Added StudioFlow integration coverage for the access read model and permitted/denied mutations across projects,
+  phases, tasks, MOM, Schedule, and Presentation. Updated only pre-existing tests that had deliberately relied on the former
+  any-phase-worker edit rule.
+
+**Checks.** `npm test` 655/655; `npx tsc --noEmit`; `npm run check`; `npm run lint` (0 errors, 2 pre-existing `no-img-element`
+warnings); `npm run build`; and authenticated `next dev` renders of `/studioflow`, a project overview, and `/studioflow/projects`.
 
 ## R8.219 | 2026-09-30 | docs(studioflow): PIC-based edit rights decided, WO-SF-ACCESS-01 ready
 

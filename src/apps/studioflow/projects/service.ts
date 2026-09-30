@@ -2,6 +2,7 @@ import { createAssetRetentionService } from "./asset-retention";
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client";
+import { AppError } from "@platform/core/errors";
 import { listAuditEvents } from "@platform/core/audit/persistence";
 import type { PersonSummary } from "@platform/core/rbac/people";
 import { currentDateOnly } from "@platform/utilities/date";
@@ -13,6 +14,7 @@ import type { PhaseStatus } from "../domain/phase";
 import {
   P,
   conflict,
+  getProjectAccess,
   hasPermission,
   invalid,
   loadWritableProject,
@@ -21,6 +23,7 @@ import {
   nowOf,
   optionalText,
   requireCommand,
+  requireProjectAccess,
   requireRead,
   requiredText,
   writeAudit,
@@ -92,10 +95,10 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
     return { archiveRetentionDays: row?.archive_retention_days ?? 90 };
   }
 
-  async function assertPic(userId: string, seat: string): Promise<void> {
-    const holders = await ports.people.listHolders(P.phaseWork);
+  async function assertPic(userId: string, seat: "designer" | "drafter"): Promise<void> {
+    const holders = await ports.people.listHolders(seat === "designer" ? P.projectPicDesigner : P.projectPicDrafter);
     if (!holders.some((person) => person.id === userId)) {
-      throw invalid("PIC_NOT_ELIGIBLE", `The selected ${seat} must be an active staff member who can work on phases.`);
+      throw invalid("PIC_NOT_ELIGIBLE", `The selected ${seat} must be an active staff member eligible for that PIC seat.`);
     }
   }
 
@@ -172,10 +175,10 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
     },
 
     // ── People ─────────────────────────────────────────────────────────────
-    /** Staff who can be PIC or assignee: holders of `studioflow.phase.work`. */
-    async listAssignablePeople(input: ReadContext) {
+    /** PIC candidates are defined by their requested seat; task assignees keep phase-work eligibility. */
+    async listAssignablePeople(input: ReadContext & { seat?: "designer" | "drafter" }) {
       requireRead(input.grants);
-      return ports.people.listHolders(P.phaseWork);
+      return ports.people.listHolders(input.seat === "designer" ? P.projectPicDesigner : input.seat === "drafter" ? P.projectPicDrafter : P.phaseWork);
     },
 
     async resolvePeople(input: ReadContext & { userIds: readonly string[] }) {
@@ -466,11 +469,12 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
     },
 
     async updateProject(input: CommandContext & { projectId: string } & ProjectEditInput) {
-      requireCommand(input, P.projectManage);
+      const userId = requireCommand(input, P.projectManage);
       const area = input.area === undefined ? undefined : parseArea(input.area);
       const openingDate = input.openingDate === undefined ? undefined : parseOpeningDate(input.openingDate);
       const timelineStartDate = input.timelineStartDate === undefined ? undefined : parseOpeningDate(input.timelineStartDate);
       return runTransaction(async (tx) => {
+        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
         const project = await loadWritableProject(tx, input.projectId);
         const data: Prisma.SfProjectUncheckedUpdateInput = {};
         const changes: Record<string, { from: unknown; to: unknown }> = {};
@@ -515,8 +519,9 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
     },
 
     async setProjectPriority(input: CommandContext & { projectId: string; priority: ProjectPriority }) {
-      requireCommand(input, P.projectManage);
+      const userId = requireCommand(input, P.projectManage);
       return runTransaction(async (tx) => {
+        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
         const project = await loadWritableProject(tx, input.projectId);
         if (project.priority === input.priority) return { projectId: project.id };
         await tx.sfProject.update({ where: { id: project.id }, data: { priority: input.priority } });
@@ -527,8 +532,9 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
 
     /** ACTIVE ↔ ON_HOLD, or COMPLETED (legacy `executeCompleteProject`), or reactivate. */
     async setProjectStatus(input: CommandContext & { projectId: string; status: ProjectStatus }) {
-      requireCommand(input, P.projectManage);
+      const userId = requireCommand(input, P.projectManage);
       return runTransaction(async (tx) => {
+        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
         const project = await loadWritableProject(tx, input.projectId);
         if (project.status === input.status) return { projectId: project.id };
         await tx.sfProject.update({ where: { id: project.id }, data: { status: input.status } });
@@ -541,6 +547,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       const userId = requireCommand(input, P.projectManage);
       const reason = requiredText(input.reason, "ARCHIVE_REASON_REQUIRED", "A reason", 500);
       return runTransaction(async (tx) => {
+        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
         const project = await tx.sfProject.findUnique({ where: { id: input.projectId } });
         if (!project) throw notFound("project");
         if (project.archived_at) throw conflict("PROJECT_ALREADY_ARCHIVED", "This project is already archived.");
@@ -553,8 +560,9 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
     },
 
     async restoreProject(input: CommandContext & { projectId: string; reason?: string | null }) {
-      requireCommand(input, P.projectManage);
+      const userId = requireCommand(input, P.projectManage);
       return runTransaction(async (tx) => {
+        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
         const project = await tx.sfProject.findUnique({ where: { id: input.projectId } });
         if (!project) throw notFound("project");
         if (!project.archived_at) throw conflict("PROJECT_NOT_ARCHIVED", "This project is not archived.");
@@ -574,6 +582,12 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         anyOf: [{ entityType: "project", entityId: project.id }, { metadata: { path: ["projectId"], equals: project.id } }],
         limit: Math.min(Math.max(input.limit ?? 200, 1), 500),
       });
+    },
+
+    async getAccess(input: ReadContext & { actor: CommandContext["actor"]; projectId: string }) {
+      requireRead(input.grants);
+      if (input.actor.kind !== "USER" || !input.actor.userId) throw new AppError("UNAUTHENTICATED", "ACTOR_REQUIRED", "An authenticated staff member is required.");
+      return getProjectAccess(db, { grants: input.grants, actorId: input.actor.userId, projectId: input.projectId });
     },
 
     canManageProjects(grants: ReadContext["grants"]) {

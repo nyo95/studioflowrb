@@ -59,6 +59,46 @@ export function requireCommand(ctx: CommandContext, permission: string): string 
   return ctx.actor.userId;
 }
 
+export type ProjectAccess = {
+  override: boolean;
+  isDesigner: boolean;
+  isDrafter: boolean;
+  canEditProject: boolean;
+  canEditDocuments: boolean;
+  phases: Array<{ phaseId: string; canTransition: boolean; canEditContent: boolean }>;
+};
+
+/** The single StudioFlow PIC-assignment policy (WO-SF-ACCESS-01). */
+export async function getProjectAccess(tx: Db | TxClient, input: { grants: PermissionGrants; actorId: string; projectId: string }): Promise<ProjectAccess> {
+  const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { pic_designer_id: true, pic_drafter_id: true, phases: { select: { id: true, seat_snapshot: true } } } });
+  if (!project) throw notFound("project");
+  const override = hasPermission(input.grants, P.projectOverride);
+  const isDesigner = project.pic_designer_id === input.actorId;
+  const isDrafter = project.pic_drafter_id === input.actorId;
+  return {
+    override,
+    isDesigner,
+    isDrafter,
+    canEditProject: override || isDesigner,
+    canEditDocuments: override || isDesigner || isDrafter,
+    phases: project.phases.map((phase) => ({
+      phaseId: phase.id,
+      canTransition: override || isDesigner || (isDrafter && phase.seat_snapshot === "drafter"),
+      canEditContent: override || isDesigner || (isDrafter && phase.seat_snapshot === "drafter"),
+    })),
+  };
+}
+
+export async function requireProjectAccess(tx: Db | TxClient, input: { grants: PermissionGrants; actorId: string; projectId: string; kind: "project" | "document" | "transition" | "content"; phaseId?: string | null }): Promise<ProjectAccess> {
+  const access = await getProjectAccess(tx, input);
+  const permitted = input.kind === "project" ? access.canEditProject
+    : input.kind === "document" ? access.canEditDocuments
+      : input.kind === "transition" ? access.phases.some((phase) => phase.phaseId === input.phaseId && phase.canTransition)
+        : access.phases.some((phase) => phase.phaseId === input.phaseId && phase.canEditContent);
+  if (!permitted) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "Only the project's assigned designer or drafter can change this.");
+  return access;
+}
+
 export function notFound(entity: string): AppError {
   return new AppError("NOT_FOUND", `${entity.toUpperCase().replace(/\s+/g, "_")}_NOT_FOUND`, `This ${entity} no longer exists.`);
 }

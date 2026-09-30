@@ -12,6 +12,7 @@ import {
   notFound,
   optionalText,
   requireCommand,
+  requireProjectAccess,
   requireRead,
   requiredText,
   writeAudit,
@@ -67,6 +68,12 @@ function orderIds(ids: readonly string[], expected: readonly string[]): void {
 
 export function createPresentationService(db: Db, ports: StudioFlowPorts) {
   const { runTransaction, storage } = ports;
+
+  async function requirePresentationCommand(input: CommandContext & { projectId: string }): Promise<string> {
+    const userId = requireCommand(input, P.presentationManage);
+    await requireProjectAccess(db, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "document" });
+    return userId;
+  }
 
   async function removeUnreferenced(keys: readonly (string | null | undefined)[]) {
     await removeUnreferencedAssets(db, storage, keys);
@@ -181,7 +188,7 @@ export function createPresentationService(db: Db, ports: StudioFlowPorts) {
     },
 
     async createBoard(input: CommandContext & { projectId: string; title: string }) {
-      const userId = requireCommand(input, P.presentationManage);
+      const userId = await requirePresentationCommand(input);
       const title = requiredText(input.title, "PRESENTATION_TITLE_REQUIRED", "Board title", 200);
       return runTransaction(async (tx) => {
         await loadWritableProject(tx, input.projectId);
@@ -193,7 +200,7 @@ export function createPresentationService(db: Db, ports: StudioFlowPorts) {
     },
 
     async updateBoard(input: CommandContext & { projectId: string; boardId: string; title: string }) {
-      requireCommand(input, P.presentationManage);
+      await requirePresentationCommand(input);
       const title = requiredText(input.title, "PRESENTATION_TITLE_REQUIRED", "Board title", 200);
       return runTransaction(async (tx) => {
         const board = await loadBoard(tx, input.projectId, input.boardId, true);
@@ -204,7 +211,7 @@ export function createPresentationService(db: Db, ports: StudioFlowPorts) {
     },
 
     async reorderBoards(input: CommandContext & { projectId: string; orderedIds: string[] }) {
-      requireCommand(input, P.presentationManage);
+      await requirePresentationCommand(input);
       return runTransaction(async (tx) => {
         await loadWritableProject(tx, input.projectId);
         const boards = await tx.sfPresentationBoard.findMany({ where: { project_id: input.projectId }, select: { id: true } });
@@ -215,7 +222,7 @@ export function createPresentationService(db: Db, ports: StudioFlowPorts) {
     },
 
     async deleteBoard(input: CommandContext & { projectId: string; boardId: string }) {
-      requireCommand(input, P.presentationManage);
+      await requirePresentationCommand(input);
       const result = await runTransaction(async (tx) => {
         const board = await loadBoard(tx, input.projectId, input.boardId, true);
         const slides = await tx.sfPresentationSlide.findMany({ where: { board_id: board.id }, select: { image_key: true } });
@@ -227,7 +234,7 @@ export function createPresentationService(db: Db, ports: StudioFlowPorts) {
     },
 
     async addSlides(input: CommandContext & { projectId: string; boardId: string; files: PresentationImageUpload[] }) {
-      requireCommand(input, P.presentationManage);
+      await requirePresentationCommand(input);
       if (input.files.length === 0) throw invalid("PRESENTATION_IMAGES_REQUIRED", "Choose at least one image.");
       const uploads = input.files.map((file) => ({ file, extension: validateImage(file), ratio: imageRatio(file.imageRatio) }));
       await loadBoard(db, input.projectId, input.boardId, true);
@@ -255,7 +262,7 @@ export function createPresentationService(db: Db, ports: StudioFlowPorts) {
     },
 
     async reorderSlides(input: CommandContext & { projectId: string; boardId: string; orderedIds: string[] }) {
-      requireCommand(input, P.presentationManage);
+      await requirePresentationCommand(input);
       return runTransaction(async (tx) => {
         await loadBoard(tx, input.projectId, input.boardId, true);
         const slides = await tx.sfPresentationSlide.findMany({ where: { board_id: input.boardId }, select: { id: true } });
@@ -266,7 +273,7 @@ export function createPresentationService(db: Db, ports: StudioFlowPorts) {
     },
 
     async deleteSlide(input: CommandContext & { projectId: string; slideId: string }) {
-      requireCommand(input, P.presentationManage);
+      await requirePresentationCommand(input);
       const result = await runTransaction(async (tx) => {
         const slide = await loadSlide(tx, input.projectId, input.slideId, true);
         await tx.sfPresentationSlide.delete({ where: { id: slide.id } });
@@ -277,7 +284,7 @@ export function createPresentationService(db: Db, ports: StudioFlowPorts) {
     },
 
     async addAnnotation(input: CommandContext & { projectId: string; slideId: string; pinX: number; pinY: number; scheduleEntryId?: string | null; labelSide?: string; note?: string | null }) {
-      requireCommand(input, P.presentationManage);
+      await requirePresentationCommand(input);
       const pinX = pin(input.pinX, "x");
       const pinY = pin(input.pinY, "y");
       const side = labelSide(input.labelSide);
@@ -293,7 +300,7 @@ export function createPresentationService(db: Db, ports: StudioFlowPorts) {
     },
 
     async updateAnnotation(input: CommandContext & { projectId: string; annotationId: string; pinX?: number; pinY?: number; scheduleEntryId?: string | null; labelSide?: string; note?: string | null }) {
-      requireCommand(input, P.presentationManage);
+      await requirePresentationCommand(input);
       const side = input.labelSide === undefined ? undefined : labelSide(input.labelSide);
       const note = input.note === undefined ? undefined : optionalText(input.note, 2000);
       return runTransaction(async (tx) => {
@@ -308,7 +315,7 @@ export function createPresentationService(db: Db, ports: StudioFlowPorts) {
     },
 
     async deleteAnnotation(input: CommandContext & { projectId: string; annotationId: string }) {
-      requireCommand(input, P.presentationManage);
+      await requirePresentationCommand(input);
       return runTransaction(async (tx) => {
         const annotation = await loadAnnotation(tx, input.projectId, input.annotationId, true);
         await tx.sfPresentationAnnotation.delete({ where: { id: annotation.id } });
