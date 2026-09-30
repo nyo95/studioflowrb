@@ -5,13 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.246**
-- Next local revision: **R8.247**
+- Current revision after this entry is committed: **R8.247**
+- Next local revision: **R8.248**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.247 | 2026-09-30 | feat(platform,studioflow,masterdata): one settings pattern everywhere
+
+- **Owner request:** settings had no consistent pattern. Agreed structure: **My Preferences** (per person), **Platform** settings, and **one group per application**, with each application keeping one "Settings" entry in its own side menu.
+- **One sidebar.** `SettingsNavigation` (`settings/settings-navigation.tsx`) is rebuilt as the single settings sidebar with four headings: My Preferences (Account & security), Platform (General Settings, Users, Roles & Access), Master Data (Dictionaries & approvals), StudioFlow (Studio Settings, Schedule templates). A link shows only if the person may open that page. Every settings destination now renders it: the account page (moved inside the settings layout, retitled "Account & security", menu entry "My preferences"), the platform pages (unchanged), Master Data settings (unchanged), Studio Settings (its in-page jump list — Archived files, Checklist, Phase Templates — now sits under the shared sidebar) and Schedule templates (now inside the settings layout).
+- **Application side menus.** StudioFlow's rail keeps one entry, renamed "Settings" (it also highlights on Schedule templates); the separate "Schedule templates" rail entry from R8.246 is removed (the toolbar link stays). Master Data's rail gets a "Settings" entry for people who may open its settings; it is added in the app's nav component because Master Data settings live in the shared settings area, outside the app's own route root.
+- **Not changed.** No URL moved (no redirects needed), no permission or data change. BQ has no settings yet, so no group. "My Preferences" holds only the account for now; personal preferences (theme, start page, personal date format) and a Storage page are the next work orders.
+
+**Checks.** `npm test` 693/693, `npm run check`, `tsc --noEmit`, eslint on the touched screens. Not exercised in the browser.
 
 ## R8.246 | 2026-09-30 | feat(studioflow): Schedule templates on their own page
 

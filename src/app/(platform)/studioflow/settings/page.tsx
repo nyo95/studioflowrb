@@ -4,7 +4,8 @@ import { studioFlow } from "@/apps/studioflow/runtime";
 import { PageHeader, PageShell, SettingsShell } from "@/platform/ui_engine";
 
 import { pageSession } from "../_components/session";
-import { StudioSettingsNav } from "./studio-settings-nav";
+import { SettingsNavigation } from "@/app/(platform)/settings/settings-navigation";
+import { StudioSettingsAnchors } from "./studio-settings-nav";
 import { StudioSettingsView } from "./studio-settings-view";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export default async function StudioSettingsPage() {
   return (
     <PageShell measure="wide">
       <PageHeader title="Studio Settings" description="Which checklist every project gets." divider />
-      <SettingsShell navigationLabel="Studio Settings navigation" navigation={<StudioSettingsNav />}>
+      <SettingsShell navigation={<SettingsNavigation grants={grants} active="studioflow" onThisPage={<StudioSettingsAnchors />} />}>
         <StudioSettingsView
           archiveRetentionDays={settings.archiveRetentionDays}
           canManageProjects={hasPermission(grants, P.projectManage)}

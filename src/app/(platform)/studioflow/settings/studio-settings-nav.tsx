@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { ContextNavHeading, ContextNavLink } from "@/platform/ui_engine";
 
 const SECTIONS = [
@@ -8,18 +6,14 @@ const SECTIONS = [
   { href: "#phase-templates", label: "Phase Templates" },
 ] as const;
 
-/** In-page section jump list plus a bridge back to platform-level settings. */
-export function StudioSettingsNav() {
+/** In-page section jump list, shown under the shared settings sidebar. */
+export function StudioSettingsAnchors() {
   return (
-    <>
+    <div className="grid gap-1">
       <ContextNavHeading>On this page</ContextNavHeading>
       {SECTIONS.map((item) => (
         <ContextNavLink key={item.href} href={item.href}>{item.label}</ContextNavLink>
       ))}
-      <ContextNavHeading>Related</ContextNavHeading>
-      <ContextNavLink component={Link} href="/studioflow/schedule-templates">Schedule templates</ContextNavLink>
-      <ContextNavHeading>Settings</ContextNavHeading>
-      <ContextNavLink component={Link} href="/settings/general">Platform Settings</ContextNavLink>
-    </>
+    </div>
   );
 }

@@ -1,12 +1,15 @@
 import { redirect } from "next/navigation";
 
+import { SettingsNavigation } from "@/app/(platform)/settings/settings-navigation";
+
 import {
   PageHeader,
   PageSection,
   PageShell,
+  SettingsShell,
 } from "@/platform/ui_engine";
 import { formatInstant } from "@platform/utilities/date";
-import { listUserSessions, logoutAllSessions, requirePrincipal, currentSessionId } from "@platform/core/auth";
+import { listUserSessions, logoutAllSessions, requirePrincipal, requirePrincipalGrants, currentSessionId } from "@platform/core/auth";
 import { prisma } from "@platform/core/db";
 import { readPlatformGeneralSettings } from "@platform/core/settings";
 import { AccountForms } from "./account-forms";
@@ -22,8 +25,9 @@ async function logoutAllAction(): Promise<void> {
 }
 
 export default async function AccountPage() {
-  const principal = await requirePrincipal().catch(() => null);
-  if (!principal) redirect("/login");
+  const principalGrants = await requirePrincipalGrants().catch(() => null);
+  if (!principalGrants) redirect("/login");
+  const { principal, grants } = principalGrants;
 
   const [sessions, currentId, settings] = await Promise.all([
     listUserSessions(prisma, principal.userId),
@@ -34,12 +38,13 @@ export default async function AccountPage() {
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Account"
-        title="Your account"
+        eyebrow="My Preferences"
+        title="Account & security"
         description="Update your profile, secure your password, and manage active sessions."
         divider
       />
 
+      <SettingsShell navigation={<SettingsNavigation grants={grants} active="account" />}>
       <PageSection title="Profile">
         <AccountForms displayName={principal.displayName} email={principal.email} />
       </PageSection>
@@ -61,6 +66,7 @@ export default async function AccountPage() {
           onLogoutAll={logoutAllAction}
         />
       </PageSection>
+      </SettingsShell>
     </PageShell>
   );
 }

@@ -27,7 +27,7 @@ export default async function PlatformLayout({ children }: { children: ReactNode
     .map(({ appId, name, rootPath, icon }) => ({ appId, name, rootPath, icon }));
 
   const domainNavigation = <>
-    {apps.some((app) => app.appId === "masterdata") ? <MasterDataNav canManageSampleRequests={hasPermission(grants, MASTERDATA_PERMISSIONS.sampleRequestManage)} canUseWorkbook={(hasPermission(grants, MASTERDATA_PERMISSIONS.skuRead) && hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialRead)) || (hasPermission(grants, MASTERDATA_PERMISSIONS.skuManage) && hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialManage))} /> : null}
+    {apps.some((app) => app.appId === "masterdata") ? <MasterDataNav canManageSampleRequests={hasPermission(grants, MASTERDATA_PERMISSIONS.sampleRequestManage)} canOpenSettings={hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryRead) || hasPermission(grants, MASTERDATA_PERMISSIONS.promotionApprove)} canUseWorkbook={(hasPermission(grants, MASTERDATA_PERMISSIONS.skuRead) && hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialRead)) || (hasPermission(grants, MASTERDATA_PERMISSIONS.skuManage) && hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialManage))} /> : null}
     {apps.some((app) => app.appId === "bq") ? <BqNav /> : null}
     {apps.some((app) => app.appId === "studioflow") ? <StudioFlowNav /> : null}
   </>;

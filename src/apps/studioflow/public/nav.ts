@@ -36,8 +36,5 @@ export const STUDIOFLOW_NAV_LINKS: {
     { href: "/studioflow/clients", label: "Clients" },
     { href: "/studioflow/library", label: "Library" },
   ],
-  utility: [
-    { href: "/studioflow/schedule-templates", label: "Schedule templates" },
-    { href: "/studioflow/settings", label: "Studio Settings" },
-  ],
+  utility: [{ href: "/studioflow/settings", label: "Settings" }],
 };

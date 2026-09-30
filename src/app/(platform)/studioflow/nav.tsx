@@ -1,6 +1,6 @@
 "use client";
 
-import { BookMarked, Building2, ChartGantt, FolderKanban, LayoutTemplate, ListChecks, Settings } from "lucide-react";
+import { BookMarked, Building2, ChartGantt, FolderKanban, ListChecks, Settings } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { NavGroup, NavItem, UtilitySection } from "@/platform/ui_engine";
@@ -13,7 +13,6 @@ const ICONS: Record<string, typeof ListChecks> = {
   "/studioflow/clients": Building2,
   "/studioflow/library": BookMarked,
   "/studioflow/settings": Settings,
-  "/studioflow/schedule-templates": LayoutTemplate,
 };
 
 function isActive(pathname: string, href: string, exact = false): boolean {
@@ -46,7 +45,7 @@ export function StudioFlowUtilityNav() {
       {STUDIOFLOW_NAV_LINKS.utility.map(({ href, label, exact }) => {
         const Icon = ICONS[href] ?? Settings;
         return (
-          <NavItem key={href} href={href} icon={<Icon size={16} />} active={isActive(pathname, href, exact)} prefetch={false}>
+          <NavItem key={href} href={href} icon={<Icon size={16} />} active={isActive(pathname, href, exact) || (href === "/studioflow/settings" && isActive(pathname, "/studioflow/schedule-templates"))} prefetch={false}>
             {label}
           </NavItem>
         );

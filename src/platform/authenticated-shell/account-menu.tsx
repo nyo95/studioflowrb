@@ -28,7 +28,7 @@ export function AccountMenu({ name, logoutAction, showSettings }: {
     </DropdownMenu.Trigger>
     <DropdownMenu.Portal><DropdownMenu.Content align="end" sideOffset={6} className="z-[65] min-w-48 rounded-control border border-line bg-surface-raised p-1 shadow-elevated">
       <DropdownMenu.Label className="truncate px-3 pb-1 pt-1.5 text-xs font-semibold text-ink">{name}</DropdownMenu.Label>
-      <DropdownMenu.Item asChild><Link href="/account" className={itemClass}><UserRound size={16} aria-hidden="true" />Account</Link></DropdownMenu.Item>
+      <DropdownMenu.Item asChild><Link href="/account" className={itemClass}><UserRound size={16} aria-hidden="true" />My preferences</Link></DropdownMenu.Item>
       {showSettings ? <DropdownMenu.Item asChild><Link href="/settings/general" className={itemClass}><Settings size={16} aria-hidden="true" />Settings</Link></DropdownMenu.Item> : null}
       <DropdownMenu.Separator className="my-1 h-px bg-line" />
       <DropdownMenu.Item

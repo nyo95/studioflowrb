@@ -1,6 +1,6 @@
 "use client";
 
-import { Banknote, FileSpreadsheet, FlaskConical, LayoutGrid, Tags, Truck } from "lucide-react";
+import { Banknote, FileSpreadsheet, FlaskConical, LayoutGrid, Settings, Tags, Truck } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { NavGroup, NavItem } from "@/platform/ui_engine";
@@ -25,8 +25,10 @@ const iconMap: Record<string, typeof LayoutGrid> = {
  * list entirely rather than showing a link nobody but an approver can act on.
  *
  * `canUseWorkbook` does the same for Import & export: it shows for anyone who may export (read SKUs and prices) or import (manage them).
+ *
+ * `canOpenSettings` shows the one "Settings" entry that leads to Master Data's group in the shared settings area.
  */
-export function MasterDataNav({ canManageSampleRequests = false, canUseWorkbook = false }: { canManageSampleRequests?: boolean; canUseWorkbook?: boolean }) {
+export function MasterDataNav({ canManageSampleRequests = false, canUseWorkbook = false, canOpenSettings = false }: { canManageSampleRequests?: boolean; canUseWorkbook?: boolean; canOpenSettings?: boolean }) {
   const pathname = usePathname();
 
   if (!pathname.startsWith("/masterdata")) return null;
@@ -50,6 +52,10 @@ export function MasterDataNav({ canManageSampleRequests = false, canUseWorkbook 
           </NavItem>
         );
       })}
+      {/* Settings live in the shared settings area, outside this app's route root, so the link is added here rather than in the app's public route list. */}
+      {canOpenSettings ? (
+        <NavItem icon={<Settings size={16} />} active={false} href="/settings/general/masterdata" prefetch={false}>Settings</NavItem>
+      ) : null}
     </NavGroup>
   );
 }
