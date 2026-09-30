@@ -11,7 +11,7 @@ import {
 import { formatInstant } from "@platform/utilities/date";
 import { listUserSessions, logoutAllSessions, requirePrincipal, requirePrincipalGrants, currentSessionId } from "@platform/core/auth";
 import { prisma } from "@platform/core/db";
-import { readPlatformGeneralSettings } from "@platform/core/settings";
+import { userPreferences } from "@platform/runtime";
 import { AccountForms } from "./account-forms";
 import { SessionsTable } from "./sessions-table";
 
@@ -32,7 +32,7 @@ export default async function AccountPage() {
   const [sessions, currentId, settings] = await Promise.all([
     listUserSessions(prisma, principal.userId),
     currentSessionId(),
-    readPlatformGeneralSettings(prisma),
+    userPreferences.resolveDisplay({ userId: principal.userId }),
   ]);
 
   return (

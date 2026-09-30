@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.249] My Preferences and Storage report
+- Surface: Settings → My Preferences and Platform → Storage
+- Fixture: signed-in staff member with one accessible app; platform settings reader; a settings reader without another app
+- Viewport: desktop (default)
+- Steps: 1. Save a personal timezone, locale, theme and accessible start page. 2. Clear the locale/timezone and revisit the account session table. 3. Open Storage as a settings reader, then as a person without that permission.
+- Acceptance: the saved values persist for the same person; cleared display values fall back to the studio setting; Storage shows grouped usage and is refused to an unauthorized person.
+- Status: PENDING
+
 ### [R8.240] StudioFlow deliverable file lifecycle
 - Surface: `/studioflow/projects/[projectId]/phases/[phaseId]`
 - Fixture: designer PIC and project manager; active writable phase; a PDF above 52 MB if local storage permits

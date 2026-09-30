@@ -72,7 +72,7 @@ export type DbClient = PrismaClient | Prisma.TransactionClient;
 
 const NAME_MAX = 120;
 
-function isSupportedLocale(value: string): boolean {
+export function isSupportedLocale(value: string): boolean {
   if (!/^[a-zA-Z]{2,3}(-[a-zA-Z0-9]+)*$/.test(value)) return false;
   try {
     new Intl.DateTimeFormat(value);
@@ -82,7 +82,7 @@ function isSupportedLocale(value: string): boolean {
   }
 }
 
-function isSupportedTimezone(value: string): boolean {
+export function isSupportedTimezone(value: string): boolean {
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: value });
     return true;

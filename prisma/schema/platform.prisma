@@ -34,8 +34,24 @@ model User {
 
   sessions   Session[]
   user_roles UserRole[]
+  preference UserPreference?
 
   @@index([status])
+  @@schema("platform")
+}
+
+/// Personal display and landing preferences. Null always means platform default.
+model UserPreference {
+  user_id    String @id @db.Uuid
+  theme      String?
+  locale     String?
+  timezone   String?
+  start_page String?
+  updated_at DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_preference")
   @@schema("platform")
 }
 

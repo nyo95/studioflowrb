@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.248**
-- Next local revision: **R8.249**
+- Current revision after this entry is committed: **R8.249**
+- Next local revision: **R8.250**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.249 | 2026-09-30 | feat(platform): store personal display preferences and storage usage
+
+- Added per-person preferences for theme, locale, timezone, and allowed start page. Null values use the platform-wide setting; the authenticated shell and account session timestamps now use the effective personal display settings. Personal changes have no audit trail and actions always derive the person from the signed-in session.
+- Added a read-only, 60-second cached storage report for holders of Platform Settings read access. It totals free and total disk space, configured reserve, and file bytes by top-level area while ignoring symlinks and bounding a large walk.
+- Migration `20260930210000_platform_user_preferences` was applied to the office development and disposable test databases. No dependencies.
+
+**Checks.** `npm test`; `npx tsc --noEmit`; `npm run check`; `npm run lint`; focused preference and storage-report tests. `npm run build` is not run when the owner dev server occupies port 3001. Browser acceptance is queued for the Reviewer.
 
 ## R8.248 | 2026-09-30 | docs(platform): WO-PLAT-PREFS-01 ready
 

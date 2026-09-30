@@ -75,7 +75,7 @@ export type LocalFilesystemStorageOptions = {
 
 const DEFAULT_MIN_FREE_BYTES = 2 * 1024 * 1024 * 1024;
 
-function configuredMinFreeBytes(value = process.env.STORAGE_MIN_FREE_BYTES): number {
+export function configuredMinFreeBytes(value = process.env.STORAGE_MIN_FREE_BYTES): number {
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : DEFAULT_MIN_FREE_BYTES;
 }

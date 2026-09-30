@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { AppError } from "@platform/core/errors";
-import { displayNameSchema, passwordSchema, requirePrincipal, revokeSessionById, setSessionCookie } from "@platform/core/auth";
+import { displayNameSchema, passwordSchema, requirePrincipal, requirePrincipalGrants, revokeSessionById, setSessionCookie } from "@platform/core/auth";
 import { prisma } from "@platform/core/db";
-import { platformAccount } from "@platform/runtime";
+import { platformAccount, storageUsage, userPreferences } from "@platform/runtime";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { validationError } from "@platform/core/validation";
 
@@ -70,5 +70,37 @@ export async function revokeSessionAction(sessionId: string): Promise<ActionResu
     const revoked = await revokeSessionById(prisma, sessionId);
     revalidatePath("/account");
     return { revoked };
+  });
+}
+
+const PreferenceInput = z.strictObject({
+  theme: z.enum(["SYSTEM", "LIGHT", "DARK"]).nullable().optional(),
+  locale: z.string().max(80).nullable().optional(),
+  timezone: z.string().max(120).nullable().optional(),
+  startPage: z.string().max(300).nullable().optional(),
+});
+
+/** Personal-only boundary: the browser never supplies a user id. */
+export async function updateMyPreferencesAction(input: z.infer<typeof PreferenceInput>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = PreferenceInput.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    const result = await userPreferences.update({ userId: principal.userId, grants, ...parsed.data });
+    revalidatePath("/account");
+    revalidatePath("/", "layout");
+    return result;
+  });
+}
+
+export async function getMyPreferences() {
+  const principal = await requirePrincipal();
+  return userPreferences.get({ userId: principal.userId });
+}
+
+export async function getStorageUsageAction(): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const { grants } = await requirePrincipalGrants();
+    return storageUsage.getStorageUsage({ grants });
   });
 }
