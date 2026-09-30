@@ -28,11 +28,17 @@ function clean(value: unknown): string { return String(value ?? "").trim(); }
 function key(value: string): string { return value.trim().toLocaleLowerCase(); }
 function bytesOf(file: WorkbookFile): { data: Buffer; name?: string; type?: string } { return Buffer.isBuffer(file) ? { data: file } : file; }
 function fileError(message: string): never { throw new AppError("VALIDATION", "SKU_PRICE_WORKBOOK_INVALID", message); }
+const INVALID_CELL = "__SKU_PRICE_INVALID_CELL__";
 function value(row: ExcelJS.Row, index: number): string {
   const cell = row.getCell(index);
   const raw = cell.value;
   if (raw === null || raw === undefined) return "";
-  if (typeof raw === "object" && "text" in raw) return clean((raw as { text: string }).text);
+  if (typeof raw === "object") {
+    if ("formula" in raw) { const result = (raw as { result?: unknown }).result; return result === undefined || result === null || typeof result === "object" ? INVALID_CELL : clean(result); }
+    if ("richText" in raw) return clean((raw as { richText: Array<{ text?: string }> }).richText.map((part) => part.text ?? "").join(""));
+    if ("text" in raw) return clean((raw as { text: string }).text);
+    return INVALID_CELL;
+  }
   return clean(raw);
 }
 function same(a: string | null | undefined, b: string | null | undefined): boolean { return (a ?? "") === (b ?? ""); }
@@ -81,6 +87,7 @@ export function createSkuPriceWorkbookService(
     const seen = new Set<string>(); const results: Array<{ row: number; outcome: Outcome; errors: RowError[] }> = []; const valid: ValidRow[] = [];
     for (const source of rows) {
       const errors: RowError[] = []; const add = (column: string, message: string) => errors.push({ row: source.row, column, message });
+      for (const header of HEADERS) if (source[header] === INVALID_CELL) add(header, "Cell must contain a plain value or a calculated result.");
       const skuId = source["SKU ID"]; const priceId = source["Price ID"];
       const sku = skuId ? skuById.get(skuId) ?? null : null; const price = priceId ? priceById.get(priceId) ?? null : null;
       if (skuId && !sku) add("SKU ID", "SKU was not found."); if (sku?.deleted_at) add("SKU ID", "SKU is archived.");
@@ -102,6 +109,12 @@ export function createSkuPriceWorkbookService(
       if (!skuId && !hasPrice) add("Supplier", "A new SKU needs its first material price.");
       if (!source.Name && !source.Code) add("Name", "SKU name or code is required.");
       if (price && supplierId && price.supplier_vendor_id !== supplierId) add("Supplier", "Supplier cannot be changed for an existing price.");
+      if (sku && !sku.deleted_at) {
+        const livePrices = await client.priceMaterial.count({ where: { sku_id: sku.id, deleted_at: null } });
+        const measurementChanged = sku.base_unit_id !== baseUnitId || sku.purchase_unit_id !== purchaseUnitId || !same(sku.dimension_length?.toString() ?? null, source.Length || null) || !same(sku.dimension_width?.toString() ?? null, source.Width || null) || !same(sku.dimension_thickness?.toString() ?? null, source.Thickness || null) || sku.dimension_unit_id !== dimensionUnitId;
+        if (livePrices > 0 && measurementChanged) add("Base unit", "SKU measurement and unit layout cannot change while live material prices exist.");
+        if (sku.brand_id !== brandId && await client.priceMaterial.count({ where: { sku_id: sku.id, deleted_at: null, source_link_id: { not: null } } }) > 0) add("Brand", "Brand cannot change while live material prices have source links.");
+      }
       const duplicate = skuId ? `${skuId}:${priceId || supplierId || "sku"}` : `${key(source.Code)}:${key(source.Name)}:${supplierId || ""}`;
       if (seen.has(duplicate)) add(priceId ? "Price ID" : "Supplier", "This row duplicates another SKU and supplier price row."); else seen.add(duplicate);
       const candidate = { ...source, sku, price, brandId, categoryId: categoryId ?? "", baseUnitId: baseUnitId ?? "", purchaseUnitId, dimensionUnitId, supplierId } as ValidRow;
@@ -143,10 +156,13 @@ export function createSkuPriceWorkbookService(
       return ports.runTransaction(async (tx) => {
         const check = await validate(parsed.rows, tx as PrismaClient); if (check.errors.length) throw new AppError("VALIDATION", "SKU_PRICE_IMPORT_ERRORS", "Fix the workbook errors before applying.", { details: { errors: check.errors } });
         const service = createScopedService(tx); let created = 0; let updated = 0;
+        const newRows = new Map<string, ValidRow[]>();
+        for (const row of check.valid) if (!row.sku) { const group = `${key(row.Code)}:${key(row.Name)}`; newRows.set(group, [...(newRows.get(group) ?? []), row]); }
+        const completedNewGroups = new Set<string>();
         for (const row of check.valid) {
           const skuInput = { grants: input.grants, actor: input.actor, name: row.Name || null, code: row.Code || null, notes: row.Notes || null, brandId: row.brandId, baseUnitId: row.baseUnitId, purchaseUnitId: row.purchaseUnitId, dimensionLength: row.Length || null, dimensionWidth: row.Width || null, dimensionThickness: row.Thickness || null, dimensionUnitId: row.dimensionUnitId, categoryId: row.categoryId };
           let skuId = row.sku?.id;
-          if (!skuId) { const result = await service.createSku({ ...skuInput, suppressAudit: true, priceMaterials: [{ supplierVendorId: row.supplierId!, amount: row.Amount, currency: row.Currency, notes: row["Price notes"] || undefined }] }); skuId = result.skuId; created += 1; continue; }
+          if (!skuId) { const group = `${key(row.Code)}:${key(row.Name)}`; if (completedNewGroups.has(group)) continue; const grouped = newRows.get(group)!; const result = await service.createSku({ ...skuInput, suppressAudit: true, priceMaterials: grouped.map((entry) => ({ supplierVendorId: entry.supplierId!, amount: entry.Amount, currency: entry.Currency, notes: entry["Price notes"] || undefined })) }); skuId = result.skuId; completedNewGroups.add(group); created += 1; continue; }
           const before = check.rows.find((x) => x.row === row.row)!; if (before.outcome === "update") { await service.updateSku({ ...skuInput, skuId, suppressAudit: true }); updated += 1; }
           if (row.Supplier && !row.price) { await service.createPriceMaterial({ grants: input.grants, actor: input.actor, skuId, supplierVendorId: row.supplierId!, amount: row.Amount, currency: row.Currency, notes: row["Price notes"] || undefined, suppressAudit: true }); if (before.outcome !== "update") updated += 1; }
           else if (row.price && (row.price.amount.toString() !== requiredAmount(row.Amount) || row.price.currency !== requiredCurrency(row.Currency) || !same(row.price.notes, row["Price notes"] || null))) await service.updatePriceMaterial({ grants: input.grants, actor: input.actor, priceMaterialId: row.price.id, amount: row.Amount, currency: row.Currency, notes: row["Price notes"] || null, suppressAudit: true });

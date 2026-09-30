@@ -5,13 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.216**
-- Next local revision: **R8.217**
+- Current revision after this entry is committed: **R8.217**
+- Next local revision: **R8.218**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.217 | 2026-09-30 | fix(masterdata): correct SKU price workbook import
+
+- **Single-category safety.** Workbook rows now keep the established one PRODUCT category. Empty or unknown Category cells are preview errors, so an edit cannot clear a SKU's category.
+- **Supplier-row grouping.** Multiple new rows with the same Code and Name now create one SKU with all supplied material prices, rather than duplicate SKUs.
+- **Earlier, safer feedback.** Preview rejects unsupported cell objects, uses formula results and rich-text content safely, and shows the existing measurement and linked-brand locks on the affected row before apply. The import still validates file size/type and the 2,000-row limit before parsing.
+- **Acceptance coverage.** Added integration coverage for unchanged exports (including exact decimal and no-price rows), rollback on a later failure, grouped supplier rows, category preservation, locks, formulas/rich text, and file/row limits.
+
+**Checks.** `npm test` 654/654 passed; `npx tsc --noEmit`, `npm run check`, `npm run build`, and `npm run lint` passed.
 
 ## R8.216 | 2026-09-30 | feat(masterdata): add SKU price workbook export and atomic import
 

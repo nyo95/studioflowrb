@@ -112,6 +112,58 @@ describe("Master Data service", () => {
     await assert.rejects(service.applySkuPriceImport({ grants: GRANTS, actor: ACTOR, file: Buffer.from(await invalid.xlsx.writeBuffer()), hash: invalidPreview.hash }), (error: unknown) => error instanceof AppError && error.code === "SKU_PRICE_IMPORT_ERRORS");
   });
 
+  it("keeps the single category, groups new supplier rows, and reports workbook limits before parsing", async () => {
+    const context = await createMaterialContext();
+    const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Supplier Two", vendorTypeIds: [supplierType.id] });
+    const { skuId } = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Single category", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "120", currency: "IDR" }] });
+    const book = new ExcelJS.Workbook(); const sheet = book.addWorksheet("SKU Prices");
+    sheet.addRow(["SKU ID", "Code", "Name", "Brand", "Category", "Base unit", "Purchase unit", "Length", "Width", "Thickness", "Dimension unit", "Notes", "Price ID", "Supplier", "Amount", "Currency", "Price notes"]);
+    const existingPrice = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: skuId } });
+    sheet.addRow([skuId, "", "Renamed category SKU", "", "Panel", "PCS", "", "", "", "", "", "", existingPrice.id, "Supplier One", "125.50", "IDR", ""]);
+    sheet.addRow(["", "NEW-1", "New grouped SKU", "", "Panel", "PCS", "", "", "", "", "", "", "", "Supplier One", "120", "IDR", ""]);
+    sheet.addRow(["", "NEW-1", "New grouped SKU", "", "Panel", "PCS", "", "", "", "", "", "", "", "Supplier Two", "0.10", "IDR", ""]);
+    const file = Buffer.from(await book.xlsx.writeBuffer()); const preview = await service.previewSkuPriceImport({ grants: GRANTS, file });
+    assert.equal(preview.errors.length, 0); await service.applySkuPriceImport({ grants: GRANTS, actor: ACTOR, file, hash: preview.hash });
+    assert.equal((await testDb.prisma.skuCategory.findMany({ where: { sku_id: skuId } })).map((row) => row.category_id)[0], context.categoryId);
+    const grouped = await testDb.prisma.sku.findFirstOrThrow({ where: { code: "NEW-1" }, include: { material_prices: true } }); assert.equal(grouped.material_prices.length, 2);
+    sheet.getCell("E2").value = ""; const blankCategory = await service.previewSkuPriceImport({ grants: GRANTS, file: Buffer.from(await book.xlsx.writeBuffer()) }); assert.ok(blankCategory.errors.some((error) => error.column === "Category"));
+    await assert.rejects(service.previewSkuPriceImport({ grants: GRANTS, file: { data: Buffer.alloc(5 * 1024 * 1024 + 1), name: "large.xlsx" } }), (error: unknown) => error instanceof AppError && error.code === "SKU_PRICE_WORKBOOK_INVALID");
+    await assert.rejects(service.previewSkuPriceImport({ grants: GRANTS, file: { data: Buffer.from("not parsed"), name: "wrong.csv" } }), (error: unknown) => error instanceof AppError && error.code === "SKU_PRICE_WORKBOOK_INVALID");
+  });
+
+  it("previews unchanged exports, row limits, formula cells, locked SKU changes, and rolls back a later failure", async () => {
+    const context = await createMaterialContext(); const secondCategory = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Other Panel", kind: "PRODUCT" });
+    const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    const supplierTwo = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Supplier Two", vendorTypeIds: [supplierType.id] });
+    const { skuId } = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Locked SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "120", currency: "IDR" }] });
+    await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Decimal SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: supplierTwo.vendorId, amount: "125.50", currency: "IDR" }] });
+    await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Small Decimal SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "0.10", currency: "IDR" }] });
+    const noPriceSkuId = crypto.randomUUID();
+    await testDb.prisma.sku.create({ data: { id: noPriceSkuId, name: "No Price SKU", slug: "no-price-sku", base_unit_id: context.unit.id } });
+    await testDb.prisma.skuCategory.create({ data: { id: crypto.randomUUID(), sku_id: noPriceSkuId, category_id: context.categoryId } });
+    const linked = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Linked Brand SKU", brandId: context.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] });
+    const link = await testDb.prisma.brandLink.create({ data: { id: crypto.randomUUID(), brand_id: context.brandId, kind: "WEBSITE", url: "https://example.test/locked", label: "Locked source" } });
+    await testDb.prisma.priceMaterial.updateMany({ where: { sku_id: linked.skuId }, data: { source_link_id: link.id } });
+    const exportedData = await service.exportSkuPriceWorkbook({ grants: GRANTS });
+    const unchanged = await service.previewSkuPriceImport({ grants: GRANTS, file: exportedData }); assert.equal(unchanged.totals.unchanged, unchanged.rows.length); assert.equal(unchanged.errors.length, 0);
+    const exported = new ExcelJS.Workbook(); await exported.xlsx.load(exportedData as any); const sheet = exported.getWorksheet("SKU Prices")!;
+    const rowFor = (id: string) => { for (let row = 2; row <= sheet.rowCount; row += 1) if (sheet.getCell(row, 1).text === id) return row; throw new Error(`Missing SKU ${id}`); };
+    const lockedRow = rowFor(skuId); const linkedRow = rowFor(linked.skuId);
+    sheet.getCell(lockedRow, 3).value = { formula: '"Formula SKU"', result: "Formula SKU" };
+    const formula = await service.previewSkuPriceImport({ grants: GRANTS, file: Buffer.from(await exported.xlsx.writeBuffer()) }); assert.equal(formula.errors.length, 0); assert.ok(formula.rows.some((row) => row.row === lockedRow && row.outcome === "update"));
+    sheet.getCell(lockedRow, 3).value = { richText: [{ text: "Rich " }, { text: "SKU" }] };
+    const richText = await service.previewSkuPriceImport({ grants: GRANTS, file: Buffer.from(await exported.xlsx.writeBuffer()) }); assert.equal(richText.errors.length, 0); assert.equal(JSON.stringify(richText).includes("[object Object]"), false);
+    sheet.getCell(lockedRow, 6).value = "M";
+    const locked = await service.previewSkuPriceImport({ grants: GRANTS, file: Buffer.from(await exported.xlsx.writeBuffer()) }); assert.ok(locked.errors.some((error) => error.row === lockedRow && error.column === "Base unit"));
+    sheet.getCell(lockedRow, 5).value = secondCategory.categoryId; const badCategory = await service.previewSkuPriceImport({ grants: GRANTS, file: Buffer.from(await exported.xlsx.writeBuffer()) }); assert.ok(badCategory.errors.some((error) => error.row === lockedRow && error.column === "Category"));
+    sheet.getCell(lockedRow, 5).value = "Panel"; sheet.getCell(lockedRow, 6).value = "PCS"; sheet.getCell(linkedRow, 4).value = "";
+    const linkedBrand = await service.previewSkuPriceImport({ grants: GRANTS, file: Buffer.from(await exported.xlsx.writeBuffer()) }); assert.ok(linkedBrand.errors.some((error) => error.row === linkedRow && error.column === "Brand"));
+    const tooMany = new ExcelJS.Workbook(); const rows = tooMany.addWorksheet("SKU Prices"); rows.addRow(["SKU ID", "Code", "Name", "Brand", "Category", "Base unit", "Purchase unit", "Length", "Width", "Thickness", "Dimension unit", "Notes", "Price ID", "Supplier", "Amount", "Currency", "Price notes"]); for (let i = 0; i < 2001; i += 1) rows.addRow(["", `C${i}`, `N${i}`, "", "Panel", "PCS", "", "", "", "", "", "", "", "Supplier One", "1", "IDR", ""]);
+    await assert.rejects(service.previewSkuPriceImport({ grants: GRANTS, file: Buffer.from(await tooMany.xlsx.writeBuffer()) }), (error: unknown) => error instanceof AppError && error.code === "SKU_PRICE_WORKBOOK_INVALID");
+    const rollback = new ExcelJS.Workbook(); const roll = rollback.addWorksheet("SKU Prices"); roll.addRow(["SKU ID", "Code", "Name", "Brand", "Category", "Base unit", "Purchase unit", "Length", "Width", "Thickness", "Dimension unit", "Notes", "Price ID", "Supplier", "Amount", "Currency", "Price notes"]); const price = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: skuId } }); roll.addRow([skuId, "", "Would roll back", "", "Panel", "PCS", "", "", "", "", "", "", price.id, "Supplier One", "120", "IDR", ""]); roll.addRow([skuId, "", "Would roll back", "", "Panel", "PCS", "", "", "", "", "", "", "", "Supplier One", "1", "IDR", ""]); const rollbackFile = Buffer.from(await rollback.xlsx.writeBuffer()); const rollbackPreview = await service.previewSkuPriceImport({ grants: GRANTS, file: rollbackFile }); await assert.rejects(service.applySkuPriceImport({ grants: GRANTS, actor: ACTOR, file: rollbackFile, hash: rollbackPreview.hash })); assert.equal((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: skuId } })).name, "Locked SKU");
+  });
+
   it("separates live Brand owners from material-capable supplier choices", async () => {
     const ownerOnly = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Owner Only" });
     const materialSupplier = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Material Supplier" });
