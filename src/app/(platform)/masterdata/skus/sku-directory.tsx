@@ -1,6 +1,7 @@
 "use client";
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
+import { lowestPriceByCurrencyUnit, matchesDirectoryStatus, type DirectoryStatus } from "../directory-findability";
 import { DirectoryShell,DraftDialog,EntityPrimaryCell,Pagination,RowActionMenu,Text,usePagination } from "@/platform/ui_engine";
 
 
@@ -59,6 +60,9 @@ export function SkuDirectory({
   canManage: boolean;
 }) {
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<DirectoryStatus>("ACTIVE");
+  const [priceFilter, setPriceFilter] = useState("ALL");
+  const [supplierFilter, setSupplierFilter] = useState("ALL");
   const [brandFilter, setBrandFilter] = useState<string>("ALL");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
 
@@ -75,15 +79,19 @@ export function SkuDirectory({
   const [editPending, setEditPending] = useState(false);
 
   const filtered = skus.filter((sku) => {
+    if (!matchesDirectoryStatus(sku.deleted_at, statusFilter)) return false;
     if (brandFilter !== "ALL" && sku.brand?.id !== brandFilter) return false;
     if (categoryFilter !== "ALL" && !sku.categories.some((c) => c.category.id === categoryFilter)) return false;
+    if (priceFilter === "YES" && sku.material_prices.length === 0) return false;
+    if (priceFilter === "NO" && sku.material_prices.length > 0) return false;
+    if (supplierFilter !== "ALL" && !sku.material_prices.some((price) => price.supplier_vendor.id === supplierFilter)) return false;
     if (!query) return true;
     const q = query.toLowerCase();
     return (
       (sku.name ?? "").toLowerCase().includes(q) ||
       sku.slug.toLowerCase().includes(q) ||
       (sku.code && sku.code.toLowerCase().includes(q)) ||
-      (sku.brand && sku.brand.name.toLowerCase().includes(q))
+      (sku.brand && sku.brand.name.toLowerCase().includes(q)) || sku.categories.some((item) => item.category.name.toLowerCase().includes(q)) || Boolean(sku.notes?.toLowerCase().includes(q))
     );
   });
   const { locale } = useDisplaySettings();
@@ -97,7 +105,7 @@ export function SkuDirectory({
     const result = typeof left === "number" && typeof right === "number" ? left - right : collator.compare(String(left), String(right));
     return (sortDirection === "asc" ? result : -result) || a.id.localeCompare(b.id);
   });
-  const paging = usePagination(orderedRows.length, 25, JSON.stringify([query, sortKey, sortDirection, brandFilter, categoryFilter]));
+  const paging = usePagination(orderedRows.length, 25, JSON.stringify([query, statusFilter, priceFilter, supplierFilter, sortKey, sortDirection, brandFilter, categoryFilter]));
   const visibleRows = orderedRows.slice(paging.offset, paging.offset + 25);
   const pageFooter = <div className="grid gap-2"><Text tone="secondary" size="sm">{orderedRows.length ? paging.offset + 1 : 0}–{Math.min(paging.offset + 25, orderedRows.length)} of {orderedRows.length} records</Text>{paging.pageCount > 1 ? <Pagination page={paging.page} pageCount={paging.pageCount} onPageChange={paging.setPage} /> : null}</div>;
 
@@ -112,12 +120,14 @@ export function SkuDirectory({
     <DirectoryShell fill header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false}>
         <div className="flex flex-wrap items-center gap-3">
           <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search SKUs by name, code, brand..." />
+          <Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as DirectoryStatus)}><option value="ACTIVE">Active</option><option value="ARCHIVED">Archived</option><option value="ALL">All status</option></Select>
           <div className="w-52">
             <Combobox label="Brand filter" options={[{ id: "ALL", label: "All brands" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={brandFilter} onValueChange={setBrandFilter} placeholder="All brands" searchPlaceholder="Search brands…" />
           </div>
           <div className="w-52">
             <Combobox label="Product category filter" options={[{ id: "ALL", label: "All categories" }, ...productCategories.map((category) => ({ id: category.id, label: category.name }))]} value={categoryFilter} onValueChange={setCategoryFilter} placeholder="All categories" searchPlaceholder="Search product categories…" />
           </div>
+          <Select value={priceFilter} onChange={(event) => setPriceFilter(event.target.value)}><option value="ALL">Any price</option><option value="YES">Has price</option><option value="NO">No price</option></Select><Select value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)}><option value="ALL">Any priced supplier</option>{[...new Map(skus.flatMap((sku) => sku.material_prices.map((price) => [price.supplier_vendor.id, price.supplier_vendor] as const))).values()].map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</Select><Button type="button" variant="ghost" size="sm" onClick={() => { setQuery(""); setStatusFilter("ACTIVE"); setBrandFilter("ALL"); setCategoryFilter("ALL"); setPriceFilter("ALL"); setSupplierFilter("ALL"); }}>Clear filters</Button><Text size="sm" tone="secondary">{filtered.length} of {skus.length}</Text>
         </div>
       </TableToolbar>}>
 
@@ -143,7 +153,7 @@ export function SkuDirectory({
             {visibleRows.map((sku) => {
               const isPending = pendingId === sku.id;
               const isArchived = sku.deleted_at !== null;
-              const primaryPrice = sku.material_prices[0];
+              const primaryPrice = lowestPriceByCurrencyUnit(sku.material_prices);
 
               return (
                 <TableRow key={sku.id}>
@@ -186,7 +196,7 @@ export function SkuDirectory({
                     {primaryPrice ? (
                       <TableCellContent
                         primary={<span><span className="font-semibold">{formatMoney(createMoney(String(primaryPrice.amount), primaryPrice.currency))}</span><span className="text-ink-secondary"> / {primaryPrice.unit.code}</span></span>}
-                        secondary={<span className="truncate max-w-[140px]">{primaryPrice.supplier_vendor.name}</span>}
+                        secondary={<span className="truncate max-w-[140px]">{sku.material_prices.length} price{sku.material_prices.length === 1 ? "" : "s"} · {primaryPrice.supplier_vendor.name}</span>}
                       />
                     ) : (
                       <span className="text-xs text-ink-tertiary">No price</span>

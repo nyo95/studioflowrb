@@ -2,6 +2,7 @@
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { UpdatedCell } from "../updated-cell";
 import { PhoneNumbersField, contactPhoneList, phoneSummary } from "../contact-phones";
+import { matchesDirectoryStatus, normalizeIndonesiaPhone, type DirectoryStatus } from "../directory-findability";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { formatInstant } from "@platform/utilities/date";
 import {
@@ -254,6 +255,9 @@ export function VendorDirectory({
 }) {
   const { options: categoryOptions, upsertOverlayOption: upsertCategoryOption } = useOptionOverlay(supplierCategories);
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<DirectoryStatus>("ACTIVE");
+  const [brandFilter, setBrandFilter] = useState("ALL");
+  const [capabilityFilter, setCapabilityFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [createOpen, setCreateOpen] = useState(false);
@@ -312,15 +316,20 @@ export function VendorDirectory({
   });
 
   const filtered = vendors.filter((v) => {
+    if (!matchesDirectoryStatus(v.deleted_at, statusFilter)) return false;
     if (typeFilter !== "ALL" && !v.types.some((t) => t.vendor_type.id === typeFilter)) return false;
     if (categoryFilter !== "ALL" && !v.supplier_categories.some((c) => c.supplier_category.id === categoryFilter)) return false;
+    if (brandFilter !== "ALL" && !v.brand_suppliers.some((item) => item.brand.id === brandFilter) && !v.owned_brands.some((item) => item.id === brandFilter)) return false;
+    if (capabilityFilter === "MATERIAL" && !v.types.some((item) => item.vendor_type.can_supply_material)) return false;
+    if (capabilityFilter === "LABOR" && !v.types.some((item) => item.vendor_type.can_supply_labor)) return false;
     if (!query) return true;
     const q = query.toLowerCase();
     return (
       v.name.toLowerCase().includes(q) ||
       v.slug.toLowerCase().includes(q) ||
       (v.legal_name && v.legal_name.toLowerCase().includes(q)) ||
-      v.contacts.some((c) => c.person_name.toLowerCase().includes(q) || (c.email && c.email.toLowerCase().includes(q)))
+      v.contacts.some((c) => c.person_name.toLowerCase().includes(q) || (c.email && c.email.toLowerCase().includes(q)) || contactPhoneList(c).some((phone) => phone.replace(/\D/g, "").includes(q.replace(/\D/g, "")))) ||
+      (v.address?.toLowerCase().includes(q) ?? false) || (v.notes?.toLowerCase().includes(q) ?? false) || v.brand_suppliers.some((item) => item.brand.name.toLowerCase().includes(q))
     );
   });
   const { locale, timezone } = useDisplaySettings();
@@ -334,7 +343,7 @@ export function VendorDirectory({
     const result = typeof left === "number" && typeof right === "number" ? left - right : collator.compare(String(left), String(right));
     return (sortDirection === "asc" ? result : -result) || a.id.localeCompare(b.id);
   });
-  const paging = usePagination(orderedRows.length, 25, JSON.stringify([query, typeFilter, categoryFilter, sortKey, sortDirection]));
+  const paging = usePagination(orderedRows.length, 25, JSON.stringify([query, statusFilter, typeFilter, categoryFilter, brandFilter, capabilityFilter, sortKey, sortDirection]));
   const visibleRows = orderedRows.slice(paging.offset, paging.offset + 25);
   const pageFooter = <div className="grid gap-2"><Text tone="secondary" size="sm">{orderedRows.length ? paging.offset + 1 : 0}–{Math.min(paging.offset + 25, orderedRows.length)} of {orderedRows.length} records</Text>{paging.pageCount > 1 ? <Pagination page={paging.page} pageCount={paging.pageCount} onPageChange={paging.setPage} /> : null}</div>;
 
@@ -443,7 +452,8 @@ export function VendorDirectory({
           <span>New supplier</span>
         </Button>
       ) : undefined}>
-        <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search suppliers by name, legal name, contact..." />
+        <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search suppliers, brands, address, phone..." />
+        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as DirectoryStatus)}><option value="ACTIVE">Active</option><option value="ARCHIVED">Archived</option><option value="ALL">All status</option></Select>
         <div className="w-48">
           <Select value={typeFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTypeFilter(e.target.value)}>
             <option value="ALL">All supplier types</option>
@@ -454,6 +464,9 @@ export function VendorDirectory({
             ))}
           </Select>
         </div>
+        <Select value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)}><option value="ALL">All brands</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</Select>
+        <Select value={capabilityFilter} onChange={(e) => setCapabilityFilter(e.target.value)}><option value="ALL">Any capability</option><option value="MATERIAL">Material</option><option value="LABOR">Labor</option></Select>
+        <Button type="button" variant="ghost" size="sm" onClick={() => { setQuery(""); setStatusFilter("ACTIVE"); setTypeFilter("ALL"); setCategoryFilter("ALL"); setBrandFilter("ALL"); setCapabilityFilter("ALL"); }}>Clear filters</Button><Text size="sm" tone="secondary">{filtered.length} of {vendors.length}</Text>
         <div className="w-48">
           <Select value={categoryFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setCategoryFilter(e.target.value)}>
             <option value="ALL">All categories</option>
@@ -502,6 +515,7 @@ export function VendorDirectory({
                       tone={isArchived ? "danger" : "success"}
                       statusLabel={isArchived ? "Archived" : "Active"}
                       name={vendor.name}
+                      secondary={vendor.address ? <span className="text-xs text-ink-secondary">{vendor.address}</span> : undefined}
                     />
                   </TableCell>
                   <TableCell>
@@ -545,7 +559,7 @@ export function VendorDirectory({
                         vendor.contacts.slice(0, 2).map((c) => (
                           <div key={c.id} className="truncate">
                             <span className="font-medium text-ink">{c.person_name}</span>
-                            {contactPhoneList(c).length > 0 ? ` (${phoneSummary(contactPhoneList(c))})` : c.email ? ` (${c.email})` : ""}
+                            {contactPhoneList(c).length > 0 ? <span> ({contactPhoneList(c).map((phone, index) => { const normalized = normalizeIndonesiaPhone(phone); return <span key={`${c.id}-${phone}`}>{index ? ", " : ""}<a href={`tel:${phone.replace(/\s/g, "")}`} className="text-action underline">{phone}</a>{normalized ? <a href={`https://wa.me/${normalized}`} target="_blank" rel="noopener noreferrer" className="ml-1 text-action underline" aria-label={`WhatsApp ${phone}`}>WA</a> : null}</span>; })})</span> : c.email ? ` (${c.email})` : ""}
                           </div>
                         ))
                       )}

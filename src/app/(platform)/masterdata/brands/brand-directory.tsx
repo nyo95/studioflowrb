@@ -2,6 +2,7 @@
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { UpdatedCell } from "../updated-cell";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
+import { matchesDirectoryStatus, type DirectoryStatus } from "../directory-findability";
 import { formatInstant } from "@platform/utilities/date";
 import { DirectoryShell,DraftDialog,Pagination,RowActionMenu,RowActionsCell,RowActionsHead,Text,usePagination } from "@/platform/ui_engine";
 ﻿
@@ -71,6 +72,9 @@ export function BrandDirectory({
   canManageCategories: boolean;
 }) {
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<DirectoryStatus>("ACTIVE");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
+  const [supplierFilter, setSupplierFilter] = useState("ALL");
   const [createOpen, setCreateOpen] = useState(false);
   const [createDraftKey, setCreateDraftKey] = useState(0);
   const [editTarget, setEditTarget] = useState<BrandRow | null>(null);
@@ -135,6 +139,9 @@ export function BrandDirectory({
   });
 
   const filtered = brands.filter((b) => {
+    if (!matchesDirectoryStatus(b.deleted_at, statusFilter)) return false;
+    if (categoryFilter !== "ALL" && !b.categories.some((item) => item.category.id === categoryFilter)) return false;
+    if (supplierFilter !== "ALL" && b.owner_vendor?.id !== supplierFilter && !b.suppliers.some((item) => item.vendor.id === supplierFilter)) return false;
     if (!query) return true;
     const q = query.toLowerCase();
     return (
@@ -142,6 +149,7 @@ export function BrandDirectory({
       b.slug.toLowerCase().includes(q) ||
       b.hashtags.some((h) => h.label.toLowerCase().includes(q) || h.normalized.includes(q)) ||
       b.categories.some((c) => c.category.name.toLowerCase().includes(q))
+      || b.owner_vendor?.name.toLowerCase().includes(q) || b.suppliers.some((supplier) => supplier.vendor.name.toLowerCase().includes(q))
     );
   });
   const { locale, timezone } = useDisplaySettings();
@@ -155,7 +163,7 @@ export function BrandDirectory({
     const result = typeof left === "number" && typeof right === "number" ? left - right : collator.compare(String(left), String(right));
     return (sortDirection === "asc" ? result : -result) || a.id.localeCompare(b.id);
   });
-  const paging = usePagination(orderedRows.length, 25, JSON.stringify([query, sortKey, sortDirection]));
+  const paging = usePagination(orderedRows.length, 25, JSON.stringify([query, statusFilter, categoryFilter, supplierFilter, sortKey, sortDirection]));
   const visibleRows = orderedRows.slice(paging.offset, paging.offset + 25);
   const pageFooter = <div className="grid gap-2"><Text tone="secondary" size="sm">{orderedRows.length ? paging.offset + 1 : 0}–{Math.min(paging.offset + 25, orderedRows.length)} of {orderedRows.length} records</Text>{paging.pageCount > 1 ? <Pagination page={paging.page} pageCount={paging.pageCount} onPageChange={paging.setPage} /> : null}</div>;
 
@@ -281,7 +289,7 @@ export function BrandDirectory({
             New brand
           </Button>
       ) : undefined}>
-        <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search brands by name, hashtag, category..." />
+        <div className="flex flex-wrap items-center gap-2"><SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search brands, suppliers, categories..." /><Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as DirectoryStatus)}><option value="ACTIVE">Active</option><option value="ARCHIVED">Archived</option><option value="ALL">All status</option></Select><Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}><option value="ALL">All product categories</option>{productCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select><Select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)}><option value="ALL">All suppliers</option>{[...ownerVendors, ...materialVendors].filter((item, index, list) => list.findIndex((candidate) => candidate.id === item.id) === index).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select><Button type="button" variant="ghost" size="sm" onClick={() => { setQuery(""); setStatusFilter("ACTIVE"); setCategoryFilter("ALL"); setSupplierFilter("ALL"); }}>Clear filters</Button><Text size="sm" tone="secondary">{filtered.length} of {brands.length}</Text></div>
       </TableToolbar>}>
 
 
@@ -298,8 +306,8 @@ export function BrandDirectory({
 <TableHead style={{ width: 180 }}  >Categories</TableHead>
 <TableHead style={{ width: 160 }}  >Hashtags</TableHead>
 <TableHead style={{ width: 180 }}  >Owner</TableHead>
-<TableHead style={{ width: 90 }} align="end" sortable sortDirection={sortKey === "Suppliers" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Suppliers"); setSortDirection(direction); }}>Suppliers</TableHead>
-<TableHead style={{ width: 90 }} align="end" sortable sortDirection={sortKey === "Resources" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Resources"); setSortDirection(direction); }}>Resources</TableHead>
+<TableHead style={{ width: 150 }} sortable sortDirection={sortKey === "Suppliers" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Suppliers"); setSortDirection(direction); }}>Supplied by</TableHead>
+<TableHead style={{ width: 130 }} sortable sortDirection={sortKey === "Resources" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Resources"); setSortDirection(direction); }}>Links</TableHead>
 <TableHead style={{ width: 90 }} align="end" sortable sortDirection={sortKey === "SKUs" ? sortDirection : null} onSortChange={(direction) => { setSortKey("SKUs"); setSortDirection(direction); }}>SKUs</TableHead>
 <TableHead style={{ width: 180 }}>Updated</TableHead>
 <RowActionsHead /></TableRow>
@@ -315,8 +323,8 @@ export function BrandDirectory({
  <TableCell><DiscoverySummary values={brand.categories.map(c => c.category.name)} limit={3} /></TableCell>
  <TableCell><DiscoverySummary values={brand.hashtags.map(h => `#${h.label.replace(/^#/, "")}`)} limit={2} /></TableCell>
  <TableCell wrap><TableCellContent primary={brand.owner_vendor?.name ?? "—"} primaryLines={2} /></TableCell>
- <TableCell align="end">{brand._count.suppliers.toLocaleString(locale)}</TableCell>
- <TableCell align="end">{brand._count.links.toLocaleString(locale)}</TableCell>
+ <TableCell><DiscoverySummary values={[...(brand.owner_vendor ? [`${brand.owner_vendor.name} (owner)`] : []), ...brand.suppliers.map((item) => item.vendor.name)]} limit={2} /></TableCell>
+ <TableCell><div className="flex flex-wrap gap-1">{brand.links.length ? brand.links.map((link) => <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="text-xs text-action underline">{link.label || link.kind}</a>) : "—"}</div></TableCell>
  <TableCell align="end">{brand._count.skus.toLocaleString(locale)}</TableCell>
  <UpdatedCell at={brand.updated_at} by={brand.updated_by_label} />
  <RowActionsCell>

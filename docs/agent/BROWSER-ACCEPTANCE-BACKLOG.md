@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.257] Master Data directory findability
+- Surface: Brands, Suppliers, SKUs, and Pricing directories
+- Fixture: signed-in Master Data reader with active and archived records, linked brands/suppliers, and prices in more than one currency or unit
+- Viewport: desktop (default)
+- Steps: 1. Confirm each directory initially shows only Active records, then try Archived and All. 2. Apply and clear each contextual filter; confirm the result count changes. 3. Search supplier/brand/category details and open a Brand link. 4. Check supplier phone links and SKU lowest-price display. 5. Filter pricing by supplier, brand, and work category.
+- Acceptance: filters only alter the displayed rows; cleared filters restore the active default; links are safe and external; pricing is never compared across mixed currency or unit.
+- Status: PENDING
+
 ### [R8.249] My Preferences and Storage report
 - Surface: Settings → My Preferences and Platform → Storage
 - Fixture: signed-in staff member with one accessible app; platform settings reader; a settings reader without another app
