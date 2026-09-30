@@ -21,6 +21,15 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 **Checks.** `npm test`; `npx tsc --noEmit`; `npm run check`; `npm run lint`; focused preference and storage-report tests. `npm run build` is not run when the owner dev server occupies port 3001. Browser acceptance is queued for the Reviewer.
 
+## R8.254 | 2026-09-30 | fix(masterdata): a Supplier with a supplier category can be permanently deleted
+
+- **Owner report:** an archived Supplier ("dadawda", the red square in the Suppliers list) could not be submitted for deletion; the dialog answered "A related record is missing or still referenced."
+- **Cause (reproduced in the browser).** The owner holds the deletion-approval permission, so "Request deletion" is not a request for that account: it permanently deletes at once (`hardDeleteArchived`). The Supplier's link to its supplier category (`VendorSupplierCategory`, a restrict-on-delete link) was the one related table the delete did not clear, unlike contacts and supplier types, so the database refused it and the generic foreign-key message came back. Any archived Supplier with a supplier category was affected, whether deleted directly or through an approved request.
+- **Fix.** The permanent delete now also removes the Supplier's category links (the category itself stays). New integration test: an archived Supplier with a category, contacts and types is deleted directly; it fails without the fix.
+- **Not changed, noted.** For an approver the dialog still reads "Submit supplier for deletion" although the action deletes immediately; the wording could say so. The Supplier in the report was not deleted by this session; retry it.
+
+**Checks.** `npm test` 697/697 (two runs in a row), `npm run check`, `tsc --noEmit`. The first commit of this revision shipped a test that reused fixed category and supplier names and failed on the second run (the test database keeps master data between runs); the names are now unique per run.
+
 ## R8.253 | 2026-09-30 | fix(studioflow): card editor follows the typography rule; Brand no longer overflows
 
 - **Browser acceptance of R8.252 (Lead, dev server, the owner's session).** The dev server was restarted first (the R8.249 Prisma model needed a regenerated client; the running server still had the old one and every page failed on the preferences read). Checked on the PT-01 item: the card table opens as a dialog; editing Color and saving persists (reload shows it); turning the Pattern slot on, adding option B, selecting it, editing it and option A, then Save once saved both; a dirty close asks "Discard changes?"; the option menu offers Add photo and Delete option and delete asks for confirmation; at phone width the card comes first. All test data was restored (option B deleted, colour back to Pink, Pattern slot off). Not checked: read-only view for an account without edit rights, Set as final, sample request, photo change (these touch other data), Fixture item.

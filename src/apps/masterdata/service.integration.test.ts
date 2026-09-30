@@ -1110,6 +1110,20 @@ describe("Master Data service", () => {
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "unit.deleted", entity_id: created.unitId } }), 1);
   });
 
+  it("permanently deletes an archived Supplier that has a supplier category, contacts and types", async () => {
+    const { supplierCategoryId } = await service.createSupplierCategory({ grants: GRANTS, actor: ACTOR, code: `SC_DEL_${crypto.randomUUID().slice(0, 8)}`, name: `Category to delete with supplier ${crypto.randomUUID().slice(0, 8)}` });
+    const { vendorId } = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: `Supplier With Category ${crypto.randomUUID().slice(0, 8)}`, supplierCategoryIds: [supplierCategoryId] });
+    assert.equal(await testDb.prisma.vendorSupplierCategory.count({ where: { vendor_id: vendorId } }), 1);
+    await service.archiveVendor({ grants: GRANTS, actor: ACTOR, vendorId });
+
+    const result = await service.hardDeleteArchived({ grants: GRANTS, actor: ACTOR, targetType: "vendor", targetId: vendorId });
+
+    assert.equal(result?.direct, true);
+    assert.equal(await testDb.prisma.vendor.findUnique({ where: { id: vendorId } }), null);
+    assert.equal(await testDb.prisma.vendorSupplierCategory.count({ where: { vendor_id: vendorId } }), 0);
+    assert.equal(await testDb.prisma.supplierCategory.count({ where: { id: supplierCategoryId } }), 1, "the category itself stays");
+  });
+
   it("reuses an existing pending deletion request instead of creating a duplicate for the same target", async () => {
     const created = await service.createUnit({ grants: GRANTS, actor: ACTOR, code: "DUP_REQUEST", name: "Duplicate Request" });
     await service.archiveUnit({ grants: GRANTS, actor: ACTOR, unitId: created.unitId });

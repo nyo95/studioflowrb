@@ -102,6 +102,8 @@ async function hardDeleteMasterDataTarget(tx: any, targetType: string, targetId:
     if (priceCount > 0) throw new AppError("CONFLICT", "VENDOR_HAS_PRICES", "Supplier still has price rows. Delete them first.");
     await tx.vendorContact.deleteMany({ where: { vendor_id: targetId } });
     await tx.vendorVendorType.deleteMany({ where: { vendor_id: targetId } });
+    // Restrict FK: without this a Supplier that has a supplier category could never be permanently deleted.
+    await tx.vendorSupplierCategory.deleteMany({ where: { vendor_id: targetId } });
     await tx.archiveCause.deleteMany({ where: { entity_type: "vendor", entity_id: targetId } });
     await tx.vendor.delete({ where: { id: targetId } });
   } else if (targetType === "sku") {
