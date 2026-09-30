@@ -38,8 +38,3 @@ export async function applySkuPriceImportAction(formData: FormData): Promise<Act
     return result;
   });
 }
-
-// Bare executor hooks; the Lead-owned UI consumes the typed actions above.
-export async function exportSkuPriceWorkbookFormAction(_formData: FormData): Promise<void> { await exportSkuPriceWorkbookAction(); }
-export async function previewSkuPriceImportFormAction(formData: FormData): Promise<void> { await previewSkuPriceImportAction(formData); }
-export async function applySkuPriceImportFormAction(formData: FormData): Promise<void> { await applySkuPriceImportAction(formData); }

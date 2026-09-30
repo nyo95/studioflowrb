@@ -5,13 +5,26 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.217**
-- Next local revision: **R8.218**
+- Current revision after this entry is committed: **R8.218**
+- Next local revision: **R8.219**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.218 | 2026-09-30 | feat(masterdata): Excel workbook screen; review PASS for R8.216-R8.217
+
+- **Review verdict, WO-MD-IMPORT-01: PASS** (R8.216 + correction R8.217; `npm test` 654/654 re-run by the Lead). The Lead's
+  first correction finding (multi-category SKUs) was withdrawn: `SkuCategory` is unique per SKU by contract.
+  Recorded non-blocking gap: the preview counts each supplier row of a grouped new SKU as "new" while apply creates one SKU.
+- **Screen** `/masterdata/workbook` replaces the executor's bare page: 1 Export (download), 2 Check (upload, totals,
+  per-row error table, rows that will change), 3 Save (enabled only when the check is clean and something changes; server
+  re-validates with the hash). Entry point: "Excel workbook" button on the SKU catalogue for SKU managers. The bare
+  form actions were removed. Export and check were run in the browser against the empty dev catalogue; changed/error paths
+  are covered by the R8.217 integration tests.
+
+**Checks.** `tsc --noEmit`, eslint on touched folders. Authenticated Excel round trip with real data still queued in `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`.
 
 ## R8.217 | 2026-09-30 | fix(masterdata): correct SKU price workbook import
 

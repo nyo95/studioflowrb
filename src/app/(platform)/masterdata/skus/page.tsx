@@ -1,4 +1,7 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
+
+import { FileSpreadsheet } from "lucide-react";
 
 
 import { requirePrincipalGrants } from "@platform/core/auth";
@@ -9,6 +12,7 @@ import {
   ErrorState,
   PageHeader,
   SectionCard,
+  buttonClasses,
 } from "@/platform/ui_engine";
 
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
@@ -48,6 +52,12 @@ export default async function SkusPage() {
     <>
       <PageHeader
         title="Material SKUs Catalog"
+        actions={canManage ? (
+          <Link href="/masterdata/workbook" className={buttonClasses("secondary")}>
+            <FileSpreadsheet size={14} aria-hidden="true" />
+            <span>Excel workbook</span>
+          </Link>
+        ) : undefined}
         divider
       />
       <SkuDirectory
