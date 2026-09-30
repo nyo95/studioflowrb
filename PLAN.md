@@ -1,84 +1,75 @@
 # Active Plan
 
-Plan ID: WO-SF-CDLIST-01
-Scope: StudioFlow CD List (Construction Drawing item list) — schema, service, audit, tests. Backend only; the Lead builds the screen afterwards.
-Target revision: R8.225
+Plan ID: WO-MD-SAMPLEPRICE-01
+Scope: Master Data — put a sample request's quoted price into the material price list (server command, audit, tests). Backend only; the Lead builds the SKU picker and the "Add to price list" action afterwards.
+Target revision: R8.232
 Status: READY
 Priority: P2
-Owner: owner (Product Owner). Go-ahead 2026-09-30 ("ya boleh ... sekalian build"); wave-2 item of `STUDIOFLOW-REWORK-CONTRACT.md` (RW-04). Details below decided by the Lead from legacy evidence.
+Owner: owner (Product Owner). Continuation of the sample-request workflow approved 2026-09-29 ("lanjut 2", 2026-09-30); details below are Lead defaults from legacy evidence and are open to the owner's veto.
 Last updated: 2026-09-30
 
 ## Outcome
 
-On a drafter-seat phase (Construction Drawing) the team keeps a checklist of drawings to produce: each item has a drawing number, a drawing name, a status
-(Pending / In progress / Completed) and an optional assignee. Users with edit rights on that phase can add, edit, change status of, and delete items;
-everyone who can read the project can see the list. The list is informational: it never blocks approving a phase.
+Master Data staff work a sample request: they record the supplier's quote (supplier, amount, currency) and, when the product exists in the catalogue, pick its SKU.
+One command then writes that quote into the real material price list for that SKU and supplier, and links the request to the resulting price. Today the queue stores
+the quote and the ids but never touches `PriceMaterial`; staff re-type the price by hand in Pricing.
 
 ## Context and Evidence
 
-- Legacy (read-only, `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`): `prisma/schema.prisma` `model CDList` (`phase_id`, `group_code`, `drawing_name`,
-  `status_enum` PENDING/IN_PROGRESS/COMPLETED, `assigned_to_id?`, `created_at`); `src/lib/services/phase-service.ts` `executeCreateCDItem` /
-  `executeUpdateCDItem` / `executeUpdateCDStatus` / `executeDeleteCDItem` (each writes an audit log with project_id, phase_id, drawing details);
-  `src/components/cd-list-table.tsx` (drawing-number normalisation `ID_<number>`, numeric sort, groups by hundreds); `project-service.ts` deletes items with their phases.
-- Rebuild today: no CD List. A phase carries `seat_snapshot` (`drafter` for CD); access gate `requireProjectAccess(..., kind: "content", phaseId)` in
-  `src/apps/studioflow/shared.ts` (drafter PIC or designer PIC on a drafter-seat phase, designer PIC elsewhere, or override) — REUSE, do not re-derive.
-  Writable-phase loader `loadWritablePhase` (`shared.ts`) rejects archived projects and locked phases.
-- Patterns to follow: `src/apps/studioflow/tasks/service.ts` and `phases/service.ts` (command shape, `runTransaction`, `writeAudit`), `permissions.ts`.
+- Rebuild today: `SampleRequestIntake` already stores `vendor_id`, `quoted_amount`, `quoted_currency`, `sku_id`, `price_material_id`, `staff_note`; `recordSampleQuote`,
+  `markSampleRequestPriced`, `declineSampleRequest` in `src/apps/masterdata/services/sample-request.service.ts`. `createPriceMaterial` / `updatePriceMaterial` in
+  `services/pricing.service.ts` own price validation, the derived unit, permissions and audit (REUSE them, do not write `PriceMaterial` directly).
+- Legacy (read-only, `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`): `src/subapps/master-data/actions/sample-request-actions.ts` `VendorFollowUpInput.syncToMaterialPrice` /
+  `syncSkuPrice`: the price sync required an existing SKU (`SKU_REQUIRED` otherwise: "every price hangs off a SKU") and recorded the actor and a note; it never created a SKU.
+- Boundary: Master Data only. StudioFlow is untouched (it only requests).
 
 ## Locked Decisions
 
-- **Table `SfCdItem` (`sf_cd_item`, schema `studioflow`)**: `id` uuid, `phase_id` FK → `SfPhase` `onDelete: Cascade` (so project/phase deletion removes items, matching legacy),
-  `drawing_code` text (normalised, see below), `drawing_name` text, `status` enum `SfCdItemStatus` `PENDING | IN_PROGRESS | COMPLETED` default `PENDING`,
-  `assigned_to_id` text nullable (a user id; **no foreign key** to the platform, same convention as the other `sf_*` tables), `created_by_id`, `created_at`, `updated_at`.
-  Index on `phase_id`. One additive migration.
-- **Only on drafter-seat phases** (`seat_snapshot = 'drafter'`): any create/list on another phase is a validation error `CD_LIST_WRONG_PHASE`.
-- **Drawing code** input is free text; normalise as legacy: strip a leading `ARS`/`ID` prefix and separators, upper-case, and store `ID_<number>`; an empty number stores `ID_`.
-  Keep the normaliser as a small pure function in `src/apps/studioflow/domain/` with unit tests (cases: `12`, `id-12.5`, `ARS_301`, empty, non-numeric).
-  `drawing_name` is required (trimmed, max 200) → `DRAWING_NAME_REQUIRED`.
-- **Order and grouping are presentation:** `list` returns items sorted by numeric drawing code ascending (non-numeric last, then by `created_at`) and includes
-  `group` = `floor(number/100)*100` as a string, or `"-"` when not numeric, exactly as legacy computed it.
-- **Commands (`studioFlow.cdList`):** `list({ grants, projectId, phaseId })`, `create`, `update`, `setStatus`, `delete`. Reads require `studioflow.project.read`.
-  Writes require base grant `studioflow.phase.work` AND `requireProjectAccess(kind: "content", phaseId)`, and the phase must be writable (`loadWritablePhase`).
-  Items may be edited while the phase is in any writable state (before, during and after review); a **locked** (approved) phase rejects changes, same as checklist edits.
-- **Assignee:** optional; when set it must be an active user holding `studioflow.phase.work` (same rule as task assignees) → `CD_ASSIGNEE_NOT_ELIGIBLE`. Clearing is allowed.
-- **Audit:** `cd-item.created` / `cd-item.updated` (with changed fields) / `cd-item.status-changed` / `cd-item.deleted`, entity `cd_item`, metadata `{ projectId, phaseId, drawingCode, drawingName }`, following `writeAudit` usage.
-- **Read model for the UI:** `getAccess` already reports `phases[].canEditContent`; the Lead uses that. No new access API.
-- **Never affects phase gates:** do not add CD items to blockers, warnings, `todoBlockers` or approval checks.
+- **Command:** `syncSampleQuoteToPrice({ grants, actor, intakeId })` on the Master Data service (module `sample-request.service.ts` or a small sibling), exposed through the existing
+  service object. Allowed while the intake is `IN_PROGRESS` or `PRICED` (staff often mark priced first); a `DECLINED` intake is rejected (`SAMPLE_INTAKE_DECLINED`).
+- **Permissions:** the caller must hold BOTH `masterdata.sample-request.manage` and the material-price manage permission (`priceMaterialManage`). Neither alone is enough.
+- **Preconditions (all must be set on the intake, otherwise `SAMPLE_PRICE_SYNC_INCOMPLETE` with a plain message naming what is missing):** a supplier (`vendor_id`), a live SKU (`sku_id`),
+  a quoted amount and currency. **It never creates a SKU or a supplier** (legacy parity, and the reference-data rule of the workbook import). No SKU means: create the SKU first, then link it.
+- **Effect:** if a live `PriceMaterial` already exists for the same SKU and supplier, UPDATE it (amount, currency; unit stays the SKU's derived unit) through the existing update rules;
+  otherwise CREATE one. Set `intake.price_material_id` to it. Price notes: `From sample request: <product name> (<project name>)`, appended without overwriting an existing note.
+  Use the existing price services so their validation (supplier must be material-capable, SKU live, currency, amount) applies; suppress their own audit and write one combined event.
+- **Idempotent:** if the intake is already linked to a live price whose amount and currency equal the quote, the command changes nothing and returns it.
+- **Audit:** one event `masterdata.sample-request.price-synced`, entity `sample_request_intake`, changes `{ priceMaterialId, action: "created" | "updated", amount, currency }`, metadata `{ sourceRequestId, skuId, vendorId }`. No notification change.
+- **Read model:** the intake read (`toRead`) already exposes `skuId`, `vendorId`, `priceMaterialId`; also expose the linked SKU's display name and code and the price's amount for the UI (small additive fields, no new query per row).
+- **Errors** use `AppError` with plain messages; a mismatch such as an archived SKU or supplier surfaces the existing price-service errors.
 
 ## Business Rules and Architecture Constraints
 
-- StudioFlow only; no cross-app reads/writes, no Master Data/BQ changes, no platform RBAC changes, no new permissions, no new dependency.
-- New service module under `src/apps/studioflow/cd-list/` registered in `src/apps/studioflow/service.ts` like the other services; one canonical implementation.
-- Respect the audit and error conventions used by `tasks/service.ts`; user-facing messages plain English.
-- Migration is additive (new enum and table). Apply it to both approved rebuild databases; verify with `prisma migrate status`.
+- Master Data only; no StudioFlow, BQ or platform RBAC changes; no schema change (all needed columns exist — verify before starting; if a migration turns out to be needed, stop with BLOCKED / CONFLICT). No new dependency.
+- Money as decimal strings through the existing helpers. One transaction. Follow the module's existing patterns (`openIntake`, `quoteData`, `writeAudit`).
+- Keep the Master Data operational-override ledger in `docs/apps/masterdata/masterdata.md` section 4.3 accurate: if this command relaxes any locked rule, add an entry; if not, say so in the report.
 
 ## Boundaries and Non-goals
 
-No UI. No import/export. No CD List on non-drafter phases. No per-item comments/files. No effect on approvals. No dependencies between items. No push.
+No UI (Lead). No SKU creation from a request. No bulk sync. No change to who receives notifications. No automatic sync on "Mark priced". No push.
 
 ## Acceptance Criteria
 
-- A designer PIC and the drafter PIC can create, edit, change status, and delete items on the CD phase; an unassigned staff member with `phase.work` is denied every write (`PERMISSION_DENIED`) but can list.
-- A drafter PIC cannot use the CD List API on a designer-seat phase (wrong phase error) and creating on any non-drafter phase fails.
-- A locked phase and an archived project reject writes; a project deleted/phase cascade removes items.
-- Code normalisation, numeric sort and grouping match the cases in the unit tests; assignee eligibility enforced.
-- Each write produces exactly one audit event with the fields above.
+- With supplier + SKU + amount + currency set, the command creates the price when none exists, updates it when one exists, links the intake, and writes exactly one audit event; running it twice changes nothing the second time.
+- Missing supplier, SKU, or amount each fail with `SAMPLE_PRICE_SYNC_INCOMPLETE`; a declined intake is rejected; an archived SKU or a non-material supplier is rejected by the existing price rules.
+- A caller with only the sample-request permission, or only the price permission, is denied.
+- The price appears in the normal Pricing list for that SKU and supplier and the update path keeps the previous notes.
 
 ## Verification
 
-`npm test`, `npx tsc --noEmit`, `npm run check`, eslint, `npm run build`. Render `/studioflow` and a project page once in `next dev` and report it (restart the dev server first: the permission registry loads at boot). STUDIOFLOW_LOCATION=kantor. Databases: only `studioflow_rebuild` (dev) and `studioflow_rebuild_test` on localhost:5433 (container `studioflowrb-gateb-test-db`); never any legacy database.
+`npm test`, `npx tsc --noEmit`, `npm run check`, eslint, `npm run build`. Render `/masterdata/sample-requests` and `/masterdata/pricing` once in `next dev` (a dev server may already be running on port 3001, started by the owner or a previous agent; check its process before assuming you may restart it, and if a restart is needed for a Prisma change say so instead of killing it). STUDIOFLOW_LOCATION=kantor. Databases: only `studioflow_rebuild` (dev) and `studioflow_rebuild_test` on localhost:5433 (container `studioflowrb-gateb-test-db`); never any legacy database.
 
 ## Reviewer Acceptance
 
-The Lead reviews the diff, then builds the CD List table on the Construction Drawing phase canvas (add, inline edit, status select, delete, sorted/grouped like legacy, read-only for viewers) and verifies it in the browser.
+The Lead reviews the diff, then adds a SKU picker to the quote dialog and an "Add to price list" action, and checks the flow in the browser without changing the owner's real data.
 
 ## Regression Risks and Recovery
 
-Low: additive table and a new service module. Recovery: revert the single commit and drop `sf_cd_item` / `SfCdItemStatus` with a follow-up migration.
+Low: one new command reusing tested price services. Recovery: revert the single commit (no migration).
 
 ## Executor Prompt
 
 You are the Backend Executor. Location: kantor. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY backend
 outcome and nothing beyond it. Inspect current repository evidence, preserve unrelated owner work, make sound in-scope implementation decisions, run the
-required checks (including opening the touched routes in `next dev`), update `CHANGELOG.md`, and create the target local revision commit R8.225. Stop only for
+required checks (including opening the touched routes in `next dev`), update `CHANGELOG.md`, and create the target local revision commit R8.232. Stop only for
 a material locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT report. Report the commit, checks, limitations, and remaining unrelated dirty files.

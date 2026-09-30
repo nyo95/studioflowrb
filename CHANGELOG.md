@@ -5,13 +5,19 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.230**
-- Next local revision: **R8.231**
+- Current revision after this entry is committed: **R8.231**
+- Next local revision: **R8.232**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.231 | 2026-09-30 | docs(masterdata): WO-MD-SAMPLEPRICE-01 ready
+
+- `PLAN.md` now holds WO-MD-SAMPLEPRICE-01 (READY, Executor target **R8.232**): one Master Data command that writes a sample request's quoted price into the material price list
+  (create or update the price for the linked SKU and supplier, link the request, one audit event, idempotent), gated by both the sample-request and price-manage permissions,
+  never creating a SKU or supplier (legacy parity: `sample-request-actions.ts` `syncToMaterialPrice`). The Lead builds the SKU picker and the action afterwards. No code changed.
 
 ## R8.230 | 2026-09-30 | chore(platform): harness rule for server-calls-client, quieter polling, backlog cleanup
 

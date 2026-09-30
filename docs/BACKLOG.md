@@ -139,7 +139,7 @@ invitation to make unrequested drive-by changes.
 
 - [ ] [PLANNED] Define media/file behavior after shared storage exists.
 
-- [ ] [PLANNED] **Screen built in R8.185 (queue, Take/Record quote/Mark priced/Decline); vendor/SKU/`PriceMaterial` linking on
+- [ ] [PLANNED] **Price sync from a quote: backend READY as `WO-MD-SAMPLEPRICE-01` in `PLAN.md` (2026-09-30), SKU picker and action to follow as a Lead revision.** Original entry: **Screen built in R8.185 (queue, Take/Record quote/Mark priced/Decline); vendor/SKU/`PriceMaterial` linking on
   the quote is still to build.** **Incoming Sample Requests screen (owner roadmap review, 2026-09-26).** StudioFlow's public
   read port exposes pending physical-sample requests (`SfScheduleSampleRequest`, see mirrored entry under **StudioFlow** above
   for the full evidence trail). The Master Data side is a staff-facing queue (`(platform)/masterdata/sample-requests`) to read
