@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.241**
-- Next local revision: **R8.242**
+- Current revision after this entry is committed: **R8.242**
+- Next local revision: **R8.243**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.242 | 2026-09-30 | feat(studioflow): deliverables panel shows Final/expiry clearly and reports upload progress
+
+- **Owner answers (2026-09-30).** Maximum file size: 100-200 MB is enough, 500 MB is fine, so the 500 MB default stays. Disk: the storage lives on the owner's PC with hundreds of GB free, so the 2 GB free-space reserve stays as is.
+- **Panel (Lead).** Each file shows a Final badge (kept) or "Deleted in N days" (warning colour at 7 days or less) and its version number ("newest" on the latest). Upload uses a progress bar with a percentage, refuses a file over 500 MB before sending, and gives a plain message if the connection drops. The hint under the button states the 30-day and 2-version rules.
+- **Not changed.** No backend or schema change.
+
+**Checks.** `tsc --noEmit`, eslint on the panel. Not exercised in the browser with a large file yet (owner tests UI; listed in the acceptance backlog).
 
 ## R8.241 | 2026-09-30 | fix(studioflow): large deliverable uploads no longer truncated by the proxy; review of R8.240
 

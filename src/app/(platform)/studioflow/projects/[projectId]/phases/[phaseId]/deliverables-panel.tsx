@@ -28,6 +28,10 @@ const STATUS_CONFIG: Record<DeliverableStatus, { label: string; tone: "success" 
   OUTDATED: { label: "Outdated", tone: "warning", icon: AlertTriangle },
 };
 
+/** Client-side courtesy check; the server enforces its own (configurable) limit. */
+const CLIENT_MAX_BYTES = 500 * 1024 * 1024;
+const EXPIRY_WARNING_DAYS = 7;
+
 function formatBytes(bytes: number | null): string {
   if (bytes === null) return "";
   if (bytes < 1024) return `${bytes} B`;
@@ -53,6 +57,7 @@ export function DeliverablesPanel({
   const [isPending, startTransition] = useTransition();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const statusConfig = STATUS_CONFIG[status];
@@ -67,26 +72,41 @@ export function DeliverablesPanel({
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const input = e.target;
+    const file = input.files?.[0];
     if (!file) return;
     setUploadError(null);
-    startTransition(async () => {
-      const response = await fetch("/api/studioflow/deliverables", {
-        method: "PUT",
-        headers: {
-          "content-type": file.type,
-          "content-length": String(file.size),
-          "x-studioflow-project-id": projectId,
-          "x-studioflow-phase-id": phaseId,
-          "x-studioflow-file-name": file.name,
-        },
-        body: file,
-      });
-      const result = await response.json() as { ok: boolean; error?: { safeMessage: string } };
-      if (!result.ok) setUploadError(result.error?.safeMessage ?? "Upload failed.");
+    if (file.size > CLIENT_MAX_BYTES) {
+      setUploadError(`That file is ${formatBytes(file.size)}. The limit is ${formatBytes(CLIENT_MAX_BYTES)}.`);
+      input.value = "";
+      return;
+    }
+    // XMLHttpRequest, not fetch: fetch cannot report upload progress, which matters for files of hundreds of MB.
+    const request = new XMLHttpRequest();
+    request.open("PUT", "/api/studioflow/deliverables");
+    request.setRequestHeader("content-type", file.type);
+    request.setRequestHeader("x-studioflow-project-id", projectId);
+    request.setRequestHeader("x-studioflow-phase-id", phaseId);
+    request.setRequestHeader("x-studioflow-file-name", file.name);
+    request.upload.onprogress = (event) => { if (event.lengthComputable) setProgress(Math.round((event.loaded / event.total) * 100)); };
+    const finish = (message: string | null) => {
+      setProgress(null);
+      input.value = "";
+      if (message) setUploadError(message);
       else window.location.reload();
-      if (fileRef.current) fileRef.current.value = "";
-    });
+    };
+    request.onerror = () => finish("The upload was interrupted. Check the connection and try again.");
+    request.onabort = () => finish("The upload was cancelled.");
+    request.onload = () => {
+      try {
+        const result = JSON.parse(request.responseText) as { ok: boolean; error?: { safeMessage: string } };
+        finish(result.ok ? null : result.error?.safeMessage ?? "Upload failed.");
+      } catch {
+        finish("Upload failed.");
+      }
+    };
+    setProgress(0);
+    request.send(file);
   }
 
   function setFinal(d: Deliverable, isFinal: boolean) {
@@ -120,7 +140,16 @@ export function DeliverablesPanel({
                 {d.fileSizeBytes !== null ? (
                   <p className="text-xs text-ink-secondary">{formatBytes(d.fileSizeBytes)}</p>
                 ) : null}
-                <p className="text-xs text-ink-secondary">{d.isFinal ? "Final" : `Expires in ${d.daysLeft ?? 0} days`} · v{d.versionNumber}</p>
+                <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-secondary">
+                  {d.isFinal ? (
+                    <Badge tone="success">Final · kept</Badge>
+                  ) : (
+                    <Badge tone={(d.daysLeft ?? 0) <= EXPIRY_WARNING_DAYS ? "warning" : "neutral"}>
+                      {(d.daysLeft ?? 0) === 0 ? "Deleted soon" : `Deleted in ${d.daysLeft} day${d.daysLeft === 1 ? "" : "s"}`}
+                    </Badge>
+                  )}
+                  <span>Version {d.versionNumber}{d.versionNumber === 1 ? " (newest)" : ""}</span>
+                </p>
               </div>
               <a
                 href={d.url}
@@ -168,13 +197,14 @@ export function DeliverablesPanel({
           />
           <label
             htmlFor={`deliverable-upload-${phaseId}`}
-            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-secondary transition-colors hover:border-line-emphasis hover:text-ink ${isPending ? "pointer-events-none opacity-60" : ""}`}
+            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-secondary transition-colors hover:border-line-emphasis hover:text-ink ${isPending || progress !== null ? "pointer-events-none opacity-60" : ""}`}
           >
             <Upload className="size-3.5" />
-            {isPending ? "Uploading…" : "Upload file"}
+            {progress !== null ? `Uploading… ${progress}%` : "Upload file"}
           </label>
+          {progress !== null ? <progress className="mt-2 block h-1.5 w-full max-w-xs" max={100} value={progress} aria-label="Upload progress" /> : null}
           {uploadError ? <p className="mt-1.5 text-xs text-danger">{uploadError}</p> : null}
-          <p className="mt-1 text-xs text-ink-tertiary">PDF, PNG, JPEG, WebP, ZIP — max 500 MB</p>
+          <p className="mt-1 text-xs text-ink-tertiary">PDF, PNG, JPEG, WebP, ZIP — up to 500 MB. Files that are not marked final delete themselves after 30 days; only the 2 newest versions of a file are kept.</p>
         </div>
       ) : null}
     </SectionCard>
