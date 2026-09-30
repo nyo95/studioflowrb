@@ -32,7 +32,7 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
           supplier_categories: { select: { supplier_category: { select: { id: true, code: true, name: true } } }, orderBy: { supplier_category: { name: "asc" } } },
           contacts: { select: { id: true, person_name: true, job_title: true, email: true, phone: true, extra_phones: true, is_primary: true, brand_id: true, notes: true } },
           brand_suppliers: { select: { id: true, is_authorized: true, notes: true, brand: { select: { id: true, name: true, categories: { select: { category: { select: { id: true, name: true, status: true } } } } } } }, orderBy: { brand: { name: "asc" } } },
-          owned_brands: { where: { deleted_at: null }, select: { id: true } },
+          owned_brands: { where: { deleted_at: null }, select: { id: true, name: true, categories: { select: { category: { select: { id: true, name: true, status: true } } } } } },
           _count: { select: { owned_brands: true, brand_suppliers: true, material_prices: true, material_labor_prices: true, labor_prices: true } },
         },
       });

@@ -1,4 +1,5 @@
 "use client";
+import { FilterSummary, StatusFilterSelect } from "../directory-filters";
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { lowestPricesByCurrencyUnit, matchesDirectoryStatus, type DirectoryStatus } from "../directory-findability";
@@ -120,14 +121,14 @@ export function SkuDirectory({
     <DirectoryShell fill header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false}>
         <div className="flex flex-wrap items-center gap-3">
           <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search SKUs by name, code, brand..." />
-          <Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as DirectoryStatus)}><option value="ACTIVE">Active</option><option value="ARCHIVED">Archived</option><option value="ALL">All status</option></Select>
+          <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
           <div className="w-52">
             <Combobox label="Brand filter" options={[{ id: "ALL", label: "All brands" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={brandFilter} onValueChange={setBrandFilter} placeholder="All brands" searchPlaceholder="Search brands…" />
           </div>
           <div className="w-52">
             <Combobox label="Product category filter" options={[{ id: "ALL", label: "All categories" }, ...productCategories.map((category) => ({ id: category.id, label: category.name }))]} value={categoryFilter} onValueChange={setCategoryFilter} placeholder="All categories" searchPlaceholder="Search product categories…" />
           </div>
-          <Select value={priceFilter} onChange={(event) => setPriceFilter(event.target.value)}><option value="ALL">Any price</option><option value="YES">Has price</option><option value="NO">No price</option></Select><Select value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)}><option value="ALL">Any priced supplier</option>{[...new Map(skus.flatMap((sku) => sku.material_prices.map((price) => [price.supplier_vendor.id, price.supplier_vendor] as const))).values()].map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</Select><Button type="button" variant="ghost" size="sm" onClick={() => { setQuery(""); setStatusFilter("ACTIVE"); setBrandFilter("ALL"); setCategoryFilter("ALL"); setPriceFilter("ALL"); setSupplierFilter("ALL"); }}>Clear filters</Button><Text size="sm" tone="secondary">{filtered.length} of {skus.length}</Text>
+          <Select value={priceFilter} onChange={(event) => setPriceFilter(event.target.value)}><option value="ALL">Any price</option><option value="YES">Has price</option><option value="NO">No price</option></Select><Select value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)}><option value="ALL">Any priced supplier</option>{[...new Map(skus.flatMap((sku) => sku.material_prices.map((price) => [price.supplier_vendor.id, price.supplier_vendor] as const))).values()].map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</Select><FilterSummary filtered={Boolean(query) || statusFilter !== "ACTIVE" || brandFilter !== "ALL" || categoryFilter !== "ALL" || priceFilter !== "ALL" || supplierFilter !== "ALL"} shown={filtered.length} total={skus.length} onClear={() => { setQuery(""); setStatusFilter("ACTIVE"); setBrandFilter("ALL"); setCategoryFilter("ALL"); setPriceFilter("ALL"); setSupplierFilter("ALL"); }} />
         </div>
       </TableToolbar>}>
 
@@ -175,7 +176,7 @@ export function SkuDirectory({
                       {sku.brand ? (
                         <span className="text-xs font-semibold text-ink">{sku.brand.name}</span>
                       ) : (
-                        <span className="text-xs text-ink-tertiary">Brand unavailable</span>
+                        <span className="text-xs text-ink-tertiary">No brand</span>
                       )}
                       <div className="flex flex-wrap gap-1">
                         {sku.categories.map((c) => (

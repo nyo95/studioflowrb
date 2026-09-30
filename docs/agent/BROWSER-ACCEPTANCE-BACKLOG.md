@@ -36,7 +36,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop (default)
 - Steps: 1. Confirm each directory initially shows only Active records, then try Archived and All. 2. Apply and clear each contextual filter; confirm the result count changes. 3. Search supplier/brand/category details and open a Brand link. 4. Check supplier phone links and SKU lowest-price display. 5. Filter pricing by supplier, brand, and work category.
 - Acceptance: filters only alter the displayed rows; cleared filters restore the active default; links are safe and external; pricing is never compared across mixed currency or unit.
-- Status: PENDING
+- Status: PASSED by the Lead on 2026-09-30 (R8.261) with "ZZ SAMPLE" fixtures (since removed): Pricing all three tabs (filters, search by brand/category, sort headers, Group by item with Lowest, mixed currency without a badge, contacts with tel/WhatsApp, filtered tab counts, clear filters), SKU per-currency "from" summary, Suppliers (Active default, brand, capability and product-category filters, Brands column including owned brands), Brands (Supplied by, Links, filters). Not covered: Archived/All views on SKUs and Brands with real archived rows, the narrow-width layout of the Pricing filter bar, an account without supplier-read permission (contacts must be hidden).
 
 ### [R8.249] My Preferences and Storage report
 - Surface: Settings → My Preferences and Platform → Storage

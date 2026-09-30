@@ -3,7 +3,7 @@
 Plan ID: WO-MD-FINDABILITY-01
 Scope: Master Data — presentation only. Make Brands, Suppliers, SKUs and Pricing (material, material + labor, labor only) quick to search, filter and compare, so a contractor can find a supplier, a brand and a price in a few clicks. Screens, filters, columns, sorting and links; NO change to business rules, data meaning, schema, permissions, prices, validation, actions or audit.
 Target revision: R8.261
-Status: READY (correction pass 2; R8.257 and R8.259 delivered part of it, see below)
+Status: COMPLETE (R8.257 and R8.259 by the Executor; finished by the Lead in R8.261 after the owner asked the Lead to take over; browser acceptance passed, see the acceptance backlog)
 Priority: P2
 Owner: owner (Product Owner). Review by the Lead on 2026-09-30 as a head-of-interior-contractor user; the owner approved a thorough improvement, assigned it to the Executor (UI included, by the owner's explicit lane assignment for this plan), and confirmed it is **presentation only, no business-contract change** ("hanya tampilan yang disempurnakan").
 Last updated: 2026-09-30

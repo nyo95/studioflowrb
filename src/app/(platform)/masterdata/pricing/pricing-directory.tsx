@@ -1,12 +1,14 @@
 "use client";
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { UpdatedCell } from "../updated-cell";
-import { groupLowestRows, matchesDirectoryStatus, type DirectoryStatus } from "../directory-findability";
+import { FilterSummary, StatusFilterSelect } from "../directory-filters";
+import { compareAmounts, groupPriceRows, matchesDirectoryStatus, tabCountLabel, type DirectoryStatus } from "../directory-findability";
+import { PhoneLinks } from "../phone-links";
 import { getPaginationSlice } from "@platform/utilities/pagination";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { DirectoryShell,RowActionMenu,RowActionsCell,RowActionsHead } from "@/platform/ui_engine";
 
-import { Button,ButtonMenu,Checkbox,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,Text,Tooltip,useFormDraftGuard,useOptionOverlay,type SortDirection } from "@/platform/ui_engine";
+import { Badge,Button,ButtonMenu,Checkbox,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,Text,Tooltip,useFormDraftGuard,useOptionOverlay,type SortDirection } from "@/platform/ui_engine";
 import { VendorQuickCreateDialog } from "../vendor-quick-create-dialog";
 import { compareDecimals,formatDecimal,type DecimalString } from "@platform/utilities/decimal";
 import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurement";
@@ -17,7 +19,7 @@ import { archivePriceAction,createMaterialSkuAction,createPricingBrandQuickActio
 
 type Kind = "material" | "material-labor" | "labor";
 type SkuRef = { id: string; name: string | null; code: string | null; brand: { id: string; name: string } | null; base_unit: { id: string; code: string; name: string } | null; purchase_unit: { id: string; code: string; name: string } | null; dimension_length: string | null; dimension_width: string | null; dimension_thickness: string | null; dimension_unit: { id: string; code: string; name: string } | null; purchase_to_base_factor: string | null };
-type MaterialRow = { id: string; sku: { id: string; name: string | null; code: string | null; brand: { id: string; name: string } | null }; supplier_vendor: { id: string; name: string }; amount: string; currency: string; unit: { id: string; code: string; name: string }; notes: string | null; updated_at: Date; updated_by_label: string; deleted_at: Date | null };
+type MaterialRow = { id: string; sku: { id: string; name: string | null; code: string | null; brand: { id: string; name: string } | null; categories: Array<{ id: string; name: string }>; size: string }; supplier_vendor: { id: string; name: string }; amount: string; currency: string; unit: { id: string; code: string; name: string }; notes: string | null; updated_at: Date; updated_by_label: string; deleted_at: Date | null };
 type WorkRow = { id: string; name: string; category: { id: string; name: string }; vendor: { id: string; name: string }; amount: string; currency: string; unit: { id: string; code: string; name: string }; scope_note?: string | null; notes: string | null; updated_at: Date; updated_by_label: string; deleted_at: Date | null };
 type Target = { kind: Kind; id: string; name: string };
 type Editor = { kind: Kind; row?: MaterialRow | WorkRow };
@@ -27,10 +29,10 @@ const PRICE_PAGE_SIZE = 25;
 
 
 
-export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; canManageVendors: boolean; canManageCategories: boolean; canManageSkus: boolean; canManageBrands: boolean; skus: SkuRef[]; brands: Ref[]; productCategories: Ref[]; vendors: Ref[]; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
+export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; contacts: Record<string, { name: string; phones: string[] }>; canManageVendors: boolean; canManageCategories: boolean; canManageSkus: boolean; canManageBrands: boolean; skus: SkuRef[]; brands: Ref[]; productCategories: Ref[]; vendors: Ref[]; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
   const { locale } = useDisplaySettings();
   const displayPrice = (amount: string, currency: string) => formatMoney(createMoney(amount, currency), { locale });
-  const [query, setQuery] = useState(""); const [status, setStatus] = useState<DirectoryStatus>("ACTIVE"); const [supplierFilter, setSupplierFilter] = useState("ALL"); const [brandFilter, setBrandFilter] = useState("ALL"); const [workCategoryFilter, setWorkCategoryFilter] = useState("ALL"); const [groupByItem, setGroupByItem] = useState(false); const [page, setPage] = useState(1); const [sort, setSort] = useState<{ key: PriceSortKey; direction: SortDirection }>({ key: "name", direction: "asc" }); const [editor, setEditor] = useState<Editor | null>(null); const [formError, setFormError] = useState<string | null>(null);
+  const [query, setQuery] = useState(""); const [status, setStatus] = useState<DirectoryStatus>("ACTIVE"); const [supplierFilter, setSupplierFilter] = useState("ALL"); const [brandFilter, setBrandFilter] = useState("ALL"); const [workCategoryFilter, setWorkCategoryFilter] = useState("ALL"); const [productCategoryFilter, setProductCategoryFilter] = useState("ALL"); const [groupByItem, setGroupByItem] = useState(false); const [page, setPage] = useState(1); const [sort, setSort] = useState<{ key: PriceSortKey; direction: SortDirection }>({ key: "name", direction: "asc" }); const [editor, setEditor] = useState<Editor | null>(null); const [formError, setFormError] = useState<string | null>(null);
   const [archive, setArchive] = useState<Target | null>(null); const [restore, setRestore] = useState<Target | null>(null); const [deletion, setDeletion] = useState<Target | null>(null); const [reason, setReason] = useState(""); const [rowError, setRowError] = useState<string | null>(null);
   const [savePending, setSavePending] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null); const [, startTransition] = useTransition();
@@ -51,21 +53,140 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
     });
   };
   const closeEditor = () => { setEditor(null); setFormError(null); };
-  const sortRows = <T extends MaterialRow | WorkRow>(rows: T[], name: (row: T) => string, vendor: (row: T) => string) => [...rows].sort((left, right) => {
-    const leftValue = sort.key === "name" ? name(left) : sort.key === "vendor" ? vendor(left) : sort.key === "updated" ? left.updated_at.toISOString() : sort.key === "category" ? ("category" in left ? left.category.name : "") : sort.key === "brand" ? ("sku" in left ? left.sku.brand?.name ?? "" : "") : left.amount;
-    const rightValue = sort.key === "name" ? name(right) : sort.key === "vendor" ? vendor(right) : sort.key === "updated" ? right.updated_at.toISOString() : sort.key === "category" ? ("category" in right ? right.category.name : "") : sort.key === "brand" ? ("sku" in right ? right.sku.brand?.name ?? "" : "") : right.amount;
-    const compared = sort.key === "amount" ? compareDecimals(leftValue as DecimalString, rightValue as DecimalString) : leftValue.localeCompare(rightValue, "id");
+  type SortBy<T> = { name: (row: T) => string; vendor: (row: T) => string; category: (row: T) => string; brand: (row: T) => string };
+  const sortRows = <T extends MaterialRow | WorkRow>(rows: T[], by: SortBy<T>) => [...rows].sort((left, right) => {
+    const compared = sort.key === "amount" ? compareAmounts(left.amount, right.amount)
+      : sort.key === "updated" ? left.updated_at.getTime() - right.updated_at.getTime()
+      : by[sort.key](left).localeCompare(by[sort.key](right), "id");
     return sort.direction === "asc" ? compared : -compared;
   });
   const paginate = <T,>(rows: T[]) => { const result = getPaginationSlice(rows, page, PRICE_PAGE_SIZE); return { rows: result.rows, currentPage: result.page, pageCount: result.pageCount }; };
   const changeSort = (key: PriceSortKey) => (direction: SortDirection) => { setSort({ key, direction }); setPage(1); };
   const sortableHead = (key: PriceSortKey, label: string, align: "start" | "end" = "start") => <TableHead align={align} sortable sortDirection={sort.key === key ? sort.direction : null} onSortChange={changeSort(key)} sortLabel={(direction) => `${label}, sort ${direction}`}>{label}</TableHead>;
   const pagination = (currentPage: number, pageCount: number) => pageCount > 1 ? <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} label="Pricing pages" /> : null;
-  const toolbar = <TableToolbar framed={false}><SearchField value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} onClear={() => { setQuery(""); setPage(1); }} placeholder="Search item, category, brand, supplier..." /><div className="w-36"><Select value={status} onChange={(event) => { setStatus(event.target.value as DirectoryStatus); setPage(1); }}><option value="ACTIVE">Active</option><option value="ARCHIVED">Archived</option><option value="ALL">All status</option></Select></div><Select value={supplierFilter} onChange={(event) => { setSupplierFilter(event.target.value); setPage(1); }}><option value="ALL">All suppliers</option>{props.vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}</Select><Select value={brandFilter} onChange={(event) => { setBrandFilter(event.target.value); setPage(1); }}><option value="ALL">All material brands</option>{props.brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</Select><Select value={workCategoryFilter} onChange={(event) => { setWorkCategoryFilter(event.target.value); setPage(1); }}><option value="ALL">All work categories</option>{props.workCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select><Checkbox label="Group by item" checked={groupByItem} onCheckedChange={(checked) => { setGroupByItem(Boolean(checked)); setPage(1); }} /><Button type="button" size="sm" variant="ghost" onClick={() => { setQuery(""); setStatus("ACTIVE"); setSupplierFilter("ALL"); setBrandFilter("ALL"); setWorkCategoryFilter("ALL"); setPage(1); }}>Clear filters</Button></TableToolbar>;
+  const filtersActive = Boolean(query) || status !== "ACTIVE" || supplierFilter !== "ALL" || brandFilter !== "ALL" || productCategoryFilter !== "ALL" || workCategoryFilter !== "ALL";
+  const clearFilters = () => { setQuery(""); setStatus("ACTIVE"); setSupplierFilter("ALL"); setBrandFilter("ALL"); setProductCategoryFilter("ALL"); setWorkCategoryFilter("ALL"); setPage(1); };
+  const resetPage = <T,>(setter: (value: T) => void) => (value: T) => { setter(value); setPage(1); };
+  const toolbarFor = (kind: Kind, shown: number, total: number) => (
+    <TableToolbar framed={false}>
+      <div className="flex flex-wrap items-center gap-2">
+      <SearchField value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} onClear={() => { setQuery(""); setPage(1); }} placeholder={kind === "material" ? "Search SKU, code, brand, category, supplier..." : "Search item, category, supplier..."} />
+      <StatusFilterSelect value={status} onChange={resetPage(setStatus)} />
+      <div className="w-44"><Select aria-label="Supplier" value={supplierFilter} onChange={(event) => resetPage(setSupplierFilter)(event.target.value)}><option value="ALL">All suppliers</option>{props.vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}</Select></div>
+      {kind === "material" ? (
+        <>
+          <div className="w-44"><Select aria-label="Brand" value={brandFilter} onChange={(event) => resetPage(setBrandFilter)(event.target.value)}><option value="ALL">All brands</option>{props.brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</Select></div>
+          <div className="w-44"><Select aria-label="Product category" value={productCategoryFilter} onChange={(event) => resetPage(setProductCategoryFilter)(event.target.value)}><option value="ALL">All product categories</option>{props.productCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></div>
+        </>
+      ) : (
+        <div className="w-44"><Select aria-label="Work category" value={workCategoryFilter} onChange={(event) => resetPage(setWorkCategoryFilter)(event.target.value)}><option value="ALL">All work categories</option>{props.workCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></div>
+      )}
+      <Checkbox label="Group by item" checked={groupByItem} onCheckedChange={(checked) => { setGroupByItem(Boolean(checked)); setPage(1); }} />
+      <FilterSummary filtered={filtersActive} shown={shown} total={total} onClear={clearFilters} />
+      </div>
+    </TableToolbar>
+  );
   const actions = (row: { id: string; deleted_at: Date | null }, target: Target, canManage: boolean, edit: () => void) => !canManage ? null : <RowActionsCell><RowActionMenu label={`Actions for ${target.name}`} pending={pendingId === row.id} items={[...(pendingId === row.id ? [] : []),...(!row.deleted_at ? [...[{ label: "Edit", onSelect: edit, disabled: undefined, danger: false, separatorBefore: false }],...[{ label: "Archive", onSelect: () => setArchive(target), disabled: undefined, danger: false, separatorBefore: false }]] : [...[{ label: "Restore", onSelect: () => setRestore(target), disabled: undefined, danger: false, separatorBefore: false }],...[{ label: "Request deletion", onSelect: () => setDeletion(target), disabled: undefined, danger: true, separatorBefore: true }]])]} /></RowActionsCell>;
-  const material = props.materialPrices.filter((row) => matches(`${row.sku.name ?? ""} ${row.sku.code ?? ""} ${row.sku.brand?.name ?? ""} ${row.supplier_vendor.name}`, row.deleted_at) && (supplierFilter === "ALL" || row.supplier_vendor.id === supplierFilter) && (brandFilter === "ALL" || row.sku.brand?.id === brandFilter));
-  const materialPaged = paginate(sortRows(material, (row) => row.sku.name ?? row.sku.code ?? "", (row) => row.supplier_vendor.name));
-  const workTable = (rows: WorkRow[], kind: Kind, canManage: boolean, title: string) => { const filtered = rows.filter((row) => matches(`${row.name} ${row.category.name} ${row.vendor.name}`, row.deleted_at) && (supplierFilter === "ALL" || row.vendor.id === supplierFilter) && (workCategoryFilter === "ALL" || row.category.id === workCategoryFilter)); const paged = paginate(sortRows(filtered, (row) => row.name, (row) => row.vendor.name)); return <DirectoryShell fill surface toolbar={toolbar} pagination={pagination(paged.currentPage, paged.pageCount)}>{filtered.length === 0 ? <EmptyState title={title} description={query ? "No prices match this search." : "No pricing records yet."} /> : <><DataTable density="compact" stickyHeader fill framed={false} minWidth={830}><TableHeader><TableRow>{sortableHead("name", "Name")}<TableHead>Category</TableHead>{sortableHead("vendor", "Supplier")}{sortableHead("amount", "Price", "end")}<TableHead>Unit</TableHead><TableHead>Updated</TableHead>{canManage && <RowActionsHead />}</TableRow></TableHeader><TableBody>{paged.rows.map((row) => <TableRow key={row.id}><TableCell><EntityPrimaryCell tone={row.deleted_at ? "danger" : "success"} statusLabel={row.deleted_at ? "Archived" : "Active"} name={row.name} /></TableCell><TableCell>{row.category.name}</TableCell><TableCell>{row.vendor.name}</TableCell><TableCell align="end">{displayPrice(row.amount, row.currency)}</TableCell><TableCell><span className="font-ui-mono text-xs">{row.unit.code}</span></TableCell><UpdatedCell at={row.updated_at} by={row.updated_by_label} />{actions(row, { kind, id: row.id, name: row.name }, canManage, () => setEditor({ kind, row }))}</TableRow>)}</TableBody></DataTable></>}</DirectoryShell>; };
+  const material = props.materialPrices.filter((row) => matches(`${row.sku.name ?? ""} ${row.sku.code ?? ""} ${row.sku.brand?.name ?? ""} ${row.sku.categories.map((category) => category.name).join(" ")} ${row.supplier_vendor.name}`, row.deleted_at) && (supplierFilter === "ALL" || row.supplier_vendor.id === supplierFilter) && (brandFilter === "ALL" || row.sku.brand?.id === brandFilter) && (productCategoryFilter === "ALL" || row.sku.categories.some((category) => category.id === productCategoryFilter)));
+  const workFiltered = (rows: WorkRow[]) => rows.filter((row) => matches(`${row.name} ${row.category.name} ${row.vendor.name}`, row.deleted_at) && (supplierFilter === "ALL" || row.vendor.id === supplierFilter) && (workCategoryFilter === "ALL" || row.category.id === workCategoryFilter));
+  const materialLaborFiltered = workFiltered(props.materialLaborPrices);
+  const laborFiltered = workFiltered(props.laborPrices);
+
+  type Arranged<T> = { row: T; groupKey: string | null; group: string | null; lowest: boolean };
+  /** The order the rows are shown in: grouped by item (cheapest first, "Lowest" marked) or sorted by the chosen column. */
+  const arrange = <T extends MaterialRow | WorkRow>(rows: T[], by: SortBy<T>, keyOf: (row: T) => string, labelOf: (row: T) => string): Array<Arranged<T>> => groupByItem
+    ? groupPriceRows(rows, keyOf, labelOf).flatMap((group) => group.rows.map((row) => ({ row, groupKey: group.key, group: group.label, lowest: group.lowestIds.has(row.id) })))
+    : sortRows(rows, by).map((row) => ({ row, groupKey: null, group: null, lowest: false }));
+  const groupHeader = <T,>(rows: Array<Arranged<T>>, index: number, columns: number) => rows[index].group !== null && (index === 0 || rows[index - 1].groupKey !== rows[index].groupKey)
+    ? <TableRow key={`group-${rows[index].groupKey}-${index}`}><TableCell colSpan={columns}><span className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-secondary">{rows[index].group}</span></TableCell></TableRow>
+    : null;
+  const priceCell = (row: { amount: string; currency: string }, lowest: boolean) => (
+    <TableCell align="end"><span>{displayPrice(row.amount, row.currency)}</span>{lowest ? <span className="ml-2 align-middle"><Badge tone="success">Lowest</Badge></span> : null}</TableCell>
+  );
+  const supplierCell = (vendor: { id: string; name: string }) => {
+    const contact = props.contacts[vendor.id];
+    return (
+      <TableCell>
+        <div className="grid gap-0.5">
+          <span>{vendor.name}</span>
+          {contact ? <span className="text-xs text-ink-secondary">{contact.name}{contact.phones.length > 0 ? <> · <PhoneLinks phones={contact.phones} keyPrefix={vendor.id} /></> : null}</span> : null}
+        </div>
+      </TableCell>
+    );
+  };
+  const emptyState = (title: string, emptyText: string) => <EmptyState title={filtersActive ? "No prices match these filters" : title} description={filtersActive ? "Change or clear the filters to see more." : emptyText} />;
+
+  const materialBy: SortBy<MaterialRow> = { name: (row) => row.sku.name ?? row.sku.code ?? "", vendor: (row) => row.supplier_vendor.name, category: (row) => row.sku.categories[0]?.name ?? "", brand: (row) => row.sku.brand?.name ?? "" };
+  const materialArranged = arrange(material, materialBy, (row) => row.sku.id, (row) => row.sku.name ?? row.sku.code ?? "Unnamed SKU");
+  const materialPaged = paginate(materialArranged);
+  const materialTab = (
+    <DirectoryShell fill surface toolbar={toolbarFor("material", material.length, props.materialPrices.length)} pagination={pagination(materialPaged.currentPage, materialPaged.pageCount)}>
+      {material.length === 0 ? emptyState("No material prices", "Create a material price for an active SKU and eligible supplier.") : (
+        <DataTable density="compact" stickyHeader fill framed={false} minWidth={1180}>
+          <TableHeader>
+            <TableRow>
+              {sortableHead("name", "SKU")}{sortableHead("brand", "Brand")}{sortableHead("category", "Category")}<TableHead>Size</TableHead>{sortableHead("vendor", "Supplier")}{sortableHead("amount", "Price", "end")}<TableHead>Unit</TableHead>{sortableHead("updated", "Updated")}{props.canManageMaterial && <RowActionsHead />}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {materialPaged.rows.map((shown, index) => {
+              const row = shown.row;
+              return [
+                groupHeader(materialPaged.rows, index, props.canManageMaterial ? 9 : 8),
+                <TableRow key={row.id}>
+                  <TableCell><EntityPrimaryCell tone={row.deleted_at ? "danger" : "success"} statusLabel={row.deleted_at ? "Archived" : "Active"} name={row.sku.name ?? row.sku.code ?? "Unnamed SKU"} secondary={row.sku.name && row.sku.code && row.sku.code !== row.sku.name ? <span className="font-ui-mono text-xs">{row.sku.code}</span> : undefined} /></TableCell>
+                  <TableCell>{row.sku.brand?.name ?? <span className="text-ink-tertiary">—</span>}</TableCell>
+                  <TableCell>{row.sku.categories.length > 0 ? row.sku.categories.map((category) => category.name).join(", ") : <span className="text-ink-tertiary">—</span>}</TableCell>
+                  <TableCell>{row.sku.size || <span className="text-ink-tertiary">—</span>}</TableCell>
+                  {supplierCell(row.supplier_vendor)}
+                  {priceCell(row, shown.lowest)}
+                  <TableCell><span className="font-ui-mono text-xs">{row.unit.code}</span></TableCell>
+                  <UpdatedCell at={row.updated_at} by={row.updated_by_label} />
+                  {actions(row, { kind: "material", id: row.id, name: `${row.sku.name ?? row.sku.code ?? "Unnamed SKU"} / ${row.supplier_vendor.name}` }, props.canManageMaterial, () => setEditor({ kind: "material", row }))}
+                </TableRow>,
+              ];
+            })}
+          </TableBody>
+        </DataTable>
+      )}
+    </DirectoryShell>
+  );
+
+  const workBy: SortBy<WorkRow> = { name: (row) => row.name, vendor: (row) => row.vendor.name, category: (row) => row.category.name, brand: () => "" };
+  const workTable = (rows: WorkRow[], totalCount: number, kind: Kind, canManage: boolean, title: string) => {
+    const arranged = arrange(rows, workBy, (row) => `${row.name.trim().toLowerCase()}|${row.category.id}`, (row) => `${row.name} · ${row.category.name}`);
+    const paged = paginate(arranged);
+    return (
+      <DirectoryShell fill surface toolbar={toolbarFor(kind, rows.length, totalCount)} pagination={pagination(paged.currentPage, paged.pageCount)}>
+        {rows.length === 0 ? emptyState(title, "No pricing records yet.") : (
+          <DataTable density="compact" stickyHeader fill framed={false} minWidth={980}>
+            <TableHeader>
+              <TableRow>
+                {sortableHead("name", "Name")}{sortableHead("category", "Category")}{sortableHead("vendor", "Supplier")}{sortableHead("amount", "Price", "end")}<TableHead>Unit</TableHead>{sortableHead("updated", "Updated")}{canManage && <RowActionsHead />}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paged.rows.map((shown, index) => {
+                const row = shown.row;
+                return [
+                  groupHeader(paged.rows, index, canManage ? 7 : 6),
+                  <TableRow key={row.id}>
+                    <TableCell><EntityPrimaryCell tone={row.deleted_at ? "danger" : "success"} statusLabel={row.deleted_at ? "Archived" : "Active"} name={row.name} /></TableCell>
+                    <TableCell>{row.category.name}</TableCell>
+                    {supplierCell(row.vendor)}
+                    {priceCell(row, shown.lowest)}
+                    <TableCell><span className="font-ui-mono text-xs">{row.unit.code}</span></TableCell>
+                    <UpdatedCell at={row.updated_at} by={row.updated_by_label} />
+                    {actions(row, { kind, id: row.id, name: row.name }, canManage, () => setEditor({ kind, row }))}
+                  </TableRow>,
+                ];
+              })}
+            </TableBody>
+          </DataTable>
+        )}
+      </DirectoryShell>
+    );
+  };
   return <div className="flex min-h-0 flex-1 flex-col gap-4">
     {rowError ? <InlineError>{rowError}</InlineError> : null}
     {editor && <PriceEditor pending={savePending} editor={editor} refs={props} error={formError} onCancel={closeEditor} onSubmit={async (event) => { event.preventDefault(); if (savePending) return; setSavePending(true); setFormError(null); const formData = new FormData(event.currentTarget); try { const result = editor.kind === "material" && !editor.row && formData.get("materialEntryMode") === "new" ? await createMaterialSkuAction(formData) : await savePriceAction(editor.kind, formData); if (result.ok) closeEditor(); else if (result.ok === false) setFormError(result.error.safeMessage); } catch { setFormError("The price could not be saved. Please try again."); } finally { setSavePending(false); } }} />}
@@ -83,9 +204,9 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
         />
       ) : undefined}
       items={[
-      { value: "material", label: `Material Prices (${props.materialPrices.length})`, disabled: !props.canReadMaterial, content: <DirectoryShell fill surface toolbar={toolbar} pagination={pagination(materialPaged.currentPage, materialPaged.pageCount)}>{material.length === 0 ? <EmptyState title="No material prices" description={query ? "No prices match this search." : "Create a material price for an active SKU and eligible supplier."} /> : <><DataTable density="compact" stickyHeader fill framed={false} minWidth={790}><TableHeader><TableRow>{sortableHead("name", "SKU")}{sortableHead("vendor", "Supplier")}{sortableHead("amount", "Price", "end")}<TableHead>Unit</TableHead><TableHead>Updated</TableHead>{props.canManageMaterial && <RowActionsHead />}</TableRow></TableHeader><TableBody>{materialPaged.rows.map((row) => <TableRow key={row.id}><TableCell><EntityPrimaryCell tone={row.deleted_at ? "danger" : "success"} statusLabel={row.deleted_at ? "Archived" : "Active"} name={row.sku.name ?? row.sku.code ?? "Unnamed SKU"} secondary={row.sku.name && row.sku.code && row.sku.code !== row.sku.name ? <span className="font-ui-mono text-xs">{row.sku.code}</span> : undefined} /></TableCell><TableCell>{row.supplier_vendor.name}</TableCell><TableCell align="end">{displayPrice(row.amount, row.currency)}</TableCell><TableCell><span className="font-ui-mono text-xs">{row.unit.code}</span></TableCell><UpdatedCell at={row.updated_at} by={row.updated_by_label} />{actions(row, { kind: "material", id: row.id, name: `${row.sku.name ?? row.sku.code ?? "Unnamed SKU"} / ${row.supplier_vendor.name}` }, props.canManageMaterial, () => setEditor({ kind: "material", row }))}</TableRow>)}</TableBody></DataTable></>}</DirectoryShell> },
-      { value: "material-labor", label: `Material + Labor (${props.materialLaborPrices.length})`, disabled: !props.canReadWork, content: workTable(props.materialLaborPrices, "material-labor", props.canManageWork, "No material + labor prices") },
-      { value: "labor", label: `Labor Only (${props.laborPrices.length})`, disabled: !props.canReadWork, content: workTable(props.laborPrices, "labor", props.canManageWork, "No labor-only prices") },
+      { value: "material", label: tabCountLabel("Material Prices", material.length), disabled: !props.canReadMaterial, content: materialTab },
+      { value: "material-labor", label: tabCountLabel("Material + Labor", materialLaborFiltered.length), disabled: !props.canReadWork, content: workTable(materialLaborFiltered, props.materialLaborPrices.length, "material-labor", props.canManageWork, "No material + labor prices") },
+      { value: "labor", label: tabCountLabel("Labor Only", laborFiltered.length), disabled: !props.canReadWork, content: workTable(laborFiltered, props.laborPrices.length, "labor", props.canManageWork, "No labor-only prices") },
     ]} />
     {archive && <ConfirmDialog error={rowError} pending={pendingId !== null} open onOpenChange={(open) => !open && setArchive(null)} title={`Archive ${archive.name}?`} description="It will be removed from active pricing and pickers." confirmLabel="Archive" tone="danger" onConfirm={() => { const value = archive;  run(value.id, () => archivePriceAction(value.kind, value.id), () => { setArchive(null); }); }} />}
     {restore && <ConfirmDialog error={rowError} pending={pendingId !== null} open onOpenChange={(open) => !open && setRestore(null)} title={`Restore ${restore.name}?`} description="Required references will be validated before restoring it." confirmLabel="Restore" onConfirm={() => { const value = restore;  run(value.id, () => restorePriceAction(value.kind, value.id), () => { setRestore(null); }); }} />}

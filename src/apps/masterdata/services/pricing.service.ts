@@ -17,7 +17,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       return db.priceMaterial.findMany({
         where: { ...(input.includeArchived ? {} : { deleted_at: null }), ...(input.skuId ? { sku_id: input.skuId } : {}), ...(input.supplierVendorId ? { supplier_vendor_id: input.supplierVendorId } : {}), ...(input.brandId ? { sku: { brand_id: input.brandId } } : {}), ...(search ? { OR: [{ sku: { name: { contains: search, mode: "insensitive" } } }, { supplier_vendor: { name: { contains: search, mode: "insensitive" } } }] } : {}) },
         orderBy: [{ sku: { name: "asc" } }, { supplier_vendor: { name: "asc" } }],
-        select: { id: true, amount: true, currency: true, notes: true, updated_at: true, updated_by_label: true, deleted_at: true, sku: { select: { id: true, name: true, slug: true, code: true, brand: { select: { id: true, name: true, slug: true } } } }, supplier_vendor: { select: { id: true, name: true, slug: true } }, unit: { select: { id: true, code: true, name: true } }, source_link: { select: { id: true, kind: true, url: true, label: true } } },
+        select: { id: true, amount: true, currency: true, notes: true, updated_at: true, updated_by_label: true, deleted_at: true, sku: { select: { id: true, name: true, slug: true, code: true, brand: { select: { id: true, name: true, slug: true } }, categories: { select: { category: { select: { id: true, name: true } } } }, dimension_length: true, dimension_width: true, dimension_thickness: true, dimension_unit: { select: { code: true } } } }, supplier_vendor: { select: { id: true, name: true, slug: true } }, unit: { select: { id: true, code: true, name: true } }, source_link: { select: { id: true, kind: true, url: true, label: true } } },
       });
     },
 

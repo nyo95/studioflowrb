@@ -1,4 +1,5 @@
 "use client";
+import { FilterSummary, StatusFilterSelect } from "../directory-filters";
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { UpdatedCell } from "../updated-cell";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
@@ -289,7 +290,7 @@ export function BrandDirectory({
             New brand
           </Button>
       ) : undefined}>
-        <div className="flex flex-wrap items-center gap-2"><SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search brands, suppliers, categories..." /><Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as DirectoryStatus)}><option value="ACTIVE">Active</option><option value="ARCHIVED">Archived</option><option value="ALL">All status</option></Select><Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}><option value="ALL">All product categories</option>{productCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select><Select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)}><option value="ALL">All suppliers</option>{[...ownerVendors, ...materialVendors].filter((item, index, list) => list.findIndex((candidate) => candidate.id === item.id) === index).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select><Button type="button" variant="ghost" size="sm" onClick={() => { setQuery(""); setStatusFilter("ACTIVE"); setCategoryFilter("ALL"); setSupplierFilter("ALL"); }}>Clear filters</Button><Text size="sm" tone="secondary">{filtered.length} of {brands.length}</Text></div>
+        <div className="flex flex-wrap items-center gap-2"><SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search brands, suppliers, categories..." /><StatusFilterSelect value={statusFilter} onChange={setStatusFilter} /><Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}><option value="ALL">All product categories</option>{productCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select><Select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)}><option value="ALL">All suppliers</option>{[...ownerVendors, ...materialVendors].filter((item, index, list) => list.findIndex((candidate) => candidate.id === item.id) === index).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select><FilterSummary filtered={Boolean(query) || statusFilter !== "ACTIVE" || categoryFilter !== "ALL" || supplierFilter !== "ALL"} shown={filtered.length} total={brands.length} onClear={() => { setQuery(""); setStatusFilter("ACTIVE"); setCategoryFilter("ALL"); setSupplierFilter("ALL"); }} /></div>
       </TableToolbar>}>
 
 

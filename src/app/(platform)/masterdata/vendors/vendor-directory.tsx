@@ -1,8 +1,10 @@
 "use client";
+import { FilterSummary, StatusFilterSelect } from "../directory-filters";
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { UpdatedCell } from "../updated-cell";
 import { PhoneNumbersField, contactPhoneList, phoneSummary } from "../contact-phones";
-import { matchesDirectoryStatus, normalizeIndonesiaPhone, type DirectoryStatus } from "../directory-findability";
+import { carriedBrandNames, matchesDirectoryStatus, type DirectoryStatus } from "../directory-findability";
+import { PhoneLinks } from "../phone-links";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { formatInstant } from "@platform/utilities/date";
 import {
@@ -33,10 +35,15 @@ updateVendorAction,
 import { createSupplierCategoryQuickAction } from "../../settings/general/masterdata/supplier-categories-actions";
 
 /** Product categories of the brands a supplier carries, alphabetical and de-duplicated (archived categories left out). */
-function brandCategoryNames(vendor: Pick<VendorRow, "brand_suppliers">): string[] {
+function carriedBrands(vendor: Pick<VendorRow, "brand_suppliers" | "owned_brands">) {
+  const seen = new Set<string>();
+  return [...vendor.owned_brands, ...vendor.brand_suppliers.map((relation) => relation.brand)].filter((brand) => (seen.has(brand.id) ? false : (seen.add(brand.id), true)));
+}
+
+function brandCategoryNames(vendor: Pick<VendorRow, "brand_suppliers" | "owned_brands">): string[] {
   const names = new Set<string>();
-  for (const relation of vendor.brand_suppliers) {
-    for (const assignment of relation.brand.categories ?? []) {
+  for (const brand of carriedBrands(vendor)) {
+    for (const assignment of brand.categories ?? []) {
       if (assignment.category.status === "ACTIVE") names.add(assignment.category.name);
     }
   }
@@ -89,7 +96,7 @@ type VendorRow = {
     /** `categories` are the brand's product categories; the Suppliers list derives a supplier's "from brands" categories from them. */
     brand: { id: string; name: string; categories?: Array<{ category: { id: string; name: string; status: string } }> };
   }>;
-  owned_brands: Array<{ id: string }>;
+  owned_brands: Array<{ id: string; name: string; categories?: Array<{ category: { id: string; name: string; status: string } }> }>;
   _count: {
     owned_brands: number;
     brand_suppliers: number;
@@ -320,7 +327,7 @@ export function VendorDirectory({
     if (!matchesDirectoryStatus(v.deleted_at, statusFilter)) return false;
     if (typeFilter !== "ALL" && !v.types.some((t) => t.vendor_type.id === typeFilter)) return false;
     if (categoryFilter !== "ALL" && !v.supplier_categories.some((c) => c.supplier_category.id === categoryFilter)) return false;
-    if (productCategoryFilter !== "ALL" && !v.brand_suppliers.some((item) => item.brand.categories?.some((category) => category.category.id === productCategoryFilter && category.category.status === "ACTIVE"))) return false;
+    if (productCategoryFilter !== "ALL" && !carriedBrands(v).some((brand) => brand.categories?.some((category) => category.category.id === productCategoryFilter && category.category.status === "ACTIVE"))) return false;
     if (brandFilter !== "ALL" && !v.brand_suppliers.some((item) => item.brand.id === brandFilter) && !v.owned_brands.some((item) => item.id === brandFilter)) return false;
     if (capabilityFilter === "MATERIAL" && !v.types.some((item) => item.vendor_type.can_supply_material)) return false;
     if (capabilityFilter === "LABOR" && !v.types.some((item) => item.vendor_type.can_supply_labor)) return false;
@@ -331,13 +338,13 @@ export function VendorDirectory({
       v.slug.toLowerCase().includes(q) ||
       (v.legal_name && v.legal_name.toLowerCase().includes(q)) ||
       v.contacts.some((c) => c.person_name.toLowerCase().includes(q) || (c.email && c.email.toLowerCase().includes(q)) || contactPhoneList(c).some((phone) => phone.replace(/\D/g, "").includes(q.replace(/\D/g, "")))) ||
-      (v.address?.toLowerCase().includes(q) ?? false) || (v.notes?.toLowerCase().includes(q) ?? false) || v.brand_suppliers.some((item) => item.brand.name.toLowerCase().includes(q))
+      (v.address?.toLowerCase().includes(q) ?? false) || (v.notes?.toLowerCase().includes(q) ?? false) || carriedBrandNames(v.owned_brands, v.brand_suppliers).some((name) => name.toLowerCase().includes(q))
     );
   });
   const { locale, timezone } = useDisplaySettings();
   const [sortKey, setSortKey] = useState<"Supplier" | "Brands">("Supplier");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const sortValues: Record<"Supplier" | "Brands", (r: VendorRow) => string | number | null> = {"Supplier": (r) => r.name, "Brands": (r) => r._count.brand_suppliers};
+  const sortValues: Record<"Supplier" | "Brands", (r: VendorRow) => string | number | null> = {"Supplier": (r) => r.name, "Brands": (r) => carriedBrandNames(r.owned_brands, r.brand_suppliers).length};
   const collator = new Intl.Collator(locale, { sensitivity: "base", numeric: true });
   const orderedRows = [...filtered].sort((a, b) => {
     const left = sortValues[sortKey](a), right = sortValues[sortKey](b);
@@ -345,7 +352,7 @@ export function VendorDirectory({
     const result = typeof left === "number" && typeof right === "number" ? left - right : collator.compare(String(left), String(right));
     return (sortDirection === "asc" ? result : -result) || a.id.localeCompare(b.id);
   });
-  const productCategoryOptions = [...new Map(vendors.flatMap((vendor) => vendor.brand_suppliers.flatMap((item) => (item.brand.categories ?? []).filter((category) => category.category.status === "ACTIVE").map((category) => [category.category.id, category.category.name] as const)))).entries()].map(([id, name]) => ({ id, name }));
+  const productCategoryOptions = [...new Map(vendors.flatMap((vendor) => carriedBrands(vendor).flatMap((brand) => (brand.categories ?? []).filter((category) => category.category.status === "ACTIVE").map((category) => [category.category.id, category.category.name] as const)))).entries()].map(([id, name]) => ({ id, name }));
   const paging = usePagination(orderedRows.length, 25, JSON.stringify([query, statusFilter, typeFilter, categoryFilter, productCategoryFilter, brandFilter, capabilityFilter, sortKey, sortDirection]));
   const visibleRows = orderedRows.slice(paging.offset, paging.offset + 25);
   const pageFooter = <div className="grid gap-2"><Text tone="secondary" size="sm">{orderedRows.length ? paging.offset + 1 : 0}–{Math.min(paging.offset + 25, orderedRows.length)} of {orderedRows.length} records</Text>{paging.pageCount > 1 ? <Pagination page={paging.page} pageCount={paging.pageCount} onPageChange={paging.setPage} /> : null}</div>;
@@ -456,7 +463,7 @@ export function VendorDirectory({
         </Button>
       ) : undefined}>
         <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search suppliers, brands, address, phone..." />
-        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as DirectoryStatus)}><option value="ACTIVE">Active</option><option value="ARCHIVED">Archived</option><option value="ALL">All status</option></Select>
+        <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
         <div className="w-48">
           <Select value={typeFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTypeFilter(e.target.value)}>
             <option value="ALL">All supplier types</option>
@@ -470,10 +477,10 @@ export function VendorDirectory({
         <Select value={productCategoryFilter} onChange={(e) => setProductCategoryFilter(e.target.value)}><option value="ALL">All product categories</option>{productCategoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select>
         <Select value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)}><option value="ALL">All brands</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</Select>
         <Select value={capabilityFilter} onChange={(e) => setCapabilityFilter(e.target.value)}><option value="ALL">Any capability</option><option value="MATERIAL">Material</option><option value="LABOR">Labor</option></Select>
-        <Button type="button" variant="ghost" size="sm" onClick={() => { setQuery(""); setStatusFilter("ACTIVE"); setTypeFilter("ALL"); setCategoryFilter("ALL"); setBrandFilter("ALL"); setCapabilityFilter("ALL"); }}>Clear filters</Button><Text size="sm" tone="secondary">{filtered.length} of {vendors.length}</Text>
+        <FilterSummary filtered={Boolean(query) || statusFilter !== "ACTIVE" || typeFilter !== "ALL" || categoryFilter !== "ALL" || productCategoryFilter !== "ALL" || brandFilter !== "ALL" || capabilityFilter !== "ALL"} shown={filtered.length} total={vendors.length} onClear={() => { setQuery(""); setStatusFilter("ACTIVE"); setTypeFilter("ALL"); setCategoryFilter("ALL"); setProductCategoryFilter("ALL"); setBrandFilter("ALL"); setCapabilityFilter("ALL"); }} />
         <div className="w-48">
           <Select value={categoryFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setCategoryFilter(e.target.value)}>
-            <option value="ALL">All categories</option>
+            <option value="ALL">All supplier categories</option>
             {supplierCategories.map((sc) => (
               <option key={sc.id} value={sc.id}>
                 {sc.name}
@@ -523,7 +530,7 @@ export function VendorDirectory({
                       secondary={vendor.address ? <span className="text-xs text-ink-secondary">{vendor.address}</span> : undefined}
                     />
                   </TableCell>
-                  <TableCell><span className="text-xs text-ink-secondary" title={vendor.brand_suppliers.map((item) => item.brand.name).join(", ")}>{vendor.brand_suppliers.slice(0, 3).map((item) => item.brand.name).join(", ") || "—"}{vendor.brand_suppliers.length > 3 ? ` +${vendor.brand_suppliers.length - 3}` : ""}</span></TableCell>
+                  <TableCell><span className="text-xs text-ink-secondary" title={carriedBrandNames(vendor.owned_brands, vendor.brand_suppliers).join(", ")}>{carriedBrandNames(vendor.owned_brands, vendor.brand_suppliers).slice(0, 3).join(", ") || "—"}{carriedBrandNames(vendor.owned_brands, vendor.brand_suppliers).length > 3 ? ` +${carriedBrandNames(vendor.owned_brands, vendor.brand_suppliers).length - 3}` : ""}</span></TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1 items-center max-w-xs">
                       {vendor.types.map((t) => (
@@ -565,7 +572,7 @@ export function VendorDirectory({
                         vendor.contacts.slice(0, 2).map((c) => (
                           <div key={c.id} className="truncate">
                             <span className="font-medium text-ink">{c.person_name}</span>
-                            {contactPhoneList(c).length > 0 ? <span> ({contactPhoneList(c).map((phone, index) => { const normalized = normalizeIndonesiaPhone(phone); return <span key={`${c.id}-${phone}`}>{index ? ", " : ""}<a href={`tel:${phone.replace(/\s/g, "")}`} className="text-action underline">{phone}</a>{normalized ? <a href={`https://wa.me/${normalized}`} target="_blank" rel="noopener noreferrer" className="ml-1 text-action underline" aria-label={`WhatsApp ${phone}`}>WA</a> : null}</span>; })})</span> : c.email ? ` (${c.email})` : ""}
+                            {contactPhoneList(c).length > 0 ? <span> (<PhoneLinks phones={contactPhoneList(c)} keyPrefix={c.id} />)</span> : c.email ? ` (${c.email})` : ""}
                           </div>
                         ))
                       )}

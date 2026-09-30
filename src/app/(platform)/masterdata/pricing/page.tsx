@@ -1,3 +1,4 @@
+import { sizeText } from "../directory-findability";
 import { redirect } from "next/navigation";
 
 
@@ -29,14 +30,22 @@ function mapMaterialPrice(p: {
   updated_at: Date;
   updated_by_label: string;
   deleted_at: Date | null;
-  sku: { name: string | null; id: string; code: string | null; slug: string; brand: { name: string; id: string; slug: string } | null };
+  sku: {
+    name: string | null; id: string; code: string | null; slug: string; brand: { name: string; id: string; slug: string } | null;
+    categories: Array<{ category: { id: string; name: string } }>;
+    dimension_length: { toString(): string } | null; dimension_width: { toString(): string } | null; dimension_thickness: { toString(): string } | null; dimension_unit: { code: string } | null;
+  };
   supplier_vendor: { id: string; name: string; slug: string };
   unit: { id: string; code: string; name: string };
   source_link: { id: string; kind: string; url: string; label: string | null } | null;
 }) {
   return {
     id: p.id,
-    sku: p.sku,
+    sku: {
+      id: p.sku.id, name: p.sku.name, code: p.sku.code, brand: p.sku.brand,
+      categories: p.sku.categories.map((item) => item.category),
+      size: sizeText({ length: p.sku.dimension_length?.toString() ?? null, width: p.sku.dimension_width?.toString() ?? null, thickness: p.sku.dimension_thickness?.toString() ?? null, unitCode: p.sku.dimension_unit?.code ?? null }),
+    },
     supplier_vendor: p.supplier_vendor,
     amount: p.amount.toString(),
     currency: p.currency,
@@ -116,6 +125,16 @@ export default async function PricingPage() {
     canManageVendors ? masterDataService.listVendorTypesForAssignment({ grants }) : [],
   ]);
 
+  // Supplier contacts are shown next to prices only to people who may already read suppliers.
+  const canReadVendors = hasPermission(grants, MASTERDATA_PERMISSIONS.vendorRead) || hasPermission(grants, MASTERDATA_PERMISSIONS.vendorManage);
+  const contacts: Record<string, { name: string; phones: string[] }> = {};
+  if (canReadVendors) {
+    for (const vendor of await masterDataService.listVendors({ grants, includeArchived: true })) {
+      const contact = [...vendor.contacts].sort((a, b) => Number(b.is_primary) - Number(a.is_primary))[0];
+      if (contact) contacts[vendor.id] = { name: contact.person_name, phones: [contact.phone, ...(contact.extra_phones ?? [])].filter((phone): phone is string => Boolean(phone && phone.trim())) };
+    }
+  }
+
   const materialPrices = rawMaterial.map(mapMaterialPrice);
   const materialLaborPrices = rawML.map(mapWorkPrice);
   const laborPrices = rawLabor.map(mapWorkPrice);
@@ -130,6 +149,7 @@ export default async function PricingPage() {
         materialPrices={materialPrices}
         materialLaborPrices={materialLaborPrices}
         laborPrices={laborPrices}
+        contacts={contacts}
         canManageMaterial={canManageMaterial}
         canManageWork={canManageWork}
         canReadMaterial={canReadMaterial}
