@@ -1,4 +1,5 @@
 import { createLibraryService } from "./library/service";
+import { createCdListService } from "./cd-list/service";
 import { createMomService } from "./mom/service";
 import { STUDIOFLOW_PERMISSIONS } from "./permissions";
 import { createPhaseService } from "./phases/service";
@@ -13,6 +14,7 @@ import { createTodayService } from "./today/service";
 export function createStudioFlowService(db: Db, ports: StudioFlowPorts) {
   return {
     projects: createProjectService(db, ports),
+    cdList: createCdListService(db, ports),
     phases: createPhaseService(db, ports),
     tasks: createTaskService(db, ports),
     today: createTodayService(db, ports),

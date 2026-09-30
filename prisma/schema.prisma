@@ -1272,6 +1272,15 @@ enum SfActivityStatus {
   @@schema("studioflow")
 }
 
+enum SfCdItemStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+
+  @@map("sf_cd_item_status")
+  @@schema("studioflow")
+}
+
 /// Singleton StudioFlow workflow settings (id = "studio").
 model SfSettings {
   id                  String   @id @default("studio")
@@ -1385,6 +1394,7 @@ model SfPhase {
   activities      SfActivity[]
   checklist_items SfChecklistItem[]
   deliverables    SfDeliverable[]
+  cd_items        SfCdItem[]
 
   @@unique([project_id, order_index])
   @@map("sf_phase")
@@ -1494,6 +1504,24 @@ model SfChecklistItem {
   @@index([phase_id, is_blocking, is_checked])
   @@index([assigned_to_id, is_checked])
   @@map("sf_checklist_item")
+  @@schema("studioflow")
+}
+
+model SfCdItem {
+  id             String         @id @default(uuid())
+  phase_id       String
+  drawing_code   String
+  drawing_name   String
+  status         SfCdItemStatus @default(PENDING)
+  assigned_to_id String?
+  created_by_id  String
+  created_at     DateTime       @default(now())
+  updated_at     DateTime       @updatedAt
+
+  phase SfPhase @relation(fields: [phase_id], references: [id], onDelete: Cascade)
+
+  @@index([phase_id])
+  @@map("sf_cd_item")
   @@schema("studioflow")
 }
 

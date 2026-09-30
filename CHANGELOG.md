@@ -5,13 +5,30 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.224**
-- Next local revision: **R8.225**
+- Current revision after this entry is committed: **R8.225**
+- Next local revision: **R8.226**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.225 | 2026-09-30 | feat(studioflow): add Construction Drawing list backend
+
+- **CD List backend.** Construction Drawing phases now have an additive drawing-item table and one StudioFlow service for listing,
+  creating, editing, changing status, and deleting drawings. It accepts drafter-seat phases only, normalizes legacy drawing codes,
+  returns numeric ordering and hundreds grouping, and never participates in phase approval blockers.
+- **Access and audit.** Writes retain `studioflow.phase.work`, reuse the existing PIC content gate, reject locked/archived projects,
+  validate optional assignees as active phase workers, and write one `cd-item` audit record per actual change. Reads remain open to
+  project readers. The new table cascades when its phase or project is removed.
+- **Migration.** `20260930180000_sf_cd_list` was applied to the approved `studioflow_rebuild` and `studioflow_rebuild_test`
+  databases; both migration-status checks are up to date. The first local deploy exposed the repository's text phase IDs; its
+  uncommitted failed enum artifact was verified unreferenced, removed, then the compatible additive migration was applied cleanly.
+- **Reviewer follow-up.** Added the CD List phase-canvas browser scenario to `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`; the Lead
+  owns that UI implementation and its acceptance.
+
+**Checks.** `npm test` 662/662; `npx tsc --noEmit`; `npm run check`; `npm run lint` (0 errors, 2 existing `no-img-element`
+warnings); `npm run build`; restarted authenticated `next dev` rendered `/studioflow` and a project overview.
 
 ## R8.224 | 2026-09-30 | docs(masterdata): record the staff-driven overrides in the contracts
 

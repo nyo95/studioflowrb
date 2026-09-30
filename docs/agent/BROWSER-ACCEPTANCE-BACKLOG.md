@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.225] StudioFlow CD List phase canvas
+- Surface: `/studioflow/projects/[projectId]/phases/[phaseId]` on a drafter-seat Construction Drawing phase
+- Fixture: designer PIC, drafter PIC, unassigned phase worker, and a project with a Construction Drawing phase
+- Viewport: desktop (default)
+- Steps: 1. Open the Construction Drawing phase as each fixture user. 2. Add drawings with numeric and non-numeric codes. 3. Edit an item, change its status, assign/clear a phase worker, and delete it. 4. Try the same writes as the unassigned worker and on a designer-seat phase.
+- Acceptance: rows are grouped and numerically ordered; both PICs can edit the drafter phase; the unassigned worker can only view; a non-drafter phase has no usable CD List; the list does not affect phase approval.
+- Status: PENDING
+
 ### [R8.216] Master Data SKU price workbook workflow
 - Surface: `/masterdata/workbook`
 - Fixture: staff member with SKU and material-price read/manage grants; a catalogue SKU with one supplier price

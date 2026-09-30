@@ -11,7 +11,7 @@ import { FakeObjectStorage, type ObjectStorage } from "@platform/core/storage";
 import { createMasterDataPublicRead, MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
 import { createNotificationWriter } from "@platform/core/notifications/persistence";
 import { createSampleRequestNotifier } from "./sample-request-notifier";
-import type { PrismaClient } from "@/generated/prisma/client";
+import { SfCdItemStatus, type PrismaClient } from "@/generated/prisma/client";
 
 import { APP_REGISTRATIONS } from "../../app/app-registrations";
 import { dateToDateOnly } from "./domain/dates";
@@ -120,6 +120,57 @@ async function phaseOf(projectId: string, legacy: keyof typeof LEGACY) {
 async function revisions(phaseId: string) {
   return (await testDb.prisma.sfRevision.findMany({ where: { phase_id: phaseId }, orderBy: [{ major: "asc" }, { minor: "asc" }] })).map((r) => `v${r.major}.${r.minor}:${r.status}`);
 }
+
+describe("WO-SF-CDLIST-01 Construction Drawing list", () => {
+  it("lets both PICs manage sorted drawing items, records one audit event per change, and keeps the list informational", async () => {
+    const { projectId } = await newProject();
+    const cd = await phaseOf(projectId, "cd");
+    const first = await sf.cdList.create({ ...as(designer), projectId, phaseId: cd.id, drawingCode: "ARS_301", drawingName: "Ceiling plan", assignedToId: drafter.id });
+    const second = await sf.cdList.create({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id, drawingCode: "12", drawingName: "Key plan" });
+    const third = await sf.cdList.create({ ...as(designer), projectId, phaseId: cd.id, drawingCode: "plan-a", drawingName: "Legend" });
+    const listed = await sf.cdList.list({ grants: [P.access, P.projectRead], projectId, phaseId: cd.id });
+    assert.deepEqual(listed.map((item) => [item.drawingCode, item.group]), [["ID_12", "0"], ["ID_301", "300"], ["ID_PLAN-A", "-"]]);
+
+    const updated = await sf.cdList.update({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id, itemId: first.id, drawingCode: "id-12.5", drawingName: "Ceiling reflected plan", assignedToId: null });
+    await sf.cdList.setStatus({ ...as(designer), projectId, phaseId: cd.id, itemId: updated.id, status: SfCdItemStatus.COMPLETED });
+    await sf.cdList.delete({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id, itemId: third.id });
+
+    const events = await testDb.prisma.auditEvent.findMany({ where: { entity_id: updated.id }, orderBy: { occurred_at: "asc" } });
+    assert.deepEqual(events.map((event) => event.action), ["studioflow.cd-item.created", "studioflow.cd-item.updated", "studioflow.cd-item.status-changed"]);
+    assert.deepEqual(events[1].changes, { drawingCode: { from: "ID_301", to: "ID_12.5" }, drawingName: { from: "Ceiling plan", to: "Ceiling reflected plan" }, assignedToId: { from: drafter.id, to: null } });
+    assert.deepEqual(events[2].metadata, { projectId, phaseId: cd.id, drawingCode: "ID_12.5", drawingName: "Ceiling reflected plan" });
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { entity_id: third.id, action: "studioflow.cd-item.deleted" } }), 1);
+    assert.equal(await testDb.prisma.sfCdItem.count({ where: { phase_id: cd.id } }), 2);
+    assert.equal(second.status, SfCdItemStatus.PENDING);
+  });
+
+  it("enforces phase, PIC, assignee, archive, lock, and cascade rules", async () => {
+    const { projectId } = await newProject();
+    const cd = await phaseOf(projectId, "cd");
+    const moodboard = await phaseOf(projectId, "moodboard");
+    const unassignedGrants = ALL.filter((grant) => grant !== P.projectOverride);
+    const outsider = await seedUser("CD outsider", unassignedGrants);
+    const viewer = await seedUser("CD viewer", [P.access, P.projectRead]);
+    const ineligible = await seedUser("CD ineligible", [P.access, P.projectRead]);
+
+    await rejectsWith(sf.cdList.create({ ...as(outsider, unassignedGrants), projectId, phaseId: cd.id, drawingCode: "1", drawingName: "Denied" }), "PERMISSION_DENIED");
+    assert.deepEqual(await sf.cdList.list({ grants: [P.access, P.projectRead], projectId, phaseId: cd.id }), []);
+    await rejectsWith(sf.cdList.list({ grants: [P.access, P.projectRead], projectId, phaseId: moodboard.id }), "CD_LIST_WRONG_PHASE");
+    await rejectsWith(sf.cdList.create({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: moodboard.id, drawingCode: "1", drawingName: "Wrong phase" }), "CD_LIST_WRONG_PHASE");
+    await rejectsWith(sf.cdList.create({ ...as(designer), projectId, phaseId: cd.id, drawingCode: "1", drawingName: "Invalid assignee", assignedToId: ineligible.id }), "CD_ASSIGNEE_NOT_ELIGIBLE");
+
+    const item = await sf.cdList.create({ ...as(designer), projectId, phaseId: cd.id, drawingCode: "1", drawingName: "Section" });
+    await testDb.prisma.sfPhase.update({ where: { id: cd.id }, data: { is_locked: true } });
+    await rejectsWith(sf.cdList.update({ ...as(designer), projectId, phaseId: cd.id, itemId: item.id, drawingName: "Locked" }), "PHASE_LOCKED");
+    await testDb.prisma.sfPhase.update({ where: { id: cd.id }, data: { is_locked: false } });
+    await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { archived_at: new Date() } });
+    await rejectsWith(sf.cdList.delete({ ...as(designer), projectId, phaseId: cd.id, itemId: item.id }), "PROJECT_ARCHIVED");
+    await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { archived_at: null } });
+    await testDb.prisma.sfProject.delete({ where: { id: projectId } });
+    assert.equal(await testDb.prisma.sfCdItem.count({ where: { id: item.id } }), 0);
+    assert.ok(viewer.id);
+  });
+});
 
 describe("WO-BE-02 archived asset retention", () => {
   afterEach(() => storage.objects.clear());
