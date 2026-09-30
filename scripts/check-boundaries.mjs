@@ -18,6 +18,7 @@ export const RULE_DATABASE_OWNERSHIP = "database ownership";
 export const RULE_STALE_ALLOW_LIST = "stale allow-list entry";
 export const RULE_UNSCANNED_FILE = "unscanned file under src";
 export const RULE_DUPLICATE_MACHINERY = "app-local copy of generic machinery";
+export const RULE_MIGRATION_ISOLATION = "migration touches more than one app schema";
 export const RULE_SERVER_CALLS_CLIENT_FUNCTION = "server code -> function in a \"use client\" module";
 
 /**
@@ -828,17 +829,37 @@ function literalTexts(node) {
  * they seed and inspect across ownership on purpose. Independently of any file,
  * a Prisma `@relation` may not join models of two different schemas.
  */
+/**
+ * The Prisma schema as text: `prisma/schema/*.prisma` (one file per database schema) when that folder exists,
+ * otherwise the single `prisma/schema.prisma`. `path` names what to point a violation at.
+ */
+export async function readPrismaSchema(projectRoot) {
+  const folder = join(projectRoot, "prisma", "schema");
+  try {
+    const names = (await readdir(folder)).filter((name) => name.endsWith(".prisma")).sort();
+    if (names.length > 0) {
+      const parts = [];
+      for (const name of names) parts.push(await readFile(join(folder, name), "utf8"));
+      return { source: parts.join("\n"), path: folder };
+    }
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  try {
+    const file = join(projectRoot, "prisma", "schema.prisma");
+    return { source: await readFile(file, "utf8"), path: file };
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
 export async function collectDatabaseOwnershipViolations({ projectRoot = process.cwd(), srcDir } = {}) {
   projectRoot = resolve(projectRoot);
   srcDir = srcDir ? resolve(srcDir) : join(projectRoot, "src");
-  let schemaSource;
-  try {
-    schemaSource = await readFile(join(projectRoot, "prisma", "schema.prisma"), "utf8");
-  } catch (error) {
-    if (error?.code === "ENOENT") return [];
-    throw error;
-  }
-  const { models, relations, schemas } = parsePrismaOwnership(schemaSource);
+  const schemaRead = await readPrismaSchema(projectRoot);
+  if (!schemaRead) return [];
+  const { models, relations, schemas } = parsePrismaOwnership(schemaRead.source);
   if (models.size === 0) return [];
 
   const violations = [];
@@ -848,7 +869,7 @@ export async function collectDatabaseOwnershipViolations({ projectRoot = process
     if (models.get(model) === models.get(target)) continue;
     violations.push({
       rule: RULE_DATABASE_OWNERSHIP,
-      file: join(projectRoot, "prisma", "schema.prisma"),
+      file: schemaRead.path,
       specifier: `${model}.${field} -> ${target}`,
       detail: `Prisma relation ${model}.${field} points from schema "${models.get(model)}" to ${target} in schema "${models.get(target)}". Store a plain id (and a label snapshot when history matters), not a cross-schema foreign key.`,
     });
@@ -1143,6 +1164,71 @@ export async function collectServerClientCallViolations({ projectRoot = process.
   return violations;
 }
 
+
+/**
+ * Migrations that predate this rule and legitimately touch two app schemas. Ratchet: a new migration must not join
+ * this list (split it per app instead), and an entry whose migration no longer spans two schemas fails as stale.
+ */
+export const MIGRATION_ISOLATION_ALLOW_LIST = [
+  "20260906110000_bq_project_deletion_workflow",
+  "20260907090000_regression_sku_and_custom_snapshot",
+  "20260907091000_r6_21_db_invariants",
+];
+
+/**
+ * One migration may change the tables of at most one app schema (studioflow, master_data, bq). The platform schema
+ * may appear alongside, because grants and audit rows live there. This keeps a fix in one app from silently rewriting
+ * another app's tables in the same deploy step.
+ */
+export async function collectMigrationIsolationViolations({ projectRoot = process.cwd(), allowList = MIGRATION_ISOLATION_ALLOW_LIST } = {}) {
+  projectRoot = resolve(projectRoot);
+  const schemaRead = await readPrismaSchema(projectRoot);
+  const datasource = schemaRead ? /schemas\s*=\s*\[([^\]]*)\]/.exec(schemaRead.source) : null;
+  if (!datasource) return [];
+  const appSchemas = [...datasource[1].matchAll(/"([a-z0-9_]+)"/g)].map((m) => m[1]).filter((name) => name !== "platform");
+  const migrationsDir = join(projectRoot, "prisma", "migrations");
+  let names;
+  try {
+    names = (await readdir(migrationsDir, { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+  } catch (error) {
+    if (error?.code === "ENOENT") return [];
+    throw error;
+  }
+  const violations = [];
+  const spanning = new Set();
+  for (const name of names) {
+    let sql;
+    try {
+      sql = await readFile(join(migrationsDir, name, "migration.sql"), "utf8");
+    } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      throw error;
+    }
+    const touched = appSchemas.filter((schema) => new RegExp(`"${schema}"\\s*\\.|(?:SCHEMA|SCHEMAS)\\s+"?${schema}"?[\\s;]`, "i").test(sql));
+    if (touched.length < 2) continue;
+    spanning.add(name);
+    if (!allowList.includes(name)) {
+      violations.push({
+        rule: RULE_MIGRATION_ISOLATION,
+        file: join(migrationsDir, name, "migration.sql"),
+        specifier: touched.join(", "),
+        detail: `Migration ${name} changes tables in ${touched.length} app schemas (${touched.join(", ")}). Split it into one migration per app so a change in one app cannot rewrite another app's tables in the same step.`,
+      });
+    }
+  }
+  for (const entry of allowList) {
+    if (!spanning.has(entry)) {
+      violations.push({
+        rule: RULE_STALE_ALLOW_LIST,
+        file: join(migrationsDir, entry, "migration.sql"),
+        specifier: entry,
+        detail: "Allow-listed migration no longer spans two app schemas (or no longer exists). Remove it from MIGRATION_ISOLATION_ALLOW_LIST.",
+      });
+    }
+  }
+  return violations;
+}
+
 export async function collectAllViolations(options = {}) {
   const boundary = await collectBoundaryViolations(options);
   const permission = await collectPermissionVocabularyViolations(options);
@@ -1152,7 +1238,8 @@ export async function collectAllViolations(options = {}) {
   const unscanned = await collectUnscannedFileViolations(options);
   const machinery = await collectDuplicateMachineryViolations(options);
   const clientCalls = await collectServerClientCallViolations(options);
-  return { boundary, permission, route, duplicate, database, unscanned, machinery, clientCalls };
+  const migrations = await collectMigrationIsolationViolations(options);
+  return { boundary, permission, route, duplicate, database, unscanned, machinery, clientCalls, migrations };
 }
 
 async function main() {
@@ -1175,6 +1262,7 @@ async function main() {
     ["Unscanned files", all.unscanned],
     ["Duplicated generic machinery", all.machinery],
     ["Server code calling client-module functions", all.clientCalls],
+    ["Migration isolation", all.migrations],
   ];
   let count = 0;
   for (const [title, list] of sections) {

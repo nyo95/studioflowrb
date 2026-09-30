@@ -5,13 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.232**
-- Next local revision: **R8.233**
+- Current revision after this entry is committed: **R8.233**
+- Next local revision: **R8.234**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.233 | 2026-09-30 | refactor(platform): one Prisma schema file per app, migration isolation rule, BQ index drift fixed
+
+- **Prisma schema split (owner concern: a fix in one app must not disturb Master Data or BQ).** `prisma/schema.prisma` is now `prisma/schema/` with one file per database schema:
+  `base.prisma` (generator, datasource), `platform.prisma`, `studioflow.prisma`, `master_data.prisma`, `bq.prisma`. Block text and doc comments moved verbatim; only their file changed.
+  `prisma.config.ts` points at the folder and pins `migrations.path` to `prisma/migrations` (without that Prisma looks for migrations inside the schema folder and reports none). The generator
+  output path is now `../../src/generated/prisma`. Verified: `prisma validate` passes, `prisma migrate diff` against the live dev database is identical for the old and new schema text,
+  and the full suite and `next build` pass. A StudioFlow edit now touches `studioflow.prisma` only.
+- **Migration isolation rule** in `npm run check`: a migration may change tables of at most one app schema (platform may appear alongside for grants and audit). Three older BQ/Master Data
+  migrations that span two app schemas are allow-listed with a stale-entry ratchet; any new spanning migration fails. The Prisma ownership rule reads the schema folder.
+- **BQ index drift fixed.** `prisma migrate diff` showed the live database differing from the schema (five BQ indexes named in PascalCase, five redundant sort-order indexes left over from the
+  R8.205 uniqueness migration). Migration `20260930190000_bq_index_names_sync` renames and drops them; applied to dev and test; the diff is now empty. BQ-only, no data change.
+- **Docs.** `docs/README.md` and `docs/MODULE-BOUNDARIES.md` point to `prisma/schema/*.prisma`. `PLAN.md` (sample price sync) moves to Executor target R8.234.
+
+**Checks.** `npm test` 666/666, `npm run check` (fixtures included), `tsc --noEmit`, `npm run build`, `prisma validate`, `prisma migrate diff` empty on both rebuild databases.
 
 ## R8.232 | 2026-09-30 | feat(platform): notification retention, app icons in the switcher, stale storage roadmap fixed
 

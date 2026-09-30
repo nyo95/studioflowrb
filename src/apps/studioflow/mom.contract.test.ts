@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-const schema = readFileSync(new URL("../../../prisma/schema.prisma", import.meta.url), "utf8");
+const schemaDir = new URL("../../../prisma/schema/", import.meta.url);
+const schema = readdirSync(schemaDir).filter((name) => name.endsWith(".prisma")).sort().map((name) => readFileSync(new URL(name, schemaDir), "utf8")).join("\n");
 const service = readFileSync(new URL("./mom/service.ts", import.meta.url), "utf8");
 const permissions = readFileSync(new URL("./permissions.ts", import.meta.url), "utf8");
 const editor = readFileSync(new URL("../../app/(platform)/studioflow/projects/[projectId]/mom/[momId]/mom-editor.tsx", import.meta.url), "utf8");

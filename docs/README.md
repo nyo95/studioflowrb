@@ -131,7 +131,7 @@ When facts disagree, use this order:
 1. the owner's latest explicit instruction;
 2. `CORE.md`, `DESIGN.md`, and `UI_ENGINE.md` for their respective shared concerns;
 3. an active app contract when the owner has activated one;
-4. `prisma/schema.prisma` and migrations as evidence of the currently implemented database;
+4. `prisma/schema/*.prisma` (one file per database schema) and migrations as evidence of the currently implemented database;
 5. current code and tests as evidence of current behavior;
 6. legacy code at an exact recorded commit as behavioral evidence only.
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import {
   collectAllViolations,
   collectBoundaryViolations,
@@ -10,6 +10,8 @@ import {
   collectUnscannedFileViolations,
   collectDuplicateMachineryViolations,
   collectServerClientCallViolations,
+  collectMigrationIsolationViolations,
+  RULE_MIGRATION_ISOLATION,
   RULE_SERVER_CALLS_CLIENT_FUNCTION,
   RULE_DUPLICATE_MACHINERY,
   RULE_UNSCANNED_FILE,
@@ -466,4 +468,36 @@ try {
   console.log("PASS server-calls-client fixtures: direct, barrel and renamed calls flagged; components, constants, types, pure modules, client callers and tests clean");
 } finally {
   await rm(clientCallRoot, { recursive: true, force: true });
+}
+
+const MIGRATION_FILES = {
+  "tsconfig.json": JSON.stringify(TSCONFIG, null, 2),
+  "prisma/schema/base.prisma": 'datasource db {\n  provider = "postgresql"\n  schemas  = ["platform", "alpha", "beta"]\n}\n',
+  "prisma/schema/platform.prisma": 'model User {\n  id String @id\n  @@schema("platform")\n}\n',
+  "prisma/schema/alpha.prisma": 'model AlphaThing {\n  id String @id\n  @@schema("alpha")\n}\nmodel AlphaLink {\n  id String @id\n  ownerId String\n  owner User @relation(fields: [ownerId], references: [id])\n  @@schema("alpha")\n}\n',
+  "prisma/migrations/001_alpha_only/migration.sql": 'CREATE TABLE "alpha"."thing" ("id" TEXT);\n',
+  "prisma/migrations/002_alpha_with_platform/migration.sql": 'INSERT INTO "platform"."RolePermission" SELECT 1;\nALTER TABLE "alpha"."thing" ADD COLUMN "x" TEXT;\n',
+  "prisma/migrations/003_alpha_and_beta/migration.sql": 'ALTER TABLE "alpha"."thing" ADD COLUMN "y" TEXT;\nALTER TABLE "beta"."widget" ADD COLUMN "y" TEXT;\n',
+  "prisma/migrations/004_old_spanning/migration.sql": 'ALTER TABLE "alpha"."thing" ADD COLUMN "z" TEXT;\nALTER TABLE "beta"."widget" ADD COLUMN "z" TEXT;\n',
+  "prisma/migrations/005_no_longer_spanning/migration.sql": 'ALTER TABLE "beta"."widget" ADD COLUMN "w" TEXT;\n',
+  "src/apps/alpha/own.ts": "export const ok = 1;\n",
+};
+
+const migrationRoot = await mkdtemp(join(tmpdir(), "wo3-boundaries-migrations-"));
+try {
+  await writeTree(migrationRoot, MIGRATION_FILES);
+  const isolation = await collectMigrationIsolationViolations({ projectRoot: migrationRoot, allowList: ["004_old_spanning", "005_no_longer_spanning"] });
+  assert.deepEqual(
+    isolation.map((v) => `${relative(migrationRoot, v.file).split(sep).join("/")} | ${v.rule}`).sort(),
+    [
+      `prisma/migrations/003_alpha_and_beta/migration.sql | ${RULE_MIGRATION_ISOLATION}`,
+      `prisma/migrations/005_no_longer_spanning/migration.sql | ${RULE_STALE_ALLOW_LIST}`,
+    ].sort(),
+  );
+  // The folder-based schema is read too: a relation from an alpha model to a platform model is still a cross-schema foreign key.
+  const folderDatabase = await collectDatabaseOwnershipViolations({ projectRoot: migrationRoot });
+  assert.deepEqual(folderDatabase.map((v) => v.specifier), ["AlphaLink.owner -> User"]);
+  console.log("PASS migration isolation fixtures: two app schemas rejected, platform alongside allowed, allow-list ratchet, folder-based Prisma schema read");
+} finally {
+  await rm(migrationRoot, { recursive: true, force: true });
 }

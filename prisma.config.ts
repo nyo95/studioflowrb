@@ -11,7 +11,9 @@ loadEnv({ path: ".env.local" });
 loadEnv({ path: ".env" });
 
 export default defineConfig({
-  schema: "prisma/schema.prisma",
+  schema: "prisma/schema",
+  // With a schema folder Prisma would look for migrations inside it; they stay in prisma/migrations.
+  migrations: { path: "prisma/migrations" },
   datasource: {
     url: process.env.DIRECT_URL || process.env.DATABASE_URL!,
     shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL,

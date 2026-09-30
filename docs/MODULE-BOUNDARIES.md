@@ -1,7 +1,7 @@
 # Module Boundaries
 
 Status: ACTIVE — describes the enforced architecture. Evidence: `scripts/check-boundaries.mjs`
-(fixtures in `scripts/test-boundaries-checker.mjs`), `prisma/schema.prisma`, `CORE.md` "Layer access".
+(fixtures in `scripts/test-boundaries-checker.mjs`), `prisma/schema/*.prisma`, `CORE.md` "Layer access".
 
 ## Decision
 

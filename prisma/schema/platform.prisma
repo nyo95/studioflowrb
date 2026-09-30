@@ -1,0 +1,303 @@
+// ============================================================================
+// PLATFORM — Identity and access (Foundation F0, CORE.md §3/§4)
+// ============================================================================
+
+/// Operational account status. There is no deleted state: accounts are
+/// disabled (DISABLED + disabled_at) and restoring is an explicit command.
+enum UserStatus {
+  ACTIVE
+  DISABLED
+
+  @@schema("platform")
+}
+
+/// Platform user identity. Email is stored already normalized (trimmed,
+/// lowercase); race-safe uniqueness is the unique index itself.
+///
+/// Password material is only the encoded Argon2id PHC hash — plaintext,
+/// session tokens, and hashes never appear in logs, audit rows, or client
+/// results. Users are disabled, never hard-deleted, so historical AuditEvent
+/// actor references stay readable.
+model User {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// Canonical normalized email (trimmed, lowercase). Unique index is the
+  /// race-safe authority; the application validates format before insert.
+  email         String     @unique
+  display_name  String
+  password_hash String
+  status        UserStatus @default(ACTIVE)
+
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  disabled_at DateTime?
+
+  sessions   Session[]
+  user_roles UserRole[]
+
+  @@index([status])
+  @@schema("platform")
+}
+
+/// Access role. `code` is immutable and normalized; rename of `name` and
+/// `description` is allowed. Archiving (archived_at) revokes all effective
+/// grants and blocks new assignments; there is no hard delete, so
+/// UserRole/RolePermission history is never silently destroyed.
+model Role {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// Immutable normalized role code (e.g. "platform-owner"). Unique index is
+  /// the race-safe authority, including archived rows.
+  code        String  @unique
+  name        String
+  description String?
+  is_system   Boolean @default(false)
+
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  archived_at DateTime?
+
+  user_roles       UserRole[]
+  role_permissions RolePermission[]
+
+  @@index([archived_at])
+  @@schema("platform")
+}
+
+/// Unique User × Role assignment. Restrict on both sides: assignment rows are
+/// historical facts; users are disabled (never deleted) and roles are archived
+/// (never deleted).
+model UserRole {
+  id      String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id String @db.Uuid
+  role_id String @db.Uuid
+
+  assigned_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  role Role @relation(fields: [role_id], references: [id], onDelete: Restrict)
+
+  @@unique([user_id, role_id])
+  @@index([role_id])
+  @@schema("platform")
+}
+
+/// Unique Role × registered permission ID grant. `permission_id` must be a
+/// permission in the code-owned registry (application-enforced on write);
+/// unknown persisted IDs grant nothing and surface as integrity failures.
+model RolePermission {
+  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  role_id       String @db.Uuid
+  permission_id String
+
+  granted_at DateTime @default(now())
+
+  role Role @relation(fields: [role_id], references: [id], onDelete: Restrict)
+
+  @@unique([role_id, permission_id])
+  @@index([permission_id])
+  @@schema("platform")
+}
+
+/// Revocable database session. Only the SHA-256 hash of the opaque browser
+/// token is persisted — never the raw token. `token_hash` unique index is the
+/// live-lookup authority; user/revocation/expiry indexes support revocation
+/// and cleanup.
+model Session {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// SHA-256 hex digest of the raw session token. Lookup authority.
+  token_hash String @unique
+  user_id    String @db.Uuid
+
+  created_at          DateTime  @default(now())
+  last_seen_at        DateTime
+  idle_expires_at     DateTime
+  absolute_expires_at DateTime
+  revoked_at          DateTime?
+
+  /// Bounded client metadata (truncated to 255 chars), best-effort only and
+  /// never used for authorization.
+  user_agent     String?
+  client_address String?
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Restrict)
+
+  @@index([user_id, revoked_at])
+  @@index([idle_expires_at])
+  @@index([absolute_expires_at])
+  @@schema("platform")
+}
+
+/// Infrastructure table owned by the login limiter adapter. It is declared so
+/// Prisma migration diff sees the platform schema as complete; application code
+/// still accesses it only through the limiter boundary.
+model LoginRateLimit {
+  key    String @id @db.VarChar(255)
+  points Int    @default(0)
+  expire BigInt?
+
+  @@schema("platform")
+}
+
+/// Typed platform General Settings singleton (CORE.md §11). Exactly one row
+/// exists: the SQL check constraint below pins the singleton ID, so no
+/// application code can create a second settings row.
+model PlatformGeneralSettings {
+  /// Constant singleton identity, enforced by CHECK (id = 'platform_general_settings').
+  id String @id @default("platform_general_settings")
+
+  organization_name String
+  app_title         String
+  locale            String
+  timezone          String
+  currency          String
+  /// Weekday number the week starts on (0 = Sunday, 1 = Monday).
+  week_starts_on    Int
+  brand_mark_url    String?
+  /// Server-owned Platform asset reference. This is deliberately distinct
+  /// from a safe external/site-relative URL and is resolved only at read time.
+  brand_mark_storage_key String?
+
+  /// Typed global appearance theme (D-SF-02: Platform owns appearance/theme,
+  /// F-C / PF-4). DESIGN.md locks the canonical "light" theme; the SQL CHECK
+  /// constraint mirrors the typed union so no other value can be persisted.
+  theme String @default("light")
+
+  /// Owner-configured launcher routing (roadmap "configurable main-route
+  /// settings"). Both are advisory: an id that is null, unknown, or no
+  /// longer accessible to the current user is ignored at read time, never
+  /// enforced or validated against the app registry here (Core stays
+  /// domain-neutral and never imports app code).
+  main_app_id    String?
+  landing_app_id String?
+
+  updated_at DateTime @updatedAt
+
+  @@schema("platform")
+}
+
+// ============================================================================
+// PLATFORM — AuditEvent (append-only, domain-neutral Core envelope)
+// ============================================================================
+
+/// Platform-owned append-only persistence of the locked Core audit envelope
+/// (CORE.md §5) for every future app. App-specific audit tables are forbidden.
+///
+/// - entityType/entityId and actor_user_id are polymorphic references with NO
+///   foreign keys by contract.
+/// - app_id/actor_kind persist as plain strings: the envelope is domain-neutral
+///   and must not couple to per-app enum evolution.
+/// - changes/metadata follow Core serialization/redaction rules (canonical
+///   decimal strings, ISO-8601 UTC instants, no secrets/blobs).
+/// - Append-only: no product revert/delete use case exists; retained
+///   indefinitely in MVP.
+model AuditEvent {
+  id String @id @default(uuid())
+
+  app_id      String
+  action      String
+  entity_type String
+  entity_id   String
+
+  actor_kind    String
+  actor_user_id String?
+  actor_label   String
+
+  occurred_at DateTime @default(now())
+
+  request_id String?
+  changes    Json?
+  metadata   Json?
+
+  @@index([app_id, entity_type, entity_id, occurred_at])
+  @@index([actor_user_id, occurred_at])
+  @@index([occurred_at])
+  @@schema("platform")
+}
+
+/// In-app notification inbox item. Domain-neutral: an app decides who is told and what it says; the
+/// platform stores it for one recipient and tracks whether that person has read it. The recipient is a
+/// plain user id (no foreign key), like audit actors, so an inbox row never blocks a user change.
+model Notification {
+  id                String    @id @default(uuid())
+  recipient_user_id String
+  app_id            String
+  kind              String
+  title             String
+  body              String?
+  href              String?
+  entity_type       String?
+  entity_id         String?
+  created_at        DateTime  @default(now())
+  read_at           DateTime?
+
+  @@index([recipient_user_id, read_at, created_at])
+  @@schema("platform")
+}
+
+/// Platform-wide private 1:1 messenger conversation. The pair key is the two
+/// participant ids sorted and joined by the service, so the same two people
+/// always resolve to one conversation regardless of who starts it.
+model MessengerConversation {
+  id         String   @id @default(uuid())
+  pair_key   String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  participants MessengerParticipant[]
+  messages     MessengerMessage[]
+
+  @@index([updated_at])
+  @@schema("platform")
+}
+
+/// Per-user membership/read cursor for a private conversation. User ids are
+/// plain platform ids rather than foreign keys so chat history never blocks
+/// user lifecycle changes.
+model MessengerParticipant {
+  id              String    @id @default(uuid())
+  conversation_id String
+  user_id         String
+  last_read_at    DateTime?
+  created_at      DateTime  @default(now())
+
+  conversation MessengerConversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
+  @@unique([conversation_id, user_id])
+  @@index([user_id, conversation_id])
+  @@schema("platform")
+}
+
+model MessengerMessage {
+  id              String   @id @default(uuid())
+  conversation_id String
+  author_user_id  String
+  body            String?
+  created_at      DateTime @default(now())
+
+  conversation MessengerConversation  @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  attachments  MessengerAttachment[]
+
+  @@index([conversation_id, created_at])
+  @@index([author_user_id, created_at])
+  @@schema("platform")
+}
+
+model MessengerAttachment {
+  id               String    @id @default(uuid())
+  message_id        String
+  storage_key       String?   @unique
+  filename          String
+  content_type      String
+  bytes             Int
+  expires_at        DateTime
+  purged_at         DateTime?
+  created_at        DateTime  @default(now())
+
+  message MessengerMessage @relation(fields: [message_id], references: [id], onDelete: Cascade)
+
+  @@index([message_id])
+  @@index([expires_at, purged_at])
+  @@schema("platform")
+}
