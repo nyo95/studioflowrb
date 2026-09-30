@@ -5,13 +5,18 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.221**
-- Next local revision: **R8.222**
+- Current revision after this entry is committed: **R8.222**
+- Next local revision: **R8.223**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.222 | 2026-09-30 | docs(studioflow): WO-SF-CDLIST-01 ready
+
+- `PLAN.md` now holds WO-SF-CDLIST-01 (READY, Executor target **R8.223**): CD List backend (`sf_cd_item`, service, audit, tests) ported from legacy
+  `CDList` (`c4b0c466`), drafter-seat phases only, gated by the PIC content rule. The Lead builds the screen after review. No code changed.
 
 ## R8.221 | 2026-09-30 | feat(studioflow): hide edit controls the viewer cannot use; review PASS for R8.220
 

@@ -1,86 +1,84 @@
 # Active Plan
 
-Plan ID: WO-SF-ACCESS-01
-Scope: StudioFlow edit rights follow the project's PIC assignment (server enforcement, new permissions, access read model). Backend only; the Lead does the UI gating afterwards.
-Target revision: R8.220
+Plan ID: WO-SF-CDLIST-01
+Scope: StudioFlow CD List (Construction Drawing item list) — schema, service, audit, tests. Backend only; the Lead builds the screen afterwards.
+Target revision: R8.223
 Status: READY
-Priority: P1
-Owner: owner (Product Owner). Decisions answered 2026-09-30: adopt the legacy rule with an admin override permission; every staff member may still view (read-only); separate PIC designer/drafter permissions; project-level documents are editable by the designer OR drafter PIC.
+Priority: P2
+Owner: owner (Product Owner). Go-ahead 2026-09-30 ("ya boleh ... sekalian build"); wave-2 item of `STUDIOFLOW-REWORK-CONTRACT.md` (RW-04). Details below decided by the Lead from legacy evidence.
 Last updated: 2026-09-30
 
 ## Outcome
 
-Today any holder of a role permission (for example `studioflow.phase.work` or `studioflow.mom.manage`) can edit every project. After this change a
-staff member can edit a project only when they are **assigned to it as PIC designer or PIC drafter** (rules below) or hold the new override
-permission. Reading stays open to everyone who has `studioflow.project.read`. The PIC pickers list only people who may take that seat.
+On a drafter-seat phase (Construction Drawing) the team keeps a checklist of drawings to produce: each item has a drawing number, a drawing name, a status
+(Pending / In progress / Completed) and an optional assignee. Users with edit rights on that phase can add, edit, change status of, and delete items;
+everyone who can read the project can see the list. The list is informational: it never blocks approving a phase.
 
 ## Context and Evidence
 
-- Rebuild today: authorization is grants only (`requireCommand(ctx, permission)` in `src/apps/studioflow/shared.ts`). The PIC fields
-  `SfProject.pic_designer_id` / `pic_drafter_id` and each phase's `seat_snapshot` (`designer` | `drafter`, CD phase = drafter) exist but are used only for display
-  and fallback assignee. `STUDIOFLOW-REWORK-CONTRACT.md` RW-02 and §3 said "no PIC-based authorization"; the owner reversed that on 2026-09-30 and the Lead updated the contract.
-- Legacy evidence (`c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`, read-only): `src/core/rbac/guards.ts` `evaluateAccess`, `src/core/rbac/permissions.ts`
-  `getProjectMembershipOrThrow`, `assertPhaseContentMutationAccess`. Legacy required BOTH the role permission and the assignment; ADMIN/DEVELOPER bypassed everything.
-- Existing services and their current permission checks: `projects/service.ts`, `phases/service.ts`, `tasks/service.ts`, `mom/service.ts`, `schedule/service.ts`,
-  `presentation/service.ts`, plus `library` and `today` where they mutate project data. `listAssignablePeople` and `assertPic` use `P.phaseWork` holders today.
-- Permission registry: `src/apps/studioflow/permissions.ts`, registered in `src/app/app-registrations.ts`.
+- Legacy (read-only, `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`): `prisma/schema.prisma` `model CDList` (`phase_id`, `group_code`, `drawing_name`,
+  `status_enum` PENDING/IN_PROGRESS/COMPLETED, `assigned_to_id?`, `created_at`); `src/lib/services/phase-service.ts` `executeCreateCDItem` /
+  `executeUpdateCDItem` / `executeUpdateCDStatus` / `executeDeleteCDItem` (each writes an audit log with project_id, phase_id, drawing details);
+  `src/components/cd-list-table.tsx` (drawing-number normalisation `ID_<number>`, numeric sort, groups by hundreds); `project-service.ts` deletes items with their phases.
+- Rebuild today: no CD List. A phase carries `seat_snapshot` (`drafter` for CD); access gate `requireProjectAccess(..., kind: "content", phaseId)` in
+  `src/apps/studioflow/shared.ts` (drafter PIC or designer PIC on a drafter-seat phase, designer PIC elsewhere, or override) — REUSE, do not re-derive.
+  Writable-phase loader `loadWritablePhase` (`shared.ts`) rejects archived projects and locked phases.
+- Patterns to follow: `src/apps/studioflow/tasks/service.ts` and `phases/service.ts` (command shape, `runTransaction`, `writeAudit`), `permissions.ts`.
 
 ## Locked Decisions
 
-- **Rule = base grant AND assignment.** Every mutating command keeps its current grant check and additionally passes the assignment gate below. The gate is a single
-  shared helper in `src/apps/studioflow/shared.ts` (one implementation, unit-tested); services call it, nothing re-derives it.
-- **New permissions (registered, labelled in plain English for Platform Access).** Platform RBAC accepts only three-part IDs (`app.area.action`, hyphens allowed), so the PIC permissions use `pic-designer` / `pic-drafter` (Lead decision 2026-09-30 after the Executor's BLOCKED report; option A):
-  - `studioflow.project.override` — "Edit any project regardless of assignment" (replaces legacy "ADMIN always allowed"). Passes every gate below. Does not replace the base grant.
-  - `studioflow.project.pic-designer` — "Can be assigned as a project's designer (PIC)".
-  - `studioflow.project.pic-drafter` — "Can be assigned as a project's drafter (PIC)".
-  - Keep `studioflow.phase.override` unchanged (it is the revision hard-reset command, a different thing).
-- **Gate rules** (`actor` = the signed-in user; `override` = holds `project.override`):
-  1. Project data (edit fields, priority, status, archive/restore, set PICs, project dates): PIC designer, or `override`. Creating a project and client management keep the base `project.manage` only (no project exists yet).
-  2. Phase transitions (activate, submit, approve/reject, reopen, bypass, override-revision): PIC designer on every phase; PIC drafter only on a phase whose `seat_snapshot` is `drafter`; or `override`. The base grant (`phase.work` / `phase.review` / `phase.override`) is still required.
-  3. Phase content (activities, checklist items attached to a phase, deliverables/files, deferrals): phase seat `drafter` → PIC drafter or PIC designer; any other phase → PIC designer only; or `override`.
-  4. Project-level documents and lists not tied to a phase (MOM, Product Schedule and its sample requests, Presentation, Library, project-level checklist/tasks): PIC designer OR PIC drafter, or `override`.
-  5. Reading: unchanged. Anyone with `project.read` may read everything, including Today and search.
-- **Assignee rule unchanged:** tasks may still be assigned to any eligible staff (`phase.work` holders); this plan does not restrict assignment targets.
-- **PIC eligibility:** `assertPic("designer")` requires the person to hold `studioflow.project.pic-designer` (and remain active); `assertPic("drafter")` requires `studioflow.project.pic-drafter`.
-  `listAssignablePeople` takes a `seat` argument and returns the matching holders. A project's existing PICs are never re-checked unless the PIC is being changed.
-- **Read model for the UI:** add `projects.getAccess({ grants, actor, projectId })` returning `{ override, isDesigner, isDrafter, canEditProject, canEditDocuments, phases: Array<{ phaseId, canTransition, canEditContent }> }`, computed by the same helper. The Lead's UI consumes only this; it must never re-derive rules.
-- **Existing data / deploy safety:** ship a data migration (no schema change if role grants are rows, otherwise the registry mechanism the repo already uses) so behavior does not silently lock people out: every role that currently holds `studioflow.phase.work` also receives both PIC permissions; every role that holds `studioflow.phase.override` receives `studioflow.project.override`. The owner tightens this afterwards in Platform Access. Inspect how grants are stored first; if grants are only configured in the UI and cannot be migrated safely, stop with BLOCKED / CONFLICT rather than guessing.
-- Errors: a failed gate throws the existing `PERMISSION_DENIED`-family `AppError` with a plain message ("Only the project's assigned designer or drafter can change this.").
-- Audit: unchanged. Do not audit denied attempts.
+- **Table `SfCdItem` (`sf_cd_item`, schema `studioflow`)**: `id` uuid, `phase_id` FK → `SfPhase` `onDelete: Cascade` (so project/phase deletion removes items, matching legacy),
+  `drawing_code` text (normalised, see below), `drawing_name` text, `status` enum `SfCdItemStatus` `PENDING | IN_PROGRESS | COMPLETED` default `PENDING`,
+  `assigned_to_id` text nullable (a user id; **no foreign key** to the platform, same convention as the other `sf_*` tables), `created_by_id`, `created_at`, `updated_at`.
+  Index on `phase_id`. One additive migration.
+- **Only on drafter-seat phases** (`seat_snapshot = 'drafter'`): any create/list on another phase is a validation error `CD_LIST_WRONG_PHASE`.
+- **Drawing code** input is free text; normalise as legacy: strip a leading `ARS`/`ID` prefix and separators, upper-case, and store `ID_<number>`; an empty number stores `ID_`.
+  Keep the normaliser as a small pure function in `src/apps/studioflow/domain/` with unit tests (cases: `12`, `id-12.5`, `ARS_301`, empty, non-numeric).
+  `drawing_name` is required (trimmed, max 200) → `DRAWING_NAME_REQUIRED`.
+- **Order and grouping are presentation:** `list` returns items sorted by numeric drawing code ascending (non-numeric last, then by `created_at`) and includes
+  `group` = `floor(number/100)*100` as a string, or `"-"` when not numeric, exactly as legacy computed it.
+- **Commands (`studioFlow.cdList`):** `list({ grants, projectId, phaseId })`, `create`, `update`, `setStatus`, `delete`. Reads require `studioflow.project.read`.
+  Writes require base grant `studioflow.phase.work` AND `requireProjectAccess(kind: "content", phaseId)`, and the phase must be writable (`loadWritablePhase`).
+  Items may be edited while the phase is in any writable state (before, during and after review); a **locked** (approved) phase rejects changes, same as checklist edits.
+- **Assignee:** optional; when set it must be an active user holding `studioflow.phase.work` (same rule as task assignees) → `CD_ASSIGNEE_NOT_ELIGIBLE`. Clearing is allowed.
+- **Audit:** `cd-item.created` / `cd-item.updated` (with changed fields) / `cd-item.status-changed` / `cd-item.deleted`, entity `cd_item`, metadata `{ projectId, phaseId, drawingCode, drawingName }`, following `writeAudit` usage.
+- **Read model for the UI:** `getAccess` already reports `phases[].canEditContent`; the Lead uses that. No new access API.
+- **Never affects phase gates:** do not add CD items to blockers, warnings, `todoBlockers` or approval checks.
 
 ## Business Rules and Architecture Constraints
 
-- StudioFlow only. Do not change Master Data, BQ, platform RBAC mechanics, or the Prisma schema beyond what the grant storage requires. No new dependency.
-- Do not add abstraction layers beyond the one gate helper and the `getAccess` read model.
-- Nothing outside StudioFlow may import the gate helper. Public exports only if a consumer already exists.
-- Keep every existing test passing except tests that assert the old "any holder can edit any project" behavior; update those deliberately and list them in the report.
+- StudioFlow only; no cross-app reads/writes, no Master Data/BQ changes, no platform RBAC changes, no new permissions, no new dependency.
+- New service module under `src/apps/studioflow/cd-list/` registered in `src/apps/studioflow/service.ts` like the other services; one canonical implementation.
+- Respect the audit and error conventions used by `tasks/service.ts`; user-facing messages plain English.
+- Migration is additive (new enum and table). Apply it to both approved rebuild databases; verify with `prisma migrate status`.
 
 ## Boundaries and Non-goals
 
-No UI work (the Lead hides/disables controls afterwards). No per-phase permissions beyond `seat_snapshot`. No change to who can be an assignee. No project membership table. No change to Master Data or BQ. No push.
+No UI. No import/export. No CD List on non-drafter phases. No per-item comments/files. No effect on approvals. No dependencies between items. No push.
 
 ## Acceptance Criteria
 
-- A designer PIC can edit their project everywhere; the drafter PIC can transition and edit content only on the drafter-seat phase and can edit project-level documents; an unassigned staff member with all base grants is denied every mutation on that project and can still read it; a user with `project.override` can edit any project.
-- Unit tests for the gate helper cover all five rules and the override; integration tests cover at least one mutation per service (projects, phases, tasks, mom, schedule, presentation, library) for allowed and denied cases.
-- `assertPic` and `listAssignablePeople` respect the seat permissions; changing a PIC to an ineligible person is rejected; an unchanged existing PIC is not re-checked.
-- The deploy data migration leaves every current role able to do what it could before (no lock-out), verified by a test or a documented dry run against the dev database.
+- A designer PIC and the drafter PIC can create, edit, change status, and delete items on the CD phase; an unassigned staff member with `phase.work` is denied every write (`PERMISSION_DENIED`) but can list.
+- A drafter PIC cannot use the CD List API on a designer-seat phase (wrong phase error) and creating on any non-drafter phase fails.
+- A locked phase and an archived project reject writes; a project deleted/phase cascade removes items.
+- Code normalisation, numeric sort and grouping match the cases in the unit tests; assignee eligibility enforced.
+- Each write produces exactly one audit event with the fields above.
 
 ## Verification
 
-`npm test`, `npx tsc --noEmit`, `npm run check`, eslint, `npm run build`. Render `/studioflow`, a project page, and the Projects list once in `next dev` and report it. Use STUDIOFLOW_LOCATION=kantor. Databases: only `studioflow_rebuild` (dev) and `studioflow_rebuild_test` on localhost:5433; never the stale scratch databases `studioflow_rebuild_browser_test` / `studioflow_rebuild_regression_test` and never any legacy database.
+`npm test`, `npx tsc --noEmit`, `npm run check`, eslint, `npm run build`. Render `/studioflow` and a project page once in `next dev` and report it (restart the dev server first: the permission registry loads at boot). STUDIOFLOW_LOCATION=kantor. Databases: only `studioflow_rebuild` (dev) and `studioflow_rebuild_test` on localhost:5433 (container `studioflowrb-gateb-test-db`); never any legacy database.
 
 ## Reviewer Acceptance
 
-The Lead reviews the diff and the test list, then builds the UI gating from `getAccess` and verifies in the browser with three accounts (designer PIC, unassigned staff, override holder).
+The Lead reviews the diff, then builds the CD List table on the Construction Drawing phase canvas (add, inline edit, status select, delete, sorted/grouped like legacy, read-only for viewers) and verifies it in the browser.
 
 ## Regression Risks and Recovery
 
-Largest risk: a missed mutation path stays open, or a role loses access on deploy. Mitigate with the per-service integration tests and the grant-copy migration. Recovery: revert the single commit and, if the data migration ran, the reverse grant rows it recorded.
+Low: additive table and a new service module. Recovery: revert the single commit and drop `sf_cd_item` / `SfCdItemStatus` with a follow-up migration.
 
 ## Executor Prompt
 
 You are the Backend Executor. Location: kantor. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY backend
 outcome and nothing beyond it. Inspect current repository evidence, preserve unrelated owner work, make sound in-scope implementation decisions, run the
-required checks (including opening the touched routes in `next dev`), update `CHANGELOG.md`, and create the target local revision commit R8.220. Stop only for
+required checks (including opening the touched routes in `next dev`), update `CHANGELOG.md`, and create the target local revision commit R8.223. Stop only for
 a material locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT report. Report the commit, checks, limitations, and remaining unrelated dirty files.
