@@ -6,7 +6,6 @@ const SECTIONS = [
   { href: "#archive-retention", label: "Archived files" },
   { href: "#checklist-templates", label: "Checklist Templates" },
   { href: "#phase-templates", label: "Phase Templates" },
-  { href: "#product-schedule", label: "Product Schedule" },
 ] as const;
 
 /** In-page section jump list plus a bridge back to platform-level settings. */
@@ -17,6 +16,8 @@ export function StudioSettingsNav() {
       {SECTIONS.map((item) => (
         <ContextNavLink key={item.href} href={item.href}>{item.label}</ContextNavLink>
       ))}
+      <ContextNavHeading>Related</ContextNavHeading>
+      <ContextNavLink component={Link} href="/studioflow/schedule-templates">Schedule templates</ContextNavLink>
       <ContextNavHeading>Settings</ContextNavHeading>
       <ContextNavLink component={Link} href="/settings/general">Platform Settings</ContextNavLink>
     </>

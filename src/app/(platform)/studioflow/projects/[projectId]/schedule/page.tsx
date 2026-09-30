@@ -36,7 +36,7 @@ export default async function ProjectSchedulePage({ params }: { params: Promise<
         brands={brands}
         canEdit={canEdit}
         canManageTemplates={hasPermission(grants, P.settingsManage)}
-        settingsHref={STUDIOFLOW_ROUTES.settings}
+        templatesHref={STUDIOFLOW_ROUTES.scheduleTemplates}
       />
     </SectionCard>
     </>

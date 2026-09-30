@@ -1,6 +1,6 @@
 "use client";
 
-import { BookMarked, Building2, ChartGantt, FolderKanban, ListChecks, Settings } from "lucide-react";
+import { BookMarked, Building2, ChartGantt, FolderKanban, LayoutTemplate, ListChecks, Settings } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { NavGroup, NavItem, UtilitySection } from "@/platform/ui_engine";
@@ -13,6 +13,7 @@ const ICONS: Record<string, typeof ListChecks> = {
   "/studioflow/clients": Building2,
   "/studioflow/library": BookMarked,
   "/studioflow/settings": Settings,
+  "/studioflow/schedule-templates": LayoutTemplate,
 };
 
 function isActive(pathname: string, href: string, exact = false): boolean {

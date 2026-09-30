@@ -413,7 +413,7 @@ export function ScheduleBoard({
   brands,
   canEdit,
   canManageTemplates,
-  settingsHref,
+  templatesHref,
 }: {
   projectId: string;
   entries: readonly ScheduleEntryView[];
@@ -421,7 +421,7 @@ export function ScheduleBoard({
   canEdit: boolean;
   /** Studio settings permission: template settings link and "Save as template". */
   canManageTemplates: boolean;
-  settingsHref: string;
+  templatesHref: string;
 }) {
   const command = useCommand();
   const { run, isPending, error } = command;
@@ -526,10 +526,10 @@ export function ScheduleBoard({
           {canManageTemplates ? (
             <Link
               prefetch={false}
-              href={`${settingsHref}#product-schedule`}
+              href={templatesHref}
               className="inline-flex min-h-(--ui-control-height-sm) items-center gap-1.5 rounded-control px-2.5 text-xs font-medium text-ink-secondary hover:bg-surface-muted hover:text-ink"
             >
-              <Settings2 aria-hidden="true" className="h-3.5 w-3.5" /> Template settings
+              <Settings2 aria-hidden="true" className="h-3.5 w-3.5" /> Schedule templates
             </Link>
           ) : null}
           {canEdit ? <>

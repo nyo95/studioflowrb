@@ -11,12 +11,9 @@ export const dynamic = "force-dynamic";
 
 export default async function StudioSettingsPage() {
   const { grants } = await pageSession();
-  const [settings, templates, scheduleTemplates, schedulePrefixes, brands, phaseTemplates] = await Promise.all([
+  const [settings, templates, phaseTemplates] = await Promise.all([
     studioFlow.projects.getStudioSettings({ grants }),
     studioFlow.tasks.listTemplates({ grants, includeInactive: true }),
-    studioFlow.schedule.listTemplates({ grants }),
-    studioFlow.schedule.listPrefixes({ grants }),
-    studioFlow.schedule.listBrandChoices({ grants }),
     studioFlow.phases.listPhaseTemplates({ grants }),
   ]);
   const defaultTemplate = phaseTemplates.find((template) => template.isDefault && template.isActive);
@@ -28,9 +25,6 @@ export default async function StudioSettingsPage() {
           archiveRetentionDays={settings.archiveRetentionDays}
           canManageProjects={hasPermission(grants, P.projectManage)}
           templates={templates}
-          scheduleTemplates={scheduleTemplates}
-          schedulePrefixes={schedulePrefixes}
-          brands={brands}
           phases={(defaultTemplate?.definitions ?? []).map((definition) => ({ id: definition.id, label: definition.name }))}
           phaseTemplates={phaseTemplates}
           canManage={hasPermission(grants, P.settingsManage)}

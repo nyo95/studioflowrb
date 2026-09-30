@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.245**
-- Next local revision: **R8.246**
+- Current revision after this entry is committed: **R8.246**
+- Next local revision: **R8.247**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.246 | 2026-09-30 | feat(studioflow): Schedule templates on their own page
+
+- **Owner request:** "Template settings" on the Product Schedule opened a long general settings page. The standard Product Schedule (codes such as PT-01 that repeat in every standard project, which "Apply templates" adds to a project) now has its own page, **Schedule templates** (`/studioflow/schedule-templates`), reachable from the schedule toolbar (renamed from "Template settings"), the StudioFlow side menu (next to Studio Settings) and a link on Studio Settings.
+- **Page.** The prefix dictionary and template items moved unchanged, with a new **Code** column that shows the code a new standard project will give each active item (prefix plus its place in that category, e.g. PT-01, PT-02), using the same prefix rule as project creation. Same permission as before (settings manage edits; others read). A short note explains that new projects get every active item and that "Apply templates" adds missing ones to an existing project.
+- **Studio Settings** keeps the checklist, phase templates and archived-files sections; the Product Schedule section is gone from it. No backend, schema or permission change.
+
+**Checks.** `npm test` 693/693, `npm run check`, `tsc --noEmit`, eslint on the StudioFlow screens. Not exercised in the browser.
 
 ## R8.245 | 2026-09-30 | feat(masterdata): "Import & export" in the Master Data side menu
 

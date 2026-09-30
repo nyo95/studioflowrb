@@ -9,7 +9,7 @@ const scheduleBoard = readFileSync(
 const serviceTs = readFileSync("src/apps/studioflow/schedule/service.ts", "utf8");
 const actionsTs = readFileSync("src/app/(platform)/studioflow/actions.ts", "utf8");
 const settingsView = readFileSync(
-  "src/app/(platform)/studioflow/settings/studio-settings-view.tsx",
+  "src/app/(platform)/studioflow/schedule-templates/schedule-templates-view.tsx",
   "utf8",
 );
 const scheduleDomain = readFileSync("src/apps/studioflow/domain/schedule.ts", "utf8");
