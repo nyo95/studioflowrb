@@ -11,11 +11,11 @@ export const dynamic = "force-dynamic";
 type Search = { status?: string; priority?: string; pic?: string; client?: string; q?: string; view?: string };
 
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<Search> }) {
-  const { grants, userId } = await pageSession();
+  const { grants, userId, actor } = await pageSession();
   const params = await searchParams;
   const status = params.status === "ALL" || params.status === "ON_HOLD" || params.status === "COMPLETED" ? params.status : params.status === "ACTIVE" ? "ACTIVE" : "ALL";
   const archived = params.view === "archived";
-  const [projects, people, clients, settings] = await Promise.all([
+  const [projects, people, designers, drafters, clients, settings] = await Promise.all([
     studioFlow.projects.listProjects({
       grants,
       status,
@@ -26,9 +26,14 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       archived,
     }),
     studioFlow.projects.listAssignablePeople({ grants }),
+    studioFlow.projects.listAssignablePeople({ grants, seat: "designer" }),
+    studioFlow.projects.listAssignablePeople({ grants, seat: "drafter" }),
     studioFlow.projects.listClients({ grants }),
     studioFlow.projects.getStudioSettings({ grants }),
   ]);
+
+  const accessRows = await Promise.all(projects.map(async (project) => [project.id, (await studioFlow.projects.getAccess({ grants, actor, projectId: project.id })).canEditProject] as const));
+  const editableProjectIds = accessRows.filter(([, editable]) => editable).map(([id]) => id);
 
   return (
     <PageShell measure="wide">
@@ -36,6 +41,9 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       <ProjectDirectory
         projects={projects}
         people={people}
+        designers={designers}
+        drafters={drafters}
+        editableProjectIds={editableProjectIds}
         clients={clients.map((c) => ({ id: c.id, name: c.name }))}
         filters={{ status, priority: params.priority ?? "", pic: params.pic ?? "", client: params.client ?? "", q: params.q ?? "", archived }}
         canManage={hasPermission(grants, P.projectManage)}

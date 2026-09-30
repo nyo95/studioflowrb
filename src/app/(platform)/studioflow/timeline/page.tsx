@@ -18,7 +18,7 @@ function currentTimeMs(): number {
 }
 
 export default async function TimelinePage({ searchParams }: { searchParams: Promise<Search> }) {
-  const { grants, userId } = await pageSession();
+  const { grants, userId, actor } = await pageSession();
   const params = await searchParams;
   const status = params.status === "ALL" || params.status === "ON_HOLD" || params.status === "COMPLETED" ? params.status : params.status === "ACTIVE" ? "ACTIVE" : "ALL";
   const archived = params.view === "archived";
@@ -49,6 +49,12 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
     return true;
   });
 
+  const editable: Record<string, { project: boolean; phaseIds: string[] }> = {};
+  await Promise.all(projects.map(async (project) => {
+    const access = await studioFlow.projects.getAccess({ grants, actor, projectId: project.id });
+    editable[project.id] = { project: access.canEditProject, phaseIds: access.phases.filter((phase) => phase.canEditContent).map((phase) => phase.phaseId) };
+  }));
+
   return (
     <PageShell measure="wide">
       <PageHeader
@@ -62,6 +68,7 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
         clients={clients.map((c) => ({ id: c.id, name: c.name }))}
         filters={{ status, pic: params.pic ?? "", client: params.client ?? "", from: from ?? "", to: to ?? "", archived }}
         canManage={hasPermission(grants, P.projectManage)}
+        editable={editable}
         now={now}
       />
     </PageShell>

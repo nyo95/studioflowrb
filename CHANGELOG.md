@@ -5,13 +5,32 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.220**
-- Next local revision: **R8.221**
+- Current revision after this entry is committed: **R8.221**
+- Next local revision: **R8.222**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.221 | 2026-09-30 | feat(studioflow): hide edit controls the viewer cannot use; review PASS for R8.220
+
+- **Review verdict, WO-SF-ACCESS-01 (R8.220): PASS.** Lead re-ran `npm test` (655/655), `tsc`, `npm run check`; read the shared gate
+  (`requireProjectAccess`/`getProjectAccess`), the five gated project commands, the centralized MOM/Schedule/Presentation/Tasks/Phases
+  gates, and the role-grant migration (dev "Owner" role got override + both PIC seats, so nobody was locked out). Notes: permissions
+  have no per-permission plain-English label mechanism, so the labels promised in the plan are the raw ids; the gate reads the PIC
+  outside the mutation transaction (negligible race).
+- **UI (Lead).** `pageProjectAccess` + `ReadOnlyNotice`; project page and phase page hide phase actions, activities, checklist and
+  deliverable edits per the phase's seat; MOM, Schedule, Presentation pages disable editing for non-PICs and show "View only";
+  Projects list shows "View only" instead of row actions and the New/Edit dialogs use per-seat PIC lists (current PIC stays
+  selectable); Timeline shows "Edit project dates" only for editable projects and phase bars only for editable phases.
+- **Test.** Added denied cases: drafter PIC cannot activate or add activity on a designer-seat phase or edit project fields.
+- **Housekeeping.** Reset the two stale scratch databases (`browser_test`, `regression_test`) to a clean current schema at the owner's
+  request; dev and test databases untouched. Backlog: CD List recorded as `[PLANNED]` (owner go-ahead), stale-DB blocker removed.
+  A running dev server must be restarted after new permissions ship (the permission registry loads once at boot).
+
+**Checks.** `npm test` 655/655, `tsc --noEmit`, eslint (0 errors), pages rendered as the override holder; read-only rendering for other
+accounts queued in `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`.
 
 ## R8.220 | 2026-09-30 | feat(studioflow): enforce PIC project edit access
 

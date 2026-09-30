@@ -11,7 +11,7 @@ import { ClientSelect } from "./client-select";
 import { PersonSelect, type Person } from "../_components/people";
 import { useCommand } from "../_components/use-command";
 
-export function NewProjectDialog({ people, clients, onClose }: { people: Person[]; clients: Array<{ id: string; name: string }>; onClose: () => void }) {
+export function NewProjectDialog({ designers, drafters, clients, onClose }: { designers: Person[]; drafters: Person[]; clients: Array<{ id: string; name: string }>; onClose: () => void }) {
   const router = useRouter();
   const { run, pending, error } = useCommand();
   const [form, setForm] = useState({
@@ -53,8 +53,8 @@ export function NewProjectDialog({ people, clients, onClose }: { people: Person[
             <ClientSelect clients={clients} value={form.client} onChange={(v) => set("client", v)} />
           </Field>
           <Field label="Client contact"><Input value={form.clientContact} maxLength={200} onChange={(e) => set("clientContact", e.target.value)} /></Field>
-          <Field label="Designer (PIC)" required><PersonSelect required people={people} value={form.picDesignerId || null} onChange={(v) => set("picDesignerId", v ?? "")} /></Field>
-          <Field label="Drafter (PIC)" required><PersonSelect required people={people} value={form.picDrafterId || null} onChange={(v) => set("picDrafterId", v ?? "")} /></Field>
+          <Field label="Designer (PIC)" required><PersonSelect required people={designers} value={form.picDesignerId || null} onChange={(v) => set("picDesignerId", v ?? "")} /></Field>
+          <Field label="Drafter (PIC)" required><PersonSelect required people={drafters} value={form.picDrafterId || null} onChange={(v) => set("picDrafterId", v ?? "")} /></Field>
           <Field label="Priority">
             <Select value={form.priority} onChange={(e) => set("priority", e.target.value as typeof form.priority)}>
               <option value="URGENT">Urgent</option>
@@ -65,7 +65,7 @@ export function NewProjectDialog({ people, clients, onClose }: { people: Person[
           <Field label="Area (m²)"><Input inputMode="decimal" value={form.area} onChange={(e) => set("area", e.target.value)} /></Field>
         </div>
         <Field label="Site address"><Textarea rows={2} value={form.address} onChange={(e) => set("address", e.target.value)} /></Field>
-        {people.length === 0 ? <Text size="sm" tone="secondary">No staff can be assigned yet. Grant “StudioFlow phase work” to a role in Platform Access first.</Text> : null}
+        {designers.length === 0 || drafters.length === 0 ? <Text size="sm" tone="secondary">No one can be picked as {designers.length === 0 ? "designer" : "drafter"} yet. Grant “Can be assigned as a project’s {designers.length === 0 ? "designer" : "drafter"} (PIC)” to a role in Platform Access first.</Text> : null}
         {error ? <InlineError>{error}</InlineError> : null}
         <FormActions>
           <Button type="button" data-dialog-cancel disabled={pending}>Cancel</Button>

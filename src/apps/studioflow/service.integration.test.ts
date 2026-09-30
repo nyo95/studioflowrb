@@ -569,6 +569,9 @@ describe("SF-R1 bootstrap and naming", () => {
     assert.equal(access.phases.find((phase) => phase.phaseId === cd.id)?.canTransition, true);
     assert.equal(access.phases.find((phase) => phase.phaseId === cd.id)?.canEditContent, true);
 
+    await rejectsWith(sf.phases.activatePhase({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: moodboard.id }), "PERMISSION_DENIED");
+    await rejectsWith(sf.phases.addActivity({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: moodboard.id, content: "Not the drafter's phase", mode: "FEEDBACK" }), "PERMISSION_DENIED");
+    await rejectsWith(sf.projects.setProjectPriority({ ...as(drafter, DRAFTER_GRANTS), projectId, priority: "LOW" }), "PERMISSION_DENIED");
     const override = await seedUser("Override", ALL);
     const overrideAccess = await sf.projects.getAccess({ grants: ALL, actor: override.actor, projectId });
     assert.equal(overrideAccess.override, true);

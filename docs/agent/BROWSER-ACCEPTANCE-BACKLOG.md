@@ -148,3 +148,11 @@ this backlog's former SF-A entries.)_
 - Steps: 1. Confirm New and Edit project have no date fields. 2. On Timeline click "Edit project dates", change start and opening date, save. 3. Edit the project's address on Projects and save.
 - Acceptance: the bar and both date labels update immediately; the opening date survives the unrelated edit; clearing start falls back to the day the project was added.
 - Status: PENDING
+
+### [R8.221] PIC-based edit rights (WO-SF-ACCESS-01 + UI gating)
+- Surface: StudioFlow → Projects, project page (phase canvas), MOM, Schedule, Presentation, Timeline
+- Fixture: one project; three accounts: designer PIC, an unassigned staff member (all base grants, no override), a holder of "Edit any project" (override). Drafter PIC too if available.
+- Viewport: desktop (default)
+- Steps: 1. As the unassigned staff open each page. 2. As the drafter PIC open the drafter-seat phase and a designer-seat phase. 3. As designer PIC edit project fields, open Timeline. 4. As override holder repeat.
+- Acceptance: unassigned staff sees "View only" notices, no edit/phase buttons, row shows "View only" in Projects, and any forced attempt is refused; drafter PIC edits only the drafter-seat phase plus MOM/Schedule/Presentation; designer PIC edits everything; override edits everything. Designer/Drafter pickers list only holders of the matching PIC permission. Owner (override) verified on 2026-09-30: all pages render, no "View only".
+- Status: PENDING (read-only paths not yet seen in a browser)

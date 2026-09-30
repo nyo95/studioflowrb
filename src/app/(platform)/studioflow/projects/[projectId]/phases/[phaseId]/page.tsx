@@ -11,7 +11,8 @@ import { ChecklistTree } from "../../../../_components/checklist-tree";
 import { PhaseGate } from "../../../../_components/phase-gate";
 import { PhaseStatusBadge } from "../../../../_components/phase-status";
 import { PersonChip } from "../../../../_components/people";
-import { pageSession } from "../../../../_components/session";
+import { pageProjectAccess, pageSession } from "../../../../_components/session";
+import { ReadOnlyNotice } from "../../../../_components/read-only-notice";
 import { PhaseActions } from "./phase-actions";
 import { DeliverablesPanel } from "./deliverables-panel";
 import { RevisionHistory } from "./revision-history";
@@ -33,11 +34,16 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
   const { items: phaseDeliverables, status: deliverableStatus } = phaseDeliverablesResult;
   const seatPerson = (await studioFlow.projects.resolvePeople({ grants, userIds: [phase.seatUserId] }))[0];
   const caps = studioFlow.phases.capabilities(grants);
-  const canWork = phase.modifiable && caps.work;
-  const canManage = hasPermission(grants, P.projectManage);
+  const access = await pageProjectAccess(projectId);
+  const phaseAccess = access.phases.find((item) => item.phaseId === phaseId);
+  const canTransition = phaseAccess?.canTransition ?? false;
+  const canContent = phaseAccess?.canEditContent ?? false;
+  const canWork = phase.modifiable && caps.work && canContent;
+  const canManage = hasPermission(grants, P.projectManage) && access.canEditProject;
 
   return (
     <div className="grid gap-4">
+      {!canTransition && !canContent && phase.modifiable ? <ReadOnlyNotice scope={access.isDesigner || access.isDrafter ? "phase" : "project"} /> : null}
       <SectionCard padded>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="grid gap-1.5">
@@ -52,7 +58,7 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
               phase.allowParallel ? "Can run in parallel" : "Sequential",
             ]} />
           </div>
-          <PhaseActions
+          {canTransition ? <PhaseActions
             projectId={projectId}
             phaseId={phaseId}
             commands={phase.commands}
@@ -63,7 +69,7 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
             canOverride={caps.override}
             activeRevision={phase.activeRevision?.label ?? null}
             openFeedback={phase.activeRevision?.activities.filter((a) => a.mode === "FEEDBACK" && !a.done).map((a) => a.content) ?? []}
-          />
+          /> : null}
         </div>
         {phase.startBlockedReason ? <Notice className="mt-3" tone="neutral" title="Not yet">{phase.startBlockedReason}</Notice> : null}
         {phase.status !== "PENDING" && phase.blockers.total > 0 && !phase.isLocked ? (
@@ -99,7 +105,7 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
           title="Phase checklist"
           description="Ticked items gate approval. Items marked Optional are warnings only. Subtasks never block."
         >
-          <ChecklistTree projectId={projectId} phaseId={phaseId} nodes={checklist} people={people} canEdit={phase.modifiable && hasPermission(grants, P.taskManage)} canToggleOptional={canWork} emptyText="No checklist for this phase" />
+          <ChecklistTree projectId={projectId} phaseId={phaseId} nodes={checklist} people={people} canEdit={phase.modifiable && hasPermission(grants, P.taskManage) && canContent} canToggleOptional={canWork} emptyText="No checklist for this phase" />
         </SectionCard>
       </div>
 

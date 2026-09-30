@@ -30,6 +30,7 @@ export function TimelineDirectory({
   clients,
   filters,
   canManage,
+  editable,
   now,
 }: {
   projects: TimelineProject[];
@@ -39,6 +40,8 @@ export function TimelineDirectory({
   /** Captured once on the server and passed through, so the "today" marker matches between SSR and hydration instead of drifting with a fresh client-side `Date.now()`. */
   now: number;
   canManage: boolean;
+  /** Per project: may the viewer edit its dates, and which phases (PIC assignment). */
+  editable: Record<string, { project: boolean; phaseIds: string[] }>;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -103,7 +106,7 @@ export function TimelineDirectory({
       ) : (
         <div className="grid gap-3">
           {projects.map((project) => (
-            <TimelineRow key={project.id} project={project} canManage={canManage} now={now} onEditPhase={(phase) => setEditing({ projectId: project.id, phase })} onEditDates={() => setEditingProject(project)} />
+            <TimelineRow key={project.id} project={project} canManage={canManage} canEditDates={canManage && (editable[project.id]?.project ?? false)} phaseIds={editable[project.id]?.phaseIds ?? []} now={now} onEditPhase={(phase) => setEditing({ projectId: project.id, phase })} onEditDates={() => setEditingProject(project)} />
           ))}
         </div>
       )}
@@ -117,7 +120,7 @@ export function TimelineDirectory({
   );
 }
 
-function TimelineRow({ project, canManage, now, onEditPhase, onEditDates }: { project: TimelineProject; canManage: boolean; now: number; onEditPhase: (phase: TimelinePhase) => void; onEditDates: () => void }) {
+function TimelineRow({ project, canManage, canEditDates, phaseIds, now, onEditPhase, onEditDates }: { project: TimelineProject; canManage: boolean; canEditDates: boolean; phaseIds: string[]; now: number; onEditPhase: (phase: TimelinePhase) => void; onEditDates: () => void }) {
   if (project.phases.length === 0) return null;
   const span = resolveTimelineSpan(project.timelineStartDate, project.openingDate, { phases: project.phases, now });
   const segments = computePhaseSegments(span, project.phases);
@@ -134,7 +137,7 @@ function TimelineRow({ project, canManage, now, onEditPhase, onEditDates }: { pr
             const style = { left: `${segment.leftPct}%`, width: `${segment.widthPct}%` };
             const title = `${phase.label} — ${phaseStatusDisplay(phase.status).label}${segment.dated ? ` (${phase.plannedStartDate} – ${phase.plannedEndDate})` : " — no planned dates, click to set"}`;
             const tone = `${phaseAccentDotClass(phase.definitionId)} ${phase.status === "PENDING" ? "opacity-30" : "opacity-90"}`;
-            return canManage ? (
+            return canManage && phaseIds.includes(phase.id) ? (
               <button
                 key={phase.id}
                 type="button"
@@ -152,7 +155,7 @@ function TimelineRow({ project, canManage, now, onEditPhase, onEditDates }: { pr
         </div>
         <div className="flex items-center justify-between">
           <Text tone="tertiary" size="sm">{project.timelineStartDate}</Text>
-          {canManage ? <Button type="button" size="sm" variant="ghost" onClick={onEditDates}>Edit project dates</Button> : null}
+          {canEditDates ? <Button type="button" size="sm" variant="ghost" onClick={onEditDates}>Edit project dates</Button> : null}
           <Text tone="tertiary" size="sm">{project.openingDate ?? "Ongoing"}</Text>
         </div>
       </div>

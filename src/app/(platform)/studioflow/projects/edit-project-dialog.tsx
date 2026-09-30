@@ -28,8 +28,12 @@ export type EditableProject = {
 /** Moved off the project detail page (owner, 2026-09-23): administrative fields — name, client,
  * designer/drafter, opening date, type, area, address, priority, status — are edited from the
  * Projects list, not the project's own pages, which now show phase information only. */
-export function EditProjectDialog({ project, people, clients, onClose }: { project: EditableProject; people: Person[]; clients: Array<{ id: string; name: string }>; onClose: () => void }) {
+export function EditProjectDialog({ project, designers, drafters, clients, onClose }: { project: EditableProject; designers: Person[]; drafters: Person[]; clients: Array<{ id: string; name: string }>; onClose: () => void }) {
   const { run, pending, error } = useCommand();
+  // The current PIC stays selectable even if they no longer hold the seat permission (the server only re-checks a changed PIC).
+  const withCurrent = (list: Person[], current: Person) => (list.some((person) => person.id === current.id) ? list : [current, ...list]);
+  const designerChoices = withCurrent(designers, project.designer);
+  const drafterChoices = withCurrent(drafters, project.drafter);
   const [form, setForm] = useState({
     name: project.name,
     clientId: project.client?.id ?? "",
@@ -72,8 +76,8 @@ export function EditProjectDialog({ project, people, clients, onClose }: { proje
             <ClientSelect clients={clients} value={form.clientId} onChange={(v) => set("clientId", v)} />
           </Field>
           <Field label="Client contact"><Input value={form.clientContact} maxLength={200} onChange={(e) => set("clientContact", e.target.value)} /></Field>
-          <Field label="Designer (PIC)" required><PersonSelect required people={people} value={form.picDesignerId} onChange={(v) => set("picDesignerId", v ?? "")} /></Field>
-          <Field label="Drafter (PIC)" required><PersonSelect required people={people} value={form.picDrafterId} onChange={(v) => set("picDrafterId", v ?? "")} /></Field>
+          <Field label="Designer (PIC)" required><PersonSelect required people={designerChoices} value={form.picDesignerId} onChange={(v) => set("picDesignerId", v ?? "")} /></Field>
+          <Field label="Drafter (PIC)" required><PersonSelect required people={drafterChoices} value={form.picDrafterId} onChange={(v) => set("picDrafterId", v ?? "")} /></Field>
           <Field label="Priority">
             <Select value={form.priority} onChange={(e) => set("priority", e.target.value as typeof form.priority)}>
               <option value="URGENT">Urgent</option>

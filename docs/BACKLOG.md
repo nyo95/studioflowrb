@@ -293,16 +293,10 @@ check-then-act races in `projects.ts` (now guarded with the same
 
 ## StudioFlow
 
-- [ ] [PLANNED][P1] **Project edit rights follow the PIC assignment (owner, 2026-09-30) — decisions answered, plan READY.** Owner answers:
-  adopt the legacy rule with a new admin-only override permission; everyone may still view read-only; PIC designer/drafter pickers use two
-  separate permissions; project-level documents (Schedule, MOM, Presentation) are editable by the designer OR drafter PIC. Backend is
-  `PLAN.md` WO-SF-ACCESS-01 (Executor, target R8.220); the Lead then gates the UI from the `getAccess` read model and verifies in the browser.
-  Contract updated (RW-02, §3). Legacy evidence recorded in the plan (`c4b0c466`).
-
-- [ ] [BLOCKED][P3] **Two stale scratch databases (`studioflow_rebuild_browser_test`, `studioflow_rebuild_regression_test`).**
-  Both are weeks behind the current migrations (regression's history also diverges). Not used by `npm test` or the dev
-  server. Owner question: "Reset dan migrasi ulang keduanya (isinya hanya data uji), atau dibiarkan?" Do not run migrations
-  against them before an answer.
+- [ ] [PLANNED][P2] **CD List (Construction Drawing item list) — owner go-ahead 2026-09-30.** Wave-2 item in `STUDIOFLOW-REWORK-CONTRACT.md`
+  (RW-04, "Phase reading / CD list" DEFER) now approved to build. Legacy evidence: `cd-list-table.tsx`, model `CDList`, `phase-service.ts`
+  (`c4b0c466`). Scope, editing rights (drafter PIC or designer PIC, i.e. the phase-content rule) and schema need a Lead plan first; backend
+  (table, service, tests) goes to the Executor, the screen to the Lead. Do not build before that plan exists.
 
 
 **Fixed this session (2026-09-22, R8.107):** SF-02 (`deletePhaseDefinition`

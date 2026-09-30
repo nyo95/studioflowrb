@@ -11,7 +11,7 @@ import { ArchivedFilesNote } from "../_components/archived-files-note";
 import { EditProjectDialog, type EditableProject } from "./edit-project-dialog";
 
 /** Row-level equivalent of the administrative actions moved off the project detail page (owner, 2026-09-23). */
-export function ProjectRowActions({ project, people, clients, archiveRetentionDays, asOf }: { project: EditableProject & { archivedAt: Date | null; assetsPurgedAt: Date | null }; people: Person[]; clients: Array<{ id: string; name: string }>; archiveRetentionDays: number; asOf: string }) {
+export function ProjectRowActions({ project, designers, drafters, clients, archiveRetentionDays, asOf }: { project: EditableProject & { archivedAt: Date | null; assetsPurgedAt: Date | null }; designers: Person[]; drafters: Person[]; clients: Array<{ id: string; name: string }>; archiveRetentionDays: number; asOf: string }) {
   const { run, pending, error } = useCommand();
   const [dialog, setDialog] = useState<null | "edit" | "archive" | "restore">(null);
   const [reason, setReason] = useState("");
@@ -59,7 +59,7 @@ export function ProjectRowActions({ project, people, clients, archiveRetentionDa
           </form>
         </Dialog>
       ) : null}
-      {dialog === "edit" ? <EditProjectDialog project={project} people={people} clients={clients} onClose={() => setDialog(null)} /> : null}
+      {dialog === "edit" ? <EditProjectDialog project={project} designers={designers} drafters={drafters} clients={clients} onClose={() => setDialog(null)} /> : null}
     </>
   );
 }

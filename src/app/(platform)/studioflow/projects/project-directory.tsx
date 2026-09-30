@@ -78,6 +78,9 @@ function PhaseDotLabel({ phases }: { phases: ProjectRow["phases"] }) {
 export function ProjectDirectory({
   projects,
   people,
+  designers,
+  drafters,
+  editableProjectIds,
   clients,
   filters,
   canManage,
@@ -86,6 +89,11 @@ export function ProjectDirectory({
 }: {
   projects: ProjectRow[];
   people: Person[];
+  /** Who may be picked for each seat (their PIC permission). */
+  designers: Person[];
+  drafters: Person[];
+  /** Projects the viewer may edit (assigned PIC or override); other rows stay read-only. */
+  editableProjectIds: string[];
   clients: Array<{ id: string; name: string }>;
   filters: { status: string; priority: string; pic: string; client: string; q: string; archived: boolean };
   canManage: boolean;
@@ -188,9 +196,13 @@ export function ProjectDirectory({
               <TableCell className="tabular-nums"><FormattedInstant value={project.updatedAt} locale={locale} timeZone={timezone} /></TableCell>
               {canManage ? (
                 <RowActionsCell>
-                  <span onClick={(e) => e.stopPropagation()}>
-                    <ProjectRowActions project={project} people={people} clients={clients} archiveRetentionDays={archiveRetentionDays} asOf={asOf} />
-                  </span>
+                  {editableProjectIds.includes(project.id) ? (
+                    <span onClick={(e) => e.stopPropagation()}>
+                      <ProjectRowActions project={project} designers={designers} drafters={drafters} clients={clients} archiveRetentionDays={archiveRetentionDays} asOf={asOf} />
+                    </span>
+                  ) : (
+                    <span className="text-xs text-ink-tertiary" title="Only the project's assigned designer can edit it">View only</span>
+                  )}
                 </RowActionsCell>
               ) : null}
             </TableRow>
@@ -198,7 +210,7 @@ export function ProjectDirectory({
         </TableBody>
       </DataTable>
 
-      {creating ? <NewProjectDialog people={people} clients={clients} onClose={() => setCreating(false)} /> : null}
+      {creating ? <NewProjectDialog designers={designers} drafters={drafters} clients={clients} onClose={() => setCreating(false)} /> : null}
     </div>
   );
 }

@@ -22,7 +22,8 @@ import { ActivityList } from "../../_components/activity-list";
 import { ChecklistTree } from "../../_components/checklist-tree";
 import { PhaseGate } from "../../_components/phase-gate";
 import { PhaseStatusBadge } from "../../_components/phase-status";
-import { pageSession } from "../../_components/session";
+import { pageProjectAccess, pageSession } from "../../_components/session";
+import { ReadOnlyNotice } from "../../_components/read-only-notice";
 import { DeliverablesPanel } from "./phases/[phaseId]/deliverables-panel";
 import { PhaseActions } from "./phases/[phaseId]/phase-actions";
 import { RevisionHistory } from "./phases/[phaseId]/revision-history";
@@ -118,6 +119,7 @@ async function PhaseCanvas({
 }) {
   const { grants } = await pageSession();
   const caps = studioFlow.phases.capabilities(grants);
+  const access = await pageProjectAccess(projectId);
 
   const phaseDetail = await studioFlow.phases.getPhaseDetail({ grants, projectId, phaseId }).catch((error) => {
     if (error instanceof AppError && error.kind === "NOT_FOUND") return null;
@@ -130,10 +132,15 @@ async function PhaseCanvas({
     studioFlow.phases.listDeliverables({ grants, projectId, phaseId: phaseDetail.id }),
   ]);
   const { items: phaseDeliverables, status: deliverableStatus } = deliverablesResult;
-  const canManage = hasPermission(grants, P.projectManage);
+  const phaseAccess = access.phases.find((phase) => phase.phaseId === phaseDetail.id);
+  const canTransition = phaseAccess?.canTransition ?? false;
+  const canContent = phaseAccess?.canEditContent ?? false;
+  const canManage = hasPermission(grants, P.projectManage) && access.canEditProject;
 
   return (
     <>
+      {!archived && !canTransition && !canContent ? <ReadOnlyNotice scope={access.isDesigner || access.isDrafter ? "phase" : "project"} /> : null}
+
       {/* Phase actions */}
       <SectionCard padded>
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -143,7 +150,7 @@ async function PhaseCanvas({
             {phaseDetail.isLocked ? <Badge tone="success">Locked</Badge> : null}
             {phaseDetail.seat === "drafter" ? <Text size="sm" tone="secondary" meta>drafter</Text> : null}
           </div>
-          {!archived ? (
+          {!archived && canTransition ? (
             <PhaseActions
               projectId={projectId}
               phaseId={phaseDetail.id}
@@ -164,7 +171,7 @@ async function PhaseCanvas({
             projectId={projectId}
             checklistItems={phaseDetail.blockers.checklistItems}
             activityItems={phaseDetail.blockers.activityItems}
-            canWork={caps.work}
+            canWork={caps.work && canContent}
           />
         ) : null}
       </SectionCard>
@@ -181,7 +188,7 @@ async function PhaseCanvas({
               phaseId={phaseDetail.id}
               items={phaseDetail.activeRevision.activities}
               people={people}
-              canEdit={phaseDetail.modifiable && caps.work}
+              canEdit={phaseDetail.modifiable && caps.work && canContent}
               emptyText="Nothing recorded for this revision"
             />
           ) : (
@@ -200,8 +207,8 @@ async function PhaseCanvas({
             phaseId={phaseDetail.id}
             nodes={checklist}
             people={people}
-            canEdit={phaseDetail.modifiable && hasPermission(grants, P.taskManage)}
-            canToggleOptional={phaseDetail.modifiable && caps.work}
+            canEdit={phaseDetail.modifiable && hasPermission(grants, P.taskManage) && canContent}
+            canToggleOptional={phaseDetail.modifiable && caps.work && canContent}
             emptyText="No checklist for this phase"
           />
         </SectionCard>
@@ -213,7 +220,7 @@ async function PhaseCanvas({
         phaseId={phaseDetail.id}
         deliverables={phaseDeliverables}
         status={deliverableStatus}
-        canWork={phaseDetail.modifiable && caps.work}
+        canWork={phaseDetail.modifiable && caps.work && canContent}
         canManage={canManage}
       />
 
