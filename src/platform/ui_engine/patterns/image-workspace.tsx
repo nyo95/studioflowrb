@@ -5,6 +5,7 @@ import Image from "next/image";
 
 import { Button } from "../primitives/actions";
 import { Input } from "../primitives/forms";
+import { ADJUST_LIMITS, colorFilter, compressionSteps, formatSize, isNeutral, NEUTRAL_ADJUST, type ColorAdjust } from "./image-adjust";
 
 type Point = { x: number; y: number };
 type DrawTool = "pen" | "arrow" | "rect" | "ellipse";
@@ -33,8 +34,20 @@ export type ImageWorkspaceProps = {
   outputQuality?: number;
   /** Fixed crop aspect (width / height); omitted keeps the source aspect. */
   aspect?: number;
+  /**
+   * The prepared image is re-encoded smaller (JPEG quality first, then a little fewer pixels) until it fits this size.
+   * An image that already fits is encoded once with the settings above.
+   */
+  targetBytes?: number;
   disabled?: boolean;
 };
+
+const DEFAULT_TARGET_BYTES = 1.5 * 1024 * 1024;
+
+/** `ctx.filter` is missing in older Safari; without it the colour sliders would preview one thing and save another, so they are hidden. */
+function canBakeColorFilter(): boolean {
+  return typeof CanvasRenderingContext2D !== "undefined" && "filter" in CanvasRenderingContext2D.prototype;
+}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -92,7 +105,7 @@ function drawStrokes(context: CanvasRenderingContext2D, strokes: readonly Stroke
 }
 
 /** Browser image preparation only; storage and consumer policy stay outside. */
-export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jpeg,image/webp", maxBytes = 10 * 1024 * 1024, maxDimension = 1800, outputType = "image/png", outputQuality = 0.86, aspect, disabled = false }: ImageWorkspaceProps) {
+export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jpeg,image/webp", maxBytes = 30 * 1024 * 1024, maxDimension = 1800, outputType = "image/png", outputQuality = 0.86, aspect, targetBytes = DEFAULT_TARGET_BYTES, disabled = false }: ImageWorkspaceProps) {
   const pickerRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -108,6 +121,10 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
   const [drawing, setDrawing] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [adjust, setAdjust] = useState<ColorAdjust>(NEUTRAL_ADJUST);
+  const [sizeNote, setSizeNote] = useState<string | null>(null);
+  // Read once on the client; the controls only render after an image is chosen, so there is no server markup to disagree with.
+  const [colorSupported] = useState(canBakeColorFilter);
 
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
 
@@ -139,7 +156,7 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(selected);
     setPreviewUrl(URL.createObjectURL(selected));
-    setZoom(1); setPanX(50); setPanY(50); setStrokes([]);
+    setZoom(1); setPanX(50); setPanY(50); setStrokes([]); setAdjust(NEUTRAL_ADJUST); setSizeNote(null);
   };
 
   const pointFromEvent = (event: PointerEvent<HTMLCanvasElement>): Point => {
@@ -162,18 +179,30 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
       const cropHeight = baseHeight / zoom;
       const sourceX = (image.naturalWidth - cropWidth) * (panX / 100);
       const sourceY = (image.naturalHeight - cropHeight) * (panY / 100);
-      const scale = Math.min(1, maxDimension / Math.max(cropWidth, cropHeight));
-      const width = Math.max(1, Math.round(cropWidth * scale));
-      const height = Math.max(1, Math.round(cropHeight * scale));
-      const canvas = document.createElement("canvas");
-      canvas.width = width; canvas.height = height;
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("Canvas is unavailable");
-      if (outputType === "image/jpeg") { context.fillStyle = "#ffffff"; context.fillRect(0, 0, width, height); }
-      context.drawImage(image, sourceX, sourceY, cropWidth, cropHeight, 0, 0, width, height);
-      drawStrokes(context, strokes, width, height, Math.max(2, width / 700));
-      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error("Image preparation failed")), outputType, outputQuality));
-      if (blob.size > maxBytes) throw new Error("Prepared image is too large");
+      const baseScale = Math.min(1, maxDimension / Math.max(cropWidth, cropHeight));
+      const render = (factor: number): HTMLCanvasElement => {
+        const width = Math.max(1, Math.round(cropWidth * baseScale * factor));
+        const height = Math.max(1, Math.round(cropHeight * baseScale * factor));
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Canvas is unavailable");
+        if (outputType === "image/jpeg") { context.fillStyle = "#ffffff"; context.fillRect(0, 0, width, height); }
+        // Colour tweaks apply to the photo only; annotations drawn afterwards keep their exact colours.
+        if (colorSupported && !isNeutral(adjust)) context.filter = colorFilter(adjust);
+        context.drawImage(image, sourceX, sourceY, cropWidth, cropHeight, 0, 0, width, height);
+        context.filter = "none";
+        drawStrokes(context, strokes, width, height, Math.max(2, width / 700));
+        return canvas;
+      };
+      const encode = (canvas: HTMLCanvasElement, quality: number) => new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error("Image preparation failed")), outputType, quality));
+      let blob: Blob | null = null;
+      for (const step of compressionSteps(outputType, outputQuality)) {
+        blob = await encode(render(step.scale), step.quality);
+        if (blob.size <= targetBytes) break;
+      }
+      if (!blob || blob.size > maxBytes) throw new Error("Prepared image is too large");
+      setSizeNote(blob.size < file.size ? `Made smaller: ${formatSize(file.size)} → ${formatSize(blob.size)}` : `${formatSize(blob.size)}`);
       const extension = outputType === "image/jpeg" ? "jpg" : "png";
       await onPrepared(new File([blob], `${file.name.replace(/\.[^.]+$/, "") || "image"}.${extension}`, { type: outputType }));
     } catch {
@@ -226,7 +255,7 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
         style={aspect ? { aspectRatio: String(aspect) } : undefined}
         onWheel={onWheelZoom}
       >
-        <Image ref={imageRef} src={previewUrl} alt="Image preview" fill unoptimized className="object-cover" style={{ transform: `scale(${zoom})`, transformOrigin: `${panX}% ${panY}%` }} />
+        <Image ref={imageRef} src={previewUrl} alt="Image preview" fill unoptimized className="object-cover" style={{ transform: `scale(${zoom})`, transformOrigin: `${panX}% ${panY}%`, filter: colorSupported ? colorFilter(adjust) : undefined }} />
         <canvas ref={overlayRef} className={tool === "pan" ? "absolute inset-0 h-full w-full cursor-grab active:cursor-grabbing" : "absolute inset-0 h-full w-full cursor-crosshair"} aria-label="Annotation canvas" onPointerDown={onOverlayPointerDown} onPointerMove={onOverlayPointerMove} onPointerUp={onOverlayPointerUp} onPointerCancel={onOverlayPointerUp} />
       </div>
       <div className="grid gap-2 sm:grid-cols-3">
@@ -234,6 +263,18 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
         <label className="grid gap-1 text-xs text-ink-secondary">Horizontal focus<Input type="range" min="0" max="100" value={panX} onChange={(event) => setPanX(Number(event.target.value))} /></label>
         <label className="grid gap-1 text-xs text-ink-secondary">Vertical focus<Input type="range" min="0" max="100" value={panY} onChange={(event) => setPanY(Number(event.target.value))} /></label>
       </div>
+      {colorSupported ? <details className="rounded-control border border-line-subtle px-3 py-2">
+        <summary className="cursor-pointer text-xs text-ink-secondary">Touch up colours{isNeutral(adjust) ? "" : " (changed)"}</summary>
+        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+          {(["hue", "saturation", "brightness"] as const).map((key) => (
+            <label key={key} className="grid gap-1 text-xs text-ink-secondary">
+              {key === "hue" ? "Hue" : key === "saturation" ? "Saturation" : "Brightness"} ({adjust[key]}{ADJUST_LIMITS[key].unit})
+              <Input type="range" min={ADJUST_LIMITS[key].min} max={ADJUST_LIMITS[key].max} step={ADJUST_LIMITS[key].step} value={adjust[key]} onChange={(event) => setAdjust((current) => ({ ...current, [key]: Number(event.target.value) }))} />
+            </label>
+          ))}
+        </div>
+        <Button type="button" size="sm" variant="ghost" className="mt-1" onClick={() => setAdjust(NEUTRAL_ADJUST)} disabled={isNeutral(adjust)}>Reset colours</Button>
+      </details> : null}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex gap-1" role="group" aria-label="Annotation tool">
           {TOOLS.map((option) => (
@@ -257,6 +298,7 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
       <p className="text-xs text-ink-tertiary">Scroll to zoom. Pick Pan to drag the preview, or draw with the other tools.</p>
       <div className="flex flex-wrap gap-2"><Button type="button" variant="primary" pending={pending} onClick={prepare}>Use prepared image</Button><Button type="button" variant="secondary" onClick={() => setStrokes([])} disabled={!strokes.length || pending}>Clear annotations</Button><Button type="button" variant="ghost" onClick={() => pickerRef.current?.click()} disabled={pending}>Choose another</Button></div>
     </>}
+    {sizeNote && !error ? <p className="text-xs text-ink-secondary" aria-live="polite">{sizeNote}</p> : null}
     {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
   </div>;
 }

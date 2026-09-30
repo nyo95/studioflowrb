@@ -5,13 +5,23 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.242**
-- Next local revision: **R8.243**
+- Current revision after this entry is committed: **R8.243**
+- Next local revision: **R8.244**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.243 | 2026-09-30 | feat(ui-engine): image workspace gets colour touch-ups and automatic compression
+
+- **Owner request:** attaching a picture should not be a chore; give it an editor and a compressor, with no regression. The shared `ImageWorkspace` (used by MOM photos and Product Schedule photos) is extended; every existing setting keeps its meaning.
+- **Colour touch-ups.** A closed-by-default "Touch up colours" section with narrow hue (±30°), saturation (70-130%) and brightness (80-120%) sliders and Reset. The preview and the saved image use the same filter; annotations keep their exact colours. Hidden on browsers whose canvas cannot apply the filter (older Safari), so preview and result can never disagree. Untouched sliders change nothing.
+- **Compression.** New `targetBytes` (default 1.5 MB). The first encode uses the caller's own size and quality exactly as before; only if the result is larger does it lower JPEG quality (0.78, 0.7, 0.62), then shrink the pixels (85%, 72%, 60%, 50%) until it fits. The result line shows "Made smaller: 5.8 MB → 1.2 MB". The accepted input size grows from 10 MB to 30 MB (the prepared image is what gets uploaded), so a phone photo no longer has to be shrunk by hand first.
+- **Crop.** Crop stays zoom and focus with the caller's aspect ratio (unchanged); a free-drag crop box is not built.
+- **Pure logic tested.** `patterns/image-adjust.ts` (filter string, compression plan, size text) has its own tests. Dependencies and schema: none.
+
+**Checks.** `npm test` 693/693, `npm run check`, `tsc --noEmit`, eslint on the patterns folder; the canvas behaviour was NOT exercised in a browser (needs a signed-in project page); please try attaching a large photo to a MOM or a schedule item.
 
 ## R8.242 | 2026-09-30 | feat(studioflow): deliverables panel shows Final/expiry clearly and reports upload progress
 
