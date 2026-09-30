@@ -31,6 +31,17 @@ updateVendorAction,
 } from "./actions";
 import { createSupplierCategoryQuickAction } from "../../settings/general/masterdata/supplier-categories-actions";
 
+/** Product categories of the brands a supplier carries, alphabetical and de-duplicated (archived categories left out). */
+function brandCategoryNames(vendor: Pick<VendorRow, "brand_suppliers">): string[] {
+  const names = new Set<string>();
+  for (const relation of vendor.brand_suppliers) {
+    for (const assignment of relation.brand.categories ?? []) {
+      if (assignment.category.status === "ACTIVE") names.add(assignment.category.name);
+    }
+  }
+  return [...names].sort((a, b) => a.localeCompare(b));
+}
+
 type VendorRow = {
   id: string;
   name: string;
@@ -74,7 +85,8 @@ type VendorRow = {
     id: string;
     is_authorized: boolean;
     notes: string | null;
-    brand: { id: string; name: string };
+    /** `categories` are the brand's product categories; the Suppliers list derives a supplier's "from brands" categories from them. */
+    brand: { id: string; name: string; categories?: Array<{ category: { id: string; name: string; status: string } }> };
   }>;
   owned_brands: Array<{ id: string }>;
   _count: {
@@ -513,11 +525,16 @@ export function VendorDirectory({
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1 items-center max-w-xs">
-                      {vendor.supplier_categories.length === 0 ? (
+                      {vendor.supplier_categories.length === 0 && brandCategoryNames(vendor).length === 0 ? (
                         <span className="text-ink-tertiary text-xs">No categories</span>
                       ) : (
                         vendor.supplier_categories.map((c) => <Badge key={c.supplier_category.id} tone="neutral">{c.supplier_category.name}</Badge>)
                       )}
+                      {brandCategoryNames(vendor).length > 0 ? (
+                        <span className="text-ink-tertiary text-xs" title="Product categories of the brands this supplier carries. Read-only: change them on the Brands.">
+                          {vendor.supplier_categories.length > 0 ? "+ " : ""}from brands: {brandCategoryNames(vendor).slice(0, 3).join(", ")}{brandCategoryNames(vendor).length > 3 ? ` +${brandCategoryNames(vendor).length - 3}` : ""}
+                        </span>
+                      ) : null}
                     </div>
                   </TableCell>
                   <TableCell>

@@ -21,6 +21,15 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 **Checks.** `npm test`; `npx tsc --noEmit`; `npm run check`; `npm run lint`; focused preference and storage-report tests. `npm run build` is not run when the owner dev server occupies port 3001. Browser acceptance is queued for the Reviewer.
 
+## R8.255 | 2026-09-30 | feat(masterdata): Suppliers list shows the product categories of the brands each supplier carries
+
+- **Owner question:** categories added through the Brands screen never appeared on the Suppliers list ("No categories"); could suppliers inherit them? There are two different vocabularies: **supplier categories** (what kind of supplier it is, set on the supplier from Master Data Settings) and **product categories** (what a brand makes, set on the Brand). The list column only showed the first.
+- **Change.** The Categories column now also shows the product categories of the supplier's brands, read-only and de-duplicated, as "from brands: Flooring, Stones" (first three, then a count; archived categories left out; a tooltip says to change them on the Brands). A supplier's own supplier categories still show as before; "No categories" appears only when there is neither. Checked in the browser: Profitto shows Finishing, Flooring; PT Bangun Delta Abadi shows Flooring; PT. CITATAH shows Stones.
+- **Why not copy them into supplier categories.** The two lists mean different things, and a copy would go stale as soon as a brand's categories or supplier links change; a derived display is always current. No data, permission or filter change (the "All categories" filter still filters by supplier category).
+- **Noted.** Suppliers whose brands have no categories, or that carry no brands, still read "No categories".
+
+**Checks.** `npm test` 697/697, `npm run check`, `tsc --noEmit`, eslint on the touched files.
+
 ## R8.254 | 2026-09-30 | fix(masterdata): a Supplier with a supplier category can be permanently deleted
 
 - **Owner report:** an archived Supplier ("dadawda", the red square in the Suppliers list) could not be submitted for deletion; the dialog answered "A related record is missing or still referenced."
