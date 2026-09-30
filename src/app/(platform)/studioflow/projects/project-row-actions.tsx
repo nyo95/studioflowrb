@@ -20,7 +20,7 @@ export function ProjectRowActions({ project, people, clients, archiveRetentionDa
   if (project.archivedAt) {
     return (
       <>
-        <RowActionMenu label={`${project.readableName} actions`} pending={pending} items={[
+        <RowActionMenu label={`${project.name} actions`} pending={pending} items={[
           { label: "Restore project", onSelect: () => { setReason(""); setDialog("restore"); } },
         ]} />
         {dialog === "restore" ? (
@@ -45,7 +45,7 @@ export function ProjectRowActions({ project, people, clients, archiveRetentionDa
     <>
       {notice ? <Text size="sm" tone="secondary" className="mr-1 inline-block">{notice}</Text> : null}
       {error && dialog === null ? <InlineError className="mr-1 inline-block">{error}</InlineError> : null}
-      <RowActionMenu label={`${project.readableName} actions`} pending={pending} items={[
+      <RowActionMenu label={`${project.name} actions`} pending={pending} items={[
         { label: "Edit details", onSelect: () => setDialog("edit") },
         { label: "Apply checklist templates", onSelect: () => void run("sync", () => syncChecklistAction(project.id), (data) => setNotice(`${(data as { created: number }).created} checklist item(s) added`)) },
         { label: "Archive project…", danger: true, separatorBefore: true, onSelect: () => { setReason(""); setDialog("archive"); } },

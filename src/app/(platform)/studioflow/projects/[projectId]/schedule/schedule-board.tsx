@@ -241,6 +241,7 @@ function BoardView({
   onOpenPhoto,
   onRequestSample,
   onCancelSample,
+  onReceiveSample,
 }: {
   projectId: string;
   groups: Array<{ category: string; rows: ScheduleEntryView[] }>;
@@ -254,6 +255,7 @@ function BoardView({
   onOpenPhoto: (entry: ScheduleEntryView, option: ScheduleOptionView) => void;
   onRequestSample: (option: ScheduleOptionView) => void;
   onCancelSample: (entryId: string, option: ScheduleOptionView) => void;
+  onReceiveSample: (entryId: string, option: ScheduleOptionView) => void;
 }) {
   const { draggingId, dragOverId, start, end, over, leave } = useRowDrag();
   return (
@@ -344,6 +346,17 @@ function BoardView({
                           className="cursor-pointer text-xs font-medium text-ink-secondary hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus"
                         >
                           {shown.sampleRequest ? "Request sample again" : "Request sample"}
+                        </span>
+                      ) : null}
+                      {canEdit && shown.sampleRequest?.status === "REQUESTED" ? (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(event) => { event.stopPropagation(); onReceiveSample(entry.id, shown); }}
+                          onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); onReceiveSample(entry.id, shown); } }}
+                          className="cursor-pointer text-xs font-medium text-ink-secondary hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus"
+                        >
+                          Mark received
                         </span>
                       ) : null}
                       {canEdit && shown.sampleRequest?.status === "REQUESTED" ? (
@@ -466,6 +479,9 @@ export function ScheduleBoard({
     if (ok) await run(`${entryId}-sample-cancel`, () => cancelScheduleSampleAction({ projectId, requestId: option.sampleRequest!.id }));
   };
 
+  const receiveSample = (entryId: string, option: ScheduleOptionView) =>
+    run(`${entryId}-sample-receive`, () => receiveScheduleSampleAction({ projectId, requestId: option.sampleRequest!.id }));
+
   /** Reorder within one category group (one code prefix); drag targets never span groups. */
   const reorderGroup = (rows: ScheduleEntryView[], draggedId: string, targetId: string) => {
     if (draggedId === targetId) return;
@@ -556,6 +572,7 @@ export function ScheduleBoard({
                 onOpenPhoto={(entry, option) => openEntry(entry.id, option.id)}
                 onRequestSample={(option) => setSampleFor(option)}
                 onCancelSample={cancelSample}
+                onReceiveSample={receiveSample}
               />
             ) : (
               <div className="grid">
@@ -1315,7 +1332,7 @@ function EntryPanelContent({
                       {specLine(option) ? <span className="text-xs text-ink-tertiary">{specLine(option)}</span> : null}
                       {option.notes ? <span className="whitespace-pre-wrap text-xs text-ink-secondary">{option.notes}</span> : null}
                       {/* Set final / Request sample buttons on card face — visible actions, not buried in the ⋯ menu */}
-                      {canEdit && (!option.isFinal || option.sampleRequest?.status !== "REQUESTED") ? (
+                      {canEdit ? (
                         <div className="mt-1.5 flex flex-wrap gap-1.5">
                           {!option.isFinal ? (
                             <Button
@@ -1331,7 +1348,16 @@ function EntryPanelContent({
                             <Button size="sm" variant="secondary" onClick={() => setSampleFor(option)}>
                               {option.sampleRequest ? "Request sample again" : "Request sample"}
                             </Button>
-                          ) : null}
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              pending={isPending(`${entry.id}-opt-${option.id}`)}
+                              onClick={() => void run(`${entry.id}-opt-${option.id}`, () => receiveScheduleSampleAction({ projectId, requestId: option.sampleRequest!.id }))}
+                            >
+                              Mark sample received
+                            </Button>
+                          )}
                         </div>
                       ) : null}
                       {option.sampleRequest ? (

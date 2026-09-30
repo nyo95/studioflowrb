@@ -22,10 +22,9 @@ export default async function StudioSettingsPage() {
   const defaultTemplate = phaseTemplates.find((template) => template.isDefault && template.isActive);
   return (
     <PageShell measure="wide">
-      <PageHeader title="Studio Settings" description="How projects are named and which checklist every project gets." divider />
+      <PageHeader title="Studio Settings" description="Which checklist every project gets." divider />
       <SettingsShell navigationLabel="Studio Settings navigation" navigation={<StudioSettingsNav />}>
         <StudioSettingsView
-          autoNaming={settings.autoNamingEnabled}
           archiveRetentionDays={settings.archiveRetentionDays}
           canManageProjects={hasPermission(grants, P.projectManage)}
           templates={templates}

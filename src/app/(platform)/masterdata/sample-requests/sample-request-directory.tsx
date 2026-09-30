@@ -7,7 +7,7 @@ import { formatInstant } from "@platform/utilities/date";
 import { createMoney, formatMoney } from "@platform/utilities/money";
 import {
   Button,
-  Combobox,
+  CreatableSearch,
   DirectoryShell,
   DraftDialog,
   EmptyState,
@@ -33,6 +33,9 @@ import {
 } from "@/platform/ui_engine";
 
 import type { SampleQueueRow } from "@/application/sample-request-coordinator";
+
+import { VendorQuickCreateDialog, type VendorTypeOption } from "../vendor-quick-create-dialog";
+import { createPricingVendorQuickAction } from "../pricing/actions";
 
 import {
   declineSampleRequestAction,
@@ -70,7 +73,7 @@ function statusBadge(row: SampleQueueRow) {
 
 type ActionResultLike = { ok: boolean; error?: { safeMessage?: string } };
 
-export function SampleRequestDirectory({ rows, vendors }: { rows: SampleQueueRow[]; vendors: readonly { id: string; name: string }[] }) {
+export function SampleRequestDirectory({ rows, vendors, canManageVendors, vendorTypes }: { rows: SampleQueueRow[]; vendors: readonly { id: string; name: string }[]; canManageVendors: boolean; vendorTypes: readonly VendorTypeOption[] }) {
   const [query, setQuery] = useState("");
   const [showFinished, setShowFinished] = useState(false);
   const [detail, setDetail] = useState<SampleQueueRow | null>(null);
@@ -79,6 +82,12 @@ export function SampleRequestDirectory({ rows, vendors }: { rows: SampleQueueRow
   const [quoteCurrency, setQuoteCurrency] = useState("IDR");
   const [quoteVendorId, setQuoteVendorId] = useState("");
   const [quoteNote, setQuoteNote] = useState("");
+  const [createdVendors, setCreatedVendors] = useState<Array<{ id: string; name: string }>>([]);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickName, setQuickName] = useState("");
+  const [quickVendorTypeId, setQuickVendorTypeId] = useState("");
+  const [quickError, setQuickError] = useState<string | null>(null);
+  const [quickPending, setQuickPending] = useState(false);
   const [declineTarget, setDeclineTarget] = useState<SampleQueueRow | null>(null);
   const [declineReason, setDeclineReason] = useState("");
   const [rowError, setRowError] = useState<string | null>(null);
@@ -101,6 +110,25 @@ export function SampleRequestDirectory({ rows, vendors }: { rows: SampleQueueRow
       {paging.pageCount > 1 ? <Pagination page={paging.page} pageCount={paging.pageCount} onPageChange={paging.setPage} /> : null}
     </div>
   );
+
+  async function addVendor() {
+    setQuickError(null);
+    setQuickPending(true);
+    const data = new FormData();
+    data.set("name", quickName);
+    data.set("vendorTypeId", quickVendorTypeId);
+    const result = await createPricingVendorQuickAction("material", data);
+    setQuickPending(false);
+    if (result.ok === false) {
+      setQuickError(result.error.safeMessage);
+      return;
+    }
+    setCreatedVendors((current) => [...current, { id: result.data.vendorId, name: quickName.trim() }]);
+    setQuoteVendorId(result.data.vendorId);
+    setQuickName("");
+    setQuickVendorTypeId("");
+    setQuickOpen(false);
+  }
 
   function run(id: string, command: () => Promise<ActionResultLike>, onSuccess?: () => void) {
     if (pendingId) return;
@@ -225,14 +253,16 @@ export function SampleRequestDirectory({ rows, vendors }: { rows: SampleQueueRow
               <Field label="Currency"><Input value={quoteCurrency} onChange={(event) => setQuoteCurrency(event.target.value.toUpperCase())} maxLength={3} /></Field>
             </div>
             <Field label="Supplier" description="Optional. Link the supplier who gave this quote.">
-              <Combobox
+              <CreatableSearch
                 label="Supplier"
-                options={[{ id: "", label: "No supplier linked" }, ...vendors.map((vendor) => ({ id: vendor.id, label: vendor.name }))]}
+                options={[{ id: "", label: "No supplier linked" }, ...[...vendors, ...createdVendors.filter((created) => !vendors.some((vendor) => vendor.id === created.id))].map((vendor) => ({ id: vendor.id, label: vendor.name }))]}
                 value={quoteVendorId}
                 onValueChange={setQuoteVendorId}
                 placeholder="No supplier linked"
                 searchPlaceholder="Search suppliers…"
                 emptyLabel="No suppliers match this search."
+                onCreate={canManageVendors ? (name) => { setQuickName(name); setQuickVendorTypeId(""); setQuickError(null); setQuickOpen(true); return ""; } : undefined}
+                createLabel={(name) => `Add “${name}” as a new supplier`}
                 className="w-full"
               />
             </Field>
@@ -264,6 +294,20 @@ export function SampleRequestDirectory({ rows, vendors }: { rows: SampleQueueRow
           </div>
         </DraftDialog>
       ) : null}
+
+      <VendorQuickCreateDialog
+        open={quickOpen}
+        pending={quickPending}
+        error={quickError}
+        name={quickName}
+        onNameChange={setQuickName}
+        vendorTypeId={quickVendorTypeId}
+        onVendorTypeIdChange={setQuickVendorTypeId}
+        vendorTypes={vendorTypes}
+        onSubmit={() => void addVendor()}
+        onCancel={() => setQuickOpen(false)}
+        description="Create a supplier and use it for this quote."
+      />
 
       {declineTarget ? (
         <DraftDialog open onOpenChange={(open) => !open && setDeclineTarget(null)} title="Decline this sample request" description={declineTarget.product.name}>

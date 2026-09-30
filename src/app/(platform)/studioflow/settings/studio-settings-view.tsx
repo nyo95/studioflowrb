@@ -41,7 +41,6 @@ import {
   deleteTemplateAction,
   reorderPhaseDefinitionsAction,
   reorderTemplatesAction,
-  setAutoNamingAction,
   setScheduleTemplateItemActiveAction,
   updatePhaseDefinitionAction,
   updatePhaseTemplateAction,
@@ -81,7 +80,6 @@ type SchedulePrefix = { id: string; section: "MATERIAL" | "FIXTURE"; category: s
 type BrandChoice = { id: string; name: string };
 
 export function StudioSettingsView({
-  autoNaming,
   archiveRetentionDays,
   canManageProjects,
   templates,
@@ -92,7 +90,6 @@ export function StudioSettingsView({
   phaseTemplates,
   canManage,
 }: {
-  autoNaming: boolean;
   archiveRetentionDays: number;
   /** Project-manage holders may run the archived-files cleanup; settings-manage holders may change the window. */
   canManageProjects: boolean;
@@ -112,19 +109,7 @@ export function StudioSettingsView({
 
   return (
     <div className="grid gap-4">
-      <SectionCard id="project-naming" className="scroll-mt-20" title="Project naming" padded>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="grid gap-1">
-            <Text>Automatic numbering</Text>
-            <Text size="sm" tone="secondary">
-              {autoNaming ? "New projects get the next number for the year: 2026-012 Heloskin Cimanggu." : "People type the full name, which must follow [Year]-[Number] [Name]."}
-            </Text>
-          </div>
-          <Switch label={autoNaming ? "On" : "Off"} checked={autoNaming} disabled={!canManage || pendingKey === "naming"} onCheckedChange={(checked) => run("naming", () => setAutoNamingAction(checked))} />
-        </div>
-      </SectionCard>
-
-      <ArchiveRetentionSettings retentionDays={archiveRetentionDays} autoNaming={autoNaming} canManage={canManage} canCleanup={canManageProjects} />
+      <ArchiveRetentionSettings retentionDays={archiveRetentionDays} canManage={canManage} canCleanup={canManageProjects} />
 
       {error ? <InlineError>{error}</InlineError> : null}
 

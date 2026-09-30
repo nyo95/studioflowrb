@@ -5,13 +5,33 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.212**
-- Next local revision: **R8.213**
+- Current revision after this entry is committed: **R8.213**
+- Next local revision: **R8.214**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.213 | 2026-09-30 | fix(studioflow,masterdata): free-text project names, inline client/supplier creation, sample receipt on cards
+
+- **KB-062 (naming, client, type).** Owner decision: no year-number-name convention. Project names are free text on
+  create and edit (duplicate name gives `PROJECT_NAME_TAKEN`). Removed the naming rule, the auto-numbering switch and
+  `setAutoNaming` (now `setArchiveRetention`), `domain/naming.ts`, and the never-used Project type. New/Edit project use a
+  single searchable, creatable Client control (`client-select.tsx`). Existing project names are kept as they are.
+- **Migration `20260930100000_sf_free_text_project_name`** (applied to dev and test): drops `sf_project.project_code`,
+  `sf_project.project_type`, table `sf_project_sequence`, and `sf_settings.auto_naming_enabled`. Destructive but
+  only removes derived/unused data.
+- **Concurrency fix uncovered by the change.** The per-year counter used to serialize project creates by accident; without
+  it the same-new-client race (SF-05) aborted the loser's transaction. Client upsert now uses `ON CONFLICT DO NOTHING`.
+  Unique-name violations on project write map to `PROJECT_NAME_TAKEN` (rename onto a taken name used to leak `P2002`).
+- **KB-061.** Schedule board cards and option cards show "Mark received" / "Mark sample received" for a requested sample.
+- **KB-060.** The sample-request quote dialog searches suppliers and can create a real one inline (existing quick-create
+  dialog, material-capable types, only with supplier manage).
+- **Still open:** the Opening date / Timeline part of KB-062 waits on an owner answer. Browser checks queued in
+  `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`. `PLAN.md` target moved to R8.214.
+
+**Checks.** `npm test` 650/650, `tsc --noEmit`, `check:boundaries`, `check:legacy-runtime` pass; no browser run.
 
 ## R8.212 | 2026-09-29 | fix(studioflow,docs): refine sample request copy and record walkthrough follow-ups
 

@@ -9,7 +9,6 @@ import { toDecimalString } from "@platform/utilities/decimal";
 import { normalizeText } from "@platform/utilities/normalization";
 
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
-import { formatProjectName, looksFormatted, parseProjectName } from "../domain/naming";
 import type { PhaseStatus } from "../domain/phase";
 import {
   P,
@@ -49,7 +48,6 @@ export type ProjectInput = {
   openingDate?: string | null;
   /** Gantt/timeline start override; null clears it back to the `createdAt`-date fallback. */
   timelineStartDate?: string | null;
-  projectType?: string | null;
   priority?: ProjectPriority;
   clientContact?: string | null;
   address?: string | null;
@@ -91,7 +89,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
 
   async function readSettings(client: Db | TxClient) {
     const row = await client.sfSettings.findUnique({ where: { id: SETTINGS_ID } });
-    return { autoNamingEnabled: row?.auto_naming_enabled ?? true, archiveRetentionDays: row?.archive_retention_days ?? 90 };
+    return { archiveRetentionDays: row?.archive_retention_days ?? 90 };
   }
 
   async function assertPic(userId: string, seat: string): Promise<void> {
@@ -109,24 +107,27 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       if (existing.archived_at) throw conflict("CLIENT_ARCHIVED", "That client is archived. Restore it first.");
       return existing;
     }
-    let created;
-    try {
-      created = await tx.sfClient.create({ data: { id: randomUUID(), name: clean, name_key: nameKey } });
-    } catch (error) {
-      // A concurrent call may have just created the same client (name uniqueness race).
-      // Converge on that row instead of failing the caller — this is an upsert, so the
-      // loser should return what the winner created, the same as the `existing` branch above.
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        const winner = await tx.sfClient.findUnique({ where: { name_key: nameKey } });
-        if (winner) {
-          if (winner.archived_at) throw conflict("CLIENT_ARCHIVED", "That client is archived. Restore it first.");
-          return winner;
-        }
-      }
-      mapWriteError(error);
+    // ON CONFLICT DO NOTHING instead of catching a unique violation: a failed statement aborts the whole
+    // Postgres transaction, so the loser of a concurrent same-name race could not read the winner's row.
+    const inserted = await tx.$executeRaw`
+      INSERT INTO "studioflow"."sf_client" ("id", "name", "name_key", "updated_at")
+      VALUES (${randomUUID()}, ${clean}, ${nameKey}, now())
+      ON CONFLICT ("name_key") DO NOTHING`;
+    const created = await tx.sfClient.findUniqueOrThrow({ where: { name_key: nameKey } });
+    if (inserted === 0) {
+      if (created.archived_at) throw conflict("CLIENT_ARCHIVED", "That client is archived. Restore it first.");
+      return created;
     }
     await writeAudit(ports, tx, { action: "studioflow.client.created", entityType: "client", entityId: created.id, actor, metadata: { name: clean } });
     return created;
+  }
+
+  /** A unique-name violation on SfProject is a taken name; anything else maps as usual. */
+  function mapProjectWriteError(error: unknown): never {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw conflict("PROJECT_NAME_TAKEN", "A project with this name already exists.");
+    }
+    return mapWriteError(error);
   }
 
   async function resolveClientId(tx: TxClient, input: { clientId?: string | null; newClientName?: string | null }, actor: CommandContext["actor"]) {
@@ -136,35 +137,6 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
     if (!client) throw notFound("client");
     if (client.archived_at) throw conflict("CLIENT_ARCHIVED", "That client is archived. Restore it first.");
     return client.id;
-  }
-
-  async function allocateName(tx: TxClient, readable: string, autoNaming: boolean, now: Date) {
-    const clean = requiredText(readable, "PROJECT_NAME_REQUIRED", "Project name", 200);
-    if (!autoNaming) {
-      const parsed = parseProjectName(clean);
-      if (!parsed) throw invalid("PROJECT_NAME_FORMAT", "Project name must use the format: [YYYY]-[Number] [Name], for example 2025-429 Heloskin Cimanggu.");
-      return { name: clean, code: parsed.code };
-    }
-    if (looksFormatted(clean)) {
-      throw invalid("PROJECT_NAME_AUTO_CONFLICT", "Enter only the readable project name. Year and number are generated automatically.");
-    }
-    const year = Number(currentDateOnly({ now }).slice(0, 4));
-    // Row-locked counter: concurrent creates in the same year serialize here.
-    const [row] = await tx.$queryRaw<{ last_number: number }[]>`
-      INSERT INTO "studioflow"."sf_project_sequence" ("year", "last_number")
-      VALUES (${year}, 1)
-      ON CONFLICT ("year") DO UPDATE SET "last_number" = "sf_project_sequence"."last_number" + 1
-      RETURNING "last_number"`;
-    // Respect manually named projects already using higher numbers this year.
-    const manualMax = await tx.sfProject.findMany({ where: { project_code: { startsWith: `${year}-` } }, select: { project_code: true } });
-    let sequence = row.last_number;
-    const highest = manualMax.reduce((max, p) => Math.max(max, Number(p.project_code.split("-")[1]) || 0), 0);
-    if (highest >= sequence) {
-      sequence = highest + 1;
-      await tx.sfProjectSequence.update({ where: { year }, data: { last_number: sequence } });
-    }
-    const name = formatProjectName(year, sequence, clean);
-    return { name, code: parseProjectName(name)!.code };
   }
 
   async function namesFor(ids: Array<string | null | undefined>): Promise<Map<string, PersonSummary>> {
@@ -180,22 +152,22 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       return readSettings(db);
     },
 
-    async setAutoNaming(input: CommandContext & { enabled: boolean; archiveRetentionDays?: number }) {
+    async setArchiveRetention(input: CommandContext & { archiveRetentionDays: number }) {
       const userId = requireCommand(input, P.settingsManage);
-      if (input.archiveRetentionDays !== undefined && (!Number.isInteger(input.archiveRetentionDays) || input.archiveRetentionDays < 7 || input.archiveRetentionDays > 730)) {
+      if (!Number.isInteger(input.archiveRetentionDays) || input.archiveRetentionDays < 7 || input.archiveRetentionDays > 730) {
         throw invalid("ARCHIVE_RETENTION_INVALID", "Keep archived files for a whole number of days between 7 and 730.");
       }
       return runTransaction(async (tx) => {
         const before = await readSettings(tx);
-        const archiveRetentionDays = input.archiveRetentionDays ?? before.archiveRetentionDays;
-        if (before.autoNamingEnabled === input.enabled && before.archiveRetentionDays === archiveRetentionDays) return before;
+        const archiveRetentionDays = input.archiveRetentionDays;
+        if (before.archiveRetentionDays === archiveRetentionDays) return before;
         await tx.sfSettings.upsert({
           where: { id: SETTINGS_ID },
-          create: { id: SETTINGS_ID, auto_naming_enabled: input.enabled, archive_retention_days: archiveRetentionDays, updated_by_id: userId },
-          update: { auto_naming_enabled: input.enabled, archive_retention_days: archiveRetentionDays, updated_by_id: userId },
+          create: { id: SETTINGS_ID, archive_retention_days: archiveRetentionDays, updated_by_id: userId },
+          update: { archive_retention_days: archiveRetentionDays, updated_by_id: userId },
         });
-        await writeAudit(ports, tx, { action: "studioflow.settings.updated", entityType: "settings", entityId: SETTINGS_ID, actor: input.actor, changes: { ...(before.autoNamingEnabled !== input.enabled ? { autoNamingEnabled: { from: before.autoNamingEnabled, to: input.enabled } } : {}), ...(before.archiveRetentionDays !== archiveRetentionDays ? { archiveRetentionDays: { from: before.archiveRetentionDays, to: archiveRetentionDays } } : {}) } });
-        return { autoNamingEnabled: input.enabled, archiveRetentionDays };
+        await writeAudit(ports, tx, { action: "studioflow.settings.updated", entityType: "settings", entityId: SETTINGS_ID, actor: input.actor, changes: { archiveRetentionDays: { from: before.archiveRetentionDays, to: archiveRetentionDays } } });
+        return { archiveRetentionDays };
       });
     },
 
@@ -378,13 +350,10 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       const people = await namesFor(rows.flatMap((row) => [row.pic_designer_id, row.pic_drafter_id]));
       return rows.map((row) => ({
         id: row.id,
-        code: row.project_code,
         name: row.name,
-        readableName: parseProjectName(row.name)?.readable ?? row.name,
         client: row.client,
         status: row.status as ProjectStatus,
         priority: row.priority as ProjectPriority,
-        projectType: row.project_type,
         openingDate: dateToDateOnly(row.opening_date),
         /** Gantt/timeline start; falls back to `createdAt`'s date when the owner hasn't overridden it. */
         timelineStartDate: dateToDateOnly(row.timeline_start_date) ?? dateToDateOnly(row.created_at)!,
@@ -408,13 +377,10 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       const people = await namesFor([row.pic_designer_id, row.pic_drafter_id, row.archived_by_id]);
       return {
         id: row.id,
-        code: row.project_code,
         name: row.name,
-        readableName: parseProjectName(row.name)?.readable ?? row.name,
         client: row.client,
         status: row.status as ProjectStatus,
         priority: row.priority as ProjectPriority,
-        projectType: row.project_type,
         openingDate: dateToDateOnly(row.opening_date),
         /** Gantt/timeline start; falls back to `createdAt`'s date when the owner hasn't overridden it. */
         timelineStartDate: dateToDateOnly(row.timeline_start_date) ?? dateToDateOnly(row.created_at)!,
@@ -441,10 +407,9 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       const openingDate = parseOpeningDate(input.openingDate);
       const now = nowOf(ports);
       return runTransaction(async (tx) => {
-        const settings = await readSettings(tx);
-        const { name, code } = await allocateName(tx, input.name, settings.autoNamingEnabled, now);
-        if (await tx.sfProject.findFirst({ where: { OR: [{ name }, { project_code: code }] }, select: { id: true } })) {
-          throw conflict("PROJECT_NAME_TAKEN", "A project with this name or number already exists.");
+        const name = requiredText(input.name, "PROJECT_NAME_REQUIRED", "Project name", 200);
+        if (await tx.sfProject.findFirst({ where: { name }, select: { id: true } })) {
+          throw conflict("PROJECT_NAME_TAKEN", "A project with this name already exists.");
         }
         const clientId = await resolveClientId(tx, input, input.actor);
         const projectId = randomUUID();
@@ -452,13 +417,11 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           await tx.sfProject.create({
             data: {
               id: projectId,
-              project_code: code,
               name,
               client_id: clientId,
               pic_designer_id: input.picDesignerId,
               pic_drafter_id: input.picDrafterId,
               opening_date: openingDate,
-              project_type: optionalText(input.projectType, 60) ?? "RETAIL",
               priority: input.priority ?? "NORMAL",
               client_contact: optionalText(input.clientContact, 200),
               address: optionalText(input.address),
@@ -466,7 +429,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
               created_by_id: userId,
             },
           });
-        } catch (error) { mapWriteError(error); }
+        } catch (error) { mapProjectWriteError(error); }
 
         // Bootstrap from the active default phase template: one phase per definition, snapshotted (V2-D3).
         const defaultTemplate = await tx.sfPhaseTemplate.findFirst({ where: { is_default: true, is_active: true }, include: { definitions: { orderBy: { order_index: "asc" } } } });
@@ -497,7 +460,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         const seeded = await seedChecklistFromTemplates(tx, projectId, userId);
         // Legacy: default schedule categories and template items land on every new project.
         const scheduleRows = await seedScheduleFromTemplates(tx, projectId);
-        await writeAudit(ports, tx, { action: "studioflow.project.created", entityType: "project", entityId: projectId, actor: input.actor, metadata: { projectId, name, code, clientId, checklistItems: seeded, scheduleRows } });
+        await writeAudit(ports, tx, { action: "studioflow.project.created", entityType: "project", entityId: projectId, actor: input.actor, metadata: { projectId, name, clientId, checklistItems: seeded, scheduleRows } });
         return { projectId, name };
       });
     },
@@ -518,15 +481,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           if (a !== b) { changes[key] = { from: a, to: b }; apply(); }
         };
         if (input.name !== undefined) {
-          const parsed = parseProjectName(project.name);
-          const readable = requiredText(input.name, "PROJECT_NAME_REQUIRED", "Project name", 200);
-          const next = looksFormatted(readable) ? readable : parsed ? `${parsed.code} ${readable}` : readable;
-          const nextParsed = parseProjectName(next);
-          if (!nextParsed) throw invalid("PROJECT_NAME_FORMAT", "Project name must use the format: [YYYY]-[Number] [Name].");
-          if (looksFormatted(readable) && nextParsed.code !== project.project_code) {
-            throw invalid("PROJECT_CODE_IMMUTABLE", "The project number cannot be changed.");
-          }
-          // R2.5D: Normal editing preserves project_code; only the readable name changes.
+          const next = requiredText(input.name, "PROJECT_NAME_REQUIRED", "Project name", 200);
           track("name", project.name, next, () => { data.name = next; });
         }
         if (input.picDesignerId !== undefined && input.picDesignerId !== project.pic_designer_id) await assertPic(input.picDesignerId, "designer");
@@ -541,10 +496,6 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         }
         track("openingDate", project.opening_date, openingDate, () => { data.opening_date = openingDate; });
         track("timelineStartDate", project.timeline_start_date, timelineStartDate, () => { data.timeline_start_date = timelineStartDate; });
-        if (input.projectType !== undefined) {
-          const type = optionalText(input.projectType, 60) ?? "RETAIL";
-          track("projectType", project.project_type, type, () => { data.project_type = type; });
-        }
         if (input.clientContact !== undefined) {
           const value = optionalText(input.clientContact, 200);
           track("clientContact", project.client_contact, value, () => { data.client_contact = value; });
@@ -557,7 +508,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         if (Object.keys(changes).length === 0) return { projectId: project.id };
         try {
           await tx.sfProject.update({ where: { id: project.id }, data });
-        } catch (error) { mapWriteError(error); }
+        } catch (error) { mapProjectWriteError(error); }
         await writeAudit(ports, tx, { action: "studioflow.project.updated", entityType: "project", entityId: project.id, actor: input.actor, changes, metadata: { projectId: project.id } });
         return { projectId: project.id };
       });

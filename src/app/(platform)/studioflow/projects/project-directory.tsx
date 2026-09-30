@@ -36,13 +36,10 @@ import { ProjectRowActions } from "./project-row-actions";
 type ProjectRow = {
   id: string;
   /** Stored project number (e.g. 2025-429); the immutable half of `name`. */
-  code: string;
   name: string;
-  readableName: string;
   client: { id: string; name: string } | null;
   status: "ACTIVE" | "ON_HOLD" | "COMPLETED";
   priority: "URGENT" | "NORMAL" | "LOW";
-  projectType: string;
   openingDate: string | null;
   timelineStartDate: string;
   clientContact: string | null;
@@ -84,7 +81,6 @@ export function ProjectDirectory({
   clients,
   filters,
   canManage,
-  autoNaming,
   archiveRetentionDays,
   asOf,
 }: {
@@ -93,7 +89,6 @@ export function ProjectDirectory({
   clients: Array<{ id: string; name: string }>;
   filters: { status: string; priority: string; pic: string; client: string; q: string; archived: boolean };
   canManage: boolean;
-  autoNaming: boolean;
   /** Studio setting: how long an archived project's files are kept. */
   archiveRetentionDays: number;
   /** Server render time (ISO), so retention wording is identical on server and client. */
@@ -203,7 +198,7 @@ export function ProjectDirectory({
         </TableBody>
       </DataTable>
 
-      {creating ? <NewProjectDialog people={people} clients={clients} autoNaming={autoNaming} onClose={() => setCreating(false)} /> : null}
+      {creating ? <NewProjectDialog people={people} clients={clients} onClose={() => setCreating(false)} /> : null}
     </div>
   );
 }

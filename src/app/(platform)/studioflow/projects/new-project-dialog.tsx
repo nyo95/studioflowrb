@@ -7,22 +7,19 @@ import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
 import { Button, DraftDialog, Field, FormActions, InlineError, Input, Select, Text, Textarea } from "@/platform/ui_engine";
 
 import { createProjectAction } from "../actions";
+import { ClientSelect } from "./client-select";
 import { PersonSelect, type Person } from "../_components/people";
 import { useCommand } from "../_components/use-command";
 
-const NEW_CLIENT = "__new__";
-
-export function NewProjectDialog({ people, clients, autoNaming, onClose }: { people: Person[]; clients: Array<{ id: string; name: string }>; autoNaming: boolean; onClose: () => void }) {
+export function NewProjectDialog({ people, clients, onClose }: { people: Person[]; clients: Array<{ id: string; name: string }>; onClose: () => void }) {
   const router = useRouter();
   const { run, pending, error } = useCommand();
   const [form, setForm] = useState({
     name: "",
     client: "",
-    newClientName: "",
     picDesignerId: "",
     picDrafterId: "",
     openingDate: "",
-    projectType: "RETAIL",
     priority: "NORMAL" as "URGENT" | "NORMAL" | "LOW",
     clientContact: "",
     address: "",
@@ -36,12 +33,10 @@ export function NewProjectDialog({ people, clients, autoNaming, onClose }: { peo
         event.preventDefault();
         void run("create", () => createProjectAction({
           name: form.name,
-          clientId: form.client && form.client !== NEW_CLIENT ? form.client : null,
-          newClientName: form.client === NEW_CLIENT ? form.newClientName : null,
+          clientId: form.client || null,
           picDesignerId: form.picDesignerId,
           picDrafterId: form.picDrafterId,
           openingDate: form.openingDate || null,
-          projectType: form.projectType,
           priority: form.priority,
           clientContact: form.clientContact || null,
           address: form.address || null,
@@ -52,24 +47,14 @@ export function NewProjectDialog({ people, clients, autoNaming, onClose }: { peo
           router.push(STUDIOFLOW_ROUTES.project(created.projectId));
         });
       }}>
-        <Field label="Project name" required description={autoNaming ? "Year and number are added automatically, e.g. 2026-012 Heloskin Cimanggu." : "Use the format [Year]-[Number] [Name], e.g. 2026-012 Heloskin Cimanggu."}>
-          <Input autoFocus value={form.name} maxLength={200} placeholder={autoNaming ? "Heloskin Cimanggu" : "2026-012 Heloskin Cimanggu"} onChange={(e) => set("name", e.target.value)} />
+        <Field label="Project name" required>
+          <Input autoFocus value={form.name} maxLength={200} placeholder="Heloskin Cimanggu" onChange={(e) => set("name", e.target.value)} />
         </Field>
         <div className="grid grid-cols-2 gap-3 max-[560px]:grid-cols-1">
           <Field label="Client">
-            <Select value={form.client} onChange={(e) => set("client", e.target.value)}>
-              <option value="">No client yet</option>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              <option value={NEW_CLIENT}>+ New client…</option>
-            </Select>
+            <ClientSelect clients={clients} value={form.client} onChange={(v) => set("client", v)} />
           </Field>
-          {form.client === NEW_CLIENT ? (
-            <Field label="New client name" required>
-              <Input value={form.newClientName} maxLength={200} onChange={(e) => set("newClientName", e.target.value)} />
-            </Field>
-          ) : (
-            <Field label="Client contact"><Input value={form.clientContact} maxLength={200} onChange={(e) => set("clientContact", e.target.value)} /></Field>
-          )}
+          <Field label="Client contact"><Input value={form.clientContact} maxLength={200} onChange={(e) => set("clientContact", e.target.value)} /></Field>
           <Field label="Designer (PIC)" required><PersonSelect required people={people} value={form.picDesignerId || null} onChange={(v) => set("picDesignerId", v ?? "")} /></Field>
           <Field label="Drafter (PIC)" required><PersonSelect required people={people} value={form.picDrafterId || null} onChange={(v) => set("picDrafterId", v ?? "")} /></Field>
           <Field label="Opening date"><Input type="date" value={form.openingDate} onChange={(e) => set("openingDate", e.target.value)} /></Field>
@@ -80,14 +65,8 @@ export function NewProjectDialog({ people, clients, autoNaming, onClose }: { peo
               <option value="LOW">Low</option>
             </Select>
           </Field>
-          <Field label="Project type">
-            <Input list="sf-project-types" value={form.projectType} maxLength={60} onChange={(e) => set("projectType", e.target.value)} />
-          </Field>
           <Field label="Area (m²)"><Input inputMode="decimal" value={form.area} onChange={(e) => set("area", e.target.value)} /></Field>
         </div>
-        <datalist id="sf-project-types">
-          <option value="RETAIL" /><option value="RESIDENTIAL" /><option value="OFFICE" /><option value="HOSPITALITY" /><option value="F&B" />
-        </datalist>
         <Field label="Site address"><Textarea rows={2} value={form.address} onChange={(e) => set("address", e.target.value)} /></Field>
         {people.length === 0 ? <Text size="sm" tone="secondary">No staff can be assigned yet. Grant “StudioFlow phase work” to a role in Platform Access first.</Text> : null}
         {error ? <InlineError>{error}</InlineError> : null}

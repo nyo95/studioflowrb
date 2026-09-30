@@ -28,15 +28,22 @@ export default async function SampleRequestsPage() {
     );
   }
 
-  const [queue, vendors] = await Promise.all([
+  const canManageVendors = hasPermission(grants, MASTERDATA_PERMISSIONS.vendorManage);
+  const [queue, vendors, vendorTypes] = await Promise.all([
     sampleRequestCoordinator.listQueue({ grants, includeFinished: true }),
     masterDataService.listSampleRequestVendorChoices({ grants }),
+    canManageVendors ? masterDataService.listVendorTypesForAssignment({ grants }) : [],
   ]);
 
   return (
     <>
       <PageHeader title="Sample requests" divider />
-      <SampleRequestDirectory rows={queue} vendors={vendors} />
+      <SampleRequestDirectory
+        rows={queue}
+        vendors={vendors}
+        canManageVendors={canManageVendors}
+        vendorTypes={vendorTypes.filter((type) => type.can_supply_material).map((type) => ({ id: type.id, name: type.name }))}
+      />
     </>
   );
 }

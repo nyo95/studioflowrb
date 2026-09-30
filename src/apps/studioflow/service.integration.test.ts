@@ -80,7 +80,7 @@ async function reset() {
     "sf_deliverable", "sf_asset_cleanup_failure",
     "sf_activity", "sf_revision", "sf_phase",
     "sf_phase_definition", "sf_phase_template",
-    "sf_project", "sf_client", "sf_project_sequence", "sf_settings",
+    "sf_project", "sf_client", "sf_settings",
   ].map((t) => `"studioflow"."${t}"`).join(", ")} RESTART IDENTITY CASCADE`);
   await truncatePlatformTables(testDb);
   await testDb.prisma.notification.deleteMany();
@@ -259,19 +259,18 @@ describe("WO-BE-02 archived asset retention", () => {
 
   it("validates settings and permissions, respects changed retention and oldest-first limits", async () => {
     assert.equal((await sf.projects.getStudioSettings({ grants: ALL })).archiveRetentionDays, 90);
-    for (const archiveRetentionDays of [6, 731, 7.5, NaN]) await rejectsWith(sf.projects.setAutoNaming({ ...as(designer), enabled: true, archiveRetentionDays }), "ARCHIVE_RETENTION_INVALID");
-    await rejectsWith(sf.projects.setAutoNaming({ ...as(drafter, DRAFTER_GRANTS), enabled: true, archiveRetentionDays: 7 }), "PERMISSION_DENIED");
+    for (const archiveRetentionDays of [6, 731, 7.5, NaN]) await rejectsWith(sf.projects.setArchiveRetention({ ...as(designer), archiveRetentionDays }), "ARCHIVE_RETENTION_INVALID");
+    await rejectsWith(sf.projects.setArchiveRetention({ ...as(drafter, DRAFTER_GRANTS), archiveRetentionDays: 7 }), "PERMISSION_DENIED");
     await rejectsWith(retention().runAssetCleanup(as(drafter, DRAFTER_GRANTS)), "PERMISSION_DENIED");
     const older = await fixture("Older", 20);
     const newer = await fixture("Newer", 10);
     assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0);
-    await sf.projects.setAutoNaming({ ...as(designer), enabled: true, archiveRetentionDays: 7 });
+    await sf.projects.setArchiveRetention({ ...as(designer), archiveRetentionDays: 7 });
     assert.equal((await retention().runAssetCleanup({ ...as(designer), limit: 1 })).projectsPurged, 1);
     assert.ok((await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: older.projectId } })).assets_purged_at);
     assert.equal((await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: newer.projectId } })).assets_purged_at, null);
-    await sf.projects.setAutoNaming({ ...as(designer), enabled: false });
-    assert.deepEqual(await sf.projects.getStudioSettings({ grants: ALL }), { autoNamingEnabled: false, archiveRetentionDays: 7 });
-    await sf.projects.setAutoNaming({ ...as(designer), enabled: false, archiveRetentionDays: 730 });
+    assert.deepEqual(await sf.projects.getStudioSettings({ grants: ALL }), { archiveRetentionDays: 7 });
+    await sf.projects.setArchiveRetention({ ...as(designer), archiveRetentionDays: 730 });
     assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0);
   });
 
@@ -383,34 +382,27 @@ describe("WO-BE-02 archived asset retention", () => {
     assert.equal(archivedRows.find((row) => row.id === boundary.projectId)?.assetsPurgedAt, null);
     assert.equal((await sf.projects.getProject({ grants: ALL, projectId: live.projectId })).assetsPurgedAt, null);
 
-    await sf.projects.setAutoNaming({ ...as(designer), enabled: true, archiveRetentionDays: 7 });
+    await sf.projects.setArchiveRetention({ ...as(designer), archiveRetentionDays: 7 });
     assert.deepEqual(await retention().previewAssetCleanup(as(designer)), { eligibleProjects: 1, retentionDays: 7 }, "a shorter window makes the 90-day-old project eligible");
   });
 });
 
 describe("WO-BE-01 backend regressions", () => {
-  it("allocates distinct stored project codes for concurrent creates", async () => {
-    const results = await Promise.all(["Concurrent A", "Concurrent B"].map((name) => sf.projects.createProject({
+  it("stores project names exactly as typed and rejects a duplicate name", async () => {
+    const results = await Promise.all(["Concurrent A", "2026-012 Typed number"].map((name) => sf.projects.createProject({
       ...as(designer), name, picDesignerId: designer.id, picDrafterId: drafter.id,
     })));
     const projects = await testDb.prisma.sfProject.findMany({ where: { id: { in: results.map((r) => r.projectId) } } });
-    assert.equal(projects.length, 2);
-    assert.deepEqual(projects.map((p) => p.project_code).sort(), ["2026-001", "2026-002"]);
-    for (const project of projects) assert.ok(project.name.startsWith(`${project.project_code} `));
+    assert.deepEqual(projects.map((p) => p.name).sort(), ["2026-012 Typed number", "Concurrent A"]);
+    await rejectsWith(sf.projects.createProject({ ...as(designer), name: "Concurrent A", picDesignerId: designer.id, picDrafterId: drafter.id }), "PROJECT_NAME_TAKEN");
   });
 
-  it("rejects a changed typed project number without writes, while retaining valid rename behavior", async () => {
-    const { projectId } = await newProject();
-    const before = await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: projectId } });
-    const auditBefore = await testDb.prisma.auditEvent.count();
-    await rejectsWith(sf.projects.updateProject({ ...as(designer), projectId, name: "2027-999 Changed", address: "Must not persist" }), "PROJECT_CODE_IMMUTABLE");
-    assert.deepEqual(await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: projectId } }), before);
-    assert.equal(await testDb.prisma.auditEvent.count(), auditBefore);
-    await sf.projects.updateProject({ ...as(designer), projectId, name: `${before.project_code} Same number` });
+  it("renames a project freely and refuses a name another project already uses", async () => {
+    const { projectId } = await newProject("Rename me");
+    await newProject("Taken name");
     await sf.projects.updateProject({ ...as(designer), projectId, name: "Readable rename" });
-    const after = await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: projectId } });
-    assert.equal(after.project_code, before.project_code);
-    assert.equal(after.name, `${before.project_code} Readable rename`);
+    assert.equal((await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: projectId } })).name, "Readable rename");
+    await rejectsWith(sf.projects.updateProject({ ...as(designer), projectId, name: "Taken name" }), "PROJECT_NAME_TAKEN");
   });
 
   it("batched blockers equal single-phase counts and nav retains warning-only root items", async () => {
@@ -503,13 +495,13 @@ describe("WO-BE-01 backend regressions", () => {
 });
 
 describe("SF-R1 bootstrap and naming", () => {
-  it("creates the legacy project skeleton with auto naming and template seeding", async () => {
+  it("creates the legacy project skeleton and template seeding", async () => {
     await sf.tasks.createTemplate({ ...as(designer), definitionId: null, label: "Kick-off meeting" });
     await sf.tasks.createTemplate({ ...as(designer), definitionId: LEGACY.moodboard, label: "Collect references" });
     const first = await newProject();
     const second = await newProject("Kopi Kenangan");
-    assert.equal(first.name, "2026-001 Heloskin Cimanggu");
-    assert.equal(second.name, "2026-002 Kopi Kenangan");
+    assert.equal(first.name, "Heloskin Cimanggu");
+    assert.equal(second.name, "Kopi Kenangan");
 
     const phases = await testDb.prisma.sfPhase.findMany({ where: { project_id: first.projectId }, orderBy: { order_index: "asc" } });
     assert.deepEqual(phases.map((p) => [p.definition_id, p.status, p.allow_parallel]), [
@@ -536,15 +528,10 @@ describe("SF-R1 bootstrap and naming", () => {
     assert.equal(matching[0].activeProjects, 2, "both projects resolved to the same client row");
   });
 
-  it("rejects prefixed names in auto mode and validates manual format", async () => {
-    await rejectsWith(sf.projects.createProject({ ...as(designer), name: "2026-010 Manual", picDesignerId: designer.id, picDrafterId: drafter.id }), "PROJECT_NAME_AUTO_CONFLICT");
-    await sf.projects.setAutoNaming({ ...as(designer), enabled: false });
-    await rejectsWith(sf.projects.createProject({ ...as(designer), name: "No Number", picDesignerId: designer.id, picDrafterId: drafter.id }), "PROJECT_NAME_FORMAT");
-    const manual = await sf.projects.createProject({ ...as(designer), name: "2026-050 Manual", picDesignerId: designer.id, picDrafterId: drafter.id });
-    assert.equal(manual.name, "2026-050 Manual");
-    await sf.projects.setAutoNaming({ ...as(designer), enabled: true });
-    const next = await newProject("After Manual");
-    assert.equal(next.name, "2026-051 After Manual");
+  it("accepts any non-empty project name", async () => {
+    await rejectsWith(sf.projects.createProject({ ...as(designer), name: "   ", picDesignerId: designer.id, picDrafterId: drafter.id }), "PROJECT_NAME_REQUIRED");
+    const created = await sf.projects.createProject({ ...as(designer), name: " No Number ", picDesignerId: designer.id, picDrafterId: drafter.id });
+    assert.equal(created.name, "No Number");
   });
 
   it("requires eligible PICs and the manage grant", async () => {
@@ -750,7 +737,7 @@ describe("SF-R1 checklist and Today", () => {
 
     const today = await sf.today.getToday({ ...as(drafter, DRAFTER_GRANTS), scope: "all" });
     assert.equal(today.scope, "mine", "scope all needs manage grant");
-    assert.deepEqual(today.groups.map((g) => [g.project.name, g.project.isUrgent, g.tasks.length]), [["2026-001 One", true, 2], ["2026-002 Two", false, 0]]);
+    assert.deepEqual(today.groups.map((g) => [g.project.name, g.project.isUrgent, g.tasks.length]), [["One", true, 2], ["Two", false, 0]]);
     assert.deepEqual(today.groups[0].tasks.map((t) => t.label), ["Call client", "Board"], "layout items stay quiet until the phase starts");
     const layoutTarget = today.addTargets[0].targets.find((t) => t.label === "Layout Plan");
     assert.equal(layoutTarget?.disabledReason, "Not started");
@@ -1250,7 +1237,7 @@ describe("SF-R3 Product Schedule", () => {
     rowA = (await list()).find((row) => row.id === a.entryId)!;
     assert.deepEqual([rowA.options[2].productName, rowA.options[2].brandName, rowA.options[2].color], ["Alt D2", "Jotun", "Ivory"]);
     const hits = await sf.schedule.searchReusableOptions({ grants: ALL, projectId: (await newProject("Other")).projectId, query: "ivory" });
-    assert.equal(hits[0]?.sourceProjectName, "2026-001 Heloskin Cimanggu", "edited snapshot is searchable");
+    assert.equal(hits[0]?.sourceProjectName, "Heloskin Cimanggu", "edited snapshot is searchable");
 
     await sf.schedule.updateEntry({ ...as(designer), projectId, entryId: a.entryId, location: "Lobby" });
     rowA = (await list()).find((row) => row.id === a.entryId)!;
@@ -1632,17 +1619,6 @@ describe("Deliverable reference revision", () => {
     await sf.phases.rejectPhase({ ...base, type: "INTERNAL" });
     const after = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
     assert.equal(after.status, "OUTDATED", "files belong to old revision after reject");
-  });
-});
-
-describe("Project code immutability", () => {
-  it("normal edit preserves project_code", async () => {
-    const { projectId } = await newProject("Test Project");
-    const before = await sf.projects.getProject({ grants: ALL, projectId });
-    const originalCode = before.code;
-    await sf.projects.updateProject({ ...as(designer), projectId, name: "Renamed Project" });
-    const after = await sf.projects.getProject({ grants: ALL, projectId });
-    assert.equal(after.code, originalCode, "project code preserved after rename");
   });
 });
 

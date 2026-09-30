@@ -3,7 +3,6 @@ import Link from "next/link";
 import { ContextNavHeading, ContextNavLink } from "@/platform/ui_engine";
 
 const SECTIONS = [
-  { href: "#project-naming", label: "Project naming" },
   { href: "#archive-retention", label: "Archived files" },
   { href: "#checklist-templates", label: "Checklist Templates" },
   { href: "#phase-templates", label: "Phase Templates" },

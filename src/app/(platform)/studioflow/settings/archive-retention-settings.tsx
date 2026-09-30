@@ -9,7 +9,7 @@ import {
 } from "@/apps/studioflow/domain/retention";
 import { Button, ConfirmDialog, Dialog, Field, FormActions, Input, Notice, SectionCard, Text } from "@/platform/ui_engine";
 
-import { getAssetCleanupPreviewAction, runAssetCleanupAction, setAutoNamingAction } from "../actions";
+import { getAssetCleanupPreviewAction, runAssetCleanupAction, setArchiveRetentionAction } from "../actions";
 import { useCommand } from "../_components/use-command";
 
 /** Most projects one manual cleanup handles; the action accepts 1 to 100. */
@@ -41,13 +41,10 @@ const plural = (count: number, one: string, many: string) => `${count} ${count =
  */
 export function ArchiveRetentionSettings({
   retentionDays,
-  autoNaming,
   canManage,
   canCleanup,
 }: {
   retentionDays: number;
-  /** Passed back unchanged when saving, because the shared settings command carries both values. */
-  autoNaming: boolean;
   canManage: boolean;
   canCleanup: boolean;
 }) {
@@ -122,7 +119,7 @@ export function ArchiveRetentionSettings({
               variant="primary"
               disabled={!dirty}
               pending={saving}
-              onClick={() => void run("retention", () => setAutoNamingAction(autoNaming, parsed))}
+              onClick={() => void run("retention", () => setArchiveRetentionAction(parsed))}
             >
               Save
             </Button>

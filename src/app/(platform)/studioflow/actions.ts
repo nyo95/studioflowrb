@@ -36,10 +36,10 @@ function refresh(projectId?: string) {
 
 // ── Settings ────────────────────────────────────────────────────────────────
 
-export async function setAutoNamingAction(enabled: boolean, archiveRetentionDays?: number): Promise<ActionResult<unknown>> {
+export async function setArchiveRetentionAction(archiveRetentionDays: number): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
-    const result = await studioFlow.projects.setAutoNaming({ ...ctx, enabled: parse(z.boolean(), enabled), archiveRetentionDays: parse(z.number().int().min(7).max(730).optional(), archiveRetentionDays) });
+    const result = await studioFlow.projects.setArchiveRetention({ ...ctx, archiveRetentionDays: parse(z.number().int().min(7).max(730), archiveRetentionDays) });
     refresh();
     return result;
   });
@@ -119,7 +119,6 @@ const ProjectFields = {
   picDrafterId: Id,
   openingDate: DateOnly,
   timelineStartDate: DateOnly,
-  projectType: z.string().max(60).nullish(),
   clientContact: z.string().max(200).nullish(),
   address: OptionalText,
   area: z.string().max(20).nullish(),

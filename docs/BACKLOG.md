@@ -155,30 +155,12 @@ invitation to make unrequested drive-by changes.
   owner request, and the two questions on the StudioFlow-side mirror entry
   are still open.
 
-- [ ] [PLANNED] **KB-060 — Create a Supplier from the Sample Request quote dialog.** The quote dialog currently searches
-  only existing suppliers; when the vendor is absent, the user reaches a dead end. The owner requested a `CreatableSearch`
-  affordance: choose an existing Supplier or begin the existing quick-create Supplier flow, then select the newly created
-  Supplier for this quote. It must create a real Master Data Supplier and retain the existing validation/capability rules;
-  it must not store an unlinked free-text supplier name. This is Lead-owned UI/workflow work, not an authorization to alter
-  the Master Data quote contract in isolation.
-
-- [ ] [PLANNED] **KB-061 — Mark a physical sample received from the Schedule card.** Master Data's `Priced` status means
-  a quote was recorded; it must not imply that the physical sample has arrived. StudioFlow already has the separate
-  `receiveSample` command and renders a `Sample received` badge, but the Schedule board exposes only `Cancel` while a
-  request is pending. Add a clear Schedule action to mark the sample received (with its existing optional receipt note),
-  then show the received badge. Do not couple this physical-receipt fact to Master Data's quote status.
-
-- [ ] [PLANNED] **KB-062 — Align the New Project form with the legacy workflow.** The rebuild added several project-setup
-  behaviours that the owner confirms did not exist in legacy. Remove the enforced `[Year]-[Number] [Name]` project-name
-  format (it is server validation today, not merely helper copy); project numbering, if retained, must be generated without
-  making users type a fabricated format. Replace the Client native select plus separate `+ New client` branch with one
-  searchable, creatable Client control that selects an existing client or creates and selects a real one using the existing
-  creation contract. Remove the defaulted `Project type` field (including the invented `RETAIL` default) unless a separately
-  approved business workflow needs it. Finally, make the project-level Opening date one comprehensible Timeline target:
-  the date shown/edited in project administration and the Timeline must be the same stored fact and immediately reflect one
-  another; individual phase planned dates remain distinct and must not silently redefine that project target. Lead owns the
-  UI and final interaction wording; executor work, if needed, must preserve existing projects and compatibility at the
-  service boundary.
+- [ ] [PLANNED] **KB-062 (remaining) — Make the project-level Opening date one comprehensible Timeline target.** The
+  rest of KB-062 shipped in R8.213 (free-text project name, no numbering, one searchable/creatable Client control, no
+  Project type). Still open: the code already stores Opening date once (`SfProject.opening_date`) and the Timeline reads
+  it, so the confusion is likely the separate Timeline start date or that the opening date cannot be changed from the
+  Timeline. **Owner question pending:** which of the two is confusing, or should the opening date be editable directly on
+  the Timeline? Do not start until answered. Individual phase planned dates stay distinct.
 
 **Fixed 2026-09-23 (R8.123):** Physical Samples workflow — from a Product
 Schedule option, staff can request a physical sample from a vendor/supplier

@@ -108,3 +108,27 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 _(cleared 2026-09-22 — see `CHANGELOG.md` for the revisions that superseded
 this backlog's former SF-A entries.)_
+
+### [R8.213] Sample request quote: create a supplier inline (KB-060)
+- Surface: Master Data → Sample requests → Record quote
+- Fixture: user with sample-request and supplier manage grants; one pending request
+- Viewport: desktop (default)
+- Steps: 1. Open Record quote. 2. Type a supplier name that does not exist. 3. Choose "Add … as a new supplier", pick a Supplier Type, create. 4. Save the quote.
+- Acceptance: the new supplier is a real Master Data supplier, is selected on the quote, and the option is hidden for users without supplier manage.
+- Status: PENDING
+
+### [R8.213] Schedule: mark a sample received from the card (KB-061)
+- Surface: StudioFlow project → Product Schedule (board view and option cards)
+- Fixture: option with a REQUESTED sample request
+- Viewport: desktop (default)
+- Steps: 1. Find the "Sample requested" badge. 2. Click "Mark received" (board) or "Mark sample received" (option card).
+- Acceptance: badge turns to "Sample received"; Master Data quote status is unchanged.
+- Status: PENDING
+
+### [R8.213] New/Edit project: free name, searchable client, no project type
+- Surface: StudioFlow → Projects → New project / Edit project; Settings
+- Fixture: any staff with project manage
+- Viewport: desktop (default)
+- Steps: 1. Create a project named without year/number. 2. In Client type a new name and add it. 3. Edit the project name. 4. Open Studio Settings.
+- Acceptance: any name saves as typed; duplicate name shows a clear error; client is created and selected; no Project type field and no naming switch.
+- Status: PENDING

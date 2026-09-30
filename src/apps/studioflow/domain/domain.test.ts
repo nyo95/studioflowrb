@@ -15,7 +15,6 @@ import {
   toChecklistFilterQuery,
 } from "./checklist";
 import { countOpen, groupFeed, nestFeed, sortFeed, type FeedTask } from "./feed";
-import { formatProjectName, looksFormatted, parseProjectName } from "./naming";
 import {
   LEGACY_PHASE_DEFINITION_IDS,
   PHASE_STATUSES,
@@ -107,16 +106,6 @@ describe("blockers", () => {
   it("counts only checklist items for internal submission", () => {
     assert.equal(todoBlockers(counts).total, 3);
     assert.equal(todoBlockers({ ...counts, openRootChecklistItems: 0 }).total, 0);
-  });
-});
-
-describe("naming", () => {
-  it("formats and parses [Year]-[Number] [Name]", () => {
-    assert.equal(formatProjectName(2026, 7, " Heloskin Cimanggu "), "2026-007 Heloskin Cimanggu");
-    assert.deepEqual(parseProjectName("2025-429 Heloskin Cimanggu"), { code: "2025-429", year: 2025, sequence: 429, readable: "Heloskin Cimanggu" });
-    assert.equal(parseProjectName("2025-429-Heloskin"), null);
-    assert.equal(looksFormatted("2026-001 X"), true);
-    assert.equal(looksFormatted("Heloskin"), false);
   });
 });
 

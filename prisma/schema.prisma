@@ -1273,7 +1273,6 @@ enum SfActivityStatus {
 /// Singleton StudioFlow workflow settings (id = "studio").
 model SfSettings {
   id                  String   @id @default("studio")
-  auto_naming_enabled Boolean  @default(true)
   archive_retention_days Int   @default(90)
   updated_at          DateTime @updatedAt
   updated_by_id       String?
@@ -1298,15 +1297,6 @@ model SfAssetCleanupFailure {
   @@schema("studioflow")
 }
 
-/// Per-year project sequence used by auto naming ("2026-007 Name").
-model SfProjectSequence {
-  year        Int @id
-  last_number Int @default(0)
-
-  @@map("sf_project_sequence")
-  @@schema("studioflow")
-}
-
 model SfClient {
   id               String    @id @default(uuid())
   name             String
@@ -1326,9 +1316,7 @@ model SfClient {
 
 model SfProject {
   id              String            @id @default(uuid())
-  /// "YYYY-NNN" part of the formatted name.
-  project_code    String            @unique
-  /// Full formatted name "[Year]-[Number] [Name]".
+  /// Free-text project name (owner, 2026-09-30: no year-number convention).
   name            String            @unique
   client_id       String?
   pic_designer_id String
@@ -1336,7 +1324,6 @@ model SfProject {
   opening_date    DateTime?         @db.Date
   /// Gantt/timeline start; overridable, falls back to `created_at`'s date when unset (owner, 2026-09-23).
   timeline_start_date DateTime?     @db.Date
-  project_type    String            @default("RETAIL")
   status          SfProjectStatus   @default(ACTIVE)
   priority        SfProjectPriority @default(NORMAL)
   client_contact  String?
