@@ -245,6 +245,7 @@ function PermissionCheckboxes({
     ? groups
         .map((app) => ({
           ...app,
+          positions: app.positions.filter((p) => matches(p.id) || matches(p.actionLabel) || matches("position") || matches(app.appLabel)),
           resources: app.resources
             .map((resource) => ({
               ...resource,
@@ -252,7 +253,7 @@ function PermissionCheckboxes({
             }))
             .filter((resource) => resource.permissions.length > 0),
         }))
-        .filter((app) => app.resources.length > 0)
+        .filter((app) => app.resources.length > 0 || app.positions.length > 0)
     : groups;
 
   return (
@@ -272,6 +273,22 @@ function PermissionCheckboxes({
             <div key={app.appLabel} className="grid gap-1.5">
               <Text as="span" weight="semibold" size="sm">{app.appLabel}</Text>
               <div className="grid gap-1 border-l border-line-subtle pl-2.5">
+                {app.positions.length > 0 ? (
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <Text as="span" size="sm" tone="secondary" className="min-w-[9rem]">Position</Text>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      {app.positions.map((position) => (
+                        <Checkbox
+                          key={position.id}
+                          name={name}
+                          value={position.id}
+                          defaultChecked={checkedIds.includes(position.id)}
+                          label={position.actionLabel}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 {app.resources.map((resource) => (
                   <div key={resource.resourceLabel} className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                     <Text as="span" size="sm" tone="secondary" className="min-w-[9rem]">{resource.resourceLabel}</Text>

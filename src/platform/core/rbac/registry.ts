@@ -41,7 +41,11 @@ export type RegisteredApp = {
   /** The `<appId>.access` permission gating app entry. */
   accessPermission: PermissionId;
   permissions: readonly PermissionId[];
+  /** Permissions that describe who a member IS in the app (e.g. a designer seat) rather than what they may do; the role editor lists them apart. */
+  positions: readonly AppPositionInput[];
 };
+
+export type AppPositionInput = { permission: PermissionId; label: string };
 
 export type AppPermissionRegistrationInput = {
   appId: string;
@@ -49,6 +53,8 @@ export type AppPermissionRegistrationInput = {
   rootPath: string;
   icon?: string;
   permissions: readonly PermissionId[];
+  /** Optional subset of `permissions` presented as positions. Presentational only; grants are unchanged. */
+  positions?: readonly AppPositionInput[];
 };
 
 export type PermissionRegistry = {
@@ -76,7 +82,7 @@ export function composePermissionRegistry(
   const apps: RegisteredApp[] = [];
 
   for (const registration of registrations) {
-    const { appId, name, rootPath, permissions, icon } = registration;
+    const { appId, name, rootPath, permissions, icon, positions = [] } = registration;
     if (!APP_ID_PATTERN.test(appId)) {
       throw new AppError("INVARIANT", "REGISTRY_INVALID_APP_ID", "An app registration is invalid.");
     }
@@ -102,6 +108,11 @@ export function composePermissionRegistry(
       }
       seenPermissions.add(permission);
     }
+    for (const position of positions) {
+      if (!permissions.includes(position.permission) || position.permission === accessPermission || typeof position.label !== "string" || position.label.trim().length === 0) {
+        throw new AppError("INVARIANT", "REGISTRY_INVALID_POSITION", "An app registration is invalid.");
+      }
+    }
     seenApps.add(appId);
     apps.push({
       appId,
@@ -110,6 +121,7 @@ export function composePermissionRegistry(
       ...(typeof icon === "string" && icon.trim() ? { icon: icon.trim() } : {}),
       accessPermission,
       permissions: Object.freeze([...permissions]),
+      positions: Object.freeze(positions.map((position) => Object.freeze({ permission: position.permission, label: position.label.trim() }))),
     });
   }
 

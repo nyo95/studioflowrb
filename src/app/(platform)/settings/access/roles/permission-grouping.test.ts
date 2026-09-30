@@ -84,3 +84,34 @@ describe("groupPermissionsByApp", () => {
     assert.deepEqual(flattened.sort(), [...ALL_IDS].sort());
   });
 });
+
+describe("groupPermissionsByApp positions", () => {
+  const withPositions = composePermissionRegistry([
+    {
+      appId: "studioflow",
+      name: "StudioFlow",
+      rootPath: "/studioflow",
+      permissions: ["studioflow.access", "studioflow.project.read", "studioflow.project.pic-designer", "studioflow.project.pic-drafter"],
+      positions: [
+        { permission: "studioflow.project.pic-designer", label: "Designer" },
+        { permission: "studioflow.project.pic-drafter", label: "Drafter" },
+      ],
+    },
+  ]);
+  const grouped = groupPermissionsByApp(withPositions.permissions.filter((id) => id.startsWith("studioflow.")), withPositions);
+
+  it("lists position permissions apart from the resource rows", () => {
+    const app = grouped[0];
+    assert.deepEqual(app.positions, [
+      { id: "studioflow.project.pic-designer", actionLabel: "Designer" },
+      { id: "studioflow.project.pic-drafter", actionLabel: "Drafter" },
+    ]);
+    assert.deepEqual(app.resources.find((r) => r.resourceLabel === "Project")!.permissions.map((p) => p.actionLabel), ["Read"]);
+  });
+
+  it("rejects a position that is not a registered permission", () => {
+    assert.throws(() => composePermissionRegistry([
+      { appId: "x", name: "X", rootPath: "/x", permissions: ["x.access"], positions: [{ permission: "x.thing.work", label: "Y" }] },
+    ]));
+  });
+});

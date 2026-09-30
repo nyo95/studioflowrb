@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.235**
-- Next local revision: **R8.236**
+- Current revision after this entry is committed: **R8.236**
+- Next local revision: **R8.237**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.236 | 2026-09-30 | feat(platform,studioflow): role editor lists app positions apart from permissions
+
+- **Owner request:** "Pic Designer / Pic Drafter" sat among Read/Manage/Override in the role editor, which reads as permissions rather than who a member is. An app can now register optional `positions` (a labelled subset of its own permissions); the role editor shows them on a separate "Position" row. StudioFlow registers Designer and Drafter (`STUDIOFLOW_POSITIONS`).
+- **Presentation only.** The stored permission ids, grants, PIC eligibility checks and existing roles are unchanged; no migration. Registry composition rejects a position that is not one of the app's permissions, is the access permission, or has an empty label.
+- **Tests.** Grouping puts positions apart from the resource rows; an invalid position is refused. Dependencies: none.
+
+**Checks.** `npm test` 671/671, `npm run check`, `tsc --noEmit`. Not checked in the browser (owner tests UI).
 
 ## R8.235 | 2026-09-30 | feat(masterdata): pick a SKU on a quote and add it to the price list; review PASS for R8.234
 

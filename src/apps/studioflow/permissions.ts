@@ -19,4 +19,10 @@ export const STUDIOFLOW_PERMISSIONS = {
   presentationManage: "studioflow.presentation.manage",
 } as const;
 
+/** Who a member is in StudioFlow (a PIC seat), listed apart from what they may do in the role editor. */
+export const STUDIOFLOW_POSITIONS = [
+  { permission: STUDIOFLOW_PERMISSIONS.projectPicDesigner, label: "Designer" },
+  { permission: STUDIOFLOW_PERMISSIONS.projectPicDrafter, label: "Drafter" },
+] as const;
+
 export type StudioFlowPermission = (typeof STUDIOFLOW_PERMISSIONS)[keyof typeof STUDIOFLOW_PERMISSIONS];

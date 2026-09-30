@@ -24,7 +24,7 @@ export function appLabelOf(appId: string, registry: Registry): string {
 
 export type PermissionRow = { id: string; actionLabel: string };
 export type ResourceGroup = { resourceLabel: string; permissions: PermissionRow[] };
-export type AppGroup = { appLabel: string; resources: ResourceGroup[] };
+export type AppGroup = { appLabel: string; positions: PermissionRow[]; resources: ResourceGroup[] };
 
 /**
  * Groups the flat registry permission list by app, then by resource within
@@ -41,7 +41,9 @@ export function groupPermissionsByApp(permissionIds: readonly string[], registry
     const { appId, resource, action } = parsePermissionId(id);
     const appLabel = appLabelOf(appId, registry);
     let app = apps.find((a) => a.appLabel === appLabel);
-    if (!app) { app = { appLabel, resources: [] }; apps.push(app); }
+    if (!app) { app = { appLabel, positions: [], resources: [] }; apps.push(app); }
+    const position = registry.findAppById(appId)?.positions.find((p) => p.permission === id);
+    if (position) { app.positions.push({ id, actionLabel: position.label }); continue; }
     const resourceLabel = resource ? titleCase(resource) : "Access this app";
     let group = app.resources.find((r) => r.resourceLabel === resourceLabel);
     if (!group) { group = { resourceLabel, permissions: [] }; app.resources.push(group); }
