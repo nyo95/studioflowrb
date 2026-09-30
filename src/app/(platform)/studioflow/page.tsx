@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { prisma } from "@platform/core/db";
 import { hasPermission } from "@platform/core/rbac";
 import { userPreferences } from "@platform/runtime";
 import { currentDateOnly } from "@platform/utilities/date";

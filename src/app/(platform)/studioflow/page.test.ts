@@ -8,7 +8,9 @@ const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
 
 describe("Today page summary", () => {
   it("resolves the studio date from the display timezone, not UTC", () => {
-    assert.match(source, /readPlatformGeneralSettings\(prisma\)/);
+    // The person's effective timezone (personal, else the studio's) is the one the client badges follow.
+    assert.match(source, /userPreferences\.resolveDisplay\(\{\s*userId\s*\}\)/);
+    assert.doesNotMatch(source, /readPlatformGeneralSettings/);
     assert.match(source, /currentDateOnly\(\{\s*timeZone:\s*timezone\s*\}\)/);
     assert.doesNotMatch(source, /toISOString\(\)\.split\("T"\)/);
   });
