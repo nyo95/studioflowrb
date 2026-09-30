@@ -81,6 +81,43 @@ after(async () => {
   await closeTestDb(testDb);
 });
 
+describe("Supplier and Brand contacts", () => {
+  it("keeps up to three phone numbers per contact and rejects a fourth", async () => {
+    const context = await createMaterialContext();
+    await service.updateVendor({ grants: GRANTS, actor: ACTOR, vendorId: context.vendorId, name: "Supplier One", contacts: [{ personName: "Sales", phones: [" 0215819089 ", "0812111", "0812222", "0812111"] }] });
+    const row = await testDb.prisma.vendorContact.findFirstOrThrow({ where: { vendor_id: context.vendorId } });
+    assert.equal(row.phone, "0215819089");
+    assert.deepEqual(row.extra_phones, ["0812111", "0812222"]);
+    await assert.rejects(service.updateVendor({ grants: GRANTS, actor: ACTOR, vendorId: context.vendorId, name: "Supplier One", contacts: [{ id: row.id, personName: "Sales", phones: ["1", "2", "3", "4"] }] }), (error: unknown) => error instanceof AppError && error.code === "CONTACT_PHONES_TOO_MANY");
+    await service.updateVendor({ grants: GRANTS, actor: ACTOR, vendorId: context.vendorId, name: "Supplier One", contacts: [{ id: row.id, personName: "Sales", phone: "0215819089" }] });
+    assert.deepEqual((await testDb.prisma.vendorContact.findUniqueOrThrow({ where: { id: row.id } })).extra_phones, []);
+  });
+
+  it("links the supplier to a Brand when a contact is scoped to it, instead of blocking the save", async () => {
+    const context = await createMaterialContext();
+    assert.equal(await testDb.prisma.brandSupplier.count({ where: { vendor_id: context.vendorId } }), 0);
+    await service.updateVendor({ grants: GRANTS, actor: ACTOR, vendorId: context.vendorId, name: "Supplier One", contacts: [{ personName: "Office", phones: ["0215819089"], brandId: context.brandId }] });
+    assert.equal(await testDb.prisma.brandSupplier.count({ where: { vendor_id: context.vendorId, brand_id: context.brandId } }), 1);
+    const contact = await testDb.prisma.vendorContact.findFirstOrThrow({ where: { vendor_id: context.vendorId } });
+    assert.equal(contact.brand_id, context.brandId);
+    const unrelated = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "No Material Type" });
+    await assert.rejects(service.updateVendor({ grants: GRANTS, actor: ACTOR, vendorId: unrelated.vendorId, name: "No Material Type", contacts: [{ personName: "X", brandId: context.brandId }] }), (error: unknown) => error instanceof AppError && error.code === "CONTACT_BRAND_NOT_RELATED");
+  });
+
+  it("manages a Brand's supplier contacts from the Brand itself", async () => {
+    const context = await createMaterialContext();
+    const { brandId } = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Contact Brand", suppliers: [{ vendorId: context.vendorId }], contacts: [{ vendorId: context.vendorId, personName: "Rina", phones: ["0811", "0822"], isPrimary: true }] });
+    const [created] = await testDb.prisma.vendorContact.findMany({ where: { brand_id: brandId } });
+    assert.deepEqual([created.vendor_id, created.person_name, created.phone, created.extra_phones, created.is_primary], [context.vendorId, "Rina", "0811", ["0822"], true]);
+    await service.updateBrand({ grants: GRANTS, actor: ACTOR, brandId, name: "Contact Brand", suppliers: [{ vendorId: context.vendorId }], contacts: [{ id: created.id, vendorId: context.vendorId, personName: "Rina S", phones: ["0811"] }, { vendorId: context.vendorId, personName: "Budi" }] });
+    assert.deepEqual((await testDb.prisma.vendorContact.findMany({ where: { brand_id: brandId }, orderBy: { person_name: "asc" } })).map((c) => c.person_name), ["Budi", "Rina S"]);
+    const stranger = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Stranger" });
+    await assert.rejects(service.updateBrand({ grants: GRANTS, actor: ACTOR, brandId, name: "Contact Brand", suppliers: [{ vendorId: context.vendorId }], contacts: [{ vendorId: stranger.vendorId, personName: "Nope" }] }), (error: unknown) => error instanceof AppError && error.code === "CONTACT_VENDOR_NOT_BRAND_SUPPLIER");
+    await service.updateBrand({ grants: GRANTS, actor: ACTOR, brandId, name: "Contact Brand", suppliers: [{ vendorId: context.vendorId }], contacts: [] });
+    assert.equal(await testDb.prisma.vendorContact.count({ where: { brand_id: brandId } }), 0);
+  });
+});
+
 describe("Master Data service", () => {
   it("round-trips SKU material prices through the workbook and rejects all invalid rows before apply", async () => {
     const context = await createMaterialContext();

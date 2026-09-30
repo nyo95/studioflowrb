@@ -156,3 +156,11 @@ this backlog's former SF-A entries.)_
 - Steps: 1. As the unassigned staff open each page. 2. As the drafter PIC open the drafter-seat phase and a designer-seat phase. 3. As designer PIC edit project fields, open Timeline. 4. As override holder repeat.
 - Acceptance: unassigned staff sees "View only" notices, no edit/phase buttons, row shows "View only" in Projects, and any forced attempt is refused; drafter PIC edits only the drafter-seat phase plus MOM/Schedule/Presentation; designer PIC edits everything; override edits everything. Designer/Drafter pickers list only holders of the matching PIC permission. Owner (override) verified on 2026-09-30: all pages render, no "View only".
 - Status: PENDING (read-only paths not yet seen in a browser)
+
+### [R8.223] Supplier contacts: auto-link Brand, Brand-side contacts, three phone numbers
+- Surface: Master Data → Suppliers (Edit supplier, contacts), Brands (Create/Edit brand, Supplier contacts)
+- Fixture: a material supplier not linked to a Brand; a Brand with an owner
+- Viewport: desktop (default)
+- Steps: 1. In Edit supplier add a contact, pick a Brand the supplier does not carry, read the hint, save. 2. In Brands → Edit, add a contact for the owner with three numbers, save. 3. Reopen both dialogs; check the Suppliers table.
+- Acceptance: step 1 saves and the supplier now appears in that Brand's suppliers; step 2 contact shows on the Supplier with all three numbers; the table shows the first number with "+2"; a fourth number is impossible to add.
+- Status: PENDING

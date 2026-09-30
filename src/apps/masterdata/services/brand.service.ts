@@ -5,10 +5,40 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, normalizeHashtags, assertVendorMaterialCapable, assertLiveProductCategories, latestAuditActorLabels, createDeletionRequest, writeAudit, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, assertSkuRestorable, assertPriceMaterialRestorable } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, normalizeHashtags, assertVendorMaterialCapable, assertLiveProductCategories, latestAuditActorLabels, createDeletionRequest, writeAudit, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, assertSkuRestorable, assertPriceMaterialRestorable } from "./shared";
+
+import { type ContactInput, contactColumns, sameContactColumns } from "./vendor-contact";
+
+/** A Brand-scoped contact belongs to one of the Brand's suppliers (or its owner). */
+export type BrandContactInput = ContactInput & { vendorId: string };
 
 export function createBrandService(db: PrismaClient, ports: MasterDataServicePorts) {
   const { runTransaction } = ports;
+
+  /**
+   * Makes the Brand's own scoped contacts exactly `contacts` (create / update / delete). Each contact must belong to the
+   * Brand's owner or one of its suppliers. Returns a count delta when anything changed, otherwise null.
+   */
+  async function syncBrandContacts(tx: TxClient, brandId: string, contacts: BrandContactInput[], related: { ownerVendorId: string | null; supplierIds: string[] }) {
+    const allowed = new Set([...(related.ownerVendorId ? [related.ownerVendorId] : []), ...related.supplierIds]);
+    const existing = await tx.vendorContact.findMany({ where: { brand_id: brandId } });
+    const existingById = new Map(existing.map((c) => [c.id, c] as const));
+    const kept = new Set(contacts.map((c) => c.id).filter((id): id is string => Boolean(id && existingById.has(id))));
+    let changed = false;
+    const removed = existing.filter((c) => !kept.has(c.id));
+    if (removed.length > 0) { await tx.vendorContact.deleteMany({ where: { id: { in: removed.map((c) => c.id) } } }); changed = true; }
+    for (const c of contacts) {
+      if (!allowed.has(c.vendorId)) throw new AppError("VALIDATION", "CONTACT_VENDOR_NOT_BRAND_SUPPLIER", "Choose one of this Brand's suppliers for each contact.");
+      const vendor = await tx.vendor.findUniqueOrThrow({ where: { id: c.vendorId }, select: { deleted_at: true } });
+      if (vendor.deleted_at !== null) throw new AppError("VALIDATION", "CONTACT_VENDOR_ARCHIVED", "That supplier is archived.");
+      const columns = { ...contactColumns({ ...c, brandId }), };
+      const current = c.id ? existingById.get(c.id) : undefined;
+      if (current) {
+        if (current.vendor_id !== c.vendorId || !sameContactColumns(current, columns)) { await tx.vendorContact.update({ where: { id: current.id }, data: { vendor_id: c.vendorId, ...columns } }); changed = true; }
+      } else { await tx.vendorContact.create({ data: { id: randomUUID(), vendor_id: c.vendorId, ...columns } }); changed = true; }
+    }
+    return changed ? { from: existing.length, to: contacts.length } : null;
+  }
 
   return {
     async listBrands(input: { grants: PermissionGrants; search?: string; categoryId?: string; hashtag?: string; ownerVendorId?: string; supplierVendorId?: string; includeArchived?: boolean }) {
@@ -32,6 +62,7 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
           hashtags: { select: { id: true, label: true, normalized: true } },
           links: { select: { id: true, kind: true, url: true, label: true } },
           suppliers: { select: { id: true, vendor: { select: { id: true, name: true } } } },
+          contacts: { select: { id: true, vendor_id: true, person_name: true, job_title: true, email: true, phone: true, extra_phones: true, is_primary: true, notes: true }, orderBy: [{ is_primary: "desc" }, { person_name: "asc" }] },
           _count: { select: { skus: true, suppliers: true, links: true, categories: true } },
         },
       });
@@ -70,7 +101,7 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
       });
     },
 
-    async createBrand(input: { grants: PermissionGrants; actor: AuditActor; name: string; ownerVendorId?: string; notes?: string; categoryIds?: string[]; hashtags?: string[]; links?: Array<{ kind: string; url: string; label?: string }>; suppliers?: Array<{ vendorId: string; isAuthorized?: boolean; notes?: string | null }> }) {
+    async createBrand(input: { grants: PermissionGrants; actor: AuditActor; name: string; ownerVendorId?: string; notes?: string; categoryIds?: string[]; hashtags?: string[]; links?: Array<{ kind: string; url: string; label?: string }>; suppliers?: Array<{ vendorId: string; isAuthorized?: boolean; notes?: string | null }>; contacts?: BrandContactInput[] }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.brandManage);
       actorIsUsable(input.actor);
       const name = requiredName(input.name, "BRAND_NAME_REQUIRED");
@@ -92,12 +123,13 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
         if (input.suppliers && input.suppliers.length > 0) {
           for (const s of input.suppliers) { await assertVendorMaterialCapable(tx, s.vendorId); await tx.brandSupplier.create({ data: { id: randomUUID(), brand_id: brandId, vendor_id: s.vendorId, is_authorized: s.isAuthorized ?? false, notes: s.notes?.trim() || null } }); }
         }
-        await writeAudit(ports, tx, { action: "brand.created", entityType: "brand", entityId: brandId, actor: input.actor, metadata: { slug, owner_vendor_id: input.ownerVendorId ?? null } });
+        if (input.contacts && input.contacts.length > 0) await syncBrandContacts(tx, brandId, input.contacts, { ownerVendorId: input.ownerVendorId ?? null, supplierIds: (input.suppliers ?? []).map((s) => s.vendorId) });
+        await writeAudit(ports, tx, { action: "brand.created", entityType: "brand", entityId: brandId, actor: input.actor, metadata: { slug, owner_vendor_id: input.ownerVendorId ?? null, contacts: input.contacts?.length ?? 0 } });
         return { brandId };
       });
     },
 
-    async updateBrand(input: { grants: PermissionGrants; actor: AuditActor; brandId: string; name: string; ownerVendorId?: string | null; notes?: string | null; categoryIds?: string[]; hashtags?: string[]; links?: Array<{ kind: string; url: string; label?: string }>; suppliers?: Array<{ vendorId: string; isAuthorized?: boolean; notes?: string | null }>; infoLinks?: Array<{ kind: string; url: string; label?: string | null }>; linkReviewSnapshot?: unknown[] }) {
+    async updateBrand(input: { grants: PermissionGrants; actor: AuditActor; brandId: string; name: string; ownerVendorId?: string | null; notes?: string | null; categoryIds?: string[]; hashtags?: string[]; links?: Array<{ kind: string; url: string; label?: string }>; suppliers?: Array<{ vendorId: string; isAuthorized?: boolean; notes?: string | null }>; infoLinks?: Array<{ kind: string; url: string; label?: string | null }>; linkReviewSnapshot?: unknown[]; contacts?: BrandContactInput[] }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.brandManage);
       actorIsUsable(input.actor);
       const name = requiredName(input.name, "BRAND_NAME_REQUIRED");
@@ -151,6 +183,11 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
           const before = existing.suppliers.map((s) => s.vendor_id).sort();
           const after = input.suppliers.map((s) => s.vendorId).sort();
           if (before.join("\u0000") !== after.join("\u0000")) changes.suppliers = { from: before, to: after };
+        }
+        if (input.contacts !== undefined) {
+          const relatedNow = await tx.brand.findUniqueOrThrow({ where: { id: input.brandId }, select: { owner_vendor_id: true, suppliers: { select: { vendor_id: true } } } });
+          const contactChange = await syncBrandContacts(tx, input.brandId, input.contacts, { ownerVendorId: relatedNow.owner_vendor_id, supplierIds: relatedNow.suppliers.map((s) => s.vendor_id) });
+          if (contactChange) changes.contacts = contactChange;
         }
         if (Object.keys(changes).length > 0) await writeAudit(ports, tx, { action: "brand.updated", entityType: "brand", entityId: input.brandId, actor: input.actor, changes });
         return { brandId: input.brandId };

@@ -23,6 +23,7 @@ updateBrandAction,
 } from "./actions";
 import { normalizeBrandLinks,normalizeBrandLinkUrl,type BrandLinkDraft } from "./brand-link-input";
 import { buildBrandHashtagOptions } from "./brand-directory-options";
+import { BrandContactsEditor, brandContactDrafts, serializeBrandContacts, type BrandContactDraft } from "./brand-contacts-editor";
 
 type BrandRow = {
   id: string;
@@ -40,6 +41,7 @@ type BrandRow = {
   hashtags: Array<{ id: string; label: string; normalized: string }>;
   links: Array<{ id: string; kind: string; url: string; label: string | null }>;
   suppliers: Array<{ id: string; vendor: { id: string; name: string } }>;
+  contacts: Array<{ id: string; vendor_id: string; person_name: string; job_title: string | null; email: string | null; phone: string | null; extra_phones: string[]; is_primary: boolean; notes: string | null }>;
   _count: { skus: number; suppliers: number; links: number; categories: number };
 };
 
@@ -80,6 +82,8 @@ export function BrandDirectory({
   const [editHashtags, setEditHashtags] = useState<string[]>([]);
   const [createSupplierIds, setCreateSupplierIds] = useState<string[]>([]);
   const [editSupplierIds, setEditSupplierIds] = useState<string[]>([]);
+  const [createContacts, setCreateContacts] = useState<BrandContactDraft[]>([]);
+  const [editContacts, setEditContacts] = useState<BrandContactDraft[]>([]);
   const [confirmArchive, setConfirmArchive] = useState<BrandRow | null>(null);
   const [confirmRestore, setConfirmRestore] = useState<BrandRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BrandRow | null>(null);
@@ -105,6 +109,11 @@ export function BrandDirectory({
   const [vendorQuick, setVendorQuick] = useState<{ target: "createOwner" | "editOwner" | "createSupplier" | "editSupplier"; name: string; vendorTypeId: string } | null>(null);
   const [vendorQuickPending, setVendorQuickPending] = useState(false);
   const [vendorQuickError, setVendorQuickError] = useState<string | null>(null);
+  /** Who a Brand contact can belong to: the Brand's owner and its selected suppliers. */
+  const contactVendorChoices = (ownerId: string, supplierIds: readonly string[]) => {
+    const nameOf = (id: string) => [...ownerVendorOptions, ...materialVendorOptions].find((vendor) => vendor.id === id)?.name ?? "Supplier";
+    return [...new Set([...(ownerId ? [ownerId] : []), ...supplierIds])].map((id) => ({ id, name: nameOf(id) }));
+  };
   const hashtagSuggestions = brands.flatMap((brand) => brand.hashtags);
   const createFormRef = useRef<HTMLFormElement>(null);
   const editFormRef = useRef<HTMLFormElement>(null);
@@ -112,7 +121,7 @@ export function BrandDirectory({
     formRef: createFormRef,
     resetKey: createDraftKey,
     active: createOpen,
-    watchedValue: JSON.stringify([createOwnerVendorId, createCategoryIds, createHashtags, createSupplierIds, linksList, newLinkKind, newLinkUrl, newLinkLabel]),
+    watchedValue: JSON.stringify([createOwnerVendorId, createCategoryIds, createHashtags, createSupplierIds, createContacts, linksList, newLinkKind, newLinkUrl, newLinkLabel]),
     title: "Discard brand draft?",
     description: "Your changes are only in this browser and have not been saved.",
   });
@@ -120,7 +129,7 @@ export function BrandDirectory({
     formRef: editFormRef,
     resetKey: editTarget?.id ?? "",
     active: Boolean(editTarget),
-    watchedValue: JSON.stringify([editOwnerVendorId, editCategoryIds, editHashtags, editSupplierIds, linksList, newLinkKind, newLinkUrl, newLinkLabel]),
+    watchedValue: JSON.stringify([editOwnerVendorId, editCategoryIds, editHashtags, editSupplierIds, editContacts, linksList, newLinkKind, newLinkUrl, newLinkLabel]),
     title: "Discard changes?",
     description: "Your edits are only in this browser and have not been saved.",
   });
@@ -178,6 +187,7 @@ export function BrandDirectory({
     setCreateCategoryIds([]);
     setCreateHashtags([]);
     setCreateSupplierIds([]);
+    setCreateContacts([]);
     setCreateNameWarning(null);
     setCreateDraftKey((key) => key + 1);
     setCreateOpen(true);
@@ -192,6 +202,7 @@ export function BrandDirectory({
     setEditCategoryIds(brand.categories.map((item) => item.category.id));
     setEditHashtags(brand.hashtags.map((item) => item.label));
     setEditSupplierIds(brand.suppliers.map((item) => item.vendor.id));
+    setEditContacts(brandContactDrafts(brand.contacts));
     setEditNameWarning(null);
     setEditTarget(brand);
   };
@@ -363,6 +374,7 @@ export function BrandDirectory({
             <Notice tone="warning">{createNameWarning}</Notice>
           ) : null}
           <input type="hidden" name="ownerVendorId" value={createOwnerVendorId} />
+          <input type="hidden" name="contactsJson" value={serializeBrandContacts(createContacts)} />
           {createCategoryIds.map((id) => <input key={id} type="hidden" name="categoryIds" value={id} />)}
           {createSupplierIds.map((id) => <input key={id} type="hidden" name="supplierIds" value={id} />)}
           <input type="hidden" name="hashtags" value={createHashtags.join(" ")} />
@@ -389,6 +401,7 @@ export function BrandDirectory({
               {canManageVendors ? <Button type="button" size="sm" variant="ghost" className="justify-self-start" onClick={() => openVendorQuick("createSupplier", "")}>+ Create new supplier for this brand</Button> : null}
             </div>
           </Field>
+          <BrandContactsEditor value={createContacts} onChange={setCreateContacts} vendorChoices={contactVendorChoices(createOwnerVendorId, createSupplierIds)} />
           {/* Links builder */}
           <div className="grid gap-2 border-t border-line pt-3">
             <Text size="sm" weight="semibold">External links (Catalogs, Website)</Text>
@@ -469,6 +482,7 @@ export function BrandDirectory({
             className="grid gap-4  pr-1"
           >
             <input type="hidden" name="brandId" value={editTarget.id} />
+            <input type="hidden" name="contactsJson" value={serializeBrandContacts(editContacts)} />
             {editCategoryIds.map((id) => <input key={id} type="hidden" name="categoryIds" value={id} />)}
             {editSupplierIds.map((id) => <input key={id} type="hidden" name="supplierIds" value={id} />)}
             <input type="hidden" name="hashtags" value={editHashtags.join(" ")} />
@@ -503,6 +517,7 @@ export function BrandDirectory({
                 {canManageVendors ? <Button type="button" size="sm" variant="ghost" className="justify-self-start" onClick={() => openVendorQuick("editSupplier", "")}>+ Create new supplier for this brand</Button> : null}
               </div>
             </Field>
+            <BrandContactsEditor value={editContacts} onChange={setEditContacts} vendorChoices={contactVendorChoices(editOwnerVendorId, editSupplierIds)} />
             {/* Links builder */}
             <div className="grid gap-2 border-t border-line pt-3">
               <Text size="sm" weight="semibold">External links</Text>

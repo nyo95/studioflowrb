@@ -494,6 +494,8 @@ model VendorContact {
   job_title   String?
   email       String?
   phone       String?
+  /// Second and third phone numbers (the first stays in `phone`); at most two.
+  extra_phones String[] @default([])
   is_primary  Boolean  @default(false)
   notes       String?
   created_at  DateTime @default(now())

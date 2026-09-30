@@ -1,6 +1,7 @@
 "use client";
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { UpdatedCell } from "../updated-cell";
+import { PhoneNumbersField, contactPhoneList, phoneSummary } from "../contact-phones";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { formatInstant } from "@platform/utilities/date";
 import {
@@ -64,6 +65,7 @@ type VendorRow = {
     job_title: string | null;
     email: string | null;
     phone: string | null;
+    extra_phones: string[];
     is_primary: boolean;
     brand_id: string | null;
     notes: string | null;
@@ -74,6 +76,7 @@ type VendorRow = {
     notes: string | null;
     brand: { id: string; name: string };
   }>;
+  owned_brands: Array<{ id: string }>;
   _count: {
     owned_brands: number;
     brand_suppliers: number;
@@ -216,7 +219,7 @@ type ContactDraft = {
   personName: string;
   jobTitle: string;
   email: string;
-  phone: string;
+  phones: string[];
   isPrimary: boolean;
   brandId: string;
   notes: string;
@@ -382,7 +385,7 @@ export function VendorDirectory({
         personName: c.person_name,
         jobTitle: c.job_title ?? "",
         email: c.email ?? "",
-        phone: c.phone ?? "",
+        phones: contactPhoneList(c),
         isPrimary: c.is_primary ?? false,
         brandId: c.brand_id ?? "",
         notes: c.notes ?? "",
@@ -400,8 +403,15 @@ export function VendorDirectory({
     setEditTarget(vendor);
   };
 
+  /** A contact scoped to a Brand the supplier does not carry yet also links the supplier to that Brand when saved. */
+  const scopeHint = (brandId: string, relatedBrandIds: readonly string[]) => {
+    if (!brandId || relatedBrandIds.includes(brandId)) return undefined;
+    const brandName = brands.find((brand) => brand.id === brandId)?.name ?? "this Brand";
+    return `Saving also adds this supplier to ${brandName}'s suppliers.`;
+  };
+
   const addContactDraft = () => {
-    setContactsList([...contactsList, { personName: "", jobTitle: "", email: "", phone: "", isPrimary: false, brandId: "", notes: "" }]);
+    setContactsList([...contactsList, { personName: "", jobTitle: "", email: "", phones: [""], isPrimary: false, brandId: "", notes: "" }]);
   };
 
   const updateContactDraft = (idx: number, patch: Partial<ContactDraft>) => {
@@ -518,7 +528,7 @@ export function VendorDirectory({
                         vendor.contacts.slice(0, 2).map((c) => (
                           <div key={c.id} className="truncate">
                             <span className="font-medium text-ink">{c.person_name}</span>
-                            {c.phone ? ` (${c.phone})` : c.email ? ` (${c.email})` : ""}
+                            {contactPhoneList(c).length > 0 ? ` (${phoneSummary(contactPhoneList(c))})` : c.email ? ` (${c.email})` : ""}
                           </div>
                         ))
                       )}
@@ -651,13 +661,8 @@ export function VendorDirectory({
                     onChange={(e) => updateContactDraft(idx, { jobTitle: e.target.value })}
                   />
                 </Field>
-                <Field label="Phone number">
-                  <Input
-                    value={contact.phone}
-                    onChange={(e) => updateContactDraft(idx, { phone: e.target.value })}
-                  />
-                </Field>
-                <Field label="Email address">
+                <PhoneNumbersField value={contact.phones} onChange={(phones) => updateContactDraft(idx, { phones })} />
+                <Field label="Email address" className="self-start">
                   <Input
                     type="email"
                     value={contact.email}
@@ -665,7 +670,10 @@ export function VendorDirectory({
                   />
                 </Field>
                 <Field label="Brand scoping">
+                  <div className="grid gap-1">
                   <Combobox label={`Brand scope for ${contact.personName || "contact"}`} options={[{ id: "", label: "All supplier brands" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={contact.brandId} onValueChange={(brandId) => updateContactDraft(idx, { brandId })} placeholder="All supplier brands" searchPlaceholder="Search brands…" />
+                  {scopeHint(contact.brandId, createBrandIds) ? <p className="mt-1 text-xs text-ink-secondary">{scopeHint(contact.brandId, createBrandIds)}</p> : null}
+                  </div>
                 </Field>
                 <Checkbox className="col-span-2 text-sm text-ink-secondary" checked={contact.isPrimary} onCheckedChange={(checked) => updateContactDraft(idx, { isPrimary: checked === true })} label="Primary contact" />
               </div>
@@ -799,13 +807,8 @@ export function VendorDirectory({
                               onChange={(e) => updateContactDraft(idx, { jobTitle: e.target.value })}
                             />
                           </Field>
-                          <Field label="Phone number">
-                            <Input
-                              value={contact.phone}
-                              onChange={(e) => updateContactDraft(idx, { phone: e.target.value })}
-                            />
-                          </Field>
-                          <Field label="Email address">
+                          <PhoneNumbersField value={contact.phones} onChange={(phones) => updateContactDraft(idx, { phones })} />
+                          <Field label="Email address" className="self-start">
                             <Input
                               type="email"
                               value={contact.email}
@@ -813,7 +816,10 @@ export function VendorDirectory({
                             />
                           </Field>
                           <Field label="Brand scoping">
+                            <div className="grid gap-1">
                             <Combobox label={`Brand scope for ${contact.personName || "contact"}`} options={[{ id: "", label: "All supplier brands" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={contact.brandId} onValueChange={(brandId) => updateContactDraft(idx, { brandId })} placeholder="All supplier brands" searchPlaceholder="Search brands…" />
+                            {scopeHint(contact.brandId, [...(editTarget?.brand_suppliers.map((relation) => relation.brand.id) ?? []), ...(editTarget?.owned_brands.map((brand) => brand.id) ?? [])]) ? <p className="mt-1 text-xs text-ink-secondary">{scopeHint(contact.brandId, [...(editTarget?.brand_suppliers.map((relation) => relation.brand.id) ?? []), ...(editTarget?.owned_brands.map((brand) => brand.id) ?? [])])}</p> : null}
+                            </div>
                           </Field>
                           <Checkbox className="col-span-2 text-sm text-ink-secondary" checked={contact.isPrimary} onCheckedChange={(checked) => updateContactDraft(idx, { isPrimary: checked === true })} label="Primary contact" />
                         </div>

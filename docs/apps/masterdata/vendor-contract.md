@@ -153,13 +153,14 @@ Renamed from `PartyContact`. Many contacts per Vendor. Structure:
 | `vendor_id` | FK → Vendor | Required |
 | `person_name` | String | Required |
 | `job_title` | String? | |
-| `phone` | String? | |
+| `phone` | String? | First phone number |
+| `extra_phones` | String[] | Up to two more numbers (max 3 in total, each ≤ 32 chars, de-duplicated) — owner-approved 2026-09-30 after staff asked for a 3rd number |
 | `email` | String? | |
 | `is_primary` | Boolean | Display preference, not uniqueness constraint |
 | `notes` | String? | |
 | `brand_id` | FK → Brand? | Optional brand scope. NULL = general contact |
 
-Brand-scoped contact validation: the Brand must be live, and the Vendor must own or supply it (existing `assertBrandScopedContactAllowed` logic retained, references updated from Party to Vendor).
+Brand-scoped contact validation: the Brand must be live, and the Vendor must own or supply it. **Changed 2026-09-30 (staff request):** when a Supplier is saved with a contact scoped to a Brand it does not yet carry, the missing `BrandSupplier` relation (not authorized, no notes) is created in the same transaction instead of rejecting the save — provided the Vendor is material-capable, otherwise `CONTACT_BRAND_NOT_RELATED` asks for a material Supplier Type first. The audit `changes` carry `brand_suppliers_added`. **Brand-side entry:** a Brand's Create/Edit dialog manages the Brand's own scoped contacts (owner or supplier as the contact's Vendor; `updateBrand`/`createBrand` `contacts`, full set, requires `brand.manage`); they are ordinary `VendorContact` rows and appear on that Supplier.
 
 ---
 

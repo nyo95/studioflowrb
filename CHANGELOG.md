@@ -5,13 +5,28 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.222**
-- Next local revision: **R8.223**
+- Current revision after this entry is committed: **R8.223**
+- Next local revision: **R8.224**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.223 | 2026-09-30 | feat(masterdata): supplier contacts from staff feedback (auto-link Brand, Brand-side contacts, 3 phone numbers)
+
+- **Staff input, three items.** (1) Saving a Supplier contact scoped to a Brand the supplier does not carry used to fail with "Supplier must own or supply this
+  Brand" and sent staff to another menu. It now links the supplier to that Brand in the same save (not authorized) and the dialog says so beforehand; a
+  supplier without a material type gets a clear message instead. (2) The Brand Create/Edit dialog has a "Supplier contacts" section (owner or supplier as the
+  contact's supplier, name, job title, phones, email, primary) — full set, `brand.manage`, stored as normal `VendorContact` rows so they also show on the Supplier.
+  (3) A contact can have up to three phone numbers: additive migration `20260930170000_md_contact_extra_phones` (`extra_phones text[]`, first number stays in
+  `phone`), shared `PhoneNumbersField`, tables show the first number plus "+N". Applied to dev and test databases.
+- **Contracts** updated (`vendor-contract.md` §4, `brand-contract.md`). Master Data was worked by the Lead at the owner's explicit request.
+- **Tests** (+3): phone limits/dedupe/legacy single phone, auto-link and the non-material-supplier refusal, Brand-side contact create/update/delete and refusal for a non-supplier.
+- **Browser** (Lead, dev data untouched, nothing saved): Brand edit shows existing scoped contact with three phone rows and the add/remove behaviour; Supplier
+  edit shows the new hint under Brand scoping. Real saves are queued in the browser acceptance list. `PLAN.md` (CD List) target moves to R8.224.
+
+**Checks.** `npm test` 658/658, `tsc --noEmit`, eslint (0 errors). Dev server restarted after the schema change.
 
 ## R8.222 | 2026-09-30 | docs(studioflow): WO-SF-CDLIST-01 ready
 

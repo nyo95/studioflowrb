@@ -7,6 +7,8 @@ import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
 import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, assertVendorTypeRemovalSafe, assertVendorMaterialCapable, latestAuditActorLabels, createDeletionRequest, writeAudit, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, assertPriceMaterialRestorable, assertWorkPriceRestorable } from "./shared";
 
+import { type ContactInput, contactColumns, ensureVendorBrandRelation, sameContactColumns } from "./vendor-contact";
+
 export function createVendorService(db: PrismaClient, ports: MasterDataServicePorts) {
   const { runTransaction } = ports;
   return {
@@ -28,8 +30,9 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
           id: true, name: true, slug: true, legal_name: true, address: true, notes: true, info_links: true, link_review_snapshot: true, updated_at: true, deleted_at: true,
           types: { select: { vendor_type: { select: { id: true, code: true, name: true, can_supply_material: true, can_supply_labor: true } } } },
           supplier_categories: { select: { supplier_category: { select: { id: true, code: true, name: true } } }, orderBy: { supplier_category: { name: "asc" } } },
-          contacts: { select: { id: true, person_name: true, job_title: true, email: true, phone: true, is_primary: true, brand_id: true, notes: true } },
+          contacts: { select: { id: true, person_name: true, job_title: true, email: true, phone: true, extra_phones: true, is_primary: true, brand_id: true, notes: true } },
           brand_suppliers: { select: { id: true, is_authorized: true, notes: true, brand: { select: { id: true, name: true } } }, orderBy: { brand: { name: "asc" } } },
+          owned_brands: { where: { deleted_at: null }, select: { id: true } },
           _count: { select: { owned_brands: true, brand_suppliers: true, material_prices: true, material_labor_prices: true, labor_prices: true } },
         },
       });
@@ -78,7 +81,7 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
       });
     },
 
-    async createVendor(input: { grants: PermissionGrants; actor: AuditActor; name: string; legalName?: string; address?: string; notes?: string; vendorTypeIds?: string[]; supplierCategoryIds?: string[]; brandIds?: string[]; contacts?: Array<{ personName: string; jobTitle?: string; email?: string; phone?: string; isPrimary?: boolean; notes?: string; brandId?: string }> }) {
+    async createVendor(input: { grants: PermissionGrants; actor: AuditActor; name: string; legalName?: string; address?: string; notes?: string; vendorTypeIds?: string[]; supplierCategoryIds?: string[]; brandIds?: string[]; contacts?: ContactInput[] }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
       actorIsUsable(input.actor);
       const name = requiredName(input.name, "VENDOR_NAME_REQUIRED");
@@ -111,13 +114,8 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
         }
         if (input.contacts && input.contacts.length > 0) {
           for (const c of input.contacts) {
-            if (c.brandId) {
-              const brand = await tx.brand.findUniqueOrThrow({ where: { id: c.brandId } });
-              if (brand.deleted_at !== null) throw new AppError("VALIDATION", "CONTACT_BRAND_ARCHIVED", "Brand is archived.");
-              const ownsViaBrand = brand.owner_vendor_id === vendorId;
-              if (!ownsViaBrand) { const existingSupplier = await tx.brandSupplier.findFirst({ where: { brand_id: c.brandId, vendor_id: vendorId } }); if (!existingSupplier) throw new AppError("VALIDATION", "CONTACT_BRAND_NOT_RELATED", "Supplier must own or supply this Brand to assign a Brand-scoped contact."); }
-            }
-            await tx.vendorContact.create({ data: { id: randomUUID(), vendor_id: vendorId, person_name: requiredName(c.personName, "CONTACT_NAME_REQUIRED"), job_title: c.jobTitle?.trim() || null, email: c.email?.trim() || null, phone: c.phone?.trim() || null, is_primary: c.isPrimary ?? false, notes: c.notes?.trim() || null, brand_id: c.brandId || null } });
+            if (c.brandId) await ensureVendorBrandRelation(tx, vendorId, c.brandId);
+            await tx.vendorContact.create({ data: { id: randomUUID(), vendor_id: vendorId, ...contactColumns(c) } });
           }
         }
         await writeAudit(ports, tx, { action: "vendor.created", entityType: "vendor", entityId: vendorId, actor: input.actor, metadata: { slug, brand_ids: input.brandIds ?? [] } });
@@ -142,7 +140,7 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
       });
     },
 
-    async updateVendor(input: { grants: PermissionGrants; actor: AuditActor; vendorId: string; name: string; legalName?: string | null; address?: string | null; notes?: string | null; vendorTypeIds?: string[]; supplierCategoryIds?: string[]; contacts?: Array<{ id?: string; personName: string; jobTitle?: string; email?: string; phone?: string; isPrimary?: boolean; notes?: string; brandId?: string }>; infoLinks?: Array<{ kind: string; url: string; label?: string | null }>; linkReviewSnapshot?: unknown[] }) {
+    async updateVendor(input: { grants: PermissionGrants; actor: AuditActor; vendorId: string; name: string; legalName?: string | null; address?: string | null; notes?: string | null; vendorTypeIds?: string[]; supplierCategoryIds?: string[]; contacts?: ContactInput[]; infoLinks?: Array<{ kind: string; url: string; label?: string | null }>; linkReviewSnapshot?: unknown[] }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
       actorIsUsable(input.actor);
       const name = requiredName(input.name, "VENDOR_NAME_REQUIRED");
@@ -182,12 +180,14 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
           if (removedContacts.length > 0) await tx.vendorContact.deleteMany({ where: { id: { in: removedContacts.map((c) => c.id) } } });
           const existingContactById = new Map(existing.contacts.map((c) => [c.id, c] as const));
           let contactFieldChanged = false;
+          const autoLinkedBrandIds: string[] = [];
           for (const c of input.contacts) {
-            if (c.brandId) { const brand = await tx.brand.findUniqueOrThrow({ where: { id: c.brandId } }); if (brand.deleted_at !== null) throw new AppError("VALIDATION", "CONTACT_BRAND_ARCHIVED", "Brand is archived."); const ownsViaBrand = brand.owner_vendor_id === input.vendorId; if (!ownsViaBrand) { const existingSupplier = await tx.brandSupplier.findFirst({ where: { brand_id: c.brandId, vendor_id: input.vendorId } }); if (!existingSupplier) throw new AppError("VALIDATION", "CONTACT_BRAND_NOT_RELATED", "Supplier must own or supply this Brand to assign a Brand-scoped contact."); } }
-            const contactData = { person_name: requiredName(c.personName, "CONTACT_NAME_REQUIRED"), job_title: c.jobTitle?.trim() || null, email: c.email?.trim() || null, phone: c.phone?.trim() || null, is_primary: c.isPrimary ?? false, notes: c.notes?.trim() || null, brand_id: c.brandId || null };
-            if (c.id && existingContactById.has(c.id)) { const ex = existingContactById.get(c.id)!; const contactChanged = ex.person_name !== contactData.person_name || (ex.job_title || null) !== contactData.job_title || (ex.email || null) !== contactData.email || (ex.phone || null) !== contactData.phone || ex.is_primary !== contactData.is_primary || (ex.notes || null) !== contactData.notes || (ex.brand_id || null) !== contactData.brand_id; if (contactChanged) { await tx.vendorContact.update({ where: { id: c.id }, data: contactData }); contactFieldChanged = true; } }
+            if (c.brandId && await ensureVendorBrandRelation(tx, input.vendorId, c.brandId)) autoLinkedBrandIds.push(c.brandId);
+            const contactData = contactColumns(c);
+            if (c.id && existingContactById.has(c.id)) { if (!sameContactColumns(existingContactById.get(c.id)!, contactData)) { await tx.vendorContact.update({ where: { id: c.id }, data: contactData }); contactFieldChanged = true; } }
             else { await tx.vendorContact.create({ data: { id: c.id || randomUUID(), vendor_id: input.vendorId, ...contactData } }); }
           }
+          if (autoLinkedBrandIds.length > 0) changes.brand_suppliers_added = { from: [], to: [...new Set(autoLinkedBrandIds)].sort() };
           const beforeContactIds = existing.contacts.map((c) => c.id).sort();
           const afterContactIds = input.contacts.map((c, index) => c.id ?? `new:${index}`).sort();
           const contactIdsChanged = beforeContactIds.join("\u0000") !== afterContactIds.join("\u0000");

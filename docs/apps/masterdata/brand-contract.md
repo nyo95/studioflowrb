@@ -177,7 +177,8 @@ In one transaction:
 3. make those SKUs effectively archived and add their SKU-parent cause to every
    `PriceMaterial` row they own;
 4. preserve Categories/origins, hashtags, resources, owner, BrandSupplier, and
-   scoped contacts;
+   scoped contacts (Brand-scoped contacts are also created, edited and removed from
+   the Brand dialog; see `vendor-contract.md` §4);
 5. write one `brand.archived` primary AuditEvent.
 
 **Lifecycle eligibility:** Brand archive cascades a persisted parent archive

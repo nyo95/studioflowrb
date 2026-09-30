@@ -32,7 +32,36 @@ const BrandInputSchema = z.object({
   hashtags: z.array(z.string()).optional(),
   links: z.array(z.object({ kind: z.string().min(1), url: HttpUrlSchema, label: z.string().optional().nullable() })).optional(),
   suppliers: z.array(z.object({ vendorId: z.string().uuid() })).optional(),
+  /** The Brand's own supplier contacts (full set). Absent = leave contacts alone. */
+  contacts: z.array(z.object({
+    id: z.string().uuid().optional(),
+    vendorId: z.string().uuid(),
+    personName: z.string().min(1, "Contact name is required").max(128),
+    jobTitle: z.string().max(64).optional().nullable().or(z.literal("")),
+    email: z.string().email().optional().nullable().or(z.literal("")),
+    phones: z.array(z.string().max(32)).max(3).optional(),
+    isPrimary: z.boolean().optional(),
+    notes: z.string().max(500).optional().nullable().or(z.literal("")),
+  })).optional(),
 });
+
+function readContacts(formData: FormData): unknown {
+  if (!formData.has("contactsJson")) return undefined;
+  try { return JSON.parse(String(formData.get("contactsJson") ?? "[]")); } catch { return null; }
+}
+
+function toContactInputs(contacts: NonNullable<z.infer<typeof BrandInputSchema>["contacts"]> | undefined) {
+  return contacts?.map((c) => ({
+    id: c.id,
+    vendorId: c.vendorId,
+    personName: c.personName,
+    jobTitle: c.jobTitle || undefined,
+    email: c.email || undefined,
+    phones: c.phones,
+    isPrimary: c.isPrimary ?? false,
+    notes: c.notes || undefined,
+  }));
+}
 const IdSchema = z.string().uuid();
 const DeletionInputSchema = z.object({ id: IdSchema, reason: z.string().max(1000).optional(), notes: z.string().max(1000).optional() });
 
@@ -101,6 +130,7 @@ export async function createBrandAction(
       notes: formData.get("notes") ? String(formData.get("notes")) : null,
       categoryIds,
       suppliers: supplierIds.map((vendorId) => ({ vendorId })),
+      contacts: readContacts(formData),
       hashtags: rawHashtags,
       links,
     });
@@ -116,6 +146,7 @@ export async function createBrandAction(
       hashtags: parsed.data.hashtags,
       links: (parsed.data.links ?? []).map((l) => ({ kind: l.kind, url: l.url, label: l.label ?? undefined })),
       suppliers: parsed.data.suppliers,
+      contacts: toContactInputs(parsed.data.contacts),
     });
     revalidateBrands();
     return result;
@@ -151,6 +182,7 @@ export async function updateBrandAction(
       notes: formData.get("notes") ? String(formData.get("notes")) : null,
       categoryIds,
       suppliers: supplierIds.map((vendorId) => ({ vendorId })),
+      contacts: readContacts(formData),
       hashtags: rawHashtags,
       links,
     });
@@ -167,6 +199,7 @@ export async function updateBrandAction(
       hashtags: parsed.data.hashtags,
       links: (parsed.data.links ?? []).map((l) => ({ kind: l.kind, url: l.url, label: l.label ?? undefined })),
       suppliers: parsed.data.suppliers,
+      contacts: toContactInputs(parsed.data.contacts),
     });
     revalidateBrands();
     return result;

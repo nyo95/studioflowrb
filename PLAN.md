@@ -2,7 +2,7 @@
 
 Plan ID: WO-SF-CDLIST-01
 Scope: StudioFlow CD List (Construction Drawing item list) — schema, service, audit, tests. Backend only; the Lead builds the screen afterwards.
-Target revision: R8.223
+Target revision: R8.224
 Status: READY
 Priority: P2
 Owner: owner (Product Owner). Go-ahead 2026-09-30 ("ya boleh ... sekalian build"); wave-2 item of `STUDIOFLOW-REWORK-CONTRACT.md` (RW-04). Details below decided by the Lead from legacy evidence.
@@ -80,5 +80,5 @@ Low: additive table and a new service module. Recovery: revert the single commit
 
 You are the Backend Executor. Location: kantor. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY backend
 outcome and nothing beyond it. Inspect current repository evidence, preserve unrelated owner work, make sound in-scope implementation decisions, run the
-required checks (including opening the touched routes in `next dev`), update `CHANGELOG.md`, and create the target local revision commit R8.223. Stop only for
+required checks (including opening the touched routes in `next dev`), update `CHANGELOG.md`, and create the target local revision commit R8.224. Stop only for
 a material locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT report. Report the commit, checks, limitations, and remaining unrelated dirty files.
