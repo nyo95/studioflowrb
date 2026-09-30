@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.240**
-- Next local revision: **R8.241**
+- Current revision after this entry is committed: **R8.241**
+- Next local revision: **R8.242**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.241 | 2026-09-30 | fix(studioflow): large deliverable uploads no longer truncated by the proxy; review of R8.240
+
+- **Review verdict, WO-SF-FILELIFE-01 (R8.240): CORRECTION REQUIRED, repaired here by the Lead.** The lifecycle rules (slot, Final, 2 newest, 30-day expiry, one warning, sweep, free-space guard, streaming port, migration) match the plan and their tests pass. One defect: Next.js buffers any request body that passes through `src/proxy.ts` and silently cuts it at 10 MB, and the proxy matcher covered `/api/studioflow/deliverables`. A 200 MB upload would therefore have been stored as its first 10 MB and recorded as a valid file.
+- **Repairs.** The deliverable upload route is excluded from the proxy matcher (the route already authenticates itself and answers 401 without a session). The service now refuses a stored size that differs from the declared size (`DELIVERABLE_INCOMPLETE`), so a truncated or interrupted upload can never be saved as a good file. The configured size limit is capped at the 32-bit column maximum. New integration test: streamed upload succeeds; a short stream and an over-limit declaration are refused and leave no object or row.
+- **Left as noted, not defects.** The route handler and the free-space guard have no direct test of an over-limit stream through the HTTP layer (covered at service and adapter level); browser acceptance of large uploads is in the acceptance backlog.
+
+**Checks.** `npm test` 687/687, `npm run check`, `tsc --noEmit`; `npm run build` not run (owner dev server active).
 
 ## R8.240 | 2026-09-30 | feat(studioflow): stream deliverables with version lifecycle
 

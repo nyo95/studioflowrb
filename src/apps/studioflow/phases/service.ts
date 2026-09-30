@@ -954,7 +954,8 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
 
   function deliverableMaxBytes(value = process.env.STUDIOFLOW_DELIVERABLE_MAX_BYTES): number {
     const parsed = Number(value);
-    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : DEFAULT_DELIVERABLE_MAX_BYTES;
+    // file_size_bytes is a 32-bit column, so the limit can never exceed it.
+    return Number.isSafeInteger(parsed) && parsed > 0 ? Math.min(parsed, 2_147_483_647) : DEFAULT_DELIVERABLE_MAX_BYTES;
   }
 
   function slotKey(name: string): string { return name.trim().toLowerCase(); }
@@ -979,6 +980,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     try {
       stored = await store(key);
       if (stored.bytes > deliverableMaxBytes() || stored.bytes === 0) throw invalid("DELIVERABLE_SIZE", "File exceeds the allowed size.");
+      if (stored.bytes !== declaredBytes) throw invalid("DELIVERABLE_INCOMPLETE", "The upload did not arrive completely. Try again.");
       const pruned = await runTransaction(async (tx) => {
         const phase = await loadWritablePhase(tx, input.projectId, input.phaseId);
         await requireProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: input.projectId, phaseId: phase.id, kind: "content" });

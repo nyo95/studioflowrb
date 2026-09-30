@@ -3,7 +3,7 @@
 Plan ID: WO-SF-FILELIFE-01
 Scope: StudioFlow deliverables — large-file upload (streaming), Final flag, "keep the 2 newest working versions" rule, automatic expiry of non-final files with a warning, plus the storage-port streaming and free-space guard they need. Backend and minimal wiring only; the Lead builds the deliverables screen (final toggle, expiry chips, upload progress) and the image editor afterwards.
 Target revision: R8.240
-Status: READY
+Status: COMPLETE (implemented R8.240, reviewed R8.241 with one correction; browser acceptance in the acceptance backlog)
 Priority: P2
 Owner: owner (Product Owner). Direction given 2026-09-30: files may exceed 100 MB but erase themselves unless marked final; keep only the last 2 files; chat and working/internal files vanish after a while. The numbers below are Lead defaults from the recommendation put to the owner and are open to the owner's veto.
 Last updated: 2026-09-30

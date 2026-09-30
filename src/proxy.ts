@@ -27,6 +27,10 @@ export function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
+/**
+ * The deliverable upload route is excluded on purpose: Next.js buffers (and silently truncates at 10 MB) any request body that
+ * passes through proxy. The route authenticates itself with requirePrincipalGrants and answers 401 without a session.
+ */
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff2?|txt|xml)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/studioflow/deliverables|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff2?|txt|xml)$).*)"],
 };

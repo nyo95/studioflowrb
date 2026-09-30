@@ -1766,6 +1766,22 @@ describe("Deliverable reference revision", () => {
     assert.equal(afterNewFinal.items.filter((item) => item.name.toLowerCase().trim() === "design.pdf" && item.isFinal).length, 1, "a newer final clears the old final in its slot");
   });
 
+  it("streams a deliverable, and refuses a stream that is short of, or over, its declared size", async () => {
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "moodboard");
+    const base = { ...as(designer), projectId, phaseId: phase.id, name: "big.zip", contentType: "application/zip" };
+    const streamOf = (size: number) => new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new Uint8Array(size).fill(7)); controller.close(); } });
+    await sf.phases.uploadDeliverableStream({ ...base, stream: streamOf(1000), declaredBytes: 1000 });
+    const stored = await testDb.prisma.sfDeliverable.findFirstOrThrow({ where: { phase_id: phase.id } });
+    assert.equal(stored.file_size_bytes, 1000);
+    assert.equal(storage.objects.get(stored.storage_key)?.bytes, 1000);
+    const before = storage.objects.size;
+    await rejectsWith(sf.phases.uploadDeliverableStream({ ...base, stream: streamOf(400), declaredBytes: 1000 }), "DELIVERABLE_INCOMPLETE");
+    await rejectsWith(sf.phases.uploadDeliverableStream({ ...base, stream: streamOf(10), declaredBytes: 600 * 1024 * 1024 }), "DELIVERABLE_SIZE");
+    assert.equal(storage.objects.size, before, "a refused upload leaves no stored object");
+    assert.equal(await testDb.prisma.sfDeliverable.count({ where: { phase_id: phase.id } }), 1);
+  });
+
   it("cleans expired non-finals and warns an uploader only once until extended", async () => {
     const { projectId } = await newProject();
     const phase = await phaseOf(projectId, "moodboard");
