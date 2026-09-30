@@ -53,6 +53,7 @@ import {
   deleteScheduleEntryAction,
   deleteScheduleOptionAction,
   importScheduleCsvAction,
+  scheduleImportTemplateAction,
   markScheduleFinalAction,
   moveScheduleEntryAction,
   moveScheduleEntryToCategoryAction,
@@ -1662,6 +1663,7 @@ function MoveDialog({ projectId, entry, categories, command, onClose }: { projec
 function ImportDialog({ projectId, section, command, onClose }: { projectId: string; section: Section; command: Command; onClose: () => void }) {
   const [target, setTarget] = useState<Section>(section);
   const [csv, setCsv] = useState("");
+  const [file, setFile] = useState<{ name: string; base64: string } | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [result, setResult] = useState<{ created: number; updated: number } | null>(null);
   const pending = command.isPending("import");
@@ -1669,23 +1671,39 @@ function ImportDialog({ projectId, section, command, onClose }: { projectId: str
   const pick = async (file: File | undefined) => {
     if (!file) return;
     setFileName(file.name);
-    setCsv(await file.text());
+    setCsv("");
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    setFile({ name: file.name, base64: btoa(binary) });
+  };
+
+  const downloadTemplate = async (format: "xlsx" | "csv") => {
+    await command.run("import-template", () => scheduleImportTemplateAction({ projectId, format }), (data) => {
+      const { filename, mimeType, base64 } = data as { filename: string; mimeType: string; base64: string };
+      const url = URL.createObjectURL(new Blob([Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))], { type: mimeType }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    });
   };
 
   const submit = async () => {
     setResult(null);
-    await command.run("import", () => importScheduleCsvAction({ projectId, section: target, csv }), (data) => setResult(data as { created: number; updated: number }));
+    await command.run("import", () => importScheduleCsvAction({ projectId, section: target, ...(file ? { file } : { csv }) }), (data) => setResult(data as { created: number; updated: number }));
   };
 
   return (
     <Dialog
       open
       onOpenChange={(value) => { if (!value) onClose(); }}
-      title="Import schedule CSV"
-      description="Use the Google Sheets export (File → Download → CSV). Rows whose code already exists update that item; new codes are added."
+      title="Import schedule"
+      description="Use an Excel (.xlsx) or CSV file: the Google Sheets export, or the plain template. Rows whose code already exists update that item; new codes are added."
       size="lg"
       dismissible={!pending}
-      footer={<Footer><Button variant="ghost" onClick={onClose} disabled={pending}>{result ? "Close" : "Cancel"}</Button><Button variant="primary" pending={pending} disabled={!csv.trim()} onClick={submit}>Import</Button></Footer>}
+      footer={<Footer><Button variant="ghost" onClick={onClose} disabled={pending}>{result ? "Close" : "Cancel"}</Button><Button variant="primary" pending={pending} disabled={!file && !csv.trim()} onClick={submit}>Import</Button></Footer>}
     >
       <div className="grid gap-3">
         <div className="grid gap-3 sm:grid-cols-2">
@@ -1695,13 +1713,18 @@ function ImportDialog({ projectId, section, command, onClose }: { projectId: str
               <option value="FIXTURE">Fixture</option>
             </Select>
           </Field>
-          <Field label="CSV file" description={fileName ?? undefined}>
-            <Input type="file" accept=".csv,text/csv" onChange={(e) => void pick(e.target.files?.[0])} />
+          <Field label="Excel or CSV file" description={fileName ?? undefined}>
+            <Input type="file" accept=".xlsx,.csv,text/csv" onChange={(e) => void pick(e.target.files?.[0])} />
           </Field>
         </div>
         <Field label="Or paste CSV">
-          <Textarea rows={6} value={csv} onChange={(e) => { setCsv(e.target.value); setFileName(null); }} placeholder={"Code,Product Category,Ex,Type,Initials Type,Image,Location,Contact,Qty,Unit"} className="font-ui-mono text-xs" />
+          <Textarea rows={6} value={csv} onChange={(e) => { setCsv(e.target.value); setFileName(null); setFile(null); }} placeholder={"Code,Product Category,Ex,Type,Initials Type,Image,Location,Contact,Qty,Unit"} className="font-ui-mono text-xs" />
         </Field>
+        <div className="flex flex-wrap items-center gap-2">
+          <Text size="sm" tone="secondary">Need a blank sheet?</Text>
+          <Button variant="ghost" size="sm" pending={command.isPending("import-template")} onClick={() => void downloadTemplate("xlsx")}>Excel template</Button>
+          <Button variant="ghost" size="sm" pending={command.isPending("import-template")} onClick={() => void downloadTemplate("csv")}>CSV template</Button>
+        </div>
         {result ? <Text size="sm">Imported: {result.created} new, {result.updated} updated.</Text> : null}
         {command.error ? <InlineError>{command.error}</InlineError> : null}
       </div>

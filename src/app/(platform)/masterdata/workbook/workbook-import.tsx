@@ -27,9 +27,9 @@ type Preview = {
 
 const OUTCOME_LABEL = { create: "new", update: "changed", unchanged: "unchanged", error: "error" } as const;
 
-function download(filename: string, base64: string) {
+function download(filename: string, base64: string, mimeType: string) {
   const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
-  const url = URL.createObjectURL(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  const url = URL.createObjectURL(new Blob([bytes], { type: mimeType }));
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
@@ -78,7 +78,7 @@ export function WorkbookImport({ canExport, canImport }: { canExport: boolean; c
             onClick={() => run("export", async () => {
               const result = await exportSkuPriceWorkbookAction();
               if (result.ok === false) { setError(result.error.safeMessage); return; }
-              download(result.data.filename, result.data.base64);
+              download(result.data.filename, result.data.base64, result.data.mimeType);
             })}
           >
             Download workbook
@@ -93,7 +93,7 @@ export function WorkbookImport({ canExport, canImport }: { canExport: boolean; c
               <input
                 ref={inputRef}
                 type="file"
-                accept=".xlsx"
+                accept=".xlsx,.csv"
                 className="text-sm"
                 onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); setDone(null); setError(null); }}
               />

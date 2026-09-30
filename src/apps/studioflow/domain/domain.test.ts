@@ -1,3 +1,4 @@
+import { parseCsvText } from "@platform/utilities/tabular";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
@@ -197,7 +198,7 @@ describe("schedule rules", () => {
   });
 
   it("parses legacy CSV quoting", () => {
-    const rows = parseLegacyScheduleCsv('category,brand,product,notes\nTile,Roman,"Tile, ivory","Use ""matte"""');
+    const rows = parseLegacyScheduleCsv(parseCsvText('category,brand,product,notes\nTile,Roman,"Tile, ivory","Use ""matte"""'));
     assert.deepEqual(rows, [{ category: "Tile", brand: "Roman", product: "Tile, ivory", notes: 'Use "matte"' }]);
   });
 });
@@ -228,11 +229,11 @@ describe("schedule labels and legacy sheet", () => {
       'PT-01,Paint,Dulux,"Easy Clean, Matt",EC,,Bedroom,"Budi, 0812",3,pail',
       ",,,,,,,,,",
     ].join("\r\n");
-    const rows = parseLegacyScheduleSheet(csv, "MATERIAL");
+    const rows = parseLegacyScheduleSheet(parseCsvText(csv), "MATERIAL");
     assert.deepEqual(rows, [{ code: "PT-01", category: "Paint", brand: "Dulux", product: "Easy Clean, Matt", initialsType: "EC", imageUrl: null, location: "Bedroom", contact: "Budi, 0812", qty: null, unit: "pail" }]);
-    assert.equal(parseLegacyScheduleSheet("category,brand,product\nTile,Roman,Granitio", "MATERIAL"), null);
-    assert.equal(parseLegacyScheduleSheet("Code,Ex,Type\nLF-01,Cellini,Aria", "MATERIAL"), null, "Material sheets need a Product Category column");
-    assert.equal(parseLegacyScheduleSheet("Code,Ex,Type,Qty\nLF-01,Cellini,Aria,4", "FIXTURE")?.[0]?.qty, "4");
+    assert.equal(parseLegacyScheduleSheet(parseCsvText("category,brand,product\nTile,Roman,Granitio"), "MATERIAL"), null);
+    assert.equal(parseLegacyScheduleSheet(parseCsvText("Code,Ex,Type\nLF-01,Cellini,Aria"), "MATERIAL"), null, "Material sheets need a Product Category column");
+    assert.equal(parseLegacyScheduleSheet(parseCsvText("Code,Ex,Type,Qty\nLF-01,Cellini,Aria,4"), "FIXTURE")?.[0]?.qty, "4");
   });
 
   it("includes pattern in scheduleSearchKey", () => {

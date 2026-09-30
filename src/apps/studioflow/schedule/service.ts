@@ -2,6 +2,7 @@ import { removeUnreferenced as removeUnreferencedAssets } from "../asset-cleanup
 import { Prisma } from "@/generated/prisma/client";
 
 import { createPrivateObjectKey } from "@platform/core/storage";
+import { buildImportTemplate, parseCsvText, readTabularGrid, type FileResult, type ImportFormat, type TableColumn } from "@platform/utilities/tabular";
 
 import { STUDIOFLOW_IMAGE_TYPES, sniffImage } from "../domain/images";
 import {
@@ -120,8 +121,29 @@ function scopeError() {
   return notFound("schedule item");
 }
 
+const SIMPLE_IMPORT_COLUMNS: TableColumn[] = [
+  { key: "category", header: "Category", required: true, example: "Tile", note: "Product category of the item." },
+  { key: "brand", header: "Brand", example: "Roman" },
+  { key: "product", header: "Product", required: true, example: "Granitio", note: "Rows without a product are skipped." },
+  { key: "sku", header: "SKU", example: "GR-1" },
+  { key: "color", header: "Color", example: "Ivory" },
+  { key: "pattern", header: "Pattern" },
+  { key: "finishing", header: "Finishing" },
+  { key: "dimension", header: "Dimension", example: "60x60" },
+  { key: "qty", header: "Qty", type: "number", example: "12", note: "Fixture items only." },
+  { key: "unit", header: "Unit", example: "m2" },
+  { key: "location", header: "Location", example: "Lobby" },
+  { key: "notes", header: "Notes" },
+];
+
 export function createScheduleService(db: Db, ports: StudioFlowPorts) {
   const { runTransaction, storage } = ports;
+
+  async function scheduleGrid(input: { csv?: string; file?: { name: string; data: Buffer } }): Promise<string[][]> {
+    if (input.file) return readTabularGrid({ data: input.file.data, filename: input.file.name });
+    if (typeof input.csv === "string") return parseCsvText(input.csv);
+    throw invalid("SCHEDULE_CSV_EMPTY", "Choose a file or paste the sheet first.");
+  }
 
   async function requireScheduleCommand(input: CommandContext & { projectId: string }): Promise<string> {
     const userId = requireCommand(input, P.scheduleManage);
@@ -848,6 +870,12 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       });
     },
 
+    /** A blank sheet in the plain `category, brand, product, …` layout that the import reads. */
+    async importTemplate(input: CommandContext & { projectId: string; format?: ImportFormat }): Promise<FileResult> {
+      await requireScheduleCommand(input);
+      return buildImportTemplate({ format: input.format ?? "xlsx", filename: "schedule-import-template", sheetName: "Schedule", columns: SIMPLE_IMPORT_COLUMNS, includeExample: true, notes: ["Rows are added as new schedule items. The Google Sheets export (with a Code column) also imports; it updates items that share a code."] });
+    },
+
     /**
      * CSV import. The legacy Google Sheets export (header row starting with
      * `code`, columns `product category` / `ex` / `type` …) is the primary
@@ -855,10 +883,11 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
      * quantities; a new code adds a row (numbering stays gapless). A simple
      * `category,brand,product,…` sheet is accepted as a fallback.
      */
-    async importCsv(input: CommandContext & { projectId: string; section: string; csv: string }) {
+    async importCsv(input: CommandContext & { projectId: string; section: string; csv?: string; file?: { name: string; data: Buffer } }) {
       await requireScheduleCommand(input);
       const section = sectionOf(input.section);
-      const sheet = parseLegacyScheduleSheet(input.csv, section);
+      const grid = await scheduleGrid(input);
+      const sheet = parseLegacyScheduleSheet(grid, section);
       if (sheet) {
         if (sheet.length === 0) throw invalid("SCHEDULE_CSV_EMPTY", "The sheet has a header but no rows.");
         return runTransaction(async (tx) => {
@@ -929,7 +958,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         });
       }
 
-      const rows = parseLegacyScheduleCsv(input.csv);
+      const rows = parseLegacyScheduleCsv(grid);
       if (rows.length === 0) throw invalid("SCHEDULE_CSV_EMPTY", "The CSV has no rows.");
       return runTransaction(async (tx) => {
         await loadWritableProject(tx, input.projectId);

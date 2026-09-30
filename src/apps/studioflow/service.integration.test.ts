@@ -5,6 +5,7 @@ import { after, afterEach, before, beforeEach, describe, it, mock } from "node:t
 import { createAuditEventWriter } from "@platform/core/audit/persistence";
 import { closeTestDb, createTestDb, requireDisposableTestDatabaseUrl, truncatePlatformTables, type TestDb } from "@platform/core/db/test-support";
 import { AppError } from "@platform/core/errors";
+import { exportTable } from "@platform/utilities/tabular";
 import { createPeopleDirectory } from "@platform/core/rbac/people";
 import { initializePermissionRegistry } from "@platform/core/rbac/registry";
 import { FakeObjectStorage, type ObjectStorage } from "@platform/core/storage";
@@ -1217,6 +1218,22 @@ describe("SF-R3 Product Schedule", () => {
     // An article-code column is appended to Type rather than stored twice (R8.111).
     assert.ok((await sf.schedule.listSchedule({ grants: ALL, projectId: target.projectId, section: "MATERIAL" })).some((row) => row.options[0].productName === "Granitio - GR-1"));
     assert.notEqual(sourceEntry.entryId, targetEntry.entryId);
+  });
+
+  it("imports the plain schedule layout from an .xlsx exactly like the CSV, and offers a template", async () => {
+    const { projectId } = await newProject("Xlsx import");
+    const columns = [{ key: "category", header: "Category" }, { key: "brand", header: "Brand" }, { key: "product", header: "Product" }, { key: "qty", header: "Qty" }, { key: "unit", header: "Unit" }, { key: "location", header: "Location" }];
+    const rows = [{ category: "Tile", brand: "Roman", product: "Granitio", qty: "12", unit: "m2", location: "Lobby" }];
+    const xlsx = await exportTable({ format: "xlsx", filename: "schedule", columns, rows });
+    const imported = await sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", file: { name: xlsx.filename, data: xlsx.data } });
+    assert.equal(imported.created, 1);
+    assert.ok((await sf.schedule.listSchedule({ grants: ALL, projectId, section: "MATERIAL" })).some((row) => row.options[0].productName === "Granitio"));
+    await rejectsWith(sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", file: { name: "notes.txt", data: Buffer.from("x") } }), "TABULAR_FILE_TYPE");
+    for (const format of ["xlsx", "csv"] as const) {
+      const template = await sf.schedule.importTemplate({ ...as(designer), projectId, format });
+      const again = await sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", file: { name: template.filename, data: template.data } });
+      assert.equal(again.created, 1, "the template's example row imports as a plain-layout row");
+    }
   });
 
   it("roundtrips pattern field and uses PAINT → PT prefix fallback", async () => {

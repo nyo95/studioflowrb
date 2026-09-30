@@ -1450,4 +1450,21 @@ describe("Sample request notifications (Master Data side, real database)", () =>
     const row = await testDb.prisma.sampleRequestIntake.findUniqueOrThrow({ where: { id: intake.id } });
     assert.equal(row.status, "IN_PROGRESS", "the request stays open so it can be finished again");
   });
+
+  it("exports the price list as xlsx, csv and pdf, re-imports the csv, and builds an import template", async () => {
+    const context = await createMaterialContext();
+    await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Format SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "120", currency: "IDR" }] });
+    const csv = await service.exportSkuPriceList({ grants: GRANTS, format: "csv" });
+    assert.equal(csv.filename, "sku-prices.csv");
+    const preview = await service.previewSkuPriceImport({ grants: GRANTS, file: { data: csv.data, name: csv.filename } });
+    assert.equal(preview.errors.length, 0);
+    assert.equal(preview.totals.unchanged, preview.rows.length, "an unedited export imports as no changes");
+    const pdf = await service.exportSkuPriceList({ grants: GRANTS, format: "pdf" });
+    assert.equal(pdf.data.subarray(0, 4).toString(), "%PDF");
+    for (const format of ["xlsx", "csv"] as const) {
+      const template = await service.skuPriceImportTemplate({ grants: GRANTS, format });
+      const parsed = await service.previewSkuPriceImport({ grants: GRANTS, file: { data: template.data, name: template.filename } });
+      assert.ok(parsed.rows.length === 1 && parsed.rows[0].errors.length > 0, "the example row is checked against real suppliers, so it reports errors instead of saving");
+    }
+  });
 });

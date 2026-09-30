@@ -3,7 +3,7 @@
 Plan ID: WO-PLAT-TABULAR-01
 Scope: Platform utilities — one shared tabular export (Excel, CSV, PDF) and import (Excel, CSV, downloadable template) capability, and the two existing consumers moved onto it. Backend/utility only; the Lead redesigns the Master Data workbook page and the download UI afterwards.
 Target revision: R8.238
-Status: READY
+Status: COMPLETE (implemented R8.238 by the Lead after the Executor ran out of quota; needs Reviewer browser acceptance of the two screens)
 Priority: P2
 Owner: owner (Product Owner). Approved 2026-09-30: shared utility; export as Excel or PDF; import as Excel or CSV "like Product Schedule"; templates built where needed; PDF is a simple table for now, and each app/module must be able to customize its PDF model later.
 Last updated: 2026-09-30

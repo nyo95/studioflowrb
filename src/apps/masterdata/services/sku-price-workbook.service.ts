@@ -1,17 +1,19 @@
 import { createHash } from "node:crypto";
 
-import ExcelJS from "exceljs";
 
 import { type PrismaClient } from "@/generated/prisma/client";
 import { prepareAuditEvent, type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
+import { buildImportTemplate, exportTable, parseTabularFile, type FileResult, type ImportFormat, type TableColumn, type TableFormat } from "@platform/utilities/tabular";
 
 import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, requiredAmount, requiredCurrency } from "./shared";
 
 const SHEET = "SKU Prices";
 const HEADERS = ["SKU ID", "Code", "Name", "Brand", "Category", "Base unit", "Purchase unit", "Length", "Width", "Thickness", "Dimension unit", "Notes", "Price ID", "Supplier", "Amount", "Currency", "Price notes"] as const;
 const MAX_BYTES = 5 * 1024 * 1024;
+const COLUMNS: TableColumn[] = HEADERS.map((header) => ({ key: header, header, required: true }));
+const PDF_COLUMNS: TableColumn[] = HEADERS.filter((header) => !["SKU ID", "Price ID", "Notes", "Price notes"].includes(header)).map((header) => ({ key: header, header, type: header === "Amount" ? "money" : "text", width: header === "Name" ? 26 : header === "Supplier" ? 20 : 10 }));
 const MAX_ROWS = 2000;
 
 type WorkbookFile = Buffer | { data: Buffer; name?: string; type?: string };
@@ -29,18 +31,6 @@ function key(value: string): string { return value.trim().toLocaleLowerCase(); }
 function bytesOf(file: WorkbookFile): { data: Buffer; name?: string; type?: string } { return Buffer.isBuffer(file) ? { data: file } : file; }
 function fileError(message: string): never { throw new AppError("VALIDATION", "SKU_PRICE_WORKBOOK_INVALID", message); }
 const INVALID_CELL = "__SKU_PRICE_INVALID_CELL__";
-function value(row: ExcelJS.Row, index: number): string {
-  const cell = row.getCell(index);
-  const raw = cell.value;
-  if (raw === null || raw === undefined) return "";
-  if (typeof raw === "object") {
-    if ("formula" in raw) { const result = (raw as { result?: unknown }).result; return result === undefined || result === null || typeof result === "object" ? INVALID_CELL : clean(result); }
-    if ("richText" in raw) return clean((raw as { richText: Array<{ text?: string }> }).richText.map((part) => part.text ?? "").join(""));
-    if ("text" in raw) return clean((raw as { text: string }).text);
-    return INVALID_CELL;
-  }
-  return clean(raw);
-}
 function same(a: string | null | undefined, b: string | null | undefined): boolean { return (a ?? "") === (b ?? ""); }
 
 export function createSkuPriceWorkbookService(
@@ -51,18 +41,15 @@ export function createSkuPriceWorkbookService(
   async function readRows(file: WorkbookFile): Promise<{ data: Buffer; rows: ParsedRow[] }> {
     const input = bytesOf(file);
     if (input.data.length > MAX_BYTES) fileError("The workbook is larger than 5 MB.");
-    if ((input.name && !input.name.toLowerCase().endsWith(".xlsx")) || (input.type && input.type !== "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" && input.type !== "application/octet-stream")) fileError("Upload an .xlsx workbook.");
-    const book = new ExcelJS.Workbook();
-    try { await book.xlsx.load(input.data as any); } catch { fileError("The uploaded file is not a readable .xlsx workbook."); }
-    const sheet = book.getWorksheet(SHEET);
-    if (!sheet) fileError('The workbook must contain a sheet named "SKU Prices".');
-    for (let index = 0; index < HEADERS.length; index += 1) if (value(sheet.getRow(1), index + 1) !== HEADERS[index]) fileError("The SKU Prices header row does not match the exported workbook.");
-    const rows: ParsedRow[] = [];
-    sheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1 || row.values.length === 0 || HEADERS.every((_, i) => !value(row, i + 1))) return;
-      rows.push(Object.assign({ row: rowNumber }, Object.fromEntries(HEADERS.map((header, i) => [header, value(row, i + 1)]))) as unknown as ParsedRow);
-    });
-    if (rows.length > MAX_ROWS) fileError("The workbook has more than 2,000 data rows.");
+    let table: Awaited<ReturnType<typeof parseTabularFile>>;
+    try {
+      table = await parseTabularFile({ data: input.data, filename: input.name ?? "workbook.xlsx", columns: COLUMNS, maxBytes: MAX_BYTES, maxRows: MAX_ROWS, sheetName: SHEET });
+    } catch (error) {
+      if (error instanceof AppError && error.code.startsWith("TABULAR_")) fileError(error.code === "TABULAR_ROW_LIMIT" ? "The workbook has more than 2,000 data rows." : error.message);
+      throw error;
+    }
+    const invalid = new Set(table.invalidCells.map((cell) => `${cell.row}:${cell.column}`));
+    const rows = table.rows.map((row) => Object.assign({ row: row.row }, Object.fromEntries(HEADERS.map((header) => [header, invalid.has(`${row.row}:${header}`) ? INVALID_CELL : row.values[header] ?? ""]))) as unknown as ParsedRow);
     return { data: input.data, rows };
   }
 
@@ -130,20 +117,38 @@ export function createSkuPriceWorkbookService(
     return { rows: results, errors: results.flatMap((x) => x.errors), valid };
   }
 
-  return {
-    async exportSkuPriceWorkbook(input: { grants: PermissionGrants }): Promise<Buffer> {
+  const api = {
+    /** Every live SKU with one row per supplier price. Only `xlsx` and `csv` re-import; `pdf` is a read-only price list. */
+    async exportSkuPriceList(input: { grants: PermissionGrants; format?: TableFormat }): Promise<FileResult> {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuRead); requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialRead);
+      const format = input.format ?? "xlsx";
       const [skus, brands, categories, units, vendors] = await Promise.all([
         db.sku.findMany({ where: { deleted_at: null }, include: { brand: true, base_unit: true, purchase_unit: true, dimension_unit: true, categories: { include: { category: true } }, material_prices: { where: { deleted_at: null }, include: { supplier_vendor: true } } }, orderBy: { name: "asc" } }),
         db.brand.findMany({ where: { deleted_at: null }, select: { name: true }, orderBy: { name: "asc" } }), db.category.findMany({ where: { status: "ACTIVE", kind: "PRODUCT" }, select: { name: true }, orderBy: { name: "asc" } }), db.unit.findMany({ where: { status: "ACTIVE" }, select: { code: true, name: true }, orderBy: { code: "asc" } }), db.vendor.findMany({ where: { deleted_at: null }, select: { name: true }, orderBy: { name: "asc" } }),
       ]);
-      const book = new ExcelJS.Workbook(); const sheet = book.addWorksheet(SHEET); sheet.addRow(HEADERS); sheet.getRow(1).font = { bold: true }; sheet.views = [{ state: "frozen", ySplit: 1 }];
+      const rows: Array<Record<string, string>> = [];
       for (const sku of skus) {
-        const common = [sku.id, sku.code ?? "", sku.name ?? "", sku.brand?.name ?? "", sku.categories[0]?.category.name ?? "", sku.base_unit.code, sku.purchase_unit?.code ?? "", sku.dimension_length?.toString() ?? "", sku.dimension_width?.toString() ?? "", sku.dimension_thickness?.toString() ?? "", sku.dimension_unit?.code ?? "", sku.notes ?? ""];
-        const prices = sku.material_prices.length ? sku.material_prices : [null]; for (const price of prices) sheet.addRow([...common, price?.id ?? "", price?.supplier_vendor.name ?? "", price?.amount.toString() ?? "", price?.currency ?? "", price?.notes ?? ""]);
+        const common = { "SKU ID": sku.id, Code: sku.code ?? "", Name: sku.name ?? "", Brand: sku.brand?.name ?? "", Category: sku.categories[0]?.category.name ?? "", "Base unit": sku.base_unit.code, "Purchase unit": sku.purchase_unit?.code ?? "", Length: sku.dimension_length?.toString() ?? "", Width: sku.dimension_width?.toString() ?? "", Thickness: sku.dimension_thickness?.toString() ?? "", "Dimension unit": sku.dimension_unit?.code ?? "", Notes: sku.notes ?? "" };
+        for (const price of sku.material_prices.length ? sku.material_prices : [null]) rows.push({ ...common, "Price ID": price?.id ?? "", Supplier: price?.supplier_vendor.name ?? "", Amount: price?.amount.toString() ?? "", Currency: price?.currency ?? "", "Price notes": price?.notes ?? "" });
       }
-      const ref = book.addWorksheet("Reference"); ref.addRow(["Brands", "Categories", "Units", "Suppliers"]); const total = Math.max(brands.length, categories.length, units.length, vendors.length); for (let i = 0; i < total; i += 1) ref.addRow([brands[i]?.name ?? "", categories[i]?.name ?? "", units[i] ? `${units[i].code} — ${units[i].name}` : "", vendors[i]?.name ?? ""]); await ref.protect("", { selectLockedCells: true });
-      return Buffer.from(await book.xlsx.writeBuffer());
+      const reference: string[][] = [["Brands", "Categories", "Units", "Suppliers"]];
+      for (let i = 0; i < Math.max(brands.length, categories.length, units.length, vendors.length); i += 1) reference.push([brands[i]?.name ?? "", categories[i]?.name ?? "", units[i] ? `${units[i].code} — ${units[i].name}` : "", vendors[i]?.name ?? ""]);
+      return exportTable({
+        format, filename: "sku-prices", sheetName: SHEET, title: "SKU price list",
+        columns: format === "pdf" ? PDF_COLUMNS : COLUMNS, rows,
+        pdf: { orientation: "landscape", showGeneratedAt: true },
+        extraSheets: [{ name: "Reference", rows: reference, protect: true }],
+      });
+    },
+    async exportSkuPriceWorkbook(input: { grants: PermissionGrants }): Promise<Buffer> {
+      return (await api.exportSkuPriceList({ grants: input.grants, format: "xlsx" })).data;
+    },
+    /** A blank import file with the export's headers and one example row. */
+    async skuPriceImportTemplate(input: { grants: PermissionGrants; format?: ImportFormat }): Promise<FileResult> {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuManage); requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
+      const example: Record<string, string> = { Code: "KYU-001", Name: "Kayu jati 2x20", Brand: "", Category: "Kayu", "Base unit": "pcs", Supplier: "PT Contoh", Amount: "120000", Currency: "IDR" };
+      const notes: Record<string, string> = { "SKU ID": "Leave empty for a new SKU.", "Price ID": "Leave empty for a new price.", Category: "Must already exist.", "Base unit": "Unit code; must already exist.", Supplier: "Must already exist." };
+      return buildImportTemplate({ format: input.format ?? "xlsx", filename: "sku-prices-template", sheetName: SHEET, columns: COLUMNS.map((column) => ({ ...column, required: false, example: example[column.key] ?? "", note: notes[column.key] })), includeExample: true, notes: ["Suppliers, units, categories and brands are never created by the import."] });
     },
     async previewSkuPriceImport(input: { grants: PermissionGrants; file: WorkbookFile }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuManage); requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
@@ -172,4 +177,5 @@ export function createSkuPriceWorkbookService(
       });
     },
   };
+  return api;
 }

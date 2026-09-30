@@ -781,6 +781,23 @@ export async function collectDuplicatePrimitiveViolations({
     }
   }
 
+  // Spreadsheet and PDF files have one canonical implementation (WO-PLAT-TABULAR-01); an app must not
+  // reach for the libraries directly. Test files may build fixtures with them.
+  for (const file of await walkSources(srcDir)) {
+    if (allowed.has(file) || /\.test\.[cm]?[jt]sx?$/.test(file)) continue;
+    if (classifyImporter(file, projectRoot, apps).kind !== "app") continue;
+    const source = await readFile(file, "utf8");
+    const match = /from\s+["'](exceljs|pdf-lib|pdfkit|xlsx)["']/.exec(source);
+    if (match) {
+      violations.push({
+        rule: RULE_DUPLICATE_PRIMITIVE,
+        file,
+        specifier: match[1],
+        detail: `App file imports "${match[1]}" directly. Export and import tables through "@platform/utilities/tabular".`,
+      });
+    }
+  }
+
   return violations;
 }
 

@@ -906,14 +906,30 @@ export async function applyScheduleTemplatesAction(input: z.infer<typeof Schedul
   });
 }
 
-const ScheduleCsvImport = z.strictObject({ projectId: Id, section: ScheduleSection, csv: z.string().max(200000) });
+const ScheduleCsvImport = z.strictObject({
+  projectId: Id,
+  section: ScheduleSection,
+  csv: z.string().max(200000).optional(),
+  /** An .xlsx or .csv upload as base64 (about 5 MB of file). */
+  file: z.strictObject({ name: z.string().min(1).max(200), base64: z.string().max(7_200_000) }).optional(),
+});
 export async function importScheduleCsvAction(input: z.infer<typeof ScheduleCsvImport>): Promise<ActionResult<{ created: number; updated: number }>> {
   return runSafeAction(async () => {
     const ctx = await context();
     const data = parse(ScheduleCsvImport, input);
-    const result = await studioFlow.schedule.importCsv({ ...ctx, ...data });
+    const { file, ...rest } = data;
+    const result = await studioFlow.schedule.importCsv({ ...ctx, ...rest, ...(file ? { file: { name: file.name, data: Buffer.from(file.base64, "base64") } } : {}) });
     refreshSchedule(data.projectId);
     return result;
+  });
+}
+
+export async function scheduleImportTemplateAction(input: { projectId: string; format?: "xlsx" | "csv" }): Promise<ActionResult<{ filename: string; mimeType: string; base64: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(z.strictObject({ projectId: Id, format: z.enum(["xlsx", "csv"]).optional() }), input);
+    const file = await studioFlow.schedule.importTemplate({ ...ctx, ...data });
+    return { filename: file.filename, mimeType: file.mimeType, base64: file.data.toString("base64") };
   });
 }
 

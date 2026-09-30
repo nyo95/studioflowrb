@@ -337,43 +337,12 @@ export function isPermutation(current: readonly string[], next: readonly string[
   return counts.size === 0;
 }
 
-export function parseLegacyScheduleCsv(text: string): Array<Record<string, string>> {
-  const rows: string[][] = [];
-  let field = "";
-  let row: string[] = [];
-  let quoted = false;
-  for (let index = 0; index < text.length; index++) {
-    const char = text[index];
-    if (quoted) {
-      if (char === '"' && text[index + 1] === '"') {
-        field += '"';
-        index++;
-      } else if (char === '"') {
-        quoted = false;
-      } else {
-        field += char;
-      }
-      continue;
-    }
-    if (char === '"') quoted = true;
-    else if (char === ",") {
-      row.push(field);
-      field = "";
-    } else if (char === "\n") {
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = "";
-    } else if (char !== "\r") {
-      field += char;
-    }
-  }
-  row.push(field);
-  if (row.some((cell) => cell.trim())) rows.push(row);
-  const [header, ...body] = rows;
-  if (!header) return [];
-  const keys = header.map((cell) => cell.trim().toLocaleLowerCase("id-ID"));
-  return body.map((cells) => Object.fromEntries(keys.map((key, index) => [key, cells[index]?.trim() ?? ""])));
+/** A header-keyed reading of a plain sheet (`category,brand,product,…`); `grid` comes from the shared tabular reader. */
+export function parseLegacyScheduleCsv(grid: string[][]): Array<Record<string, string>> {
+  const [head, ...body] = cleanGrid(grid);
+  if (!head) return [];
+  const keys = head.map((cell) => cell.toLocaleLowerCase("id-ID"));
+  return body.map((cells) => Object.fromEntries(keys.map((key, index) => [key, cells[index] ?? ""])));
 }
 
 /** One row of the legacy Google Sheets export (`lib/schedule/csv-parse.ts`). */
@@ -390,27 +359,8 @@ export type LegacySheetRow = {
   unit: string | null;
 };
 
-function sheetRecords(text: string): string[][] {
-  const records: string[][] = [];
-  let record: string[] = [];
-  let field = "";
-  let quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    if (char === '"') {
-      if (quoted && text[i + 1] === '"') { field += '"'; i++; } else quoted = !quoted;
-      continue;
-    }
-    if (char === "," && !quoted) { record.push(field); field = ""; continue; }
-    if ((char === "\n" || char === "\r") && !quoted) {
-      if (char === "\r" && text[i + 1] === "\n") i++;
-      record.push(field); records.push(record); record = []; field = "";
-      continue;
-    }
-    field += char;
-  }
-  if (field.length > 0 || record.length > 0) { record.push(field); records.push(record); }
-  return records.map((r) => r.map((cell) => cell.trim())).filter((r) => r.some((cell) => cell.length > 0));
+function cleanGrid(grid: string[][]): string[][] {
+  return grid.map((row) => row.map((cell) => cell.trim())).filter((row) => row.some((cell) => cell.length > 0));
 }
 
 const header = (value: string) => value.replace(/^\uFEFF/, "").trim().toLowerCase();
@@ -420,8 +370,8 @@ const header = (value: string) => value.replace(/^\uFEFF/, "").trim().toLowerCas
  * title rows; it starts with `code` and has `ex` + `type` (Material sheets also
  * `product category`). Returns null when no such header exists.
  */
-export function parseLegacyScheduleSheet(text: string, section: ScheduleSection): LegacySheetRow[] | null {
-  const records = sheetRecords(text);
+export function parseLegacyScheduleSheet(grid: string[][], section: ScheduleSection): LegacySheetRow[] | null {
+  const records = cleanGrid(grid);
   const required = section === "MATERIAL" ? ["product category", "ex", "type"] : ["ex", "type"];
   const headerIndex = records.findIndex((r) => {
     const cells = r.map(header);

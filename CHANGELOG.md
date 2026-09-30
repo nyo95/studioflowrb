@@ -5,13 +5,25 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.237**
-- Next local revision: **R8.238**
+- Current revision after this entry is committed: **R8.238**
+- Next local revision: **R8.239**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.238 | 2026-09-30 | feat(platform): shared tabular export/import (Excel, CSV, PDF) and template; Master Data and schedule use it
+
+- **Lane note.** The Executor started WO-PLAT-TABULAR-01 and hit its usage limit after a first draft of the utility and the `pdf-lib` dependency. With the owner's approval the Lead took over, rewrote the utility and finished the plan.
+- **Utility** `@platform/utilities/tabular`: `exportTable` (xlsx / csv / pdf), `parseTabularFile` (xlsx / csv; header aliases, duplicate/missing/unknown headers, size and row limits, unreadable formula cells reported), `buildImportTemplate`, `readTabularGrid` / `parseCsvText` for callers with their own layout. CSV is UTF-8 with BOM and imports back unchanged (formula-looking text gets a leading apostrophe on export and loses it on import); xlsx text is always a string cell. PDF is a plain table drawn with `pdf-lib`; `PdfTableTemplate` (page size, orientation, title, footer, colour, column weights, zebra rows) is the per-app customization seam. Non-Latin text degrades to `?`, never throws.
+- **Master Data.** The SKU price workbook reads and writes through the utility. `exportSkuPriceList({ format })` adds csv and a read-only landscape pdf; `skuPriceImportTemplate` adds a template; preview/apply accept an exported xlsx or csv unchanged (same hash flow, same row rules). The exported xlsx keeps its sheet name, header order and Reference sheet.
+- **StudioFlow.** The schedule import accepts an .xlsx as well as CSV text (`file` on the action) and offers a plain-layout template; the two private CSV parsers in the domain are gone (the domain now reads a cell grid from the shared reader, with identical results for the existing fixtures).
+- **Boundary rule.** An app file importing `exceljs`, `pdf-lib`, `pdfkit` or `xlsx` fails `npm run check`. `docs/UTILITY-INVENTORY.md` lists the utility.
+- **UI wiring only.** Master Data download uses the file's own type and the import picker accepts .csv; the schedule Import dialog picks .xlsx/.csv and has template buttons. The workbook page redesign and format picker are the Lead's next revision.
+- **Dependencies.** `pdf-lib`. Migrations: none.
+
+**Checks.** `npm test` 682/682, `npm run check`, `tsc --noEmit`, eslint on touched folders. `npm run build` NOT run (the owner dev server uses the same build folder); PDF export is covered by tests under Node, not yet by a Next build or the browser.
 
 ## R8.237 | 2026-09-30 | docs(platform): WO-PLAT-TABULAR-01 ready
 

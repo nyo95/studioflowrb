@@ -9,15 +9,27 @@ import { masterDataService } from "@/apps/masterdata/runtime";
 
 async function upload(formData: FormData) {
   const file = formData.get("file");
-  if (!(file instanceof File)) throw new AppError("VALIDATION", "SKU_PRICE_WORKBOOK_REQUIRED", "Choose an .xlsx workbook first.");
+  if (!(file instanceof File)) throw new AppError("VALIDATION", "SKU_PRICE_WORKBOOK_REQUIRED", "Choose an .xlsx or .csv file first.");
   return { data: Buffer.from(await file.arrayBuffer()), name: file.name, type: file.type };
 }
 
-export async function exportSkuPriceWorkbookAction(): Promise<ActionResult<{ filename: string; base64: string }>> {
+type DownloadFile = { filename: string; mimeType: string; base64: string };
+
+export async function exportSkuPriceWorkbookAction(format: "xlsx" | "csv" | "pdf" = "xlsx"): Promise<ActionResult<DownloadFile>> {
   return runSafeAction(async () => {
     const { grants } = await requirePrincipalGrants();
-    const workbook = await masterDataService.exportSkuPriceWorkbook({ grants });
-    return { filename: "sku-prices.xlsx", base64: workbook.toString("base64") };
+    if (format !== "xlsx" && format !== "csv" && format !== "pdf") throw new AppError("VALIDATION", "EXPORT_FORMAT_INVALID", "Choose Excel, CSV or PDF.");
+    const file = await masterDataService.exportSkuPriceList({ grants, format });
+    return { filename: file.filename, mimeType: file.mimeType, base64: file.data.toString("base64") };
+  });
+}
+
+export async function skuPriceImportTemplateAction(format: "xlsx" | "csv" = "xlsx"): Promise<ActionResult<DownloadFile>> {
+  return runSafeAction(async () => {
+    const { grants } = await requirePrincipalGrants();
+    if (format !== "xlsx" && format !== "csv") throw new AppError("VALIDATION", "EXPORT_FORMAT_INVALID", "Choose Excel or CSV.");
+    const file = await masterDataService.skuPriceImportTemplate({ grants, format });
+    return { filename: file.filename, mimeType: file.mimeType, base64: file.data.toString("base64") };
   });
 }
 
