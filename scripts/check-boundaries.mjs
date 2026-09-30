@@ -18,6 +18,7 @@ export const RULE_DATABASE_OWNERSHIP = "database ownership";
 export const RULE_STALE_ALLOW_LIST = "stale allow-list entry";
 export const RULE_UNSCANNED_FILE = "unscanned file under src";
 export const RULE_DUPLICATE_MACHINERY = "app-local copy of generic machinery";
+export const RULE_SERVER_CALLS_CLIENT_FUNCTION = "server code -> function in a \"use client\" module";
 
 /**
  * App layers a composition/shell file (anything under `src/app` or
@@ -987,6 +988,161 @@ export async function collectUnscannedFileViolations({ projectRoot = process.cwd
   return violations;
 }
 
+
+const MODULE_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"];
+
+async function fileExists(path) {
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/** Resolves an extension-less import target to the source file it names (`x.ts`, `x.tsx`, `x/index.ts`, ...). */
+async function resolveModuleFile(targetPath) {
+  if (SOURCE_EXTENSIONS.has(extname(basename(targetPath))) && (await fileExists(targetPath))) return targetPath;
+  for (const ext of MODULE_EXTENSIONS) if (await fileExists(targetPath + ext)) return targetPath + ext;
+  for (const ext of MODULE_EXTENSIONS) if (await fileExists(join(targetPath, "index" + ext))) return join(targetPath, "index" + ext);
+  return null;
+}
+
+function hasUseClientDirective(sourceFile) {
+  for (const statement of sourceFile.statements) {
+    if (ts.isExpressionStatement(statement) && ts.isStringLiteral(statement.expression)) {
+      if (statement.expression.text === "use client") return true;
+      continue;
+    }
+    break;
+  }
+  return false;
+}
+
+function hasExportModifier(node) {
+  return Boolean(ts.canHaveModifiers(node) && ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword));
+}
+
+/**
+ * Where an exported name is really defined. Follows `export { a } from`, `export { a as b } from` and
+ * `export * from` chains, so a barrel that re-exports a client-module function does not hide it.
+ */
+async function exportOrigin(file, name, context, seen = new Set()) {
+  const key = `${file}::${name}`;
+  if (seen.has(key)) return null;
+  seen.add(key);
+  const info = await context.moduleInfo(file);
+  if (!info) return null;
+  if (info.local.has(name)) return { file, kind: info.local.get(name), client: info.client };
+  const named = info.reexportNamed.get(name);
+  if (named) {
+    const target = await context.resolve(named.specifier, file);
+    if (target) return exportOrigin(target, named.original, context, seen);
+  }
+  for (const specifier of info.reexportStar) {
+    const target = await context.resolve(specifier, file);
+    if (!target) continue;
+    const found = await exportOrigin(target, name, context, seen);
+    if (found) return found;
+  }
+  return null;
+}
+
+/**
+ * Server code (no `"use client"` directive) must not CALL a function that lives in a `"use client"` module: Next turns
+ * every export of such a module into a client reference, so the call throws at render time. Components (rendered as
+ * JSX), types, and hooks are not in scope; only lower-case identifiers invoked as a function are. R8.164 and R8.210
+ * both shipped this failure and neither `npm test` nor `next build` caught it.
+ */
+export async function collectServerClientCallViolations({ projectRoot = process.cwd(), srcDir } = {}) {
+  projectRoot = resolve(projectRoot);
+  srcDir = srcDir ? resolve(srcDir) : join(projectRoot, "src");
+  const aliasMap = await readAliasMap(projectRoot);
+  const cache = new Map();
+  const context = {
+    async resolve(specifier, importer) {
+      const target = resolveSpecifier(specifier, importer, aliasMap, projectRoot);
+      return target ? resolveModuleFile(target) : null;
+    },
+    async moduleInfo(file) {
+      if (cache.has(file)) return cache.get(file);
+      let info = null;
+      try {
+        const source = await readFile(file, "utf8");
+        const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, scriptKindFor(file));
+        info = { client: hasUseClientDirective(sourceFile), local: new Map(), reexportNamed: new Map(), reexportStar: [], sourceFile };
+        for (const statement of sourceFile.statements) {
+          if (ts.isFunctionDeclaration(statement) && hasExportModifier(statement) && statement.name) {
+            info.local.set(statement.name.text, "function");
+            if (statement.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)) info.local.set("default", "function");
+          } else if (ts.isVariableStatement(statement) && hasExportModifier(statement)) {
+            for (const declaration of statement.declarationList.declarations) {
+              if (!ts.isIdentifier(declaration.name)) continue;
+              const init = declaration.initializer;
+              const isFunction = Boolean(init && (ts.isArrowFunction(init) || ts.isFunctionExpression(init)));
+              info.local.set(declaration.name.text, isFunction ? "function" : "value");
+            }
+          } else if (ts.isExportDeclaration(statement) && !statement.isTypeOnly) {
+            if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
+              const specifier = statement.moduleSpecifier.text;
+              if (!statement.exportClause) info.reexportStar.push(specifier);
+              else if (ts.isNamedExports(statement.exportClause)) {
+                for (const element of statement.exportClause.elements) {
+                  if (element.isTypeOnly) continue;
+                  info.reexportNamed.set(element.name.text, { specifier, original: (element.propertyName ?? element.name).text });
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        info = null;
+      }
+      cache.set(file, info);
+      return info;
+    },
+  };
+
+  const violations = [];
+  for (const file of await walkSources(srcDir)) {
+    if (/\.(test|spec)\.[jt]sx?$/.test(file)) continue;
+    const info = await context.moduleInfo(file);
+    if (!info || info.client) continue;
+    // Local name -> { specifier, original } for every named value import.
+    const imported = new Map();
+    for (const statement of info.sourceFile.statements) {
+      if (!ts.isImportDeclaration(statement) || !statement.importClause || statement.importClause.isTypeOnly) continue;
+      const bindings = statement.importClause.namedBindings;
+      if (!bindings || !ts.isNamedImports(bindings) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
+      for (const element of bindings.elements) {
+        if (element.isTypeOnly) continue;
+        imported.set(element.name.text, { specifier: statement.moduleSpecifier.text, original: (element.propertyName ?? element.name).text });
+      }
+    }
+    if (imported.size === 0) continue;
+    const called = new Set();
+    const visit = (node) => {
+      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) called.add(node.expression.text);
+      ts.forEachChild(node, visit);
+    };
+    visit(info.sourceFile);
+    for (const [localName, { specifier, original }] of imported) {
+      if (!called.has(localName) || /^[A-Z]/.test(localName) || /^use[A-Z]/.test(localName)) continue;
+      const target = await context.resolve(specifier, file);
+      if (!target) continue;
+      const origin = await exportOrigin(target, original, context);
+      if (origin && origin.client && origin.kind === "function") {
+        violations.push({
+          rule: RULE_SERVER_CALLS_CLIENT_FUNCTION,
+          file,
+          specifier: `${localName} from ${specifier}`,
+          detail: `Server code calls "${original}", which is defined in "${relative(projectRoot, origin.file).split(sep).join("/")}" (a "use client" module). Move the pure function into a module without the directive and import it from there.`,
+        });
+      }
+    }
+  }
+  return violations;
+}
+
 export async function collectAllViolations(options = {}) {
   const boundary = await collectBoundaryViolations(options);
   const permission = await collectPermissionVocabularyViolations(options);
@@ -995,7 +1151,8 @@ export async function collectAllViolations(options = {}) {
   const database = await collectDatabaseOwnershipViolations(options);
   const unscanned = await collectUnscannedFileViolations(options);
   const machinery = await collectDuplicateMachineryViolations(options);
-  return { boundary, permission, route, duplicate, database, unscanned, machinery };
+  const clientCalls = await collectServerClientCallViolations(options);
+  return { boundary, permission, route, duplicate, database, unscanned, machinery, clientCalls };
 }
 
 async function main() {
@@ -1017,6 +1174,7 @@ async function main() {
     ["Database ownership", all.database],
     ["Unscanned files", all.unscanned],
     ["Duplicated generic machinery", all.machinery],
+    ["Server code calling client-module functions", all.clientCalls],
   ];
   let count = 0;
   for (const [title, list] of sections) {

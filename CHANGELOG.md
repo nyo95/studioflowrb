@@ -5,13 +5,25 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.229**
-- Next local revision: **R8.230**
+- Current revision after this entry is committed: **R8.230**
+- Next local revision: **R8.231**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.230 | 2026-09-30 | chore(platform): harness rule for server-calls-client, quieter polling, backlog cleanup
+
+- **Harness.** `check-boundaries` gets rule "server code -> function in a "use client" module" (`collectServerClientCallViolations`): a file without the `"use client"`
+  directive that imports a lower-case function from a `"use client"` module (directly, through a barrel's `export {}` / `export *`, or under a renamed import) and calls
+  it now fails `npm run check`. Components, hooks, constants, types, tests and client callers are ignored. Fixture tests cover each case; the real tree is clean. This is
+  the class that broke `/bq` in R8.210 and R8.164 while `npm test` and `next build` passed.
+- **Polling.** The notification bell and quick messenger polled every 60 s even in a background tab (about two POSTs a minute, the "hundreds of requests" seen on a
+  long-open tab). They now skip the tick while the tab is hidden and refresh when it becomes visible again. No behavior change for a visible tab.
+- **Backlog.** Removed the two finished entries (workbook import/export, harness rule).
+
+**Checks.** `npm test`, `npm run check` (boundaries fixtures included), `tsc --noEmit`.
 
 ## R8.229 | 2026-09-30 | feat(studioflow): collapsible project cards on Today
 

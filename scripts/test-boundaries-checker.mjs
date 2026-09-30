@@ -9,6 +9,8 @@ import {
   collectDuplicatePrimitiveViolations,
   collectUnscannedFileViolations,
   collectDuplicateMachineryViolations,
+  collectServerClientCallViolations,
+  RULE_SERVER_CALLS_CLIENT_FUNCTION,
   RULE_DUPLICATE_MACHINERY,
   RULE_UNSCANNED_FILE,
   collectPermissionVocabularyViolations,
@@ -406,4 +408,62 @@ try {
   console.log("PASS database ownership fixtures: foreign delegates, nested receivers, Prisma types, raw SQL schemas, cross-schema relations; own access, comments and tests clean");
 } finally {
   await rm(databaseRoot, { recursive: true, force: true });
+}
+
+const CLIENT_CALL_FILES = {
+  "tsconfig.json": JSON.stringify(TSCONFIG, null, 2),
+  "src/platform/ui_engine/client-helpers.tsx": `"use client";
+export function getSlice(items) { return items; }
+export const pageCount = (n) => n;
+export function Widget() { return null; }
+export function useThing() { return 1; }
+export const LABEL = "x";
+`,
+  "src/platform/ui_engine/pure.ts": `export function pureSlice(items) { return items; }
+`,
+  "src/platform/ui_engine/index.ts": `export { getSlice, pageCount as pages, Widget, useThing, LABEL } from "./client-helpers";
+export * from "./pure";
+`,
+  "src/app/(platform)/x/direct.tsx": `import { getSlice } from "@/platform/ui_engine/client-helpers";
+export const bad = () => getSlice([]);
+`,
+  "src/app/(platform)/x/barrel.tsx": `import { getSlice } from "@/platform/ui_engine";
+export const bad = () => getSlice([]);
+`,
+  "src/app/(platform)/x/renamed.tsx": `import { pages as countPages } from "@/platform/ui_engine";
+export const bad = () => countPages(3);
+`,
+  "src/app/(platform)/x/component.tsx": `import { Widget, LABEL } from "@/platform/ui_engine";
+export const ok = () => <Widget label={LABEL} />;
+`,
+  "src/app/(platform)/x/pure-ok.tsx": `import { pureSlice } from "@/platform/ui_engine";
+export const ok = () => pureSlice([]);
+`,
+  "src/app/(platform)/x/type-only.tsx": `import type { getSlice } from "@/platform/ui_engine";
+export type T = typeof getSlice;
+`,
+  "src/app/(platform)/x/client-caller.tsx": `"use client";
+import { getSlice } from "@/platform/ui_engine";
+export const ok = () => getSlice([]);
+`,
+  "src/app/(platform)/x/server.test.ts": `import { getSlice } from "@/platform/ui_engine";
+export const ok = () => getSlice([]);
+`,
+};
+
+const clientCallRoot = await mkdtemp(join(tmpdir(), "wo3-boundaries-clientcall-"));
+try {
+  await writeTree(clientCallRoot, CLIENT_CALL_FILES);
+  const clientCalls = await collectServerClientCallViolations({ projectRoot: clientCallRoot });
+  assert.deepEqual(
+    clientCalls.map((v) => violationKey(clientCallRoot, v)).sort(),
+    [
+      `src/app/(platform)/x/barrel.tsx | ${RULE_SERVER_CALLS_CLIENT_FUNCTION} | getSlice from @/platform/ui_engine`,
+      `src/app/(platform)/x/direct.tsx | ${RULE_SERVER_CALLS_CLIENT_FUNCTION} | getSlice from @/platform/ui_engine/client-helpers`,
+      `src/app/(platform)/x/renamed.tsx | ${RULE_SERVER_CALLS_CLIENT_FUNCTION} | countPages from @/platform/ui_engine`,
+    ].sort(),
+  );
+  console.log("PASS server-calls-client fixtures: direct, barrel and renamed calls flagged; components, constants, types, pure modules, client callers and tests clean");
+} finally {
+  await rm(clientCallRoot, { recursive: true, force: true });
 }

@@ -123,8 +123,11 @@ export function QuickMessenger() {
 
   useEffect(() => {
     refreshUnread();
-    const interval = setInterval(refreshUnread, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
+    // A background tab does not need fresh counts; catch up as soon as it is visible again.
+    const tick = () => { if (document.visibilityState === "visible") refreshUnread(); };
+    const interval = setInterval(tick, POLL_INTERVAL_MS);
+    document.addEventListener("visibilitychange", tick);
+    return () => { clearInterval(interval); document.removeEventListener("visibilitychange", tick); };
   }, [refreshUnread]);
 
   useEffect(() => {
@@ -139,7 +142,7 @@ export function QuickMessenger() {
 
   useEffect(() => {
     if (!open || !activeId) return;
-    const interval = setInterval(() => openConversation(activeId), POLL_INTERVAL_MS);
+    const interval = setInterval(() => { if (document.visibilityState === "visible") openConversation(activeId); }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [activeId, open, openConversation]);
 

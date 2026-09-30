@@ -50,8 +50,11 @@ export function NotificationBell() {
 
   useEffect(() => {
     refreshCount();
-    const interval = setInterval(refreshCount, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
+    // A background tab does not need fresh counts; catch up as soon as it is visible again.
+    const tick = () => { if (document.visibilityState === "visible") refreshCount(); };
+    const interval = setInterval(tick, POLL_INTERVAL_MS);
+    document.addEventListener("visibilitychange", tick);
+    return () => { clearInterval(interval); document.removeEventListener("visibilitychange", tick); };
   }, [refreshCount]);
 
   useEffect(() => {

@@ -164,12 +164,6 @@ reference, same pattern as `brand_name`); when received, the designer sees a
 writes to Master Data — its public contract is read-only by design — a
 Master Data user adds the SKU/price themselves. See `CHANGELOG.md` R8.123,
 `STUDIOFLOW-REWORK-CONTRACT.md` §11.11.
-- [ ] [PLANNED] **Workbook import/export (SKU + material pricing) - approved approach, READY as `WO-MD-IMPORT-01` in `PLAN.md`.**
-  Edit in Excel and re-import with a preview first, all-or-nothing apply, per-row error report, unknown vendors/units/categories rejected
-  (Decision gates, 2026-09-28). Backend first (Codex, R8.212); the import/export screens follow as a Lead UI revision.
-- [ ] [PLANNED] **Harness: catch "server code calls a function that lives in a `"use client"` module".** R8.210 shipped exactly this
-  (`/bq` crashed) and neither `npm test` nor `next build` failed. Add a `check-boundaries` rule (or a route smoke test that renders every
-  server page once) so this class fails before review. Same failure as R8.164.
 - [x] [CLEANUP][P2] KB-025 — `src/apps/masterdata/services/index.ts` exports
   many internal-implementation helpers with no external consumer found. Not a
   current coupling problem; narrow the barrel when consumers and the public
