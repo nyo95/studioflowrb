@@ -1,77 +1,72 @@
 # Active Plan
 
-Plan ID: WO-PLAT-PREFS-01
-Scope: Platform — per-person preferences (theme, personal date/number locale and timezone, start page) with server-side storage and validation, the effective display settings for the signed-in person, and a read-only storage usage report for administrators. Backend and minimal wiring only; the Lead builds the "My Preferences" screen, theme switching, start-page redirect and the Storage page afterwards.
-Target revision: R8.249
-Status: COMPLETE (implemented R8.249, reviewed R8.250 with one correction; browser acceptance in the acceptance backlog)
+Plan ID: WO-MD-FINDABILITY-01
+Scope: Master Data — presentation only. Make Brands, Suppliers, SKUs and Pricing (material, material + labor, labor only) quick to search, filter and compare, so a contractor can find a supplier, a brand and a price in a few clicks. Screens, filters, columns, sorting and links; NO change to business rules, data meaning, schema, permissions, prices, validation, actions or audit.
+Target revision: R8.257
+Status: READY
 Priority: P2
-Owner: owner (Product Owner). Settings structure approved 2026-09-30: "My Preferences (per user)", General Settings (Platform, then one group per app), each app keeps one Settings entry. The first content of My Preferences (theme, start page, personal timezone/date format) and a Storage page were proposed by the Lead and accepted ("setuju"). Details below are Lead defaults open to the owner's veto.
+Owner: owner (Product Owner). Review by the Lead on 2026-09-30 as a head-of-interior-contractor user; the owner approved a thorough improvement, assigned it to the Executor (UI included, by the owner's explicit lane assignment for this plan), and confirmed it is **presentation only, no business-contract change** ("hanya tampilan yang disempurnakan").
 Last updated: 2026-09-30
 
 ## Outcome
 
-Every signed-in person can save a few personal preferences that follow them across devices, and the app shows dates and times in their own timezone and format when they set one (falling back to the studio-wide General Settings when they do not). An administrator can see how much of the storage disk is used, by area, and how much is free.
+On the four Master Data lists a person can answer, without leaving the list: "who sells brand X and whom do I call", "which suppliers carry material Y or do labor Z", and "what is the cheapest price for this item and from whom". Archived records stop mixing with active ones. Every list has a filter bar that behaves the same way.
 
-## Context and Evidence
+## Hard constraint (read first)
 
-- Platform settings today: `src/platform/core/settings/index.ts` (`PlatformGeneralSettings` with `locale` and `timezone`, `isSupportedLocale`, `isSupportedTimezone`, validation and audit); the shell provides them to the UI through `DisplaySettingsProvider` (`src/platform/authenticated-shell/display-settings.tsx`, `index.tsx`), read in `src/app/(platform)/layout.tsx`.
-- Users: `model User` in `prisma/schema/platform.prisma`; account page `src/app/(platform)/account/`. Auth helpers `requirePrincipalGrants` / `requirePrincipal` in `@platform/core/auth`.
-- Storage: `src/platform/infrastructure/storage/` (local filesystem adapter, `storage-root.ts`, free-space guard added in R8.240 with `STORAGE_MIN_FREE_BYTES`, default reserve 2 GB); private objects live under `<root>/private-assets/`, public brand marks under `<root>/public-assets/`. Keys are prefixed by owner area, for example `studioflow/deliverables/<project>/…`, `messenger/…`.
-- The shared settings sidebar and page pattern: R8.247 (`src/app/(platform)/settings/settings-navigation.tsx`). The Lead adds screens there; the Executor adds none.
+This is a **display** work order. Do not change: schema or migrations, permission ids, service commands and their validation, price/SKU/brand/supplier rules, deletion and archive behavior, audit, action inputs, import/export files, other apps. Existing server actions and services are called exactly as today. The only backend touch allowed is **additive, read-only fields on the existing list reads** when a column needs data that already exists in the database (listed below); those additions must not alter existing fields, filters, ordering, permission checks or performance characteristics materially (batch selects, no per-row queries). If a wanted column would need a rule change or a new command, do not build it: note it in `docs/BACKLOG.md` as `[PLANNED]` and continue.
+
+## Context and Evidence (Lead review, 2026-09-30, live app + code)
+
+- Brands (`masterdata/brands/brand-directory.tsx`): only a search box; columns Brand, Categories, Hashtags, Owner, Suppliers (a count), Resources (a count), SKUs, Updated. The Suppliers count reads 0 for brands whose owner is the seller; supplier names are not shown; links are only counted.
+- Suppliers (`vendors/vendor-directory.tsx`): filters only supplier type and supplier category; no brand or capability (material/labor) filter although the service already accepts `brandId`, `canSupplyMaterial`, `canSupplyLabor`; search misses brand names, address and notes; no "brands carried" column; the Categories column shows supplier categories and (R8.255) read-only "from brands" product categories; phone numbers are plain text.
+- SKUs (`skus/sku-directory.tsx`): filters brand and product category; columns SKU & Code, Brand & Categories, Units, Prices.
+- Pricing (`pricing/pricing-directory.tsx`): one search box and a status select shared by three tabs; the material search matches only SKU name/code and supplier name; the material table has SKU, Supplier, Price, Unit, Updated (no brand, category, size, contact); work tables have Name, Category, Supplier, Price, Unit, Updated; sort only by name, supplier, price; tab counts ignore search/status; no comparison across suppliers.
+- Brand, Supplier and SKU pages load archived rows (\`includeArchived: true\`) and show them mixed with active ones (only a small red marker differs). Pricing already has an Active/Archived/All select.
+- Contact-phone helpers: \`masterdata/contact-phones.tsx\` (\`contactPhoneList\`, \`phoneSummary\`).
+- The dev database currently holds no prices, no SKUs; use the existing import workbook/template (R8.238) or the screens to create fixtures in a **disposable rebuild-only** database for tests; the Lead will load sample rows in the dev database for browser acceptance.
 
 ## Locked Decisions
 
-- **Storage of preferences:** one row per user in the platform schema (`user_preference`, keyed by `user_id`, `ON DELETE CASCADE` from the user), typed columns, all nullable meaning "use the default": `theme` (`SYSTEM` | `LIGHT` | `DARK`; null = system), `locale` (nullable, must pass `isSupportedLocale`), `timezone` (nullable, must pass `isSupportedTimezone`), `start_page` (nullable path), `updated_at`. No JSON blob. Additive migration; apply to dev and test databases.
-- **Start page:** must be `/` or an application root path from the permission registry (`getPermissionRegistry().apps[].rootPath`) that the person currently has access to; anything else is refused with a plain error. Stored as the path; the Lead does the redirect.
-- **Who may read/write:** only the signed-in person, only their own row. No new permission id. No audit event for preference changes (personal, low value); a validation failure never echoes raw input.
-- **Effective display settings:** a read helper returns `{ locale, timezone }` = the person's values when set, otherwise the platform General Settings values; the (platform) layout passes these to `DisplaySettingsProvider` instead of the platform values. Server-rendered dates must use the same effective values wherever the code already reads the platform settings for the signed-in request (account sessions table, and any other place found in one search of `readPlatformGeneralSettings` used for display); do not refactor unrelated callers.
-- **Theme is UI-owned:** the backend stores and returns `theme`; applying it (attribute on the document, no flash) is the Lead's next revision. Do not add a theming implementation here.
-- **Storage usage report (read-only):** `getStorageUsage({ grants })` in platform (permission `platform.settings.read`), returning `{ totalBytes, freeBytes, minFreeBytes, groups: [{ prefix, files, bytes }], generatedAt }`. `groups` come from walking the private-assets root grouped by the first key segment (e.g. `studioflow`, `messenger`) plus one `public-assets` group; the platform must not import any app. Bound the walk (skip symlinks, cap at a fixed number of files with a `truncated` flag), and cache the result in memory for 60 seconds. `totalBytes`/`freeBytes` come from `fs.statfs` on the storage root; `minFreeBytes` is the configured reserve.
-- **Non-goals guardrails:** no notification preferences (email/push do not exist), no per-app preference framework, no changes to General Settings behavior, no UI screens, no new dependency.
-
-## Business Rules and Architecture Constraints
-
-- Platform owns this; apps do not read the preference table directly. Only the effective display settings are exposed to the shell.
-- Validation reuses the existing locale/timezone validators; do not duplicate lists.
-- Reads must not make an unauthenticated request succeed; a person with no row gets defaults, and a row is created lazily on first save (upsert).
-
-## Backend Contract
-
-- `preferences.get({ userId })` → `{ theme: "SYSTEM"|"LIGHT"|"DARK", locale: string|null, timezone: string|null, startPage: string|null }`.
-- `preferences.update({ userId, grants, ... })` upserts the given fields (a field explicitly `null` clears it), validating each as above.
-- `preferences.resolveDisplay({ userId })` → `{ locale, timezone }` effective values.
-- `getStorageUsage({ grants })` as above.
-- Server actions for the account area: `updateMyPreferencesAction`, `getMyPreferences` read for pages; storage usage read for a page (the Lead builds both screens).
-
-## UI Contract
-
-The Executor adds no screen. It only makes sure the layout uses the effective display settings and that the actions and reads above exist and are tested. Layout, copy, theme application, start-page redirect and the Storage page are the Lead's.
+1. **Status filter on Brands, Suppliers, SKUs**: Active (default) | Archived | All, same wording and control as Pricing. Pricing keeps its own select (same component/wording). Counts and pagination follow the filter. Archived rows keep their current look in "All".
+2. **One shared filter bar pattern** across the four screens: search box, then filter controls in a fixed order (Status first, then domain filters), a visible "Clear filters" when any filter is set, and the result count ("12 of 40"). Reuse UI Engine \`TableToolbar\`, \`SearchField\`, \`Select\`, \`Combobox\`; build the bar once as a small shared component in the Master Data screens folder (or extend UI Engine once if a generic gap is proven; never duplicate per screen). Filter state is client-side, as today; no URL persistence in this plan.
+3. **Brands.** Filters: Status, Product category, Supplier (matches the owner or any linked supplier). Columns: rename "Suppliers" to **"Supplied by"** and show names (owner first, marked "owner" in a tooltip, then linked suppliers, up to 2 then "+N"); keep it sortable by the existing count semantics; rename "Resources" to **"Links"** and show the link kinds as small clickable labels (Website, Catalog … opening the stored URL in a new tab with \`rel="noopener noreferrer"\`, using the URL safety already applied on save; a brand with no links shows "—"). Search also matches supplier/owner names.
+4. **Suppliers.** Filters: Status, Supplier type, Supplier category, **Product category (from brands)**, **Brand** (Combobox over brands the supplier carries or owns), **Capability** (Any | Material | Labor, from the supplier types' can-supply flags, same meaning as the existing badges). New column **"Brands"**: names (first 3, then "+N"), sortable by the existing count. The supplier name cell gets a secondary line with the first line of the address when present. Search also matches brand names, address, notes and contact phone digits. Contact phones become links: \`tel:\` always, plus a WhatsApp link (\`https://wa.me/<digits>\`, a leading 0 replaced by 62 for Indonesian numbers) only when the number normalizes to 8–15 digits; otherwise plain text. The "Prices" column keeps the total and adds a small breakdown ("M 3 · M+L 1 · L 0") in its tooltip.
+5. **SKUs.** Filters: Status, Brand, Product category, **Has price** (Any | With price | No price), **Supplier** (has an active price from that supplier). Search also matches brand name, category names and notes. The Prices column shows the count and, when there are prices, the lowest active price per currency ("from Rp 45.000 / m2"); the existing display of the row's first price stays available in the row menu/expansion if it exists today (do not remove information; move it, do not delete it).
+6. **Pricing.** Filters (all tabs): Status, **Supplier**. Material tab adds **Brand** and **Product category** (from the SKU); work tabs add **Category** (their own work category). Search matches SKU name/code, brand, category, supplier and, on work tabs, name. Material table columns: SKU (name + code), **Brand**, **Category**, **Size** (the SKU's dimension text when set), Supplier (with phone links per decision 4, first contact), Price (amount + currency), Unit, Updated. Work tables: Name, Category, Supplier (with phone), Price, Unit, Updated. Sorting gains **Updated** and **Category** (and Brand on Material). Tab labels show the filtered count, with the unfiltered total only in a tooltip. **Compare view:** a "Group by item" switch (default off) groups rows by item (material: SKU; work: name + category) and orders each group by price ascending; within a group, rows with the same currency and unit as the cheapest get a **"Lowest"** badge on the cheapest active row when the group has at least two active prices (never compare across currencies or units; a group with mixed currencies shows no badge). No price is computed or converted; this is ordering and labeling of existing values only.
+7. **Consistency and copy.** Plain English labels; empty states say whether a filter is hiding results ("No brands match these filters — Clear filters"); horizontal-scroll tables keep the first column sticky where the UI Engine table supports it.
+8. **Read-only additions allowed (no other backend touch).** (a) \`listBrands\`: the owner and linked supplier names, and the link kinds and URLs, per brand (fields it already reads or can read in the same query). (b) \`listSkus\`: active price amounts, currencies, units and supplier ids per SKU for the summary/filters. (c) \`listVendors\`: address is already returned; nothing else needed beyond R8.255. (d) Pricing page reads: SKU brand id/name, SKU product categories and dimension text on material prices; the first contact and its phones on each supplier reference. Each addition must keep permission checks and existing result fields byte-compatible for current callers (existing tests stay green).
 
 ## Boundaries and Non-goals
 
-- Do not touch legacy or any legacy database. Do not change the roles/permissions vocabulary. No Master Data, BQ or StudioFlow domain changes.
+- No schema/migration, no new permission, no new server action, no write path change, no rule or validation change, no import/export change, no other app.
+- No unified cross-tab "price search" page and no saved views/URL-persisted filters in this plan (candidates for a later plan).
+- No currency conversion, no averaging, no price recommendation.
+- Do not touch legacy or any legacy database.
 
 ## Acceptance Criteria
 
-- A person can save and clear each preference; invalid locale, timezone and unauthorized or unknown start pages are refused with plain errors; one person cannot read or change another person's row.
-- With a personal timezone set, a date rendered through the shell provider uses it; with none, it uses the platform value (test at the helper and provider-input level).
-- The storage usage report returns correct per-prefix totals for a fixture directory, marks truncation, ignores symlinks, is cached for 60 seconds (injectable clock), and refuses a caller without `platform.settings.read`.
-- Migration applies on a database that already has users without data loss; deleting a user removes their preference row.
-- `npm test`, `npx tsc --noEmit`, `npm run check`, eslint on touched folders pass; `npm run build` only if the owner dev server is stopped (otherwise report it as not run).
+- Each of the four screens shows the filters and columns above and behaves per the decisions; every filter combines with search and with the others (logical AND); "Clear filters" resets all; counts match what is listed.
+- Status defaults to Active on Brands, Suppliers and SKUs; archived rows appear only under Archived/All; Pricing unchanged in behavior.
+- Supplier "Brand" filter lists exactly the brands the supplier carries or owns; "Capability: Labor" shows only suppliers with a labor-capable type; product-category filter uses active categories of the supplier's brands (same rule as R8.255).
+- Pricing: filtering by supplier/brand/category and searching by brand or category find the expected rows; "Group by item" orders each group by price ascending and marks "Lowest" only per the rule (two or more active prices, same currency and unit, mixed currency = no badge); totals in tab labels follow the filters.
+- Phone links: a normal Indonesian number produces \`tel:\` and a WhatsApp link with 62; a malformed number produces neither link.
+- Existing Master Data tests pass unchanged (contracts intact); new pure-function tests cover: filter combination, status filter, "supplied by" composition, brand-category derivation, lowest-price grouping (edge cases: single price, ties, mixed currency/unit, archived rows), phone normalization.
+- No change to any server action signature, service command, permission, schema or audit event (state this in the changelog with the evidence that \`git diff\` touches only read selects and screens).
 
 ## Verification
 
-Executor: unit tests for validation and the effective-settings helper, integration tests against the disposable test database for the upsert/clear/ownership rules and cascade, and tests for the storage usage walk with a temporary directory. Record any skipped check as not passed.
+Executor: extract the filter/group/normalization logic into pure, unit-tested helpers (not buried in JSX); \`npm test\`, \`npx tsc --noEmit\`, \`npm run check\`, eslint on the touched folders; if the owner's dev server is running, do not run \`npm run build\` (report it as not run). The Lead performs browser acceptance afterwards with sample data; browser scenarios are added to the acceptance backlog by the Executor for: each screen's filters, the archived default, phone links, "Group by item".
 
 ## Reviewer Acceptance
 
-Lead after the commit: build the My Preferences screen and Storage page, save each preference in the browser and confirm the display changes; view the storage report against the real folder.
+Lead, in the browser with the dev database after loading sample suppliers, brands, SKUs and prices (material, material + labor, labor): run the three contractor questions end to end; check the status defaults, every filter, sorting, the "Lowest" badge, phone links, empty states and narrow-width behavior.
 
 ## Regression Risks and Recovery
 
-- The layout change touches every page's date display; the fallback to platform values when no preference exists must be covered by a test.
-- Recovery: revert the revision; the extra table is unused.
+- Client-side filtering over full lists is unchanged in cost; if a list is large the Executor must still keep render time reasonable (memoize derived data).
+- The main risk is accidental business change: any diff outside screens, pure helpers and read selects is a defect. Recovery: revert the revision; nothing persisted changes.
 
 ## Executor Prompt
 
-You are the Backend Executor. Location: kantor. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY backend outcome and nothing beyond it. Inspect current repository evidence, preserve unrelated owner work, make sound in-scope implementation decisions, run the required checks, update `CHANGELOG.md` (next revision R8.249), and create the target local revision commit. Stop only for a material locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT report; otherwise finish the coherent outcome and report the commit, checks, limitations, and remaining unrelated dirty files.
+You are the Executor. Location: kantor. This plan is presentation-only and the owner has assigned the UI work to you for this plan. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, `DESIGN.md` (typography: sans for operational UI; serif only for large display) and this `PLAN.md`, then implement the entire READY outcome and nothing beyond it. Inspect current repository evidence, preserve unrelated owner work, keep every business rule, action, permission, schema and audit behavior exactly as it is, run the required checks, check test results before committing (never commit with a failing test), update `CHANGELOG.md` (next revision R8.257), and create the target local revision commit. Stop only for a material locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT report; otherwise finish the coherent outcome and report the commit, checks, limitations, and remaining unrelated dirty files.

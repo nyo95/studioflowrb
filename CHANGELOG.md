@@ -21,6 +21,13 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 **Checks.** `npm test`; `npx tsc --noEmit`; `npm run check`; `npm run lint`; focused preference and storage-report tests. `npm run build` is not run when the owner dev server occupies port 3001. Browser acceptance is queued for the Reviewer.
 
+## R8.256 | 2026-09-30 | docs(masterdata): WO-MD-FINDABILITY-01 ready
+
+- **Work Order written, no code.** `PLAN.md` holds WO-MD-FINDABILITY-01 (target R8.257), the outcome of the Lead's review of Brands, Suppliers, SKUs and Pricing from a head-of-interior-contractor's point of view. **Presentation only, by the owner's explicit confirmation:** no schema, permission, rule, validation, action, audit or import/export change; the only backend touch allowed is additive read-only fields on existing list reads.
+- **Contents.** Active/Archived/All status filter (default Active) on Brands, Suppliers and SKUs; one shared filter bar with clear-filters and result count; Brands "Supplied by" names and clickable "Links"; Suppliers filters for brand, capability and brand product categories, a "Brands" column, address line and clickable phone numbers (tel and WhatsApp); SKUs "Has price" and supplier filters with a lowest-price summary; Pricing supplier, brand and category filters, richer columns, more sort keys, filtered tab counts and a "Group by item" view with a "Lowest" badge (never across currencies or units). Executor builds the UI for this plan by the owner's lane assignment; the Lead does the browser acceptance.
+
+**Checks.** Documentation only; not run.
+
 ## R8.255 | 2026-09-30 | feat(masterdata): Suppliers list shows the product categories of the brands each supplier carries
 
 - **Owner question:** categories added through the Brands screen never appeared on the Suppliers list ("No categories"); could suppliers inherit them? There are two different vocabularies: **supplier categories** (what kind of supplier it is, set on the supplier from Master Data Settings) and **product categories** (what a brand makes, set on the Brand). The list column only showed the first.
