@@ -55,7 +55,7 @@ export default async function SkusPage() {
         actions={canManage ? (
           <Link href="/masterdata/workbook" className={buttonClasses("secondary")}>
             <FileSpreadsheet size={14} aria-hidden="true" />
-            <span>Excel workbook</span>
+            <span>Import & export</span>
           </Link>
         ) : undefined}
         divider

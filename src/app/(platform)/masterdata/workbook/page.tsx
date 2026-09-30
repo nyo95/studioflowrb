@@ -20,9 +20,9 @@ export default async function WorkbookPage() {
   if (!canExport && !canImport) {
     return (
       <>
-        <PageHeader title="Excel workbook" divider />
+        <PageHeader title="Import & export prices" divider />
         <SectionCard>
-          <ErrorState title="Access denied" description="You do not have permission to export or import the SKU price workbook." />
+          <ErrorState title="Access denied" description="You do not have permission to export or import SKU prices." />
         </SectionCard>
       </>
     );
@@ -30,7 +30,7 @@ export default async function WorkbookPage() {
 
   return (
     <>
-      <PageHeader title="Excel workbook" description="Edit SKUs and their material prices in Excel, then import them back. Nothing is saved until you confirm." divider />
+      <PageHeader title="Import & export prices" description="Download SKUs and their material prices as Excel, CSV or PDF, or edit them in Excel and bring the changes back in. Nothing is saved until you confirm." divider />
       <WorkbookImport canExport={canExport} canImport={canImport} />
     </>
   );

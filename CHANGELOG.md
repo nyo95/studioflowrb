@@ -5,13 +5,20 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.243**
-- Next local revision: **R8.244**
+- Current revision after this entry is committed: **R8.244**
+- Next local revision: **R8.245**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.244 | 2026-09-30 | feat(masterdata): clearer import and export prices page
+
+- **Owner complaint:** the export/import page was not clear. The page (`/masterdata/workbook`, same address) is now "Import & export prices", in two cards side by side. **Get the data out:** a file type choice (Excel, CSV, PDF price list) with one plain sentence about each ("PDF is read-only and cannot be imported"), a Download button, and a "Download a blank template" button for people who may import. **Bring changes in:** three numbered steps (choose your file, check it, save), each saying what it does and whether it saves anything; results in plain words ("new / changed / unchanged / with problems"), problem rows listed as Row, Column, Problem, and messages such as "Check the file first" or "There is nothing to save" instead of a silent disabled button.
+- **Names.** The button on the SKU catalogue reads "Import & export" (was "Excel workbook"). No behaviour, permission or backend change; this uses the R8.238 actions.
+
+**Checks.** `npm test` 693/693, `npm run check`, `tsc --noEmit`, eslint on the Master Data screens. Not exercised in the browser (owner tests UI).
 
 ## R8.243 | 2026-09-30 | feat(ui-engine): image workspace gets colour touch-ups and automatic compression
 
