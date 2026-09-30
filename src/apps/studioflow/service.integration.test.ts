@@ -1092,6 +1092,17 @@ describe("SF-R3 Product Schedule", () => {
     assert.equal(second.entryId.length > 0, true);
   });
 
+  it("keeps quantity and unit for Fixture only", async () => {
+    const { projectId } = await newProject();
+    const material = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", qty: "12", unit: "m2", location: "Living room" });
+    const fixture = await sf.schedule.createEntry({ ...as(designer), projectId, section: "FIXTURE", category: "Lamp", qty: "3", unit: "pcs" });
+    const rows = await sf.schedule.listSchedule({ grants: ALL, projectId });
+    const m = rows.find((row) => row.id === material.entryId)!;
+    const f = rows.find((row) => row.id === fixture.entryId)!;
+    assert.deepEqual([m.qty, m.unit, m.location], [null, null, "Living room"]);
+    assert.deepEqual([f.qty, f.unit], ["3", "pcs"]);
+  });
+
   it("lets a designer request a sample without naming a supplier", async () => {
     const { projectId } = await newProject();
     const { entryId } = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "Unknown source paint", brandName: "Dulux" } });
@@ -1311,7 +1322,7 @@ describe("SF-R3 Product Schedule", () => {
     const { projectId } = await newProject();
     await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Paint", prefix: "PT" });
     await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Wallpaper", prefix: "WP" });
-    const a = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", qty: "2", unit: "pail", snapshot: { productName: "A paint" } });
+    const a = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", location: "Bedroom", snapshot: { productName: "A paint" } });
     const b = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "B paint" } });
     const c = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });
 
@@ -1337,7 +1348,7 @@ describe("SF-R3 Product Schedule", () => {
 
     await sf.schedule.updateEntry({ ...as(designer), projectId, entryId: a.entryId, location: "Lobby" });
     rowA = (await list()).find((row) => row.id === a.entryId)!;
-    assert.deepEqual([rowA.qty, rowA.unit, rowA.location], ["2", "pail", "Lobby"], "omitted fields keep their value");
+    assert.deepEqual([rowA.qty, rowA.unit, rowA.location], [null, null, "Lobby"], "a Material line never keeps qty or unit, and only the sent field changes");
 
     await sf.schedule.moveEntry({ ...as(designer), projectId, entryId: c.entryId, direction: "up" });
     assert.deepEqual((await list()).map((row) => [row.code, row.id]), [["PT-01", a.entryId], ["PT-02", c.entryId], ["PT-03", b.entryId]]);

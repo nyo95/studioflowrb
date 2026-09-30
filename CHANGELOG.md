@@ -5,13 +5,24 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.226**
-- Next local revision: **R8.227**
+- Current revision after this entry is committed: **R8.227**
+- Next local revision: **R8.228**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.227 | 2026-09-30 | fix(studioflow): simpler Add item dialog; quantity and unit are Fixture-only everywhere
+
+- Owner feedback: the Add schedule item dialog looked too formal and still showed Qty/Unit for Material, although only the item panel had been corrected (Qty is a
+  Fixture-only fact). The dialog now uses Material/Fixture chips, a searchable/creatable Category, Location, and shows Qty and Unit only for Fixture. Product
+  fields: one Brand control (pick a Master Data brand or type any name), Size next to it, Color/Pattern/Finishing, and Notes plus extra specs behind "+ Notes or
+  other specs" (opened automatically when they already have content, which also applies to the inline option editor). Friendlier copy.
+- Server: `createEntry` and `updateEntry` ignore qty/unit for a Material entry. Tests: new "keeps quantity and unit for Fixture only"; the old assertions that
+  expected Material qty were updated; the source guard for the Finishing field follows the new markup.
+
+**Checks.** `npm test` 665/665, `tsc --noEmit`, eslint. Checked in the browser (Material hides Qty/Unit, Fixture shows them); nothing saved.
 
 ## R8.226 | 2026-09-30 | fix(studioflow,masterdata): a designer can request a sample without naming a supplier
 

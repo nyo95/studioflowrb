@@ -750,30 +750,48 @@ function toSnapshot(draft: ProductDraft) {
 function ProductFields({ value, onChange, brands, extraBrand }: { value: ProductDraft; onChange: (next: ProductDraft) => void; brands: readonly Brand[]; extraBrand?: Brand | null }) {
   const set = (key: keyof ProductDraft) => (event: { target: { value: string } }) => onChange({ ...value, [key]: event.target.value });
   const brandOptions = extraBrand && !brands.some((b) => b.id === extraBrand.id) ? [extraBrand, ...brands] : brands;
+  // One brand control: pick a Master Data brand, or type any name (kept as plain text, id-less).
+  const customBrand = !value.brandId && value.brandName.trim() ? [{ id: `custom:${value.brandName}`, label: value.brandName }] : [];
+  const brandValue = value.brandId || (customBrand[0]?.id ?? "");
+  const [moreOpen, setMoreOpen] = useState(() => Boolean(value.notes.trim() || value.extra.length > 0));
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <Field label="Type" required className="sm:col-span-2" description="The product designation, e.g. “Nude Pro - ATS 1132 M”. It is the card title.">
-        <Input value={value.productName} onChange={set("productName")} maxLength={200} placeholder="e.g. Nude Pro - ATS 1132 M" />
+      <Field label="Type" required className="sm:col-span-2">
+        <Input value={value.productName} onChange={set("productName")} maxLength={200} placeholder="Product name, e.g. Nude Pro - ATS 1132 M" autoFocus />
       </Field>
       <Field label="Brand">
-        <Select value={value.brandId} onChange={(e) => onChange({ ...value, brandId: e.target.value, brandName: e.target.value ? "" : value.brandName })}>
-          <option value="">Other (type the name)</option>
-          {brandOptions.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
-        </Select>
+        <CreatableSearch
+          label="Brand"
+          options={[{ id: "", label: "No brand" }, ...customBrand, ...brandOptions.map((brand) => ({ id: brand.id, label: brand.name }))]}
+          value={brandValue}
+          onValueChange={(next) => {
+            if (next.startsWith("custom:")) onChange({ ...value, brandId: "", brandName: next.slice(7) });
+            else onChange({ ...value, brandId: next, brandName: "" });
+          }}
+          onCreate={(name) => `custom:${name.trim()}`}
+          createLabel={(name) => `Use “${name}” as the brand`}
+          placeholder="Pick or type a brand"
+          searchPlaceholder="Search brands…"
+          emptyLabel="No brand matches."
+          className="w-full"
+        />
       </Field>
-      <Field label="Brand name" description={value.brandId ? "Taken from Master Data." : undefined}>
-        <Input value={value.brandId ? brandOptions.find((b) => b.id === value.brandId)?.name ?? "" : value.brandName} onChange={set("brandName")} disabled={!!value.brandId} maxLength={160} />
-      </Field>
+      <Field label="Size"><Input value={value.dimension} onChange={set("dimension")} maxLength={160} placeholder="e.g. 60 × 60 cm" /></Field>
       <Field label="Color"><Input value={value.color} onChange={set("color")} maxLength={160} /></Field>
       <Field label="Pattern"><Input value={value.pattern} onChange={set("pattern")} maxLength={160} /></Field>
-      <Field label="Finishing"><Input value={value.finishing} onChange={set("finishing")} maxLength={160} /></Field>
-      <Field label="Size"><Input value={value.dimension} onChange={set("dimension")} maxLength={160} placeholder="e.g. 60 × 60 cm" /></Field>
-      <Field label="Notes" className="sm:col-span-2">
-        <Textarea value={value.notes} onChange={set("notes")} maxLength={2000} rows={2} className="min-h-[60px]" />
-      </Field>
-      <div className="sm:col-span-2">
-        <ExtraFieldsEditor value={value.extra} onChange={(extra) => onChange({ ...value, extra })} />
-      </div>
+      <Field label="Finishing" className="sm:col-span-2"><Input value={value.finishing} onChange={set("finishing")} maxLength={160} /></Field>
+      {moreOpen ? (
+        <>
+          <Field label="Notes" className="sm:col-span-2">
+            <Textarea value={value.notes} onChange={set("notes")} maxLength={2000} rows={2} className="min-h-[60px]" />
+          </Field>
+          <div className="sm:col-span-2">
+            <ExtraFieldsEditor value={value.extra} onChange={(extra) => onChange({ ...value, extra })} />
+          </div>
+        </>
+      ) : (
+        <Button type="button" size="sm" variant="ghost" className="justify-self-start sm:col-span-2" onClick={() => setMoreOpen(true)}>+ Notes or other specs</Button>
+      )}
     </div>
   );
 }
@@ -819,6 +837,7 @@ function AddItemDialog({ projectId, section, categories, brands, command, onClos
   const [withProduct, setWithProduct] = useState(true);
   const [product, setProduct] = useState<ProductDraft>(EMPTY_PRODUCT);
   const [qty, setQty] = useState({ qty: "", unit: "", location: "" });
+  const isFixture = targetSection === "FIXTURE";
   const pending = command.isPending("add-item");
   const canSave = category.trim() && (!withProduct || product.productName.trim());
 
@@ -827,8 +846,9 @@ function AddItemDialog({ projectId, section, categories, brands, command, onClos
       projectId,
       section: targetSection,
       category: category.trim(),
-      qty: qty.qty.trim() || null,
-      unit: qty.unit.trim() || null,
+      // Qty and unit only exist for Fixture: a Material line is specified, not counted.
+      qty: isFixture ? qty.qty.trim() || null : null,
+      unit: isFixture ? qty.unit.trim() || null : null,
       location: qty.location.trim() || null,
       snapshot: withProduct ? toSnapshot(product) : null,
     }));
@@ -839,35 +859,45 @@ function AddItemDialog({ projectId, section, categories, brands, command, onClos
     <Dialog
       open
       onOpenChange={(value) => { if (!value) onClose(); }}
-      title="Add schedule item"
-      description="The code is assigned from the category prefix (for example PT-03)."
+      title="Add item"
+      description="It gets a code from the category, like PT-03."
       size="lg"
       dismissible={!pending}
       footer={<Footer><Button variant="ghost" onClick={onClose} disabled={pending}>Cancel</Button><Button variant="primary" pending={pending} disabled={!canSave} onClick={save}>Add item</Button></Footer>}
     >
       <div className="grid gap-4">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Section">
+          <FilterChip selected={targetSection === "MATERIAL"} onClick={() => setTargetSection("MATERIAL")}>Material</FilterChip>
+          <FilterChip selected={targetSection === "FIXTURE"} onClick={() => setTargetSection("FIXTURE")}>Fixture</FilterChip>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Section">
-            <Select value={targetSection} onChange={(e) => setTargetSection(e.target.value as Section)}>
-              <option value="MATERIAL">Material</option>
-              <option value="FIXTURE">Fixture</option>
-            </Select>
+          <Field label="Category" required>
+            <CreatableSearch
+              label="Category"
+              options={categories.map((name) => ({ id: name, label: name }))}
+              value={category}
+              onValueChange={setCategory}
+              onCreate={(name) => name.trim()}
+              createLabel={(name) => `New category “${name}”`}
+              placeholder="Pick or type a category, e.g. Paint"
+              searchPlaceholder="Search categories…"
+              emptyLabel="No category yet. Type a new one."
+              className="w-full"
+            />
           </Field>
-          <Field label="Category" required description="Pick an existing one or type a new category.">
-            <Input list="schedule-categories" value={category} onChange={(e) => setCategory(e.target.value)} maxLength={80} placeholder="e.g. Paint" />
-          </Field>
-          <datalist id="schedule-categories">{categories.map((c) => <option key={c} value={c} />)}</datalist>
-          <Field label="Location"><Input value={qty.location} onChange={(e) => setQty({ ...qty, location: e.target.value })} maxLength={160} /></Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Qty"><Input inputMode="decimal" value={qty.qty} onChange={(e) => setQty({ ...qty, qty: e.target.value })} maxLength={20} /></Field>
-            <Field label="Unit"><Input value={qty.unit} onChange={(e) => setQty({ ...qty, unit: e.target.value })} maxLength={40} /></Field>
-          </div>
+          <Field label="Location"><Input value={qty.location} onChange={(e) => setQty({ ...qty, location: e.target.value })} maxLength={160} placeholder="e.g. Living room wall" /></Field>
+          {isFixture ? (
+            <div className="grid grid-cols-2 gap-3 sm:col-span-2">
+              <Field label="Qty"><Input inputMode="decimal" value={qty.qty} onChange={(e) => setQty({ ...qty, qty: e.target.value })} maxLength={20} /></Field>
+              <Field label="Unit"><Input value={qty.unit} onChange={(e) => setQty({ ...qty, unit: e.target.value })} maxLength={40} placeholder="pcs, set…" /></Field>
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Item content">
-          <FilterChip selected={withProduct} onClick={() => setWithProduct(true)}>With product</FilterChip>
-          <FilterChip selected={!withProduct} onClick={() => setWithProduct(false)}>Reserve code only</FilterChip>
+          <FilterChip selected={withProduct} onClick={() => setWithProduct(true)}>Add the product now</FilterChip>
+          <FilterChip selected={!withProduct} onClick={() => setWithProduct(false)}>Just reserve the code</FilterChip>
         </div>
-        {withProduct ? <ProductFields value={product} onChange={setProduct} brands={brands} /> : <Text tone="secondary" size="sm">The code is reserved now; add options later from the item panel.</Text>}
+        {withProduct ? <ProductFields value={product} onChange={setProduct} brands={brands} /> : <Text tone="secondary" size="sm">The code is reserved now. Add the product later from the item.</Text>}
         {command.error ? <InlineError>{command.error}</InlineError> : null}
       </div>
     </Dialog>

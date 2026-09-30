@@ -498,8 +498,9 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
           section,
           category: category.label,
           categoryKey: category.key,
-          qty: decimalText(input.qty),
-          unit: optionalText(input.unit, 40),
+          // A Material line is specified, not counted: qty and unit belong to Fixture only.
+          qty: section === "FIXTURE" ? decimalText(input.qty) : null,
+          unit: section === "FIXTURE" ? optionalText(input.unit, 40) : null,
           location: optionalText(input.location, 160),
           snapshot: input.snapshot ? { ...input.snapshot, ...brand, imageKey: null } : null,
         });
@@ -514,8 +515,9 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         const entry = await loadEntry(tx, input.projectId, input.entryId, true);
         // Only the fields that were sent change; omitted fields keep their value.
         const data: { qty?: string | null; unit?: string | null; location?: string | null } = {};
-        if (input.qty !== undefined) data.qty = decimalText(input.qty);
-        if (input.unit !== undefined) data.unit = optionalText(input.unit, 40);
+        // Qty and unit exist for Fixture only; a Material line ignores them.
+        if (entry.section !== "MATERIAL" && input.qty !== undefined) data.qty = decimalText(input.qty);
+        if (entry.section !== "MATERIAL" && input.unit !== undefined) data.unit = optionalText(input.unit, 40);
         if (input.location !== undefined) data.location = optionalText(input.location, 160);
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         const before = { qty: entry.qty?.toString() ?? null, unit: entry.unit, location: entry.location };

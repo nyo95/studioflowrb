@@ -71,7 +71,7 @@ describe("Schedule Board/List outer branching and pattern form preservation", ()
     const patternField = scheduleBoard.indexOf('<Field label="Pattern">', productFieldsIndex);
     assert.ok(patternField > -1, "Pattern field exists in ProductFields");
     assert.ok(patternField > scheduleBoard.indexOf('<Field label="Color">', productFieldsIndex), "Pattern sits after Color");
-    assert.ok(patternField < scheduleBoard.indexOf('<Field label="Finishing">', productFieldsIndex), "Pattern sits before Finishing");
+    assert.ok(patternField < scheduleBoard.indexOf('<Field label="Finishing"', productFieldsIndex), "Pattern sits before Finishing");
   });
 
   it("accepts pattern in the ScheduleSnapshot action schema", () => {
