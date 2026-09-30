@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.216] Master Data SKU price workbook workflow
+- Surface: `/masterdata/workbook`
+- Fixture: staff member with SKU and material-price read/manage grants; a catalogue SKU with one supplier price
+- Viewport: desktop (default)
+- Steps: 1. Open the temporary workbook tools route. 2. Export the workbook. 3. Change one SKU name and one amount in Excel, preview it, then apply the same file using the returned hash. 4. Try an unknown supplier and confirm apply is refused.
+- Acceptance: export is a usable `.xlsx`; preview identifies each changed or invalid row; apply changes every valid row together and rejects an invalid workbook without partial changes.
+- Status: PENDING
+
 ### [R8.208] Remaining browser checks that need a second person, real hardware, or data the dev database lacks
 - Surface: messenger (`/messenger`, topbar popup), BQ Cost Component picker, StudioFlow archive/cleanup, Deliverables
 - Fixture: needs (a) a second signed-in user, (b) Master Data with at least one supplier price, (c) an archived project past its retention date, (d) a real device

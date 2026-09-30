@@ -5,13 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.215**
-- Next local revision: **R8.216**
+- Current revision after this entry is committed: **R8.216**
+- Next local revision: **R8.217**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.216 | 2026-09-30 | feat(masterdata): add SKU price workbook export and atomic import
+
+- **Workbook contract.** Master Data can export SKU material prices to `.xlsx` with the locked `SKU Prices` columns and a protected `Reference` sheet. Import accepts only the exported format up to 5 MB / 2,000 rows, resolves references by trimmed case-insensitive name or code, and never creates reference data.
+- **Safe import.** Preview is read-only and reports create, update, unchanged, or per-cell errors with a content hash. Apply revalidates the same bytes within one transaction, refuses changed/invalid files, uses the existing SKU and material-price write paths, and records one counts-only audit event.
+- **Boundary/testing.** Added typed Master Data server actions and a temporary executor route at `/masterdata/workbook`; the Lead-owned finished upload/preview UI remains next work. Added an integration round trip plus invalid-workbook coverage. Browser acceptance is queued in `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`.
+- **Dependency.** Added the approved `exceljs` package only.
+
+**Checks.** `npm test` passed; `npx tsc --noEmit`, `npm run check`, and `npm run build` passed. `/masterdata/workbook` opened in `next dev` and correctly redirected the signed-out session to `/login`; authenticated browser acceptance remains queued.
 
 ## R8.215 | 2026-09-30 | fix(ui): align the creatable search trigger, record blocked owner decisions
 

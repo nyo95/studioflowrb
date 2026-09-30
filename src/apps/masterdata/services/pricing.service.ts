@@ -26,7 +26,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       return db.priceMaterial.findUniqueOrThrow({ where: { id: input.priceMaterialId }, include: { sku: { include: { brand: { select: { id: true, name: true, slug: true, links: true } }, base_unit: true, purchase_unit: true } }, supplier_vendor: true, unit: true, source_link: true } });
     },
 
-    async createPriceMaterial(input: { grants: PermissionGrants; actor: AuditActor; skuId: string; supplierVendorId: string; amount: string; currency: string; sourceLinkId?: string; notes?: string }) {
+    async createPriceMaterial(input: { grants: PermissionGrants; actor: AuditActor; skuId: string; supplierVendorId: string; amount: string; currency: string; sourceLinkId?: string; notes?: string; suppressAudit?: boolean }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
       actorIsUsable(input.actor);
       const currency = requiredCurrency(input.currency);
@@ -41,12 +41,12 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         const unitId = sku.purchase_unit_id ?? sku.base_unit_id;
         let price;
         try { price = await tx.priceMaterial.create({ data: { id: randomUUID(), sku_id: input.skuId, supplier_vendor_id: input.supplierVendorId, amount, currency, unit_id: unitId, source_link_id: input.sourceLinkId || null, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
-        await writeAudit(ports, tx, { action: "price-material.created", entityType: "price_material", entityId: price!.id, actor: input.actor, metadata: { sku_id: input.skuId, vendor_id: input.supplierVendorId } });
+        if (!input.suppressAudit) await writeAudit(ports, tx, { action: "price-material.created", entityType: "price_material", entityId: price!.id, actor: input.actor, metadata: { sku_id: input.skuId, vendor_id: input.supplierVendorId } });
         return { priceMaterialId: price!.id };
       });
     },
 
-    async updatePriceMaterial(input: { grants: PermissionGrants; actor: AuditActor; priceMaterialId: string; amount: string; currency: string; unitId?: string; sourceLinkId?: string | null; notes?: string | null }) {
+    async updatePriceMaterial(input: { grants: PermissionGrants; actor: AuditActor; priceMaterialId: string; amount: string; currency: string; unitId?: string; sourceLinkId?: string | null; notes?: string | null; suppressAudit?: boolean }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
       actorIsUsable(input.actor);
       const currency = requiredCurrency(input.currency);
@@ -68,7 +68,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         if ((existing.notes || null) !== (input.notes?.trim() || null)) changes.notes = { from: existing.notes, to: input.notes?.trim() || null };
         if (Object.keys(changes).length === 0) return { priceMaterialId: input.priceMaterialId };
         try { await tx.priceMaterial.update({ where: { id: input.priceMaterialId }, data: { amount, currency, unit_id: unitId, source_link_id: input.sourceLinkId !== undefined ? (input.sourceLinkId || null) : existing.source_link_id, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
-        await writeAudit(ports, tx, { action: "price-material.updated", entityType: "price_material", entityId: input.priceMaterialId, actor: input.actor, changes: Object.keys(changes).length > 0 ? changes : undefined });
+        if (!input.suppressAudit) await writeAudit(ports, tx, { action: "price-material.updated", entityType: "price_material", entityId: input.priceMaterialId, actor: input.actor, changes: Object.keys(changes).length > 0 ? changes : undefined });
         return { priceMaterialId: input.priceMaterialId };
       });
     },

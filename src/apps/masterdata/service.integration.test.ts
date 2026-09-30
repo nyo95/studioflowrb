@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it } from "node:test";
+import ExcelJS from "exceljs";
 
 import type { PrismaClient } from "@/generated/prisma/client";
 import { createAuditEventWriter } from "@platform/core/audit/persistence";
@@ -81,6 +82,36 @@ after(async () => {
 });
 
 describe("Master Data service", () => {
+  it("round-trips SKU material prices through the workbook and rejects all invalid rows before apply", async () => {
+    const context = await createMaterialContext();
+    const { skuId } = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Workbook SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "120", currency: "IDR" }] });
+    const workbook = await service.exportSkuPriceWorkbook({ grants: GRANTS });
+    const book = new ExcelJS.Workbook(); await book.xlsx.load(workbook as any);
+    const sheet = book.getWorksheet("SKU Prices")!;
+    sheet.getCell("C2").value = "Workbook SKU edited";
+    sheet.getCell("O2").value = "125.50";
+    const edited = Buffer.from(await book.xlsx.writeBuffer());
+    const preview = await service.previewSkuPriceImport({ grants: GRANTS, file: { data: edited, name: "sku-prices.xlsx" } });
+    assert.deepEqual(preview.totals, { create: 0, update: 1, unchanged: 0, error: 0 });
+    await service.applySkuPriceImport({ grants: GRANTS, actor: ACTOR, file: edited, hash: preview.hash });
+    assert.equal((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: skuId } })).name, "Workbook SKU edited");
+    assert.equal((await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: skuId } })).amount.toString(), "125.5");
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "sku-price-workbook.applied" } }), 1);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: { in: ["sku.updated", "price-material.updated"] } } }), 0);
+
+    const invalid = new ExcelJS.Workbook(); const invalidSheet = invalid.addWorksheet("SKU Prices");
+    invalidSheet.addRow(["SKU ID", "Code", "Name", "Brand", "Category", "Base unit", "Purchase unit", "Length", "Width", "Thickness", "Dimension unit", "Notes", "Price ID", "Supplier", "Amount", "Currency", "Price notes"]);
+    invalidSheet.addRow([crypto.randomUUID(), "", "Bad", "", "Unknown category", "PCS", "", "", "", "", "", "", crypto.randomUUID(), "Unknown supplier", "bad", "IDR", ""]);
+    invalidSheet.addRow([skuId, "", "Workbook SKU edited", "", "Panel", "PCS", "", "", "", "", "", "", "", context.vendorId, "1", "IDR", ""]);
+    invalidSheet.addRow([skuId, "", "Workbook SKU edited", "", "Panel", "PCS", "", "", "", "", "", "", "", context.vendorId, "1", "IDR", ""]);
+    const invalidPreview = await service.previewSkuPriceImport({ grants: GRANTS, file: Buffer.from(await invalid.xlsx.writeBuffer()) });
+    assert.ok(invalidPreview.errors.some((error) => error.column === "SKU ID"));
+    assert.ok(invalidPreview.errors.some((error) => error.column === "Supplier"));
+    assert.ok(invalidPreview.errors.some((error) => error.column === "Amount"));
+    assert.ok(invalidPreview.errors.some((error) => error.column === "Price ID" || error.column === "Supplier"));
+    await assert.rejects(service.applySkuPriceImport({ grants: GRANTS, actor: ACTOR, file: Buffer.from(await invalid.xlsx.writeBuffer()), hash: invalidPreview.hash }), (error: unknown) => error instanceof AppError && error.code === "SKU_PRICE_IMPORT_ERRORS");
+  });
+
   it("separates live Brand owners from material-capable supplier choices", async () => {
     const ownerOnly = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Owner Only" });
     const materialSupplier = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Material Supplier" });
