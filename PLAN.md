@@ -2,7 +2,7 @@
 
 Plan ID: WO-MD-IMPORT-01
 Scope: Master Data workbook export/import for SKUs and their material prices (backend + minimal wiring)
-Target revision: R8.214
+Target revision: R8.215
 Status: READY
 Priority: P2
 Owner: owner (Product Owner); approach approved 2026-09-28 (Decision gates in `docs/BACKLOG.md`), details below decided by the Lead
@@ -90,5 +90,5 @@ Largest risk is a partial write; the single-transaction apply and a rollback tes
 
 You are the Backend Executor. Location: <rumah|kantor>. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY backend
 outcome and nothing beyond it. Inspect current repository evidence, preserve unrelated owner work, make sound in-scope implementation decisions, run the
-required checks (including opening the touched routes in `next dev`), update `CHANGELOG.md`, and create the target local revision commit R8.214. Stop only for
+required checks (including opening the touched routes in `next dev`), update `CHANGELOG.md`, and create the target local revision commit R8.215. Stop only for
 a material locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT report. Report the commit, checks, limitations, and remaining unrelated dirty files.

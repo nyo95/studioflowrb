@@ -1637,6 +1637,13 @@ describe("Project timeline start (Gantt, owner 2026-09-23)", () => {
     updated = await sf.projects.getProject({ grants: ALL, projectId });
     assert.equal(updated.timelineStartDate, dateToDateOnly(created.createdAt), "clearing the override resets to the createdAt fallback");
   });
+
+  it("keeps the opening date when other project fields are edited", async () => {
+    const { projectId } = await newProject();
+    await sf.projects.updateProject({ ...as(designer), projectId, openingDate: "2026-12-01" });
+    await sf.projects.updateProject({ ...as(designer), projectId, address: "Somewhere" });
+    assert.equal((await sf.projects.getProject({ grants: ALL, projectId })).openingDate, "2026-12-01");
+  });
 });
 
 // ── SF-V2-E: phases come from definitions, never from a fixed enum ───────────

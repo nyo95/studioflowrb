@@ -132,3 +132,11 @@ this backlog's former SF-A entries.)_
 - Steps: 1. Create a project named without year/number. 2. In Client type a new name and add it. 3. Edit the project name. 4. Open Studio Settings.
 - Acceptance: any name saves as typed; duplicate name shows a clear error; client is created and selected; no Project type field and no naming switch.
 - Status: PENDING
+
+### [R8.214] Project dates are set only from Timeline
+- Surface: StudioFlow → Timeline; Projects → New / Edit project
+- Fixture: staff with project manage; a project with an opening date
+- Viewport: desktop (default)
+- Steps: 1. Confirm New and Edit project have no date fields. 2. On Timeline click "Edit project dates", change start and opening date, save. 3. Edit the project's address on Projects and save.
+- Acceptance: the bar and both date labels update immediately; the opening date survives the unrelated edit; clearing start falls back to the day the project was added.
+- Status: PENDING

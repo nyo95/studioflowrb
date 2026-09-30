@@ -19,7 +19,6 @@ export function NewProjectDialog({ people, clients, onClose }: { people: Person[
     client: "",
     picDesignerId: "",
     picDrafterId: "",
-    openingDate: "",
     priority: "NORMAL" as "URGENT" | "NORMAL" | "LOW",
     clientContact: "",
     address: "",
@@ -36,7 +35,6 @@ export function NewProjectDialog({ people, clients, onClose }: { people: Person[
           clientId: form.client || null,
           picDesignerId: form.picDesignerId,
           picDrafterId: form.picDrafterId,
-          openingDate: form.openingDate || null,
           priority: form.priority,
           clientContact: form.clientContact || null,
           address: form.address || null,
@@ -57,7 +55,6 @@ export function NewProjectDialog({ people, clients, onClose }: { people: Person[
           <Field label="Client contact"><Input value={form.clientContact} maxLength={200} onChange={(e) => set("clientContact", e.target.value)} /></Field>
           <Field label="Designer (PIC)" required><PersonSelect required people={people} value={form.picDesignerId || null} onChange={(v) => set("picDesignerId", v ?? "")} /></Field>
           <Field label="Drafter (PIC)" required><PersonSelect required people={people} value={form.picDrafterId || null} onChange={(v) => set("picDrafterId", v ?? "")} /></Field>
-          <Field label="Opening date"><Input type="date" value={form.openingDate} onChange={(e) => set("openingDate", e.target.value)} /></Field>
           <Field label="Priority">
             <Select value={form.priority} onChange={(e) => set("priority", e.target.value as typeof form.priority)}>
               <option value="URGENT">Urgent</option>

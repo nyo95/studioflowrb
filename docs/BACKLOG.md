@@ -155,13 +155,6 @@ invitation to make unrequested drive-by changes.
   owner request, and the two questions on the StudioFlow-side mirror entry
   are still open.
 
-- [ ] [PLANNED] **KB-062 (remaining) — Make the project-level Opening date one comprehensible Timeline target.** The
-  rest of KB-062 shipped in R8.213 (free-text project name, no numbering, one searchable/creatable Client control, no
-  Project type). Still open: the code already stores Opening date once (`SfProject.opening_date`) and the Timeline reads
-  it, so the confusion is likely the separate Timeline start date or that the opening date cannot be changed from the
-  Timeline. **Owner question pending:** which of the two is confusing, or should the opening date be editable directly on
-  the Timeline? Do not start until answered. Individual phase planned dates stay distinct.
-
 **Fixed 2026-09-23 (R8.123):** Physical Samples workflow — from a Product
 Schedule option, staff can request a physical sample from a vendor/supplier
 (`SfScheduleSampleRequest`, free-text `requestedFrom`, no live Master Data

@@ -139,7 +139,19 @@ export async function updateProjectAction(input: z.infer<typeof ProjectUpdate>):
   return runSafeAction(async () => {
     const ctx = await context();
     const data = parse(ProjectUpdate, input);
-    const result = await studioFlow.projects.updateProject({ ...ctx, ...data, openingDate: data.openingDate || null });
+    const result = await studioFlow.projects.updateProject({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+/** Timeline is the only place a project's start and opening date are set (owner, 2026-09-30). */
+const ProjectDates = z.strictObject({ projectId: Id, timelineStartDate: DateOnly, openingDate: DateOnly });
+export async function setProjectDatesAction(input: z.infer<typeof ProjectDates>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ProjectDates, input);
+    const result = await studioFlow.projects.updateProject({ ...ctx, projectId: data.projectId, timelineStartDate: data.timelineStartDate || null, openingDate: data.openingDate || null });
     refresh(data.projectId);
     return result;
   });

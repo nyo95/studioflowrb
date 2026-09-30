@@ -5,13 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.213**
-- Next local revision: **R8.214**
+- Current revision after this entry is committed: **R8.214**
+- Next local revision: **R8.215**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.214 | 2026-09-30 | feat(studioflow): set project dates only from Timeline
+
+- **KB-062 closed.** Owner decision: all time settings live on Timeline. New and Edit project no longer have Opening date
+  or Timeline start; Timeline rows get "Edit project dates" (start + opening date) via `setProjectDatesAction`.
+  `updateProjectAction` no longer forces the opening date to null when the field is omitted (it would have wiped it on
+  every edit once the field left the form). Regression test added. Phase dates are still set from the bar.
+
+**Checks.** `npm test` 651/651, `tsc --noEmit`, boundaries and legacy-runtime checks pass; no browser run (queued).
 
 ## R8.213 | 2026-09-30 | fix(studioflow,masterdata): free-text project names, inline client/supplier creation, sample receipt on cards
 

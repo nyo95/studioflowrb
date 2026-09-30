@@ -7,9 +7,10 @@ import { useState } from "react";
 import { phaseAccentDotClass, phaseStatusDisplay, type PhaseStatus } from "@/apps/studioflow/domain/phase";
 import { computePhaseSegments, resolveTimelineSpan } from "@/apps/studioflow/domain/timeline";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
-import { EmptyState, FilterChip, Input, SectionCard, Select, TableToolbar, Text } from "@/platform/ui_engine";
+import { Button, EmptyState, FilterChip, Input, SectionCard, Select, TableToolbar, Text } from "@/platform/ui_engine";
 
 import { EditPhaseDatesDialog } from "./edit-phase-dates-dialog";
+import { EditProjectDatesDialog } from "./edit-project-dates-dialog";
 
 export type TimelinePhase = { id: string; definitionId: string | null; label: string; status: PhaseStatus; plannedStartDate: string | null; plannedEndDate: string | null };
 export type TimelineProject = {
@@ -43,6 +44,7 @@ export function TimelineDirectory({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [editing, setEditing] = useState<{ projectId: string; phase: TimelinePhase } | null>(null);
+  const [editingProject, setEditingProject] = useState<TimelineProject | null>(null);
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams.toString());
@@ -101,10 +103,12 @@ export function TimelineDirectory({
       ) : (
         <div className="grid gap-3">
           {projects.map((project) => (
-            <TimelineRow key={project.id} project={project} canManage={canManage} now={now} onEditPhase={(phase) => setEditing({ projectId: project.id, phase })} />
+            <TimelineRow key={project.id} project={project} canManage={canManage} now={now} onEditPhase={(phase) => setEditing({ projectId: project.id, phase })} onEditDates={() => setEditingProject(project)} />
           ))}
         </div>
       )}
+
+      {editingProject ? <EditProjectDatesDialog project={editingProject} onClose={() => setEditingProject(null)} /> : null}
 
       {editing ? (
         <EditPhaseDatesDialog projectId={editing.projectId} phase={editing.phase} onClose={() => setEditing(null)} />
@@ -113,7 +117,7 @@ export function TimelineDirectory({
   );
 }
 
-function TimelineRow({ project, canManage, now, onEditPhase }: { project: TimelineProject; canManage: boolean; now: number; onEditPhase: (phase: TimelinePhase) => void }) {
+function TimelineRow({ project, canManage, now, onEditPhase, onEditDates }: { project: TimelineProject; canManage: boolean; now: number; onEditPhase: (phase: TimelinePhase) => void; onEditDates: () => void }) {
   if (project.phases.length === 0) return null;
   const span = resolveTimelineSpan(project.timelineStartDate, project.openingDate, { phases: project.phases, now });
   const segments = computePhaseSegments(span, project.phases);
@@ -148,6 +152,7 @@ function TimelineRow({ project, canManage, now, onEditPhase }: { project: Timeli
         </div>
         <div className="flex items-center justify-between">
           <Text tone="tertiary" size="sm">{project.timelineStartDate}</Text>
+          {canManage ? <Button type="button" size="sm" variant="ghost" onClick={onEditDates}>Edit project dates</Button> : null}
           <Text tone="tertiary" size="sm">{project.openingDate ?? "Ongoing"}</Text>
         </div>
       </div>
