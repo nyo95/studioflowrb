@@ -21,6 +21,15 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 **Checks.** `npm test`; `npx tsc --noEmit`; `npm run check`; `npm run lint`; focused preference and storage-report tests. `npm run build` is not run when the owner dev server occupies port 3001. Browser acceptance is queued for the Reviewer.
 
+## R8.252 | 2026-09-30 | feat(studioflow): Product Schedule item editor as a card table
+
+- **Owner request:** edit a schedule card like a card game (Yu-Gi-Oh / Clash Royale / capsa), but keep the app's own look. The concept was reviewed on a design canvas and made more minimal at the owner's request; this builds it.
+- **What changed (only the editor's layout).** The item dialog ("Card content" checklist plus "Spec options" list) is now a three-part card table in a wider dialog: **Card slots** on the left (the old field checklist as toggle buttons, with "Use default" and a "card filled in" meter), **the card** in the middle (code chip, category, Type as the serif title, photo window with sample badge, and Brand, Color, Pattern, Finishing, Size, Location, Qty and extra spec lines as plates edited in place; Notes still uses the shared editor), and **your hand** on the right (the options as small cards; the selected one lifts), with Set as final, Request sample or Mark received, a menu (photo, remove photo, cancel sample, delete option), Add option and From past project. The photo editor replaces the hand while it is open. On a narrow screen the card comes first.
+- **Rules unchanged.** Nothing saves until Save (owner decision 2026-09-24), now per option, so several options can be edited and saved together; closing with unsaved edits still asks to discard; slots hide without losing text; Type is always shown; Qty is Fixture-only; Brand is free text or a Master Data brand and never writes Master Data; every control is gated by edit permission or a pending save. No server, schema or permission change.
+- **Removed.** The old checklist rows and the inline option form (their behaviour now lives on the card). The source-check regression tests that pinned the old markup are rewritten to pin the same rules on the new structure.
+
+**Checks.** `npm test` 696/696, `npm run check`, `tsc --noEmit`, eslint on the schedule screens. NOT exercised in the browser (needs a signed-in project); scenario added to the acceptance backlog.
+
 ## R8.251 | 2026-09-30 | test(studioflow): Today page timezone test follows R8.250
 
 - **Correction to R8.250.** R8.250 was committed with one failing test (695/696): a source check on the Today page still looked for the old settings call. The test now asserts the real rule: the date comes from the person's effective timezone (`userPreferences.resolveDisplay`) and the studio-wide reader is not used there. An unused database import in that page is removed. No behaviour change.

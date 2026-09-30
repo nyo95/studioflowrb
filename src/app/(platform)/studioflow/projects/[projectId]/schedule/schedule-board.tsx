@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, FileUp, History, ImageIcon, Plus, Printer, Search, Settings2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Crown, FileUp, History, ImageIcon, Plus, Printer, Search, Settings2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 
@@ -197,9 +197,6 @@ function SampleRequestDialog({
     </Dialog>
   );
 }
-
-/** Simple single-input option fields between Type and Location in the checklist; Brand, Size and Notes get their own row shape. */
-const SIMPLE_OPTION_FIELD_KEYS = ["color", "pattern", "finishing"] as const;
 
 function Thumb({ url, alt, className = "h-14 w-11" }: { url: string | null; alt: string; className?: string }) {
   return (
@@ -801,37 +798,6 @@ function Footer({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap justify-end gap-2">{children}</div>;
 }
 
-/**
- * Edit an existing option's fields in place, no dialog. Legacy edits product
- * fields by clicking straight into them on the card; this keeps that "no
- * navigation, no modal" property while editing every field in one save
- * (rather than one commit per keystroke-field), since these fields are
- * naturally edited together as one product record.
- */
-function OptionInlineForm({ projectId, option, brands, command, onClose }: { projectId: string; option: ScheduleOptionView; brands: readonly Brand[]; command: Command; onClose: () => void }) {
-  const [product, setProduct] = useState<ProductDraft>(productFromOption(option));
-  const key = `${option.id}-inline`;
-  const pending = command.isPending(key);
-
-  const save = async () => {
-    const ok = await command.run(key, () => updateScheduleOptionAction({ projectId, optionId: option.id, snapshot: toSnapshot(product) }));
-    if (ok) onClose();
-  };
-
-  return (
-    <div className="grid gap-3">
-      <ProductFields value={product} onChange={setProduct} brands={brands} extraBrand={option.brandId ? { id: option.brandId, name: option.brandName ?? "Brand" } : null} />
-      {command.error ? <InlineError>{command.error}</InlineError> : null}
-      <Footer>
-        <Button type="button" onClick={onClose} disabled={pending}>Cancel</Button>
-        <Button type="button" variant="primary" pending={pending} disabled={!product.productName.trim()} onClick={() => void save()}>Save option</Button>
-      </Footer>
-    </div>
-  );
-}
-
-// ── Add item ─────────────────────────────────────────────────────────────────
-
 function AddItemDialog({ projectId, section, categories, brands, command, onClose }: { projectId: string; section: Section; categories: string[]; brands: readonly Brand[]; command: Command; onClose: () => void }) {
   const [targetSection, setTargetSection] = useState<Section>(section);
   const [category, setCategory] = useState(categories[0] ?? "");
@@ -913,39 +879,29 @@ function AddItemDialog({ projectId, section, categories, brands, command, onClos
  * elsewhere (owner decision 2026-09-23, closer to legacy's per-card inline
  * editing than a separate popover ever was).
  */
-function ChecklistRow({
-  label,
-  checked,
-  disabled,
-  disabledHint,
-  onToggle,
-  className,
-  children,
-}: {
-  label: string;
-  checked: boolean;
-  disabled: boolean;
-  disabledHint?: string;
-  onToggle: () => void;
-  className?: string;
-  children?: ReactNode;
-}) {
+// ── Entry panel content (the body of EntryDialog) ──────────────────────────────
+
+/** A slim, borderless field that reads as text until it is hovered or focused: how the card is edited in place. */
+const PLATE_INPUT = "h-7 w-full rounded-[6px] border border-transparent bg-transparent px-0 text-sm font-medium text-ink placeholder:font-normal placeholder:text-ink-tertiary hover:border-line-subtle focus:border-line-focus focus:bg-surface focus:px-1.5 focus:outline-none disabled:opacity-70";
+
+function CardPlate({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-control border ${checked ? "border-line-subtle" : "border-transparent"} ${className ?? ""}`}>
-      <label
-        title={disabled ? disabledHint : undefined}
-        className={`flex items-center gap-2 rounded-control px-1.5 py-1.5 text-sm ${disabled ? "text-ink-tertiary" : "hover:bg-surface-muted"}`}
-      >
-        <input type="checkbox" checked={checked} disabled={disabled} onChange={onToggle} />
-        {label}
-      </label>
-      {checked && children ? <div className="px-1.5 pb-2 pt-0.5">{children}</div> : null}
+    <div className={`rounded-control border border-line-subtle bg-surface px-2.5 pb-1 pt-1.5 ${className}`}>
+      <div className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-tertiary">{label}</div>
+      {children}
     </div>
   );
 }
 
-// ── Entry panel content (the body of EntryDialog) ──────────────────────────────
+const HAND_WIDTH = 264;
+const HAND_CARD = 96;
 
+/**
+ * The Product Schedule item editor, laid out as a card table: the card itself in the middle, edited in place;
+ * the slots that appear on it on the left; the spec options as a hand of small cards on the right. Everything
+ * here is still one local draft until Save is pressed (owner decision 2026-09-24), now per option, so several
+ * options can be edited before saving. Only the picture changed; the rules did not.
+ */
 function EntryPanelContent({
   projectId,
   entry,
@@ -966,7 +922,7 @@ function EntryPanelContent({
   onClose: () => void;
   onDirtyChange?: (dirty: boolean) => void;
   /** Set once, from the board card's photo click, to open the panel with
-   * that option's photo editor already active — this component owns
+   * that option selected and its photo editor already active — this component owns
    * consuming it (a ref, not a prop echoed back) so a stale value can never
    * leak into a later, unrelated open of the same mounted panel. */
   initialPhotoOptionId?: string | null;
@@ -975,14 +931,16 @@ function EntryPanelContent({
   const [editing, setEditing] = useState<ScheduleOptionView | "new" | null>(null);
   const [reuse, setReuse] = useState(false);
   const [photoFor, setPhotoFor] = useState<string | null>(null);
-  const [inlineEdit, setInlineEdit] = useState<string | null>(null);
   const [sampleFor, setSampleFor] = useState<ScheduleOptionView | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => {
+    const wanted = initialPhotoOptionId && entry.options.some((option) => option.id === initialPhotoOptionId) ? initialPhotoOptionId : null;
+    return wanted ?? shownOptionOf(entry)?.id ?? null;
+  });
 
   // Adjust-during-render, not useEffect: this fires once per fresh mount
   // (the panel fully unmounts on close, so the ref always starts at null),
-  // and the ref guard keeps it from re-firing on every re-render the way a
-  // second useState here previously caused a loop elsewhere in this file.
+  // and the ref guard keeps it from re-firing on every re-render.
   const normalizedInitialPhotoOptionId = initialPhotoOptionId ?? null;
   const autoPhotoAppliedRef = useRef<string | null>(null);
   if (autoPhotoAppliedRef.current !== normalizedInitialPhotoOptionId) {
@@ -990,53 +948,38 @@ function EntryPanelContent({
     if (normalizedInitialPhotoOptionId && entry.options.some((option) => option.id === normalizedInitialPhotoOptionId)) setPhotoFor(normalizedInitialPhotoOptionId);
   }
 
-  // The checklist edits the option the card itself speaks for — same rule as
-  // the card face (shownOptionOf).
-  const shown = shownOptionOf(entry);
+  const selected = entry.options.find((option) => option.id === selectedId) ?? shownOptionOf(entry);
   const extraChoices = extraChoicesOf(entry);
   const extraKeys = extraChoices.map((extra) => extra.key);
 
-  // Owner decision 2026-09-24: this section no longer auto-saves per field on
-  // blur — every edit here (item fields, product details, card-field choice)
-  // is a local draft until "Save" is pressed, matching Master Data's
-  // draft/discard pattern. `baseline` is what is actually persisted; the
-  // three pieces of local state below are the in-progress draft.
-  const baselineOf = (source: ScheduleEntryView, shownOption: ScheduleOptionView | null) => ({
-    fields: { qty: source.qty ?? "", unit: source.unit ?? "", location: source.location ?? "" },
-    option: shownOption ? productFromOption(shownOption) : EMPTY_PRODUCT,
-    cardFields: source.cardFields,
-  });
-  const [baseline, setBaseline] = useState(() => baselineOf(entry, shown));
+  // Owner decision 2026-09-24: nothing auto-saves per field. `baseline` is what is persisted for the item-level
+  // pieces; `optionBaseline` holds what was last saved per option (props catch up after the refresh);
+  // `drafts` holds only the options the person has touched.
+  const [baseline, setBaseline] = useState(() => ({ fields: { qty: entry.qty ?? "", unit: entry.unit ?? "", location: entry.location ?? "" }, cardFields: entry.cardFields }));
   const [fields, setFields] = useState(baseline.fields);
-  const [optionDraft, setOptionDraft] = useState<ProductDraft>(baseline.option);
   const [cardFieldsDraft, setCardFieldsDraft] = useState<string[] | null>(baseline.cardFields);
+  const [drafts, setDrafts] = useState<Record<string, ProductDraft>>({});
+  const [optionBaseline, setOptionBaseline] = useState<Record<string, ProductDraft>>({});
 
-  // Resync the whole draft only when the shown option's *identity* changes
-  // (e.g. a different option becomes final while this dialog stays open) —
-  // a ref, not a second piece of state, tracks what was last seen so this can
-  // never itself trigger a further state update that re-enters this check.
-  const shownIdRef = useRef(shown?.id ?? null);
-  if (shownIdRef.current !== (shown?.id ?? null)) {
-    shownIdRef.current = shown?.id ?? null;
-    const next = baselineOf(entry, shown);
-    setBaseline(next);
-    setFields(next.fields);
-    setOptionDraft(next.option);
-    setCardFieldsDraft(next.cardFields);
-  }
+  const baselineOfOption = (option: ScheduleOptionView | null): ProductDraft => (option ? optionBaseline[option.id] ?? productFromOption(option) : EMPTY_PRODUCT);
+  const draftKey = selected?.id ?? "new";
+  const draft = drafts[draftKey] ?? baselineOfOption(selected);
+  const updateDraft = (patch: Partial<ProductDraft>) => setDrafts((current) => ({ ...current, [draftKey]: { ...(current[draftKey] ?? baselineOfOption(selected)), ...patch } }));
 
   const displayCardFields = resolveCardFields(cardFieldsDraft, extraKeys);
-  const optionChanged = JSON.stringify(optionDraft) !== JSON.stringify(baseline.option);
+  const dirtyOptionKeys = Object.keys(drafts).filter((key) => {
+    const option = entry.options.find((row) => row.id === key) ?? null;
+    if (key !== "new" && !option) return false; // the option was deleted meanwhile
+    return JSON.stringify(drafts[key]) !== JSON.stringify(baselineOfOption(option));
+  });
   const fieldsChanged = fields.qty !== baseline.fields.qty || fields.unit !== baseline.fields.unit || fields.location !== baseline.fields.location;
   const cardFieldsChanged = JSON.stringify(resolveCardFields(cardFieldsDraft, extraKeys)) !== JSON.stringify(resolveCardFields(baseline.cardFields, extraKeys));
-  const isDirty = optionChanged || fieldsChanged || cardFieldsChanged;
+  const isDirty = dirtyOptionKeys.length > 0 || fieldsChanged || cardFieldsChanged;
   // Tell the dialog wrapper whether it's safe to close without confirming —
-  // a ref write in the parent, not a state update, so this stays a pure
-  // "synchronize with an external system" effect.
+  // a ref write in the parent, not a state update.
   useEffect(() => { onDirtyChange?.(isDirty); }, [isDirty, onDirtyChange]);
-  // Needs a Type before an option can be created (matches OptionDialog's own
-  // rule) — blocks Save only when the missing piece is the option itself.
-  const optionNeedsType = optionChanged && !shown && !optionDraft.productName.trim();
+  // Every option needs a Type before it can be saved (same rule as OptionDialog).
+  const optionNeedsType = dirtyOptionKeys.some((key) => !drafts[key].productName.trim());
 
   const entryFieldsKey = `${entry.id}-fields`;
   const optionFieldsKey = `${entry.id}-option-fields`;
@@ -1045,12 +988,15 @@ function EntryPanelContent({
 
   const saveAll = async () => {
     setSaveError(null);
-    if (optionChanged && !optionNeedsType) {
-      const snapshot = toSnapshot(optionDraft);
-      const ok = await run(optionFieldsKey, () => shown
-        ? updateScheduleOptionAction({ projectId, optionId: shown.id, snapshot })
-        : createScheduleOptionAction({ projectId, entryId: entry.id, snapshot }));
+    if (optionNeedsType) return;
+    for (const key of dirtyOptionKeys) {
+      const snapshot = toSnapshot(drafts[key]);
+      const ok = await run(optionFieldsKey, () => key === "new"
+        ? createScheduleOptionAction({ projectId, entryId: entry.id, snapshot })
+        : updateScheduleOptionAction({ projectId, optionId: key, snapshot }));
       if (!ok) return;
+      setOptionBaseline((current) => ({ ...current, [key]: drafts[key] }));
+      setDrafts((current) => { const next = { ...current }; delete next[key]; return next; });
     }
     if (fieldsChanged) {
       const ok = await run(entryFieldsKey, () => updateScheduleEntryAction({
@@ -1063,47 +1009,38 @@ function EntryPanelContent({
       const ok = await run(cardFieldsKey, () => updateScheduleEntryCardFieldsAction({ projectId, entryId: entry.id, fields: cardFieldsDraft === null ? null : [...cardFieldsDraft] }));
       if (!ok) return;
     }
-    setBaseline({ fields, option: optionDraft, cardFields: cardFieldsDraft });
+    setBaseline({ fields, cardFields: cardFieldsDraft });
   };
   const discardDraft = () => {
     setFields(baseline.fields);
-    setOptionDraft(baseline.option);
+    setDrafts({});
     setCardFieldsDraft(baseline.cardFields);
     setSaveError(null);
   };
 
-  const setOptionField = (key: keyof ProductDraft) => (event: { target: { value: string } }) =>
-    setOptionDraft((current) => ({ ...current, [key]: event.target.value }));
-  const brandOptions = shown?.brandId && !brands.some((b) => b.id === shown.brandId)
-    ? [{ id: shown.brandId, name: shown.brandName ?? "Brand" }, ...brands]
+  const brandOptions = selected?.brandId && !brands.some((b) => b.id === selected.brandId)
+    ? [{ id: selected.brandId, name: selected.brandName ?? "Brand" }, ...brands]
     : brands;
   // One combobox instead of a select-plus-fallback-input pair: search Master
   // Data, or type a name that is not in it — no Master Data write happens
   // either way (StudioFlow never writes Master Data; brand text with no
-  // catalogued id is the documented, ordinary case, §11.3). The typed name
-  // itself doubles as its own option id so the trigger still shows it.
+  // catalogued id is the documented, ordinary case, §11.3).
   const isKnownBrandId = (id: string) => brandOptions.some((b) => b.id === id);
   const brandSearchOptions: CreatableSearchOption[] = [
     ...brandOptions.map((b) => ({ id: b.id, label: b.name })),
-    ...(!optionDraft.brandId && optionDraft.brandName.trim()
-      ? [{ id: optionDraft.brandName, label: optionDraft.brandName, description: "Typed — not in Master Data" }]
+    ...(!draft.brandId && draft.brandName.trim()
+      ? [{ id: draft.brandName, label: draft.brandName, description: "Typed — not in Master Data" }]
       : []),
   ];
   const handleBrandChange = (next: string) => {
-    setOptionDraft(isKnownBrandId(next)
-      ? { ...optionDraft, brandId: next, brandName: "" }
-      : { ...optionDraft, brandId: "", brandName: next });
+    updateDraft(isKnownBrandId(next) ? { brandId: next, brandName: "" } : { brandId: "", brandName: next });
   };
 
-  const effectiveFields = displayCardFields;
   // Unchecking everything is a real choice (photo, code and title only), not a
-  // reset — `null` is the reset, and "Use default" below is how it is reached.
-  // Ticking is never blocked by the field being empty — ticking is how a field
-  // starts being filled in (owner decision 2026-09-23; the old "grey out an
-  // empty field" rule made an empty field un-tickable, which was the opposite
-  // of useful for "I don't know the brand yet, but note it here").
+  // reset — `null` is the reset, and "Use default" is how it is reached.
+  // Ticking is never blocked by the field being empty: ticking is how a field starts being filled in.
   const toggleCardField = (field: string) =>
-    setCardFieldsDraft(effectiveFields.includes(field) ? effectiveFields.filter((key) => key !== field) : [...effectiveFields, field]);
+    setCardFieldsDraft(displayCardFields.includes(field) ? displayCardFields.filter((key) => key !== field) : [...displayCardFields, field]);
 
   const removePhoto = async (option: ScheduleOptionView) => {
     const ok = await confirm({
@@ -1135,299 +1072,271 @@ function EntryPanelContent({
     if (ok) await run(`${entry.id}-opt-${option.id}`, () => deleteScheduleOptionAction({ projectId, optionId: option.id }));
   };
 
+  // ── What is on the card, and how full it is ──
+  const disabled = !canEdit || savePending;
+  const extraValue = (label: string) => draft.extra.find((field) => field.label === label)?.value ?? "";
+  const setExtraValue = (label: string, value: string) => updateDraft({
+    extra: draft.extra.some((field) => field.label === label)
+      ? draft.extra.map((field) => (field.label === label ? { ...field, value } : field))
+      : [...draft.extra, { label, value }],
+  });
+  const slotKeys = ["brand", "color", "pattern", "finishing", "dimension", "location", ...(entry.section === "FIXTURE" ? ["qty"] : []), "notes", ...extraKeys];
+  const slotLabel = (key: string) => cardFieldLabel(key, extraChoices);
+  const valueOfSlot = (key: string): string => {
+    if (key === "brand") return draft.brandId || draft.brandName;
+    if (key === "location") return fields.location;
+    if (key === "qty") return fields.qty;
+    if (key === "notes") return draft.notes;
+    if (key === "color" || key === "pattern" || key === "finishing" || key === "dimension") return draft[key];
+    return extraValue(extraChoices.find((extra) => extra.key === key)?.label ?? key);
+  };
+  const shownSlots = slotKeys.filter((key) => displayCardFields.includes(key));
+  const filledCount = shownSlots.filter((key) => valueOfSlot(key).trim().length > 0).length;
+  const accent = selected?.isFinal ? "var(--ui-warning-fg)" : entry.section === "FIXTURE" ? "var(--ui-action-primary)" : "var(--ph-mood)";
+  const status = selected ? STATUS_LABEL[selected.status] ?? STATUS_LABEL.DRAFT : STATUS_LABEL.DRAFT;
+  const busyKey = selected ? `${entry.id}-opt-${selected.id}` : "";
+
+  const handStep = entry.options.length > 1 ? Math.min(72, (HAND_WIDTH - HAND_CARD) / (entry.options.length - 1)) : 0;
+  const handStart = (HAND_WIDTH - (HAND_CARD + (entry.options.length - 1) * handStep)) / 2;
+
   return (
-    <div className="grid gap-5">
-      <div className="grid gap-2">
-        <Text weight="semibold">Card content</Text>
-        <Text size="sm" tone="tertiary">
-          {entry.cardFields === null ? "Using the default set." : "Custom for this item."} Tick a field to fill it in and put it on
-          the card; Type and the photo always show. Unticking hides it without losing what you typed.
-        </Text>
-        <div className="grid gap-1.5 sm:grid-cols-2">
-          <ChecklistRow
-            label="Brand"
-            checked={effectiveFields.includes("brand")}
-            disabled={!canEdit || savePending}
-            onToggle={() => toggleCardField("brand")}
-          >
-            <CreatableSearch
-              label="Brand"
-              options={brandSearchOptions}
-              value={optionDraft.brandId || optionDraft.brandName}
-              onValueChange={handleBrandChange}
-              onCreate={(text) => text}
-              createLabel={(text) => `Use "${text}" (not in Master Data)`}
-              placeholder="Search or type a brand"
-              searchPlaceholder="Search brands…"
-              emptyLabel="No brands found"
-              allowClear
-              disabled={!canEdit || savePending}
-              className="w-full"
-            />
-          </ChecklistRow>
-
-          {/* Type has no checkbox — it is the card title and always shows (§11.3). */}
-          <div className="rounded-control border border-line-subtle">
-            <div className="flex items-center gap-2 rounded-control px-1.5 py-1.5 text-sm">
-              Type <span className="text-xs font-normal text-ink-tertiary">always shown</span>
-            </div>
-            <div className="px-1.5 pb-2 pt-0.5">
-              <Input
-                value={optionDraft.productName}
-                onChange={setOptionField("productName")}
-                disabled={!canEdit || savePending}
-                maxLength={200}
-                placeholder="e.g. Nude Pro - ATS 1132 M"
-              />
-            </div>
-          </div>
-
-          {SIMPLE_OPTION_FIELD_KEYS.map((key) => (
-            <ChecklistRow
-              key={key}
-              label={CARD_FIELD_LABEL[key]}
-              checked={effectiveFields.includes(key)}
-              disabled={!canEdit || savePending}
-              onToggle={() => toggleCardField(key)}
-            >
-              <Input
-                autoFocus
-                value={optionDraft[key]}
-                onChange={setOptionField(key)}
-                disabled={!canEdit || savePending}
-                maxLength={160}
-              />
-            </ChecklistRow>
-          ))}
-
-          <ChecklistRow label="Location" checked={effectiveFields.includes("location")} disabled={!canEdit || savePending} onToggle={() => toggleCardField("location")}>
-            <Input
-              autoFocus
-              value={fields.location}
-              onChange={(e) => setFields({ ...fields, location: e.target.value })}
-              disabled={!canEdit || savePending}
-              maxLength={160}
-            />
-          </ChecklistRow>
-
-          {/* Qty only for Fixture — a Material line is specified, not counted; legacy's own sheet import already discards Qty on Material (owner decision 2026-09-23). */}
-          {entry.section === "FIXTURE" ? (
-            <ChecklistRow label="Qty" checked={effectiveFields.includes("qty")} disabled={!canEdit || savePending} onToggle={() => toggleCardField("qty")}>
-              <div className="grid grid-cols-[1fr_5.5rem] gap-1.5">
-                <Input autoFocus inputMode="decimal" value={fields.qty} onChange={(e) => setFields({ ...fields, qty: e.target.value })} disabled={!canEdit || savePending} maxLength={20} />
-                <Input placeholder="Unit" value={fields.unit} onChange={(e) => setFields({ ...fields, unit: e.target.value })} disabled={!canEdit || savePending} maxLength={40} />
-              </div>
-            </ChecklistRow>
-          ) : null}
-
-          <ChecklistRow
-            label="Size"
-            checked={effectiveFields.includes("dimension")}
-            disabled={!canEdit || savePending}
-            onToggle={() => toggleCardField("dimension")}
-          >
-            <Input
-              autoFocus
-              value={optionDraft.dimension}
-              onChange={setOptionField("dimension")}
-              disabled={!canEdit || savePending}
-              maxLength={160}
-              placeholder="e.g. 60 × 60 cm"
-            />
-          </ChecklistRow>
-
-          <ChecklistRow
-            className="sm:col-span-2"
-            label="Notes"
-            checked={effectiveFields.includes("notes")}
-            disabled={!canEdit || savePending}
-            onToggle={() => toggleCardField("notes")}
-          >
-            <SimpleTextEditor autoFocus value={optionDraft.notes} onChange={setOptionField("notes")} disabled={!canEdit || savePending} maxLength={2000} rows={2} />
-          </ChecklistRow>
-
-          {extraChoices.map((extra) => (
-            <ChecklistRow
-              key={extra.key}
-              label={extra.label}
-              checked={effectiveFields.includes(extra.key)}
-              disabled={!canEdit || savePending}
-              onToggle={() => toggleCardField(extra.key)}
-            />
-          ))}
-        </div>
-        {canEdit && cardFieldsDraft !== null ? (
-          <button type="button" disabled={savePending} onClick={() => setCardFieldsDraft(null)} className="justify-self-start text-xs font-medium text-ink-secondary hover:text-ink hover:underline">
-            Use default
-          </button>
-        ) : null}
-        {optionNeedsType ? <InlineError>Enter a Type before saving product details.</InlineError> : null}
-        {saveError ? <InlineError>{saveError}</InlineError> : null}
-        {canEdit ? (
-          <FormActions>
-            <Button type="button" variant="ghost" disabled={!isDirty || savePending} onClick={discardDraft}>Discard</Button>
-            <Button type="button" variant="primary" pending={savePending} disabled={!isDirty || optionNeedsType} onClick={() => void saveAll().catch((error) => setSaveError(error instanceof Error ? error.message : "Could not save."))}>
-              Save
-            </Button>
-          </FormActions>
-        ) : null}
-      </div>
-
-      <div className="grid gap-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Text weight="semibold">Spec options</Text>
-          {canEdit ? (
-            <div className="flex gap-2">
-              <Button size="sm" variant="ghost" leadingIcon={<History className="h-3.5 w-3.5" />} onClick={() => setReuse(true)}>From past project</Button>
-              <Button size="sm" variant="secondary" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => setEditing("new")}>Add option</Button>
-            </div>
-          ) : null}
-        </div>
-
-        {/* Option chip nav */}
-        {entry.options.length > 1 ? (
-          <div className="flex gap-1.5" role="group" aria-label="Jump to option">
-            {entry.options.map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => document.getElementById(`opt-${opt.id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" })}
-                className={`inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full px-2 text-xs font-semibold transition-colors ${
-                  opt.isFinal
-                    ? "border border-success-line bg-success-surface text-success"
-                    : "border border-line bg-surface-muted text-ink-secondary hover:border-line-subtle hover:text-ink"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        {entry.options.length === 0 ? (
-          <Text tone="tertiary" size="sm">No product yet. Add an option or copy one from a past project.</Text>
-        ) : (
-          <ul className="m-0 grid list-none gap-2 p-0">
-            {entry.options.map((option) => {
-              const status = STATUS_LABEL[option.status] ?? STATUS_LABEL.DRAFT;
-              if (inlineEdit === option.id) {
-                return (
-                  <li id={`opt-${option.id}`} key={option.id} className="rounded-control border border-line-focus bg-surface px-3 py-2.5">
-                    <OptionInlineForm projectId={projectId} option={option} brands={brands} command={command} onClose={() => setInlineEdit(null)} />
-                  </li>
-                );
-              }
-              if (photoFor === option.id) {
-                return (
-                  <li id={`opt-${option.id}`} key={option.id} className="rounded-control border border-line-focus bg-surface px-3 py-2.5">
-                    <InlinePhotoEditor projectId={projectId} entryCode={entry.code} option={option} command={command} onClose={() => setPhotoFor(null)} />
-                  </li>
-                );
-              }
+    <div className="grid gap-4">
+      <div className="grid items-start gap-5 lg:grid-cols-[12.5rem_minmax(0,1fr)_16.5rem]">
+        {/* Card slots */}
+        <div className="order-2 grid gap-2 lg:order-1">
+          <Text weight="semibold">Card slots</Text>
+          <Text size="sm" tone="tertiary">
+            {entry.cardFields === null ? "Default set." : "Custom for this item."} Tap a slot to put it on the card. Turning one off only hides it.
+          </Text>
+          <div className="grid gap-1.5">
+            {slotKeys.map((key) => {
+              const on = displayCardFields.includes(key);
               return (
-                <li id={`opt-${option.id}`} key={option.id} className={`rounded-control border px-3 py-2 ${option.isFinal ? "border-success-line bg-success-surface/40" : "border-line"}`}>
-                  <div className="flex items-start gap-2">
-                    <span className="mt-0.5 font-ui-mono text-sm font-semibold">{option.label}</span>
-                    <div className="grid shrink-0 justify-items-center gap-1">
-                      {canEdit ? (
-                        <button
-                          type="button"
-                          onClick={() => { setPhotoFor(option.id); }}
-                          aria-label={option.imageUrl ? `Change photo of option ${option.label}` : `Add photo to option ${option.label}`}
-                          title={option.imageUrl ? "Change photo" : "Add photo"}
-                          className="rounded-[4px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus"
-                        >
-                          <Thumb url={option.imageUrl} alt={option.productName} className="h-20 w-16" />
-                        </button>
-                      ) : (
-                        <Thumb url={option.imageUrl} alt={option.productName} className="h-20 w-16" />
-                      )}
-                      {canEdit ? (
-                        <button
-                          type="button"
-                          onClick={() => { setPhotoFor(option.id); }}
-                          className="text-xs font-medium text-ink-secondary hover:text-ink hover:underline"
-                        >
-                          {option.imageUrl ? "Change photo" : "Add photo"}
-                        </button>
-                      ) : null}
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={on}
+                  disabled={disabled}
+                  onClick={() => toggleCardField(key)}
+                  className={`flex min-h-9 items-center justify-between rounded-control border px-3 text-left text-sm transition-colors disabled:opacity-60 ${on ? "border-line-strong bg-surface-raised text-ink" : "border-line-subtle bg-surface text-ink-secondary hover:border-line"}`}
+                >
+                  <span>{slotLabel(key)}</span>
+                  <span className="text-xs text-ink-tertiary">{on ? "On card" : "Hidden"}</span>
+                </button>
+              );
+            })}
+          </div>
+          {canEdit && cardFieldsDraft !== null ? (
+            <button type="button" disabled={savePending} onClick={() => setCardFieldsDraft(null)} className="justify-self-start text-xs font-medium text-ink-secondary hover:text-ink hover:underline">
+              Use default
+            </button>
+          ) : null}
+          <div className="mt-1 rounded-control bg-surface-raised p-3">
+            <div className="mb-1.5 flex justify-between text-xs text-ink-secondary"><span>Card filled in</span><span>{filledCount} of {shownSlots.length}</span></div>
+            <div className="h-1 overflow-hidden rounded-full bg-surface-muted"><div className="h-full rounded-full bg-ink-tertiary" style={{ width: `${shownSlots.length ? Math.round((filledCount / shownSlots.length) * 100) : 0}%` }} /></div>
+          </div>
+        </div>
+
+        {/* The card */}
+        <div className="order-1 flex justify-center lg:order-2">
+          <div className="relative w-full max-w-[23.5rem] rounded-[18px] border border-line bg-surface shadow-elevated">
+            <span aria-hidden="true" className="absolute inset-x-5 top-0 h-0.5 rounded-b-full" style={{ background: accent }} />
+            <div className="grid gap-2.5 p-5">
+              <div className="flex items-center justify-between">
+                <span className="rounded-[6px] bg-surface-raised px-2 py-0.5 font-ui-mono text-xs font-medium text-ink-secondary">{entry.code}</span>
+                <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-ink-tertiary">{entry.category}</span>
+              </div>
+
+              <input
+                aria-label="Type"
+                value={draft.productName}
+                onChange={(event) => updateDraft({ productName: event.target.value })}
+                disabled={disabled}
+                maxLength={200}
+                placeholder="Type, e.g. Nude Pro - ATS 1132 M"
+                className="h-11 w-full rounded-[6px] border border-transparent bg-transparent px-0 font-ui-serif text-[1.75rem] leading-tight text-ink placeholder:font-sans placeholder:text-sm placeholder:text-ink-tertiary hover:border-line-subtle focus:border-line-focus focus:bg-surface focus:px-1.5 focus:outline-none"
+              />
+
+              <div className="relative">
+                {selected && canEdit ? (
+                  <button type="button" onClick={() => setPhotoFor(selected.id)} aria-label={selected.imageUrl ? `Change photo of option ${selected.label}` : `Add photo to option ${selected.label}`} className="block w-full rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
+                    <Thumb url={selected.imageUrl} alt={selected.productName} className="h-36 w-full !rounded-control" />
+                  </button>
+                ) : (
+                  <Thumb url={selected?.imageUrl ?? null} alt={selected?.productName ?? "No photo"} className="h-36 w-full !rounded-control" />
+                )}
+                {selected?.sampleRequest ? (
+                  <span className="absolute right-2 top-2"><Badge tone={selected.sampleRequest.status === "RECEIVED" ? "success" : "warning"}>{selected.sampleRequest.status === "RECEIVED" ? "Sample received" : "Sample requested"}</Badge></span>
+                ) : null}
+                {selected && canEdit ? <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-surface/90 px-2 py-0.5 text-[11px] font-medium text-ink-secondary">{selected.imageUrl ? "Change photo" : "Add photo"}</span> : null}
+              </div>
+
+              <div className="grid grid-cols-2 gap-1.5">
+                {displayCardFields.includes("brand") ? (
+                  <CardPlate label="Brand">
+                    <CreatableSearch
+                      label="Brand"
+                      options={brandSearchOptions}
+                      value={draft.brandId || draft.brandName}
+                      onValueChange={handleBrandChange}
+                      onCreate={(text) => text}
+                      createLabel={(text) => `Use "${text}" (not in Master Data)`}
+                      placeholder="Search or type a brand"
+                      searchPlaceholder="Search brands…"
+                      emptyLabel="No brands found"
+                      allowClear
+                      disabled={disabled}
+                      className="w-full"
+                    />
+                  </CardPlate>
+                ) : null}
+                {(["color", "pattern", "finishing"] as const).filter((key) => displayCardFields.includes(key)).map((key) => (
+                  <CardPlate key={key} label={CARD_FIELD_LABEL[key]}>
+                    <input aria-label={CARD_FIELD_LABEL[key]} value={draft[key]} onChange={(event) => updateDraft({ [key]: event.target.value })} disabled={disabled} maxLength={160} placeholder="Tap to add" className={PLATE_INPUT} />
+                  </CardPlate>
+                ))}
+                {displayCardFields.includes("dimension") ? (
+                  <CardPlate label="Size">
+                    <input aria-label="Size" value={draft.dimension} onChange={(event) => updateDraft({ dimension: event.target.value })} disabled={disabled} maxLength={160} placeholder="e.g. 60 × 60 cm" className={PLATE_INPUT} />
+                  </CardPlate>
+                ) : null}
+                {displayCardFields.includes("location") ? (
+                  <CardPlate label="Location">
+                    <input aria-label="Location" value={fields.location} onChange={(event) => setFields({ ...fields, location: event.target.value })} disabled={disabled} maxLength={160} placeholder="Tap to add" className={PLATE_INPUT} />
+                  </CardPlate>
+                ) : null}
+                {/* Qty only for Fixture — a Material line is specified, not counted (owner decision 2026-09-23). */}
+                {entry.section === "FIXTURE" && displayCardFields.includes("qty") ? (
+                  <CardPlate label="Qty">
+                    <div className="grid grid-cols-[1fr_4rem] gap-1.5">
+                      <input aria-label="Qty" inputMode="decimal" value={fields.qty} onChange={(event) => setFields({ ...fields, qty: event.target.value })} disabled={disabled} maxLength={20} placeholder="0" className={PLATE_INPUT} />
+                      <input aria-label="Unit" placeholder="Unit" value={fields.unit} onChange={(event) => setFields({ ...fields, unit: event.target.value })} disabled={disabled} maxLength={40} className={PLATE_INPUT} />
                     </div>
-                    <div className="grid min-w-0 flex-1 gap-0.5">
-                      {canEdit ? (
-                        <button type="button" onClick={() => setInlineEdit(option.id)} className="w-fit text-left hover:underline" title="Click to edit product details">
-                          <span className="text-sm font-medium">{option.productName}{option.brandName ? <span className="font-normal text-ink-secondary"> · ex. {option.brandName}</span> : null}</span>
-                        </button>
+                  </CardPlate>
+                ) : null}
+                {extraChoices.filter((extra) => displayCardFields.includes(extra.key)).map((extra) => (
+                  <CardPlate key={extra.key} label={extra.label}>
+                    <input aria-label={extra.label} value={extraValue(extra.label)} onChange={(event) => setExtraValue(extra.label, event.target.value)} disabled={disabled} maxLength={400} placeholder="Tap to add" className={PLATE_INPUT} />
+                  </CardPlate>
+                ))}
+              </div>
+
+              {displayCardFields.includes("notes") ? (
+                <div className="pt-1">
+                  <SimpleTextEditor value={draft.notes} onChange={(event) => updateDraft({ notes: event.target.value })} disabled={disabled} maxLength={2000} rows={2} />
+                </div>
+              ) : null}
+
+              <div className="mt-1 flex items-center justify-between">
+                <span className="flex items-center gap-2 text-xs text-ink-tertiary">
+                  <span className="grid h-7 w-7 place-items-center rounded-full bg-surface-raised font-ui-serif text-base text-ink-secondary">{selected?.label ?? "A"}</span>
+                  {selected ? `Option ${selected.label} of ${entry.options.length}` : "No option yet"}
+                </span>
+                {selected?.isFinal ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.08em]" style={{ color: "var(--ui-warning-fg)" }}>
+                    <Crown aria-hidden="true" className="h-4 w-4" /> Final
+                  </span>
+                ) : selected ? <Badge tone={status.tone}>{status.label}</Badge> : null}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Your hand */}
+        <div className="order-3 grid gap-3">
+          {photoFor && entry.options.some((option) => option.id === photoFor) ? (
+            <InlinePhotoEditor projectId={projectId} entryCode={entry.code} option={entry.options.find((option) => option.id === photoFor)!} command={command} onClose={() => setPhotoFor(null)} />
+          ) : (
+            <>
+              <div className="flex items-baseline justify-between">
+                <Text weight="semibold">Your hand</Text>
+                <Text size="sm" tone="tertiary">{entry.options.length} {entry.options.length === 1 ? "option" : "options"}</Text>
+              </div>
+
+              {entry.options.length === 0 ? (
+                <Text tone="tertiary" size="sm">No product yet. Fill in the card and save, or copy an option from a past project.</Text>
+              ) : (
+                <div className="relative mx-auto h-[13.5rem] w-[16.5rem]" role="group" aria-label="Spec options">
+                  {entry.options.map((option, index) => {
+                    const isSelected = option.id === selected?.id;
+                    const rotate = isSelected ? 0 : Math.round((index - (entry.options.length - 1) / 2) * 5);
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        aria-pressed={isSelected}
+                        aria-label={`Option ${option.label}: ${option.productName}`}
+                        onClick={() => setSelectedId(option.id)}
+                        className={`absolute h-36 rounded-[12px] border bg-surface p-2 text-left shadow-plane transition-[bottom,transform] ${isSelected ? "border-line-focus" : option.isFinal ? "border-warning-border" : "border-line hover:border-line-strong"}`}
+                        style={{ width: HAND_CARD, left: Math.round(handStart + index * handStep), bottom: isSelected ? 26 : 6, transform: `rotate(${rotate}deg)`, zIndex: isSelected ? 30 : index + 1 }}
+                      >
+                        <span className="flex items-center justify-between">
+                          <span className="grid h-5 w-5 place-items-center rounded-full bg-surface-raised font-ui-serif text-sm text-ink-secondary">{option.label}</span>
+                          {option.isFinal ? <Crown aria-hidden="true" className="h-3.5 w-3.5" style={{ color: "var(--ui-warning-fg)" }} /> : null}
+                        </span>
+                        <Thumb url={option.imageUrl} alt="" className="mt-1.5 h-14 w-full" />
+                        <span className="mt-1 line-clamp-2 font-ui-serif text-[0.95rem] leading-tight text-ink">{option.productName || "Untitled"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {canEdit ? (
+                <div className="grid gap-2">
+                  {selected ? (
+                    selected.isFinal ? (
+                      <div className="inline-flex min-h-10 items-center justify-center gap-2 rounded-control border border-warning-border bg-warning-surface text-sm font-medium" style={{ color: "var(--ui-warning-fg)" }}>
+                        <Crown aria-hidden="true" className="h-4 w-4" /> This is the final
+                      </div>
+                    ) : (
+                      <Button variant="primary" pending={isPending(busyKey)} onClick={() => void run(busyKey, () => markScheduleFinalAction({ projectId, optionId: selected.id }))}>Set as final</Button>
+                    )
+                  ) : null}
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    {selected ? (
+                      selected.sampleRequest?.status !== "REQUESTED" ? (
+                        <Button variant="secondary" onClick={() => setSampleFor(selected)}>{selected.sampleRequest ? "Request sample again" : "Request sample"}</Button>
                       ) : (
-                        <span className="text-sm font-medium">{option.productName}{option.brandName ? <span className="font-normal text-ink-secondary"> · ex. {option.brandName}</span> : null}</span>
-                      )}
-                      {specLine(option) ? <span className="text-xs text-ink-tertiary">{specLine(option)}</span> : null}
-                      {option.notes ? <span className="whitespace-pre-wrap text-xs text-ink-secondary">{option.notes}</span> : null}
-                      {/* Set final / Request sample buttons on card face — visible actions, not buried in the ⋯ menu */}
-                      {canEdit ? (
-                        <div className="mt-1.5 flex flex-wrap gap-1.5">
-                          {!option.isFinal ? (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              pending={isPending(`${entry.id}-opt-${option.id}`)}
-                              onClick={() => void run(`${entry.id}-opt-${option.id}`, () => markScheduleFinalAction({ projectId, optionId: option.id }))}
-                            >
-                              Set final
-                            </Button>
-                          ) : null}
-                          {option.sampleRequest?.status !== "REQUESTED" ? (
-                            <Button size="sm" variant="secondary" onClick={() => setSampleFor(option)}>
-                              {option.sampleRequest ? "Request sample again" : "Request sample"}
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              pending={isPending(`${entry.id}-opt-${option.id}`)}
-                              onClick={() => void run(`${entry.id}-opt-${option.id}`, () => receiveScheduleSampleAction({ projectId, requestId: option.sampleRequest!.id }))}
-                            >
-                              Mark sample received
-                            </Button>
-                          )}
-                        </div>
-                      ) : null}
-                      {option.sampleRequest ? (
-                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                          <Badge tone={option.sampleRequest.status === "RECEIVED" ? "success" : "warning"}>
-                            {option.sampleRequest.status === "RECEIVED" ? "Sample received" : "Sample requested"}
-                          </Badge>
-                          {option.sampleRequest.requestedFrom ? <Text tone="tertiary" size="sm">from {option.sampleRequest.requestedFrom}</Text> : <Text tone="tertiary" size="sm">supplier to be found</Text>}
-                        </div>
-                      ) : null}
-                    </div>
-                    <Badge tone={status.tone}>{status.label}</Badge>
-                    {canEdit ? (
+                        <Button variant="secondary" pending={isPending(busyKey)} onClick={() => void run(busyKey, () => receiveScheduleSampleAction({ projectId, requestId: selected.sampleRequest!.id }))}>Mark sample received</Button>
+                      )
+                    ) : <span />}
+                    {selected ? (
                       <RowActionMenu
-                        label={`Option ${option.label} actions`}
-                        pending={isPending(`${entry.id}-opt-${option.id}`)}
+                        label={`Option ${selected.label} actions`}
+                        pending={isPending(busyKey)}
                         items={[
-                          ...(option.isFinal ? [] : [{ label: "Set as final", onSelect: () => void run(`${entry.id}-opt-${option.id}`, () => markScheduleFinalAction({ projectId, optionId: option.id })) }]),
-                          { label: "Edit", onSelect: () => setInlineEdit(option.id) },
-                          { label: option.imageUrl ? "Change photo" : "Add photo", onSelect: () => { setPhotoFor(option.id); } },
-                          ...(option.imageUrl ? [{ label: "Remove photo", onSelect: () => void removePhoto(option) }] : []),
-                          ...(option.sampleRequest?.status === "REQUESTED"
-                            ? [
-                                { label: "Mark sample received", separatorBefore: true, onSelect: () => void run(`${entry.id}-opt-${option.id}`, () => receiveScheduleSampleAction({ projectId, requestId: option.sampleRequest!.id })) },
-                                { label: "Cancel sample request", danger: true, onSelect: () => void cancelSample(option) },
-                              ]
-                            : []),
-                          { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeOption(option) },
+                          { label: selected.imageUrl ? "Change photo" : "Add photo", onSelect: () => setPhotoFor(selected.id) },
+                          ...(selected.imageUrl ? [{ label: "Remove photo", onSelect: () => void removePhoto(selected) }] : []),
+                          ...(selected.sampleRequest?.status === "REQUESTED" ? [{ label: "Cancel sample request", danger: true, separatorBefore: true, onSelect: () => void cancelSample(selected) }] : []),
+                          { label: "Delete option", danger: true, separatorBefore: true, onSelect: () => void removeOption(selected) },
                         ]}
                       />
                     ) : null}
                   </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                  {selected?.sampleRequest ? <Text tone="tertiary" size="sm">{selected.sampleRequest.requestedFrom ? `Sample from ${selected.sampleRequest.requestedFrom}` : "Supplier to be found"}</Text> : null}
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="secondary" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => setEditing("new")}>Add option</Button>
+                    <Button size="sm" variant="ghost" leadingIcon={<History className="h-3.5 w-3.5" />} onClick={() => setReuse(true)}>From past project</Button>
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
       </div>
-      {command.error && !editing && !reuse && !photoFor && !inlineEdit && !sampleFor ? <InlineError>{command.error}</InlineError> : null}
+
+      {optionNeedsType ? <InlineError>Enter a Type before saving product details.</InlineError> : null}
+      {saveError ? <InlineError>{saveError}</InlineError> : null}
+      {canEdit ? (
+        <FormActions>
+          <Button type="button" variant="ghost" disabled={!isDirty || savePending} onClick={discardDraft}>Discard</Button>
+          <Button type="button" variant="primary" pending={savePending} disabled={!isDirty || optionNeedsType} onClick={() => void saveAll().catch((error) => setSaveError(error instanceof Error ? error.message : "Could not save."))}>
+            Save
+          </Button>
+        </FormActions>
+      ) : null}
+      {command.error && !editing && !reuse && !photoFor && !sampleFor ? <InlineError>{command.error}</InlineError> : null}
 
       {editing ? (
         <OptionDialog
@@ -1495,7 +1404,7 @@ function EntryDialog({
     onClose();
   };
   return (
-    <Dialog open onOpenChange={(value) => { if (!value) void requestClose(); }} title={`${entry.code} · ${entry.category}`} description={SECTION_LABEL[entry.section]} size="lg">
+    <Dialog open onOpenChange={(value) => { if (!value) void requestClose(); }} title={`${entry.code} · ${entry.category}`} description={SECTION_LABEL[entry.section]} size="xl">
       <EntryPanelContent
         projectId={projectId}
         entry={entry}

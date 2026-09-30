@@ -204,3 +204,11 @@ this backlog's former SF-A entries.)_
 - Steps: 1. Add drawings with numbers like 101, 205, 310 and one without a number. 2. Change a status, edit a drawing (number, name, assignee), delete one. 3. Open as the unassigned staff member.
 - Acceptance: items sort by number and sit under 100/200/300 series headings ("Other" for unnumbered); status and edit work; the list never blocks approving the phase; the unassigned staff member sees the list read-only. Lead added and deleted one drawing on the dev project on 2026-09-30 (add, list, delete verified).
 - Status: PENDING
+
+### [R8.252] Product Schedule card editor
+- Surface: StudioFlow project → Product Schedule → open an item (click its card)
+- Fixture: a Material item with two or three options (one final, one with a sample requested) and a Fixture item; accounts: designer PIC, unassigned staff
+- Viewport: desktop and a narrow phone width
+- Steps: 1. Open the item; the final option is the card shown. 2. Edit Type, Brand, Color and Location on the card, then pick another option in the hand and edit it too; press Save. 3. Turn slots off and on, use "Use default". 4. Tap the photo, change it, then go back. 5. Set as final, request a sample, mark it received, delete an option. 6. Close with unsaved edits. 7. Open as the unassigned staff member.
+- Acceptance: both options' edits save together; hidden slots keep their text; photo, final, sample and delete behave as before; closing with unsaved edits asks to discard; the unassigned staff member sees the card read-only with no Save; Qty and its slot appear only on Fixture items; on a phone the card comes first, slots and hand stack below.
+- Status: PENDING

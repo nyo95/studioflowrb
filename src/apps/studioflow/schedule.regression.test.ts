@@ -42,7 +42,7 @@ describe("Schedule Board/List outer branching and pattern form preservation", ()
   it("routes both card-body and card-photo clicks through the same entry dialog (R8.141: one modal, not a separate photo dialog)", () => {
     assert.doesNotMatch(scheduleBoard, /<Dialog[\s\S]{0,80}Photo — /, "photo capture must not open its own Dialog anymore");
     assert.match(scheduleBoard, /onOpenPhoto={\(entry, option\) => openEntry\(entry\.id, option\.id\)}/, "the board card's photo click opens the shared entry dialog with an auto-photo target, not a separate dialog");
-    assert.match(scheduleBoard, /photoFor === option\.id/, "the entry dialog swaps the option row inline for its photo editor, like it already does for OptionInlineForm");
+    assert.match(scheduleBoard, /photoFor && entry\.options\.some\(\(option\) => option\.id === photoFor\)/, "the entry dialog swaps the hand of options for the photo editor inline");
   });
 
   it("has the List button and Board button in the toolbar", () => {
@@ -121,12 +121,15 @@ describe("R8.113: Item details and card fields merged into one tick-to-fill-in c
     // on `shown` existing, only on edit permission / an in-flight save.
     const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"), scheduleBoard.indexOf("function EntryDialog"));
     assert.doesNotMatch(panelBody, /\|\| !shown\}/, "no Card content row may disable itself for lack of a shown option");
-    const rowCount = (panelBody.match(/disabled=\{!canEdit \|\| savePending\}/g) ?? []).length;
-    assert.ok(rowCount >= 7, `expected every Card content checkbox row to use the shared !canEdit || savePending gate, found ${rowCount}`);
+    assert.match(panelBody, /const disabled = !canEdit \|\| savePending;/, "one shared gate: edit permission or a pending save");
+    const rowCount = (panelBody.match(/disabled=\{disabled\}/g) ?? []).length;
+    assert.ok(rowCount >= 8, `expected every card slot and field to use the shared gate, found ${rowCount}`);
   });
 
-  it("reveals a field's input only once its checkbox is ticked (ChecklistRow)", () => {
-    assert.match(scheduleBoard, /\{checked && children \? <div className="px-1\.5 pb-2 pt-0\.5">\{children\}<\/div> : null\}/);
+  it("shows a field on the card only while its slot is on (the slot list is the old checklist)", () => {
+    const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"), scheduleBoard.indexOf("function EntryDialog"));
+    assert.match(panelBody, /aria-pressed=\{on\}/, "each slot is a real toggle button");
+    for (const key of ["brand", "dimension", "location", "notes"]) assert.match(panelBody, new RegExp(`displayCardFields\\.includes\\("${key}"\\)`), `${key} renders only while its slot is on`);
   });
 
   it("R8.135: Card content is a draft with an explicit Save/Discard pair — per-field auto-save-on-blur is gone", () => {
@@ -157,23 +160,22 @@ describe("R8.113: Brand as one creatable search, Type in the checklist, Qty fixt
     assert.doesNotMatch(scheduleBoard, /masterData\.(create|insert|upsert)/i);
   });
 
-  it("Type is in the checklist, right after Brand, with no checkbox — it always shows", () => {
+  it("Type is the card's title: always shown, with no slot to turn off", () => {
     const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"));
-    const brandIndex = panelBody.indexOf('label="Brand"');
-    const typeIndex = panelBody.indexOf("Type <span");
-    const colorIndex = panelBody.indexOf('label={CARD_FIELD_LABEL[key]}');
-    assert.ok(brandIndex > -1 && typeIndex > brandIndex && colorIndex > typeIndex, "order is Brand, then Type, then the simple option fields");
-    assert.doesNotMatch(panelBody.slice(typeIndex - 40, typeIndex + 400), /type="checkbox"/, "Type has no checkbox");
-    assert.match(panelBody, /value=\{optionDraft\.productName\}/);
+    assert.match(panelBody, /aria-label="Type"/);
+    assert.match(panelBody, /value=\{draft\.productName\}/);
+    const slotLine = panelBody.slice(panelBody.indexOf("const slotKeys = ["), panelBody.indexOf("const slotLabel"));
+    assert.doesNotMatch(slotLine, /productName|"type"/i, "Type is not one of the slots");
   });
 
   it("Qty only renders for Fixture entries", () => {
-    assert.match(scheduleBoard, /\{entry\.section === "FIXTURE" \? \(\s*<ChecklistRow label="Qty"/);
+    assert.match(scheduleBoard, /entry\.section === "FIXTURE" && displayCardFields\.includes\("qty"\)/);
+    assert.match(scheduleBoard, /\.\.\.\(entry\.section === "FIXTURE" \? \["qty"\] : \[\]\)/, "the Qty slot itself is Fixture-only too");
   });
 
-  it("field order is Brand, Type, Color, Pattern, Finishing, Location, [Qty], Size, Notes", () => {
+  it("card order is Type, Brand, Color, Pattern, Finishing, Size, Location, [Qty], Notes", () => {
     const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"));
-    const order = ['label="Brand"', "Type <span", "SIMPLE_OPTION_FIELD_KEYS.map", 'label="Location"', 'ChecklistRow label="Qty"', 'label="Size"', 'label="Notes"']
+    const order = ['aria-label="Type"', '<CardPlate label="Brand">', '(["color", "pattern", "finishing"] as const)', '<CardPlate label="Size">', '<CardPlate label="Location">', '<CardPlate label="Qty">', "<SimpleTextEditor"]
       .map((needle) => panelBody.indexOf(needle));
     assert.ok(order.every((index) => index > -1), "every row is present");
     assert.ok(order.every((index, position) => position === 0 || index > order[position - 1]), "rows appear in the requested order");
@@ -181,6 +183,6 @@ describe("R8.113: Brand as one creatable search, Type in the checklist, Qty fixt
 
   it("Notes uses the shared SimpleTextEditor (masterdata's WYSIWYG-lite), not a plain Textarea", () => {
     const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"));
-    assert.match(panelBody, /<SimpleTextEditor autoFocus value=\{optionDraft\.notes\}/);
+    assert.match(panelBody, /<SimpleTextEditor value=\{draft\.notes\}/);
   });
 });
