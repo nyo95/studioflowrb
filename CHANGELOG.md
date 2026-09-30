@@ -37,6 +37,13 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 **Checks.** `npm test`; `npm run typecheck`; `npm run check`; `npm run lint`. Browser acceptance is queued for the Reviewer.
 
+## R8.260 | 2026-09-30 | docs(masterdata): review of R8.259 — second correction pass for WO-MD-FINDABILITY-01
+
+- **Review verdict, WO-MD-FINDABILITY-01 (R8.259): CORRECTION REQUIRED.** Scope stayed clean (screens plus one pure helper file; no business, schema, action, permission or audit change) and the SKU lowest-price defect is fixed (per currency and unit, "from <amount> / <unit>"). Also delivered: the Suppliers product-category filter, "Brands" column and price breakdown line. But the Pricing work is not: the "Group by item" checkbox is wired to nothing, `groupLowestRows` is imported and never called, no "Lowest" badge is rendered, the new sort keys have no clickable header, the Pricing Brand/Category/Size/contact columns and the filtered tab counts are absent, and the shared filter bar (Clear filters and "N of M") exists only on Suppliers.
+- **Next.** `PLAN.md` now has a "Correction pass 2" section that lists each open item, requires the grouping logic as a tested pure helper, and requires the Executor's report to map every item and decision 1-8 to DONE / NOT DONE with proof. Target R8.261. Browser acceptance stays after that revision.
+
+**Checks.** Documentation only; not run.
+
 ## R8.258 | 2026-09-30 | docs(masterdata): review of R8.257 — correction pass for WO-MD-FINDABILITY-01
 
 - **Review verdict, WO-MD-FINDABILITY-01 (R8.257): CORRECTION REQUIRED.** Scope was respected: the diff touches only Master Data screens and one small pure helper file (no schema, migration, action, permission, service or audit change), and the existing tests are untouched and green. About a third of the plan is delivered (status filter defaulting to Active on Brands, Suppliers and SKUs; Brands category and supplier filters, "Supplied by" and "Links"; Suppliers brand and capability filters, wider search, address line, clear button with count, tel and WhatsApp links; SKU "Has price" and supplier filters; Pricing supplier, brand and category filters). The rest is not: the shared filter bar, the Suppliers "Brands" column and product-category filter, the Pricing columns, sort keys, filtered tab counts and the "Group by item" / "Lowest" view, the helper test coverage.

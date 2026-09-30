@@ -2,24 +2,36 @@
 
 Plan ID: WO-MD-FINDABILITY-01
 Scope: Master Data — presentation only. Make Brands, Suppliers, SKUs and Pricing (material, material + labor, labor only) quick to search, filter and compare, so a contractor can find a supplier, a brand and a price in a few clicks. Screens, filters, columns, sorting and links; NO change to business rules, data meaning, schema, permissions, prices, validation, actions or audit.
-Target revision: R8.259
-Status: READY (correction pass; R8.257 delivered part of it, see below)
+Target revision: R8.261
+Status: READY (correction pass 2; R8.257 and R8.259 delivered part of it, see below)
 Priority: P2
 Owner: owner (Product Owner). Review by the Lead on 2026-09-30 as a head-of-interior-contractor user; the owner approved a thorough improvement, assigned it to the Executor (UI included, by the owner's explicit lane assignment for this plan), and confirmed it is **presentation only, no business-contract change** ("hanya tampilan yang disempurnakan").
 Last updated: 2026-09-30
 
-## Correction pass (review of R8.257 by the Lead)
+## Correction pass 2 (review of R8.259 by the Lead)
 
-**Verdict: CORRECTION REQUIRED.** R8.257 stayed inside the hard constraint (screens and one small pure helper file only; no schema, action, permission or audit change) and delivered: Active/Archived/All on Brands, Suppliers and SKUs; Brands category and supplier filters, "Supplied by", "Links", supplier-name search; Suppliers brand and capability filters, richer search, address line, clear-filters button with count, tel/WhatsApp links; SKU "Has price" and supplier filters and search by category and notes; Pricing supplier, brand and work-category filters and brand in the search. Everything else in this plan is **still to do** in the next revision (R8.259), plus these defects:
+**Verdict: CORRECTION REQUIRED.** Scope is still clean (screens plus one pure helper file; no schema, action, permission or audit change) and these are done and accepted from R8.257/R8.259: status filter (default Active) on Brands, Suppliers, SKUs; Brands category/supplier filters, "Supplied by", "Links"; Suppliers brand, capability and product-category filters, "Brands" column, address line, clear button with count, tel/WhatsApp links, price breakdown line; SKU "Has price" and supplier filters and the per-currency-and-unit "from <amount> / <unit>" summary; Pricing supplier, brand and work-category filters, brand in search, extra sort keys in the sort function.
 
-1. **Defect:** the SKU "lowest price" (`lowestPriceByCurrencyUnit`) compares every price regardless of currency and unit, so it can call a price in another currency or unit the lowest, and it is shown as a supplier name rather than the required "from <amount> / <unit>" per currency. Fix per decision 5 and make the helper honour its name (group by currency and unit, no cross-comparison); add tests for mixed currency, mixed unit, ties, a single price, and archived prices excluded.
-2. **Missing (decision 2):** the shared filter bar (fixed order, Clear filters and "N of M" count) on all four screens; today only Suppliers has them. Build it once and reuse it.
-3. **Missing (decision 3):** the count/clear/empty-state wording on Brands; sorting keeps its semantics.
-4. **Missing (decision 4):** Suppliers "Brands" column (first 3, then +N, sortable by the existing count), the product-category (from brands) filter, and the price breakdown tooltip on the Prices column.
-5. **Missing (decision 6):** Pricing material columns Brand, Category, Size and the supplier's first contact with phone links; work-table contact; sort keys Updated, Category (and Brand on Material); tab labels showing the filtered count; the "Group by item" switch with the "Lowest" badge under the stated rules (never across currency or unit; badge only with two or more active prices).
-6. **Missing tests:** pure-helper tests for filter combination, "supplied by" composition, brand-category derivation, lowest-price grouping edge cases and phone normalization edge cases (leading +62, spaces, too short, too long).
+**Defects and gaps found in R8.259 (verified in the code):**
 
-Keep every hard constraint below; the earlier R8.257 code stays unless a point above says to change it.
+1. **A control that does nothing.** The Pricing "Group by item" checkbox only sets a state flag; nothing reads it. `groupLowestRows` is imported into `pricing-directory.tsx` and never called; no "Lowest" badge is rendered anywhere. Shipping a dead control is a defect.
+2. The new Pricing sort keys (Updated, Category, Brand) have no column header wired to them, so they cannot be used.
+3. Pricing columns from decision 6 are missing: Material has no Brand, Category, Size or supplier contact; the work tables have no supplier contact.
+4. Pricing tab labels still show the unfiltered total.
+5. Decision 2 (one shared filter bar with Clear filters and "N of M", same order everywhere) is not built; only Suppliers has a clear button and count. Brands, SKUs and Pricing lack them.
+6. Tests do not cover the grouping/ordering that the "Group by item" view needs.
+
+**What to do (finish all of it in one revision, R8.261):**
+
+- Wire "Group by item" (Material: group by SKU; Material + Labor and Labor: group by name + category): groups ordered by item name, rows inside a group ordered by price ascending using decimal-safe comparison (`compareDecimals`, not `Number`), a group header line naming the item, and the "Lowest" badge from `groupLowestRows` on the cheapest active row(s) under the plan's rules (two or more active prices, one currency and one unit only, otherwise no badge; archived rows never badged). Put the grouping/ordering in a pure, tested helper (for example `groupPriceRows`) and use it from the screen.
+- Add clickable sort headers for Updated, Category (all tabs) and Brand (Material).
+- Add the missing Pricing columns (Material: Brand, Category, Size, supplier contact with phone links; work tables: supplier contact with phone links) using the existing phone helpers. Extra read data may be added only under decision 8(d).
+- Tab labels show the filtered count, with the unfiltered total in a tooltip.
+- Build the shared filter bar once (Clear filters, "N of M", fixed control order: Status first) and use it on Brands, Suppliers, SKUs and Pricing; remove the per-screen duplicates.
+- Tests: grouping/ordering (single price, ties, mixed currency, mixed unit, archived), badge rules, filter-bar clear behavior where testable as a pure function.
+- **Report format (mandatory).** The final report must contain a table with one row per item above and per decision 1–8 of this plan, each marked DONE or NOT DONE with the file and function that proves it. "Limitations" prose is not a substitute; anything NOT DONE is a correction, not a footnote. No control may ship without changing what the list shows.
+
+Keep every hard constraint below.
 
 ## Outcome
 
@@ -82,4 +94,4 @@ Lead, in the browser with the dev database after loading sample suppliers, brand
 
 ## Executor Prompt
 
-You are the Executor. Location: kantor. This plan is presentation-only and the owner has assigned the UI work to you for this plan. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, `DESIGN.md` (typography: sans for operational UI; serif only for large display) and this `PLAN.md`, then implement the entire READY outcome and nothing beyond it. Inspect current repository evidence, preserve unrelated owner work, keep every business rule, action, permission, schema and audit behavior exactly as it is, run the required checks, check test results before committing (never commit with a failing test), update `CHANGELOG.md` (next revision R8.259), and create the target local revision commit. Stop only for a material locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT report; otherwise finish the coherent outcome and report the commit, checks, limitations, and remaining unrelated dirty files.
+You are the Executor. Location: kantor. This plan is presentation-only and the owner has assigned the UI work to you for this plan. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, `DESIGN.md` (typography: sans for operational UI; serif only for large display) and this `PLAN.md`, then implement the entire READY outcome and nothing beyond it. Inspect current repository evidence, preserve unrelated owner work, keep every business rule, action, permission, schema and audit behavior exactly as it is, run the required checks, check test results before committing (never commit with a failing test), update `CHANGELOG.md` (next revision R8.261), and create the target local revision commit. Stop only for a material locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT report; otherwise finish the coherent outcome and report the commit, checks, limitations, and remaining unrelated dirty files.
