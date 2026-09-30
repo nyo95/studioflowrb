@@ -5,13 +5,20 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.218**
-- Next local revision: **R8.219**
+- Current revision after this entry is committed: **R8.219**
+- Next local revision: **R8.220**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.219 | 2026-09-30 | docs(studioflow): PIC-based edit rights decided, WO-SF-ACCESS-01 ready
+
+- Owner answered the four blocked questions (2026-09-30): legacy rule + admin override permission, read-only view for all staff, separate PIC
+  designer/drafter permissions, project-level documents editable by designer OR drafter PIC. `docs/BACKLOG.md` blocker converted to
+  `[PLANNED]`; `STUDIOFLOW-REWORK-CONTRACT.md` RW-02 and §3 updated; `PLAN.md` now holds WO-SF-ACCESS-01 (READY, target R8.220).
+  No code changed.
 
 ## R8.218 | 2026-09-30 | feat(masterdata): Excel workbook screen; review PASS for R8.216-R8.217
 

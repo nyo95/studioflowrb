@@ -1,94 +1,86 @@
 # Active Plan
 
-Plan ID: WO-MD-IMPORT-01
-Scope: Master Data workbook export/import for SKUs and their material prices (backend + minimal wiring)
-Target revision: R8.216
+Plan ID: WO-SF-ACCESS-01
+Scope: StudioFlow edit rights follow the project's PIC assignment (server enforcement, new permissions, access read model). Backend only; the Lead does the UI gating afterwards.
+Target revision: R8.220
 Status: READY
-Priority: P2
-Owner: owner (Product Owner); approach approved 2026-09-28 (Decision gates in `docs/BACKLOG.md`), details below decided by the Lead
-Last updated: 2026-09-29
+Priority: P1
+Owner: owner (Product Owner). Decisions answered 2026-09-30: adopt the legacy rule with an admin override permission; every staff member may still view (read-only); separate PIC designer/drafter permissions; project-level documents are editable by the designer OR drafter PIC.
+Last updated: 2026-09-30
 
 ## Outcome
 
-A Master Data user with the right permissions can export the SKU + material-price catalogue to an Excel workbook, edit it, and import it
-back. Import is two steps: a **preview** that saves nothing and reports exactly what would happen per row, then an **apply** that is
-all-or-nothing. Unknown vendors, units, categories or brands are rejected (never created). The Lead builds the screens afterwards; this plan
-delivers the server contract, the workbook format, tests, and a minimal way to exercise it.
+Today any holder of a role permission (for example `studioflow.phase.work` or `studioflow.mom.manage`) can edit every project. After this change a
+staff member can edit a project only when they are **assigned to it as PIC designer or PIC drafter** (rules below) or hold the new override
+permission. Reading stays open to everyone who has `studioflow.project.read`. The PIC pickers list only people who may take that seat.
 
 ## Context and Evidence
 
-- SKU: `prisma/schema.prisma` `Sku` (`code?`, `name?`, `brand_id?`, `base_unit_id`, `purchase_unit_id?`, dimensions, `purchase_to_base_factor` derived,
-  categories via `SkuCategory`). Price: `PriceMaterial` (`sku_id`, `supplier_vendor_id`, `amount` Decimal(16,2), `currency`, `unit_id` derived, `notes`).
-- Existing write paths to REUSE (do not write to tables directly): `createSku`, `updateSku` in `src/apps/masterdata/services/sku.service.ts`,
-  `createPriceMaterial` / price update in `pricing.service.ts`. They already own validation, derived fields, permissions, audit and slug rules.
-- Transactions: `runTransaction` (Serializable + retry) from the app runtime; audit through the existing writer.
-- Public read port: `src/apps/masterdata/public/index.ts`. Nothing outside Master Data needs to change.
+- Rebuild today: authorization is grants only (`requireCommand(ctx, permission)` in `src/apps/studioflow/shared.ts`). The PIC fields
+  `SfProject.pic_designer_id` / `pic_drafter_id` and each phase's `seat_snapshot` (`designer` | `drafter`, CD phase = drafter) exist but are used only for display
+  and fallback assignee. `STUDIOFLOW-REWORK-CONTRACT.md` RW-02 and §3 said "no PIC-based authorization"; the owner reversed that on 2026-09-30 and the Lead updated the contract.
+- Legacy evidence (`c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`, read-only): `src/core/rbac/guards.ts` `evaluateAccess`, `src/core/rbac/permissions.ts`
+  `getProjectMembershipOrThrow`, `assertPhaseContentMutationAccess`. Legacy required BOTH the role permission and the assignment; ADMIN/DEVELOPER bypassed everything.
+- Existing services and their current permission checks: `projects/service.ts`, `phases/service.ts`, `tasks/service.ts`, `mom/service.ts`, `schedule/service.ts`,
+  `presentation/service.ts`, plus `library` and `today` where they mutate project data. `listAssignablePeople` and `assertPic` use `P.phaseWork` holders today.
+- Permission registry: `src/apps/studioflow/permissions.ts`, registered in `src/app/app-registrations.ts`.
 
 ## Locked Decisions
 
-- **Dependency approved:** add exactly one spreadsheet library, `exceljs` (maintained, reads/writes `.xlsx`). No other new dependency.
-- **Format:** `.xlsx` only (no CSV in this plan). One sheet named `SKU Prices`, header row fixed, one row per (SKU, supplier price). A SKU
-  with no price is one row with blank supplier/amount. Columns: `SKU ID` (opaque; blank = new SKU), `Code`, `Name`, `Brand`, `Category`,
-  `Base unit`, `Purchase unit`, `Length`, `Width`, `Thickness`, `Dimension unit`, `Notes`, `Price ID` (blank = new price), `Supplier`, `Amount`,
-  `Currency`, `Price notes`. Export fills the IDs; a second read-only sheet `Reference` lists valid brands, categories, units and suppliers.
-- **References resolve by exact name or code, case-insensitive, trimmed** (units by code, vendors/brands/categories by name). Unknown or ambiguous
-  reference => row error; **never create** a vendor, unit, category or brand.
-- **Preview** parses and validates the whole file and returns per-row outcome `create | update | unchanged | error`, per-row errors
-  (`{ row, column, message }`, plain language), totals, and a **content hash**. It writes nothing.
-- **Apply** takes the same file plus the preview hash; it re-parses and re-validates, refuses if the hash differs or any row errors, then applies **all rows
-  in one transaction** (any failure rolls back everything). One audit event per apply with counts only (no row contents).
-- **Limits:** 5 MB, 2,000 data rows; over the limit is a validation error, not a truncation.
-- **Update semantics:** a row with `SKU ID` updates that SKU's fields and the given price; rows never delete SKUs or prices (deletion stays in the normal
-  screens). Archived/deleted targets are an error.
-- **Permissions:** requires both the SKU manage and pricing manage permissions that the existing services already require; export requires read.
-- Currency stays per row; amount is a decimal string, never a JS float.
+- **Rule = base grant AND assignment.** Every mutating command keeps its current grant check and additionally passes the assignment gate below. The gate is a single
+  shared helper in `src/apps/studioflow/shared.ts` (one implementation, unit-tested); services call it, nothing re-derives it.
+- **New permissions (registered, labelled in plain English for Platform Access):**
+  - `studioflow.project.override` — "Edit any project regardless of assignment" (replaces legacy "ADMIN always allowed"). Passes every gate below. Does not replace the base grant.
+  - `studioflow.project.pic.designer` — "Can be assigned as a project's designer (PIC)".
+  - `studioflow.project.pic.drafter` — "Can be assigned as a project's drafter (PIC)".
+  - Keep `studioflow.phase.override` unchanged (it is the revision hard-reset command, a different thing).
+- **Gate rules** (`actor` = the signed-in user; `override` = holds `project.override`):
+  1. Project data (edit fields, priority, status, archive/restore, set PICs, project dates): PIC designer, or `override`. Creating a project and client management keep the base `project.manage` only (no project exists yet).
+  2. Phase transitions (activate, submit, approve/reject, reopen, bypass, override-revision): PIC designer on every phase; PIC drafter only on a phase whose `seat_snapshot` is `drafter`; or `override`. The base grant (`phase.work` / `phase.review` / `phase.override`) is still required.
+  3. Phase content (activities, checklist items attached to a phase, deliverables/files, deferrals): phase seat `drafter` → PIC drafter or PIC designer; any other phase → PIC designer only; or `override`.
+  4. Project-level documents and lists not tied to a phase (MOM, Product Schedule and its sample requests, Presentation, Library, project-level checklist/tasks): PIC designer OR PIC drafter, or `override`.
+  5. Reading: unchanged. Anyone with `project.read` may read everything, including Today and search.
+- **Assignee rule unchanged:** tasks may still be assigned to any eligible staff (`phase.work` holders); this plan does not restrict assignment targets.
+- **PIC eligibility:** `assertPic("designer")` requires the person to hold `studioflow.project.pic.designer` (and remain active); `assertPic("drafter")` requires `project.pic.drafter`.
+  `listAssignablePeople` takes a `seat` argument and returns the matching holders. A project's existing PICs are never re-checked unless the PIC is being changed.
+- **Read model for the UI:** add `projects.getAccess({ grants, actor, projectId })` returning `{ override, isDesigner, isDrafter, canEditProject, canEditDocuments, phases: Array<{ phaseId, canTransition, canEditContent }> }`, computed by the same helper. The Lead's UI consumes only this; it must never re-derive rules.
+- **Existing data / deploy safety:** ship a data migration (no schema change if role grants are rows, otherwise the registry mechanism the repo already uses) so behavior does not silently lock people out: every role that currently holds `studioflow.phase.work` also receives both PIC permissions; every role that holds `studioflow.phase.override` receives `studioflow.project.override`. The owner tightens this afterwards in Platform Access. Inspect how grants are stored first; if grants are only configured in the UI and cannot be migrated safely, stop with BLOCKED / CONFLICT rather than guessing.
+- Errors: a failed gate throws the existing `PERMISSION_DENIED`-family `AppError` with a plain message ("Only the project's assigned designer or drafter can change this.").
+- Audit: unchanged. Do not audit denied attempts.
 
 ## Business Rules and Architecture Constraints
 
-- Master Data owns this; put it under `src/apps/masterdata/` (a service module, not in platform). Expose it through the app's service/runtime, and a server
-  action in the Master Data route lane only for minimal wiring. No cross-app reads or writes. No new abstraction layers; no changes to the schema.
-- Money and decimals through the existing `@platform/utilities/money`/decimal helpers used by the pricing service.
-- Preview must be deterministic for the same file and database state; apply must be safe against concurrent edits (re-validate inside the transaction).
-
-## Backend Contract
-
-`exportSkuPriceWorkbook({ grants }) -> Buffer`; `previewSkuPriceImport({ grants, file }) -> { hash, totals, rows, errors }`;
-`applySkuPriceImport({ grants, actor, file, hash }) -> { totals }`. Errors use `AppError` kinds; validation failures return the per-row list.
-
-## UI Contract
-
-Minimal wiring only: one server action per function and a bare test page or button that downloads the export and posts a file to preview/apply.
-The Lead designs the real screens (upload, preview table with error highlighting, confirm) as the next revision.
+- StudioFlow only. Do not change Master Data, BQ, platform RBAC mechanics, or the Prisma schema beyond what the grant storage requires. No new dependency.
+- Do not add abstraction layers beyond the one gate helper and the `getAccess` read model.
+- Nothing outside StudioFlow may import the gate helper. Public exports only if a consumer already exists.
+- Keep every existing test passing except tests that assert the old "any holder can edit any project" behavior; update those deliberately and list them in the report.
 
 ## Boundaries and Non-goals
 
-No CSV, no vendor/labor/material+labor price sheets (SKU material prices only), no background jobs, no file storage of uploads, no partial apply, no
-creation of reference data, no deletion via import.
+No UI work (the Lead hides/disables controls afterwards). No per-phase permissions beyond `seat_snapshot`. No change to who can be an assignee. No project membership table. No change to Master Data or BQ. No push.
 
 ## Acceptance Criteria
 
-- Round trip: export, change one amount and one name, preview shows `update` for those rows and `unchanged` for the rest, apply changes only those.
-- A file with an unknown vendor, a bad decimal, an unknown SKU ID, and a duplicate row reports every problem with row and column, and apply is refused.
-- Apply failing midway (simulated) leaves the database unchanged.
-- Over-size and wrong-type files are rejected before parsing.
+- A designer PIC can edit their project everywhere; the drafter PIC can transition and edit content only on the drafter-seat phase and can edit project-level documents; an unassigned staff member with all base grants is denied every mutation on that project and can still read it; a user with `project.override` can edit any project.
+- Unit tests for the gate helper cover all five rules and the override; integration tests cover at least one mutation per service (projects, phases, tasks, mom, schedule, presentation, library) for allowed and denied cases.
+- `assertPic` and `listAssignablePeople` respect the seat permissions; changing a PIC to an ineligible person is rejected; an unchanged existing PIC is not re-checked.
+- The deploy data migration leaves every current role able to do what it could before (no lock-out), verified by a test or a documented dry run against the dev database.
 
 ## Verification
 
-Integration tests against `masterdata_test` covering the above, plus unit tests for the parser. `npm run check`, `npm run test:boundaries`,
-`npm run test:legacy-runtime`, eslint, full `npm test`, and **`next build`**. Also **render `/masterdata` and every route you touch once in `next dev`** and
-report it: R8.210 shipped a page that crashed only at runtime, which `npm test` and the build did not catch.
+`npm test`, `npx tsc --noEmit`, `npm run check`, eslint, `npm run build`. Render `/studioflow`, a project page, and the Projects list once in `next dev` and report it. Use STUDIOFLOW_LOCATION=kantor. Databases: only `studioflow_rebuild` (dev) and `studioflow_rebuild_test` on localhost:5433; never the stale scratch databases `studioflow_rebuild_browser_test` / `studioflow_rebuild_regression_test` and never any legacy database.
 
 ## Reviewer Acceptance
 
-The Lead exports from the dev database, edits the workbook in Excel, previews and applies it in the browser after the UI revision.
+The Lead reviews the diff and the test list, then builds the UI gating from `getAccess` and verifies in the browser with three accounts (designer PIC, unassigned staff, override holder).
 
 ## Regression Risks and Recovery
 
-Largest risk is a partial write; the single-transaction apply and a rollback test cover it. Recovery: revert the single commit (no migration).
+Largest risk: a missed mutation path stays open, or a role loses access on deploy. Mitigate with the per-service integration tests and the grant-copy migration. Recovery: revert the single commit and, if the data migration ran, the reverse grant rows it recorded.
 
 ## Executor Prompt
 
-You are the Backend Executor. Location: <rumah|kantor>. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY backend
+You are the Backend Executor. Location: kantor. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY backend
 outcome and nothing beyond it. Inspect current repository evidence, preserve unrelated owner work, make sound in-scope implementation decisions, run the
-required checks (including opening the touched routes in `next dev`), update `CHANGELOG.md`, and create the target local revision commit R8.216. Stop only for
+required checks (including opening the touched routes in `next dev`), update `CHANGELOG.md`, and create the target local revision commit R8.220. Stop only for
 a material locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT report. Report the commit, checks, limitations, and remaining unrelated dirty files.

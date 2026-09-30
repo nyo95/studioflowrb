@@ -293,22 +293,11 @@ check-then-act races in `projects.ts` (now guarded with the same
 
 ## StudioFlow
 
-- [ ] [BLOCKED][P1] **Project edit rights follow the PIC assignment (owner request, 2026-09-30) — Lead default proposed, owner
-  answers pending.** Today edit rights come from platform grants alone: any holder of e.g. `studioflow.phase.work` or
-  `studioflow.mom.manage` can edit every project (`RW-02` and the "no PIC-based authorization" rule in
-  `STUDIOFLOW-REWORK-CONTRACT.md` §3 said so on purpose). The owner now wants only the assigned designer/drafter to edit.
-  Legacy evidence (`c4b0c466`, `src/core/rbac/guards.ts` `evaluateAccess`, `permissions.ts` `getProjectMembershipOrThrow`):
-  project metadata = assigned designer only; phase transitions = assigned designer on every phase, assigned drafter on the
-  CD phase only; phase content = CD phase: assigned drafter or designer, other phases: assigned designer only; checklist
-  sync = either PIC; opening project pages (e.g. MOM) = either PIC; ADMIN/DEVELOPER bypass everything. The rebuild keeps the
-  PIC fields and each phase's seat (`seat_snapshot`) but only uses them for display and fallback assignee.
-  **An agent must not guess these; ask the owner and record the answers here first:**
-  1. "Setuju memakai aturan legacy (peran + penugasan), dengan izin override baru untuk admin sebagai pengganti 'admin selalu boleh'?"
-  2. "Membuka halaman project: semua staf boleh melihat read-only (usul Lead), atau persis legacy (tidak ditugaskan = tidak bisa buka)?"
-  3. "Pilihan PIC designer dan drafter dipisah dengan dua izin sendiri ('bisa jadi PIC designer' / 'bisa jadi PIC drafter'), atau tetap satu daftar untuk keduanya?"
-  4. "Dokumen level project (Schedule, MOM, Presentation): boleh diedit designer ATAU drafter yang ditugaskan (usul Lead)?"
-  Lead plans the change and updates the contract; the Executor implements server enforcement and tests; the Lead does the
-  UI gating. Until answered: do not add PIC checks, new grants, or hide edit controls.
+- [ ] [PLANNED][P1] **Project edit rights follow the PIC assignment (owner, 2026-09-30) — decisions answered, plan READY.** Owner answers:
+  adopt the legacy rule with a new admin-only override permission; everyone may still view read-only; PIC designer/drafter pickers use two
+  separate permissions; project-level documents (Schedule, MOM, Presentation) are editable by the designer OR drafter PIC. Backend is
+  `PLAN.md` WO-SF-ACCESS-01 (Executor, target R8.220); the Lead then gates the UI from the `getAccess` read model and verifies in the browser.
+  Contract updated (RW-02, §3). Legacy evidence recorded in the plan (`c4b0c466`).
 
 - [ ] [BLOCKED][P3] **Two stale scratch databases (`studioflow_rebuild_browser_test`, `studioflow_rebuild_regression_test`).**
   Both are weeks behind the current migrations (regression's history also diverges). Not used by `npm test` or the dev

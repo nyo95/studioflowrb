@@ -35,7 +35,7 @@ Decisions taken in the same session:
 | ID | Decision |
 |---|---|
 | RW-01 | Phase workflow is the **legacy phase state machine** with revisions `vMAJOR.MINOR` and FEEDBACK→TODO conversion. The screen shows **simplified labels** (§5.3). |
-| RW-02 | Project keeps **PIC Designer** and **PIC Drafter** as assignment fields. Authorization comes only from platform RBAC grants. The CD phase is presented as the drafter's phase in the UI. No role enum. |
+| RW-02 | Project keeps **PIC Designer** and **PIC Drafter** as assignment fields. Authorization = platform RBAC grants AND assignment: edit rights follow the assigned PIC (owner, 2026-09-30, reversing the earlier grants-only rule; see §3 and `PLAN.md` WO-SF-ACCESS-01). The CD phase is the drafter's phase. No role enum. |
 | RW-03 | Archive = local git tag on the last pre-rework commit, then delete the rebuild StudioFlow code, routes, tests, and `sf_*` schema from the working branch. |
 | RW-04 | First rework wave: Project + Client + Phase + Revision; Task/Checklist + Today; MOM; Product Schedule. CD List, Deliverables/files, SketchUp, collaboration, Upcoming are wave 2+. Library shipped 2026-09-23 (§7a) once the owner confirmed scope, ahead of the rest of wave 2. |
 
@@ -129,8 +129,11 @@ grant mechanics. Registered set (replaces the old eleven):
 
 Rules:
 
-- One grant decision per service operation. No project membership table, no
-  PIC-based authorization (legacy `getProjectMembershipOrThrow` is PURGE).
+- One grant decision plus one assignment decision per mutating service operation (owner, 2026-09-30). No project membership table. The
+  assignment gate is one shared helper: project data = PIC designer; phase transitions = PIC designer on every phase, PIC drafter only on a
+  drafter-seat phase; phase content = drafter-seat phase: drafter or designer PIC, other phases: designer PIC; project-level documents (MOM,
+  Schedule, Presentation, Library) = designer OR drafter PIC. `studioflow.project.override` passes every gate (replaces legacy "admin always
+  allowed"). Reading stays open to `studioflow.project.read`. `studioflow.project.pic.designer` / `.pic.drafter` decide who may be picked for each seat.
 - PIC eligibility: `pic_designer_id` must be an active user holding
   `studioflow.phase.work`; `pic_drafter_id` likewise. Legacy DIC/DRIC maps to
   RBAC role configuration, not code.
