@@ -5,13 +5,24 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.227**
-- Next local revision: **R8.228**
+- Current revision after this entry is committed: **R8.228**
+- Next local revision: **R8.229**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.228 | 2026-09-30 | feat(studioflow): CD List screen; review PASS for R8.225
+
+- **Review verdict, WO-SF-CDLIST-01 (R8.225): PASS.** Lead re-ran the full suite (665/665 with the later changes), read the service (drafter-seat only, `requireProjectAccess`
+  content gate, writable-phase loader, assignee eligibility, audit per write) and the migration. No correction needed.
+- **Screen (Lead).** A "Drawing list" section on the Construction Drawing phase (project page canvas and phase page): quick-add row (number and name), rows grouped by
+  hundreds series with "Other" for unnumbered, inline status select, assignee chip, row menu (Edit dialog, Delete), a "N of M done" summary, read-only for viewers
+  who cannot edit the phase. Server actions `createCdItemAction`, `updateCdItemAction`, `setCdItemStatusAction`, `deleteCdItemAction`. Backlog entry removed.
+- **Browser.** On the dev project the Lead added and deleted one drawing (list rendered, database back to zero rows); status change and the edit dialog are queued.
+
+**Checks.** `tsc --noEmit`, eslint (0 errors). The dev server must be restarted after a Prisma change; a stale server showed the same symptoms earlier.
 
 ## R8.227 | 2026-09-30 | fix(studioflow): simpler Add item dialog; quantity and unit are Fixture-only everywhere
 

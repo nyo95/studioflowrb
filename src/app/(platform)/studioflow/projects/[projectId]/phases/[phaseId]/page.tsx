@@ -7,6 +7,7 @@ import { studioFlow } from "@/apps/studioflow/runtime";
 import { Badge, Heading, MetaList, Notice, SectionCard, Text } from "@/platform/ui_engine";
 
 import { ActivityList } from "../../../../_components/activity-list";
+import { CdList } from "../../../../_components/cd-list";
 import { ChecklistTree } from "../../../../_components/checklist-tree";
 import { PhaseGate } from "../../../../_components/phase-gate";
 import { PhaseStatusBadge } from "../../../../_components/phase-status";
@@ -26,10 +27,11 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
     if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
     throw error;
   });
-  const [checklist, people, phaseDeliverablesResult] = await Promise.all([
+  const [checklist, people, phaseDeliverablesResult, cdItems] = await Promise.all([
     studioFlow.tasks.listChecklist({ grants, projectId, phaseId }),
     studioFlow.projects.listAssignablePeople({ grants }),
     studioFlow.phases.listDeliverables({ grants, projectId, phaseId }),
+    phase.seat === "drafter" ? studioFlow.cdList.list({ grants, projectId, phaseId }) : Promise.resolve(null),
   ]);
   const { items: phaseDeliverables, status: deliverableStatus } = phaseDeliverablesResult;
   const seatPerson = (await studioFlow.projects.resolvePeople({ grants, userIds: [phase.seatUserId] }))[0];
@@ -108,6 +110,14 @@ export default async function PhasePage({ params }: { params: Promise<{ projectI
           <ChecklistTree projectId={projectId} phaseId={phaseId} nodes={checklist} people={people} canEdit={phase.modifiable && hasPermission(grants, P.taskManage) && canContent} canToggleOptional={canWork} emptyText="No checklist for this phase" />
         </SectionCard>
       </div>
+
+      {cdItems ? (
+        <SectionCard title="Drawing list" description="The drawings this phase needs. Tick them off as they are drawn; it never blocks approval.">
+          <div className="px-(--ui-section-px) py-3">
+            <CdList projectId={projectId} phaseId={phaseId} items={cdItems} people={people} canEdit={canWork} />
+          </div>
+        </SectionCard>
+      ) : null}
 
       <div className="grid gap-4">
         <DeliverablesPanel

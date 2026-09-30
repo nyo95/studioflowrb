@@ -172,3 +172,11 @@ this backlog's former SF-A entries.)_
 - Steps: 1. In Edit supplier add a contact, pick a Brand the supplier does not carry, read the hint, save. 2. In Brands → Edit, add a contact for the owner with three numbers, save. 3. Reopen both dialogs; check the Suppliers table.
 - Acceptance: step 1 saves and the supplier now appears in that Brand's suppliers; step 2 contact shows on the Supplier with all three numbers; the table shows the first number with "+2"; a fourth number is impossible to add.
 - Status: PENDING
+
+### [R8.228] CD List screen on the Construction Drawing phase
+- Surface: StudioFlow project → Construction Drawing phase (project page canvas and phase page)
+- Fixture: a project with a drafter PIC; accounts: drafter PIC, designer PIC, unassigned staff
+- Viewport: desktop (default)
+- Steps: 1. Add drawings with numbers like 101, 205, 310 and one without a number. 2. Change a status, edit a drawing (number, name, assignee), delete one. 3. Open as the unassigned staff member.
+- Acceptance: items sort by number and sit under 100/200/300 series headings ("Other" for unnumbered); status and edit work; the list never blocks approving the phase; the unassigned staff member sees the list read-only. Lead added and deleted one drawing on the dev project on 2026-09-30 (add, list, delete verified).
+- Status: PENDING

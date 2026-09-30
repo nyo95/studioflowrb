@@ -19,6 +19,7 @@ import {
 } from "@/platform/ui_engine";
 
 import { ActivityList } from "../../_components/activity-list";
+import { CdList } from "../../_components/cd-list";
 import { ChecklistTree } from "../../_components/checklist-tree";
 import { PhaseGate } from "../../_components/phase-gate";
 import { PhaseStatusBadge } from "../../_components/phase-status";
@@ -127,9 +128,10 @@ async function PhaseCanvas({
   });
   if (!phaseDetail) return <SectionCard padded><Text tone="secondary" size="sm">Phase not found.</Text></SectionCard>;
 
-  const [checklist, deliverablesResult] = await Promise.all([
+  const [checklist, deliverablesResult, cdItems] = await Promise.all([
     studioFlow.tasks.listChecklist({ grants, projectId, phaseId: phaseDetail.id }),
     studioFlow.phases.listDeliverables({ grants, projectId, phaseId: phaseDetail.id }),
+    phaseDetail.seat === "drafter" ? studioFlow.cdList.list({ grants, projectId, phaseId: phaseDetail.id }) : Promise.resolve(null),
   ]);
   const { items: phaseDeliverables, status: deliverableStatus } = deliverablesResult;
   const phaseAccess = access.phases.find((phase) => phase.phaseId === phaseDetail.id);
@@ -213,6 +215,14 @@ async function PhaseCanvas({
           />
         </SectionCard>
       </div>
+
+      {cdItems ? (
+        <SectionCard title="Drawing list" description="The drawings this phase needs. Tick them off as they are drawn; it never blocks approval.">
+          <div className="px-(--ui-section-px) py-3">
+            <CdList projectId={projectId} phaseId={phaseDetail.id} items={cdItems} people={people} canEdit={phaseDetail.modifiable && caps.work && canContent} />
+          </div>
+        </SectionCard>
+      ) : null}
 
       {/* Deliverables */}
       <DeliverablesPanel

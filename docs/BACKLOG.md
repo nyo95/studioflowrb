@@ -293,11 +293,6 @@ check-then-act races in `projects.ts` (now guarded with the same
 
 ## StudioFlow
 
-- [ ] [PLANNED][P2] **CD List (Construction Drawing item list) — owner go-ahead 2026-09-30.** Wave-2 item in `STUDIOFLOW-REWORK-CONTRACT.md`
-  (RW-04, "Phase reading / CD list" DEFER) now approved to build. Legacy evidence: `cd-list-table.tsx`, model `CDList`, `phase-service.ts`
-  (`c4b0c466`). Scope, editing rights (drafter PIC or designer PIC, i.e. the phase-content rule) and schema need a Lead plan first; backend
-  (table, service, tests) goes to the Executor, the screen to the Lead. Do not build before that plan exists.
-
 
 **Fixed this session (2026-09-22, R8.107):** SF-02 (`deletePhaseDefinition`
 orphan-delete guard) and SF-05 (`upsertClientByName` race leaking a raw write

@@ -84,6 +84,52 @@ export async function reorderTemplatesAction(input: z.infer<typeof TemplateReord
   });
 }
 
+// ── CD List (Construction Drawing drawings) ────────────────────────────────
+
+const CdItemCreate = z.strictObject({ projectId: Id, phaseId: Id, drawingCode: z.string().max(40), drawingName: z.string().min(1).max(200), assignedToId: Id.nullish() });
+export async function createCdItemAction(input: z.infer<typeof CdItemCreate>): Promise<ActionResult<{ itemId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(CdItemCreate, input);
+    const item = await studioFlow.cdList.create({ ...ctx, ...data });
+    refresh(data.projectId);
+    return { itemId: item.id };
+  });
+}
+
+const CdItemUpdate = z.strictObject({ projectId: Id, phaseId: Id, itemId: Id, drawingCode: z.string().max(40).optional(), drawingName: z.string().min(1).max(200).optional(), assignedToId: Id.nullish() });
+export async function updateCdItemAction(input: z.infer<typeof CdItemUpdate>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(CdItemUpdate, input);
+    const result = await studioFlow.cdList.update({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+const CdItemStatus = z.strictObject({ projectId: Id, phaseId: Id, itemId: Id, status: z.enum(["PENDING", "IN_PROGRESS", "COMPLETED"]) });
+export async function setCdItemStatusAction(input: z.infer<typeof CdItemStatus>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(CdItemStatus, input);
+    const result = await studioFlow.cdList.setStatus({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+const CdItemRef = z.strictObject({ projectId: Id, phaseId: Id, itemId: Id });
+export async function deleteCdItemAction(input: z.infer<typeof CdItemRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(CdItemRef, input);
+    const result = await studioFlow.cdList.delete({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
 // ── Clients ─────────────────────────────────────────────────────────────────
 
 const ClientInput = z.strictObject({ clientId: Id.optional(), name: z.string().min(1).max(200), address: OptionalText });
