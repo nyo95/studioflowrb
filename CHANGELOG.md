@@ -5,13 +5,23 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.214**
-- Next local revision: **R8.215**
+- Current revision after this entry is committed: **R8.215**
+- Next local revision: **R8.216**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.215 | 2026-09-30 | fix(ui): align the creatable search trigger, record blocked owner decisions
+
+- **CreatableSearch trigger.** It set `justify-between` without `!`, so the Button base's `justify-center` won and the
+  selected value (e.g. the Client field) rendered centered and looked borderless. Now matches `Combobox`
+  (`justify-between!`); checked in the browser on Edit project. Affects every CreatableSearch consumer (Pricing, Brands, Schedule).
+- **Blockers recorded** in `docs/BACKLOG.md`: PIC-based edit rights (four named owner questions, legacy evidence at
+  `c4b0c466`) and two stale scratch databases. Agents must not act on either before the owner answers. `PLAN.md` target is now R8.216.
+
+**Checks.** `tsc --noEmit` clean; browser look only, no test run needed for a class change and docs.
 
 ## R8.214 | 2026-09-30 | feat(studioflow): set project dates only from Timeline
 

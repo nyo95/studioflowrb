@@ -203,7 +203,7 @@ export function CreatableSearch({
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <Button
-          className={cx("min-w-[190px] justify-between", className)}
+          className={cx("min-w-[190px] justify-between!", className)}
           variant="secondary"
           trailingIcon={<ChevronDown aria-hidden="true" />}
           aria-label={label}
