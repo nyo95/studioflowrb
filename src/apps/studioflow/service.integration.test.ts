@@ -1092,6 +1092,15 @@ describe("SF-R3 Product Schedule", () => {
     assert.equal(second.entryId.length > 0, true);
   });
 
+  it("lets a designer request a sample without naming a supplier", async () => {
+    const { projectId } = await newProject();
+    const { entryId } = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "Unknown source paint", brandName: "Dulux" } });
+    const entry = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((e) => e.id === entryId)!;
+    await sf.schedule.requestSample({ ...as(designer), projectId, optionId: entry.options[0].id });
+    const request = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((e) => e.id === entryId)!.options[0].sampleRequest;
+    assert.deepEqual([request?.status, request?.requestedFrom], ["REQUESTED", ""]);
+  });
+
   it("tracks a physical sample request through to received, blocking a second pending request but allowing a re-request after", async () => {
     const { projectId } = await newProject();
     const { entryId } = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "Dulux Easy Clean - DX-01", brandName: "Dulux" } });

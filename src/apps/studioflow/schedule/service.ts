@@ -731,9 +731,10 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     },
 
     /** A childless-of-vendor-data option can have at most one open (REQUESTED) sample request at a time. */
-    async requestSample(input: CommandContext & { projectId: string; optionId: string; requestedFrom: string; note?: string | null }) {
+    async requestSample(input: CommandContext & { projectId: string; optionId: string; requestedFrom?: string | null; note?: string | null }) {
       const userId = await requireScheduleCommand(input);
-      const requestedFrom = requiredText(input.requestedFrom, "SAMPLE_VENDOR_REQUIRED", "Requested from", 200);
+      // Optional: a designer often does not know which supplier to ask. Blank means Master Data finds one.
+      const requestedFrom = optionalText(input.requestedFrom, 200) ?? "";
       const note = optionalText(input.note, 500);
       return runTransaction(async (tx) => {
         const option = await loadOption(tx, input.projectId, input.optionId, true);

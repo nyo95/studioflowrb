@@ -186,7 +186,7 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
         pattern: text(s.pattern, TEXT_MAX, "SAMPLE_SOURCE_INVALID", "Pattern"),
         finishing: text(s.finishing, TEXT_MAX, "SAMPLE_SOURCE_INVALID", "Finishing"),
         dimension: text(s.dimension, TEXT_MAX, "SAMPLE_SOURCE_INVALID", "Dimension"),
-        requested_from: text(s.requestedFrom, TEXT_MAX, "SAMPLE_SOURCE_INVALID", "Requested from", true)!,
+        requested_from: text(s.requestedFrom, TEXT_MAX, "SAMPLE_SOURCE_INVALID", "Requested from") ?? "",
         request_note: text(s.requestNote, NOTE_MAX, "SAMPLE_SOURCE_INVALID", "Request note"),
         requester_user_id: text(s.requesterUserId, TEXT_MAX, "SAMPLE_SOURCE_INVALID", "Requester", true)!,
         requester_label: text(s.requesterLabel, TEXT_MAX, "SAMPLE_SOURCE_INVALID", "Requester name", true)!,

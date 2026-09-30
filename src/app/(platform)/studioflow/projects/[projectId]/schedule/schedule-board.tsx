@@ -183,14 +183,14 @@ function SampleRequestDialog({
         const ok = await run(pendingKey, () => requestScheduleSampleAction({ projectId, optionId: option.id, requestedFrom, note: note || undefined }));
         if (ok) onClose();
       }}>
-        <Field label="Requested from" required>
-          <Input autoFocus value={requestedFrom} maxLength={200} placeholder="Vendor or supplier name" onChange={(e) => setRequestedFrom(e.target.value)} />
+        <Field label="Requested from (optional)" description="Not sure? Leave it blank and Master Data will find a supplier.">
+          <Input autoFocus value={requestedFrom} maxLength={200} placeholder="Vendor or supplier name, if you know it" onChange={(e) => setRequestedFrom(e.target.value)} />
         </Field>
         <Field label="Note (optional)"><Input value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} /></Field>
         {error ? <InlineError>{error}</InlineError> : null}
         <FormActions>
           <Button type="button" onClick={onClose} disabled={isPending(pendingKey)}>Cancel</Button>
-          <Button type="submit" variant="primary" pending={isPending(pendingKey)} disabled={!requestedFrom.trim()}>Request sample</Button>
+          <Button type="submit" variant="primary" pending={isPending(pendingKey)}>Request sample</Button>
         </FormActions>
       </form>
     </Dialog>
@@ -472,7 +472,7 @@ export function ScheduleBoard({
   const cancelSample = async (entryId: string, option: ScheduleOptionView) => {
     const ok = await confirm.confirm({
       title: "Cancel this sample request?",
-      description: `${option.sampleRequest?.requestedFrom} will not be asked further. This cannot be undone.`,
+      description: `${option.sampleRequest?.requestedFrom || "Master Data"} will not be asked further. This cannot be undone.`,
       confirmLabel: "Cancel request",
       tone: "danger",
     });
@@ -1087,7 +1087,7 @@ function EntryPanelContent({
   const cancelSample = async (option: ScheduleOptionView) => {
     const ok = await confirm({
       title: "Cancel this sample request?",
-      description: `${option.sampleRequest?.requestedFrom} will not be asked further. This cannot be undone.`,
+      description: `${option.sampleRequest?.requestedFrom || "Master Data"} will not be asked further. This cannot be undone.`,
       confirmLabel: "Cancel request",
       tone: "danger",
     });
@@ -1365,7 +1365,7 @@ function EntryPanelContent({
                           <Badge tone={option.sampleRequest.status === "RECEIVED" ? "success" : "warning"}>
                             {option.sampleRequest.status === "RECEIVED" ? "Sample received" : "Sample requested"}
                           </Badge>
-                          <Text tone="tertiary" size="sm">from {option.sampleRequest.requestedFrom}</Text>
+                          {option.sampleRequest.requestedFrom ? <Text tone="tertiary" size="sm">from {option.sampleRequest.requestedFrom}</Text> : <Text tone="tertiary" size="sm">supplier to be found</Text>}
                         </div>
                       ) : null}
                     </div>

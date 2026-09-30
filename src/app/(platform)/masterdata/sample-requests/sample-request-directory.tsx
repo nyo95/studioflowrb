@@ -225,7 +225,7 @@ export function SampleRequestDirectory({ rows, vendors, canManageVendors, vendor
             {alreadyReceived(detail) ? (
               <InlineError>The designer already marked this sample as received directly in StudioFlow. Confirm it is still needed before pricing it.</InlineError>
             ) : null}
-            <Text><strong>Requested from:</strong> {detail.requestedFrom}</Text>
+            <Text><strong>Requested from:</strong> {detail.requestedFrom || "Not specified. Please find a supplier."}</Text>
             <Text><strong>Requested by:</strong> {detail.requestedBy.name}</Text>
             <Text><strong>Requested:</strong> {formatInstant(detail.requestedAt, { locale, timeZone: timezone, style: "datetime" })}</Text>
             {detail.note ? <Text><strong>Note:</strong> {detail.note}</Text> : null}

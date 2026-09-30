@@ -806,7 +806,7 @@ export async function removeScheduleOptionImageAction(input: z.infer<typeof Sche
   });
 }
 
-const ScheduleSampleRequest = z.strictObject({ projectId: Id, optionId: Id, requestedFrom: z.string().min(1).max(200), note: OptionalText });
+const ScheduleSampleRequest = z.strictObject({ projectId: Id, optionId: Id, requestedFrom: z.string().max(200).optional(), note: OptionalText });
 export async function requestScheduleSampleAction(input: z.infer<typeof ScheduleSampleRequest>): Promise<ActionResult<{ requestId: string }>> {
   return runSafeAction(async () => {
     const ctx = await context();

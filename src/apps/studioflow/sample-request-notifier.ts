@@ -33,7 +33,9 @@ export function createSampleRequestNotifier(deps: { writer: NotificationWriter; 
           appId: "studioflow",
           kind: "studioflow.sample-request.created",
           title: "New sample request",
-          body: fit(`${event.requestedByName} asked ${event.requestedFrom} for a sample of ${event.productName} (${event.projectName}).`, 300),
+          body: fit(event.requestedFrom
+            ? `${event.requestedByName} asked ${event.requestedFrom} for a sample of ${event.productName} (${event.projectName}).`
+            : `${event.requestedByName} needs a sample of ${event.productName} (${event.projectName}) and did not name a supplier.`, 300),
           href: MASTERDATA_ROUTES.sampleRequests,
           entity: { type: "sample_request", id: event.requestId },
         },

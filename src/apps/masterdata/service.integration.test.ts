@@ -1197,6 +1197,12 @@ describe("Sample request intake (Master Data side of StudioFlow sample requests)
     assert.ok(events.every((event) => event.actor_kind === "USER" && event.app_id === "masterdata"));
   });
 
+  it("accepts a request that names no supplier", async () => {
+    const intake = await service.startSampleRequestIntake({ grants: GRANTS, actor: STAFF, snapshot: { ...snapshot("request-blank"), requestedFrom: "  " } });
+    assert.ok(intake);
+    assert.equal((await testDb.prisma.sampleRequestIntake.findFirstOrThrow({ where: { source_request_id: "request-blank" } })).requested_from, "");
+  });
+
   it("checks source facts and rejects an unusable actor", async () => {
     await rejectsWithCode(service.startSampleRequestIntake({ grants: GRANTS, actor: STAFF, snapshot: { ...snapshot("request-2"), productName: "   " } }), "SAMPLE_SOURCE_INVALID");
     await rejectsWithCode(service.startSampleRequestIntake({ grants: GRANTS, actor: STAFF, snapshot: { ...snapshot("request-2"), requestedFrom: "x".repeat(301) } }), "SAMPLE_SOURCE_INVALID");

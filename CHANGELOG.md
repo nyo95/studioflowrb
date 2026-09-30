@@ -5,13 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.225**
-- Next local revision: **R8.226**
+- Current revision after this entry is committed: **R8.226**
+- Next local revision: **R8.227**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.226 | 2026-09-30 | fix(studioflow,masterdata): a designer can request a sample without naming a supplier
+
+- Owner feedback on the Request sample dialog: "as a designer I do not know where to request from". "Requested from" is now optional. Blank is stored as
+  an empty string (no migration); the dialog says "Not sure? Leave it blank and Master Data will find a supplier"; the Schedule card shows "supplier to be
+  found"; the notification reads "needs a sample ... and did not name a supplier"; the Master Data queue detail shows "Not specified. Please find a supplier."
+  and its intake snapshot accepts a blank source. Tests +2 (StudioFlow request without supplier; Master Data intake with a blank source).
+
+**Checks.** `npm test` 664/664, `tsc --noEmit`.
 
 ## R8.225 | 2026-09-30 | feat(studioflow): add Construction Drawing list backend
 
