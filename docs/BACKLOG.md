@@ -127,7 +127,9 @@ No open items. (The pill-radius note from R8.83 was stale: `--ui-radius-pill` ha
   the whole relational schema and Master Data logic), WO-MD-HARDEN-01 (fix the audit's P0/P1 findings and cheap P2s), WO-MD-CHAIN-01
   (the brand → supplier → price entry below), WO-MD-BULK-01 (bulk price entry: one supplier and category, many rows, all-or-nothing),
   WO-MD-TEXT-01 (shared first-letter-capital normalization for names, lower-case for tags). Each is issued as its own plan after the
-  previous one is reviewed.
+  previous one is reviewed. Audit PASSED 2026-10-01 (R8.265 review); WO-MD-HARDEN-01 is READY (MD-AUD-001/003/004/005/006/007/009-MD/010/011/013/014).
+  Deferred from the audit: WO-MD-SCALE-01 (MD-AUD-008 pagination, UI-bearing) and WO-SCHEMA-HARDEN-01 (MD-AUD-012 and the BQ/StudioFlow
+  FK indexes, after each app's service logic is reviewed).
 - [ ] [PLANNED] **Material price entry follows the supplier's brands.** Pick the supplier first, then offer only brands/SKUs linked
   to it, and reject a material price whose brand the supplier is not linked to (with a "link this brand to the supplier" shortcut
   in the form). Owner confirmed the direction 2026-10-01; office data held no material prices when checked, so nothing needs cleanup.

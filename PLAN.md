@@ -1,99 +1,84 @@
 # Active Plan
 
-Plan ID: WO-MD-AUDIT-01
-Scope: Master Data — read-only audit of the whole relational schema and the Master Data logic, as the first step of a backend and hardening roadmap. NO code, schema, migration, or behavior change in this plan.
-Target revision: R8.264
+Plan ID: WO-MD-HARDEN-01
+Scope: Master Data backend hardening — fix the verified defects and missing guards from the audit `docs/audits/MASTERDATA-RELATIONAL-LOGIC-AUDIT-2026-10.md` that are backend-only and independent of the Brand → Supplier → Price rule. No new product behavior.
+Target revision: R8.266
 Status: READY
 Priority: P1
-Owner: owner (Product Owner). Lead plan written 2026-10-01 after R8.262 (supplier categories merged into categories).
+Owner: owner (Product Owner). Lead review of WO-MD-AUDIT-01 (R8.264): **PASS** on 2026-10-01. Five findings spot-checked against code and confirmed: MD-AUD-001 (`vendors/actions.ts` swallows a JSON parse error and the vendor service then deletes the contacts missing from the list), 003 (`deactivateCategory` checks only its own status), 004 (`archiveVendorType` has no capability guard), 005 (`updateUnit` and the other root updates do not reject an archived root), 013 (`savePriceAction` routes any unknown kind to the labor branch).
 Last updated: 2026-10-01
 
 ## Outcome
 
-One written, evidence-backed audit that tells the Lead exactly what is wrong, risky, or missing in (a) the relational model of every schema and (b) the Master Data service and action logic, ranked by severity, with a recommended fix and a target work order for each finding. The Lead then turns the findings into the hardening work orders in the Roadmap below. Nothing is fixed in this plan.
-
-Why now: Master Data just changed its relational shape (R8.262) and is about to take three more backend changes (a supplier-driven brand → supplier → price chain, bulk price entry, text normalization). Auditing first stops us building on a defect.
+The Master Data write paths stop losing data, stop leaving active records pointing at hidden or archived parents, and the database itself rejects the bad scalar and lifecycle values the service already forbids. After this plan each fixed finding has a regression test that fails on the old code.
 
 ## Context and Evidence
 
-- Schemas: `prisma/schema/` has four domains (`master_data` 21 models, `studioflow` 29, `bq` 16, `platform` 14). Boundary rules are in `AGENTS.md` (no cross-app foreign keys; consumers snapshot facts) and `docs/MODULE-BOUNDARIES.md`.
-- Master Data services: `src/apps/masterdata/services/*.ts` (brand, category, deletion, pricing, sample-request, sku, sku-price-workbook, unit, vendor, vendor-contact, vendor-type, shared) plus `service.ts`, `public.ts`, and the server actions under `src/app/(platform)/masterdata/**/actions.ts` and `settings/general/masterdata/`.
-- Contracts: `docs/apps/masterdata/` (`masterdata.md`, `brand-contract.md`, `vendor-contract.md`, `pricing-contract.md`).
-- Known gaps already observed (verify, do not assume):
-  - A material price does not require that the SKU's Brand is linked to the supplier (`BrandSupplier`); `PriceMaterial` only stores `sku_id` and `supplier_vendor_id`.
-  - `DeletionRequest.target_type`, `ArchiveCause.entity_type` and audit entity ids are free strings, not relations.
-  - Several create paths do check-then-insert; confirm each has a matching database unique constraint.
-  - `listVendors` and similar list queries load wide nested selects with no pagination.
-- Current office development data is small (13 brands, 15 suppliers, a handful of prices), so findings about volume are about design, not measured slowness.
+- Source of truth: the audit report and its `[BUG]`/`[CLEANUP]` entries in `docs/BACKLOG.md` (MD-AUD-001 … 014). Read the finding rows for evidence and file:line before changing anything; re-confirm each one against current code first and report any that no longer reproduce.
+- Office rebuild data holds none of the audited violations, so migrations in this plan must still carry a pre-check (below) because other machines may differ.
+- Postgres is 15.x, so `UNIQUE NULLS NOT DISTINCT` is available.
+- R8.262 added `VendorCategory` and the shared helpers `ensureVendorCategory` and `assertVendorCategoryRemovalSafe` in `services/shared.ts`; the Category guard below must include `VendorCategory`.
 
 ## Locked Decisions
 
-- This is an **audit only**. No edits to `src/`, `prisma/`, tests, or contracts. The only files written are the audit report and the backlog entries described below.
-- Scope = all four schemas for the relational audit (so cross-app and platform boundary problems are caught), and **Master Data** for the logic audit. StudioFlow and BQ logic are out of scope except where they read Master Data through its public ports.
-- Database access is **read-only** and only against the rebuild database. This checkout has `.env.kantor` only, so use `STUDIOFLOW_LOCATION=kantor`; before any query verify the target is `studioflow_rebuild` on `localhost`. Never touch the legacy database or any other target. Use read-only sessions (`SET default_transaction_read_only = on`). Never print secrets.
-- Severity scale: **P0** data loss/corruption or a permission bypass; **P1** wrong business result or an integrity gap reachable from the UI; **P2** latent risk, missing guard or constraint, performance design; **P3** cleanup and drift.
-- A finding needs evidence (file:line, query result, or a reproducing sequence). Hunches are listed separately as "to verify", not as findings.
+1. **Category deactivation is blocked while active data uses it** (owner-agnostic default accepted by the Lead). The user must merge the category into another one first. No automatic cascade or reassign. Active data = a non-archived SKU with the category, a non-archived Brand with it, a non-archived Supplier with it (`VendorCategory`), or a live work price filed under it. Error code `CATEGORY_IN_USE`, message names the counts and says to merge first.
+2. **Vendor Type archive runs the same capability guard as a type change.** For every supplier that holds the type, compute its remaining live types without this one and run `assertVendorTypeRemovalSafe`; block the archive on the first failure with the existing capability error codes, naming the supplier.
+3. **Child audit events are restored.** Workbook apply and sample-request sync write one audit event per SKU/price changed (with the batch id or flow in metadata) plus the existing single batch event. `suppressAudit` is removed from the public service surface; any internal bypass must not be callable from actions or other apps.
+4. **A request that contains a malformed or missing structured payload never changes stored data.** The Supplier contacts field is the case in point: an absent field means "do not touch contacts", an explicit empty list means "remove all", malformed JSON is a validation error. Sweep every Master Data action for the same silent-catch pattern and apply the same rule.
+5. **Polymorphic type strings come from one canonical registry** (deletion targets and archive-cause entity types). The service allow-list, the migration CHECK, and a test that reads the live constraint definition and compares it to the registry all use that one list, so they cannot drift again.
+6. **Archived or inactive roots are immutable through their services**: Unit, Category, Vendor Type, Brand, Supplier updates reject an archived/inactive record with a CONFLICT error (`<ENTITY>_ARCHIVED` / `_INACTIVE`), as SKU and price updates already do. The UI hiding the button is not the boundary.
 
 ## Business Rules and Architecture Constraints
 
-Audit against these rules (they are the intended invariants):
+- Capability labels: REUSE the existing `shared.ts` guards, `writeAudit`, `mapWriteError`, and the `AppError` codes; EXTEND `shared.ts` only where a guard is shared by two services; ADD one registry module for the polymorphic type lists. Master Data policy stays app-owned.
+- Every migration is additive-safe: it starts with a `DO $$` pre-check that counts violating rows and raises an exception with the table, rule, and count if any exist, so nothing is rewritten silently. No data is changed or deleted by these migrations except dropping redundant duplicate indexes.
+- Do not change public read-port shapes or any behavior StudioFlow and BQ rely on.
+- Never touch the legacy database. Migrations are applied to the office development and the disposable test databases only, after verifying the target is `studioflow_rebuild` / `studioflow_rebuild_test` on `localhost`.
 
-1. Supplier is the pivot: Brand → Supplier → Price. A supplier carries brands (`BrandSupplier`), categories (`VendorCategory`), and types (`VendorVendorType`); prices belong to a supplier.
-2. Soft-delete model: Master Data entities archive (`deleted_at` or a status) with `ArchiveCause` propagation; permanent deletion goes through `DeletionRequest` approval. Archive/restore must be symmetric and must not strand children.
-3. Category is one shared list with `kind` PRODUCT or WORK; names are unique per kind among ACTIVE rows; merge keeps the same kind.
-4. Money is `Decimal`, currency is a 3-letter code, units must be active and match the SKU's purchase or base unit for material prices.
-5. Every write is permission-checked in the service (not only in the action), audited with an actor, and runs in one transaction.
-6. Apps never write each other's tables or hold foreign keys into each other; consumers snapshot facts.
+## Backend Contract
 
-## Audit Method (what the Executor must cover)
+Deliver, in this order of priority:
 
-**A. Relational schema (all four schemas).**
-- Produce a relation map per schema: models, foreign keys, `onDelete` behavior, nullability, and which relations are string ids instead of foreign keys (and why).
-- Check: missing foreign keys; `onDelete` choices that can strand or wrongly cascade rows; missing indexes on foreign keys and common filters; missing unique or partial-unique constraints that code assumes (compare against the service code and raw-SQL indexes in `prisma/migrations`); nullable columns that code treats as required; enum versus string drift; `Decimal` precision; `updated_at` and `created_at` consistency; soft-delete consistency (`deleted_at` versus `status`) across Master Data models.
-- Check boundaries: any `platform → app` or `app → other-app` foreign key or implicit cross-app write; places that should snapshot but store a live reference.
-- Run read-only data checks for orphaned string references, duplicate live names or slugs, rows that violate the invariants above, and prices whose supplier/brand/category/unit are inactive.
+1. **MD-AUD-001 (P0).** Per Locked Decision 4. Regression tests: malformed JSON leaves existing contacts untouched and returns a validation error; field absent leaves contacts untouched; explicit `[]` removes them.
+2. **MD-AUD-003 (P1).** Per Locked Decision 1, with tests for each of the four user families, for the allowed case (unused category), and for "merge then deactivate succeeds".
+3. **MD-AUD-004 (P1).** Per Locked Decision 2, with tests for a blocked archive (live prices or brand-supplier links depend on the capability) and an allowed one.
+4. **MD-AUD-005 (P2).** Per Locked Decision 6, with a direct service test per root.
+5. **MD-AUD-006 (P2).** When a sample-request quote carries `priceMaterialId`, read that one price and require its `sku_id` and `supplier_vendor_id` to match the chosen SKU and supplier, in `start`, `recordQuote` and `markPriced`. Negative-combination tests.
+6. **MD-AUD-007 (P2).** Per Locked Decision 3, with a test that queries audit events by entity id for a workbook-created SKU and price and for a synced sample price.
+7. **MD-AUD-010 (P2).** One migration: CHECK `amount >= 0` and currency `^[A-Z]{3}$` on the three price tables; CHECK allow-list on `DeletionRequest.target_type` and `ArchiveCause.entity_type`; CHECK on the `ArchiveCause` kind/parent shape (DIRECT has no parent, PARENT has one); make the `ArchiveCause` uniqueness real for DIRECT rows (partial unique indexes or `NULLS NOT DISTINCT`, Executor's choice, with `shared.ts` still idempotent). Registry per Locked Decision 5.
+8. **MD-AUD-009, Master Data only (P2).** Add leading indexes for the six Master Data FK columns the audit lists. BQ and StudioFlow indexes are out of scope.
+9. **MD-AUD-011 (P2).** Workbook preview uses the same domain validators as apply in a dry-validation mode (units, dimensions parsing, supplier capability), so "ready" means apply will not fail on those rules. The brand-supplier rule joins later in WO-MD-CHAIN-01.
+10. **MD-AUD-013 (P2).** `savePriceAction` and every other pricing action parse `kind` with the shared `PriceKind` parser before routing; unknown values return a validation error. Test.
+11. **MD-AUD-014 (P3).** In a separate migration, drop exactly one of each identical duplicate index pair, keeping the one declared in the Prisma schema where there is one. Show the `pg_index` comparison in the changelog entry.
 
-**B. Master Data logic.** For every public method of each Master Data service and action file, record: permission check present; validation; transaction boundary; race exposure (check-then-insert without a database constraint, read-modify-write without a lock); archive/restore/delete symmetry; audit event present with actor; error code mapping; and whether the client can pass ids it should not be trusted with. Specifically trace these flows end to end:
-- Brand ↔ Supplier ↔ SKU ↔ Price (including the gap in "Known gaps").
-- Category create, rename, deactivate, merge, permanent delete (now including `VendorCategory`).
-- Vendor type capability guards versus existing prices.
-- Archive cascade and restore of Vendor, Brand, SKU, and the three price kinds.
-- Deletion request lifecycle and `hardDeleteMasterDataTarget`.
-- Workbook import/export and the quick-create actions used by the pricing form.
-- Sample-request intake and its public read port.
-- Public read ports (`public.ts`) exposed to StudioFlow and BQ: stability, what they leak, what they assume.
+Pre-checks for items 7, 8, 11 must run against the target database before the constraint or drop is created.
 
-**C. Test and constraint coverage.** For each invariant above, state whether a database constraint, a service check, and a test each exist. List invariants with none.
+## UI Contract
 
-## Deliverables
+None. Errors from the new guards use the existing server-action error surface (`safeMessage`). The Lead owns any follow-up copy or layout. Minimal wiring the Executor may add: none beyond making sure the new error codes reach the existing dialogs.
 
-1. `docs/audits/MASTERDATA-RELATIONAL-LOGIC-AUDIT-2026-10.md` containing: scope and method actually used; relation map summary; findings table (ID, severity, area, evidence, impact in plain words, recommended fix, proposed work order); "to verify" list; invariant coverage matrix; and an explicit statement of what was not audited.
-2. `docs/BACKLOG.md`: each verified defect added as `[BUG]` and each cleanup as `[CLEANUP]` under the Master Data heading, referencing the finding ID. Do not remove or reword existing entries.
-3. `CHANGELOG.md` entry for the revision. Docs only; no migration, no dependency.
+## Non-goals
+
+- MD-AUD-002 and the supplier-first form (WO-MD-CHAIN-01); bulk entry; text normalization.
+- MD-AUD-008 pagination (UI-bearing; planned as WO-MD-SCALE-01).
+- MD-AUD-012 and the non-Master-Data parts of MD-AUD-009 (WO-SCHEMA-HARDEN-01, after each app's service logic is reviewed).
+- Renaming or re-modelling any table; changing price, category, or supplier meaning.
+
+## Regression Risks
+
+- The Category guard must not block `mergeCategory` (merge moves links first, then deactivates the source in the same transaction; keep that order).
+- Removing `suppressAudit` changes workbook and sample-sync audit volume; keep one transaction and keep the batch event.
+- CHECK constraints can reject legacy rows on another machine; the pre-check must fail loudly with counts rather than the migration erroring obscurely.
+- The registry must include every target/entity type currently written (including `vendor_category` handling if any, and no removed `supplier_category`).
 
 ## Verification
 
-- `git diff --check` is clean; only the files above changed.
-- Run `npm test` once at the start and once at the end and record the result in the report (baseline versus after). Any failure is reported, not fixed.
-- Every finding cites evidence that a reader can re-run or open.
+Executor finishes before the commit: `npm test` (all pass, new regression tests included and shown to fail against the old behavior in the report), `npm run check`, `npm run lint`, `git diff --check`. Apply the new migrations to the office development and test databases and record the pre-check result. List any finding that no longer reproduces and any that was deferred with the reason.
 
 ## Reviewer Acceptance
 
-The Lead reviews the report for completeness against "Audit Method", spot-checks at least five findings against the code, and then issues the hardening work orders. No browser acceptance.
-
-## Roadmap (not authorized by this plan; the Lead issues each as its own READY plan after reviewing the audit)
-
-Sequence is deliberate: fix what the audit proves first, then build on a sound base.
-
-1. **WO-MD-AUDIT-01 (this plan).** Audit.
-2. **WO-MD-HARDEN-01.** Fix the audit's P0 and P1 findings and the cheap P2s: missing unique constraints and indexes, race conditions, missing guards and audit events, stranded-row risks. Data-safe migrations with a pre-check query for existing violations.
-3. **WO-MD-CHAIN-01.** Enforce Brand → Supplier → Price: a material price is allowed only when its SKU's Brand is linked to the supplier (or the SKU has no Brand); a command that links a Brand to a Supplier from the pricing form; supplier-scoped reference lists (brands and SKUs a supplier can price); restore and archive paths re-check the chain. Lead builds the supplier-first form behavior.
-4. **WO-MD-BULK-01.** Bulk price creation commands for labor-only, material + labor, and material with an existing SKU: one supplier and one category for many rows, one transaction, all-or-nothing, per-row error codes, a row cap, one audit event per price plus one batch event. Lead builds the table UI (name, unit, amount, notes; unit copies the previous row).
-5. **WO-MD-TEXT-01.** Shared text normalization utility (first letter of each word uppercase, remaining letters untouched; lower-case for tags and hashtags; opt-outs for codes, emails, URLs, notes) in the platform utilities layer, applied on the server for Master Data names and by the importer. Lead builds the matching UI Engine field behavior. Existing data is not rewritten.
-6. **WO-MD-WORKBOOK-01 and WO-SR-01.** Continue the already-approved workbook import/export and the incoming sample-request queue from `docs/BACKLOG.md`, after the owner's open decisions there are answered.
-
-Each work order is committed as its own revision; the Lead records PASS, one consolidated correction pass, or a precise blocker.
+The Lead re-reads each fix against its finding, runs a deliberate bad-input pass in the browser for the contacts case and the Category and Vendor Type guards (messages readable), checks that the audit trail shows child events, and then closes the matching `[BUG]` entries or returns one consolidated correction.
 
 ## Executor Prompt
 
-You are the BACKEND EXECUTOR for this checkout (D:\Misc\ProjectsHUB\studioflowrb, office computer, `STUDIOFLOW_LOCATION=kantor`). Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and the root `PLAN.md` (WO-MD-AUDIT-01). Perform the read-only audit exactly as scoped there: do not change code, schema, tests, or contracts; use only the rebuild database in read-only mode; write the audit report, the backlog entries, and the changelog entry; run `npm test` before and after and record the results; make one local commit with subject `R8.264 | docs(masterdata): audit relational schema and Master Data logic`. Stop with a `BLOCKED / CONFLICT` report if the database target is ambiguous. Finish with a Planner/Reviewer prompt (outcome, commit, checks, limitations, dirty files).
+You are the BACKEND EXECUTOR for this checkout (D:\Misc\ProjectsHUB\studioflowrb, office computer, `STUDIOFLOW_LOCATION=kantor`). Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, the root `PLAN.md` (WO-MD-HARDEN-01), and the audit report it names. Implement the whole plan, including migrations with the specified pre-checks and one regression test per fixed finding. Verify, add the changelog entry, remove each fixed `[BUG]`/`[CLEANUP]` entry from `docs/BACKLOG.md` with the revision recorded in the changelog, and make one local commit `R8.266 | fix(masterdata): harden the audited write paths and constraints`. Use only the rebuild databases (verify the target first); never the legacy database. Stop with a `BLOCKED / CONFLICT` report if a locked decision cannot be met. Finish with a Planner/Reviewer prompt (outcome, commit, checks, limitations, dirty files).

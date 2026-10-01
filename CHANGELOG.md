@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.264**
-- Next local revision: **R8.265**
+- Current revision after this entry is committed: **R8.265**
+- Next local revision: **R8.266**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.265 | 2026-10-01 | docs(masterdata): review WO-MD-AUDIT-01 (PASS) and plan WO-MD-HARDEN-01
+
+- Reviewed the R8.264 audit: PASS. Spot-checked MD-AUD-001, 003, 004, 005, and 013 against the code and confirmed each. The report covers all four schemas, every Master Data service and action surface, a read-only check of the office data (no violations), and an invariant coverage matrix.
+- Issued WO-MD-HARDEN-01 as READY (target R8.266). Locked decisions: deactivating a Category is blocked while active SKUs, Brands, Suppliers, or work prices use it (merge first); archiving a Vendor Type runs the capability guard; child audit events are restored and `suppressAudit` leaves the public surface; a malformed structured payload never changes stored data; polymorphic type lists come from one registry checked against the database constraint; archived roots are immutable through their services.
+- Deferred by design: MD-AUD-002 to WO-MD-CHAIN-01, MD-AUD-008 to WO-MD-SCALE-01, MD-AUD-012 and the BQ/StudioFlow FK indexes to WO-SCHEMA-HARDEN-01. Docs only; no code, schema, migration, or dependency change.
+
+**Checks.** `git diff --check`. No code changed, so no test run.
 
 ## R8.264 | 2026-10-01 | docs(masterdata): audit relational schema and Master Data logic
 
