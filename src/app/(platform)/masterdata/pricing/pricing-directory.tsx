@@ -15,7 +15,7 @@ import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurem
 import { createMoney,formatMoney } from "@platform/utilities/money";
 import { CircleHelp, Plus, Trash2 } from "lucide-react";
 import { useEffect,useRef,useState,useTransition,type FormEvent } from "react";
-import { archivePriceAction,createMaterialSkuAction,saveBulkWorkPricesAction,createPricingBrandQuickAction,createPricingProductCategoryQuickAction,createPricingVendorQuickAction,createPricingWorkCategoryQuickAction,requestPriceDeletionAction,restorePriceAction,savePriceAction } from "./actions";
+import { archivePriceAction,createMaterialSkuAction,linkBrandToSupplierAction,saveBulkMaterialPricesAction,saveBulkWorkPricesAction,createPricingBrandQuickAction,createPricingProductCategoryQuickAction,createPricingVendorQuickAction,createPricingWorkCategoryQuickAction,requestPriceDeletionAction,restorePriceAction,savePriceAction } from "./actions";
 
 type Kind = "material" | "material-labor" | "labor";
 type SkuRef = { id: string; name: string | null; code: string | null; brand: { id: string; name: string } | null; base_unit: { id: string; code: string; name: string } | null; purchase_unit: { id: string; code: string; name: string } | null; dimension_length: string | null; dimension_width: string | null; dimension_thickness: string | null; dimension_unit: { id: string; code: string; name: string } | null; purchase_to_base_factor: string | null };
@@ -29,7 +29,7 @@ const PRICE_PAGE_SIZE = 25;
 
 
 
-export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; contacts: Record<string, { name: string; phones: string[] }>; canManageVendors: boolean; canManageCategories: boolean; canManageSkus: boolean; canManageBrands: boolean; skus: SkuRef[]; brands: Ref[]; productCategories: Ref[]; vendors: Ref[]; materialVendors: Ref[]; workVendors: Array<Ref & { categoryIds: string[] }>; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
+export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; contacts: Record<string, { name: string; phones: string[] }>; canManageVendors: boolean; canManageCategories: boolean; canManageSkus: boolean; canManageBrands: boolean; skus: SkuRef[]; brands: Ref[]; productCategories: Ref[]; vendors: Ref[]; materialVendors: Array<Ref & { brandIds: string[] }>; workVendors: Array<Ref & { categoryIds: string[] }>; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
   const { locale } = useDisplaySettings();
   const displayPrice = (amount: string, currency: string) => formatMoney(createMoney(amount, currency), { locale });
   const [query, setQuery] = useState(""); const [status, setStatus] = useState<DirectoryStatus>("ACTIVE"); const [supplierFilter, setSupplierFilter] = useState("ALL"); const [brandFilter, setBrandFilter] = useState("ALL"); const [workCategoryFilter, setWorkCategoryFilter] = useState("ALL"); const [productCategoryFilter, setProductCategoryFilter] = useState("ALL"); const [groupByItem, setGroupByItem] = useState(false); const [page, setPage] = useState(1); const [sort, setSort] = useState<{ key: PriceSortKey; direction: SortDirection }>({ key: "name", direction: "asc" }); const [editor, setEditor] = useState<Editor | null>(null); const [formError, setFormError] = useState<string | null>(null);
@@ -216,11 +216,13 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
 
 type BulkRow = { key: number; name: string; unitId: string; amountDisplay: string; amount: string; notes: string; scopeNote: string };
 type BulkRowProblem = { rowIndex: number; message: string };
+type MaterialBulkRow = { key: number; skuId: string; amountDisplay: string; amount: string; notes: string };
+function emptyMaterialRow(key: number): MaterialBulkRow { return { key, skuId: "", amountDisplay: "", amount: "", notes: "" }; }
 function emptyBulkRow(key: number, unitId: string): BulkRow { return { key, name: "", unitId, amountDisplay: "", amount: "", notes: "", scopeNote: "" }; }
 
 type PriceEditorRefs = {
   skus: SkuRef[];
-  vendors: Array<Ref & { categoryIds?: string[] }>;
+  vendors: Array<Ref & { categoryIds?: string[]; brandIds?: string[] }>;
   units: Array<Ref & { code: string }>;
   workCategories: Ref[];
   vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }>;
@@ -562,12 +564,72 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
     const fresh = bulkKey.current++;
     setRows((current) => current.length === 1 ? [emptyBulkRow(fresh, current[0]?.unitId ?? "")] : current.filter((entry) => entry.key !== key));
   };
+  const bulkMaterial = material && !edit && materialEntryMode === "existing";
+  const anyBulk = bulk || bulkMaterial;
+  const [mRows, setMRows] = useState<MaterialBulkRow[]>(() => [emptyMaterialRow(0)]);
+  const [linkedBrandIds, setLinkedBrandIds] = useState<string[]>([]);
+  const [linkingBrandId, setLinkingBrandId] = useState<string | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const vendorBrandIds = [...(vendorOptions.find((vendor) => vendor.id === vendorId)?.brandIds ?? []), ...linkedBrandIds];
+  const skuPriceable = (sku: SkuRef) => !vendorId || !sku.brand || vendorBrandIds.includes(sku.brand.id);
+  const skuOptionsForTable = [...refs.skus].sort((left, right) => Number(skuPriceable(right)) - Number(skuPriceable(left))).map((sku) => ({
+    id: sku.id,
+    label: sku.name ?? sku.code ?? "Unnamed SKU",
+    description: skuPriceable(sku) ? (sku.code ? <span className="font-ui-mono text-xs">{sku.code}</span> : sku.brand?.name) : <span className="text-xs text-warning">{sku.brand?.name} · not linked to this supplier</span>,
+    keywords: [sku.code ?? "", sku.brand?.name ?? ""],
+  }));
+  const patchMRow = (key: number, patch: Partial<MaterialBulkRow>) => setMRows((current) => current.map((entry) => entry.key === key ? { ...entry, ...patch } : entry));
+  const addMRow = () => {
+    const key = bulkKey.current++;
+    setMRows((current) => [...current, emptyMaterialRow(key)]);
+  };
+  const removeMRow = (key: number) => {
+    const fresh = bulkKey.current++;
+    setMRows((current) => current.length === 1 ? [emptyMaterialRow(fresh)] : current.filter((entry) => entry.key !== key));
+  };
+  const filledMRows = mRows.filter((entry) => entry.skuId || entry.amount || entry.notes.trim());
+  const linkBrand = async (brandId: string) => {
+    setLinkError(null);
+    setLinkingBrandId(brandId);
+    const result = await linkBrandToSupplierAction({ brandId, vendorId });
+    setLinkingBrandId(null);
+    if (result.ok) setLinkedBrandIds((current) => [...current, brandId]);
+    else if (result.ok === false) setLinkError(result.error.safeMessage);
+  };
   const filledRows = rows.filter((entry) => entry.name.trim() || entry.amount || entry.notes.trim() || entry.scopeNote.trim());
+  const filledCount = bulkMaterial ? filledMRows.length : filledRows.length;
   const submitBulk = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (bulkPending) return;
     setBulkError(null);
     setRowProblems({});
+    if (bulkMaterial) {
+      if (!vendorId) { setBulkError("Choose the supplier first."); return; }
+      if (filledMRows.length === 0) { setBulkError("Fill in at least one row."); return; }
+      const missingM: Record<number, string> = {};
+      filledMRows.forEach((entry) => {
+        const lacks = [!entry.skuId && "SKU", !entry.amount && "amount"].filter(Boolean);
+        if (lacks.length > 0) missingM[entry.key] = `Needs ${lacks.join(" and ")}.`;
+      });
+      if (Object.keys(missingM).length > 0) { setRowProblems(missingM); setBulkError("Some rows are incomplete. Nothing was saved."); return; }
+      setBulkPending(true);
+      try {
+        const result = await saveBulkMaterialPricesAction({ vendorId, currency, rows: filledMRows.map((entry) => ({ skuId: entry.skuId, amount: entry.amount, notes: entry.notes.trim() || null })) });
+        if (result.ok) { onCancel(); return; }
+        if (result.ok === false) {
+          const details = (result.error.details as { rows?: BulkRowProblem[] } | undefined)?.rows ?? [];
+          const problems: Record<number, string> = {};
+          for (const problem of details) { const target = filledMRows[problem.rowIndex]; if (target) problems[target.key] = problem.message; }
+          setRowProblems(problems);
+          setBulkError(result.error.safeMessage);
+        }
+      } catch {
+        setBulkError("The prices could not be saved. Please try again.");
+      } finally {
+        setBulkPending(false);
+      }
+      return;
+    }
     if (!vendorId) { setBulkError("Choose the supplier first."); return; }
     if (!categoryId) { setBulkError("Choose the pricing category."); return; }
     if (filledRows.length === 0) { setBulkError("Fill in at least one row."); return; }
@@ -631,23 +693,80 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
     </div>
   ) : null;
 
+  const materialTable = bulkMaterial ? (
+    <div className="grid gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <Text weight="semibold">Items</Text>
+        <Text size="sm" tone="secondary">{filledMRows.length} filled · one supplier</Text>
+      </div>
+      <div className="hidden gap-2 px-1 text-xs font-semibold uppercase tracking-wide text-ink-tertiary sm:grid sm:grid-cols-[minmax(0,3fr)_5rem_8rem_minmax(0,2fr)_2rem]">
+        <span>SKU</span><span>Unit</span><span>Amount ({currency})</span><span>Notes</span><span />
+      </div>
+      {mRows.map((entry, index) => {
+        const sku = refs.skus.find((candidate) => candidate.id === entry.skuId);
+        const unmatched = Boolean(sku && !skuPriceable(sku));
+        return (
+          <div key={entry.key} className="grid gap-1">
+            <div className="grid items-start gap-2 sm:grid-cols-[minmax(0,3fr)_5rem_8rem_minmax(0,2fr)_2rem]">
+              <CreatableSearch
+                label={`SKU, row ${index + 1}`}
+                options={skuOptionsForTable}
+                value={entry.skuId}
+                onValueChange={(value) => patchMRow(entry.key, { skuId: value })}
+                onCreate={refs.canManageSkus ? (name) => { setSkuName(name); setMaterialEntryMode("new"); return ""; } : undefined}
+                createLabel={(name) => `Create SKU “${name}”`}
+                placeholder="Search SKU name, code, or brand"
+                searchPlaceholder="Search SKU name, code, or brand…"
+                emptyLabel="No SKU matches this search."
+                className="w-full"
+              />
+              <div className="flex min-h-(--ui-control-height-sm) items-center px-1 font-ui-mono text-sm text-ink-secondary">{sku ? (sku.purchase_unit ?? sku.base_unit)?.code ?? "–" : "–"}</div>
+              <Input aria-label={`Amount, row ${index + 1}`} density="compact" inputMode="decimal" placeholder="15.000" className="tabular-nums" value={entry.amountDisplay}
+                onChange={(event) => { const parsed = parseIndonesianAmount(event.target.value); if (parsed === null) return; patchMRow(entry.key, { amount: parsed, amountDisplay: event.target.value.endsWith(",") ? event.target.value : parsed ? formatDecimal(parsed) : "" }); }}
+                onBlur={() => patchMRow(entry.key, { amountDisplay: entry.amount ? formatDecimal(entry.amount) : "" })}
+                onKeyDown={(event) => { if (event.key === "Enter" && index === mRows.length - 1) { event.preventDefault(); addMRow(); } }}
+                invalid={Boolean(rowProblems[entry.key])} />
+              <Input aria-label={`Notes, row ${index + 1}`} density="compact" maxLength={1000} placeholder="Quote reference, remarks…" value={entry.notes} onChange={(event) => patchMRow(entry.key, { notes: event.target.value })} />
+              <IconButton label={`Remove row ${index + 1}`} icon={<Trash2 size={14} />} size="sm" onClick={() => removeMRow(entry.key)} />
+            </div>
+            {sku ? <SkuMeasurementSummary sku={sku} /> : null}
+            {unmatched && sku?.brand ? (
+              <div className="flex flex-wrap items-center gap-2 px-1 text-xs text-ink-secondary">
+                <span>Brand {sku.brand.name} is not linked to this supplier, so it cannot be priced yet.</span>
+                {refs.canManageBrands || refs.canManageVendors
+                  ? <Button type="button" variant="ghost" size="sm" disabled={linkingBrandId === sku.brand.id} onClick={() => void linkBrand(sku.brand!.id)}>Link brand to supplier</Button>
+                  : <span>Ask someone who manages Brands or Suppliers to link it.</span>}
+              </div>
+            ) : null}
+            {rowProblems[entry.key] ? <div role="alert" className="px-1 text-xs text-danger">Row {index + 1}: {rowProblems[entry.key]}</div> : null}
+          </div>
+        );
+      })}
+      {linkError ? <InlineError>{linkError}</InlineError> : null}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="ghost" size="sm" leadingIcon={<Plus />} onClick={addMRow}>Add row</Button>
+        {refs.canManageSkus ? <Button type="button" variant="ghost" size="sm" onClick={() => setMaterialEntryMode("new")}>Create a new SKU with its first price</Button> : null}
+      </div>
+    </div>
+  ) : null;
+
   const priceLabel = material ? "material price" : editor.kind === "material-labor" ? "material + labor price" : "labor price";
   const formRef = useRef<HTMLFormElement>(null);
   const draftGuard = useFormDraftGuard({
     formRef,
     resetKey: `${editor.kind}-${row?.id ?? "new"}`,
-    watchedValue: JSON.stringify([vendorId, categoryId, brandId, skuId, amount, materialEntryMode, skuBrandFilter, bulk ? rows : null]),
+    watchedValue: JSON.stringify([vendorId, categoryId, brandId, skuId, amount, materialEntryMode, skuBrandFilter, anyBulk ? [rows, mRows] : null]),
     title: edit ? "Discard changes?" : "Discard price draft?",
     description: edit ? "Your edits are only in this browser and have not been saved." : "Your changes are only in this browser and have not been saved.",
   });
 
   return <>
-    <Dialog open size={bulk ? "xl" : "md"} dismissible={!pending && !bulkPending} onOpenChange={(open) => !open && !pending && void draftGuard.requestDiscard(onCancel)} title={`${edit ? "Edit" : "Create"} ${newMaterialSku ? "SKU + material price" : bulk ? `${priceLabel}s` : priceLabel}`} description={material && edit ? "SKU and supplier identity are read-only." : "Choose only active and eligible catalog references."}><form ref={formRef} onChange={draftGuard.onFormChange} className="grid gap-4" onSubmit={bulk ? submitBulk : onSubmit}>
+    <Dialog open size={anyBulk ? "xl" : "md"} dismissible={!pending && !bulkPending} onOpenChange={(open) => !open && !pending && void draftGuard.requestDiscard(onCancel)} title={`${edit ? "Edit" : "Create"} ${newMaterialSku ? "SKU + material price" : anyBulk ? `${priceLabel}s` : priceLabel}`} description={material && edit ? "SKU and supplier identity are read-only." : "Choose only active and eligible catalog references."}><form ref={formRef} onChange={draftGuard.onFormChange} className="grid gap-4" onSubmit={anyBulk ? submitBulk : onSubmit}>
       <input type="hidden" name="materialEntryMode" value={materialEntryMode} />
       {edit && <input type="hidden" name="id" value={row!.id} />}{error && <div role="alert" className="text-sm text-danger">{error}</div>}
-      {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name ?? materialRow!.sku.code ?? "Unnamed SKU"} readOnly /></Field><Field label="Supplier"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Unit"><Input value={`${materialRow!.unit.name} (${materialRow!.unit.code})`} readOnly /></Field></> : newMaterialSku ? <>{newMaterialFields}{vendorField}</> : <><Field label="SKU" required description="Search by brand, code, or SKU name."><div className="grid gap-2"><CreatableSearch label="Brand filter" options={[{ id: "ALL", label: "All brands" }, ...brandOptions.map((brand) => ({ id: brand.id, label: brand.name }))]} value={skuBrandFilter} onValueChange={setSkuBrandFilter} placeholder="Filter SKU by brand" searchPlaceholder="Search brands…" className="w-full" onCreate={refs.canManageBrands ? async (name) => { const id = await createBrand(name); if (id) setSkuBrandFilter(id); return id; } : undefined} createLabel={(name) => `Create brand "${name}"`} disabled={brandCreatePending} /><input type="hidden" name="skuId" value={skuId} /><CreatableSearch label="SKU" options={filteredSkus.map((sku) => ({ id: sku.id, label: sku.name ?? sku.code ?? "Unnamed SKU", description: sku.code ? <span className="font-ui-mono text-xs">{sku.code}</span> : sku.brand?.name, keywords: [sku.code ?? "", sku.brand?.name ?? ""] }))} value={skuId} onValueChange={setSkuId} onCreate={refs.canManageSkus ? (name) => { setSkuName(name); setMaterialEntryMode("new"); if (skuBrandFilter !== "ALL") setBrandId(skuBrandFilter); return ""; } : undefined} createLabel={(name) => `Create SKU “${name}”`} placeholder="Search or create SKU" searchPlaceholder="Search SKU name, code, or brand…" emptyLabel="No SKU matches this search." className="w-full" /></div></Field>{selectedSku ? <SkuMeasurementSummary sku={selectedSku} /> : null}{vendorField}</>) : bulk ? <>{vendorField}{categoryField}{bulkTable}</> : <><Field label="Name" required><Input name="name" textCase="title" defaultValue={workRow?.name} required /></Field>{edit ? <input type="hidden" name="vendorId" value={vendorId} required /> : vendorField}{categoryField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note" description="Describe included work or materials. Use bullets for a clear scope."><SimpleTextEditor name="scopeNote" defaultValue={workRow?.scope_note ?? ""} placeholder={"Example:\n- Installation labor\n- Adhesive and grout"} maxLength={1000} rows={5} /></Field>}</>}
-      {!bulk && <><input type="hidden" name="amount" value={amount} /><input type="hidden" name="currency" value={currency} />
-      <Field label="Amount" description={`${currency} default currency`} required><div className="relative"><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-3 flex items-center font-ui-mono text-sm font-semibold text-ink-secondary">{currency}</span><Input aria-label="Amount" value={amountDisplay} onChange={(event) => updateAmount(event.target.value)} onBlur={() => setAmountDisplay(amount ? formatDecimal(amount) : "")} inputMode="decimal" placeholder="15.000" className="pl-14 tabular-nums" required /></div></Field><Field label="Notes"><SimpleTextEditor name="notes" defaultValue={row?.notes ?? ""} placeholder="Additional pricing context..." maxLength={1000} rows={3} /></Field></>}{bulk && bulkError ? <div role="alert" className="text-sm text-danger">{bulkError}</div> : null}<FormActions><Button type="button" variant="ghost" disabled={pending} onClick={() => void draftGuard.requestDiscard(onCancel)}>Cancel</Button><Button type="submit" variant="primary" pending={pending || bulkPending}>{edit ? "Save changes" : bulk ? `Create ${filledRows.length || ""} ${filledRows.length === 1 ? "price" : "prices"}`.replace("  ", " ") : "Create price"}</Button></FormActions>
+      {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name ?? materialRow!.sku.code ?? "Unnamed SKU"} readOnly /></Field><Field label="Supplier"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Unit"><Input value={`${materialRow!.unit.name} (${materialRow!.unit.code})`} readOnly /></Field></> : newMaterialSku ? <><div><Button type="button" variant="ghost" size="sm" onClick={() => setMaterialEntryMode("existing")}>← Back to the price table</Button></div>{newMaterialFields}{vendorField}</> : <>{vendorField}{materialTable}</>) : bulk ? <>{vendorField}{categoryField}{bulkTable}</> : <><Field label="Name" required><Input name="name" textCase="title" defaultValue={workRow?.name} required /></Field>{edit ? <input type="hidden" name="vendorId" value={vendorId} required /> : vendorField}{categoryField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note" description="Describe included work or materials. Use bullets for a clear scope."><SimpleTextEditor name="scopeNote" defaultValue={workRow?.scope_note ?? ""} placeholder={"Example:\n- Installation labor\n- Adhesive and grout"} maxLength={1000} rows={5} /></Field>}</>}
+      {!anyBulk && <><input type="hidden" name="amount" value={amount} /><input type="hidden" name="currency" value={currency} />
+      <Field label="Amount" description={`${currency} default currency`} required><div className="relative"><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-3 flex items-center font-ui-mono text-sm font-semibold text-ink-secondary">{currency}</span><Input aria-label="Amount" value={amountDisplay} onChange={(event) => updateAmount(event.target.value)} onBlur={() => setAmountDisplay(amount ? formatDecimal(amount) : "")} inputMode="decimal" placeholder="15.000" className="pl-14 tabular-nums" required /></div></Field><Field label="Notes"><SimpleTextEditor name="notes" defaultValue={row?.notes ?? ""} placeholder="Additional pricing context..." maxLength={1000} rows={3} /></Field></>}{anyBulk && bulkError ? <div role="alert" className="text-sm text-danger">{bulkError}</div> : null}<FormActions><Button type="button" variant="ghost" disabled={pending} onClick={() => void draftGuard.requestDiscard(onCancel)}>Cancel</Button><Button type="submit" variant="primary" pending={pending || bulkPending}>{edit ? "Save changes" : anyBulk ? `Create ${filledCount || ""} ${filledCount === 1 ? "price" : "prices"}`.replace("  ", " ") : "Create price"}</Button></FormActions>
     </form></Dialog>
     {draftGuard.confirmDialog}
     <VendorQuickCreateDialog

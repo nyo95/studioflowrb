@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.275**
-- Next local revision: **R8.276**
+- Current revision after this entry is committed: **R8.276**
+- Next local revision: **R8.277**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -20,6 +20,14 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Updated service integration fixtures and the Unit form's functional input normalization. The boundary checker names this single approved cross-app migration exception.
 
 **Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow image warnings); `git diff --check`; migrations deployed to verified `studioflow_rebuild` and `studioflow_rebuild_test`. Production build intentionally not run per WO-MD-PROGRAM-01.
+
+## R8.276 | 2026-10-01 | feat(masterdata): material price entry as a supplier-first table
+
+- Creating a material price now follows the same flow as the work prices: choose the supplier, then fill a table of SKU, unit (read from the SKU), amount, and notes; Add row or Enter in the last amount adds a row; saved all together or not at all, with bad rows marked. The SKU list shows the SKUs this supplier can price first; a SKU whose Brand is not linked to the supplier is listed below with that note, and picking it shows "Link brand to supplier" (needs brand-manage or supplier-manage permission; otherwise it says who to ask). The link is the existing audited, idempotent `linkBrandToSupplier`, now reachable through `linkBrandToSupplierAction`.
+- Creating a brand-new SKU with its first price is kept as a second path ("Create a new SKU with its first price", with a way back to the table); editing a single price is unchanged. The old brand filter and single SKU picker were replaced by the table.
+- Backlog: "Material form follows the supplier's brands" closed; browser acceptance entry extended. No migration.
+
+**Checks.** `npx tsc --noEmit`; `npm run lint` (0 errors); `npm run check`. Browser-checked that the dialog renders with the supplier first and the table; saving, the row errors, and the link shortcut are queued for acceptance.
 
 ## R8.275 | 2026-10-01 | feat(masterdata): bulk work-price table, supplier-first categories, and name-case field setting
 

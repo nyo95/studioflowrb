@@ -236,3 +236,11 @@ this backlog's former SF-A entries.)_
 - Steps: 1. Choose the supplier, then the category; the supplier's own categories are listed first and a one-category supplier fills it in. 2. Type three rows in lower case; leave each name field. 3. Press Enter in the last amount to add a row; the unit is copied and the cursor lands in the new name. 4. Make one row invalid (a name that already exists) and press Create; the bad row is marked and nothing is saved. 5. Fix it and save; the supplier gains the category. 6. Type a lower-case name in a Brand or Category dialog and leave the field.
 - Acceptance: names become First Letter Capital (MEP and 60x60 keep their shape); a failed save keeps the table and marks only the bad rows; a successful save creates every row with its own history entry; unit codes stay lower case.
 - Status: PENDING
+
+### [R8.276] Material price table with brand-link shortcut
+- Surface: Master Data → Pricing → New price → Material price
+- Fixture: a material supplier linked to one Brand with a SKU, plus a SKU of a second Brand that is not linked; accounts: one with brand-manage, one with only price-manage
+- Viewport: desktop and a narrow tablet width
+- Steps: 1. Choose the supplier; its Brands' SKUs are listed first, the other Brand's SKU below with a "not linked" note. 2. Add three rows (Enter adds one); amounts format as you leave them. 3. Pick the unlinked SKU: the row shows "Link brand to supplier"; use it as the brand-manager and the SKU becomes priceable; as the price-only account the button is replaced by who to ask. 4. Enter an amount for a SKU this supplier already prices and press Create: that row is marked, nothing is saved. 5. Fix it and save. 6. Use "Create a new SKU with its first price", then "Back to the price table".
+- Acceptance: one failed row never leaves partial prices; each saved row has its own history entry; the unit follows the SKU; linking works only with the right permission.
+- Status: PENDING

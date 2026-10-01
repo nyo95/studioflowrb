@@ -295,3 +295,19 @@ export async function saveBulkMaterialPricesAction(input: unknown): Promise<Acti
     return result;
   });
 }
+
+const linkBrandInput = z.object({ brandId: z.string().uuid(), vendorId: z.string().uuid() });
+
+/** The pricing form's "link this brand to the supplier" shortcut. Idempotent; needs brand-manage or supplier-manage. */
+export async function linkBrandToSupplierAction(input: unknown): Promise<ActionResult<{ brandId: string; vendorId: string }>> {
+  return runSafeAction(async () => {
+    const parsed = linkBrandInput.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    const ctx = await context();
+    const result = await masterDataService.linkBrandToSupplier({ ...ctx, ...parsed.data });
+    refreshPricing();
+    revalidatePath("/masterdata/brands");
+    revalidatePath("/masterdata/vendors");
+    return result;
+  });
+}
