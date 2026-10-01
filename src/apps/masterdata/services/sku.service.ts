@@ -72,8 +72,10 @@ export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts
         await tx.skuCategory.createMany({ data: categoryIds.map((categoryId) => ({ id: randomUUID(), sku_id: skuId, category_id: categoryId })) });
         const productCategoryIds = categories.filter((c) => c.kind === "PRODUCT").map((c) => c.id);
         for (const catId of input.brandId ? productCategoryIds : []) { let bc = await tx.brandCategory.findUnique({ where: { brand_id_category_id: { brand_id: input.brandId!, category_id: catId } } }); if (!bc) { bc = await tx.brandCategory.create({ data: { id: randomUUID(), brand_id: input.brandId!, category_id: catId } }); } await tx.brandCategoryOrigin.create({ data: { id: randomUUID(), brand_category_id: bc.id, kind: "SKU_ENRICHMENT", source_sku_id: skuId, actor_user_id: input.actor.userId ?? null, actor_label: input.actor.label } }); }
-        await tx.priceMaterial.createMany({ data: input.priceMaterials.map((pm) => ({ id: randomUUID(), sku_id: skuId, supplier_vendor_id: pm.supplierVendorId, amount: requiredAmount(pm.amount), currency: requiredCurrency(pm.currency), unit_id: priceUnitId, notes: pm.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label })) });
+        const initialPrices = input.priceMaterials.map((pm) => ({ id: randomUUID(), sku_id: skuId, supplier_vendor_id: pm.supplierVendorId, amount: requiredAmount(pm.amount), currency: requiredCurrency(pm.currency), unit_id: priceUnitId, notes: pm.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label }));
+        await tx.priceMaterial.createMany({ data: initialPrices });
         await writeAudit(ports, tx, { action: "sku.created", entityType: "sku", entityId: skuId, actor: input.actor, metadata: { slug: identity.slug, brand_id: input.brandId, categories: categoryIds.length, prices: input.priceMaterials.length, purchase_to_base_factor: measurement.purchase_to_base_factor } });
+        for (const price of initialPrices) await writeAudit(ports, tx, { action: "price-material.created", entityType: "price_material", entityId: price.id, actor: input.actor, metadata: { sku_id: skuId, vendor_id: price.supplier_vendor_id } });
         return { skuId };
       });
     },

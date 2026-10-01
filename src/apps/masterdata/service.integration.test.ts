@@ -164,6 +164,8 @@ describe("Master Data service", () => {
     assert.equal(preview.errors.length, 0); await service.applySkuPriceImport({ grants: GRANTS, actor: ACTOR, file, hash: preview.hash });
     assert.equal((await testDb.prisma.skuCategory.findMany({ where: { sku_id: skuId } })).map((row) => row.category_id)[0], context.categoryId);
     const grouped = await testDb.prisma.sku.findFirstOrThrow({ where: { code: "NEW-1" }, include: { material_prices: true } }); assert.equal(grouped.material_prices.length, 2);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "sku.created", entity_id: grouped.id } }), 1);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "price-material.created", entity_id: { in: grouped.material_prices.map((price) => price.id) } } }), 2);
     sheet.getCell("E2").value = ""; const blankCategory = await service.previewSkuPriceImport({ grants: GRANTS, file: Buffer.from(await book.xlsx.writeBuffer()) }); assert.ok(blankCategory.errors.some((error) => error.column === "Category"));
     await assert.rejects(service.previewSkuPriceImport({ grants: GRANTS, file: { data: Buffer.alloc(5 * 1024 * 1024 + 1), name: "large.xlsx" } }), (error: unknown) => error instanceof AppError && error.code === "SKU_PRICE_WORKBOOK_INVALID");
     await assert.rejects(service.previewSkuPriceImport({ grants: GRANTS, file: { data: Buffer.from("not parsed"), name: "wrong.csv" } }), (error: unknown) => error instanceof AppError && error.code === "SKU_PRICE_WORKBOOK_INVALID");
@@ -316,6 +318,8 @@ describe("Master Data service", () => {
     assert.equal(sku.material_prices[0].amount.toString(), "123456789012.34");
     assert.equal(sku.material_prices[0].currency, "IDR");
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "sku.created", entity_id: sku.id } }), 1);
+    const priceAudit = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "price-material.created", entity_type: "price_material", entity_id: sku.material_prices[0].id } });
+    assert.deepEqual(priceAudit.metadata, { sku_id: sku.id, vendor_id: context.vendorId });
   });
 
   it("accepts a code-only SKU and uses the code as its fallback identity", async () => {

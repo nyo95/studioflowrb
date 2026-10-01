@@ -5,13 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.267**
-- Next local revision: **R8.268**
+- Current revision after this entry is committed: **R8.268**
+- Next local revision: **R8.269**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.268 | 2026-10-01 | fix(masterdata): correct the hardening migration order, audit events, and registry test
+
+- Corrected the hardening migration order: it now follows the supplier-category merge and precedes duplicate-index cleanup. The office development and disposable test rebuild histories were renamed and their migration checksums updated to match.
+- **Lead decision A.** The hardening migration permanently removes every former `supplier_category` deletion request and archive cause before closing the polymorphic registry; the append-only audit trail remains the historical record. It reports the deleted row counts as a migration notice. The already-applied category merge migration was not edited.
+- Initial SKU prices now each write their own `price-material.created` audit event in the same transaction, while retaining the SKU event. Workbook-created SKUs receive the same child events. The registry constraint test now compares exact allowed-value sets, and a migration-order regression test guards the required sequence.
+- Restored `next-env.d.ts` from before the R8.266 build artifact and deliberately left it out of this revision.
+
+**Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow `<img>` warnings); `git diff --check`; `prisma migrate status` clean for verified `studioflow_rebuild` and `studioflow_rebuild_test`; disposable test database reset from scratch and seeded before the merge with PENDING and REJECTED former-category requests plus direct and parent archive causes, all removed before closed constraints were installed. Its prior data was backed up and restored afterwards. Production build intentionally not run, per correction-pass instruction.
 
 ## R8.267 | 2026-10-01 | docs(masterdata): review WO-MD-HARDEN-01 (correction required)
 

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { after, before, it } from "node:test";
 import { closeTestDb, createTestDb, requireDisposableTestDatabaseUrl, type TestDb } from "@platform/core/db/test-support";
 import { MASTERDATA_ARCHIVE_ENTITY_TYPES, MASTERDATA_DELETION_TARGET_TYPES } from "./services/polymorphic-registry";
@@ -8,6 +8,16 @@ let db: TestDb;
 before(async () => { db = await createTestDb(requireDisposableTestDatabaseUrl()); });
 after(async () => { if (db) await closeTestDb(db); });
 const migration = (name: string) => readFileSync(`prisma/migrations/${name}/migration.sql`, "utf8").replaceAll('"master_data".', 'pg_temp.').replaceAll('master_data.', 'pg_temp.').replaceAll('"bq".', 'pg_temp.');
+const checkedTextValues = (definition: string) => [...definition.matchAll(/'([^']+)'::text/g)].map((match) => match[1]).sort();
+
+it("orders supplier-category cleanup before master-data constraint hardening", () => {
+  const migrations = readdirSync("prisma/migrations", { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+  const merge = migrations.indexOf("20261001090000_merge_supplier_categories_into_categories");
+  const harden = migrations.indexOf("20261001090500_masterdata_harden_constraints");
+  const duplicateCleanup = migrations.indexOf("20261001091000_masterdata_drop_duplicate_indexes");
+  assert.ok(merge >= 0 && harden >= 0 && duplicateCleanup >= 0);
+  assert.ok(merge < harden && harden < duplicateCleanup);
+});
 
 it("corrects historical CUSTOM baselines without changing working or imported prices", async () => {
   const c = await db.pool.connect();
@@ -50,9 +60,7 @@ it("keeps the live polymorphic CHECK constraints aligned with the canonical regi
       AND conname IN ('DeletionRequest_target_type_check', 'ArchiveCause_entity_type_check', 'ArchiveCause_parent_type_check')
   `;
   const byName = new Map(rows.map((row) => [row.conname, row.definition]));
-  for (const value of MASTERDATA_DELETION_TARGET_TYPES) assert.match(byName.get("DeletionRequest_target_type_check") ?? "", new RegExp(`'${value}'`));
-  for (const value of MASTERDATA_ARCHIVE_ENTITY_TYPES) {
-    assert.match(byName.get("ArchiveCause_entity_type_check") ?? "", new RegExp(`'${value}'`));
-    assert.match(byName.get("ArchiveCause_parent_type_check") ?? "", new RegExp(`'${value}'`));
-  }
+  assert.deepEqual(checkedTextValues(byName.get("DeletionRequest_target_type_check") ?? ""), [...MASTERDATA_DELETION_TARGET_TYPES].sort());
+  assert.deepEqual(checkedTextValues(byName.get("ArchiveCause_entity_type_check") ?? ""), [...MASTERDATA_ARCHIVE_ENTITY_TYPES].sort());
+  assert.deepEqual(checkedTextValues(byName.get("ArchiveCause_parent_type_check") ?? ""), [...MASTERDATA_ARCHIVE_ENTITY_TYPES].sort());
 });

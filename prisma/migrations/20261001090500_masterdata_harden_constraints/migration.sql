@@ -1,6 +1,19 @@
 -- R8.266 — Master Data scalar, lifecycle, and FK-index hardening.
 -- Every guard is preceded by a count so an unexpected local dataset stops
 -- clearly rather than being silently rewritten.
+-- Supplier categories ceased to exist in the preceding merge migration.
+-- Remove their historical polymorphic rows before closing the registry; the
+-- append-only AuditEvent trail retains the recorded business history.
+DO $$
+DECLARE deletion_requests bigint; archive_causes bigint;
+BEGIN
+  DELETE FROM "master_data"."DeletionRequest" WHERE "target_type" = 'supplier_category';
+  GET DIAGNOSTICS deletion_requests = ROW_COUNT;
+  DELETE FROM "master_data"."ArchiveCause" WHERE "entity_type" = 'supplier_category' OR "parent_type" = 'supplier_category';
+  GET DIAGNOSTICS archive_causes = ROW_COUNT;
+  RAISE NOTICE 'master_data supplier_category cleanup deleted % DeletionRequest row(s) and % ArchiveCause row(s)', deletion_requests, archive_causes;
+END $$;
+
 DO $$
 DECLARE violations bigint;
 BEGIN
