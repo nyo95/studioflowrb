@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.266] Master Data write-path hardening
+- Surface: Suppliers, Categories, Settings → Supplier Types, workbook import, and audit history
+- Fixture: signed-in Master Data manager; a Supplier with one contact; active Categories attached to a SKU, Brand, Supplier, and work price; a capability-dependent Supplier Type
+- Viewport: desktop (default)
+- Steps: 1. Submit malformed Supplier contacts and reopen the Supplier. 2. Try deactivating each used Category and archiving the dependent Supplier Type. 3. Apply one workbook and one sample-request price update, then inspect entity audit history.
+- Acceptance: malformed contacts show a readable validation error and preserve stored contacts; lifecycle guards state why the record cannot change; each changed SKU/price has its own audit event as well as the batch event.
+- Status: PENDING
+
 ### [R8.257] Master Data directory findability
 - Surface: Brands, Suppliers, SKUs, and Pricing directories
 - Fixture: signed-in Master Data reader with active and archived records, linked brands/suppliers, and prices in more than one currency or unit

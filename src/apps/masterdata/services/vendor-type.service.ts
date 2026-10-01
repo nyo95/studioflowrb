@@ -5,7 +5,7 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, assertVendorTypeRemovalSafe, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
 
 export function createVendorTypeService(db: PrismaClient, ports: MasterDataServicePorts) {
   const { runTransaction } = ports;
@@ -49,6 +49,7 @@ export function createVendorTypeService(db: PrismaClient, ports: MasterDataServi
       const name = requiredName(input.name, "VENDOR_TYPE_NAME_REQUIRED");
       return runTransaction(async (tx) => {
         const existing = await tx.vendorType.findUniqueOrThrow({ where: { id: input.vendorTypeId } });
+        if (existing.deleted_at !== null) throw new AppError("CONFLICT", "VENDOR_TYPE_ARCHIVED", "Cannot update an archived Supplier Type.");
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (existing.name !== name) changes.name = { from: existing.name, to: name };
         if (existing.can_supply_material !== input.canSupplyMaterial) changes.can_supply_material = { from: existing.can_supply_material, to: input.canSupplyMaterial };
@@ -88,6 +89,18 @@ export function createVendorTypeService(db: PrismaClient, ports: MasterDataServi
       return runTransaction(async (tx) => {
         const vt = await tx.vendorType.findUniqueOrThrow({ where: { id: input.vendorTypeId } });
         if (vt.deleted_at !== null) throw new AppError("CONFLICT", "VENDOR_TYPE_ALREADY_ARCHIVED", "Supplier Type is already archived.");
+        const assignments = await tx.vendorVendorType.findMany({ where: { vendor_type_id: input.vendorTypeId, vendor: { deleted_at: null } }, include: { vendor: { select: { name: true } } } });
+        for (const assignment of assignments) {
+          const remaining = await tx.vendorVendorType.findMany({ where: { vendor_id: assignment.vendor_id, vendor_type_id: { not: input.vendorTypeId }, vendor_type: { deleted_at: null } }, select: { vendor_type_id: true } });
+          try {
+            await assertVendorTypeRemovalSafe(tx, assignment.vendor_id, remaining.map((row) => row.vendor_type_id));
+          } catch (error) {
+            if (error instanceof AppError && (error.code === "VENDOR_MATERIAL_CAPABILITY_IN_USE" || error.code === "VENDOR_LABOR_CAPABILITY_IN_USE")) {
+              throw new AppError("CONFLICT", error.code, `Cannot archive this Supplier Type because Supplier ${assignment.vendor.name} still depends on that capability.`);
+            }
+            throw error;
+          }
+        }
         await addDirectCause(tx, "vendor_type", input.vendorTypeId);
         await tx.vendorType.update({ where: { id: input.vendorTypeId }, data: { deleted_at: new Date() } });
         await writeAudit(ports, tx, { action: "vendor-type.archived", entityType: "vendor_type", entityId: input.vendorTypeId, actor: input.actor });

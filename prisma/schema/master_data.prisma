@@ -304,6 +304,8 @@ model Sku {
   category_origins BrandCategoryOrigin[]
 
   @@index([brand_id])
+  @@index([base_unit_id])
+  @@index([purchase_unit_id])
   @@index([deleted_at])
   @@index([code])
   @@index([dimension_unit_id])
@@ -346,6 +348,8 @@ model PriceMaterial {
 
   @@index([sku_id])
   @@index([supplier_vendor_id])
+  @@index([unit_id])
+  @@index([source_link_id])
   @@index([deleted_at])
   @@schema("master_data")
 }
@@ -375,6 +379,7 @@ model PriceMaterialLabor {
 
   @@index([category_id])
   @@index([vendor_id])
+  @@index([unit_id])
   @@index([deleted_at])
   @@schema("master_data")
 }
@@ -403,6 +408,7 @@ model PriceLabor {
 
   @@index([category_id])
   @@index([vendor_id])
+  @@index([unit_id])
   @@index([deleted_at])
   @@schema("master_data")
 }

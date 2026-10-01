@@ -7,7 +7,7 @@ import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 import { buildImportTemplate, exportTable, parseTabularFile, type FileResult, type ImportFormat, type TableColumn, type TableFormat } from "@platform/utilities/tabular";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, requiredAmount, requiredCurrency } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, requiredAmount, requiredCurrency, resolveSkuMeasurement, assertVendorMaterialCapable } from "./shared";
 
 const SHEET = "SKU Prices";
 const HEADERS = ["SKU ID", "Code", "Name", "Brand", "Category", "Base unit", "Purchase unit", "Length", "Width", "Thickness", "Dimension unit", "Notes", "Price ID", "Supplier", "Amount", "Currency", "Price notes"] as const;
@@ -93,6 +93,17 @@ export function createSkuPriceWorkbookService(
       if (hasPrice && !source.Supplier) add("Supplier", "Supplier is required for a material price."); if (hasPrice && !source.Amount) add("Amount", "Amount is required for a material price.");
       if (source.Amount) try { requiredAmount(source.Amount); } catch { add("Amount", "Amount must be a non-negative decimal."); }
       if (hasPrice && !source.Currency) add("Currency", "Currency is required for a material price."); if (source.Currency) try { requiredCurrency(source.Currency); } catch { add("Currency", "Currency must be a 3-letter code."); }
+      if (errors.length === 0) {
+        try {
+          const baseUnit = await client.unit.findUniqueOrThrow({ where: { id: baseUnitId! } });
+          const purchaseUnit = purchaseUnitId ? await client.unit.findUniqueOrThrow({ where: { id: purchaseUnitId } }) : null;
+          await resolveSkuMeasurement(client as any, { dimensionLength: source.Length || null, dimensionWidth: source.Width || null, dimensionThickness: source.Thickness || null, dimensionUnitId }, baseUnit, purchaseUnit);
+          if (supplierId) await assertVendorMaterialCapable(client as any, supplierId);
+        } catch (error) {
+          if (error instanceof AppError) add(error.code.startsWith("SKU_DIMENSION") ? "Dimension unit" : "Supplier", error.safeMessage);
+          else throw error;
+        }
+      }
       if (!skuId && !hasPrice) add("Supplier", "A new SKU needs its first material price.");
       if (!source.Name && !source.Code) add("Name", "SKU name or code is required.");
       if (price && supplierId && price.supplier_vendor_id !== supplierId) add("Supplier", "Supplier cannot be changed for an existing price.");
@@ -167,10 +178,10 @@ export function createSkuPriceWorkbookService(
         for (const row of check.valid) {
           const skuInput = { grants: input.grants, actor: input.actor, name: row.Name || null, code: row.Code || null, notes: row.Notes || null, brandId: row.brandId, baseUnitId: row.baseUnitId, purchaseUnitId: row.purchaseUnitId, dimensionLength: row.Length || null, dimensionWidth: row.Width || null, dimensionThickness: row.Thickness || null, dimensionUnitId: row.dimensionUnitId, categoryId: row.categoryId };
           let skuId = row.sku?.id;
-          if (!skuId) { const group = `${key(row.Code)}:${key(row.Name)}`; if (completedNewGroups.has(group)) continue; const grouped = newRows.get(group)!; const result = await service.createSku({ ...skuInput, suppressAudit: true, priceMaterials: grouped.map((entry) => ({ supplierVendorId: entry.supplierId!, amount: entry.Amount, currency: entry.Currency, notes: entry["Price notes"] || undefined })) }); skuId = result.skuId; completedNewGroups.add(group); created += 1; continue; }
-          const before = check.rows.find((x) => x.row === row.row)!; if (before.outcome === "update") { await service.updateSku({ ...skuInput, skuId, suppressAudit: true }); updated += 1; }
-          if (row.Supplier && !row.price) { await service.createPriceMaterial({ grants: input.grants, actor: input.actor, skuId, supplierVendorId: row.supplierId!, amount: row.Amount, currency: row.Currency, notes: row["Price notes"] || undefined, suppressAudit: true }); if (before.outcome !== "update") updated += 1; }
-          else if (row.price && (row.price.amount.toString() !== requiredAmount(row.Amount) || row.price.currency !== requiredCurrency(row.Currency) || !same(row.price.notes, row["Price notes"] || null))) await service.updatePriceMaterial({ grants: input.grants, actor: input.actor, priceMaterialId: row.price.id, amount: row.Amount, currency: row.Currency, notes: row["Price notes"] || null, suppressAudit: true });
+          if (!skuId) { const group = `${key(row.Code)}:${key(row.Name)}`; if (completedNewGroups.has(group)) continue; const grouped = newRows.get(group)!; const result = await service.createSku({ ...skuInput, priceMaterials: grouped.map((entry) => ({ supplierVendorId: entry.supplierId!, amount: entry.Amount, currency: entry.Currency, notes: entry["Price notes"] || undefined })) }); skuId = result.skuId; completedNewGroups.add(group); created += 1; continue; }
+          const before = check.rows.find((x) => x.row === row.row)!; if (before.outcome === "update") { await service.updateSku({ ...skuInput, skuId }); updated += 1; }
+          if (row.Supplier && !row.price) { await service.createPriceMaterial({ grants: input.grants, actor: input.actor, skuId, supplierVendorId: row.supplierId!, amount: row.Amount, currency: row.Currency, notes: row["Price notes"] || undefined }); if (before.outcome !== "update") updated += 1; }
+          else if (row.price && (row.price.amount.toString() !== requiredAmount(row.Amount) || row.price.currency !== requiredCurrency(row.Currency) || !same(row.price.notes, row["Price notes"] || null))) await service.updatePriceMaterial({ grants: input.grants, actor: input.actor, priceMaterialId: row.price.id, amount: row.Amount, currency: row.Currency, notes: row["Price notes"] || null });
         }
         await ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "sku-price-workbook.applied", entityType: "sku_price_workbook", entityId: actual, actor: input.actor, metadata: { created, updated, unchanged: check.rows.filter((x) => x.outcome === "unchanged").length } }), tx as any);
         return { totals: { create: created, update: updated, unchanged: check.rows.filter((x) => x.outcome === "unchanged").length, error: 0 } };

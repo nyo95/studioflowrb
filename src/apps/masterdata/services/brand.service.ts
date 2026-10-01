@@ -136,6 +136,7 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
       const slug = requiredSlug(name);
       return runTransaction(async (tx) => {
         const existing = await tx.brand.findUniqueOrThrow({ where: { id: input.brandId }, include: { categories: { include: { origins: true } }, hashtags: true, links: true, suppliers: true } });
+        if (existing.deleted_at !== null) throw new AppError("CONFLICT", "BRAND_ARCHIVED", "Cannot update an archived brand.");
         if (input.ownerVendorId) { const owner = await tx.vendor.findUniqueOrThrow({ where: { id: input.ownerVendorId } }); if (owner.deleted_at !== null) throw new AppError("VALIDATION", "BRAND_OWNER_ARCHIVED", "Owner Supplier is archived."); }
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (existing.name !== name) { changes.name = { from: existing.name, to: name }; changes.slug = { from: existing.slug, to: slug }; }
@@ -262,4 +263,3 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
     },
   };
 }
-

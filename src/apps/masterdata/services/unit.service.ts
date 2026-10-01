@@ -58,6 +58,7 @@ export function createUnitService(db: PrismaClient, ports: MasterDataServicePort
       const name = requiredName(input.name, "UNIT_NAME_REQUIRED");
       return runTransaction(async (tx) => {
         const existing = await tx.unit.findUniqueOrThrow({ where: { id: input.unitId } });
+        if (existing.status !== "ACTIVE") throw new AppError("CONFLICT", "UNIT_ARCHIVED", "Cannot update an archived unit.");
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (existing.name !== name) changes.name = { from: existing.name, to: name };
         if (existing.code !== code) throw new AppError("CONFLICT", "UNIT_CODE_IMMUTABLE", "Unit code is fixed after creation.");

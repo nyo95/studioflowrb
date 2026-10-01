@@ -44,7 +44,7 @@ export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts
       });
     },
 
-    async createSku(input: { grants: PermissionGrants; actor: AuditActor; name?: string | null; code?: string | null; notes?: string; brandId?: string | null; baseUnitId: string; purchaseUnitId?: string; dimensionLength?: string; dimensionWidth?: string; dimensionThickness?: string; dimensionUnitId?: string; categoryId: string; priceMaterials: Array<{ supplierVendorId: string; amount: string; currency: string; notes?: string }>; suppressAudit?: boolean }) {
+    async createSku(input: { grants: PermissionGrants; actor: AuditActor; name?: string | null; code?: string | null; notes?: string; brandId?: string | null; baseUnitId: string; purchaseUnitId?: string; dimensionLength?: string; dimensionWidth?: string; dimensionThickness?: string; dimensionUnitId?: string; categoryId: string; priceMaterials: Array<{ supplierVendorId: string; amount: string; currency: string; notes?: string }> }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuManage);
       actorIsUsable(input.actor);
       const identity = resolveSkuIdentity(input.name, input.code);
@@ -73,12 +73,12 @@ export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts
         const productCategoryIds = categories.filter((c) => c.kind === "PRODUCT").map((c) => c.id);
         for (const catId of input.brandId ? productCategoryIds : []) { let bc = await tx.brandCategory.findUnique({ where: { brand_id_category_id: { brand_id: input.brandId!, category_id: catId } } }); if (!bc) { bc = await tx.brandCategory.create({ data: { id: randomUUID(), brand_id: input.brandId!, category_id: catId } }); } await tx.brandCategoryOrigin.create({ data: { id: randomUUID(), brand_category_id: bc.id, kind: "SKU_ENRICHMENT", source_sku_id: skuId, actor_user_id: input.actor.userId ?? null, actor_label: input.actor.label } }); }
         await tx.priceMaterial.createMany({ data: input.priceMaterials.map((pm) => ({ id: randomUUID(), sku_id: skuId, supplier_vendor_id: pm.supplierVendorId, amount: requiredAmount(pm.amount), currency: requiredCurrency(pm.currency), unit_id: priceUnitId, notes: pm.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label })) });
-        if (!input.suppressAudit) await writeAudit(ports, tx, { action: "sku.created", entityType: "sku", entityId: skuId, actor: input.actor, metadata: { slug: identity.slug, brand_id: input.brandId, categories: categoryIds.length, prices: input.priceMaterials.length, purchase_to_base_factor: measurement.purchase_to_base_factor } });
+        await writeAudit(ports, tx, { action: "sku.created", entityType: "sku", entityId: skuId, actor: input.actor, metadata: { slug: identity.slug, brand_id: input.brandId, categories: categoryIds.length, prices: input.priceMaterials.length, purchase_to_base_factor: measurement.purchase_to_base_factor } });
         return { skuId };
       });
     },
 
-    async updateSku(input: { grants: PermissionGrants; actor: AuditActor; skuId: string; name?: string | null; code?: string | null; notes?: string | null; brandId?: string | null; baseUnitId: string; purchaseUnitId?: string | null; dimensionLength?: string | null; dimensionWidth?: string | null; dimensionThickness?: string | null; dimensionUnitId?: string | null; categoryId: string; suppressAudit?: boolean }) {
+    async updateSku(input: { grants: PermissionGrants; actor: AuditActor; skuId: string; name?: string | null; code?: string | null; notes?: string | null; brandId?: string | null; baseUnitId: string; purchaseUnitId?: string | null; dimensionLength?: string | null; dimensionWidth?: string | null; dimensionThickness?: string | null; dimensionUnitId?: string | null; categoryId: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuManage);
       actorIsUsable(input.actor);
       const identity = resolveSkuIdentity(input.name, input.code);
@@ -126,7 +126,7 @@ export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts
         const productCategoryIds = categories.filter((c) => c.kind === "PRODUCT").map((c) => c.id);
         for (const catId of input.brandId ? productCategoryIds : []) { let bc = await tx.brandCategory.findUnique({ where: { brand_id_category_id: { brand_id: input.brandId!, category_id: catId } } }); if (!bc) { bc = await tx.brandCategory.create({ data: { id: randomUUID(), brand_id: input.brandId!, category_id: catId } }); } await tx.brandCategoryOrigin.create({ data: { id: randomUUID(), brand_category_id: bc.id, kind: "SKU_ENRICHMENT", source_sku_id: input.skuId, actor_user_id: input.actor.userId ?? null, actor_label: input.actor.label } }); }
         await pruneOriginlessBrandCategories(tx, touchedBrandCategoryIds);
-        if (!input.suppressAudit && Object.keys(changes).length > 0) await writeAudit(ports, tx, { action: "sku.updated", entityType: "sku", entityId: input.skuId, actor: input.actor, changes });
+        if (Object.keys(changes).length > 0) await writeAudit(ports, tx, { action: "sku.updated", entityType: "sku", entityId: input.skuId, actor: input.actor, changes });
         return { skuId: input.skuId };
       });
     },

@@ -134,7 +134,7 @@ describe("Master Data service", () => {
     assert.equal((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: skuId } })).name, "Workbook SKU edited");
     assert.equal((await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: skuId } })).amount.toString(), "125.5");
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "sku-price-workbook.applied" } }), 1);
-    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: { in: ["sku.updated", "price-material.updated"] } } }), 0);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: { in: ["sku.updated", "price-material.updated"] } } }), 2, "workbook changes retain per-entity audit events alongside the batch event");
 
     const invalid = new ExcelJS.Workbook(); const invalidSheet = invalid.addWorksheet("SKU Prices");
     invalidSheet.addRow(["SKU ID", "Code", "Name", "Brand", "Category", "Base unit", "Purchase unit", "Length", "Width", "Thickness", "Dimension unit", "Notes", "Price ID", "Supplier", "Amount", "Currency", "Price notes"]);
@@ -1210,6 +1210,44 @@ describe("Master Data service", () => {
       "PENDING",
     );
   });
+  it("blocks category deactivation for each live family and permits it after a merge", async () => {
+    const context = await createMaterialContext();
+    const skuCategory = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Used by SKU", kind: "PRODUCT" });
+    await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Category SKU", baseUnitId: context.unit.id, categoryId: skuCategory.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] });
+    await assert.rejects(service.deactivateCategory({ grants: GRANTS, actor: ACTOR, categoryId: skuCategory.categoryId }), (error: unknown) => error instanceof AppError && error.code === "CATEGORY_IN_USE");
+    const brandCategory = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Used by Brand", kind: "PRODUCT" });
+    await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Category Brand", categoryIds: [brandCategory.categoryId] });
+    await assert.rejects(service.deactivateCategory({ grants: GRANTS, actor: ACTOR, categoryId: brandCategory.categoryId }), (error: unknown) => error instanceof AppError && error.code === "CATEGORY_IN_USE");
+    const vendorCategory = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Used by Supplier", kind: "PRODUCT" });
+    await service.updateVendor({ grants: GRANTS, actor: ACTOR, vendorId: context.vendorId, name: "Supplier One", categoryIds: [vendorCategory.categoryId] });
+    await assert.rejects(service.deactivateCategory({ grants: GRANTS, actor: ACTOR, categoryId: vendorCategory.categoryId }), (error: unknown) => error instanceof AppError && error.code === "CATEGORY_IN_USE");
+    const workCategory = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Used by Work Price", kind: "WORK" });
+    const laborType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SERVICE" } });
+    await service.updateVendor({ grants: GRANTS, actor: ACTOR, vendorId: context.vendorId, name: "Supplier One", vendorTypeIds: [(await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } })).id, laborType.id] });
+    await service.createPriceLabor({ grants: GRANTS, actor: ACTOR, name: "Category labor", categoryId: workCategory.categoryId, vendorId: context.vendorId, unitId: context.unit.id, amount: "1", currency: "IDR" });
+    await assert.rejects(service.deactivateCategory({ grants: GRANTS, actor: ACTOR, categoryId: workCategory.categoryId }), (error: unknown) => error instanceof AppError && error.code === "CATEGORY_IN_USE");
+    const target = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Merged target", kind: "PRODUCT" });
+    await service.mergeCategory({ grants: GRANTS, actor: ACTOR, sourceCategoryId: skuCategory.categoryId, targetCategoryId: target.categoryId });
+    assert.equal((await testDb.prisma.category.findUniqueOrThrow({ where: { id: skuCategory.categoryId } })).status, "DEACTIVATED");
+  });
+
+  it("blocks archiving a capability in use, permits an unused type, and rejects every archived root update", async () => {
+    const context = await createMaterialContext();
+    const materialType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Type guard SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] });
+    await assert.rejects(service.archiveVendorType({ grants: GRANTS, actor: ACTOR, vendorTypeId: materialType.id }), (error: unknown) => error instanceof AppError && error.code === "VENDOR_MATERIAL_CAPABILITY_IN_USE");
+    const unused = await service.createVendorType({ grants: GRANTS, actor: ACTOR, code: "UNUSED_TEST", name: "Unused type", canSupplyMaterial: true });
+    await service.archiveVendorType({ grants: GRANTS, actor: ACTOR, vendorTypeId: unused.vendorTypeId });
+    await assert.rejects(service.updateVendorType({ grants: GRANTS, actor: ACTOR, vendorTypeId: unused.vendorTypeId, name: "Unused type", canSupplyMaterial: true, canSupplyLabor: false }), (error: unknown) => error instanceof AppError && error.code === "VENDOR_TYPE_ARCHIVED");
+    const unit = await service.createUnit({ grants: GRANTS, actor: ACTOR, code: "ARCH_ROOT", name: "Archived root" }); await service.archiveUnit({ grants: GRANTS, actor: ACTOR, unitId: unit.unitId });
+    await assert.rejects(service.updateUnit({ grants: GRANTS, actor: ACTOR, unitId: unit.unitId, code: "ARCH_ROOT", name: "Changed" }), (error: unknown) => error instanceof AppError && error.code === "UNIT_ARCHIVED");
+    const category = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Archived category", kind: "PRODUCT" }); await service.deactivateCategory({ grants: GRANTS, actor: ACTOR, categoryId: category.categoryId });
+    await assert.rejects(service.updateCategory({ grants: GRANTS, actor: ACTOR, categoryId: category.categoryId, name: "Changed" }), (error: unknown) => error instanceof AppError && error.code === "CATEGORY_INACTIVE");
+    const brand = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Archived brand" }); await service.archiveBrand({ grants: GRANTS, actor: ACTOR, brandId: brand.brandId });
+    await assert.rejects(service.updateBrand({ grants: GRANTS, actor: ACTOR, brandId: brand.brandId, name: "Changed" }), (error: unknown) => error instanceof AppError && error.code === "BRAND_ARCHIVED");
+    const vendor = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Archived vendor" }); await service.archiveVendor({ grants: GRANTS, actor: ACTOR, vendorId: vendor.vendorId });
+    await assert.rejects(service.updateVendor({ grants: GRANTS, actor: ACTOR, vendorId: vendor.vendorId, name: "Changed" }), (error: unknown) => error instanceof AppError && error.code === "VENDOR_ARCHIVED");
+  });
 });
 
 describe("Sample request intake (Master Data side of StudioFlow sample requests)", () => {
@@ -1327,6 +1365,20 @@ describe("Sample request intake (Master Data side of StudioFlow sample requests)
     assert.equal(context.vendorId.length > 0, true);
   });
 
+  it("rejects a material price whose SKU or Supplier does not match the quote", async () => {
+    const context = await createMaterialContext();
+    const second = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Second sample supplier" });
+    const type = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    await testDb.prisma.vendorVendorType.create({ data: { id: crypto.randomUUID(), vendor_id: second.vendorId, vendor_type_id: type.id } });
+    const firstSku = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Sample first SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "10", currency: "IDR" }] });
+    const secondSku = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Sample second SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: second.vendorId, amount: "20", currency: "IDR" }] });
+    const secondPrice = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: secondSku.skuId } });
+    const intake = await start("request-mismatch");
+    await rejectsWithCode(service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: intake.id, vendorId: context.vendorId, skuId: firstSku.skuId, priceMaterialId: secondPrice.id }), "SAMPLE_PRICE_RELATION_MISMATCH");
+    await rejectsWithCode(service.markSampleRequestPriced({ grants: GRANTS, actor: STAFF, intakeId: intake.id, vendorId: context.vendorId, skuId: firstSku.skuId, priceMaterialId: secondPrice.id }), "SAMPLE_PRICE_RELATION_MISMATCH");
+    await rejectsWithCode(service.startSampleRequestIntake({ grants: GRANTS, actor: STAFF, snapshot: snapshot("request-mismatch-start"), quote: { vendorId: context.vendorId, skuId: firstSku.skuId, priceMaterialId: secondPrice.id } }), "SAMPLE_PRICE_RELATION_MISMATCH");
+  });
+
   it("marks priced only with a price, then closes the request for further changes", async () => {
     const context = await createMaterialContext();
     const { skuId } = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Priced SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1000", currency: "IDR" }] });
@@ -1341,7 +1393,7 @@ describe("Sample request intake (Master Data side of StudioFlow sample requests)
     const pricedByAmount = await service.markSampleRequestPriced({ grants: GRANTS, actor: STAFF, intakeId: withAmount.id, quotedAmount: "99000", quotedCurrency: "IDR" });
     assert.equal(pricedByAmount.status, "PRICED");
     assert.ok(pricedByAmount.resolvedAt instanceof Date);
-    const pricedByLink = await service.markSampleRequestPriced({ grants: GRANTS, actor: STAFF, intakeId: withLink.id, priceMaterialId: price.id });
+    const pricedByLink = await service.markSampleRequestPriced({ grants: GRANTS, actor: STAFF, intakeId: withLink.id, vendorId: context.vendorId, skuId, priceMaterialId: price.id });
     assert.equal(pricedByLink.priceMaterialId, price.id);
     assert.equal(pricedByLink.quotedAmount, null, "a linked price is enough; no amount is invented");
 
@@ -1384,7 +1436,7 @@ describe("Sample request intake (Master Data side of StudioFlow sample requests)
     const intake = await start("request-sync-supplier-change");
     await service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: intake.id, vendorId: context.vendorId, skuId, quotedAmount: "500", quotedCurrency: "IDR" });
     const first = await service.syncSampleQuoteToPrice({ grants: GRANTS, actor: STAFF, intakeId: intake.id });
-    await service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: intake.id, vendorId: other.vendorId });
+    await service.recordSampleQuote({ grants: GRANTS, actor: STAFF, intakeId: intake.id, vendorId: other.vendorId, priceMaterialId: null });
     const second = await service.syncSampleQuoteToPrice({ grants: GRANTS, actor: STAFF, intakeId: intake.id });
     assert.notEqual(second.priceMaterialId, first.priceMaterialId, "a different supplier gets its own price even at the same amount");
     assert.equal(await testDb.prisma.priceMaterial.count({ where: { sku_id: skuId, supplier_vendor_id: other.vendorId, deleted_at: null } }), 1);

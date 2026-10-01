@@ -9,6 +9,7 @@ import { normalizeText } from "@platform/utilities/normalization";
 import { toSlug } from "@platform/utilities/slug";
 import { compareDecimals, toDecimalString } from "@platform/utilities/decimal";
 import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurement";
+import { MASTERDATA_ARCHIVE_ENTITY_TYPES, MASTERDATA_DELETION_TARGET_TYPES, type MasterDataArchiveEntityType, type MasterDataDeletionTargetType } from "./polymorphic-registry";
 
 export { hasPermission };
 export type TxClient = Prisma.TransactionClient;
@@ -109,20 +110,20 @@ export function normalizeHashtags(hashtags: readonly string[]): Array<{ label: s
   return result;
 }
 
-export async function addDirectCause(tx: TxClient, entityType: string, entityId: string): Promise<void> {
+export async function addDirectCause(tx: TxClient, entityType: MasterDataArchiveEntityType, entityId: string): Promise<void> {
   await tx.archiveCause.createMany({ data: [{ id: randomUUID(), entity_type: entityType, entity_id: entityId, kind: "DIRECT", parent_type: null, parent_id: null }], skipDuplicates: true });
 }
 
-export async function addParentCauses(tx: TxClient, entityType: string, parentType: string, parentId: string, entityIds: string[]): Promise<void> {
+export async function addParentCauses(tx: TxClient, entityType: MasterDataArchiveEntityType, parentType: MasterDataArchiveEntityType, parentId: string, entityIds: string[]): Promise<void> {
   if (entityIds.length === 0) return;
   await tx.archiveCause.createMany({ data: entityIds.map((entityId) => ({ id: randomUUID(), entity_type: entityType, entity_id: entityId, kind: "PARENT" as const, parent_type: parentType, parent_id: parentId })), skipDuplicates: true });
 }
 
-export async function removeDirectCause(tx: TxClient, entityType: string, entityId: string): Promise<void> {
+export async function removeDirectCause(tx: TxClient, entityType: MasterDataArchiveEntityType, entityId: string): Promise<void> {
   await tx.archiveCause.deleteMany({ where: { entity_type: entityType, entity_id: entityId, kind: "DIRECT", parent_type: null, parent_id: null } });
 }
 
-export async function removeParentCausesAndFindRestored(tx: TxClient, entityType: string, parentType: string, parentId: string): Promise<string[]> {
+export async function removeParentCausesAndFindRestored(tx: TxClient, entityType: MasterDataArchiveEntityType, parentType: MasterDataArchiveEntityType, parentId: string): Promise<string[]> {
   const affected = await tx.archiveCause.findMany({ where: { entity_type: entityType, kind: "PARENT", parent_type: parentType, parent_id: parentId }, select: { entity_id: true } });
   const affectedIds = affected.map((c) => c.entity_id); if (affectedIds.length === 0) return [];
   await tx.archiveCause.deleteMany({ where: { entity_type: entityType, kind: "PARENT", parent_type: parentType, parent_id: parentId } });
@@ -149,6 +150,21 @@ export async function assertVendorTypeRemovalSafe(tx: TxClient, vendorId: string
   const hasMaterial = remainingTypes.some((t) => t.can_supply_material); const hasLabor = remainingTypes.some((t) => t.can_supply_labor);
   if (!hasMaterial) { const [priceCount, supplierCount] = await Promise.all([tx.priceMaterial.count({ where: { supplier_vendor_id: vendorId, deleted_at: null } }), tx.brandSupplier.count({ where: { vendor_id: vendorId } })]); if (priceCount > 0 || supplierCount > 0) throw new AppError("CONFLICT", "VENDOR_MATERIAL_CAPABILITY_IN_USE", "Cannot remove material supply capability while live material prices or brand supplier relations exist."); }
   if (!hasLabor) { const [mlCount, laborCount] = await Promise.all([tx.priceMaterialLabor.count({ where: { vendor_id: vendorId, deleted_at: null } }), tx.priceLabor.count({ where: { vendor_id: vendorId, deleted_at: null } })]); if (mlCount > 0 || laborCount > 0) throw new AppError("CONFLICT", "VENDOR_LABOR_CAPABILITY_IN_USE", "Cannot remove labor provision capability while live work prices exist."); }
+}
+
+/** Blocks a deactivation that would hide a category still used by live data. */
+export async function assertCategoryDeactivationSafe(tx: TxClient, categoryId: string): Promise<void> {
+  const [skus, brands, vendors, materialLaborPrices, laborPrices] = await Promise.all([
+    tx.sku.count({ where: { deleted_at: null, categories: { some: { category_id: categoryId } } } }),
+    tx.brand.count({ where: { deleted_at: null, categories: { some: { category_id: categoryId } } } }),
+    tx.vendor.count({ where: { deleted_at: null, categories: { some: { category_id: categoryId } } } }),
+    tx.priceMaterialLabor.count({ where: { deleted_at: null, category_id: categoryId } }),
+    tx.priceLabor.count({ where: { deleted_at: null, category_id: categoryId } }),
+  ]);
+  const workPrices = materialLaborPrices + laborPrices;
+  if (skus + brands + vendors + workPrices > 0) {
+    throw new AppError("CONFLICT", "CATEGORY_IN_USE", `Category is still used by ${skus} active SKU(s), ${brands} active Brand(s), ${vendors} active Supplier(s), and ${workPrices} live work price(s). Merge it into another category first.`);
+  }
 }
 
 /**
@@ -226,7 +242,7 @@ export async function assertWorkPriceRestorable(tx: TxClient, table: "material-l
   await assertVendorLaborCapable(tx, vendor.id); if (conflict) throw new AppError("CONFLICT", "PRICE_IDENTITY_CONFLICT", "A live work price already uses this Supplier identity.");
 }
 
-export async function createDeletionRequest(tx: TxClient, input: { targetType: string; targetId: string; actor: AuditActor; reason?: string; notes?: string }): Promise<string> {
+export async function createDeletionRequest(tx: TxClient, input: { targetType: MasterDataDeletionTargetType; targetId: string; actor: AuditActor; reason?: string; notes?: string }): Promise<string> {
   const existing = await tx.deletionRequest.findFirst({ where: { target_type: input.targetType, target_id: input.targetId, status: "PENDING" } });
   if (existing) {
     // A different actor's reason/notes would otherwise be silently discarded — the row still
@@ -247,7 +263,8 @@ export function latestAuditActorLabels(db: PrismaClient, entityType: string, ent
   return readLatestAuditActorLabels(db, { appId: "masterdata", entityType, entityIds });
 }
 
-export type MasterDataDeletionTarget = "brand" | "vendor" | "sku" | "unit" | "category" | "vendor_type" | "price_material" | "price_material_labor" | "price_labor";
+export type MasterDataDeletionTarget = MasterDataDeletionTargetType;
+export { MASTERDATA_ARCHIVE_ENTITY_TYPES, MASTERDATA_DELETION_TARGET_TYPES };
 
 /** Told when staff finish a sample request, inside the same transaction, so the requester can be informed. Optional. */
 export type SampleRequestResolution = {

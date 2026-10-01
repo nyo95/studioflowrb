@@ -9,12 +9,12 @@ import { masterDataService } from "@/apps/masterdata/runtime";
 import { validationError } from "@platform/core/validation";
 import { hasPermission } from "@platform/core/rbac";
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
+import { parsePriceKind, type PriceKind } from "../action-input";
 
-type PriceKind = "material" | "material-labor" | "labor";
 const mutationInput = z.object({ kind: z.enum(["material", "material-labor", "labor"]), id: z.string().uuid() });
 const deletionInput = mutationInput.extend({ reason: z.string().max(1000).optional() });
 
-function parseMutationInput(kind: PriceKind, id: string): { kind: PriceKind; id: string } {
+function parseMutationInput(kind: unknown, id: string): { kind: PriceKind; id: string } {
   const parsed = mutationInput.safeParse({ kind, id });
   if (!parsed.success) throw validationError(parsed.error);
   return parsed.data;
@@ -163,14 +163,13 @@ export async function createPricingVendorQuickAction(kind: PriceKind, formData: 
   return runSafeAction(async () => {
     const parsed = pricingVendorQuickForm.safeParse(Object.fromEntries(formData));
     if (!parsed.success) throw validationError(parsed.error);
-    const parsedKind = z.enum(["material", "material-labor", "labor"]).safeParse(kind);
-    if (!parsedKind.success) throw validationError(parsedKind.error);
+    const parsedKind = parsePriceKind(kind);
     const ctx = await context();
     const result = await masterDataService.createPricingVendorQuick({
       ...ctx,
       name: parsed.data.name,
       vendorTypeId: parsed.data.vendorTypeId,
-      capability: parsedKind.data === "material" ? "MATERIAL" : "LABOR",
+      capability: parsedKind === "material" ? "MATERIAL" : "LABOR",
     });
     refreshPricing();
     return result;
@@ -179,22 +178,23 @@ export async function createPricingVendorQuickAction(kind: PriceKind, formData: 
 
 export async function savePriceAction(kind: PriceKind, formData: FormData): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
+    const parsedKind = parsePriceKind(kind);
     const raw = Object.fromEntries(formData);
     const parsed = priceForm.safeParse(raw);
     if (!parsed.success) throw validationError(parsed.error);
     const value = parsed.data; const ctx = await context();
-    if (kind === "material" && !value.id) {
+    if (parsedKind === "material" && !value.id) {
       const required = z.object({ skuId: z.string().uuid(), vendorId: z.string().uuid() }).safeParse(raw);
       if (!required.success) throw validationError(required.error);
     }
-    if (kind !== "material") {
+    if (parsedKind !== "material") {
       const required = z.object({ name: z.string().min(1), categoryId: z.string().uuid(), vendorId: z.string().uuid(), unitId: z.string().uuid() }).safeParse(raw);
       if (!required.success) throw validationError(required.error);
     }
-    const result = kind === "material" ? value.id
+    const result = parsedKind === "material" ? value.id
       ? await masterDataService.updatePriceMaterial({ ...ctx, priceMaterialId: value.id, amount: value.amount, currency: value.currency, unitId: value.unitId, notes: value.notes })
       : await masterDataService.createPriceMaterial({ ...ctx, skuId: value.skuId!, supplierVendorId: value.vendorId!, amount: value.amount, currency: value.currency, notes: value.notes })
-      : kind === "material-labor" ? value.id
+      : parsedKind === "material-labor" ? value.id
         ? await masterDataService.updatePriceMaterialLabor({ ...ctx, priceMaterialLaborId: value.id, name: value.name!, categoryId: value.categoryId!, vendorId: value.vendorId!, unitId: value.unitId!, amount: value.amount, currency: value.currency, scopeNote: value.scopeNote, notes: value.notes })
         : await masterDataService.createPriceMaterialLabor({ ...ctx, name: value.name!, categoryId: value.categoryId!, vendorId: value.vendorId!, unitId: value.unitId!, amount: value.amount, currency: value.currency, scopeNote: value.scopeNote, notes: value.notes })
         : value.id

@@ -5,13 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.265**
-- Next local revision: **R8.266**
+- Current revision after this entry is committed: **R8.266**
+- Next local revision: **R8.267**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.266 | 2026-10-01 | fix(masterdata): harden the audited write paths and constraints
+
+- Closed MD-AUD-001/003/004/005/006/007/009-MD/010/011/013/014. Malformed Supplier contacts now fail safely; inactive roots cannot change; active Category dependencies and Supplier-Type capabilities block unsafe archives; sample-price references must match their selected SKU and Supplier; and workbook preview applies the same dimension/capability checks as import.
+- Restored per-SKU and per-price audit events for workbook and sample synchronization while retaining their batch events. Price-kind and polymorphic deletion/archive types now use canonical closed registries.
+- Added pre-checked database constraints for non-negative amounts, currency format, polymorphic values and archive-cause shape/uniqueness, plus the six Master Data FK indexes. Both migrations applied to verified local rebuild development and test targets. `pg_index` comparison confirmed and removed exactly these duplicate pairs: Brand and Vendor live names, unbranded SKU slug, material price pair, material+labor live vendor name, and labor live vendor name; curated-schema indexes remain.
+- Removed the matching fixed `[BUG]`/`[CLEANUP]` rows from `docs/BACKLOG.md`. No dependency added. Browser checks for readable contacts, Category and Supplier-Type errors, and child audit history are queued for Reviewer acceptance.
+
+**Checks.** `npm test` (all pass), `npm run check`, `npm run lint` (0 errors; two pre-existing StudioFlow `<img>` warnings), `npm run build`, `git diff --check`; migrations deployed to `studioflow_rebuild` and `studioflow_rebuild_test` after target verification.
 
 ## R8.265 | 2026-10-01 | docs(masterdata): review WO-MD-AUDIT-01 (PASS) and plan WO-MD-HARDEN-01
 

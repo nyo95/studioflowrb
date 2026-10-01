@@ -4,6 +4,7 @@ import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
 import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, hasPermission, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_DELETION_TARGET_TYPES } from "./polymorphic-registry";
 
 export function createDeletionService(db: PrismaClient, ports: MasterDataServicePorts) {
   const { runTransaction } = ports;
@@ -73,8 +74,7 @@ export function createDeletionService(db: PrismaClient, ports: MasterDataService
 }
 
 async function hardDeleteMasterDataTarget(tx: any, targetType: string, targetId: string): Promise<string> {
-  const valid = ["brand", "vendor", "sku", "unit", "category", "vendor_type", "price_material", "price_material_labor", "price_labor"];
-  if (!valid.includes(targetType)) throw new AppError("VALIDATION", "UNKNOWN_TARGET_TYPE", `Unknown deletion target type: ${targetType}`);
+  if (!(MASTERDATA_DELETION_TARGET_TYPES as readonly string[]).includes(targetType)) throw new AppError("VALIDATION", "UNKNOWN_TARGET_TYPE", `Unknown deletion target type: ${targetType}`);
   if (targetType === "brand") {
     const brand = await tx.brand.findUniqueOrThrow({ where: { id: targetId } });
     if (brand.deleted_at === null) throw new AppError("CONFLICT", "BRAND_NOT_ARCHIVED", "Brand must be archived before permanent deletion.");

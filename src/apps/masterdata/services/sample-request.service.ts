@@ -156,11 +156,23 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
       }
       data.sku_id = input.skuId;
     }
+    let selectedPrice: { id: string; sku_id: string; supplier_vendor_id: string } | null = null;
     if (input.priceMaterialId !== undefined) {
-      if (input.priceMaterialId !== null && !(await tx.priceMaterial.findFirst({ where: { id: input.priceMaterialId, deleted_at: null }, select: { id: true } }))) {
+      if (input.priceMaterialId !== null) selectedPrice = await tx.priceMaterial.findFirst({ where: { id: input.priceMaterialId, deleted_at: null }, select: { id: true, sku_id: true, supplier_vendor_id: true } });
+      if (input.priceMaterialId !== null && !selectedPrice) {
         throw new AppError("VALIDATION", "SAMPLE_PRICE_NOT_FOUND", "Choose a material price that still exists.");
       }
       data.price_material_id = input.priceMaterialId;
+    }
+    const effectivePrice = input.priceMaterialId === undefined
+      ? (current.price_material_id ? await tx.priceMaterial.findFirst({ where: { id: current.price_material_id, deleted_at: null }, select: { id: true, sku_id: true, supplier_vendor_id: true } }) : null)
+      : selectedPrice;
+    if (effectivePrice) {
+      const effectiveSkuId = data.sku_id === undefined ? current.sku_id : data.sku_id;
+      const effectiveVendorId = data.vendor_id === undefined ? current.vendor_id : data.vendor_id;
+      if (effectivePrice.sku_id !== effectiveSkuId || effectivePrice.supplier_vendor_id !== effectiveVendorId) {
+        throw new AppError("VALIDATION", "SAMPLE_PRICE_RELATION_MISMATCH", "The selected material price must belong to the chosen SKU and Supplier.");
+      }
     }
     if (input.quotedAmount !== undefined) {
       if (input.quotedAmount === null || input.quotedAmount.trim() === "") {
@@ -202,7 +214,7 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
 
   return {
     /** Staff take a request. One intake per StudioFlow request; a second taker gets a clear conflict. */
-    async startSampleRequestIntake(input: { grants: PermissionGrants; actor: AuditActor; snapshot: SampleRequestSnapshot }) {
+    async startSampleRequestIntake(input: { grants: PermissionGrants; actor: AuditActor; snapshot: SampleRequestSnapshot; quote?: SampleQuoteInput }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.sampleRequestManage);
       actorIsUsable(input.actor);
       const s = input.snapshot;
@@ -241,6 +253,10 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
             throw new AppError("CONFLICT", "SAMPLE_INTAKE_ALREADY_TAKEN", "Another staff member just took this request.");
           }
           throw error;
+        }
+        if (input.quote) {
+          const quote = await quoteData(tx, row, input.quote);
+          row = await tx.sampleRequestIntake.update({ where: { id: row.id }, data: quote });
         }
         await writeAudit(ports, tx, { action: "masterdata.sample-request.started", entityType: ENTITY, entityId: row.id, actor: input.actor, metadata: { sourceRequestId: row.source_request_id, sourceProjectId: row.source_project_id } });
         return (await enrichIntakes(tx as PrismaClient, [row]))[0];
@@ -329,8 +345,8 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
         const note = samplePriceNote(current);
         const action = existing ? "updated" as const : "created" as const;
         const priceMaterialId = existing
-          ? (await pricing.updatePriceMaterial({ grants: input.grants, actor: input.actor, priceMaterialId: existing.id, amount: amount.toString(), currency, notes: appendNote(existing.notes, note), suppressAudit: true })).priceMaterialId
-          : (await pricing.createPriceMaterial({ grants: input.grants, actor: input.actor, skuId: current.sku_id!, supplierVendorId: current.vendor_id!, amount: amount.toString(), currency, notes: note, suppressAudit: true })).priceMaterialId;
+          ? (await pricing.updatePriceMaterial({ grants: input.grants, actor: input.actor, priceMaterialId: existing.id, amount: amount.toString(), currency, notes: appendNote(existing.notes, note) })).priceMaterialId
+          : (await pricing.createPriceMaterial({ grants: input.grants, actor: input.actor, skuId: current.sku_id!, supplierVendorId: current.vendor_id!, amount: amount.toString(), currency, notes: note })).priceMaterialId;
         const row = await tx.sampleRequestIntake.update({ where: { id: current.id }, data: { price_material_id: priceMaterialId } });
         await writeAudit(ports, tx, {
           action: "masterdata.sample-request.price-synced", entityType: ENTITY, entityId: row.id, actor: input.actor,

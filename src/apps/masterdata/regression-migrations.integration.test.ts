@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { after, before, it } from "node:test";
 import { closeTestDb, createTestDb, requireDisposableTestDatabaseUrl, type TestDb } from "@platform/core/db/test-support";
+import { MASTERDATA_ARCHIVE_ENTITY_TYPES, MASTERDATA_DELETION_TARGET_TYPES } from "./services/polymorphic-registry";
 
 let db: TestDb;
 before(async () => { db = await createTestDb(requireDisposableTestDatabaseUrl()); });
@@ -39,4 +40,19 @@ it("preserves company links and holds ambiguous links with all metadata before V
     assert.equal(row.link_review_snapshot[0].id, "resource");
     assert.equal(row.link_review_snapshot[0].label, "Review me");
   } finally { await c.query("ROLLBACK"); c.release(); }
+});
+
+it("keeps the live polymorphic CHECK constraints aligned with the canonical registry", async () => {
+  const rows = await db.prisma.$queryRaw<Array<{ conname: string; definition: string }>>`
+    SELECT conname, pg_get_constraintdef(oid) AS definition
+    FROM pg_constraint
+    WHERE connamespace = 'master_data'::regnamespace
+      AND conname IN ('DeletionRequest_target_type_check', 'ArchiveCause_entity_type_check', 'ArchiveCause_parent_type_check')
+  `;
+  const byName = new Map(rows.map((row) => [row.conname, row.definition]));
+  for (const value of MASTERDATA_DELETION_TARGET_TYPES) assert.match(byName.get("DeletionRequest_target_type_check") ?? "", new RegExp(`'${value}'`));
+  for (const value of MASTERDATA_ARCHIVE_ENTITY_TYPES) {
+    assert.match(byName.get("ArchiveCause_entity_type_check") ?? "", new RegExp(`'${value}'`));
+    assert.match(byName.get("ArchiveCause_parent_type_check") ?? "", new RegExp(`'${value}'`));
+  }
 });

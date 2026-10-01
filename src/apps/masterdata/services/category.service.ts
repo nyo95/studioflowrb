@@ -5,7 +5,7 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, assertCategoryDeactivationSafe, createDeletionRequest, writeAudit } from "./shared";
 
 export function createCategoryService(db: PrismaClient, ports: MasterDataServicePorts) {
   const { runTransaction } = ports;
@@ -58,6 +58,7 @@ export function createCategoryService(db: PrismaClient, ports: MasterDataService
       const slug = requiredSlug(name);
       return runTransaction(async (tx) => {
         const existing = await tx.category.findUniqueOrThrow({ where: { id: input.categoryId } });
+        if (existing.status !== "ACTIVE") throw new AppError("CONFLICT", "CATEGORY_INACTIVE", "Cannot update an inactive category.");
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (existing.name !== name) { changes.name = { from: existing.name, to: name }; changes.slug = { from: existing.slug, to: slug }; }
         if (Object.keys(changes).length === 0) return { categoryId: input.categoryId };
@@ -73,6 +74,7 @@ export function createCategoryService(db: PrismaClient, ports: MasterDataService
       return runTransaction(async (tx) => {
         const category = await tx.category.findUniqueOrThrow({ where: { id: input.categoryId } });
         if (category.status !== "ACTIVE") throw new AppError("CONFLICT", "CATEGORY_NOT_ACTIVE", "Category is not active.");
+        await assertCategoryDeactivationSafe(tx, input.categoryId);
         const now = new Date();
         await tx.category.update({ where: { id: input.categoryId }, data: { status: "DEACTIVATED", deactivated_at: now } });
         await writeAudit(ports, tx, { action: "category.deactivated", entityType: "category", entityId: input.categoryId, actor: input.actor });

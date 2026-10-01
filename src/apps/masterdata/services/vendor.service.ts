@@ -153,6 +153,7 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
       const slug = requiredSlug(name);
       return runTransaction(async (tx) => {
         const existing = await tx.vendor.findUniqueOrThrow({ where: { id: input.vendorId }, include: { types: true, contacts: true, categories: true } });
+        if (existing.deleted_at !== null) throw new AppError("CONFLICT", "VENDOR_ARCHIVED", "Cannot update an archived supplier.");
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (existing.name !== name) { changes.name = { from: existing.name, to: name }; changes.slug = { from: existing.slug, to: slug }; }
         if ((existing.legal_name || null) !== (input.legalName?.trim() || null)) changes.legal_name = { from: existing.legal_name, to: input.legalName?.trim() || null };

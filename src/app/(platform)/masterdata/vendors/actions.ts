@@ -10,6 +10,7 @@ import { validationError } from "@platform/core/validation";
 import { hasPermission } from "@platform/core/rbac";
 import { masterDataService } from "@/apps/masterdata/runtime";
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
+import { parseOptionalContactsJson } from "../action-input";
 
 function revalidateVendors(): void {
   revalidatePath("/masterdata/vendors");
@@ -54,12 +55,7 @@ export async function createVendorAction(
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
 
-    let contacts = [];
-    try {
-      contacts = JSON.parse(String(formData.get("contactsJson") ?? "[]"));
-    } catch {
-      // ignore
-    }
+    const contacts = parseOptionalContactsJson(formData.get("contactsJson"));
 
     const vendorTypeIds = formData.getAll("vendorTypeIds").map(String).filter(Boolean);
     const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
@@ -73,7 +69,7 @@ export async function createVendorAction(
       vendorTypeIds,
       categoryIds,
       brandIds,
-      contacts,
+      ...(contacts === undefined ? {} : { contacts }),
     });
     if (!parsed.success) throw validationError(parsed.error);
 
@@ -110,12 +106,7 @@ export async function updateVendorAction(
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
 
-    let contacts = [];
-    try {
-      contacts = JSON.parse(String(formData.get("contactsJson") ?? "[]"));
-    } catch {
-      // ignore
-    }
+    const contacts = parseOptionalContactsJson(formData.get("contactsJson"));
 
     const vendorTypeIds = formData.getAll("vendorTypeIds").map(String).filter(Boolean);
     const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
@@ -143,7 +134,7 @@ export async function updateVendorAction(
       notes: formData.get("notes") ? String(formData.get("notes")) : null,
       vendorTypeIds,
       categoryIds,
-      contacts,
+      ...(contacts === undefined ? {} : { contacts }),
     });
     if (!parsed.success) throw validationError(parsed.error);
 
