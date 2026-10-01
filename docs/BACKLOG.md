@@ -119,6 +119,15 @@ No open items. (The pill-radius note from R8.83 was stale: `--ui-radius-pill` ha
 
 ## Master Data
 
+- [ ] [CLEANUP][P2] **UI Engine admission for the entry grids and `textCase` (Lead, 2026-10-01).** The work-price table, the material-price table and the
+  compare-suppliers grid are three app-local copies of one generic capability (rows, add/remove, per-row problems, Enter adds a row, paste). Extract one
+  `EntryGrid` pattern into the UI Engine with a consumer matrix and showcase entry, and add the same for `Input textCase` (no showcase, test or
+  documentation yet). AGENTS.md forbids an app-private substitute for a generic capability.
+- [ ] [CLEANUP][P3] Workbook import merges nothing into suppliers that already exist (sheet categories, contact) and its area suffix only separates repeats
+  within one file. Decide whether a re-import should add missing categories and contacts.
+- [ ] [CLEANUP][P3] Pre-existing schema drift: `platform.user_preference.updated_at` has a database default the Prisma schema does not declare (R8.249).
+- [ ] [OWNER DECISION] Permanent deletion of an archived Brand now removes its supplier links (R8.279); the contract line about a BrandSupplier delete guard is relaxed in that single case.
+
 - [ ] [UNVERIFIED] **Supplier categories merged into categories (R8.262).** Browser-checked only as far as: the Suppliers page and its
   category filter load, and the labor price form asks for the supplier first and narrows Pricing category to it (MEP for PT Mulia
   Sejahtera Adi). Still to walk: saving a work price and seeing the supplier gain the category, creating a category inline from the

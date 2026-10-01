@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.278**
-- Next local revision: **R8.279**
+- Current revision after this entry is committed: **R8.279**
+- Next local revision: **R8.280**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -20,6 +20,18 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Updated service integration fixtures and the Unit form's functional input normalization. The boundary checker names this single approved cross-app migration exception.
 
 **Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow image warnings); `git diff --check`; migrations deployed to verified `studioflow_rebuild` and `studioflow_rebuild_test`. Production build intentionally not run per WO-MD-PROGRAM-01.
+
+## R8.279 | 2026-10-01 | fix(platform,masterdata): Lead self-review of R8.262-R8.278 (transaction ceiling, batch duplicates, Brand deletion)
+
+A review of everything built this session, looking for logic defects, debt, and schema or relational damage.
+
+- **Fixed — long saves could fail.** Prisma closes an interactive transaction after 5 seconds by default, and every app used that default. A large workbook import or bulk save could hit it and fail with a confusing error (safely rolled back). The shared serializable runner now sets a 30 s ceiling and a 10 s wait (`SERIALIZABLE_TRANSACTION_TIMEOUT_MS`, tested). This is a platform-wide change; it only lengthens how long a runaway transaction may live.
+- **Fixed — duplicate rows judged by the wrong key.** Inside one bulk batch, "Screeding  base" and "screeding base" were treated as different but are the same price to the database (same slug); the second insert would have broken the transaction with a generic error. Batches now compare by slug and report a row error (test added).
+- **Fixed — an archived Brand with supplier links could never be permanently deleted.** R8.266 made archived Brands read-only and the old rule still required the links gone first, so the links could not be removed by hand. Permanent deletion (which needs an approver and an archived Brand with no active SKU) now removes the links with the Brand. This relaxes the contract's "delete guard on BrandSupplier" in this one case; flagged for the owner.
+- **Verified — the migration history builds from nothing.** All migrations applied to an empty scratch database (created and dropped, rebuild server only): lowercase unit codes, the CHECK constraints, VendorCategory present, SupplierCategory gone. A diff against the Prisma schema shows only one drift, pre-existing and unrelated: `user_preference.updated_at` default (R8.249).
+- **Recorded, not changed:** an imported file never changes a supplier that already exists (its sheet categories and contact are not merged in); area suffixes only disambiguate repeats inside one file; names are normalized when next saved, not retroactively; "iPhone" becomes "IPhone" under the owner's rule. The `textCase` setting and the three entry grids are not yet in the UI Engine showcase or consumer matrix (see backlog).
+
+**Checks.** `npm test` 744 pass; `npm run check`; `npm run lint` (0 errors); empty-database migration run.
 
 ## R8.278 | 2026-10-01 | feat(masterdata): supplier and price database workbook (import and export in the company Excel layout)
 

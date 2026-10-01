@@ -288,8 +288,8 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         const liveNames = new Set<string>(existing.flatMap((row: { name: string; slug: string }) => [row.name.trim().toLowerCase(), row.slug]));
         const ids: string[] = [];
         for (const [rowIndex, row] of input.rows.entries()) {
-          const key = row.name.trim().toLowerCase();
           const slugKey = (() => { try { return requiredSlug(row.name); } catch { return ""; } })();
+          const key = slugKey || row.name.trim().toLowerCase(); // two names with the same slug are the same price to the database
           if (key && seen.has(key)) { errors.push({ rowIndex, field: "name", code: "BULK_DUPLICATE_IN_BATCH", message: `Same name as row ${seen.get(key)! + 1} in this batch.` }); continue; }
           if (key && (liveNames.has(key) || (slugKey && liveNames.has(slugKey)))) { errors.push({ rowIndex, field: "name", code: "PRICE_IDENTITY_CONFLICT", message: "This supplier already has a price with this name. Make the name more specific." }); continue; }
           if (key) seen.set(key, rowIndex);

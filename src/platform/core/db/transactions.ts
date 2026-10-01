@@ -6,11 +6,17 @@ import { Prisma } from "@/generated/prisma/client";
  * last administrator), so the default READ COMMITTED isolation is not enough.
  */
 export const SERIALIZABLE_TRANSACTION_MAX_ATTEMPTS = 3;
+/**
+ * Prisma closes an interactive transaction after 5 s by default. Bulk saves and workbook imports legitimately run longer
+ * (each row is validated and audited), so the ceiling is raised; a runaway transaction still ends after 30 s.
+ */
+export const SERIALIZABLE_TRANSACTION_TIMEOUT_MS = 30_000;
+export const SERIALIZABLE_TRANSACTION_MAX_WAIT_MS = 10_000;
 
 export type InteractiveTransactionClient = {
   $transaction<T>(
     work: (tx: Prisma.TransactionClient) => Promise<T>,
-    options: { isolationLevel: typeof Prisma.TransactionIsolationLevel.Serializable },
+    options: { isolationLevel: typeof Prisma.TransactionIsolationLevel.Serializable; timeout?: number; maxWait?: number },
   ): Promise<T>;
 };
 
@@ -26,6 +32,8 @@ export async function runSerializableTransaction<T>(
     try {
       return await client.$transaction(work, {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        timeout: SERIALIZABLE_TRANSACTION_TIMEOUT_MS,
+        maxWait: SERIALIZABLE_TRANSACTION_MAX_WAIT_MS,
       });
     } catch (error) {
       if (!isRetryableTransactionConflict(error) || attempt === SERIALIZABLE_TRANSACTION_MAX_ATTEMPTS) {

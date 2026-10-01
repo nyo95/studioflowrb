@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { Prisma } from "@/generated/prisma/client";
-import { runSerializableTransaction, SERIALIZABLE_TRANSACTION_MAX_ATTEMPTS, type InteractiveTransactionClient } from "./transactions";
+import { runSerializableTransaction, SERIALIZABLE_TRANSACTION_MAX_ATTEMPTS, SERIALIZABLE_TRANSACTION_MAX_WAIT_MS, SERIALIZABLE_TRANSACTION_TIMEOUT_MS, type InteractiveTransactionClient } from "./transactions";
 
 const tx = {} as Prisma.TransactionClient;
 const conflict = () => new Prisma.PrismaClientKnownRequestError("conflict", { code: "P2034", clientVersion: "test" });
@@ -11,6 +11,8 @@ describe("serializable transaction runner", () => {
     const value = { committed: true };
     const client: InteractiveTransactionClient = { async $transaction(work, options) {
       assert.equal(options.isolationLevel, Prisma.TransactionIsolationLevel.Serializable);
+      assert.equal(options.timeout, SERIALIZABLE_TRANSACTION_TIMEOUT_MS, "long imports must not hit Prisma's 5 s default");
+      assert.equal(options.maxWait, SERIALIZABLE_TRANSACTION_MAX_WAIT_MS);
       return work(tx);
     } };
     assert.equal(await runSerializableTransaction(client, async (received) => { assert.equal(received, tx); return value; }), value);

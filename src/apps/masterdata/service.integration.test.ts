@@ -1055,10 +1055,10 @@ describe("Master Data service", () => {
     assert.equal((await testDb.prisma.priceMaterial.findUniqueOrThrow({ where: { id: price.id } })).deleted_at, null);
 
     await service.archiveBrand({ grants: GRANTS, actor: ACTOR, brandId: context.brandId });
-    await testDb.prisma.brandSupplier.deleteMany({ where: { brand_id: context.brandId } }); // permanent deletion requires the supplier links to be gone first
     const request = await service.requestBrandDeletion({ grants: GRANTS, actor: ACTOR, brandId: context.brandId });
     await service.approveDeletion({ grants: GRANTS, actor: ACTOR, requestId: request.requestId });
     assert.equal(await testDb.prisma.brand.findUnique({ where: { id: context.brandId } }), null);
+    assert.equal(await testDb.prisma.brandSupplier.count({ where: { brand_id: context.brandId } }), 0, "the supplier links went with the archived Brand");
     assert.equal(await testDb.prisma.sku.findUnique({ where: { id: sku.skuId } }), null);
     assert.equal(await testDb.prisma.priceMaterial.findUnique({ where: { id: price.id } }), null);
     assert.notEqual(await testDb.prisma.sku.findUnique({ where: { id: unbranded.skuId } }), null);
@@ -1395,6 +1395,23 @@ describe("Bulk price entry", () => {
     );
     assert.equal(await testDb.prisma.priceLabor.count(), before, "the valid first row was rolled back too");
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "price-labor.created" } }), auditBefore);
+  });
+
+  it("treats names that differ only in spacing or case as the same price inside one batch, with a row error rather than a failed save", async () => {
+    const vendorId = await workSupplier("Bulk Slug Supplier");
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
+    const category = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Bulk Slug Works", kind: "WORK" });
+    await assert.rejects(
+      () => service.createWorkPricesBulk({ grants: GRANTS, actor: ACTOR, kind: "labor", vendorId, categoryId: category.categoryId, currency: "IDR", rows: [
+        { name: "Screeding  base", unitId: unit.id, amount: "1" },
+        { name: "screeding base", unitId: unit.id, amount: "2" },
+      ] }),
+      (error: unknown) => {
+        assert.ok(error instanceof AppError && error.code === "BULK_ROWS_INVALID");
+        assert.deepEqual(bulkRows(error).map((row) => [row.rowIndex, row.code]), [[1, "BULK_DUPLICATE_IN_BATCH"]]);
+        return true;
+      },
+    );
   });
 
   it("limits a batch to 100 rows and rejects an empty one", async () => {

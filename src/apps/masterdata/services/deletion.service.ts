@@ -78,7 +78,8 @@ async function hardDeleteMasterDataTarget(tx: any, targetType: string, targetId:
   if (targetType === "brand") {
     const brand = await tx.brand.findUniqueOrThrow({ where: { id: targetId } });
     if (brand.deleted_at === null) throw new AppError("CONFLICT", "BRAND_NOT_ARCHIVED", "Brand must be archived before permanent deletion.");
-    if (await tx.brandSupplier.count({ where: { brand_id: targetId } }) > 0) throw new AppError("CONFLICT", "BRAND_HAS_SUPPLIERS", "Brand still has supplier relations. Remove them first.");
+    // An archived Brand cannot be edited, so its supplier links could never be removed by hand; they go with the Brand.
+    // The live-data guards below still apply (no active SKU, so no live price depends on a link).
     if (await tx.vendorContact.count({ where: { brand_id: targetId } }) > 0) throw new AppError("CONFLICT", "BRAND_HAS_CONTACTS", "Brand still has scoped contacts. Remove them first.");
     const activeSkuCount = await tx.sku.count({ where: { brand_id: targetId, deleted_at: null } });
     if (activeSkuCount > 0) throw new AppError("CONFLICT", "BRAND_HAS_ACTIVE_SKUS", "Brand still has active SKUs. Archive them before permanent deletion.");
