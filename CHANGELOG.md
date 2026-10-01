@@ -5,13 +5,20 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.266**
-- Next local revision: **R8.267**
+- Current revision after this entry is committed: **R8.267**
+- Next local revision: **R8.268**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.267 | 2026-10-01 | docs(masterdata): review WO-MD-HARDEN-01 (correction required)
+
+- Reviewed R8.266 (`f907b84`). Independent re-run: `npm test` 718/718 and `npm run check` pass. The fixes for MD-AUD-001, 003, 004, 005, 006, 009 (Master Data), 010, 011, 013 and 014 read correctly against the plan.
+- Verdict CORRECTION REQUIRED, one consolidated pass (target R8.268): the new constraint migration shares a timestamp prefix with the category-merge migration and so runs before it on a database that has neither, where it would reject the supplier-category rows the merge is meant to close; `next-env.d.ts` was committed from a production build; initial SKU prices still have no per-price audit event; the registry-versus-constraint test checks one direction only. Docs only; no code, schema, or migration change in this revision.
+
+**Checks.** `npm test`; `npm run check`; `git diff --check`.
 
 ## R8.266 | 2026-10-01 | fix(masterdata): harden the audited write paths and constraints
 
