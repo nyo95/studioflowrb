@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.268**
-- Next local revision: **R8.269**
+- Current revision after this entry is committed: **R8.269**
+- Next local revision: **R8.270**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.269 | 2026-10-01 | docs(masterdata): review R8.268 (PASS) and plan WO-MD-PROGRAM-01
+
+- Reviewed R8.268 (`b4eac94`): PASS. The hardening migration now runs after the category merge, removes obsolete supplier-category rows before it closes the type lists, and the registry test compares exact sets; initial SKU prices now write their own audit events. Independent re-run: `npm test` and `npm run check` pass; migration status is clean. This closes WO-MD-HARDEN-01.
+- Restored `next-env.d.ts` to the form `next dev` writes (R8.266 had committed the production-build form); the R8.268 correction had left it unstaged.
+- Issued WO-MD-PROGRAM-01 as READY: four ordered phases for the Executor, each its own revision with a Review Card — (1) lowercase unit codes in storage with a pre-checked migration including BQ and StudioFlow copies, (2) Brand → Supplier → Price enforcement with a link command, (3) all-or-nothing bulk price commands, (4) server-side first-letter-capital normalization with a read-only report of existing names. Docs and the editor-generated types file only; no code or schema change.
+
+**Checks.** `npm test`; `npm run check`; `git diff --check`.
 
 ## R8.268 | 2026-10-01 | fix(masterdata): correct the hardening migration order, audit events, and registry test
 
