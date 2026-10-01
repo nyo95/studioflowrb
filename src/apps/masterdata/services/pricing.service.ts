@@ -351,8 +351,11 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       });
     },
 
-    /** Creates many material prices (existing SKUs) for one supplier, all or nothing. See createWorkPricesBulk. */
-    async createMaterialPricesBulk(input: { grants: PermissionGrants; actor: AuditActor; vendorId: string; currency: string; rows: Array<{ skuId: string; amount: string; notes?: string | null }> }) {
+    /**
+     * Creates many material prices (existing SKUs), each row naming its own supplier, all or nothing. A SKU can be priced
+     * by several suppliers and one supplier can price many SKUs in the same save. Row problems come back in `details.rows`.
+     */
+    async createMaterialPriceRows(input: { grants: PermissionGrants; actor: AuditActor; currency: string; rows: Array<{ skuId: string; vendorId: string; amount: string; notes?: string | null }> }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
       actorIsUsable(input.actor);
       if (input.rows.length === 0) throw new AppError("VALIDATION", "BULK_EMPTY", "Add at least one row.");
@@ -361,16 +364,18 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         const inner = createPricingService(tx as PrismaClient, { ...ports, runTransaction: async (work) => work(tx) });
         const errors: BulkRowError[] = [];
         const batchId = randomUUID();
-        const live = await tx.priceMaterial.findMany({ where: { supplier_vendor_id: input.vendorId, deleted_at: null }, select: { sku_id: true } });
-        const taken = new Set<string>(live.map((row: { sku_id: string }) => row.sku_id));
+        const vendorIds = [...new Set(input.rows.map((row) => row.vendorId))];
+        const live = await tx.priceMaterial.findMany({ where: { supplier_vendor_id: { in: vendorIds }, deleted_at: null }, select: { sku_id: true, supplier_vendor_id: true } });
+        const taken = new Set<string>(live.map((row: { sku_id: string; supplier_vendor_id: string }) => `${row.supplier_vendor_id}|${row.sku_id}`));
         const seen = new Map<string, number>();
         const ids: string[] = [];
         for (const [rowIndex, row] of input.rows.entries()) {
-          if (seen.has(row.skuId)) { errors.push({ rowIndex, field: "skuId", code: "BULK_DUPLICATE_IN_BATCH", message: `Same SKU as row ${seen.get(row.skuId)! + 1} in this batch.` }); continue; }
-          seen.set(row.skuId, rowIndex);
-          if (taken.has(row.skuId)) { errors.push({ rowIndex, field: "skuId", code: "PRICE_PAIR_CONFLICT", message: "This supplier already has a live price for this SKU. Edit that price instead." }); continue; }
+          const pair = `${row.vendorId}|${row.skuId}`;
+          if (seen.has(pair)) { errors.push({ rowIndex, field: "skuId", code: "BULK_DUPLICATE_IN_BATCH", message: `Same SKU and supplier as row ${seen.get(pair)! + 1} in this batch.` }); continue; }
+          seen.set(pair, rowIndex);
+          if (taken.has(pair)) { errors.push({ rowIndex, field: "skuId", code: "PRICE_PAIR_CONFLICT", message: "This supplier already has a live price for this SKU. Edit that price instead." }); continue; }
           try {
-            const created = await inner.createPriceMaterial({ grants: input.grants, actor: input.actor, skuId: row.skuId, supplierVendorId: input.vendorId, amount: row.amount, currency: input.currency, notes: row.notes ?? undefined });
+            const created = await inner.createPriceMaterial({ grants: input.grants, actor: input.actor, skuId: row.skuId, supplierVendorId: row.vendorId, amount: row.amount, currency: input.currency, notes: row.notes ?? undefined });
             ids.push(created.priceMaterialId);
           } catch (error) {
             if (!(error instanceof AppError)) throw error;
@@ -378,9 +383,15 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
           }
         }
         if (errors.length > 0) throw new AppError("VALIDATION", "BULK_ROWS_INVALID", `${errors.length} row(s) need fixing. Nothing was saved.`, { details: { rows: errors } });
-        await writeAudit(ports, tx, { action: "price-bulk.created", entityType: "vendor", entityId: input.vendorId, actor: input.actor, metadata: { batch_id: batchId, kind: "material", count: ids.length } });
+        const single = vendorIds.length === 1;
+        await writeAudit(ports, tx, { action: "price-bulk.created", entityType: single ? "vendor" : "price_batch", entityId: single ? vendorIds[0]! : batchId, actor: input.actor, metadata: { batch_id: batchId, kind: "material", count: ids.length, suppliers: vendorIds.length } });
         return { batchId, ids };
       });
+    },
+
+    /** Creates many material prices (existing SKUs) for one supplier, all or nothing. See createMaterialPriceRows. */
+    async createMaterialPricesBulk(input: { grants: PermissionGrants; actor: AuditActor; vendorId: string; currency: string; rows: Array<{ skuId: string; amount: string; notes?: string | null }> }) {
+      return createPricingService(db, ports).createMaterialPriceRows({ grants: input.grants, actor: input.actor, currency: input.currency, rows: input.rows.map((row) => ({ ...row, vendorId: input.vendorId })) });
     },
 
     async createPriceLabor(input: { grants: PermissionGrants; actor: AuditActor; name: string; categoryId: string; vendorId: string; unitId: string; amount: string; currency: string; notes?: string }) {

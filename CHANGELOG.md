@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.279**
-- Next local revision: **R8.280**
+- Current revision after this entry is committed: **R8.280**
+- Next local revision: **R8.281**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -20,6 +20,16 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Updated service integration fixtures and the Unit form's functional input normalization. The boundary checker names this single approved cross-app migration exception.
 
 **Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow image warnings); `git diff --check`; migrations deployed to verified `studioflow_rebuild` and `studioflow_rebuild_test`. Production build intentionally not run per WO-MD-PROGRAM-01.
+
+## R8.280 | 2026-10-01 | feat(masterdata): material prices brand-first with a supplier on every row; specification shown under work names
+
+- **Material price entry** now starts with a **Brand** filter (All brands by default) that narrows the SKU list, so a code such as TH001AA is unambiguous; the SKU list always shows name, code and brand. The supplier moved from the top of the dialog **onto every row**, required, and it carries down from the row above, so one supplier with many SKUs needs picking once and one SKU with several suppliers is simply several rows. Suppliers linked to the row's brand are listed first and the rest are marked "not linked to this brand"; picking an unlinked one shows "Link brand to supplier" (needs brand-manage or supplier-manage).
+- New service `createMaterialPriceRows` (+ `saveMaterialPriceRowsAction`): rows name their own supplier, all or nothing, duplicates of the same SKU and supplier in the batch or against a live price are row errors, one batch event. The single-supplier `createMaterialPricesBulk` now delegates to it.
+- **Lists** (Material + labor, Labor only): the specification (the price's notes) appears as a small line under the name, and search also looks in the notes and scope note, so items that share a name can be told apart.
+- **Import:** a repeated item name for one supplier is told apart by its area or section when those differ, and otherwise by its specification ("Supply & Install Floor (Finish HT2 Ex. Niro GCA01 Lilac)"). The price identity rule (supplier + name) is unchanged by the owner's decision.
+- Tests: material rows with per-row suppliers, and the specification-based naming. No migration.
+
+**Checks.** `npm test` 746 pass; `npm run check`; `npm run lint` (0 errors). Browser-checked: the new dialog (Brand, then SKU / Supplier / Unit / Amount / Notes) and the list showing specifications. Saving and the link shortcut are in the acceptance list (R8.280).
 
 ## R8.279 | 2026-10-01 | fix(platform,masterdata): Lead self-review of R8.262-R8.278 (transaction ceiling, batch duplicates, Brand deletion)
 

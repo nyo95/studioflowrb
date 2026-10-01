@@ -293,9 +293,16 @@ export function createPriceDatabaseWorkbookService(
 
     // The same item name can be priced once per area for one supplier ("Second Skin Partition" in Shopfront Area and in Store Area).
     // Within one import such repeats are told apart by their area, so each keeps its own price.
-    const repeats = new Map<string, number>();
-    for (const cell of cells) repeats.set(`${cell.vendorId}|${key(cell.name)}`, (repeats.get(`${cell.vendorId}|${key(cell.name)}`) ?? 0) + 1);
-    for (const cell of cells) if ((repeats.get(`${cell.vendorId}|${key(cell.name)}`) ?? 0) > 1) cell.name = `${cell.item.name} (${cell.item.area || cell.item.category})`;
+    // Repeats are told apart by their area (or section) when those differ, otherwise by their specification.
+    const groups = new Map<string, Cell[]>();
+    for (const cell of cells) groups.set(`${cell.vendorId}|${key(cell.name)}`, [...(groups.get(`${cell.vendorId}|${key(cell.name)}`) ?? []), cell]);
+    for (const group of groups.values()) {
+      if (group.length < 2) continue;
+      const places = group.map((cell) => cell.item.area || cell.item.category);
+      const specs = group.map((cell) => cell.item.notes.slice(0, 40).trim());
+      if (new Set(places).size === group.length) group.forEach((cell, index) => { cell.name = `${cell.item.name} (${places[index]})`; });
+      else if (specs.every(Boolean) && new Set(specs).size === group.length) group.forEach((cell, index) => { cell.name = `${cell.item.name} (${specs[index]})`; });
+    }
     const priceTable: any = options.priceKind === "labor" ? tx.priceLabor : tx.priceMaterialLabor;
     const existing: Array<any> = cells.length ? await priceTable.findMany({ where: { deleted_at: null, vendor_id: { in: [...new Set(cells.map((cell) => cell.vendorId))] } } }) : [];
     const existingByKey = new Map(existing.map((price) => [`${price.vendor_id}|${key(price.name)}`, price] as const));

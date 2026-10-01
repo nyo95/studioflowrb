@@ -260,3 +260,11 @@ this backlog's former SF-A entries.)_
 - Steps: 1. Choose the company file, Labor only, default unit m2; press Check file: the totals, the supplier notes and the skipped-sheet notes show and nothing is saved. 2. Import. 3. Open Suppliers and Pricing: suppliers, categories and prices are there. 4. Check the same file again: everything is "unchanged". 5. Check the edited copy: one price "changed". 6. Download the export and check it: unchanged. 7. Try a file with an unknown unit and no default: the row is named and Import stays disabled.
 - Acceptance: nothing changes before Import; a file with any error imports nothing; names, areas and amounts match the file.
 - Status: PENDING
+
+### [R8.280] Material prices: brand first, supplier on every row; specification under names
+- Surface: Master Data → Pricing → New price → Material price; the Material + labor and Labor only lists
+- Fixture: two Brands with SKUs (one SKU code the same in both), two suppliers (one linked to only one Brand), an imported list with items that have specifications; accounts: brand-manage and price-only
+- Viewport: desktop and a narrow tablet width
+- Steps: 1. Leave All brands, search the shared code: both SKUs appear with their brand beside the code. 2. Choose one Brand: only its SKUs remain. 3. Pick a SKU, pick a supplier; add a row (Enter): the supplier is already filled. 4. Pick the supplier not linked to the Brand: it is marked, and the row offers "Link brand to supplier"; use it as brand-manage, as price-only the button is replaced by who to ask. 5. Price one SKU for two suppliers (two rows) and one supplier for two SKUs; save: all rows appear. 6. Repeat a SKU and supplier that already have a price and save: that row is marked and nothing is saved. 7. In the lists the specification shows under each name and typing part of it in the search finds the row.
+- Acceptance: nothing is saved when any row fails; the unit follows the SKU; the supplier carries down but can be changed per row; linking works only with permission.
+- Status: PENDING

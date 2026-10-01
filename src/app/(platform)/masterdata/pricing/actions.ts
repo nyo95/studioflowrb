@@ -332,3 +332,21 @@ export async function saveWorkPriceMatrixAction(input: unknown): Promise<ActionR
     return result;
   });
 }
+
+const materialRowsInput = z.object({
+  currency: z.string().length(3).default("IDR"),
+  rows: z.array(z.object({ skuId: z.string().uuid(), vendorId: z.string().uuid(), amount: z.string().min(1).max(32), notes: bulkRowNotes })).min(1).max(100),
+});
+
+/** Saves many material prices where every row names its supplier, all or nothing. Row problems come back in `error.details.rows`. */
+export async function saveMaterialPriceRowsAction(input: unknown): Promise<ActionResult<{ batchId: string; ids: string[] }>> {
+  return runSafeAction(async () => {
+    const parsed = materialRowsInput.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    const ctx = await context();
+    const result = await masterDataService.createMaterialPriceRows({ ...ctx, ...parsed.data });
+    refreshPricing();
+    revalidatePath("/masterdata/vendors");
+    return result;
+  });
+}

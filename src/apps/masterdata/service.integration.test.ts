@@ -1397,6 +1397,35 @@ describe("Bulk price entry", () => {
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "price-labor.created" } }), auditBefore);
   });
 
+  it("saves material prices where each row names its own supplier, reports every bad row, and writes one batch event", async () => {
+    const context = await createMaterialContext();
+    const second = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Row Supplier Two" });
+    const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    await testDb.prisma.vendorVendorType.create({ data: { id: crypto.randomUUID(), vendor_id: second.vendorId, vendor_type_id: supplierType.id } });
+    const sku = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Row SKU", code: "TH001AA", brandId: context.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "100", currency: "IDR" }] });
+    await linkBrand(context.brandId, second.vendorId);
+    const other = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Row SKU Two", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] });
+
+    await assert.rejects(
+      () => service.createMaterialPriceRows({ grants: GRANTS, actor: ACTOR, currency: "IDR", rows: [
+        { skuId: sku.skuId, vendorId: second.vendorId, amount: "120" },
+        { skuId: sku.skuId, vendorId: context.vendorId, amount: "130" },
+        { skuId: other.skuId, vendorId: second.vendorId, amount: "5" },
+        { skuId: other.skuId, vendorId: second.vendorId, amount: "6" },
+      ] }),
+      (error: unknown) => {
+        assert.ok(error instanceof AppError && error.code === "BULK_ROWS_INVALID");
+        assert.deepEqual(bulkRows(error).map((row) => [row.rowIndex, row.code]), [[1, "PRICE_PAIR_CONFLICT"], [3, "BULK_DUPLICATE_IN_BATCH"]]);
+        return true;
+      },
+    );
+    assert.equal(await testDb.prisma.priceMaterial.count({ where: { supplier_vendor_id: second.vendorId } }), 0, "the valid rows were rolled back too");
+
+    const ok = await service.createMaterialPriceRows({ grants: GRANTS, actor: ACTOR, currency: "IDR", rows: [{ skuId: sku.skuId, vendorId: second.vendorId, amount: "120" }, { skuId: other.skuId, vendorId: second.vendorId, amount: "5", notes: "quote 1" }] });
+    assert.equal(ok.ids.length, 2);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "price-bulk.created", entity_id: second.vendorId } }), 1);
+  });
+
   it("treats names that differ only in spacing or case as the same price inside one batch, with a row error rather than a failed save", async () => {
     const vendorId = await workSupplier("Bulk Slug Supplier");
     const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
@@ -1630,6 +1659,26 @@ describe("Supplier and price database workbook", () => {
     assert.deepEqual(names, [["Finish Emulsion Paint", "55000"], ["Second Skin Partition (Shopfront Area)", "250000"], ["Second Skin Partition (Store Area)", "210000"]]);
     const again = await service.previewPriceDatabaseImport({ grants: GRANTS, actor: ACTOR, file, options });
     assert.equal(again.totals.pricesUnchanged, 6, "importing the same file again changes nothing");
+  });
+
+  it("tells repeated items apart by their specification when they share the same area", async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Database Harga - Sipil");
+    ws.addRow(["DATABASE HARGA SIPIL"]);
+    ws.addRow(["Terakhir Update"]);
+    ws.addRow(["No", "Nama Material", "Spesifikasi", "Surojoyo Kreasindo", "Catatan / Merk Referensi"]);
+    ws.addRow(["FLOOR WORKS", "FLOOR WORKS", "FLOOR WORKS", "FLOOR WORKS", "FLOOR WORKS"]);
+    ws.mergeCells("A4:E4");
+    ws.addRow(["-", "Supply & Install Floor", "Finish HT2 ex. Niro GCA01 Lilac", 135000, ""]);
+    ws.addRow(["-", "Supply & Install Floor", "Finish storage ex. Asia Tile 300x300", 165000, ""]);
+    const file = Buffer.from(await wb.xlsx.writeBuffer());
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
+    const options = { priceKind: "labor" as const, defaultUnitId: unit.id };
+    const preview = await service.previewPriceDatabaseImport({ grants: GRANTS, actor: ACTOR, file, options });
+    assert.deepEqual(preview.errors, []);
+    await service.applyPriceDatabaseImport({ grants: GRANTS, actor: ACTOR, file, options, hash: preview.hash });
+    const names = (await testDb.prisma.priceLabor.findMany({ orderBy: { name: "asc" } })).map((price) => price.name);
+    assert.deepEqual(names, ["Supply & Install Floor (Finish HT2 Ex. Niro GCA01 Lilac)", "Supply & Install Floor (Finish Storage Ex. Asia Tile 300x300)"]);
   });
 
   it("exports in the import layout so an export can be edited and imported back unchanged", async () => {
