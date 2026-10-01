@@ -2,7 +2,7 @@
 
 Plan ID: WO-MD-PRICE-LABEL-01
 Scope: Master Data — a price may be a number or a quoted text label ("by request" with a reason). Backend and the shared parser only; the Lead builds the italic display and the form hints afterwards.
-Target revision: R8.283 (Executor). The Lead's follow-up UI revision is R8.284.
+Target revision: R8.284 (Executor; derive the next unused number from `CHANGELOG.md`). The Lead's follow-up UI revision follows it.
 Status: READY
 Priority: P2
 Owner: owner (Product Owner). Owner proposal 2026-10-01: use quotation marks to mark a text price; the value is whatever is inside the quotes, even "120".
@@ -67,8 +67,8 @@ The Lead builds, after this plan: italic, muted display of the label (or "By req
 
 ## Reviewer Acceptance
 
-The Lead re-runs the suite, spot-checks the parser and two service paths, then builds the UI (R8.284) and runs the browser pass: type a quoted text in the single form, a table row and the compare grid; paste cells; import and re-import the company file with a labelled cell; export and re-import.
+The Lead re-runs the suite, spot-checks the parser and two service paths, then builds the UI (R8.285) and runs the browser pass: type a quoted text in the single form, a table row and the compare grid; paste cells; import and re-import the company file with a labelled cell; export and re-import.
 
 ## Executor Prompt
 
-You are the BACKEND EXECUTOR for this checkout (D:\Misc\ProjectsHUB\studioflowrb, office computer, `STUDIOFLOW_LOCATION=kantor`). Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, the root `PLAN.md` (WO-MD-PRICE-LABEL-01), `docs/apps/masterdata/pricing-contract.md` Q19, and `CHANGELOG.md` R8.281. Implement the whole plan: the pure parser with its tests, the migration with its pre-check applied to both rebuild databases, the three price tables and their services, bulk, matrix and per-row commands, the SKU and supplier/price workbooks, the additive public read field, and the regression tests. Add the changelog entry, update `docs/BACKLOG.md`, and make one local commit `R8.283 | feat(masterdata): text price labels written in quotation marks`. Use only the rebuild databases after verifying the target; never the legacy database. Do not run `npm run build` (or restore `next-env.d.ts` before staging). Re-run `npm test` yourself and report real counts. Stop with a `BLOCKED / CONFLICT` report if a locked decision cannot be met. Finish with a Planner/Reviewer prompt (outcome, commit, checks, limitations, dirty files).
+You are the BACKEND EXECUTOR for this checkout (D:\Misc\ProjectsHUB\studioflowrb, office computer, `STUDIOFLOW_LOCATION=kantor`). Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, the root `PLAN.md` (WO-MD-PRICE-LABEL-01), `docs/apps/masterdata/pricing-contract.md` Q19, and `CHANGELOG.md` R8.281. Implement the whole plan: the pure parser with its tests, the migration with its pre-check applied to both rebuild databases, the three price tables and their services, bulk, matrix and per-row commands, the SKU and supplier/price workbooks, the additive public read field, and the regression tests. Add the changelog entry, update `docs/BACKLOG.md`, and make one local commit `R8.284 | feat(masterdata): text price labels written in quotation marks`. Use only the rebuild databases after verifying the target; never the legacy database. Do not run `npm run build` (or restore `next-env.d.ts` before staging). Re-run `npm test` yourself and report real counts. Stop with a `BLOCKED / CONFLICT` report if a locked decision cannot be met. Finish with a Planner/Reviewer prompt (outcome, commit, checks, limitations, dirty files).

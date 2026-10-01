@@ -119,7 +119,7 @@ No open items. (The pill-radius note from R8.83 was stale: `--ui-radius-pill` ha
 
 ## Master Data
 
-- [ ] [PLANNED] **Text price labels in quotation marks (WO-MD-PRICE-LABEL-01, READY in `PLAN.md`).** A price is a number or a quoted text label (stored as amount 0 + a label up to 64 characters); Executor R8.283, Lead UI R8.284 (italic muted display, amount-field hint, label search).
+- [ ] [PLANNED] **Text price labels in quotation marks (WO-MD-PRICE-LABEL-01, READY in `PLAN.md`).** A price is a number or a quoted text label (stored as amount 0 + a label up to 64 characters); Executor R8.284, Lead UI R8.285 (italic muted display, amount-field hint, label search).
 - [ ] [CLEANUP][P2] Prices of 0 now mean "by request" in Master Data (R8.281). BQ pickers and StudioFlow still receive a plain 0 amount; make them show "By request" and keep it out of totals, ideally with the planned BQ TBC / By Owner price modes.
 - [ ] [CLEANUP][P2] **UI Engine admission for the entry grids and `textCase` (Lead, 2026-10-01).** The work-price table, the material-price table and the
   compare-suppliers grid are three app-local copies of one generic capability (rows, add/remove, per-row problems, Enter adds a row, paste). Extract one
@@ -314,7 +314,7 @@ information; `/studioflow/timeline` remains. See `CHANGELOG.md` R8.138.
 
 - **[PLANNED] Iteration-based phase tracking + project-card home (owner
   design discussion, 2026-10-01 — direction agreed, NOT built, no Work Order
-  yet; a mockup and a gap check against the code come first).** Folds in
+  yet; a mockup and a gap check against the code come first; the owner's open decisions are all answered as of 2026-10-01).** Folds in
   KB-060 (Open defects). Agreed so far:
   - Only what is sent to the client is tracked; internal iterations and the
     internal-review states are dropped.
@@ -343,16 +343,15 @@ information; `/studioflow/timeline` remains. See `CHANGELOG.md` R8.138.
   - Home page becomes one card per project (phase chips + iteration chips +
     waiting-requirements marker + notes icon), replacing the task-based Today
     (owner decided 2026-10-01: the card-per-project home REPLACES Today).
-    Two items are **[BLOCKED] on an owner decision** (parked 2026-10-01, owner
-    deferred to the next session; Lead recommendations recorded):
-    - [BLOCKED] Where the per-person task feed that Today carried now lives
-      ("my tasks today", overdue). Recommendation: a compact "My tasks" strip
-      above the project cards (collapsed by default), so the daily
-      "what is on my plate" view is not lost; the cards stay the main view.
-    - [BLOCKED] "All phases done — mark project completed?" prompt on the card
-      once every phase is finished (needed because completion is no longer
-      automatic). Recommendation: yes — a quiet, dismissible prompt on the
-      card; it only offers the "Mark as completed" action, never does it.
+    Both open questions were **decided by the owner on 2026-10-01**:
+    - [DECIDED] The per-person task feed that Today carried ("my tasks today",
+      overdue) moves to a compact **"My tasks" strip above the project cards,
+      collapsed by default**, so the daily "what is on my plate" view is kept;
+      the cards stay the main view.
+    - [DECIDED] **No** "all phases done — mark project completed?" prompt on
+      the card. A project completes **only** when someone presses "Mark as
+      completed"; nothing on the card suggests or does it automatically, even
+      when every phase is finished.
   - Gap vs. current code (checked 2026-10-01): today a phase has 7 statuses
     incl. internal review and v1.0/v1.1 revisions (minor = internal reject);
     Today is a per-person task feed with an "In flight" phase strip;

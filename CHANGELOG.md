@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.282**
-- Next local revision: **R8.283**
+- Current revision after this entry is committed: **R8.283**
+- Next local revision: **R8.284**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -20,6 +20,13 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Updated service integration fixtures and the Unit form's functional input normalization. The boundary checker names this single approved cross-app migration exception.
 
 **Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow image warnings); `git diff --check`; migrations deployed to verified `studioflow_rebuild` and `studioflow_rebuild_test`. Production build intentionally not run per WO-MD-PROGRAM-01.
+
+## R8.283 | 2026-10-01 | docs(studioflow): record the owner's two decisions on the project-card home
+
+- The two open questions on the iteration-based phase tracking / project-card home are answered (owner, 2026-10-01): the per-person task feed that Today carried moves to a compact, collapsed-by-default **"My tasks" strip above the project cards**; there is **no** "all phases done — mark completed?" prompt — a project completes only when someone presses "Mark as completed" (so KB-060 is fixed by removing automatic completion, as part of the redesign). The backlog entry no longer has any blocked item; next steps are the home-card mockup, then a Work Order.
+- WO-MD-PRICE-LABEL-01 now targets R8.284 for the Executor (this revision took R8.283). Docs only; no code, schema, or migration change.
+
+**Checks.** `git diff --check`.
 
 ## R8.282 | 2026-10-01 | docs(masterdata): plan WO-MD-PRICE-LABEL-01 (text price labels in quotation marks)
 
