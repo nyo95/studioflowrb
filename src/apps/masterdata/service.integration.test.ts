@@ -1341,6 +1341,103 @@ describe("Brand → Supplier → Price chain", () => {
   });
 });
 
+describe("Bulk price entry", () => {
+  async function workSupplier(name: string) {
+    const subcon = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUBCON" } });
+    const vendor = await service.createVendor({ grants: GRANTS, actor: ACTOR, name });
+    await testDb.prisma.vendorVendorType.create({ data: { id: crypto.randomUUID(), vendor_id: vendor.vendorId, vendor_type_id: subcon.id } });
+    return vendor.vendorId;
+  }
+  const bulkRows = (error: unknown) => (error as { details?: { rows?: Array<{ rowIndex: number; field: string | null; code: string }> } }).details?.rows ?? [];
+
+  it("creates many labor prices at once, files the supplier under the category once, and audits each price plus the batch", async () => {
+    const vendorId = await workSupplier("Bulk Supplier");
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
+    const category = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Bulk Floor Works", kind: "WORK" });
+
+    const result = await service.createWorkPricesBulk({ grants: GRANTS, actor: ACTOR, kind: "labor", vendorId, categoryId: category.categoryId, currency: "IDR", rows: [
+      { name: "Screeding base", unitId: unit.id, amount: "120000", notes: "ex. mortar 1:3" },
+      { name: "Install floor", unitId: unit.id, amount: "135000" },
+      { name: "Lease line", unitId: unit.id, amount: "150000", notes: "inlay stainless" },
+    ] });
+
+    assert.equal(result.ids.length, 3);
+    assert.equal(await testDb.prisma.priceLabor.count({ where: { vendor_id: vendorId, category_id: category.categoryId } }), 3);
+    assert.equal(await testDb.prisma.vendorCategory.count({ where: { vendor_id: vendorId, category_id: category.categoryId } }), 1);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "price-labor.created", entity_id: { in: result.ids } } }), 3);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "price-bulk.created", entity_id: vendorId } }), 1);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "vendor.categories-linked", entity_id: vendorId } }), 1);
+  });
+
+  it("saves nothing when any row is wrong and reports every problem row together", async () => {
+    const vendorId = await workSupplier("Bulk All Or Nothing");
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
+    const category = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Bulk Ceiling Works", kind: "WORK" });
+    await service.createPriceLabor({ grants: GRANTS, actor: ACTOR, name: "Existing item", categoryId: category.categoryId, vendorId, unitId: unit.id, amount: "1", currency: "IDR" });
+    const before = await testDb.prisma.priceLabor.count();
+    const auditBefore = await testDb.prisma.auditEvent.count({ where: { action: "price-labor.created" } });
+
+    await assert.rejects(
+      () => service.createWorkPricesBulk({ grants: GRANTS, actor: ACTOR, kind: "labor", vendorId, categoryId: category.categoryId, currency: "IDR", rows: [
+        { name: "Fine item", unitId: unit.id, amount: "10" },
+        { name: "Existing item", unitId: unit.id, amount: "11" },
+        { name: "Bad amount", unitId: unit.id, amount: "-5" },
+        { name: "fine item", unitId: unit.id, amount: "12" },
+      ] }),
+      (error: unknown) => {
+        assert.ok(error instanceof AppError && error.code === "BULK_ROWS_INVALID");
+        const rows = bulkRows(error);
+        assert.deepEqual(rows.map((row) => row.rowIndex), [1, 2, 3]);
+        assert.equal(rows[0].code, "PRICE_IDENTITY_CONFLICT");
+        assert.equal(rows[2].code, "BULK_DUPLICATE_IN_BATCH");
+        return true;
+      },
+    );
+    assert.equal(await testDb.prisma.priceLabor.count(), before, "the valid first row was rolled back too");
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "price-labor.created" } }), auditBefore);
+  });
+
+  it("limits a batch to 100 rows and rejects an empty one", async () => {
+    const vendorId = await workSupplier("Bulk Limits");
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
+    const category = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Bulk Limits Works", kind: "WORK" });
+    const base = { grants: GRANTS, actor: ACTOR, kind: "labor" as const, vendorId, categoryId: category.categoryId, currency: "IDR" };
+    await assert.rejects(() => service.createWorkPricesBulk({ ...base, rows: [] }), (error: unknown) => error instanceof AppError && error.code === "BULK_EMPTY");
+    const many = Array.from({ length: 101 }, (_, index) => ({ name: `Item ${index}`, unitId: unit.id, amount: "1" }));
+    await assert.rejects(() => service.createWorkPricesBulk({ ...base, rows: many }), (error: unknown) => error instanceof AppError && error.code === "BULK_TOO_MANY_ROWS");
+  });
+
+  it("creates many material prices for existing SKUs and applies the supplier chain rule per row", async () => {
+    const context = await createMaterialContext();
+    const stranger = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Bulk Stranger Brand" });
+    const mk = (name: string, brandId?: string) => service.createSku({ grants: GRANTS, actor: ACTOR, name, ...(brandId ? { brandId } : {}), baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] });
+    const second = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Bulk Material Supplier" });
+    const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    await testDb.prisma.vendorVendorType.create({ data: { id: crypto.randomUUID(), vendor_id: second.vendorId, vendor_type_id: supplierType.id } });
+    await linkBrand(context.brandId, second.vendorId);
+    const linked = await mk("Bulk linked SKU", context.brandId);
+    const unbranded = await mk("Bulk unbranded SKU");
+    const unlinked = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Bulk unlinked SKU", brandId: stranger.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] }).catch(() => null);
+    assert.equal(unlinked, null, "the context supplier is not linked to the stranger Brand");
+    await linkBrand(stranger.brandId, context.vendorId);
+    const strangerSku = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Bulk stranger SKU", brandId: stranger.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] });
+
+    await assert.rejects(
+      () => service.createMaterialPricesBulk({ grants: GRANTS, actor: ACTOR, vendorId: second.vendorId, currency: "IDR", rows: [{ skuId: linked.skuId, amount: "10" }, { skuId: strangerSku.skuId, amount: "11" }, { skuId: unbranded.skuId, amount: "12" }] }),
+      (error: unknown) => {
+        assert.ok(error instanceof AppError && error.code === "BULK_ROWS_INVALID");
+        assert.deepEqual(bulkRows(error).map((row) => [row.rowIndex, row.code]), [[1, "PRICE_BRAND_SUPPLIER_NOT_LINKED"]]);
+        return true;
+      },
+    );
+    assert.equal(await testDb.prisma.priceMaterial.count({ where: { supplier_vendor_id: second.vendorId } }), 0);
+
+    const ok = await service.createMaterialPricesBulk({ grants: GRANTS, actor: ACTOR, vendorId: second.vendorId, currency: "IDR", rows: [{ skuId: linked.skuId, amount: "10" }, { skuId: unbranded.skuId, amount: "12", notes: "bulk" }] });
+    assert.equal(ok.ids.length, 2);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "price-bulk.created", entity_id: second.vendorId } }), 1);
+  });
+});
+
 describe("Sample request intake (Master Data side of StudioFlow sample requests)", () => {
   const STAFF = { kind: "USER" as const, userId: "sample-staff-1", label: "Sari Staff" };
   const OTHER = { kind: "USER" as const, userId: "sample-staff-2", label: "Budi Staff" };

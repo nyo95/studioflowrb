@@ -7,6 +7,18 @@ import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
 import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, requiredCurrency, requiredAmount, assertVendorMaterialCapable, assertVendorLaborCapable, assertPriceMaterialBrandSupplierChain, ensureVendorCategory, assertWorkPriceRestorable, assertPriceMaterialRestorable, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
 
+export const BULK_PRICE_ROW_LIMIT = 100;
+
+export type BulkRowError = { rowIndex: number; field: string | null; code: string; message: string };
+
+function bulkErrorField(code: string): string | null {
+  if (code.includes("NAME") || code.includes("IDENTITY") || code === "BULK_DUPLICATE_IN_BATCH") return "name";
+  if (code.includes("AMOUNT")) return "amount";
+  if (code.includes("UNIT")) return "unitId";
+  if (code.includes("SKU") || code.includes("PAIR") || code.includes("BRAND")) return "skuId";
+  return null;
+}
+
 export function createPricingService(db: PrismaClient, ports: MasterDataServicePorts) {
   const { runTransaction } = ports;
 
@@ -254,6 +266,79 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
     async getPriceLabor(input: { grants: PermissionGrants; priceLaborId: string }) {
       requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.priceWorkRead, MASTERDATA_PERMISSIONS.priceWorkManage], "You do not have permission to view labor prices.");
       return db.priceLabor.findUniqueOrThrow({ where: { id: input.priceLaborId }, include: { category: true, vendor: true, unit: true } });
+    },
+
+    /**
+     * Creates many work prices for one supplier and one category in a single transaction. Every row goes through the
+     * same single-price service (so every rule is identical); if any row fails the whole batch is rolled back and all
+     * row problems are returned together in `details.rows`.
+     */
+    async createWorkPricesBulk(input: { grants: PermissionGrants; actor: AuditActor; kind: "labor" | "material-labor"; vendorId: string; categoryId: string; currency: string; rows: Array<{ name: string; unitId: string; amount: string; notes?: string | null; scopeNote?: string | null }> }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkManage);
+      actorIsUsable(input.actor);
+      if (input.rows.length === 0) throw new AppError("VALIDATION", "BULK_EMPTY", "Add at least one row.");
+      if (input.rows.length > BULK_PRICE_ROW_LIMIT) throw new AppError("VALIDATION", "BULK_TOO_MANY_ROWS", `A batch holds at most ${BULK_PRICE_ROW_LIMIT} rows.`);
+      return runTransaction(async (tx: any) => {
+        const inner = createPricingService(tx as PrismaClient, { ...ports, runTransaction: async (work) => work(tx) });
+        const errors: BulkRowError[] = [];
+        const batchId = randomUUID();
+        const seen = new Map<string, number>();
+        const existing = await (input.kind === "labor" ? tx.priceLabor : tx.priceMaterialLabor).findMany({ where: { vendor_id: input.vendorId, deleted_at: null }, select: { name: true, slug: true } });
+        const liveNames = new Set<string>(existing.flatMap((row: { name: string; slug: string }) => [row.name.trim().toLowerCase(), row.slug]));
+        const ids: string[] = [];
+        for (const [rowIndex, row] of input.rows.entries()) {
+          const key = row.name.trim().toLowerCase();
+          const slugKey = (() => { try { return requiredSlug(row.name); } catch { return ""; } })();
+          if (key && seen.has(key)) { errors.push({ rowIndex, field: "name", code: "BULK_DUPLICATE_IN_BATCH", message: `Same name as row ${seen.get(key)! + 1} in this batch.` }); continue; }
+          if (key && (liveNames.has(key) || (slugKey && liveNames.has(slugKey)))) { errors.push({ rowIndex, field: "name", code: "PRICE_IDENTITY_CONFLICT", message: "This supplier already has a price with this name. Make the name more specific." }); continue; }
+          if (key) seen.set(key, rowIndex);
+          try {
+            const common = { grants: input.grants, actor: input.actor, name: row.name, categoryId: input.categoryId, vendorId: input.vendorId, unitId: row.unitId, amount: row.amount, currency: input.currency, notes: row.notes ?? undefined };
+            const created = input.kind === "labor"
+              ? await inner.createPriceLabor(common)
+              : await inner.createPriceMaterialLabor({ ...common, scopeNote: row.scopeNote ?? undefined });
+            ids.push("priceLaborId" in created ? created.priceLaborId : created.priceMaterialLaborId);
+          } catch (error) {
+            if (!(error instanceof AppError)) throw error;
+            errors.push({ rowIndex, field: bulkErrorField(error.code), code: error.code, message: error.safeMessage });
+          }
+        }
+        if (errors.length > 0) throw new AppError("VALIDATION", "BULK_ROWS_INVALID", `${errors.length} row(s) need fixing. Nothing was saved.`, { details: { rows: errors } });
+        await writeAudit(ports, tx, { action: "price-bulk.created", entityType: "vendor", entityId: input.vendorId, actor: input.actor, metadata: { batch_id: batchId, kind: input.kind, count: ids.length, category_id: input.categoryId } });
+        return { batchId, ids };
+      });
+    },
+
+    /** Creates many material prices (existing SKUs) for one supplier, all or nothing. See createWorkPricesBulk. */
+    async createMaterialPricesBulk(input: { grants: PermissionGrants; actor: AuditActor; vendorId: string; currency: string; rows: Array<{ skuId: string; amount: string; notes?: string | null }> }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
+      actorIsUsable(input.actor);
+      if (input.rows.length === 0) throw new AppError("VALIDATION", "BULK_EMPTY", "Add at least one row.");
+      if (input.rows.length > BULK_PRICE_ROW_LIMIT) throw new AppError("VALIDATION", "BULK_TOO_MANY_ROWS", `A batch holds at most ${BULK_PRICE_ROW_LIMIT} rows.`);
+      return runTransaction(async (tx: any) => {
+        const inner = createPricingService(tx as PrismaClient, { ...ports, runTransaction: async (work) => work(tx) });
+        const errors: BulkRowError[] = [];
+        const batchId = randomUUID();
+        const live = await tx.priceMaterial.findMany({ where: { supplier_vendor_id: input.vendorId, deleted_at: null }, select: { sku_id: true } });
+        const taken = new Set<string>(live.map((row: { sku_id: string }) => row.sku_id));
+        const seen = new Map<string, number>();
+        const ids: string[] = [];
+        for (const [rowIndex, row] of input.rows.entries()) {
+          if (seen.has(row.skuId)) { errors.push({ rowIndex, field: "skuId", code: "BULK_DUPLICATE_IN_BATCH", message: `Same SKU as row ${seen.get(row.skuId)! + 1} in this batch.` }); continue; }
+          seen.set(row.skuId, rowIndex);
+          if (taken.has(row.skuId)) { errors.push({ rowIndex, field: "skuId", code: "PRICE_PAIR_CONFLICT", message: "This supplier already has a live price for this SKU. Edit that price instead." }); continue; }
+          try {
+            const created = await inner.createPriceMaterial({ grants: input.grants, actor: input.actor, skuId: row.skuId, supplierVendorId: input.vendorId, amount: row.amount, currency: input.currency, notes: row.notes ?? undefined });
+            ids.push(created.priceMaterialId);
+          } catch (error) {
+            if (!(error instanceof AppError)) throw error;
+            errors.push({ rowIndex, field: bulkErrorField(error.code), code: error.code, message: error.safeMessage });
+          }
+        }
+        if (errors.length > 0) throw new AppError("VALIDATION", "BULK_ROWS_INVALID", `${errors.length} row(s) need fixing. Nothing was saved.`, { details: { rows: errors } });
+        await writeAudit(ports, tx, { action: "price-bulk.created", entityType: "vendor", entityId: input.vendorId, actor: input.actor, metadata: { batch_id: batchId, kind: "material", count: ids.length } });
+        return { batchId, ids };
+      });
     },
 
     async createPriceLabor(input: { grants: PermissionGrants; actor: AuditActor; name: string; categoryId: string; vendorId: string; unitId: string; amount: string; currency: string; notes?: string }) {

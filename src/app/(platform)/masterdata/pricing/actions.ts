@@ -255,3 +255,43 @@ export async function requestPriceDeletionAction(kind: PriceKind, id: string, re
     return result;
   });
 }
+
+const bulkRowNotes = z.string().max(1000).nullish();
+const bulkWorkInput = z.object({
+  kind: z.enum(["labor", "material-labor"]),
+  vendorId: z.string().uuid(),
+  categoryId: z.string().uuid(),
+  currency: z.string().length(3).default("IDR"),
+  rows: z.array(z.object({ name: z.string().min(1).max(128), unitId: z.string().uuid(), amount: z.string().min(1).max(32), notes: bulkRowNotes, scopeNote: bulkRowNotes })).min(1).max(100),
+});
+const bulkMaterialInput = z.object({
+  vendorId: z.string().uuid(),
+  currency: z.string().length(3).default("IDR"),
+  rows: z.array(z.object({ skuId: z.string().uuid(), amount: z.string().min(1).max(32), notes: bulkRowNotes })).min(1).max(100),
+});
+
+/** Saves many labor or material + labor prices for one supplier and category, all or nothing. Row problems come back in `error.details.rows`. */
+export async function saveBulkWorkPricesAction(input: unknown): Promise<ActionResult<{ batchId: string; ids: string[] }>> {
+  return runSafeAction(async () => {
+    const parsed = bulkWorkInput.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    const ctx = await context();
+    const result = await masterDataService.createWorkPricesBulk({ ...ctx, ...parsed.data });
+    refreshPricing();
+    revalidatePath("/masterdata/vendors");
+    return result;
+  });
+}
+
+/** Saves many material prices (existing SKUs) for one supplier, all or nothing. */
+export async function saveBulkMaterialPricesAction(input: unknown): Promise<ActionResult<{ batchId: string; ids: string[] }>> {
+  return runSafeAction(async () => {
+    const parsed = bulkMaterialInput.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    const ctx = await context();
+    const result = await masterDataService.createMaterialPricesBulk({ ...ctx, ...parsed.data });
+    refreshPricing();
+    revalidatePath("/masterdata/vendors");
+    return result;
+  });
+}

@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.272**
-- Next local revision: **R8.273**
+- Current revision after this entry is committed: **R8.273**
+- Next local revision: **R8.274**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -20,6 +20,16 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Updated service integration fixtures and the Unit form's functional input normalization. The boundary checker names this single approved cross-app migration exception.
 
 **Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow image warnings); `git diff --check`; migrations deployed to verified `studioflow_rebuild` and `studioflow_rebuild_test`. Production build intentionally not run per WO-MD-PROGRAM-01.
+
+## R8.273 | 2026-10-01 | feat(masterdata): bulk price commands (all or nothing)
+
+- Added `createWorkPricesBulk` (labor-only and material + labor: one supplier, one work category, up to 100 rows of name, unit, amount, notes, scope note) and `createMaterialPricesBulk` (one supplier, up to 100 existing SKUs). Each row goes through the existing single-price service inside one outer transaction, so capability, category, unit, amount, and the Brand → Supplier → Price rule are identical to one-at-a-time entry.
+- All or nothing: if any row fails, the whole batch is rolled back and every problem row comes back together as `details.rows` (`rowIndex`, `field`, `code`, `message`) under `BULK_ROWS_INVALID`. A same-name row inside the batch (`BULK_DUPLICATE_IN_BATCH`) or against a live price (`PRICE_IDENTITY_CONFLICT`) is a row error, caught before the database. Empty batches and batches over 100 rows are rejected.
+- Audit: one event per price plus one `price-bulk.created` batch event; the supplier is filed under the category once.
+- Server actions `saveBulkWorkPricesAction` and `saveBulkMaterialPricesAction`. Owner decisions recorded: the specification goes in Notes, a work price's identity stays supplier + name (a second item with the same name needs a more specific name), "By Request" or blank prices are simply not created, payment terms stay in supplier notes, and there is no price history.
+- Tests: four integration tests (create, rollback with all row errors, limits, material chain per row). No migration. UI table follows in the next revision.
+
+**Checks.** `npm test` 728 pass; `npx tsc --noEmit`.
 
 ## R8.272 | 2026-10-01 | fix(masterdata): finish the unit-lowercase and supplier-chain phases (Lead takeover)
 
