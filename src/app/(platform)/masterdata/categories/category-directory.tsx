@@ -188,7 +188,7 @@ export function CategoryDirectory({
             </Select>
           </Field>
           <Field label="Category name" required description="Display label (e.g. Solid Wood, HPL, Flooring).">
-            <Input name="name" required maxLength={64} placeholder="Solid Wood" autoFocus />
+            <Input name="name" textCase="title" required maxLength={64} placeholder="Solid Wood" autoFocus />
           </Field>
           <FormActions>
             <Button data-dialog-cancel type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
@@ -233,7 +233,7 @@ export function CategoryDirectory({
             <input type="hidden" name="categoryId" value={editTarget.id} />
             {editError ? <InlineError>{editError}</InlineError> : null}
             <Field label="Category name" required>
-              <Input name="name" defaultValue={editTarget.name} required maxLength={64} autoFocus />
+              <Input name="name" textCase="title" defaultValue={editTarget.name} required maxLength={64} autoFocus />
             </Field>
             <FormActions>
               <Button data-dialog-cancel type="button" variant="ghost" onClick={() => setEditTarget(null)}>

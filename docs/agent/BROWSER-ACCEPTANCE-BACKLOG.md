@@ -228,3 +228,11 @@ this backlog's former SF-A entries.)_
 - Steps: 1. Open the item; the final option is the card shown. 2. Edit Type, Brand, Color and Location on the card, then pick another option in the hand and edit it too; press Save. 3. Turn slots off and on, use "Use default". 4. Tap the photo, change it, then go back. 5. Set as final, request a sample, mark it received, delete an option. 6. Close with unsaved edits. 7. Open as the unassigned staff member.
 - Acceptance: both options' edits save together; hidden slots keep their text; photo, final, sample and delete behave as before; closing with unsaved edits asks to discard; the unassigned staff member sees the card read-only with no Save; Qty and its slot appear only on Fixture items; on a phone the card comes first, slots and hand stack below.
 - Status: PENDING
+
+### [R8.275] Bulk work-price table, supplier-first category list, name capitalization
+- Surface: Master Data → Pricing → New price → Labor price (and Material + labor price); also the Brand, Supplier, Category, Unit and Supplier Type dialogs
+- Fixture: a supplier with the Subcon type and two categories; a second supplier with no category; a unit list in lower case
+- Viewport: desktop and a narrow tablet width
+- Steps: 1. Choose the supplier, then the category; the supplier's own categories are listed first and a one-category supplier fills it in. 2. Type three rows in lower case; leave each name field. 3. Press Enter in the last amount to add a row; the unit is copied and the cursor lands in the new name. 4. Make one row invalid (a name that already exists) and press Create; the bad row is marked and nothing is saved. 5. Fix it and save; the supplier gains the category. 6. Type a lower-case name in a Brand or Category dialog and leave the field.
+- Acceptance: names become First Letter Capital (MEP and 60x60 keep their shape); a failed save keeps the table and marks only the bad rows; a successful save creates every row with its own history entry; unit codes stay lower case.
+- Status: PENDING

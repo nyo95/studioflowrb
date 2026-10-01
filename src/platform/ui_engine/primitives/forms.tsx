@@ -1,5 +1,6 @@
 "use client";
 
+import { lowerCaseText, titleCaseWords } from "@platform/utilities/text-case";
 import {
   Check,
   ChevronDown,
@@ -35,16 +36,37 @@ const CONTROL_DENSITY_CLASSES: Record<ControlDensity, string> = {
 const CONTROL_CLASSES =
   "w-full rounded-control border border-line bg-surface text-ink transition-[border-color,box-shadow] duration-[var(--ui-motion-fast)] placeholder:text-ink-tertiary enabled:hover:border-line-strong focus:border-line-focus focus:outline-0 focus:shadow-[0_0_0_3px_rgb(87_83_78/0.12)] aria-invalid:border-danger disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-ink-tertiary";
 
+/**
+ * How a text field tidies what was typed once the person leaves it (never while typing, so the caret does not jump):
+ * - `title`: first letter of every word upper-case, other letters untouched (names and titles);
+ * - `lower`: everything lower-case (unit codes, tags);
+ * - `none` (default): left exactly as typed (codes, emails, URLs, notes, addresses).
+ * The server applies the same rule to stored names, so this only previews it.
+ */
+export type TextCase = "title" | "lower" | "none";
+
+function applyTextCase(input: HTMLInputElement, mode: Exclude<TextCase, "none">) {
+  const next = mode === "title" ? titleCaseWords(input.value) : lowerCaseText(input.value);
+  if (next === input.value) return;
+  // Go through the native setter and an input event so controlled React fields pick the change up as well.
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, next);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
 export const Input = forwardRef<
   HTMLInputElement,
-  InputHTMLAttributes<HTMLInputElement> & InvalidProp & { density?: ControlDensity }
+  InputHTMLAttributes<HTMLInputElement> & InvalidProp & { density?: ControlDensity; textCase?: TextCase }
 >(
-  function Input({ className, invalid, density = "regular", ...props }, ref) {
+  function Input({ className, invalid, density = "regular", textCase = "none", onBlur, ...props }, ref) {
     return (
       <input
         ref={ref}
         className={cx(CONTROL_CLASSES, CONTROL_DENSITY_CLASSES[density], className)}
         aria-invalid={invalid || undefined}
+        onBlur={(event) => {
+          if (textCase !== "none") applyTextCase(event.currentTarget, textCase);
+          onBlur?.(event);
+        }}
         {...props}
       />
     );

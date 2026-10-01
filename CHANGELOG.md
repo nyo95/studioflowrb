@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.274**
-- Next local revision: **R8.275**
+- Current revision after this entry is committed: **R8.275**
+- Next local revision: **R8.276**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -20,6 +20,16 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Updated service integration fixtures and the Unit form's functional input normalization. The boundary checker names this single approved cross-app migration exception.
 
 **Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow image warnings); `git diff --check`; migrations deployed to verified `studioflow_rebuild` and `studioflow_rebuild_test`. Production build intentionally not run per WO-MD-PROGRAM-01.
+
+## R8.275 | 2026-10-01 | feat(masterdata): bulk work-price table, supplier-first categories, and name-case field setting
+
+- **Bulk work prices.** Creating a Labor or Material + labor price is now a table: choose the supplier and the pricing category once, then add rows of name, unit, amount, notes (specification goes here) and, for Material + labor, a scope note. "Add row" or Enter in the last amount adds a row and copies the unit; a row can be removed; blank rows are ignored; the amount keeps the Indonesian format. Saving calls the all-or-nothing bulk command: a failed save keeps the table and marks only the rows that need fixing. Editing a single price is unchanged.
+- **Category list.** Choosing the supplier first now lists that supplier's own categories first, labelled, followed by every other category; nothing is hidden and no "show all" step is needed. A supplier with exactly one category gets it filled in. The hint line still says when the category is new for the supplier. This replaces the narrowing introduced in R8.262.
+- **UI Engine.** `Input` gets a `textCase` setting ("title", "lower", "none", default none) applied when the person leaves the field, never while typing. Name fields in the Brand, Supplier (name and legal name), SKU, Category, Unit and Supplier Type dialogs and in the pricing form use "title"; the unit code uses "lower". The server applies the same rule (R8.274), so this is a preview.
+- Browser-checked: the dialog renders, a lower-case name becomes capitalized on leaving the field, the amount formats, and Enter adds a row. Not yet checked against the database from the browser (to avoid test rows): saving, the per-row error marking, and the focus move after Enter (fixed afterwards: keys are now taken outside the state updater). Added to the browser acceptance backlog.
+- Backlog: the Brand → Supplier → Price bug entry is closed (R8.271, R8.272); roadmap and remaining items updated. No migration.
+
+**Checks.** `npm test` 735 pass; `npm run check`; `npm run lint` (0 errors).
 
 ## R8.274 | 2026-10-01 | feat(masterdata): capitalize typed names on the server
 

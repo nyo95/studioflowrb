@@ -157,10 +157,10 @@ export function UnitDirectory({
         >
           {createError ? <InlineError>{createError}</InlineError> : null}
           <Field label="Unit code" required description="Lowercase symbol (e.g. pcs, set, m2).">
-            <Input name="code" required maxLength={16} placeholder="pcs" autoFocus onInput={(event) => { event.currentTarget.value = event.currentTarget.value.toLowerCase(); }} />
+            <Input name="code" required maxLength={16} placeholder="pcs" autoFocus textCase="lower" onInput={(event) => { event.currentTarget.value = event.currentTarget.value.toLowerCase(); }} />
           </Field>
           <Field label="Display name" required description="Descriptive name (e.g. Pieces, Set, Square Meter).">
-            <Input name="name" required maxLength={64} placeholder="Pieces" />
+            <Input name="name" textCase="title" required maxLength={64} placeholder="Pieces" />
           </Field>
           <FormActions>
             <Button data-dialog-cancel type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
@@ -209,7 +209,7 @@ export function UnitDirectory({
               <Input name="code" defaultValue={editTarget.code} required maxLength={16} readOnly />
             </Field>
             <Field label="Display name" required>
-              <Input name="name" defaultValue={editTarget.name} required maxLength={64} />
+              <Input name="name" textCase="title" defaultValue={editTarget.name} required maxLength={64} />
             </Field>
             <FormActions>
               <Button data-dialog-cancel type="button" variant="ghost" onClick={() => setEditTarget(null)}>

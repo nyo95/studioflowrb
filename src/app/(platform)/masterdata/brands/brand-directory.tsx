@@ -377,7 +377,7 @@ export function BrandDirectory({
         >
           {createError ? <InlineError>{createError}</InlineError> : null}
           <Field label="Brand name" required>
-            <Input name="name" required maxLength={64} placeholder="e.g. TACO, Blum, Hafele" autoFocus onChange={(e) => setCreateNameWarning(checkSimilarBrandName(e.target.value))} />
+            <Input name="name" textCase="title" required maxLength={64} placeholder="e.g. TACO, Blum, Hafele" autoFocus onChange={(e) => setCreateNameWarning(checkSimilarBrandName(e.target.value))} />
           </Field>
           {createNameWarning ? (
             <Notice tone="warning">{createNameWarning}</Notice>
@@ -497,7 +497,7 @@ export function BrandDirectory({
             <input type="hidden" name="hashtags" value={editHashtags.join(" ")} />
             {editError ? <InlineError>{editError}</InlineError> : null}
             <Field label="Brand name" required>
-              <Input name="name" defaultValue={editTarget.name} required maxLength={64} autoFocus onChange={(e) => setEditNameWarning(checkSimilarBrandName(e.target.value, editTarget.id))} />
+              <Input name="name" textCase="title" defaultValue={editTarget.name} required maxLength={64} autoFocus onChange={(e) => setEditNameWarning(checkSimilarBrandName(e.target.value, editTarget.id))} />
             </Field>
             {editNameWarning ? (
               <Notice tone="warning">{editNameWarning}</Notice>

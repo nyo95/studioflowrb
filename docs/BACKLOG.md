@@ -123,37 +123,14 @@ No open items. (The pill-radius note from R8.83 was stale: `--ui-radius-pill` ha
   category filter load, and the labor price form asks for the supplier first and narrows Pricing category to it (MEP for PT Mulia
   Sejahtera Adi). Still to walk: saving a work price and seeing the supplier gain the category, creating a category inline from the
   Suppliers dialogs, "Show all categories", the "New for this supplier" hint, and a supplier with no categories.
-- [ ] [PLANNED] **Master Data backend roadmap (Lead, 2026-10-01; full sequence in `PLAN.md`).** Phase 1, lowercase unit-code storage, shipped in R8.270. Remaining in order: WO-MD-AUDIT-01 (read-only audit of
-  the whole relational schema and Master Data logic), WO-MD-HARDEN-01 (fix the audit's P0/P1 findings and cheap P2s), WO-MD-CHAIN-01
-  (the brand → supplier → price entry below), WO-MD-BULK-01 (bulk price entry: one supplier and category, many rows, all-or-nothing),
-  WO-MD-TEXT-01 (shared first-letter-capital normalization for names, lower-case for tags). Each is issued as its own plan after the
-  previous one is reviewed. Audit PASSED 2026-10-01 (R8.265 review); WO-MD-HARDEN-01 is READY (MD-AUD-001/003/004/005/006/007/009-MD/010/011/013/014).
-  Deferred from the audit: WO-MD-SCALE-01 (MD-AUD-008 pagination, UI-bearing) and WO-SCHEMA-HARDEN-01 (MD-AUD-012 and the BQ/StudioFlow
-  FK indexes, after each app's service logic is reviewed).
-- [ ] [PLANNED] **Material price entry follows the supplier's brands.** Pick the supplier first, then offer only brands/SKUs linked
-  to it, and reject a material price whose brand the supplier is not linked to (with a "link this brand to the supplier" shortcut
-  in the form). Owner confirmed the direction 2026-10-01; office data held no material prices when checked, so nothing needs cleanup.
-
-- [ ] [BUG][P1] **MD-AUD-002 — material prices do not enforce Brand → Supplier → Price.** Price creation, initial SKU prices,
-  BrandSupplier removal, restore, import and public reads can accept or retain a Supplier that is not linked to the SKU's Brand.
-  Deliver the already-planned supplier-first behavior through WO-MD-CHAIN-01.
-- [ ] [BUG][P2] **MD-AUD-008 — wide Master Data directory/public reads are unbounded.** Brand, Supplier, SKU and price lists can
-  load the whole catalogue (including nested Supplier relations); add one bounded pagination contract before volume grows.
-- [ ] [BUG][P2] **MD-AUD-012 — repeated relational ids can form cross-parent graphs.** StudioFlow project/phase/revision ids and a
-  BQ template section's parent are individually valid FKs but are not constrained to the same aggregate. Audit the owning services,
-  then add the narrowest composite constraint or service test that enforces the intended graph.
-
-**LOCK LIFTED (owner, 2026-09-28; was LOCKED 2026-09-24).** Audited on 2026-09-24: 35/35 masterdata
-integration tests pass, 0 open `[BUG]` entries, no TODO/FIXME in source, and
-the only apparent gap found (`vendor-contract.md` §14.4 "Brand permanent
-delete... currently missing") turned out to already be implemented
-(`brand.archived` audit action + deletion-request flow both exist) — that
-table is stale historical migration checklist, not a live gap. Owner
-decision of 2026-09-24: do not modify Master Data app code without an explicit new owner
-request, even to "clean up" or "improve" something found in passing.
-**Lifted 2026-09-28:** the owner asked to unlock Master Data and start with KB-025. Master Data
-work is allowed again when it is a requested item or an approved Work Order; it is still not an
-invitation to make unrequested drive-by changes.
+- [ ] [PLANNED] **Master Data backend roadmap (status 2026-10-01).** Done: audit (R8.264), hardening (R8.266, R8.268), lowercase unit codes (R8.270, R8.272),
+  the Brand → Supplier → Price rule (R8.271, R8.272), bulk price commands (R8.273), server-side name capitalization (R8.274), and the work-price bulk table
+  with supplier-first category ordering (R8.275). Still open: bulk table for material prices with existing SKUs, the supplier-first material form,
+  WO-MD-SCALE-01 (MD-AUD-008 pagination, UI-bearing), WO-SCHEMA-HARDEN-01 (MD-AUD-012 and the BQ/StudioFlow FK indexes), the matrix
+  (items × suppliers) entry/import seen in the owner's price workbook, and an optional one-off rewrite of the few existing names the capitalization rule would change.
+- [ ] [PLANNED] **Material form follows the supplier's brands (UI).** The rule itself is enforced since R8.271. Remaining: choose the supplier first in the
+  material price form, offer only the brands and SKUs that supplier can price (the references already carry each supplier's `brandIds`), and add a
+  "link this brand to the supplier" shortcut that calls `linkBrandToSupplier`. Needs a browser pass.
 
 - [ ] [PLANNED] Define media/file behavior after shared storage exists.
 

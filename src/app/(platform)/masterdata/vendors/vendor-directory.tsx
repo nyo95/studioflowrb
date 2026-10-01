@@ -636,13 +636,13 @@ export function VendorDirectory({
           {createError ? <InlineError>{createError}</InlineError> : null}
 
           <Field label="Supplier name" required>
-            <Input name="name" required maxLength={64} placeholder="e.g. Mitra Kayu Nusantara" autoFocus onChange={(e) => setCreateNameWarning(checkSimilarName(e.target.value))} />
+            <Input name="name" textCase="title" required maxLength={64} placeholder="e.g. Mitra Kayu Nusantara" autoFocus onChange={(e) => setCreateNameWarning(checkSimilarName(e.target.value))} />
           </Field>
           {createNameWarning ? (
             <Notice tone="warning">{createNameWarning}</Notice>
           ) : null}
           <Field label="Legal entity name" description="Registered PT / CV name if applicable.">
-            <Input name="legalName" maxLength={128} placeholder="e.g. PT Mitra Kayu Nusantara" />
+            <Input name="legalName" textCase="title" maxLength={128} placeholder="e.g. PT Mitra Kayu Nusantara" />
           </Field>
           <Field label="Supplier types" description="Search the controlled type vocabulary; assign role dimensions to grant pricing capabilities.">
             <CreatableMultiSelect label="Supplier types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={createVendorTypeIds} onValueChange={setCreateVendorTypeIds} placeholder="Search supplier types" searchPlaceholder="Search supplier types…" />
@@ -793,13 +793,13 @@ export function VendorDirectory({
                   content: (
                     <div className="grid gap-4">
                       <Field label="Supplier name" required>
-                        <Input name="name" value={editName} required maxLength={64} autoFocus onChange={(e) => { setEditName(e.target.value); setEditNameWarning(checkSimilarName(e.target.value, editTarget.id)); }} />
+                        <Input name="name" textCase="title" value={editName} required maxLength={64} autoFocus onChange={(e) => { setEditName(e.target.value); setEditNameWarning(checkSimilarName(e.target.value, editTarget.id)); }} />
                       </Field>
                       {editNameWarning ? (
                         <Notice tone="warning">{editNameWarning}</Notice>
                       ) : null}
                       <Field label="Legal entity name">
-                        <Input name="legalName" value={editLegalName} maxLength={128} onChange={(e) => setEditLegalName(e.target.value)} />
+                        <Input name="legalName" textCase="title" value={editLegalName} maxLength={128} onChange={(e) => setEditLegalName(e.target.value)} />
                       </Field>
                       <Field label="Supplier types" description="Search the controlled type vocabulary. Removing capability types is guarded against active dependent prices.">
                         <CreatableMultiSelect label="Supplier types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={editVendorTypeIds} onValueChange={setEditVendorTypeIds} placeholder="Search supplier types" searchPlaceholder="Search supplier types…" />
