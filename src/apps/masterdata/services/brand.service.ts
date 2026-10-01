@@ -138,6 +138,15 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
         const existing = await tx.brand.findUniqueOrThrow({ where: { id: input.brandId }, include: { categories: { include: { origins: true } }, hashtags: true, links: true, suppliers: true } });
         if (existing.deleted_at !== null) throw new AppError("CONFLICT", "BRAND_ARCHIVED", "Cannot update an archived brand.");
         if (input.ownerVendorId) { const owner = await tx.vendor.findUniqueOrThrow({ where: { id: input.ownerVendorId } }); if (owner.deleted_at !== null) throw new AppError("VALIDATION", "BRAND_OWNER_ARCHIVED", "Owner Supplier is archived."); }
+        if (input.ownerVendorId !== undefined && existing.owner_vendor_id && (input.ownerVendorId || null) !== existing.owner_vendor_id) {
+          // A former owner priced the Brand without needing a supplier link; losing ownership must not strand those prices.
+          const formerOwnerId = existing.owner_vendor_id;
+          const stillSupplier = input.suppliers !== undefined ? input.suppliers.some((entry) => entry.vendorId === formerOwnerId) : existing.suppliers.some((entry) => entry.vendor_id === formerOwnerId);
+          if (!stillSupplier) {
+            const priceCount = await tx.priceMaterial.count({ where: { deleted_at: null, supplier_vendor_id: formerOwnerId, sku: { brand_id: input.brandId } } });
+            if (priceCount > 0) throw new AppError("CONFLICT", "BRAND_OWNER_IN_USE", `The current owner has ${priceCount} live material price(s) for this Brand. Keep it as a supplier of the Brand before changing the owner.`);
+          }
+        }
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (existing.name !== name) { changes.name = { from: existing.name, to: name }; changes.slug = { from: existing.slug, to: slug }; }
         if ((existing.owner_vendor_id || null) !== (input.ownerVendorId || null)) changes.owner_vendor_id = { from: existing.owner_vendor_id, to: input.ownerVendorId || null };

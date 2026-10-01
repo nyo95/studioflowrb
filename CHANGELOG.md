@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.269**
-- Next local revision: **R8.270**
+- Current revision after this entry is committed: **R8.272**
+- Next local revision: **R8.273**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -20,6 +20,15 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Updated service integration fixtures and the Unit form's functional input normalization. The boundary checker names this single approved cross-app migration exception.
 
 **Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow image warnings); `git diff --check`; migrations deployed to verified `studioflow_rebuild` and `studioflow_rebuild_test`. Production build intentionally not run per WO-MD-PROGRAM-01.
+
+## R8.272 | 2026-10-01 | fix(masterdata): finish the unit-lowercase and supplier-chain phases (Lead takeover)
+
+- Lead review of R8.270 and R8.271 (the Executor was near its usage limit, so the owner asked the Lead to take over the rest of WO-MD-PROGRAM-01). Phase 1 missed one BQ column: `bq_item.unit` is now lowercased by migration `20261001103000_bq_item_unit_lowercase` (same rule: only values that equal a Master Data unit code; office 3 rows, 2 changed). Added to the cross-schema migration allow-list.
+- Phase 2 had no regression tests and left ten existing tests failing once the chain rule was in force (the Executor's report said all passed). Fixed the test setups, added chain tests (a branded price needs a linked supplier; the owner and unbranded SKUs are exempt; unlinking is blocked while live prices depend on it; a restore cannot resurrect a price whose supplier no longer carries the Brand; `linkBrandToSupplier` is idempotent and audited; supplier refs expose `brandIds`).
+- Closed a gap in the rule: replacing a Brand's owner is blocked while the former owner still has live prices and is not kept as a supplier (`BRAND_OWNER_IN_USE`).
+- The disposable test database had lost its unit rows; reseeded them from the office database. No schema change.
+
+**Checks.** `npm test` 724 pass; `npm run check`; migration applied to both rebuild databases. Phases 3 and 4 follow as R8.273 onward.
 
 ## R8.271 | 2026-10-01 | feat(masterdata): enforce Brand supplier material pricing
 

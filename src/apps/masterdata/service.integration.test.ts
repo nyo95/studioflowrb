@@ -48,6 +48,10 @@ async function resetMasterData(db: PrismaClient): Promise<void> {
   await db.vendorType.updateMany({ data: { deleted_at: null } });
 }
 
+async function linkBrand(brandId: string, vendorId: string) {
+  await testDb.prisma.brandSupplier.create({ data: { id: crypto.randomUUID(), brand_id: brandId, vendor_id: vendorId, is_authorized: false, notes: null } });
+}
+
 async function createMaterialContext() {
   const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "pcs" } });
   const vendorType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
@@ -96,6 +100,7 @@ describe("Supplier and Brand contacts", () => {
 
   it("links the supplier to a Brand when a contact is scoped to it, instead of blocking the save", async () => {
     const context = await createMaterialContext();
+    await testDb.prisma.brandSupplier.deleteMany({ where: { vendor_id: context.vendorId } });
     assert.equal(await testDb.prisma.brandSupplier.count({ where: { vendor_id: context.vendorId } }), 0);
     await service.updateVendor({ grants: GRANTS, actor: ACTOR, vendorId: context.vendorId, name: "Supplier One", contacts: [{ personName: "Office", phones: ["0215819089"], brandId: context.brandId }] });
     assert.equal(await testDb.prisma.brandSupplier.count({ where: { vendor_id: context.vendorId, brand_id: context.brandId } }), 1);
@@ -501,6 +506,8 @@ describe("Master Data service", () => {
     await testDb.prisma.vendorVendorType.create({
       data: { id: crypto.randomUUID(), vendor_id: secondVendor.vendorId, vendor_type_id: supplierType.id },
     });
+    await linkBrand(context.brandId, secondVendor.vendorId);
+
     await service.createPriceMaterial({
       grants: GRANTS,
       actor: ACTOR,
@@ -613,7 +620,8 @@ describe("Master Data service", () => {
       (error: unknown) => error instanceof AppError && error.code === "SKU_BRAND_CHANGE_BLOCKED",
     );
 
-    // Clearing the source link allows the brand change to proceed
+    // Clearing the source link allows the brand change once the supplier also carries the new brand
+    await linkBrand(brand2.brandId, context.vendorId);
     await service.updatePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price.id, amount: "1000", currency: "IDR", sourceLinkId: null });
     await service.updateSku({ grants: GRANTS, actor: ACTOR, skuId, name: "Brand-Linked SKU", brandId: brand2.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId });
     assert.equal((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: skuId } })).brand_id, brand2.brandId);
@@ -624,6 +632,7 @@ describe("Master Data service", () => {
     const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
     const vendor2 = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Supplier Two Restore Block" });
     await testDb.prisma.vendorVendorType.create({ data: { id: crypto.randomUUID(), vendor_id: vendor2.vendorId, vendor_type_id: supplierType.id } });
+    await linkBrand(context.brandId, vendor2.vendorId);
 
     const { skuId } = await service.createSku({
       grants: GRANTS, actor: ACTOR, name: "All-Blocked SKU", brandId: context.brandId,
@@ -653,6 +662,7 @@ describe("Master Data service", () => {
     const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
     const vendor2 = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Supplier Mismatch Guard" });
     await testDb.prisma.vendorVendorType.create({ data: { id: crypto.randomUUID(), vendor_id: vendor2.vendorId, vendor_type_id: supplierType.id } });
+    await linkBrand(context.brandId, vendor2.vendorId);
 
     // Two prices: Price 1 gets the source link; Price 2 acts as the live safety net
     const { skuId } = await service.createSku({
@@ -670,7 +680,9 @@ describe("Master Data service", () => {
 
     // Archive Price 1 (Price 2 keeps the SKU live); no live source-linked price remains
     await service.archivePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price1.id });
-    // Brand change is now allowed (the only source-linked price is archived)
+    // Brand change is now allowed (the only source-linked price is archived) once both suppliers carry the new brand
+    await linkBrand(brand2.brandId, vendor2.vendorId);
+    await linkBrand(brand2.brandId, context.vendorId);
     await service.updateSku({ grants: GRANTS, actor: ACTOR, skuId, name: "Source-Link Mismatch SKU", brandId: brand2.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId });
 
     // Restore Price 1 — source_link still points to Brand 1, but SKU now has Brand 2
@@ -685,6 +697,7 @@ describe("Master Data service", () => {
     const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
     const vendor2 = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Supplier Unbrand Guard" });
     await testDb.prisma.vendorVendorType.create({ data: { id: crypto.randomUUID(), vendor_id: vendor2.vendorId, vendor_type_id: supplierType.id } });
+    await linkBrand(context.brandId, vendor2.vendorId);
 
     const { skuId } = await service.createSku({
       grants: GRANTS, actor: ACTOR, name: "Unbrand Guard SKU", brandId: context.brandId,
@@ -812,6 +825,8 @@ describe("Master Data service", () => {
       hashtags: ["#surface", "#finish"],
     });
 
+    await linkBrand(brand.brandId, supplier.vendorId);
+
     // SKU created for TACO with Veneer category -> persistent SKU enrichment
     const sku = await service.createSku({
       grants: GRANTS,
@@ -854,6 +869,8 @@ describe("Master Data service", () => {
     const workCat = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Flooring", kind: "WORK" });
     const prodCat = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Tile", kind: "PRODUCT" });
     const brand = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Tile Brand" });
+
+    await linkBrand(brand.brandId, vendor.vendorId);
 
     // 1. Material price via SKU
     const sku = await service.createSku({
@@ -1038,6 +1055,7 @@ describe("Master Data service", () => {
     assert.equal((await testDb.prisma.priceMaterial.findUniqueOrThrow({ where: { id: price.id } })).deleted_at, null);
 
     await service.archiveBrand({ grants: GRANTS, actor: ACTOR, brandId: context.brandId });
+    await testDb.prisma.brandSupplier.deleteMany({ where: { brand_id: context.brandId } }); // permanent deletion requires the supplier links to be gone first
     const request = await service.requestBrandDeletion({ grants: GRANTS, actor: ACTOR, brandId: context.brandId });
     await service.approveDeletion({ grants: GRANTS, actor: ACTOR, requestId: request.requestId });
     assert.equal(await testDb.prisma.brand.findUnique({ where: { id: context.brandId } }), null);
@@ -1053,6 +1071,7 @@ describe("Master Data service", () => {
     await testDb.prisma.vendorVendorType.create({
       data: { id: crypto.randomUUID(), vendor_id: alternateVendor.vendorId, vendor_type_id: supplierType.id },
     });
+    await linkBrand(context.brandId, alternateVendor.vendorId);
     const directSku = await service.createSku({
       grants: GRANTS, actor: ACTOR, name: "Direct Archived SKU", brandId: context.brandId,
       baseUnitId: context.unit.id, categoryId: context.categoryId,
@@ -1253,6 +1272,72 @@ describe("Master Data service", () => {
     await assert.rejects(service.updateBrand({ grants: GRANTS, actor: ACTOR, brandId: brand.brandId, name: "Changed" }), (error: unknown) => error instanceof AppError && error.code === "BRAND_ARCHIVED");
     const vendor = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Archived vendor" }); await service.archiveVendor({ grants: GRANTS, actor: ACTOR, vendorId: vendor.vendorId });
     await assert.rejects(service.updateVendor({ grants: GRANTS, actor: ACTOR, vendorId: vendor.vendorId, name: "Changed" }), (error: unknown) => error instanceof AppError && error.code === "VENDOR_ARCHIVED");
+  });
+});
+
+describe("Brand → Supplier → Price chain", () => {
+  async function unlinkedSupplier(name: string) {
+    const type = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    const vendor = await service.createVendor({ grants: GRANTS, actor: ACTOR, name });
+    await testDb.prisma.vendorVendorType.create({ data: { id: crypto.randomUUID(), vendor_id: vendor.vendorId, vendor_type_id: type.id } });
+    return vendor.vendorId;
+  }
+  const rejectsWith = (work: () => Promise<unknown>, code: string) => assert.rejects(work, (error: unknown) => error instanceof AppError && error.code === code);
+
+  it("prices a branded SKU only for a supplier that carries the Brand, and linking is idempotent and audited", async () => {
+    const context = await createMaterialContext();
+    const other = await unlinkedSupplier("Chain Other Supplier");
+    const { skuId } = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Chain SKU", brandId: context.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "10", currency: "IDR" }] });
+
+    await rejectsWith(() => service.createPriceMaterial({ grants: GRANTS, actor: ACTOR, skuId, supplierVendorId: other, amount: "11", currency: "IDR" }), "PRICE_BRAND_SUPPLIER_NOT_LINKED");
+    await rejectsWith(() => service.createSku({ grants: GRANTS, actor: ACTOR, name: "Chain SKU Two", brandId: context.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: other, amount: "5", currency: "IDR" }] }), "PRICE_BRAND_SUPPLIER_NOT_LINKED");
+
+    await service.linkBrandToSupplier({ grants: GRANTS, actor: ACTOR, brandId: context.brandId, vendorId: other });
+    await service.linkBrandToSupplier({ grants: GRANTS, actor: ACTOR, brandId: context.brandId, vendorId: other });
+    assert.equal(await testDb.prisma.brandSupplier.count({ where: { brand_id: context.brandId, vendor_id: other } }), 1);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "brand.supplier-linked", entity_id: context.brandId } }), 1, "the second call changes nothing and writes nothing");
+    await service.createPriceMaterial({ grants: GRANTS, actor: ACTOR, skuId, supplierVendorId: other, amount: "11", currency: "IDR" });
+  });
+
+  it("lets a Brand's owner and any supplier of an unbranded SKU price without a link", async () => {
+    const context = await createMaterialContext();
+    const owner = await unlinkedSupplier("Chain Owner Supplier");
+    const stranger = await unlinkedSupplier("Chain Stranger Supplier");
+    const owned = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Chain Owned Brand", ownerVendorId: owner });
+    await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Owned SKU", brandId: owned.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: owner, amount: "1", currency: "IDR" }] });
+    await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Unbranded SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: stranger, amount: "2", currency: "IDR" }] });
+  });
+
+  it("blocks unlinking a supplier while live prices depend on it, and refuses to restore a price whose supplier no longer carries the Brand", async () => {
+    const context = await createMaterialContext();
+    const second = await unlinkedSupplier("Chain Second Supplier");
+    await service.linkBrandToSupplier({ grants: GRANTS, actor: ACTOR, brandId: context.brandId, vendorId: second });
+    const { skuId } = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Unlink SKU", brandId: context.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "10", currency: "IDR" }, { supplierVendorId: second, amount: "12", currency: "IDR" }] });
+    await rejectsWith(() => service.updateBrand({ grants: GRANTS, actor: ACTOR, brandId: context.brandId, name: "Panel Brand", suppliers: [{ vendorId: second }] }), "BRAND_SUPPLIER_IN_USE");
+
+    const price = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: skuId, supplier_vendor_id: context.vendorId } });
+    await service.archivePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price.id });
+    await service.updateBrand({ grants: GRANTS, actor: ACTOR, brandId: context.brandId, name: "Panel Brand", suppliers: [{ vendorId: second }] });
+    assert.equal(await testDb.prisma.brandSupplier.count({ where: { brand_id: context.brandId, vendor_id: context.vendorId } }), 0);
+
+    await rejectsWith(() => service.restorePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price.id }), "PRICE_BRAND_SUPPLIER_NOT_LINKED");
+  });
+
+  it("will not let a Brand lose the owner that still has live prices", async () => {
+    const context = await createMaterialContext();
+    const owner = await unlinkedSupplier("Chain Former Owner");
+    const successor = await unlinkedSupplier("Chain Successor");
+    const owned = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Chain Handover Brand", ownerVendorId: owner });
+    await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Handover SKU", brandId: owned.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: owner, amount: "1", currency: "IDR" }] });
+    await rejectsWith(() => service.updateBrand({ grants: GRANTS, actor: ACTOR, brandId: owned.brandId, name: "Chain Handover Brand", ownerVendorId: successor }), "BRAND_OWNER_IN_USE");
+    await service.updateBrand({ grants: GRANTS, actor: ACTOR, brandId: owned.brandId, name: "Chain Handover Brand", ownerVendorId: successor, suppliers: [{ vendorId: owner }] });
+  });
+
+  it("exposes the Brands each material supplier can price", async () => {
+    const context = await createMaterialContext();
+    const refs = await service.listPricingMaterialRefs({ grants: GRANTS });
+    const supplier = refs.vendors.find((vendor) => vendor.id === context.vendorId);
+    assert.deepEqual(supplier?.brandIds, [context.brandId]);
   });
 });
 
