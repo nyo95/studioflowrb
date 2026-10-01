@@ -29,7 +29,7 @@ const PRICE_PAGE_SIZE = 25;
 
 
 
-export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; contacts: Record<string, { name: string; phones: string[] }>; canManageVendors: boolean; canManageCategories: boolean; canManageSkus: boolean; canManageBrands: boolean; skus: SkuRef[]; brands: Ref[]; productCategories: Ref[]; vendors: Ref[]; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
+export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; contacts: Record<string, { name: string; phones: string[] }>; canManageVendors: boolean; canManageCategories: boolean; canManageSkus: boolean; canManageBrands: boolean; skus: SkuRef[]; brands: Ref[]; productCategories: Ref[]; vendors: Ref[]; materialVendors: Ref[]; workVendors: Array<Ref & { categoryIds: string[] }>; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
   const { locale } = useDisplaySettings();
   const displayPrice = (amount: string, currency: string) => formatMoney(createMoney(amount, currency), { locale });
   const [query, setQuery] = useState(""); const [status, setStatus] = useState<DirectoryStatus>("ACTIVE"); const [supplierFilter, setSupplierFilter] = useState("ALL"); const [brandFilter, setBrandFilter] = useState("ALL"); const [workCategoryFilter, setWorkCategoryFilter] = useState("ALL"); const [productCategoryFilter, setProductCategoryFilter] = useState("ALL"); const [groupByItem, setGroupByItem] = useState(false); const [page, setPage] = useState(1); const [sort, setSort] = useState<{ key: PriceSortKey; direction: SortDirection }>({ key: "name", direction: "asc" }); const [editor, setEditor] = useState<Editor | null>(null); const [formError, setFormError] = useState<string | null>(null);
@@ -189,7 +189,7 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
   };
   return <div className="flex min-h-0 flex-1 flex-col gap-4">
     {rowError ? <InlineError>{rowError}</InlineError> : null}
-    {editor && <PriceEditor pending={savePending} editor={editor} refs={props} error={formError} onCancel={closeEditor} onSubmit={async (event) => { event.preventDefault(); if (savePending) return; setSavePending(true); setFormError(null); const formData = new FormData(event.currentTarget); try { const result = editor.kind === "material" && !editor.row && formData.get("materialEntryMode") === "new" ? await createMaterialSkuAction(formData) : await savePriceAction(editor.kind, formData); if (result.ok) closeEditor(); else if (result.ok === false) setFormError(result.error.safeMessage); } catch { setFormError("The price could not be saved. Please try again."); } finally { setSavePending(false); } }} />}
+    {editor && <PriceEditor pending={savePending} editor={editor} refs={{ ...props, vendors: editor.kind === "material" ? props.materialVendors : props.workVendors }} error={formError} onCancel={closeEditor} onSubmit={async (event) => { event.preventDefault(); if (savePending) return; setSavePending(true); setFormError(null); const formData = new FormData(event.currentTarget); try { const result = editor.kind === "material" && !editor.row && formData.get("materialEntryMode") === "new" ? await createMaterialSkuAction(formData) : await savePriceAction(editor.kind, formData); if (result.ok) closeEditor(); else if (result.ok === false) setFormError(result.error.safeMessage); } catch { setFormError("The price could not be saved. Please try again."); } finally { setSavePending(false); } }} />}
     <Tabs
       fill
       distribution="equal"
@@ -216,7 +216,7 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
 
 type PriceEditorRefs = {
   skus: SkuRef[];
-  vendors: Ref[];
+  vendors: Array<Ref & { categoryIds?: string[] }>;
   units: Array<Ref & { code: string }>;
   workCategories: Ref[];
   vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }>;
@@ -274,6 +274,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
   const { options: productCategoryOptions, upsertOverlayOption: upsertProductCategoryOption } = useOptionOverlay(refs.productCategories);
   const [vendorId, setVendorId] = useState(materialRow?.supplier_vendor.id ?? workRow?.vendor.id ?? "");
   const [categoryId, setCategoryId] = useState(workRow?.category.id ?? "");
+  const [showAllCategories, setShowAllCategories] = useState(false);
   const [brandId, setBrandId] = useState(materialRow?.sku.brand?.id ?? "");
   const [skuId, setSkuId] = useState(materialRow?.sku.id ?? "");
   const [skuName, setSkuName] = useState("");
@@ -398,6 +399,20 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
     return result.data.categoryId;
   };
 
+  // A work price is filed under one of the supplier's own categories. Choosing the supplier narrows the category
+  // list to those; the supplier keeps growing as new categories are priced (the server files the link on save).
+  const vendorCategoryIds = vendorOptions.find((vendor) => vendor.id === vendorId)?.categoryIds ?? [];
+  const narrowByVendor = !material && Boolean(vendorId) && vendorCategoryIds.length > 0 && !showAllCategories;
+  const visibleCategoryOptions = narrowByVendor ? categoryOptions.filter((category) => vendorCategoryIds.includes(category.id) || category.id === categoryId) : categoryOptions;
+  const categoryNotFiled = !material && Boolean(vendorId) && Boolean(categoryId) && !vendorCategoryIds.includes(categoryId);
+  const chooseVendor = (id: string) => {
+    setVendorId(id);
+    setShowAllCategories(false);
+    if (material) return;
+    const own = vendorOptions.find((vendor) => vendor.id === id)?.categoryIds ?? [];
+    if (!categoryId && own.length === 1) setCategoryId(own[0]!);
+  };
+
   const vendorField = !edit && (
     <>
       <input type="hidden" name={newMaterialSku ? "supplierVendorId" : "vendorId"} value={vendorId} required />
@@ -406,7 +421,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
           label={material ? "Supplier" : "Supplier"}
           options={vendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
           value={vendorId}
-          onValueChange={setVendorId}
+          onValueChange={chooseVendor}
           placeholder="Search or select supplier"
           searchPlaceholder="Search supplier…"
           emptyLabel="No supplier matches this search."
@@ -487,20 +502,36 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
   const categoryField = !material && (
     <>
       <input type="hidden" name="categoryId" value={categoryId} required />
-      <Field label="Pricing category" required>
-        <CreatableSearch
-          label="Pricing category"
-          options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))}
-          value={categoryId}
-          onValueChange={setCategoryId}
-          placeholder="Search or select category"
-          searchPlaceholder="Search pricing categories…"
-          emptyLabel="No pricing category matches this search."
-          onCreate={refs.canManageCategories ? createWorkCategory : undefined}
-          createLabel={(name) => `Add “${name}” as a pricing category`}
-          disabled={categoryCreatePending}
-          className="w-full"
-        />
+      <Field
+        label="Pricing category"
+        required
+        description={
+          !vendorId ? "Choose the supplier first and this list narrows to the categories it works in."
+            : vendorCategoryIds.length === 0 ? "No categories recorded for this supplier yet. The one you pick is saved to the supplier."
+              : narrowByVendor ? "Showing the categories this supplier works in."
+                : categoryNotFiled ? "New for this supplier. It is added to the supplier's categories when you save." : "Showing every category."
+        }
+      >
+        <div className="grid gap-1.5">
+          <CreatableSearch
+            label="Pricing category"
+            options={visibleCategoryOptions.map((category) => ({ id: category.id, label: category.name }))}
+            value={categoryId}
+            onValueChange={setCategoryId}
+            placeholder="Search or select category"
+            searchPlaceholder="Search pricing categories…"
+            emptyLabel={narrowByVendor ? "No category of this supplier matches. Show all categories to pick another." : "No pricing category matches this search."}
+            onCreate={refs.canManageCategories ? createWorkCategory : undefined}
+            createLabel={(name) => `Add “${name}” as a pricing category`}
+            disabled={categoryCreatePending}
+            className="w-full"
+          />
+          {vendorId && vendorCategoryIds.length > 0 ? (
+            <button type="button" className="w-fit text-sm text-action underline" onClick={() => setShowAllCategories((current) => !current)}>
+              {showAllCategories ? "Show only this supplier's categories" : "Show all categories"}
+            </button>
+          ) : null}
+        </div>
       </Field>
       {categoryCreateError ? <InlineError>{categoryCreateError}</InlineError> : null}
     </>
@@ -527,7 +558,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
     <Dialog open dismissible={!pending} onOpenChange={(open) => !open && !pending && void draftGuard.requestDiscard(onCancel)} title={`${edit ? "Edit" : "Create"} ${newMaterialSku ? "SKU + material price" : priceLabel}`} description={material && edit ? "SKU and supplier identity are read-only." : "Choose only active and eligible catalog references."}><form ref={formRef} onChange={draftGuard.onFormChange} className="grid gap-4" onSubmit={onSubmit}>
       <input type="hidden" name="materialEntryMode" value={materialEntryMode} />
       {edit && <input type="hidden" name="id" value={row!.id} />}{error && <div role="alert" className="text-sm text-danger">{error}</div>}
-      {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name ?? materialRow!.sku.code ?? "Unnamed SKU"} readOnly /></Field><Field label="Supplier"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Unit"><Input value={`${materialRow!.unit.name} (${materialRow!.unit.code})`} readOnly /></Field></> : newMaterialSku ? <>{newMaterialFields}{vendorField}</> : <><Field label="SKU" required description="Search by brand, code, or SKU name."><div className="grid gap-2"><CreatableSearch label="Brand filter" options={[{ id: "ALL", label: "All brands" }, ...brandOptions.map((brand) => ({ id: brand.id, label: brand.name }))]} value={skuBrandFilter} onValueChange={setSkuBrandFilter} placeholder="Filter SKU by brand" searchPlaceholder="Search brands…" className="w-full" onCreate={refs.canManageBrands ? async (name) => { const id = await createBrand(name); if (id) setSkuBrandFilter(id); return id; } : undefined} createLabel={(name) => `Create brand "${name}"`} disabled={brandCreatePending} /><input type="hidden" name="skuId" value={skuId} /><CreatableSearch label="SKU" options={filteredSkus.map((sku) => ({ id: sku.id, label: sku.name ?? sku.code ?? "Unnamed SKU", description: sku.code ? <span className="font-ui-mono text-xs">{sku.code}</span> : sku.brand?.name, keywords: [sku.code ?? "", sku.brand?.name ?? ""] }))} value={skuId} onValueChange={setSkuId} onCreate={refs.canManageSkus ? (name) => { setSkuName(name); setMaterialEntryMode("new"); if (skuBrandFilter !== "ALL") setBrandId(skuBrandFilter); return ""; } : undefined} createLabel={(name) => `Create SKU “${name}”`} placeholder="Search or create SKU" searchPlaceholder="Search SKU name, code, or brand…" emptyLabel="No SKU matches this search." className="w-full" /></div></Field>{selectedSku ? <SkuMeasurementSummary sku={selectedSku} /> : null}{vendorField}</>) : <><Field label="Name" required><Input name="name" defaultValue={workRow?.name} required /></Field>{categoryField}{edit ? <input type="hidden" name="vendorId" value={vendorId} required /> : vendorField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note" description="Describe included work or materials. Use bullets for a clear scope."><SimpleTextEditor name="scopeNote" defaultValue={workRow?.scope_note ?? ""} placeholder={"Example:\n- Installation labor\n- Adhesive and grout"} maxLength={1000} rows={5} /></Field>}</>}
+      {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name ?? materialRow!.sku.code ?? "Unnamed SKU"} readOnly /></Field><Field label="Supplier"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Unit"><Input value={`${materialRow!.unit.name} (${materialRow!.unit.code})`} readOnly /></Field></> : newMaterialSku ? <>{newMaterialFields}{vendorField}</> : <><Field label="SKU" required description="Search by brand, code, or SKU name."><div className="grid gap-2"><CreatableSearch label="Brand filter" options={[{ id: "ALL", label: "All brands" }, ...brandOptions.map((brand) => ({ id: brand.id, label: brand.name }))]} value={skuBrandFilter} onValueChange={setSkuBrandFilter} placeholder="Filter SKU by brand" searchPlaceholder="Search brands…" className="w-full" onCreate={refs.canManageBrands ? async (name) => { const id = await createBrand(name); if (id) setSkuBrandFilter(id); return id; } : undefined} createLabel={(name) => `Create brand "${name}"`} disabled={brandCreatePending} /><input type="hidden" name="skuId" value={skuId} /><CreatableSearch label="SKU" options={filteredSkus.map((sku) => ({ id: sku.id, label: sku.name ?? sku.code ?? "Unnamed SKU", description: sku.code ? <span className="font-ui-mono text-xs">{sku.code}</span> : sku.brand?.name, keywords: [sku.code ?? "", sku.brand?.name ?? ""] }))} value={skuId} onValueChange={setSkuId} onCreate={refs.canManageSkus ? (name) => { setSkuName(name); setMaterialEntryMode("new"); if (skuBrandFilter !== "ALL") setBrandId(skuBrandFilter); return ""; } : undefined} createLabel={(name) => `Create SKU “${name}”`} placeholder="Search or create SKU" searchPlaceholder="Search SKU name, code, or brand…" emptyLabel="No SKU matches this search." className="w-full" /></div></Field>{selectedSku ? <SkuMeasurementSummary sku={selectedSku} /> : null}{vendorField}</>) : <><Field label="Name" required><Input name="name" defaultValue={workRow?.name} required /></Field>{edit ? <input type="hidden" name="vendorId" value={vendorId} required /> : vendorField}{categoryField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note" description="Describe included work or materials. Use bullets for a clear scope."><SimpleTextEditor name="scopeNote" defaultValue={workRow?.scope_note ?? ""} placeholder={"Example:\n- Installation labor\n- Adhesive and grout"} maxLength={1000} rows={5} /></Field>}</>}
       <input type="hidden" name="amount" value={amount} /><input type="hidden" name="currency" value={currency} />
       <Field label="Amount" description={`${currency} default currency`} required><div className="relative"><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-3 flex items-center font-ui-mono text-sm font-semibold text-ink-secondary">{currency}</span><Input aria-label="Amount" value={amountDisplay} onChange={(event) => updateAmount(event.target.value)} onBlur={() => setAmountDisplay(amount ? formatDecimal(amount) : "")} inputMode="decimal" placeholder="15.000" className="pl-14 tabular-nums" required /></div></Field><Field label="Notes"><SimpleTextEditor name="notes" defaultValue={row?.notes ?? ""} placeholder="Additional pricing context..." maxLength={1000} rows={3} /></Field><FormActions><Button type="button" variant="ghost" disabled={pending} onClick={() => void draftGuard.requestDiscard(onCancel)}>Cancel</Button><Button type="submit" variant="primary" pending={pending}>{edit ? "Save changes" : "Create price"}</Button></FormActions>
     </form></Dialog>

@@ -5,14 +5,14 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, assertVendorTypeRemovalSafe, assertVendorMaterialCapable, latestAuditActorLabels, createDeletionRequest, writeAudit, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, assertPriceMaterialRestorable, assertWorkPriceRestorable } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, assertVendorTypeRemovalSafe, assertVendorCategoryRemovalSafe, assertVendorMaterialCapable, latestAuditActorLabels, createDeletionRequest, writeAudit, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, assertPriceMaterialRestorable, assertWorkPriceRestorable } from "./shared";
 
 import { type ContactInput, contactColumns, ensureVendorBrandRelation, sameContactColumns } from "./vendor-contact";
 
 export function createVendorService(db: PrismaClient, ports: MasterDataServicePorts) {
   const { runTransaction } = ports;
   return {
-    async listVendors(input: { grants: PermissionGrants; search?: string; vendorTypeId?: string; supplierCategoryId?: string; canSupplyMaterial?: boolean; canSupplyLabor?: boolean; brandId?: string; includeArchived?: boolean }) {
+    async listVendors(input: { grants: PermissionGrants; search?: string; vendorTypeId?: string; categoryId?: string; canSupplyMaterial?: boolean; canSupplyLabor?: boolean; brandId?: string; includeArchived?: boolean }) {
       requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.vendorRead, MASTERDATA_PERMISSIONS.vendorManage], "You do not have permission to view Suppliers.");
       const search = input.search?.trim();
       const rows = await db.vendor.findMany({
@@ -20,7 +20,7 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
           ...(input.includeArchived ? {} : { deleted_at: null }),
           ...(input.brandId ? { brand_suppliers: { some: { brand_id: input.brandId } } } : {}),
           ...(input.vendorTypeId ? { types: { some: { vendor_type_id: input.vendorTypeId } } } : {}),
-          ...(input.supplierCategoryId ? { supplier_categories: { some: { supplier_category_id: input.supplierCategoryId } } } : {}),
+          ...(input.categoryId ? { categories: { some: { category_id: input.categoryId } } } : {}),
           ...(input.canSupplyMaterial !== undefined ? { types: { some: { vendor_type: { can_supply_material: input.canSupplyMaterial, deleted_at: null } } } } : {}),
           ...(input.canSupplyLabor !== undefined ? { types: { some: { vendor_type: { can_supply_labor: input.canSupplyLabor, deleted_at: null } } } } : {}),
           ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { legal_name: { contains: search, mode: "insensitive" } }, { slug: { contains: search, mode: "insensitive" } }, { contacts: { some: { person_name: { contains: search, mode: "insensitive" } } } }] } : {}),
@@ -29,7 +29,7 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
         select: {
           id: true, name: true, slug: true, legal_name: true, address: true, notes: true, info_links: true, link_review_snapshot: true, updated_at: true, deleted_at: true,
           types: { select: { vendor_type: { select: { id: true, code: true, name: true, can_supply_material: true, can_supply_labor: true } } } },
-          supplier_categories: { select: { supplier_category: { select: { id: true, code: true, name: true } } }, orderBy: { supplier_category: { name: "asc" } } },
+          categories: { select: { category: { select: { id: true, name: true, kind: true, status: true } } }, orderBy: { category: { name: "asc" } } },
           contacts: { select: { id: true, person_name: true, job_title: true, email: true, phone: true, extra_phones: true, is_primary: true, brand_id: true, notes: true } },
           brand_suppliers: { select: { id: true, is_authorized: true, notes: true, brand: { select: { id: true, name: true, categories: { select: { category: { select: { id: true, name: true, status: true } } } } } } }, orderBy: { brand: { name: "asc" } } },
           owned_brands: { where: { deleted_at: null }, select: { id: true, name: true, categories: { select: { category: { select: { id: true, name: true, status: true } } } } } },
@@ -38,6 +38,11 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
       });
       const actorLabels = await latestAuditActorLabels(db, "vendor", rows.map((row) => row.id));
       return rows.map((row) => ({ ...row, updated_by_label: actorLabels.get(row.id) ?? null }));
+    },
+
+    async listCategoriesForVendorAssignment(input: { grants: PermissionGrants }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
+      return db.category.findMany({ where: { status: "ACTIVE" }, orderBy: [{ kind: "asc" }, { name: "asc" }], select: { id: true, name: true, kind: true } });
     },
 
     async listSkuDirectoryRefs(input: { grants: PermissionGrants }) {
@@ -67,21 +72,21 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
       requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.priceWorkRead, MASTERDATA_PERMISSIONS.priceWorkManage], "You do not have permission to view work price references.");
       const [workCategories, vendors, units] = await Promise.all([
         db.category.findMany({ where: { status: "ACTIVE", kind: "WORK" }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
-        db.vendor.findMany({ where: { deleted_at: null, types: { some: { vendor_type: { can_supply_labor: true, deleted_at: null } } } }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+        db.vendor.findMany({ where: { deleted_at: null, types: { some: { vendor_type: { can_supply_labor: true, deleted_at: null } } } }, orderBy: { name: "asc" }, select: { id: true, name: true, categories: { select: { category_id: true } } } }),
         db.unit.findMany({ where: { status: "ACTIVE" }, orderBy: [{ name: "asc" }, { code: "asc" }], select: { id: true, code: true, name: true } }),
       ]);
-      return { workCategories, vendors, units };
+      return { workCategories, vendors: vendors.map((vendor) => ({ id: vendor.id, name: vendor.name, categoryIds: vendor.categories.map((entry) => entry.category_id) })), units };
     },
 
     async getVendor(input: { grants: PermissionGrants; vendorId: string }) {
       requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.vendorRead, MASTERDATA_PERMISSIONS.vendorManage], "You do not have permission to view Suppliers.");
       return db.vendor.findUniqueOrThrow({
         where: { id: input.vendorId },
-        include: { types: { include: { vendor_type: true } }, supplier_categories: { include: { supplier_category: { select: { id: true, code: true, name: true } } } }, contacts: { include: { brand: { select: { id: true, name: true, slug: true } } } }, owned_brands: { select: { id: true, name: true, slug: true } }, brand_suppliers: { include: { brand: { select: { id: true, name: true, slug: true, deleted_at: true } } } }, _count: { select: { material_prices: true, material_labor_prices: true, labor_prices: true } } },
+        include: { types: { include: { vendor_type: true } }, categories: { include: { category: { select: { id: true, name: true, kind: true, status: true } } } }, contacts: { include: { brand: { select: { id: true, name: true, slug: true } } } }, owned_brands: { select: { id: true, name: true, slug: true } }, brand_suppliers: { include: { brand: { select: { id: true, name: true, slug: true, deleted_at: true } } } }, _count: { select: { material_prices: true, material_labor_prices: true, labor_prices: true } } },
       });
     },
 
-    async createVendor(input: { grants: PermissionGrants; actor: AuditActor; name: string; legalName?: string; address?: string; notes?: string; vendorTypeIds?: string[]; supplierCategoryIds?: string[]; brandIds?: string[]; contacts?: ContactInput[] }) {
+    async createVendor(input: { grants: PermissionGrants; actor: AuditActor; name: string; legalName?: string; address?: string; notes?: string; vendorTypeIds?: string[]; categoryIds?: string[]; brandIds?: string[]; contacts?: ContactInput[] }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
       actorIsUsable(input.actor);
       const name = requiredName(input.name, "VENDOR_NAME_REQUIRED");
@@ -95,10 +100,11 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
           if (vendorTypes.length !== new Set(input.vendorTypeIds).size) throw new AppError("VALIDATION", "VENDOR_TYPE_INVALID", "Every selected Supplier Type must be active.");
           await tx.vendorVendorType.createMany({ data: input.vendorTypeIds.map((vendorTypeId) => ({ id: randomUUID(), vendor_id: vendorId, vendor_type_id: vendorTypeId })) });
         }
-        if (input.supplierCategoryIds && input.supplierCategoryIds.length > 0) {
-          const supplierCategories = await tx.supplierCategory.findMany({ where: { id: { in: input.supplierCategoryIds }, deleted_at: null }, select: { id: true } });
-          if (supplierCategories.length !== new Set(input.supplierCategoryIds).size) throw new AppError("VALIDATION", "SUPPLIER_CATEGORY_INVALID", "Every selected Supplier Category must be active.");
-          await tx.vendorSupplierCategory.createMany({ data: input.supplierCategoryIds.map((supplierCategoryId) => ({ id: randomUUID(), vendor_id: vendorId, supplier_category_id: supplierCategoryId })) });
+        if (input.categoryIds && input.categoryIds.length > 0) {
+          const categoryIds = [...new Set(input.categoryIds)];
+          const categories = await tx.category.findMany({ where: { id: { in: categoryIds }, status: "ACTIVE" }, select: { id: true } });
+          if (categories.length !== categoryIds.length) throw new AppError("VALIDATION", "VENDOR_CATEGORY_INVALID", "Every selected category must be active.");
+          await tx.vendorCategory.createMany({ data: categoryIds.map((categoryId) => ({ id: randomUUID(), vendor_id: vendorId, category_id: categoryId })) });
         }
         // Brand relation is optional at creation — most suppliers are added
         // before anyone has decided which Brand they carry. Same constraint
@@ -140,13 +146,13 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
       });
     },
 
-    async updateVendor(input: { grants: PermissionGrants; actor: AuditActor; vendorId: string; name: string; legalName?: string | null; address?: string | null; notes?: string | null; vendorTypeIds?: string[]; supplierCategoryIds?: string[]; contacts?: ContactInput[]; infoLinks?: Array<{ kind: string; url: string; label?: string | null }>; linkReviewSnapshot?: unknown[] }) {
+    async updateVendor(input: { grants: PermissionGrants; actor: AuditActor; vendorId: string; name: string; legalName?: string | null; address?: string | null; notes?: string | null; vendorTypeIds?: string[]; categoryIds?: string[]; contacts?: ContactInput[]; infoLinks?: Array<{ kind: string; url: string; label?: string | null }>; linkReviewSnapshot?: unknown[] }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
       actorIsUsable(input.actor);
       const name = requiredName(input.name, "VENDOR_NAME_REQUIRED");
       const slug = requiredSlug(name);
       return runTransaction(async (tx) => {
-        const existing = await tx.vendor.findUniqueOrThrow({ where: { id: input.vendorId }, include: { types: true, contacts: true, supplier_categories: true } });
+        const existing = await tx.vendor.findUniqueOrThrow({ where: { id: input.vendorId }, include: { types: true, contacts: true, categories: true } });
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (existing.name !== name) { changes.name = { from: existing.name, to: name }; changes.slug = { from: existing.slug, to: slug }; }
         if ((existing.legal_name || null) !== (input.legalName?.trim() || null)) changes.legal_name = { from: existing.legal_name, to: input.legalName?.trim() || null };
@@ -164,15 +170,16 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
           if (addedTypeIds.length > 0) await tx.vendorVendorType.createMany({ data: addedTypeIds.map((vendorTypeId) => ({ id: randomUUID(), vendor_id: input.vendorId, vendor_type_id: vendorTypeId })) });
           if (removedTypes.length > 0 || addedTypeIds.length > 0) changes.vendor_types = { from: [...existingTypeIds].sort(), to: [...requestedTypeIds].sort() };
         }
-        if (input.supplierCategoryIds !== undefined) {
-          const requestedCategoryIds = [...new Set(input.supplierCategoryIds)];
-          if (requestedCategoryIds.length > 0) { const liveCategories = await tx.supplierCategory.findMany({ where: { id: { in: requestedCategoryIds }, deleted_at: null }, select: { id: true } }); if (liveCategories.length !== requestedCategoryIds.length) throw new AppError("VALIDATION", "SUPPLIER_CATEGORY_INVALID", "Every selected Supplier Category must be active."); }
-          const existingCategoryIds = new Set(existing.supplier_categories.map((c) => c.supplier_category_id));
-          const removedCategories = existing.supplier_categories.filter((c) => !requestedCategoryIds.includes(c.supplier_category_id));
-          if (removedCategories.length > 0) await tx.vendorSupplierCategory.deleteMany({ where: { id: { in: removedCategories.map((c) => c.id) } } });
+        if (input.categoryIds !== undefined) {
+          const requestedCategoryIds = [...new Set(input.categoryIds)];
+          const existingCategoryIds = new Set(existing.categories.map((c) => c.category_id));
           const addedCategoryIds = requestedCategoryIds.filter((id) => !existingCategoryIds.has(id));
-          if (addedCategoryIds.length > 0) await tx.vendorSupplierCategory.createMany({ data: addedCategoryIds.map((supplierCategoryId) => ({ id: randomUUID(), vendor_id: input.vendorId, supplier_category_id: supplierCategoryId })) });
-          if (removedCategories.length > 0 || addedCategoryIds.length > 0) changes.supplier_categories = { from: [...existingCategoryIds].sort(), to: [...requestedCategoryIds].sort() };
+          if (addedCategoryIds.length > 0) { const liveCategories = await tx.category.findMany({ where: { id: { in: addedCategoryIds }, status: "ACTIVE" }, select: { id: true } }); if (liveCategories.length !== addedCategoryIds.length) throw new AppError("VALIDATION", "VENDOR_CATEGORY_INVALID", "Every selected category must be active."); }
+          const removedCategories = existing.categories.filter((c) => !requestedCategoryIds.includes(c.category_id));
+          await assertVendorCategoryRemovalSafe(tx, input.vendorId, removedCategories.map((c) => c.category_id));
+          if (removedCategories.length > 0) await tx.vendorCategory.deleteMany({ where: { id: { in: removedCategories.map((c) => c.id) } } });
+          if (addedCategoryIds.length > 0) await tx.vendorCategory.createMany({ data: addedCategoryIds.map((categoryId) => ({ id: randomUUID(), vendor_id: input.vendorId, category_id: categoryId })) });
+          if (removedCategories.length > 0 || addedCategoryIds.length > 0) changes.categories = { from: [...existingCategoryIds].sort(), to: [...requestedCategoryIds].sort() };
         }
         if (input.contacts !== undefined) {
           const keptContactIds = new Set(input.contacts.map((c) => c.id).filter((id): id is string => Boolean(id)));

@@ -1110,18 +1110,63 @@ describe("Master Data service", () => {
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "unit.deleted", entity_id: created.unitId } }), 1);
   });
 
-  it("permanently deletes an archived Supplier that has a supplier category, contacts and types", async () => {
-    const { supplierCategoryId } = await service.createSupplierCategory({ grants: GRANTS, actor: ACTOR, code: `SC_DEL_${crypto.randomUUID().slice(0, 8)}`, name: `Category to delete with supplier ${crypto.randomUUID().slice(0, 8)}` });
-    const { vendorId } = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: `Supplier With Category ${crypto.randomUUID().slice(0, 8)}`, supplierCategoryIds: [supplierCategoryId] });
-    assert.equal(await testDb.prisma.vendorSupplierCategory.count({ where: { vendor_id: vendorId } }), 1);
+  it("permanently deletes an archived Supplier that has categories, contacts and types", async () => {
+    const { categoryId } = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: `Category with supplier ${crypto.randomUUID().slice(0, 8)}`, kind: "WORK" });
+    const { vendorId } = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: `Supplier With Category ${crypto.randomUUID().slice(0, 8)}`, categoryIds: [categoryId] });
+    assert.equal(await testDb.prisma.vendorCategory.count({ where: { vendor_id: vendorId } }), 1);
     await service.archiveVendor({ grants: GRANTS, actor: ACTOR, vendorId });
 
     const result = await service.hardDeleteArchived({ grants: GRANTS, actor: ACTOR, targetType: "vendor", targetId: vendorId });
 
     assert.equal(result?.direct, true);
     assert.equal(await testDb.prisma.vendor.findUnique({ where: { id: vendorId } }), null);
-    assert.equal(await testDb.prisma.vendorSupplierCategory.count({ where: { vendor_id: vendorId } }), 0);
-    assert.equal(await testDb.prisma.supplierCategory.count({ where: { id: supplierCategoryId } }), 1, "the category itself stays");
+    assert.equal(await testDb.prisma.vendorCategory.count({ where: { vendor_id: vendorId } }), 0);
+    assert.equal(await testDb.prisma.category.count({ where: { id: categoryId } }), 1, "the category itself stays");
+  });
+
+  it("files a supplier under the category of every work price saved for it", async () => {
+    const subconType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUBCON" } });
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "M2" } });
+    const mep = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: `MEP ${crypto.randomUUID().slice(0, 6)}`, kind: "WORK" });
+    const finishing = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: `Finishing ${crypto.randomUUID().slice(0, 6)}`, kind: "WORK" });
+    const { vendorId } = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: `Category Link Vendor ${crypto.randomUUID().slice(0, 6)}`, vendorTypeIds: [subconType.id], categoryIds: [mep.categoryId] });
+
+    await service.createPriceLabor({ grants: GRANTS, actor: ACTOR, name: "Finishing job", categoryId: finishing.categoryId, vendorId, unitId: unit.id, amount: "10", currency: "IDR" });
+    await service.createPriceMaterialLabor({ grants: GRANTS, actor: ACTOR, name: "MEP job", categoryId: mep.categoryId, vendorId, unitId: unit.id, amount: "20", currency: "IDR" });
+
+    const linked = (await testDb.prisma.vendorCategory.findMany({ where: { vendor_id: vendorId } })).map((row) => row.category_id).sort();
+    assert.deepEqual(linked, [mep.categoryId, finishing.categoryId].sort(), "the new category joins the existing one and nothing is duplicated");
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "vendor.categories-linked", entity_id: vendorId } }), 1, "only the genuinely new link is audited");
+  });
+
+  it("will not take a category off a supplier while live prices still use it", async () => {
+    const subconType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUBCON" } });
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "M2" } });
+    const trade = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: `Guarded trade ${crypto.randomUUID().slice(0, 6)}`, kind: "WORK" });
+    const { vendorId } = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: `Guarded Category Vendor ${crypto.randomUUID().slice(0, 6)}`, vendorTypeIds: [subconType.id], categoryIds: [trade.categoryId] });
+    const { priceLaborId } = await service.createPriceLabor({ grants: GRANTS, actor: ACTOR, name: "Guarded job", categoryId: trade.categoryId, vendorId, unitId: unit.id, amount: "10", currency: "IDR" });
+
+    await assert.rejects(
+      () => service.updateVendor({ grants: GRANTS, actor: ACTOR, vendorId, name: "Guarded Category Vendor", categoryIds: [] }),
+      (error: unknown) => error instanceof AppError && error.code === "VENDOR_CATEGORY_IN_USE",
+    );
+
+    await service.archivePriceLabor({ grants: GRANTS, actor: ACTOR, priceLaborId });
+    await service.updateVendor({ grants: GRANTS, actor: ACTOR, vendorId, name: "Guarded Category Vendor", categoryIds: [] });
+    assert.equal(await testDb.prisma.vendorCategory.count({ where: { vendor_id: vendorId } }), 0);
+  });
+
+  it("moves supplier categories onto the surviving category when two categories are merged", async () => {
+    const source = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: `Merge source ${crypto.randomUUID().slice(0, 6)}`, kind: "WORK" });
+    const target = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: `Merge target ${crypto.randomUUID().slice(0, 6)}`, kind: "WORK" });
+    const onlySource = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: `Merge only source ${crypto.randomUUID().slice(0, 6)}`, categoryIds: [source.categoryId] });
+    const both = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: `Merge both ${crypto.randomUUID().slice(0, 6)}`, categoryIds: [source.categoryId, target.categoryId] });
+
+    await service.mergeCategory({ grants: GRANTS, actor: ACTOR, sourceCategoryId: source.categoryId, targetCategoryId: target.categoryId });
+
+    assert.equal(await testDb.prisma.vendorCategory.count({ where: { category_id: source.categoryId } }), 0);
+    assert.equal(await testDb.prisma.vendorCategory.count({ where: { vendor_id: onlySource.vendorId, category_id: target.categoryId } }), 1);
+    assert.equal(await testDb.prisma.vendorCategory.count({ where: { vendor_id: both.vendorId, category_id: target.categoryId } }), 1, "no duplicate link for a supplier that already had the target");
   });
 
   it("reuses an existing pending deletion request instead of creating a duplicate for the same target", async () => {

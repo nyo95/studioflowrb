@@ -79,6 +79,7 @@ model Category {
   merged_from           Category[]           @relation("CategoryMerge")
   brand_categories      BrandCategory[]
   sku_categories        SkuCategory[]
+  vendor_categories     VendorCategory[]
   material_labor_prices PriceMaterialLabor[]
   labor_prices          PriceLabor[]
 
@@ -121,7 +122,7 @@ model Vendor {
   contacts              VendorContact[]
   owned_brands          Brand[]              @relation("BrandOwner")
   brand_suppliers       BrandSupplier[]
-  supplier_categories   VendorSupplierCategory[]
+  categories            VendorCategory[]
   material_prices       PriceMaterial[]
   material_labor_prices PriceMaterialLabor[]
   labor_prices          PriceLabor[]
@@ -130,31 +131,18 @@ model Vendor {
   @@schema("master_data")
 }
 
-model SupplierCategory {
-  id         String    @id @default(uuid())
-  code       String    @unique
-  name       String
-  sort_order Int       @default(0)
-  deleted_at DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
+/// A supplier's trades and product lines, drawn from the one shared Category list (WORK = trade such as MEP,
+/// PRODUCT = product line such as Flooring). It replaces the former free-standing SupplierCategory list.
+model VendorCategory {
+  id          String   @id @default(uuid())
+  vendor_id   String
+  category_id String
+  assigned_at DateTime @default(now())
+  vendor      Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Restrict)
+  category    Category @relation(fields: [category_id], references: [id], onDelete: Restrict)
 
-  vendor_supplier_categories VendorSupplierCategory[]
-
-  @@index([deleted_at])
-  @@schema("master_data")
-}
-
-model VendorSupplierCategory {
-  id                   String            @id @default(uuid())
-  vendor_id            String
-  supplier_category_id String
-  assigned_at          DateTime          @default(now())
-  vendor               Vendor            @relation(fields: [vendor_id], references: [id], onDelete: Restrict)
-  supplier_category    SupplierCategory  @relation(fields: [supplier_category_id], references: [id], onDelete: Restrict)
-
-  @@unique([vendor_id, supplier_category_id])
-  @@index([supplier_category_id])
+  @@unique([vendor_id, category_id])
+  @@index([category_id])
   @@schema("master_data")
 }
 

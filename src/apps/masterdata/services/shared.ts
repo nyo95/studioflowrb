@@ -151,6 +151,32 @@ export async function assertVendorTypeRemovalSafe(tx: TxClient, vendorId: string
   if (!hasLabor) { const [mlCount, laborCount] = await Promise.all([tx.priceMaterialLabor.count({ where: { vendor_id: vendorId, deleted_at: null } }), tx.priceLabor.count({ where: { vendor_id: vendorId, deleted_at: null } })]); if (mlCount > 0 || laborCount > 0) throw new AppError("CONFLICT", "VENDOR_LABOR_CAPABILITY_IN_USE", "Cannot remove labor provision capability while live work prices exist."); }
 }
 
+/**
+ * Records that a supplier works in a category (a trade for work prices, a product line for material prices).
+ * Called when a price is saved so the supplier's own category list grows with real use. Returns true when a
+ * link was added. Idempotent; a deactivated category is never newly linked.
+ */
+export async function ensureVendorCategory(tx: TxClient, vendorId: string, categoryId: string): Promise<boolean> {
+  if (await tx.vendorCategory.findUnique({ where: { vendor_id_category_id: { vendor_id: vendorId, category_id: categoryId } }, select: { id: true } })) return false;
+  const category = await tx.category.findUnique({ where: { id: categoryId }, select: { status: true } });
+  if (!category || category.status !== "ACTIVE") return false;
+  await tx.vendorCategory.create({ data: { id: randomUUID(), vendor_id: vendorId, category_id: categoryId } });
+  return true;
+}
+
+/** A category cannot be taken off a supplier while that supplier still has live prices filed under it. */
+export async function assertVendorCategoryRemovalSafe(tx: TxClient, vendorId: string, removedCategoryIds: readonly string[]): Promise<void> {
+  if (removedCategoryIds.length === 0) return;
+  const ids = [...removedCategoryIds];
+  const [mlCount, laborCount, materialCount] = await Promise.all([
+    tx.priceMaterialLabor.count({ where: { vendor_id: vendorId, deleted_at: null, category_id: { in: ids } } }),
+    tx.priceLabor.count({ where: { vendor_id: vendorId, deleted_at: null, category_id: { in: ids } } }),
+    tx.priceMaterial.count({ where: { supplier_vendor_id: vendorId, deleted_at: null, sku: { categories: { some: { category_id: { in: ids } } } } } }),
+  ]);
+  const total = mlCount + laborCount + materialCount;
+  if (total > 0) throw new AppError("CONFLICT", "VENDOR_CATEGORY_IN_USE", `Cannot remove a category while this supplier still has ${total} live price(s) under it.`);
+}
+
 export async function assertLiveProductCategories(tx: TxClient, categoryIds: readonly string[]): Promise<void> {
   if (categoryIds.length === 0) return;
   const unique = [...new Set(categoryIds)]; const categories = await tx.category.findMany({ where: { id: { in: unique } }, select: { id: true, kind: true, status: true } });
@@ -221,7 +247,7 @@ export function latestAuditActorLabels(db: PrismaClient, entityType: string, ent
   return readLatestAuditActorLabels(db, { appId: "masterdata", entityType, entityIds });
 }
 
-export type MasterDataDeletionTarget = "brand" | "vendor" | "sku" | "unit" | "category" | "vendor_type" | "supplier_category" | "price_material" | "price_material_labor" | "price_labor";
+export type MasterDataDeletionTarget = "brand" | "vendor" | "sku" | "unit" | "category" | "vendor_type" | "price_material" | "price_material_labor" | "price_labor";
 
 /** Told when staff finish a sample request, inside the same transaction, so the requester can be informed. Optional. */
 export type SampleRequestResolution = {

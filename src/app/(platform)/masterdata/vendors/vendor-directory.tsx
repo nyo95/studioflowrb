@@ -32,7 +32,7 @@ requestVendorDeletionAction,
 restoreVendorAction,
 updateVendorAction,
 } from "./actions";
-import { createSupplierCategoryQuickAction } from "../../settings/general/masterdata/supplier-categories-actions";
+import { createPricingProductCategoryQuickAction, createPricingWorkCategoryQuickAction } from "../pricing/actions";
 
 /** Product categories of the brands a supplier carries, alphabetical and de-duplicated (archived categories left out). */
 function carriedBrands(vendor: Pick<VendorRow, "brand_suppliers" | "owned_brands">) {
@@ -71,11 +71,12 @@ type VendorRow = {
       can_supply_labor: boolean;
     };
   }>;
-  supplier_categories: Array<{
-    supplier_category: {
+  categories: Array<{
+    category: {
       id: string;
-      code: string;
       name: string;
+      kind: "PRODUCT" | "WORK";
+      status: string;
     };
   }>;
   contacts: Array<{
@@ -115,7 +116,7 @@ type VendorTypeOption = {
 };
 
 type BrandOption = { id: string; name: string };
-type VendorCategoryOption = { id: string; code: string; name: string };
+type VendorCategoryOption = { id: string; name: string; kind: "PRODUCT" | "WORK" };
 
 const LINK_KINDS = ["WEBSITE", "INSTAGRAM", "FACEBOOK", "TIKTOK", "YOUTUBE", "LINKEDIN", "WHATSAPP"] as const;
 type LinkEntry = { kind: string; url: string; label: string | null };
@@ -248,19 +249,19 @@ type ContactDraft = {
 export function VendorDirectory({
   vendors,
   vendorTypes,
-  supplierCategories,
+  categories,
   brands,
   canManage,
   canManageCategories,
 }: {
   vendors: VendorRow[];
   vendorTypes: VendorTypeOption[];
-  supplierCategories: VendorCategoryOption[];
+  categories: VendorCategoryOption[];
   brands: BrandOption[];
   canManage: boolean;
   canManageCategories: boolean;
 }) {
-  const { options: categoryOptions, upsertOverlayOption: upsertCategoryOption } = useOptionOverlay(supplierCategories);
+  const { options: categoryOptions, upsertOverlayOption: upsertCategoryOption } = useOptionOverlay(categories);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<DirectoryStatus>("ACTIVE");
   const [brandFilter, setBrandFilter] = useState("ALL");
@@ -280,8 +281,8 @@ export function VendorDirectory({
   const [contactsList, setContactsList] = useState<ContactDraft[]>([]);
   const [createVendorTypeIds, setCreateVendorTypeIds] = useState<string[]>([]);
   const [editVendorTypeIds, setEditVendorTypeIds] = useState<string[]>([]);
-  const [createSupplierCategoryIds, setCreateSupplierCategoryIds] = useState<string[]>([]);
-  const [editSupplierCategoryIds, setEditSupplierCategoryIds] = useState<string[]>([]);
+  const [createCategoryIds, setCreateCategoryIds] = useState<string[]>([]);
+  const [editCategoryIds, setEditCategoryIds] = useState<string[]>([]);
   // Optional at creation — most suppliers are added before anyone has decided
   // which Brand they carry (owner: "kalau belum tau brandnya, input aja juga
   // gpp"). The relation stays editable later from each Brand's own screen,
@@ -310,7 +311,7 @@ export function VendorDirectory({
     formRef: createFormRef,
     resetKey: createDraftKey,
     active: createOpen,
-    watchedValue: JSON.stringify([createVendorTypeIds, createSupplierCategoryIds, createBrandIds, contactsList]),
+    watchedValue: JSON.stringify([createVendorTypeIds, createCategoryIds, createBrandIds, contactsList]),
     title: "Discard supplier draft?",
     description: "Your changes are only in this browser and have not been saved.",
   });
@@ -318,7 +319,7 @@ export function VendorDirectory({
     formRef: editFormRef,
     resetKey: editTarget?.id ?? "",
     active: Boolean(editTarget),
-    watchedValue: JSON.stringify([editVendorTypeIds, editSupplierCategoryIds, contactsList, stagedLinks, stagedSnapshot]),
+    watchedValue: JSON.stringify([editVendorTypeIds, editCategoryIds, contactsList, stagedLinks, stagedSnapshot]),
     title: "Discard changes?",
     description: "Your edits are only in this browser and have not been saved.",
   });
@@ -326,7 +327,7 @@ export function VendorDirectory({
   const filtered = vendors.filter((v) => {
     if (!matchesDirectoryStatus(v.deleted_at, statusFilter)) return false;
     if (typeFilter !== "ALL" && !v.types.some((t) => t.vendor_type.id === typeFilter)) return false;
-    if (categoryFilter !== "ALL" && !v.supplier_categories.some((c) => c.supplier_category.id === categoryFilter)) return false;
+    if (categoryFilter !== "ALL" && !v.categories.some((c) => c.category.id === categoryFilter)) return false;
     if (productCategoryFilter !== "ALL" && !carriedBrands(v).some((brand) => brand.categories?.some((category) => category.category.id === productCategoryFilter && category.category.status === "ACTIVE"))) return false;
     if (brandFilter !== "ALL" && !v.brand_suppliers.some((item) => item.brand.id === brandFilter) && !v.owned_brands.some((item) => item.id === brandFilter)) return false;
     if (capabilityFilter === "MATERIAL" && !v.types.some((item) => item.vendor_type.can_supply_material)) return false;
@@ -376,19 +377,23 @@ export function VendorDirectory({
     return similar ? `Potential duplicate: a similar supplier "${similar.name}" already exists.` : null;
   };
 
-  const createSupplierCategory = async (name: string, setError: (error: string | null) => void) => {
+  const createCategory = async (kind: "PRODUCT" | "WORK", name: string, setError: (error: string | null) => void) => {
     setError(null);
     const formData = new FormData();
     formData.set("name", name);
-    const result = await createSupplierCategoryQuickAction(formData);
+    const result = await (kind === "WORK" ? createPricingWorkCategoryQuickAction(formData) : createPricingProductCategoryQuickAction(formData));
     if (result.ok === false) {
       setError(result.error.safeMessage);
       return;
     }
-    const option = { id: result.data.supplierCategoryId, name: name.trim(), code: result.data.code };
-    upsertCategoryOption(option);
-    return option.id;
+    upsertCategoryOption({ id: result.data.categoryId, name: name.trim(), kind });
+    return result.data.categoryId;
   };
+
+  // The supplier form shows work (trade) and product categories as two fields over one id list.
+  const categoryKindById = new Map(categoryOptions.map((category) => [category.id, category.kind] as const));
+  const idsOfKind = (ids: string[], kind: "PRODUCT" | "WORK") => ids.filter((id) => categoryKindById.get(id) === kind);
+  const withKind = (ids: string[], kind: "PRODUCT" | "WORK", next: string[]) => [...ids.filter((id) => categoryKindById.get(id) !== kind), ...next];
 
   // Mirrors brand.service.ts's assertVendorMaterialCapable: a Brand relation
   // can only be recorded once the Vendor is actually material-capable, so the
@@ -402,7 +407,7 @@ export function VendorDirectory({
   const openCreateDialog = () => {
     setContactsList([]);
     setCreateVendorTypeIds([]);
-    setCreateSupplierCategoryIds([]);
+    setCreateCategoryIds([]);
     setCreateBrandIds([]);
     setCreateNameWarning(null);
     setCreateDraftKey((key) => key + 1);
@@ -423,7 +428,7 @@ export function VendorDirectory({
       })),
     );
     setEditVendorTypeIds(vendor.types.map((type) => type.vendor_type.id));
-    setEditSupplierCategoryIds(vendor.supplier_categories.map((category) => category.supplier_category.id));
+    setEditCategoryIds(vendor.categories.map((entry) => entry.category.id));
     setStagedLinks(parseLinks(vendor.info_links));
     setStagedSnapshot(parseLinks(vendor.link_review_snapshot));
     setEditName(vendor.name);
@@ -480,12 +485,9 @@ export function VendorDirectory({
         <FilterSummary filtered={Boolean(query) || statusFilter !== "ACTIVE" || typeFilter !== "ALL" || categoryFilter !== "ALL" || productCategoryFilter !== "ALL" || brandFilter !== "ALL" || capabilityFilter !== "ALL"} shown={filtered.length} total={vendors.length} onClear={() => { setQuery(""); setStatusFilter("ACTIVE"); setTypeFilter("ALL"); setCategoryFilter("ALL"); setProductCategoryFilter("ALL"); setBrandFilter("ALL"); setCapabilityFilter("ALL"); }} />
         <div className="w-48">
           <Select value={categoryFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setCategoryFilter(e.target.value)}>
-            <option value="ALL">All supplier categories</option>
-            {supplierCategories.map((sc) => (
-              <option key={sc.id} value={sc.id}>
-                {sc.name}
-              </option>
-            ))}
+            <option value="ALL">All categories</option>
+            <optgroup label="Work categories">{categoryOptions.filter((category) => category.kind === "WORK").map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</optgroup>
+            <optgroup label="Product categories">{categoryOptions.filter((category) => category.kind === "PRODUCT").map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</optgroup>
           </Select>
         </div>
       </TableToolbar>}>
@@ -552,14 +554,14 @@ export function VendorDirectory({
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1 items-center max-w-xs">
-                      {vendor.supplier_categories.length === 0 && brandCategoryNames(vendor).length === 0 ? (
+                      {vendor.categories.length === 0 && brandCategoryNames(vendor).length === 0 ? (
                         <span className="text-ink-tertiary text-xs">No categories</span>
                       ) : (
-                        vendor.supplier_categories.map((c) => <Badge key={c.supplier_category.id} tone="neutral">{c.supplier_category.name}</Badge>)
+                        vendor.categories.map((c) => <Badge key={c.category.id} tone="neutral" title={c.category.kind === "WORK" ? "Work category" : "Product category"}>{c.category.name}</Badge>)
                       )}
                       {brandCategoryNames(vendor).length > 0 ? (
                         <span className="text-ink-tertiary text-xs" title="Product categories of the brands this supplier carries. Read-only: change them on the Brands.">
-                          {vendor.supplier_categories.length > 0 ? "+ " : ""}from brands: {brandCategoryNames(vendor).slice(0, 3).join(", ")}{brandCategoryNames(vendor).length > 3 ? ` +${brandCategoryNames(vendor).length - 3}` : ""}
+                          {vendor.categories.length > 0 ? "+ " : ""}from brands: {brandCategoryNames(vendor).slice(0, 3).join(", ")}{brandCategoryNames(vendor).length > 3 ? ` +${brandCategoryNames(vendor).length - 3}` : ""}
                         </span>
                       ) : null}
                     </div>
@@ -629,7 +631,7 @@ export function VendorDirectory({
           className="grid gap-4  pr-1"
         >
           {createVendorTypeIds.map((id) => <input key={id} type="hidden" name="vendorTypeIds" value={id} />)}
-          {createSupplierCategoryIds.map((id) => <input key={id} type="hidden" name="supplierCategoryIds" value={id} />)}
+          {createCategoryIds.map((id) => <input key={id} type="hidden" name="categoryIds" value={id} />)}
           {createBrandIds.map((id) => <input key={id} type="hidden" name="brandIds" value={id} />)}
           {createError ? <InlineError>{createError}</InlineError> : null}
 
@@ -663,8 +665,11 @@ export function VendorDirectory({
               disabled={!createCanSupplyMaterial}
             />
           </Field>
-          <Field label="Supplier categories" description="Classification labels such as fabric supplier or hardware supplier. A supplier may have more than one; a missing category is created and added for you.">
-            <CreatableMultiSelect label="Supplier categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name, description: category.code }))} value={createSupplierCategoryIds} onValueChange={setCreateSupplierCategoryIds} onCreate={canManageCategories ? (name) => createSupplierCategory(name, setCreateError) : undefined} createLabel={(name) => `Create supplier category "${name}"`} placeholder="Search supplier categories" searchPlaceholder="Search supplier categories…" />
+          <Field label="Work categories" description="The trades this supplier does, such as MEP or Sipil. Pricing a job for this supplier adds its category here automatically.">
+            <CreatableMultiSelect label="Work categories" options={categoryOptions.filter((category) => category.kind === "WORK").map((category) => ({ id: category.id, label: category.name }))} value={idsOfKind(createCategoryIds, "WORK")} onValueChange={(next) => setCreateCategoryIds((current) => withKind(current, "WORK", next))} onCreate={canManageCategories ? (name) => createCategory("WORK", name, setCreateError) : undefined} createLabel={(name) => `Create work category "${name}"`} placeholder="Search work categories" searchPlaceholder="Search work categories…" />
+          </Field>
+          <Field label="Product categories" description="The product lines this supplier sells, such as Flooring or Sanitary.">
+            <CreatableMultiSelect label="Product categories" options={categoryOptions.filter((category) => category.kind === "PRODUCT").map((category) => ({ id: category.id, label: category.name }))} value={idsOfKind(createCategoryIds, "PRODUCT")} onValueChange={(next) => setCreateCategoryIds((current) => withKind(current, "PRODUCT", next))} onCreate={canManageCategories ? (name) => createCategory("PRODUCT", name, setCreateError) : undefined} createLabel={(name) => `Create product category "${name}"`} placeholder="Search product categories" searchPlaceholder="Search product categories…" />
           </Field>
           <Field label="Office / Workshop address">
             <Input name="address" maxLength={256} placeholder="Address, City" />
@@ -777,7 +782,7 @@ export function VendorDirectory({
           >
             <input type="hidden" name="vendorId" value={editTarget.id} />
             {editVendorTypeIds.map((id) => <input key={id} type="hidden" name="vendorTypeIds" value={id} />)}
-            {editSupplierCategoryIds.map((id) => <input key={id} type="hidden" name="supplierCategoryIds" value={id} />)}
+            {editCategoryIds.map((id) => <input key={id} type="hidden" name="categoryIds" value={id} />)}
             {editError ? <InlineError>{editError}</InlineError> : null}
 
             <Tabs keepMounted
@@ -799,9 +804,12 @@ export function VendorDirectory({
                       <Field label="Supplier types" description="Search the controlled type vocabulary. Removing capability types is guarded against active dependent prices.">
                         <CreatableMultiSelect label="Supplier types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={editVendorTypeIds} onValueChange={setEditVendorTypeIds} placeholder="Search supplier types" searchPlaceholder="Search supplier types…" />
                       </Field>
-                      <Field label="Supplier categories" description="Classification labels such as fabric supplier or hardware supplier. A supplier may have more than one; a missing category is created and added for you.">
-                        <CreatableMultiSelect label="Supplier categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name, description: category.code }))} value={editSupplierCategoryIds} onValueChange={setEditSupplierCategoryIds} onCreate={canManageCategories ? (name) => createSupplierCategory(name, setEditError) : undefined} createLabel={(name) => `Create supplier category "${name}"`} placeholder="Search supplier categories" searchPlaceholder="Search supplier categories…" />
-                      </Field>
+                      <Field label="Work categories" description="The trades this supplier does, such as MEP or Sipil. Pricing a job for this supplier adds its category here automatically.">
+            <CreatableMultiSelect label="Work categories" options={categoryOptions.filter((category) => category.kind === "WORK").map((category) => ({ id: category.id, label: category.name }))} value={idsOfKind(editCategoryIds, "WORK")} onValueChange={(next) => setEditCategoryIds((current) => withKind(current, "WORK", next))} onCreate={canManageCategories ? (name) => createCategory("WORK", name, setEditError) : undefined} createLabel={(name) => `Create work category "${name}"`} placeholder="Search work categories" searchPlaceholder="Search work categories…" />
+          </Field>
+          <Field label="Product categories" description="The product lines this supplier sells, such as Flooring or Sanitary.">
+            <CreatableMultiSelect label="Product categories" options={categoryOptions.filter((category) => category.kind === "PRODUCT").map((category) => ({ id: category.id, label: category.name }))} value={idsOfKind(editCategoryIds, "PRODUCT")} onValueChange={(next) => setEditCategoryIds((current) => withKind(current, "PRODUCT", next))} onCreate={canManageCategories ? (name) => createCategory("PRODUCT", name, setEditError) : undefined} createLabel={(name) => `Create product category "${name}"`} placeholder="Search product categories" searchPlaceholder="Search product categories…" />
+          </Field>
                       <Field label="Office / Workshop address">
                         <Input name="address" value={editAddress} maxLength={256} onChange={(e) => setEditAddress(e.target.value)} />
                       </Field>

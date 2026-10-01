@@ -40,19 +40,19 @@ export default async function VendorsPage() {
     );
   }
 
-  const [vendors, assignmentVendorTypes, assignmentSupplierCategories, brands] = await Promise.all([
+  const [vendors, assignmentVendorTypes, assignmentCategories, brands] = await Promise.all([
     masterDataService.listVendors({ grants, includeArchived: true }),
     canManage ? masterDataService.listVendorTypesForAssignment({ grants }) : [],
-    canManage ? masterDataService.listSupplierCategoriesForAssignment({ grants }) : [],
+    canManage ? masterDataService.listCategories({ grants }) : [],
     canManage ? masterDataService.listBrandsForVendorAssignment({ grants }) : [],
   ]);
   const vendorTypes = assignmentVendorTypes.length > 0
     ? assignmentVendorTypes
     : [...new Map(vendors.flatMap((vendor) => vendor.types.map((assignment) => [assignment.vendor_type.id, assignment.vendor_type] as const))).values()]
       .sort((left, right) => left.name.localeCompare(right.name, "id"));
-  const supplierCategories = assignmentSupplierCategories.length > 0
-    ? assignmentSupplierCategories
-    : [...new Map(vendors.flatMap((vendor) => vendor.supplier_categories.map((assignment) => [assignment.supplier_category.id, assignment.supplier_category] as const))).values()]
+  const categories = assignmentCategories.length > 0
+    ? assignmentCategories
+    : [...new Map(vendors.flatMap((vendor) => vendor.categories.filter((assignment) => assignment.category.status === "ACTIVE").map((assignment) => [assignment.category.id, assignment.category] as const))).values()]
       .sort((left, right) => left.name.localeCompare(right.name, "id"));
 
   return (
@@ -64,7 +64,7 @@ export default async function VendorsPage() {
       <VendorDirectory
         vendors={vendors}
         vendorTypes={vendorTypes}
-        supplierCategories={supplierCategories.map((b) => ({ id: b.id, name: b.name, code: b.code }))}
+        categories={categories.filter((category) => category.status === "ACTIVE").map((category) => ({ id: category.id, name: category.name, kind: category.kind }))}
         brands={brands.map((b) => ({ id: b.id, name: b.name }))}
         canManage={canManage}
         canManageCategories={canManageCategories}

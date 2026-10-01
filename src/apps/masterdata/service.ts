@@ -6,7 +6,6 @@ import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts } from "./services/
 import { createUnitService } from "./services/unit.service";
 import { createCategoryService } from "./services/category.service";
 import { createVendorTypeService } from "./services/vendor-type.service";
-import { createSupplierCategoryService } from "./services/supplier-category.service";
 import { createBrandService } from "./services/brand.service";
 import { createVendorService } from "./services/vendor.service";
 import { createSkuService } from "./services/sku.service";
@@ -25,7 +24,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
   const unitService = createUnitService(db, p);
   const categoryService = createCategoryService(db, p);
   const vendorTypeService = createVendorTypeService(db, p);
-  const supplierCategoryService = createSupplierCategoryService(db, p);
   const brandService = createBrandService(db, p);
   const vendorService = createVendorService(db, p);
   const skuService = createSkuService(db, p);
@@ -129,7 +127,6 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
     ...unitService,
     ...categoryService,
     ...vendorTypeService,
-    ...supplierCategoryService,
     ...brandService,
     ...vendorService,
     ...skuService,

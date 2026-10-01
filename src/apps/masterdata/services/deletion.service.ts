@@ -73,7 +73,7 @@ export function createDeletionService(db: PrismaClient, ports: MasterDataService
 }
 
 async function hardDeleteMasterDataTarget(tx: any, targetType: string, targetId: string): Promise<string> {
-  const valid = ["brand", "vendor", "sku", "unit", "category", "vendor_type", "supplier_category", "price_material", "price_material_labor", "price_labor"];
+  const valid = ["brand", "vendor", "sku", "unit", "category", "vendor_type", "price_material", "price_material_labor", "price_labor"];
   if (!valid.includes(targetType)) throw new AppError("VALIDATION", "UNKNOWN_TARGET_TYPE", `Unknown deletion target type: ${targetType}`);
   if (targetType === "brand") {
     const brand = await tx.brand.findUniqueOrThrow({ where: { id: targetId } });
@@ -102,8 +102,8 @@ async function hardDeleteMasterDataTarget(tx: any, targetType: string, targetId:
     if (priceCount > 0) throw new AppError("CONFLICT", "VENDOR_HAS_PRICES", "Supplier still has price rows. Delete them first.");
     await tx.vendorContact.deleteMany({ where: { vendor_id: targetId } });
     await tx.vendorVendorType.deleteMany({ where: { vendor_id: targetId } });
-    // Restrict FK: without this a Supplier that has a supplier category could never be permanently deleted.
-    await tx.vendorSupplierCategory.deleteMany({ where: { vendor_id: targetId } });
+    // Restrict FK: without this a Supplier that has categories could never be permanently deleted.
+    await tx.vendorCategory.deleteMany({ where: { vendor_id: targetId } });
     await tx.archiveCause.deleteMany({ where: { entity_type: "vendor", entity_id: targetId } });
     await tx.vendor.delete({ where: { id: targetId } });
   } else if (targetType === "sku") {
@@ -125,8 +125,8 @@ async function hardDeleteMasterDataTarget(tx: any, targetType: string, targetId:
   } else if (targetType === "category") {
     const category = await tx.category.findUniqueOrThrow({ where: { id: targetId } });
     if (category.status !== "DEACTIVATED") throw new AppError("CONFLICT", "CATEGORY_STILL_ACTIVE", "Category must be deactivated before permanent deletion.");
-    const [brandCatCount, skuCatCount, laborCount, workPriceCount] = await Promise.all([tx.brandCategory.count({ where: { category_id: targetId } }), tx.skuCategory.count({ where: { category_id: targetId } }), tx.priceMaterialLabor.count({ where: { category_id: targetId } }), tx.priceLabor.count({ where: { category_id: targetId } })]);
-    const dependencyCount = brandCatCount + skuCatCount + laborCount + workPriceCount;
+    const [brandCatCount, skuCatCount, laborCount, workPriceCount, vendorCatCount] = await Promise.all([tx.brandCategory.count({ where: { category_id: targetId } }), tx.skuCategory.count({ where: { category_id: targetId } }), tx.priceMaterialLabor.count({ where: { category_id: targetId } }), tx.priceLabor.count({ where: { category_id: targetId } }), tx.vendorCategory.count({ where: { category_id: targetId } })]);
+    const dependencyCount = brandCatCount + skuCatCount + laborCount + workPriceCount + vendorCatCount;
     if (dependencyCount > 0) throw new AppError("CONFLICT", "CATEGORY_HAS_DEPENDENCIES", `Category is still referenced by ${dependencyCount} record(s) and cannot be permanently deleted.`);
     try { await tx.category.delete({ where: { id: targetId } }); } catch (error) { mapWriteError(error); }
   } else if (targetType === "vendor_type") {
@@ -136,13 +136,6 @@ async function hardDeleteMasterDataTarget(tx: any, targetType: string, targetId:
     if (vendorAssignmentCount > 0) throw new AppError("CONFLICT", "VENDOR_TYPE_HAS_ASSIGNMENTS", `Supplier Type is assigned to ${vendorAssignmentCount} Supplier(s) and cannot be permanently deleted.`);
     await tx.archiveCause.deleteMany({ where: { entity_type: "vendor_type", entity_id: targetId } });
     try { await tx.vendorType.delete({ where: { id: targetId } }); } catch (error) { mapWriteError(error); }
-  } else if (targetType === "supplier_category") {
-    const supplierCategory = await tx.supplierCategory.findUniqueOrThrow({ where: { id: targetId } });
-    if (supplierCategory.deleted_at === null) throw new AppError("CONFLICT", "SUPPLIER_CATEGORY_NOT_ARCHIVED", "Supplier Category must be archived before permanent deletion.");
-    const assignmentCount = await tx.vendorSupplierCategory.count({ where: { supplier_category_id: targetId } });
-    if (assignmentCount > 0) throw new AppError("CONFLICT", "SUPPLIER_CATEGORY_HAS_ASSIGNMENTS", `Supplier Category is assigned to ${assignmentCount} Supplier(s) and cannot be permanently deleted.`);
-    await tx.archiveCause.deleteMany({ where: { entity_type: "supplier_category", entity_id: targetId } });
-    try { await tx.supplierCategory.delete({ where: { id: targetId } }); } catch (error) { mapWriteError(error); }
   } else if (targetType === "price_material") {
     const price = await tx.priceMaterial.findUniqueOrThrow({ where: { id: targetId } });
     if (price.deleted_at === null) throw new AppError("CONFLICT", "PRICE_NOT_ARCHIVED", "Price must be archived before permanent deletion.");

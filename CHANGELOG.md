@@ -5,13 +5,23 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.259**
-- Next local revision: **R8.260**
+- Current revision after this entry is committed: **R8.262**
+- Next local revision: **R8.263**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.262 | 2026-10-01 | feat(masterdata): merge supplier categories into the shared category list
+
+- A supplier's categories now come from the one shared category list (work = a trade such as MEP, product = a product line such as Flooring). The separate "Supplier categories" list, its Settings tab and its archive/deletion flow are removed. The Suppliers form has two fields, Work categories and Product categories, each able to create a missing category inline; the Suppliers filter groups both kinds.
+- Saving a work price (labor, material + labor) files the supplier under that price's category, and saving a material price files it under the SKU's product category. Each new link is audited as `vendor.categories-linked`. A category cannot be taken off a supplier while that supplier still has live prices under it (`VENDOR_CATEGORY_IN_USE`).
+- The work price form now asks for the supplier first, then narrows Pricing category to that supplier's categories, selects it when there is only one, and offers "Show all categories". A supplier with no categories yet sees every category; the chosen one is saved to it. The labor form also stops offering material-only suppliers when the person can read both price kinds.
+- Merging two categories moves supplier links onto the survivor without duplicates, and permanently deleting a category now checks supplier links.
+- Migration `20261001090000_merge_supplier_categories_into_categories` carries every supplier category and assignment over before dropping the old tables: a name that already exists as a Category is reused (so MEP stayed MEP); otherwise a Category is created (WORK when unassigned or any assigned supplier can provide labor, else PRODUCT; archived becomes DEACTIVATED). Pending supplier-category deletion requests are closed with a note. Applied to the office development and disposable test databases (office data: MEP kept its supplier, Sipil became a work category). No dependencies.
+
+**Checks.** `npm test` (712 pass); `npm run check`; `npm run lint` (no errors); new integration tests for category linking from prices, the in-use guard, merge with supplier links, and supplier deletion. Browser acceptance is not done; queued in the backlog. Material price entry is not yet restricted to brands linked to the supplier; that is a separate planned change.
 
 ## R8.249 | 2026-09-30 | feat(platform): store personal display preferences and storage usage
 

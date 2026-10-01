@@ -5,10 +5,17 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, requiredCurrency, requiredAmount, assertVendorMaterialCapable, assertVendorLaborCapable, assertWorkPriceRestorable, assertPriceMaterialRestorable, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, requiredCurrency, requiredAmount, assertVendorMaterialCapable, assertVendorLaborCapable, ensureVendorCategory, assertWorkPriceRestorable, assertPriceMaterialRestorable, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
 
 export function createPricingService(db: PrismaClient, ports: MasterDataServicePorts) {
   const { runTransaction } = ports;
+
+  // Saving a price files the supplier under that price's category, so a supplier's categories grow with real use.
+  async function linkVendorCategories(tx: any, actor: AuditActor, vendorId: string, categoryIds: readonly string[]) {
+    const added: string[] = [];
+    for (const categoryId of new Set(categoryIds)) if (await ensureVendorCategory(tx, vendorId, categoryId)) added.push(categoryId);
+    if (added.length > 0) await writeAudit(ports, tx, { action: "vendor.categories-linked", entityType: "vendor", entityId: vendorId, actor, metadata: { category_ids: added, via: "price" } });
+  }
 
   return {
     async listPriceMaterials(input: { grants: PermissionGrants; search?: string; skuId?: string; supplierVendorId?: string; brandId?: string; includeArchived?: boolean }) {
@@ -42,6 +49,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         let price;
         try { price = await tx.priceMaterial.create({ data: { id: randomUUID(), sku_id: input.skuId, supplier_vendor_id: input.supplierVendorId, amount, currency, unit_id: unitId, source_link_id: input.sourceLinkId || null, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
         if (!input.suppressAudit) await writeAudit(ports, tx, { action: "price-material.created", entityType: "price_material", entityId: price!.id, actor: input.actor, metadata: { sku_id: input.skuId, vendor_id: input.supplierVendorId } });
+        await linkVendorCategories(tx, input.actor, input.supplierVendorId, (await tx.skuCategory.findMany({ where: { sku_id: input.skuId }, select: { category_id: true } })).map((row: any) => row.category_id));
         return { priceMaterialId: price!.id };
       });
     },
@@ -150,6 +158,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         let price;
         try { price = await tx.priceMaterialLabor.create({ data: { id: randomUUID(), name, slug, category_id: input.categoryId, vendor_id: input.vendorId, unit_id: input.unitId, amount, currency, scope_note: input.scopeNote?.trim() || null, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
         await writeAudit(ports, tx, { action: "price-material-labor.created", entityType: "price_material_labor", entityId: price!.id, actor: input.actor, metadata: { vendor_id: input.vendorId, category_id: input.categoryId } });
+        await linkVendorCategories(tx, input.actor, input.vendorId, [input.categoryId]);
         return { priceMaterialLaborId: price!.id };
       });
     },
@@ -184,6 +193,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         if (Object.keys(changes).length === 0) return { priceMaterialLaborId: input.priceMaterialLaborId };
         try { await tx.priceMaterialLabor.update({ where: { id: input.priceMaterialLaborId }, data: { name, slug, category_id: input.categoryId, vendor_id: input.vendorId, unit_id: input.unitId, amount, currency, scope_note: input.scopeNote?.trim() || null, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
         await writeAudit(ports, tx, { action: "price-material-labor.updated", entityType: "price_material_labor", entityId: input.priceMaterialLaborId, actor: input.actor, changes: Object.keys(changes).length > 0 ? changes : undefined });
+        await linkVendorCategories(tx, input.actor, input.vendorId, [input.categoryId]);
         return { priceMaterialLaborId: input.priceMaterialLaborId };
       });
     },
@@ -263,6 +273,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         let price;
         try { price = await tx.priceLabor.create({ data: { id: randomUUID(), name, slug, category_id: input.categoryId, vendor_id: input.vendorId, unit_id: input.unitId, amount, currency, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
         await writeAudit(ports, tx, { action: "price-labor.created", entityType: "price_labor", entityId: price!.id, actor: input.actor, metadata: { vendor_id: input.vendorId, category_id: input.categoryId } });
+        await linkVendorCategories(tx, input.actor, input.vendorId, [input.categoryId]);
         return { priceLaborId: price!.id };
       });
     },
@@ -296,6 +307,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         if (Object.keys(changes).length === 0) return { priceLaborId: input.priceLaborId };
         try { await tx.priceLabor.update({ where: { id: input.priceLaborId }, data: { name, slug, category_id: input.categoryId, vendor_id: input.vendorId, unit_id: input.unitId, amount, currency, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
         await writeAudit(ports, tx, { action: "price-labor.updated", entityType: "price_labor", entityId: input.priceLaborId, actor: input.actor, changes: Object.keys(changes).length > 0 ? changes : undefined });
+        await linkVendorCategories(tx, input.actor, input.vendorId, [input.categoryId]);
         return { priceLaborId: input.priceLaborId };
       });
     },

@@ -24,7 +24,7 @@ export function createCategoryService(db: PrismaClient, ports: MasterDataService
         select: {
           id: true, name: true, slug: true, kind: true, status: true, merged_into_id: true,
           merged_into: { select: { id: true, name: true } },
-          _count: { select: { sku_categories: true, brand_categories: true, material_labor_prices: true, labor_prices: true } },
+          _count: { select: { sku_categories: true, brand_categories: true, vendor_categories: true, material_labor_prices: true, labor_prices: true } },
         },
       });
     },
@@ -33,7 +33,7 @@ export function createCategoryService(db: PrismaClient, ports: MasterDataService
       requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.dictionaryRead, MASTERDATA_PERMISSIONS.dictionaryManage], "You do not have permission to view categories.");
       return db.category.findUniqueOrThrow({
         where: { id: input.categoryId },
-        include: { merged_into: { select: { id: true, name: true } }, _count: { select: { sku_categories: true, brand_categories: true, material_labor_prices: true, labor_prices: true } } },
+        include: { merged_into: { select: { id: true, name: true } }, _count: { select: { sku_categories: true, brand_categories: true, vendor_categories: true, material_labor_prices: true, labor_prices: true } } },
       });
     },
 
@@ -104,6 +104,11 @@ export function createCategoryService(db: PrismaClient, ports: MasterDataService
           if (existingTargetId) { await tx.brandCategoryOrigin.updateMany({ where: { brand_category_id: sourceLink.id }, data: { brand_category_id: existingTargetId } }); await tx.brandCategory.delete({ where: { id: sourceLink.id } }); }
           else { await tx.brandCategory.update({ where: { id: sourceLink.id }, data: { category_id: input.targetCategoryId } }); }
         }
+        const targetVendorLinks = new Set((await tx.vendorCategory.findMany({ where: { category_id: input.targetCategoryId }, select: { vendor_id: true } })).map((r) => r.vendor_id));
+        const sourceVendorLinks = await tx.vendorCategory.findMany({ where: { category_id: input.sourceCategoryId }, select: { id: true, vendor_id: true } });
+        const vendorLinksToMove = sourceVendorLinks.filter((r) => !targetVendorLinks.has(r.vendor_id));
+        if (vendorLinksToMove.length > 0) await tx.vendorCategory.updateMany({ where: { id: { in: vendorLinksToMove.map((r) => r.id) } }, data: { category_id: input.targetCategoryId } });
+        await tx.vendorCategory.deleteMany({ where: { category_id: input.sourceCategoryId } });
         if (source.kind === "WORK") { await tx.priceMaterialLabor.updateMany({ where: { category_id: input.sourceCategoryId }, data: { category_id: input.targetCategoryId } }); await tx.priceLabor.updateMany({ where: { category_id: input.sourceCategoryId }, data: { category_id: input.targetCategoryId } }); }
         await tx.category.update({ where: { id: input.sourceCategoryId }, data: { status: "DEACTIVATED", deactivated_at: now, merged_into_id: input.targetCategoryId } });
         await writeAudit(ports, tx, { action: "category.merged", entityType: "category", entityId: input.sourceCategoryId, actor: input.actor, metadata: { target_category_id: input.targetCategoryId, skus_transferred: skusToTransfer.length } });
