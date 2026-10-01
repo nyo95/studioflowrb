@@ -50,3 +50,34 @@ export async function applySkuPriceImportAction(formData: FormData): Promise<Act
     return result;
   });
 }
+
+function databaseOptions(formData: FormData) {
+  return { priceKind: formData.get("priceKind") === "material-labor" ? ("material-labor" as const) : ("labor" as const), defaultUnitId: String(formData.get("defaultUnitId") ?? "") || null };
+}
+
+/** Downloads the supplier and work-price database in the same layout the import reads. */
+export async function exportPriceDatabaseAction(): Promise<ActionResult<DownloadFile>> {
+  return runSafeAction(async () => {
+    const { grants } = await requirePrincipalGrants();
+    const file = await masterDataService.exportPriceDatabase({ grants });
+    return { filename: file.filename, mimeType: file.mimeType, base64: file.data.toString("base64") };
+  });
+}
+
+export async function previewPriceDatabaseImportAction(formData: FormData): Promise<ActionResult<Awaited<ReturnType<typeof masterDataService.previewPriceDatabaseImport>>>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    return masterDataService.previewPriceDatabaseImport({ grants, actor: { kind: "USER", userId: principal.userId, label: principal.displayName }, file: await upload(formData), options: databaseOptions(formData) });
+  });
+}
+
+export async function applyPriceDatabaseImportAction(formData: FormData): Promise<ActionResult<Awaited<ReturnType<typeof masterDataService.applyPriceDatabaseImport>>>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const hash = String(formData.get("hash") ?? "").trim();
+    if (!hash) throw new AppError("VALIDATION", "PRICE_DATABASE_WORKBOOK_HASH_REQUIRED", "Check the file before importing it.");
+    const result = await masterDataService.applyPriceDatabaseImport({ grants, actor: { kind: "USER", userId: principal.userId, label: principal.displayName }, file: await upload(formData), hash, options: databaseOptions(formData) });
+    revalidatePath("/masterdata"); revalidatePath("/masterdata/vendors"); revalidatePath("/masterdata/pricing"); revalidatePath("/masterdata/categories");
+    return result;
+  });
+}

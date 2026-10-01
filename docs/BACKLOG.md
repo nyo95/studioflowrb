@@ -125,9 +125,8 @@ No open items. (The pill-radius note from R8.83 was stale: `--ui-radius-pill` ha
   Suppliers dialogs, "Show all categories", the "New for this supplier" hint, and a supplier with no categories.
 - [ ] [PLANNED] **Master Data backend roadmap (status 2026-10-01).** Done: audit (R8.264), hardening (R8.266, R8.268), lowercase unit codes (R8.270, R8.272),
   the Brand → Supplier → Price rule (R8.271, R8.272), bulk price commands (R8.273), server-side name capitalization (R8.274), and the work-price bulk table
-  with supplier-first category ordering (R8.275). Material prices now use the same supplier-first table (R8.276). Still open:
-  WO-MD-SCALE-01 (MD-AUD-008 pagination, UI-bearing), WO-SCHEMA-HARDEN-01 (MD-AUD-012 and the BQ/StudioFlow FK indexes), the matrix
-  (items × suppliers) entry/import seen in the owner's price workbook, and an optional one-off rewrite of the few existing names the capitalization rule would change.
+  with supplier-first category ordering (R8.275), the compare-suppliers grid with paste (R8.277), and the company-layout supplier and price workbook import/export (R8.278). Material prices now use the same supplier-first table (R8.276). Still open:
+  WO-MD-SCALE-01 (MD-AUD-008 pagination, UI-bearing), WO-SCHEMA-HARDEN-01 (MD-AUD-012 and the BQ/StudioFlow FK indexes), the Signage (size-based, old/new price) sheet of the owner's workbook, SKU prices read from that file, and an optional one-off rewrite of the few existing names the capitalization rule would change.
 
 - [ ] [PLANNED] Define media/file behavior after shared storage exists.
 

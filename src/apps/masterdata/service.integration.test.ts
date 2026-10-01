@@ -1500,6 +1500,144 @@ describe("Compare-suppliers grid", () => {
   });
 });
 
+describe("Supplier and price database workbook", () => {
+  async function ownerStyleWorkbook(extraItem?: (ws: ExcelJS.Worksheet) => void) {
+    const wb = new ExcelJS.Workbook();
+    wb.addWorksheet("📋 COVER").addRow(["DATABASE HARGA INTERNAL"]);
+    const subcon = wb.addWorksheet("Database - SUBCON");
+    subcon.addRow(["DATABASE SUBCON — INTERIOR CONSTRUCTION"]);
+    subcon.addRow(["Daftar supplier yang telah digunakan"]);
+    subcon.addRow(["No", "Nama Subcon", "Kategori Pekerjaan", "Alamat", "No. HP / WA", "No. HP / WA 2", "Email", "IG / Website", "Nama PIC", "Termin Pembayaran", "Catatan"]);
+    subcon.addRow([1, "afa interindo", "Furniture, Stairs", "Jl. Pondok Jagung No. 55", "0813-1562-2561", "-", "info@afa.example", "Instagram", "Ahmad Amin", "Termin", "-"]);
+    subcon.addRow([2, "Sono Sipil", "Sipil", "-", "0812-0000-1111", "-", "-", "-", "-", "-", "-"]);
+    const sipil = wb.addWorksheet("Database Harga - Sipil");
+    sipil.addRow(["DATABASE HARGA SIPIL"]);
+    sipil.addRow(["Terakhir Update: 26 June 2026"]);
+    sipil.addRow(["No", "Nama Material", "Spesifikasi", "Satuan", "Surojoyo Kreasindo (Pak Joyo)", "Sono Sipil", "Catatan / Merk Referensi"]);
+    sipil.addRow(["FLOOR WORKS", "FLOOR WORKS", "FLOOR WORKS", "FLOOR WORKS", "FLOOR WORKS", "FLOOR WORKS", "FLOOR WORKS"]);
+    sipil.mergeCells("A4:G4");
+    sipil.addRow(["-", "Screeding base", "-", "m2", 120000, "135.000", ""]);
+    sipil.addRow(["-", "Supply & install floor", "Finish storage ex. Asia Tile", "m2", "Rp 135.000", "-", "Ref 2026-1"]);
+    sipil.addRow(["-", "Lease line MT1", "ex. inlay stainless", "m", "By Request", 100000, ""]);
+    extraItem?.(sipil);
+    return Buffer.from(await wb.xlsx.writeBuffer());
+  }
+  const importAs = (file: Buffer) => ({ grants: GRANTS, actor: ACTOR, file, options: { priceKind: "labor" as const } });
+
+  it("reads an owner-style workbook: suppliers by type sheet, section headings as categories, a matrix of amounts, and tolerates dashes and By Request", async () => {
+    const file = await ownerStyleWorkbook();
+    const preview = await service.previewPriceDatabaseImport(importAs(file));
+    assert.deepEqual(preview.errors, []);
+    assert.equal(preview.totals.suppliersCreated, 2);
+    assert.equal(preview.totals.suppliersFromPrices, 1, "Surojoyo Kreasindo only exists as a price column");
+    assert.equal(preview.totals.pricesCreated, 4);
+    assert.equal(await testDb.prisma.vendor.count(), 0, "a preview saves nothing");
+
+    const applied = await service.applyPriceDatabaseImport({ ...importAs(file), hash: preview.hash });
+    assert.equal(applied.totals.pricesCreated, 4);
+    const afa = await testDb.prisma.vendor.findFirstOrThrow({ where: { name: "Afa Interindo" }, include: { contacts: true, categories: { include: { category: true } }, types: { include: { vendor_type: true } } } });
+    assert.equal(afa.types[0].vendor_type.code, "SUBCON");
+    assert.deepEqual(afa.categories.map((c) => c.category.name).sort(), ["Furniture", "Stairs"]);
+    assert.equal(afa.contacts[0].person_name, "Ahmad Amin");
+    assert.match(afa.notes ?? "", /Payment terms: Termin/);
+    const joyo = await testDb.prisma.vendor.findFirstOrThrow({ where: { name: "Surojoyo Kreasindo" }, include: { contacts: true } });
+    assert.equal(joyo.contacts[0].person_name, "Pak Joyo");
+    const floor = await testDb.prisma.category.findFirstOrThrow({ where: { name: "Floor Works", kind: "WORK" } });
+    assert.equal(await testDb.prisma.priceLabor.count({ where: { category_id: floor.id } }), 4);
+    const install = await testDb.prisma.priceLabor.findFirstOrThrow({ where: { name: "Supply & Install Floor", vendor: { name: "Surojoyo Kreasindo" } }, include: { unit: true } });
+    assert.equal(install.amount.toString(), "135000");
+    assert.equal(install.unit.code, "m2");
+    assert.equal(install.notes, "Finish storage ex. Asia Tile · Ref: Ref 2026-1");
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "price-database-workbook.applied" } }), 1);
+
+    const again = await service.previewPriceDatabaseImport(importAs(file));
+    assert.equal(again.totals.pricesCreated, 0);
+    assert.equal(again.totals.pricesUnchanged, 4);
+    assert.equal(again.totals.suppliersExisting, 2);
+  });
+
+  it("updates a changed amount on re-import and leaves everything else", async () => {
+    const file = await ownerStyleWorkbook();
+    const first = await service.previewPriceDatabaseImport(importAs(file));
+    await service.applyPriceDatabaseImport({ ...importAs(file), hash: first.hash });
+    const edited = await ownerStyleWorkbook();
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(edited as unknown as ExcelJS.Buffer);
+    const ws = wb.getWorksheet("Database Harga - Sipil")!;
+    ws.getRow(5).getCell(5).value = 125000; // Screeding base, first supplier
+    const changed = Buffer.from(await wb.xlsx.writeBuffer());
+    const preview = await service.previewPriceDatabaseImport(importAs(changed));
+    assert.equal(preview.totals.pricesUpdated, 1);
+    assert.equal(preview.totals.pricesUnchanged, 3);
+    await service.applyPriceDatabaseImport({ ...importAs(changed), hash: preview.hash });
+    const price = await testDb.prisma.priceLabor.findFirstOrThrow({ where: { name: "Screeding Base", vendor: { name: "Surojoyo Kreasindo" } } });
+    assert.equal(price.amount.toString(), "125000");
+  });
+
+  it("reports unknown units and unreadable amounts with sheet and row, applies nothing, and accepts a default unit", async () => {
+    const file = await ownerStyleWorkbook((ws) => { ws.addRow(["-", "Odd item", "", "kontainer", 5000, null, ""]); ws.addRow(["-", "Bad amount", "", "m2", "abc", null, ""]); });
+    const preview = await service.previewPriceDatabaseImport(importAs(file));
+    assert.ok(preview.errors.some((e) => e.sheet === "Database Harga - Sipil" && e.row === 8 && /kontainer/.test(e.message)));
+    assert.ok(preview.errors.some((e) => e.row === 9 && /not a number/.test(e.message)));
+    await assert.rejects(() => service.applyPriceDatabaseImport({ ...importAs(file), hash: preview.hash }), (error: unknown) => error instanceof AppError && error.code === "PRICE_DATABASE_IMPORT_ERRORS");
+    assert.equal(await testDb.prisma.vendor.count(), 0, "all or nothing");
+    assert.equal(await testDb.prisma.priceLabor.count(), 0);
+
+    const fine = await ownerStyleWorkbook((ws) => { ws.addRow(["-", "Odd item", "", "kontainer", 5000, null, ""]); });
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "set" } });
+    const withDefault = await service.previewPriceDatabaseImport({ ...importAs(fine), options: { priceKind: "labor", defaultUnitId: unit.id } });
+    assert.deepEqual(withDefault.errors, []);
+  });
+
+  it("reads sub-headings as areas and tells apart the same item priced in different areas for one supplier", async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Database Harga - Sipil");
+    ws.addRow(["DATABASE HARGA SIPIL"]);
+    ws.addRow(["Terakhir Update"]);
+    ws.addRow(["No", "Nama Material", "Spesifikasi", "Surojoyo Kreasindo", "Sono Sipil", "Catatan / Merk Referensi"]);
+    ws.addRow(["WALL WORKS", "WALL WORKS", "WALL WORKS", "WALL WORKS", "WALL WORKS", "WALL WORKS"]);
+    ws.mergeCells("A4:F4");
+    ws.addRow([null, "Shopfront Area"]);
+    ws.addRow(["-", "Second Skin Partition", "ex. plywood 9mm", 250000, 215000, ""]);
+    ws.addRow([null, "Store Area"]);
+    ws.addRow(["-", "Second Skin Partition", "ex. gypsum 9mm", 210000, 215000, ""]);
+    ws.addRow(["-", "Finish Emulsion Paint", "col. white", 55000, 55000, ""]);
+    const file = Buffer.from(await wb.xlsx.writeBuffer());
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
+    const options = { priceKind: "labor" as const, defaultUnitId: unit.id };
+    const preview = await service.previewPriceDatabaseImport({ grants: GRANTS, actor: ACTOR, file, options });
+    assert.deepEqual(preview.errors, []);
+    assert.equal(preview.totals.pricesCreated, 6);
+    await service.applyPriceDatabaseImport({ grants: GRANTS, actor: ACTOR, file, options, hash: preview.hash });
+    const names = (await testDb.prisma.priceLabor.findMany({ where: { vendor: { name: "Surojoyo Kreasindo" } }, orderBy: { name: "asc" } })).map((price) => [price.name, price.amount.toString()]);
+    assert.deepEqual(names, [["Finish Emulsion Paint", "55000"], ["Second Skin Partition (Shopfront Area)", "250000"], ["Second Skin Partition (Store Area)", "210000"]]);
+    const again = await service.previewPriceDatabaseImport({ grants: GRANTS, actor: ACTOR, file, options });
+    assert.equal(again.totals.pricesUnchanged, 6, "importing the same file again changes nothing");
+  });
+
+  it("exports in the import layout so an export can be edited and imported back unchanged", async () => {
+    const a = (await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Round Trip A", vendorTypeIds: [(await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUBCON" } })).id], contacts: [{ personName: "Budi", phones: ["0811"] }] })).vendorId;
+    const b = (await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Round Trip B", vendorTypeIds: [(await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUBCON" } })).id] })).vendorId;
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
+    const category = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Round Trip Works", kind: "WORK" });
+    await service.createWorkPricesBulk({ grants: GRANTS, actor: ACTOR, kind: "labor", vendorId: a, categoryId: category.categoryId, currency: "IDR", rows: [{ name: "Item One", unitId: unit.id, amount: "100", notes: "spec one" }, { name: "Item Two", unitId: unit.id, amount: "200" }] });
+    await service.createWorkPricesBulk({ grants: GRANTS, actor: ACTOR, kind: "labor", vendorId: b, categoryId: category.categoryId, currency: "IDR", rows: [{ name: "Item One", unitId: unit.id, amount: "110", notes: "spec one" }] });
+
+    const exported = await service.exportPriceDatabase({ grants: GRANTS });
+    assert.match(exported.filename, /\.xlsx$/);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(exported.data as unknown as ExcelJS.Buffer);
+    assert.ok(wb.getWorksheet("Database - Subcon"));
+    assert.ok(wb.getWorksheet("Database Harga - Labor"));
+
+    const preview = await service.previewPriceDatabaseImport({ grants: GRANTS, actor: ACTOR, file: exported.data, options: { priceKind: "labor" } });
+    assert.deepEqual(preview.errors, []);
+    assert.equal(preview.totals.pricesUnchanged, 3);
+    assert.equal(preview.totals.pricesCreated + preview.totals.pricesUpdated, 0);
+    assert.equal(preview.totals.suppliersExisting, 2);
+  });
+});
+
 describe("Name capitalization", () => {
   it("stores typed names with the first letter of every word capitalized and everything else untouched", async () => {
     const type = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUBCON" } });

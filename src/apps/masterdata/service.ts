@@ -13,6 +13,7 @@ import { createPricingService } from "./services/pricing.service";
 import { createDeletionService } from "./services/deletion.service";
 import { createSampleRequestService } from "./services/sample-request.service";
 import { createSkuPriceWorkbookService } from "./services/sku-price-workbook.service";
+import { createPriceDatabaseWorkbookService } from "./services/price-database-workbook.service";
 
 type PromotionMaterial = Prisma.PriceMaterialGetPayload<{ include: { sku: true; supplier_vendor: true; unit: true } }>;
 type PromotionLabor = Prisma.PriceLaborGetPayload<{ include: { vendor: true; unit: true } }>;
@@ -34,6 +35,11 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
     ...p,
     runTransaction: async (work) => work(tx as any),
   }));
+
+  const priceDatabaseWorkbookService = createPriceDatabaseWorkbookService(db, p, (tx) => createMasterDataService(tx as PrismaClient, {
+    ...p,
+    runTransaction: async (work) => work(tx as any),
+  }) as unknown as Record<string, (input: any) => Promise<any>>);
 
   return {
     async summary(input: { grants: PermissionGrants }) {
@@ -134,6 +140,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
     ...deletionService,
     ...sampleRequestService,
     ...skuPriceWorkbookService,
+    ...priceDatabaseWorkbookService,
 
     async listPromotionReferences(input: { grants: PermissionGrants }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.promotionApprove);

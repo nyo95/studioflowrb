@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.277**
-- Next local revision: **R8.278**
+- Current revision after this entry is committed: **R8.278**
+- Next local revision: **R8.279**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -20,6 +20,19 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Updated service integration fixtures and the Unit form's functional input normalization. The boundary checker names this single approved cross-app migration exception.
 
 **Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow image warnings); `git diff --check`; migrations deployed to verified `studioflow_rebuild` and `studioflow_rebuild_test`. Production build intentionally not run per WO-MD-PROGRAM-01.
+
+## R8.278 | 2026-10-01 | feat(masterdata): supplier and price database workbook (import and export in the company Excel layout)
+
+- **Import** reads the company's own Excel file as it is: "Database - <Supplier type>" sheets (Nama Subcon/Supplier, Kategori Pekerjaan, Alamat, two HP/WA numbers, Email, IG / Website, Nama PIC, Termin Pembayaran, Catatan) become suppliers with that type, categories, address, a contact and notes (payment terms and links go into notes); "Database Harga - ..." sheets become work prices: the header row names the suppliers, merged all-capital headings (FLOOR WORKS) become pricing categories (Floor Works; short words such as MEP or DB stay), a lone name row is read as an area, Spesifikasi becomes the price's notes, a Satuan column gives the unit, a supplier written "Name (Person)" gets that person as contact, and "-", "By Request", "Rp 1.250.000" and 1250000 are understood. A "Harga Beli / Sumber" list layout is read too; size-based old/new-price sheets and the cover are skipped with a note.
+- The same item name priced in different areas for one supplier ("Second Skin Partition" in Shopfront Area and Store Area) is kept as separate prices, told apart as "Second Skin Partition (Store Area)". Suppliers that exist only as price columns are created as Subcon and flagged. Unknown units are reported with sheet and row; a default unit can be chosen for sheets without a Satuan column; the price type (Labor only or Material + labor) is chosen for the file.
+- Re-importing is safe: existing suppliers are left alone, a price with the same supplier and name is updated only when its amount, unit, category or notes changed, and unchanged ones are counted. All or nothing; the preview runs the real import and rolls it back, so it cannot disagree with the apply. Hash-checked between preview and apply; one `price-database-workbook.applied` event plus the usual per-record events.
+- **Export** writes the same layout: a sheet per supplier type and the labor and material + labor prices as grids with section headings, so an export can be edited and imported back (tested as a round trip with nothing changing).
+- The page `/masterdata/workbook` gains a "Supplier and price database" card (download) and an "Import from Excel" card (file, price type, default unit, Check file, Import) beneath the existing SKU price workbook.
+- Spreadsheet access stays inside `@platform/utilities/tabular` (new `workbook.ts`: create, load, write), as the architecture check requires.
+- Checked against the owner's real file (read-only, disposable database): 9 suppliers from the sheets, 7 more from price columns, 19 categories, 100 prices, 0 errors with a default unit; MEP's "no amount" rows and the Signage sheet are reported as skipped. Limits: 1,500 price rows, 8 MB; material (SKU) prices keep their own workbook.
+- Tests: five integration tests (owner-style file, re-import update, error reporting with all-or-nothing, areas, round trip). No migration.
+
+**Checks.** `npm test` 743 pass; `npm run check`; `npm run lint` (0 errors). Browser-checked that the page and both cards render; uploading a file through the browser is queued for acceptance.
 
 ## R8.277 | 2026-10-01 | feat(masterdata): compare-suppliers grid (items by supplier, paste from Excel)
 

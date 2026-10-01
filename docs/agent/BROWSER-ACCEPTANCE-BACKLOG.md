@@ -252,3 +252,11 @@ this backlog's former SF-A entries.)_
 - Steps: 1. Choose type, category and two suppliers; the grid opens with two amount columns. 2. Type two rows by hand; Enter in the last cell adds a row. 3. Paste the Excel block; items fill, the heading is skipped, the note says how many. 4. Set one cell to the existing "Screeding base" name and press Create: that row shows the supplier-named problem and nothing is saved. 5. Fix it and save; each supplier gains the category.
 - Acceptance: blank cells create nothing; pasted amounts with dots, commas and Rp read correctly; a failure never leaves partial prices.
 - Status: PENDING
+
+### [R8.278] Supplier and price database workbook
+- Surface: Master Data → Import & export prices → Supplier and price database / Import from Excel
+- Fixture: the company file "RADIANT - DATABASE SUB CON & SUPPLIER"; a second copy with one amount edited; an export from the same page
+- Viewport: desktop
+- Steps: 1. Choose the company file, Labor only, default unit m2; press Check file: the totals, the supplier notes and the skipped-sheet notes show and nothing is saved. 2. Import. 3. Open Suppliers and Pricing: suppliers, categories and prices are there. 4. Check the same file again: everything is "unchanged". 5. Check the edited copy: one price "changed". 6. Download the export and check it: unchanged. 7. Try a file with an unknown unit and no default: the row is named and Import stays disabled.
+- Acceptance: nothing changes before Import; a file with any error imports nothing; names, areas and amounts match the file.
+- Status: PENDING

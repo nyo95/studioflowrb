@@ -12,6 +12,7 @@ import { readXlsx, writeXlsx } from "./xlsx";
 
 export type { ExtraSheet, FileResult, ImportFormat, ParsedRow, ParsedTable, PdfTableTemplate, TableColumn, TableFormat, TableRow };
 export { DEFAULT_PDF_TEMPLATE };
+export { createWorkbook, loadWorkbook, workbookToBuffer, type Workbook, type WorkbookCellValue, type Worksheet, type WorksheetRow } from "./workbook";
 
 export const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const MIME: Record<TableFormat, string> = { xlsx: XLSX_MIME, csv: "text/csv; charset=utf-8", pdf: "application/pdf" };
