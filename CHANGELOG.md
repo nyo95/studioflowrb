@@ -5,13 +5,20 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.262**
-- Next local revision: **R8.263**
+- Current revision after this entry is committed: **R8.263**
+- Next local revision: **R8.264**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.263 | 2026-10-01 | docs(masterdata): plan the audit-first backend and hardening roadmap
+
+- Replaced the completed WO-MD-FINDABILITY-01 plan with WO-MD-AUDIT-01: a read-only audit of the whole relational schema (all four schemas) and the Master Data logic, with severity scale, method, deliverables, and a locked read-only rule for the rebuild database. The plan also records the roadmap that follows: hardening, the brand → supplier → price chain, bulk price entry, and shared text normalization.
+- Added to `docs/BACKLOG.md` the roadmap entry, the brand-supplier-price entry, and the `[UNVERIFIED]` browser-check entry for R8.262. The R8.262 commit said these were queued but its backlog edit had not been applied (the file uses CRLF line endings); this revision supplies them. Docs only; no code, schema, migration, or dependency change.
+
+**Checks.** `git diff --check`. No code changed, so no test run.
 
 ## R8.262 | 2026-10-01 | feat(masterdata): merge supplier categories into the shared category list
 
