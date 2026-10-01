@@ -29,6 +29,7 @@ their app-owned duplicates. Owned by the Platform Foundation; created in
 | Normalization | `src/platform/utilities/normalization` | `normalizeText`, `normalizeEmail` | **REUSE** | `core/settings`, `core/auth` (login, identity-validation), Master Data unit service and shared service |
 | Pagination | `src/platform/utilities/pagination` | `buildPageMeta`, `calcOffset`, `normalizePage`, `normalizePageSize`, `normalizeSortDirection`, `PageMeta` | **REUSE** | `ui_engine/patterns/pagination.ts` (`usePagination`) consumed by every directory |
 | Slug | `src/platform/utilities/slug` | `toSlug` | **REUSE** | Master Data shared service (BRAND/SKU identity) |
+| Text case | `src/platform/utilities/text-case` | `titleCaseWords`, `lowerCaseText` | **ADD** | Master Data names (title case), tags (lower case) |
 | Measurement | `src/platform/utilities/measurement` | `calculateRectangleAreaSquareMeters` | **ADD** | Master Data shared service, pricing directory |
 | People directory | `src/platform/core/rbac/people.ts` | `createPeopleDirectory`, `PersonSummary` (runtime: `peopleDirectory`) | **ADD** (R8.71) | StudioFlow PIC/assignee pickers and name resolution |
 | Unit label display | `src/platform/utilities/unit` | `formatUnitLabel` | **ADD** (proven, pending consumer wiring) | its own test suite only; Master Data Units UI is the intended consumer plane |

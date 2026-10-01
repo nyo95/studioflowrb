@@ -5,7 +5,7 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, assertCategoryDeactivationSafe, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, requiredSlug, assertCategoryDeactivationSafe, createDeletionRequest, writeAudit } from "./shared";
 
 export function createCategoryService(db: PrismaClient, ports: MasterDataServicePorts) {
   const { runTransaction } = ports;
@@ -40,7 +40,7 @@ export function createCategoryService(db: PrismaClient, ports: MasterDataService
     async createCategory(input: { grants: PermissionGrants; actor: AuditActor; name: string; kind: "PRODUCT" | "WORK" }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
       actorIsUsable(input.actor);
-      const name = requiredName(input.name, "CATEGORY_NAME_REQUIRED");
+      const name = requiredTitleName(input.name, "CATEGORY_NAME_REQUIRED");
       const slug = requiredSlug(name);
       const { kind } = input;
       return runTransaction(async (tx) => {
@@ -54,7 +54,7 @@ export function createCategoryService(db: PrismaClient, ports: MasterDataService
     async updateCategory(input: { grants: PermissionGrants; actor: AuditActor; categoryId: string; name: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
       actorIsUsable(input.actor);
-      const name = requiredName(input.name, "CATEGORY_NAME_REQUIRED");
+      const name = requiredTitleName(input.name, "CATEGORY_NAME_REQUIRED");
       const slug = requiredSlug(name);
       return runTransaction(async (tx) => {
         const existing = await tx.category.findUniqueOrThrow({ where: { id: input.categoryId } });

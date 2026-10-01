@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.273**
-- Next local revision: **R8.274**
+- Current revision after this entry is committed: **R8.274**
+- Next local revision: **R8.275**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -20,6 +20,16 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Updated service integration fixtures and the Unit form's functional input normalization. The boundary checker names this single approved cross-app migration exception.
 
 **Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow image warnings); `git diff --check`; migrations deployed to verified `studioflow_rebuild` and `studioflow_rebuild_test`. Production build intentionally not run per WO-MD-PROGRAM-01.
+
+## R8.274 | 2026-10-01 | feat(masterdata): capitalize typed names on the server
+
+- New domain-neutral utility `src/platform/utilities/text-case` (`titleCaseWords`, `lowerCaseText`): the first letter of every whitespace-separated word becomes upper case, everything else is left as typed (`MEP`, `60x60`, `anti-slip` keep their shape); whitespace is trimmed and collapsed. Recorded in the utility inventory.
+- Applied on create and update, for the typed names only: Brand, Supplier name and legal name, SKU name (never the SKU code), Category, Unit name, Supplier Type name, the three work-price names, and Supplier contact name and job title. Brand hashtags are stored lower case. Codes, notes, addresses, emails, links, and the lower-case unit code are untouched. The SKU workbook and the bulk commands go through the same services, so they follow the rule.
+- Existing stored names are not rewritten; a name is normalized when it is next saved. Names that differ only in case still conflict.
+- Read-only report of existing office names that the rule would change: Unit name 2 of 11 (Square meter, Cubic meter), work price 1 of 1 (Power Outlet ex. Supreme 3 x 2,5 mm), contact name 1 of 14 (Reny marketing); Brand 0/13, Supplier 0/15, Category 0/10, Supplier Type 0/6, SKU none. A one-off rewrite is the owner's call.
+- Tests: utility unit tests (accents, MEP, digits, hyphens, idempotence) and two integration tests. Two existing expectations updated to the new capitalization. No migration.
+
+**Checks.** `npm test` 735 pass; `npm run check`; `npm run lint` (0 errors).
 
 ## R8.273 | 2026-10-01 | feat(masterdata): bulk price commands (all or nothing)
 

@@ -5,7 +5,7 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, normalizeHashtags, assertVendorMaterialCapable, assertLiveProductCategories, latestAuditActorLabels, createDeletionRequest, writeAudit, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, assertSkuRestorable, assertPriceMaterialRestorable } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, requiredSlug, normalizeHashtags, assertVendorMaterialCapable, assertLiveProductCategories, latestAuditActorLabels, createDeletionRequest, writeAudit, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, assertSkuRestorable, assertPriceMaterialRestorable } from "./shared";
 
 import { type ContactInput, contactColumns, sameContactColumns } from "./vendor-contact";
 
@@ -104,7 +104,7 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
     async createBrand(input: { grants: PermissionGrants; actor: AuditActor; name: string; ownerVendorId?: string; notes?: string; categoryIds?: string[]; hashtags?: string[]; links?: Array<{ kind: string; url: string; label?: string }>; suppliers?: Array<{ vendorId: string; isAuthorized?: boolean; notes?: string | null }>; contacts?: BrandContactInput[] }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.brandManage);
       actorIsUsable(input.actor);
-      const name = requiredName(input.name, "BRAND_NAME_REQUIRED");
+      const name = requiredTitleName(input.name, "BRAND_NAME_REQUIRED");
       const slug = requiredSlug(name);
       return runTransaction(async (tx) => {
         if (input.ownerVendorId) { const owner = await tx.vendor.findUniqueOrThrow({ where: { id: input.ownerVendorId } }); if (owner.deleted_at !== null) throw new AppError("VALIDATION", "BRAND_OWNER_ARCHIVED", "Owner Supplier is archived."); }
@@ -132,7 +132,7 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
     async updateBrand(input: { grants: PermissionGrants; actor: AuditActor; brandId: string; name: string; ownerVendorId?: string | null; notes?: string | null; categoryIds?: string[]; hashtags?: string[]; links?: Array<{ kind: string; url: string; label?: string }>; suppliers?: Array<{ vendorId: string; isAuthorized?: boolean; notes?: string | null }>; infoLinks?: Array<{ kind: string; url: string; label?: string | null }>; linkReviewSnapshot?: unknown[]; contacts?: BrandContactInput[] }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.brandManage);
       actorIsUsable(input.actor);
-      const name = requiredName(input.name, "BRAND_NAME_REQUIRED");
+      const name = requiredTitleName(input.name, "BRAND_NAME_REQUIRED");
       const slug = requiredSlug(name);
       return runTransaction(async (tx) => {
         const existing = await tx.brand.findUniqueOrThrow({ where: { id: input.brandId }, include: { categories: { include: { origins: true } }, hashtags: true, links: true, suppliers: true } });

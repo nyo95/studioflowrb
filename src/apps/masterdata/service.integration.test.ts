@@ -137,7 +137,7 @@ describe("Master Data service", () => {
     const preview = await service.previewSkuPriceImport({ grants: GRANTS, file: { data: edited, name: "sku-prices.xlsx" } });
     assert.deepEqual(preview.totals, { create: 0, update: 1, unchanged: 0, error: 0 });
     await service.applySkuPriceImport({ grants: GRANTS, actor: ACTOR, file: edited, hash: preview.hash });
-    assert.equal((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: skuId } })).name, "Workbook SKU edited");
+    assert.equal((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: skuId } })).name, "Workbook SKU Edited");
     assert.equal((await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: skuId } })).amount.toString(), "125.5");
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "sku-price-workbook.applied" } }), 1);
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: { in: ["sku.updated", "price-material.updated"] } } }), 2, "workbook changes retain per-entity audit events alongside the batch event");
@@ -1438,6 +1438,35 @@ describe("Bulk price entry", () => {
   });
 });
 
+describe("Name capitalization", () => {
+  it("stores typed names with the first letter of every word capitalized and everything else untouched", async () => {
+    const type = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUBCON" } });
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
+    const vendor = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "  pt  mulia   sejahtera MEP ", legalName: "cv  maju jaya", vendorTypeIds: [type.id], contacts: [{ personName: "rachmat hidayat", jobTitle: "site manager", phones: ["0811"] }] });
+    const row = await testDb.prisma.vendor.findUniqueOrThrow({ where: { id: vendor.vendorId }, include: { contacts: true } });
+    assert.equal(row.name, "Pt Mulia Sejahtera MEP");
+    assert.equal(row.legal_name, "Cv Maju Jaya");
+    assert.equal(row.contacts[0].person_name, "Rachmat Hidayat");
+    assert.equal(row.contacts[0].job_title, "Site Manager");
+
+    const category = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "floor works", kind: "WORK" });
+    assert.equal((await testDb.prisma.category.findUniqueOrThrow({ where: { id: category.categoryId } })).name, "Floor Works");
+    const price = await service.createPriceLabor({ grants: GRANTS, actor: ACTOR, name: "supply & install floor 60x60", categoryId: category.categoryId, vendorId: vendor.vendorId, unitId: unit.id, amount: "1", currency: "IDR" });
+    assert.equal((await testDb.prisma.priceLabor.findUniqueOrThrow({ where: { id: price.priceLaborId } })).name, "Supply & Install Floor 60x60");
+    const sku = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "granite tile", code: "gt-60x60 cm", baseUnitId: unit.id, categoryId: (await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "tile", kind: "PRODUCT" })).categoryId, priceMaterials: [{ supplierVendorId: vendor.vendorId, amount: "1", currency: "IDR" }] });
+    const stored = await testDb.prisma.sku.findUniqueOrThrow({ where: { id: sku.skuId } });
+    assert.equal(stored.name, "Granite Tile");
+    assert.equal(stored.code, "gt-60x60 cm", "codes are never recased");
+  });
+
+  it("keeps tags lower case and names that differ only in case still conflict", async () => {
+    const brand = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "taco", hashtags: ["#Surface", "FINISH"] });
+    const tags = await testDb.prisma.brandHashtag.findMany({ where: { brand_id: brand.brandId } });
+    assert.deepEqual(tags.map((tag) => tag.label).sort(), ["finish", "surface"]);
+    await assert.rejects(() => service.createBrand({ grants: GRANTS, actor: ACTOR, name: "TACO" }), (error: unknown) => error instanceof AppError && error.kind === "CONFLICT");
+  });
+});
+
 describe("Sample request intake (Master Data side of StudioFlow sample requests)", () => {
   const STAFF = { kind: "USER" as const, userId: "sample-staff-1", label: "Sari Staff" };
   const OTHER = { kind: "USER" as const, userId: "sample-staff-2", label: "Budi Staff" };
@@ -1643,7 +1672,7 @@ describe("Sample request intake (Master Data side of StudioFlow sample requests)
 
     const synced = await service.syncSampleQuoteToPrice({ grants: GRANTS, actor: STAFF, intakeId: intake.id });
     assert.equal(synced.priceMaterialId, existing.id);
-    assert.equal(synced.linkedSkuName, "Sample sync SKU");
+    assert.equal(synced.linkedSkuName, "Sample Sync SKU");
     assert.equal(synced.linkedPriceAmount, "2500.5");
     const price = await testDb.prisma.priceMaterial.findUniqueOrThrow({ where: { id: existing.id } });
     assert.equal(price.amount.toString(), "2500.5");

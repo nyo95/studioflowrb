@@ -7,6 +7,7 @@ import { AppError, mapPrismaKnownError } from "@platform/core/errors";
 import { hasPermission, requirePermission, type PermissionGrants } from "@platform/core/rbac";
 import { normalizeText } from "@platform/utilities/normalization";
 import { toSlug } from "@platform/utilities/slug";
+import { lowerCaseText, titleCaseWords } from "@platform/utilities/text-case";
 import { compareDecimals, toDecimalString } from "@platform/utilities/decimal";
 import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurement";
 import { MASTERDATA_ARCHIVE_ENTITY_TYPES, MASTERDATA_DELETION_TARGET_TYPES, type MasterDataArchiveEntityType, type MasterDataDeletionTargetType } from "./polymorphic-registry";
@@ -35,6 +36,17 @@ export function requiredName(value: string, code: string): string {
   const name = normalizeText(value);
   if (!name) throw new AppError("VALIDATION", code, "A name is required.");
   return name;
+}
+
+/** A typed display name: required, whitespace collapsed, first letter of every word upper-case (other letters untouched). */
+export function requiredTitleName(value: string, code: string): string {
+  return titleCaseWords(requiredName(value, code));
+}
+
+/** An optional typed display name (legal name, job title): same case rule, empty becomes null. */
+export function optionalTitleName(value: string | null | undefined): string | null {
+  const cleaned = titleCaseWords(value ?? "");
+  return cleaned || null;
 }
 
 export function requiredSlug(value: string): string {
@@ -82,7 +94,7 @@ export function requiredAmount(value: string): string {
 }
 
 export function resolveSkuIdentity(nameValue?: string | null, codeValue?: string | null) {
-  const name = normalizeText(nameValue ?? "") || null;
+  const name = titleCaseWords(normalizeText(nameValue ?? "")) || null;
   const code = codeValue?.trim() || null;
   if (!name && !code) throw new AppError("VALIDATION", "SKU_IDENTITY_REQUIRED", "SKU code or SKU name is required.");
   return { name, code, slug: requiredSlug(name ?? code!) };
@@ -106,7 +118,7 @@ export async function resolveSkuMeasurement(tx: TxClient, input: SkuMeasurementI
 
 export function normalizeHashtags(hashtags: readonly string[]): Array<{ label: string; normalized: string }> {
   const seen = new Set<string>(); const result: Array<{ label: string; normalized: string }> = [];
-  for (const raw of hashtags) { const clean = raw.trim().replace(/^#+/, ""); const normalized = normalizeText(clean).toLowerCase(); if (normalized && !seen.has(normalized)) { seen.add(normalized); result.push({ label: clean, normalized }); } }
+  for (const raw of hashtags) { const clean = raw.trim().replace(/^#+/, ""); const normalized = normalizeText(clean).toLowerCase(); if (normalized && !seen.has(normalized)) { seen.add(normalized); result.push({ label: lowerCaseText(clean), normalized }); } }
   return result;
 }
 

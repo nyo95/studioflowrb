@@ -5,7 +5,7 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, requiredCurrency, requiredAmount, assertVendorMaterialCapable, assertVendorLaborCapable, assertPriceMaterialBrandSupplierChain, ensureVendorCategory, assertWorkPriceRestorable, assertPriceMaterialRestorable, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, requiredSlug, requiredCurrency, requiredAmount, assertVendorMaterialCapable, assertVendorLaborCapable, assertPriceMaterialBrandSupplierChain, ensureVendorCategory, assertWorkPriceRestorable, assertPriceMaterialRestorable, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
 
 export const BULK_PRICE_ROW_LIMIT = 100;
 
@@ -156,7 +156,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
     async createPriceMaterialLabor(input: { grants: PermissionGrants; actor: AuditActor; name: string; categoryId: string; vendorId: string; unitId: string; amount: string; currency: string; scopeNote?: string; notes?: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkManage);
       actorIsUsable(input.actor);
-      const name = requiredName(input.name, "PRICE_NAME_REQUIRED");
+      const name = requiredTitleName(input.name, "PRICE_NAME_REQUIRED");
       const slug = requiredSlug(name);
       const currency = requiredCurrency(input.currency);
       const amount = requiredAmount(input.amount);
@@ -180,7 +180,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
     async updatePriceMaterialLabor(input: { grants: PermissionGrants; actor: AuditActor; priceMaterialLaborId: string; name: string; categoryId: string; vendorId: string; unitId: string; amount: string; currency: string; scopeNote?: string | null; notes?: string | null }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkManage);
       actorIsUsable(input.actor);
-      const name = requiredName(input.name, "PRICE_NAME_REQUIRED");
+      const name = requiredTitleName(input.name, "PRICE_NAME_REQUIRED");
       const slug = requiredSlug(name);
       const currency = requiredCurrency(input.currency);
       const amount = requiredAmount(input.amount);
@@ -344,7 +344,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
     async createPriceLabor(input: { grants: PermissionGrants; actor: AuditActor; name: string; categoryId: string; vendorId: string; unitId: string; amount: string; currency: string; notes?: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkManage);
       actorIsUsable(input.actor);
-      const name = requiredName(input.name, "PRICE_NAME_REQUIRED");
+      const name = requiredTitleName(input.name, "PRICE_NAME_REQUIRED");
       const slug = requiredSlug(name);
       const currency = requiredCurrency(input.currency);
       const amount = requiredAmount(input.amount);
@@ -368,7 +368,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
     async updatePriceLabor(input: { grants: PermissionGrants; actor: AuditActor; priceLaborId: string; name: string; categoryId: string; vendorId: string; unitId: string; amount: string; currency: string; notes?: string | null }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkManage);
       actorIsUsable(input.actor);
-      const name = requiredName(input.name, "PRICE_NAME_REQUIRED");
+      const name = requiredTitleName(input.name, "PRICE_NAME_REQUIRED");
       const slug = requiredSlug(name);
       const currency = requiredCurrency(input.currency);
       const amount = requiredAmount(input.amount);

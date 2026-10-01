@@ -5,7 +5,7 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, assertVendorTypeRemovalSafe, assertVendorCategoryRemovalSafe, assertVendorMaterialCapable, latestAuditActorLabels, createDeletionRequest, writeAudit, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, assertPriceMaterialRestorable, assertWorkPriceRestorable } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, optionalTitleName, requiredSlug, assertVendorTypeRemovalSafe, assertVendorCategoryRemovalSafe, assertVendorMaterialCapable, latestAuditActorLabels, createDeletionRequest, writeAudit, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, assertPriceMaterialRestorable, assertWorkPriceRestorable } from "./shared";
 
 import { type ContactInput, contactColumns, ensureVendorBrandRelation, sameContactColumns } from "./vendor-contact";
 
@@ -89,11 +89,11 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
     async createVendor(input: { grants: PermissionGrants; actor: AuditActor; name: string; legalName?: string; address?: string; notes?: string; vendorTypeIds?: string[]; categoryIds?: string[]; brandIds?: string[]; contacts?: ContactInput[] }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
       actorIsUsable(input.actor);
-      const name = requiredName(input.name, "VENDOR_NAME_REQUIRED");
+      const name = requiredTitleName(input.name, "VENDOR_NAME_REQUIRED");
       const slug = requiredSlug(name);
       return runTransaction(async (tx) => {
         let vendor;
-        try { vendor = await tx.vendor.create({ data: { id: randomUUID(), name, slug, legal_name: input.legalName?.trim() || null, address: input.address?.trim() || null, notes: input.notes?.trim() || null } }); } catch (error) { mapWriteError(error); }
+        try { vendor = await tx.vendor.create({ data: { id: randomUUID(), name, slug, legal_name: optionalTitleName(input.legalName), address: input.address?.trim() || null, notes: input.notes?.trim() || null } }); } catch (error) { mapWriteError(error); }
         const vendorId = vendor!.id;
         if (input.vendorTypeIds && input.vendorTypeIds.length > 0) {
           const vendorTypes = await tx.vendorType.findMany({ where: { id: { in: input.vendorTypeIds }, deleted_at: null }, select: { id: true } });
@@ -132,7 +132,7 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
     async createPricingVendorQuick(input: { grants: PermissionGrants; actor: AuditActor; name: string; vendorTypeId: string; capability: "MATERIAL" | "LABOR" }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
       actorIsUsable(input.actor);
-      const name = requiredName(input.name, "VENDOR_NAME_REQUIRED");
+      const name = requiredTitleName(input.name, "VENDOR_NAME_REQUIRED");
       const slug = requiredSlug(name);
       return runTransaction(async (tx) => {
         const vendorType = await tx.vendorType.findUnique({ where: { id: input.vendorTypeId } });
@@ -149,17 +149,17 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
     async updateVendor(input: { grants: PermissionGrants; actor: AuditActor; vendorId: string; name: string; legalName?: string | null; address?: string | null; notes?: string | null; vendorTypeIds?: string[]; categoryIds?: string[]; contacts?: ContactInput[]; infoLinks?: Array<{ kind: string; url: string; label?: string | null }>; linkReviewSnapshot?: unknown[] }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
       actorIsUsable(input.actor);
-      const name = requiredName(input.name, "VENDOR_NAME_REQUIRED");
+      const name = requiredTitleName(input.name, "VENDOR_NAME_REQUIRED");
       const slug = requiredSlug(name);
       return runTransaction(async (tx) => {
         const existing = await tx.vendor.findUniqueOrThrow({ where: { id: input.vendorId }, include: { types: true, contacts: true, categories: true } });
         if (existing.deleted_at !== null) throw new AppError("CONFLICT", "VENDOR_ARCHIVED", "Cannot update an archived supplier.");
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (existing.name !== name) { changes.name = { from: existing.name, to: name }; changes.slug = { from: existing.slug, to: slug }; }
-        if ((existing.legal_name || null) !== (input.legalName?.trim() || null)) changes.legal_name = { from: existing.legal_name, to: input.legalName?.trim() || null };
+        if ((existing.legal_name || null) !== (optionalTitleName(input.legalName))) changes.legal_name = { from: existing.legal_name, to: optionalTitleName(input.legalName) };
         if ((existing.address || null) !== (input.address?.trim() || null)) changes.address = { from: existing.address, to: input.address?.trim() || null };
         if ((existing.notes || null) !== (input.notes?.trim() || null)) changes.notes = { from: existing.notes, to: input.notes?.trim() || null };
-        if (Object.keys(changes).length > 0) { try { await tx.vendor.update({ where: { id: input.vendorId }, data: { name, slug, legal_name: input.legalName?.trim() || null, address: input.address?.trim() || null, notes: input.notes?.trim() || null } }); } catch (error) { mapWriteError(error); } }
+        if (Object.keys(changes).length > 0) { try { await tx.vendor.update({ where: { id: input.vendorId }, data: { name, slug, legal_name: optionalTitleName(input.legalName), address: input.address?.trim() || null, notes: input.notes?.trim() || null } }); } catch (error) { mapWriteError(error); } }
         if (input.vendorTypeIds !== undefined) {
           const requestedTypeIds = [...new Set(input.vendorTypeIds)];
           if (requestedTypeIds.length > 0) { const liveTypes = await tx.vendorType.findMany({ where: { id: { in: requestedTypeIds }, deleted_at: null }, select: { id: true } }); if (liveTypes.length !== requestedTypeIds.length) throw new AppError("VALIDATION", "VENDOR_TYPE_INVALID", "Every selected Supplier Type must be active."); }

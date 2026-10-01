@@ -6,7 +6,7 @@ import { AppError } from "@platform/core/errors";
 import { hasPermission, requirePermission, type PermissionGrants } from "@platform/core/rbac";
 import { normalizeText } from "@platform/utilities/normalization";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, requiredAmount, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, requiredSlug, requiredAmount, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
 
 type MasterDataServiceFactory = (db: PrismaClient, ports: MasterDataServicePorts) => object;
 
@@ -42,7 +42,7 @@ export function createUnitService(db: PrismaClient, ports: MasterDataServicePort
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
       actorIsUsable(input.actor);
       const code = requiredName(input.code, "UNIT_CODE_REQUIRED").toLowerCase();
-      const name = requiredName(input.name, "UNIT_NAME_REQUIRED");
+      const name = requiredTitleName(input.name, "UNIT_NAME_REQUIRED");
       return runTransaction(async (tx) => {
         let unit;
         try { unit = await tx.unit.create({ data: { id: randomUUID(), code, name } }); } catch (error) { mapWriteError(error); }
@@ -55,7 +55,7 @@ export function createUnitService(db: PrismaClient, ports: MasterDataServicePort
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
       actorIsUsable(input.actor);
       const code = requiredName(input.code, "UNIT_CODE_REQUIRED").toLowerCase();
-      const name = requiredName(input.name, "UNIT_NAME_REQUIRED");
+      const name = requiredTitleName(input.name, "UNIT_NAME_REQUIRED");
       return runTransaction(async (tx) => {
         const existing = await tx.unit.findUniqueOrThrow({ where: { id: input.unitId } });
         if (existing.status !== "ACTIVE") throw new AppError("CONFLICT", "UNIT_ARCHIVED", "Cannot update an archived unit.");

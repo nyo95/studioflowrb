@@ -5,7 +5,7 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, assertVendorTypeRemovalSafe, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, assertVendorTypeRemovalSafe, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
 
 export function createVendorTypeService(db: PrismaClient, ports: MasterDataServicePorts) {
   const { runTransaction } = ports;
@@ -34,7 +34,7 @@ export function createVendorTypeService(db: PrismaClient, ports: MasterDataServi
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
       actorIsUsable(input.actor);
       const code = requiredName(input.code, "VENDOR_TYPE_CODE_REQUIRED").toUpperCase();
-      const name = requiredName(input.name, "VENDOR_TYPE_NAME_REQUIRED");
+      const name = requiredTitleName(input.name, "VENDOR_TYPE_NAME_REQUIRED");
       return runTransaction(async (tx) => {
         let vt;
         try { vt = await tx.vendorType.create({ data: { id: randomUUID(), code, name, can_supply_material: input.canSupplyMaterial ?? false, can_supply_labor: input.canSupplyLabor ?? false } }); } catch (error) { mapWriteError(error); }
@@ -46,7 +46,7 @@ export function createVendorTypeService(db: PrismaClient, ports: MasterDataServi
     async updateVendorType(input: { grants: PermissionGrants; actor: AuditActor; vendorTypeId: string; name: string; canSupplyMaterial: boolean; canSupplyLabor: boolean }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
       actorIsUsable(input.actor);
-      const name = requiredName(input.name, "VENDOR_TYPE_NAME_REQUIRED");
+      const name = requiredTitleName(input.name, "VENDOR_TYPE_NAME_REQUIRED");
       return runTransaction(async (tx) => {
         const existing = await tx.vendorType.findUniqueOrThrow({ where: { id: input.vendorTypeId } });
         if (existing.deleted_at !== null) throw new AppError("CONFLICT", "VENDOR_TYPE_ARCHIVED", "Cannot update an archived Supplier Type.");

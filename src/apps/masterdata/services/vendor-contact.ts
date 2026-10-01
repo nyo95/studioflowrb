@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { AppError } from "@platform/core/errors";
 
-import { type TxClient, assertVendorMaterialCapable, requiredName } from "./shared";
+import { type TxClient, assertVendorMaterialCapable, requiredName, requiredTitleName, optionalTitleName } from "./shared";
 
 /** A contact keeps its first phone number in `phone` and up to two more in `extra_phones`. */
 export const MAX_CONTACT_PHONES = 3;
@@ -39,8 +39,8 @@ export function contactPhones(input: { phone?: string | null; phones?: readonly 
 export function contactColumns(input: ContactInput) {
   const phones = contactPhones(input);
   return {
-    person_name: requiredName(input.personName, "CONTACT_NAME_REQUIRED"),
-    job_title: input.jobTitle?.trim() || null,
+    person_name: requiredTitleName(input.personName, "CONTACT_NAME_REQUIRED"),
+    job_title: optionalTitleName(input.jobTitle),
     email: input.email?.trim() || null,
     phone: phones[0] ?? null,
     extra_phones: phones.slice(1),
