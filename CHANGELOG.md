@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.280**
-- Next local revision: **R8.281**
+- Current revision after this entry is committed: **R8.281**
+- Next local revision: **R8.282**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -20,6 +20,15 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Updated service integration fixtures and the Unit form's functional input normalization. The boundary checker names this single approved cross-app migration exception.
 
 **Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow image warnings); `git diff --check`; migrations deployed to verified `studioflow_rebuild` and `studioflow_rebuild_test`. Production build intentionally not run per WO-MD-PROGRAM-01.
+
+## R8.281 | 2026-10-01 | feat(masterdata): a price of 0 means "by request" (owner convention from the company price lists)
+
+- **Convention (owner, 2026-10-01):** in the company's Excel lists a 0 means the price depends on the request. It is now treated that way end to end: stored as an amount of 0, shown as **By request** instead of "Rp 0" in the Material + labor and Labor only lists, and in the SKU list's "from" price; never counted as the **lowest** price (a group needs two quoted prices to mark a lowest, and a SKU whose prices are all on request shows "By request").
+- **Import / paste:** "By Request", TBC, TBA and Nego (and a numeric 0) become a price of 0; a dash, "n/a" or a blank cell still means the supplier does not offer the item and creates nothing. **Export** writes a price of 0 as the text "By Request", so an export imports back unchanged. The grids and tables say "0 = by request" in their hints.
+- Documented as decision Q19 in `pricing-contract.md`. BQ and StudioFlow receive the amount 0 through the public ports and must treat it as unquoted; modelling it properly belongs to the planned BQ TBC / By Owner price modes (BACKLOG).
+- Tests: findability helpers (on request is never the lowest), pasted-amount parsing, and the importer / round trip keeping on-request prices. No migration.
+
+**Checks.** `npm test` 750 pass; `npm run check`; `npm run lint` (0 errors).
 
 ## R8.280 | 2026-10-01 | feat(masterdata): material prices brand-first with a supplier on every row; specification shown under work names
 

@@ -2,7 +2,7 @@
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { UpdatedCell } from "../updated-cell";
 import { FilterSummary, StatusFilterSelect } from "../directory-filters";
-import { compareAmounts, groupPriceRows, matchesDirectoryStatus, tabCountLabel, type DirectoryStatus } from "../directory-findability";
+import { compareAmounts, groupPriceRows, isPriceOnRequest, matchesDirectoryStatus, tabCountLabel, type DirectoryStatus } from "../directory-findability";
 import { PhoneLinks } from "../phone-links";
 import { getPaginationSlice } from "@platform/utilities/pagination";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
@@ -33,7 +33,7 @@ const PRICE_PAGE_SIZE = 25;
 
 export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; contacts: Record<string, { name: string; phones: string[] }>; canManageVendors: boolean; canManageCategories: boolean; canManageSkus: boolean; canManageBrands: boolean; skus: SkuRef[]; brands: Ref[]; productCategories: Ref[]; vendors: Ref[]; materialVendors: Array<Ref & { brandIds: string[] }>; workVendors: Array<Ref & { categoryIds: string[] }>; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
   const { locale } = useDisplaySettings();
-  const displayPrice = (amount: string, currency: string) => formatMoney(createMoney(amount, currency), { locale });
+  const displayPrice = (amount: string, currency: string) => isPriceOnRequest(amount) ? "By request" : formatMoney(createMoney(amount, currency), { locale });
   const [query, setQuery] = useState(""); const [status, setStatus] = useState<DirectoryStatus>("ACTIVE"); const [supplierFilter, setSupplierFilter] = useState("ALL"); const [brandFilter, setBrandFilter] = useState("ALL"); const [workCategoryFilter, setWorkCategoryFilter] = useState("ALL"); const [productCategoryFilter, setProductCategoryFilter] = useState("ALL"); const [groupByItem, setGroupByItem] = useState(false); const [page, setPage] = useState(1); const [sort, setSort] = useState<{ key: PriceSortKey; direction: SortDirection }>({ key: "name", direction: "asc" }); const [matrixOpen, setMatrixOpen] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null); const [formError, setFormError] = useState<string | null>(null);
   const [archive, setArchive] = useState<Target | null>(null); const [restore, setRestore] = useState<Target | null>(null); const [deletion, setDeletion] = useState<Target | null>(null); const [reason, setReason] = useState(""); const [rowError, setRowError] = useState<string | null>(null);
@@ -679,7 +679,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
               <option value="">Unit</option>
               {refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code}</option>)}
             </Select>
-            <Input aria-label={`Amount, row ${index + 1}`} density="compact" inputMode="decimal" placeholder="15.000" className="tabular-nums" value={entry.amountDisplay}
+            <Input aria-label={`Amount, row ${index + 1}`} density="compact" inputMode="decimal" placeholder="15.000 · 0 = by request" className="tabular-nums" value={entry.amountDisplay}
               onChange={(event) => { const parsed = parseIndonesianAmount(event.target.value); if (parsed === null) return; patchRow(entry.key, { amount: parsed, amountDisplay: event.target.value.endsWith(",") ? event.target.value : parsed ? formatDecimal(parsed) : "" }); }}
               onBlur={() => patchRow(entry.key, { amountDisplay: entry.amount ? formatDecimal(entry.amount) : "" })}
               onKeyDown={(event) => { if (event.key === "Enter" && index === rows.length - 1) { event.preventDefault(); addRow(); } }}

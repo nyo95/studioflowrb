@@ -119,6 +119,7 @@ No open items. (The pill-radius note from R8.83 was stale: `--ui-radius-pill` ha
 
 ## Master Data
 
+- [ ] [CLEANUP][P2] Prices of 0 now mean "by request" in Master Data (R8.281). BQ pickers and StudioFlow still receive a plain 0 amount; make them show "By request" and keep it out of totals, ideally with the planned BQ TBC / By Owner price modes.
 - [ ] [CLEANUP][P2] **UI Engine admission for the entry grids and `textCase` (Lead, 2026-10-01).** The work-price table, the material-price table and the
   compare-suppliers grid are three app-local copies of one generic capability (rows, add/remove, per-row problems, Enter adds a row, paste). Extract one
   `EntryGrid` pattern into the UI Engine with a consumer matrix and showcase entry, and add the same for `Input textCase` (no showcase, test or

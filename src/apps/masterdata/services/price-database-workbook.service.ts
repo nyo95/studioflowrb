@@ -39,7 +39,9 @@ class DryRun extends Error { constructor(readonly result: RunResult) { super("dr
 const key = (value: string) => value.trim().toLocaleLowerCase();
 const bytesOf = (file: WorkbookFile) => Buffer.isBuffer(file) ? { data: file, name: undefined as string | undefined } : { data: file.data, name: file.name };
 const fileError = (message: string): never => { throw new AppError("VALIDATION", "PRICE_DATABASE_WORKBOOK_INVALID", message); };
-const emptyText = (value: string) => value === "" || /^-+$/.test(value) || /^(n\/a|tbc|tba|by request)$/i.test(value);
+const emptyText = (value: string) => value === "" || /^-+$/.test(value) || /^n\/a$/i.test(value);
+/** In the company's lists "By Request" (and a 0) means the price depends on the request: kept as a price of 0, shown as "By request". */
+const ON_REQUEST = /^(by request|tbc|tba|nego|negotiable)$/i;
 
 const SHOUTED_FILLER = new Set(["AND", "DAN", "THE", "FOR", "ATAU", "OF"]);
 
@@ -66,6 +68,7 @@ function cellText(value: WorkbookCellValue): string {
 function readAmount(value: WorkbookCellValue): string | null | undefined {
   if (typeof value === "number") return value < 0 || !Number.isFinite(value) ? undefined : Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, "");
   const raw = cellText(value).replace(/^rp\.?\s*/i, "").trim();
+  if (ON_REQUEST.test(raw)) return "0";
   if (emptyText(raw)) return null;
   const text = raw.replace(/\s/g, "");
   if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(text)) return text.replace(/\./g, "").replace(",", ".");
@@ -388,7 +391,7 @@ export function createPriceDatabaseWorkbookService(
           for (const price of rows) items.set(key(price.name), [...(items.get(key(price.name)) ?? []), price]);
           for (const group of items.values()) {
             const first = group[0]!;
-            ws.addRow(["-", first.name, first.notes ?? "", first.unit.code, ...suppliers.map(([id]) => { const hit = group.find((p) => p.vendor.id === id); return hit ? Number(hit.amount.toString()) : null; }), ""]);
+            ws.addRow(["-", first.name, first.notes ?? "", first.unit.code, ...suppliers.map(([id]) => { const hit = group.find((p) => p.vendor.id === id); return hit ? (Number(hit.amount.toString()) === 0 ? "By Request" : Number(hit.amount.toString())) : null; }), ""]);
           }
         }
         ws.columns.forEach((column, index) => { column.width = index === 1 ? 36 : index === 2 ? 40 : index === 3 ? 10 : 18; });

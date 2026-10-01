@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   carriedBrandNames,
   compareAmounts,
+  isPriceOnRequest,
   groupLowestRows,
   groupPriceRows,
   lowestPriceByCurrencyUnit,
@@ -66,6 +67,16 @@ describe("price comparison", () => {
     assert.equal(lowestPriceByCurrencyUnit(rows.slice(0, 2))?.id, "b");
     assert.deepEqual(lowestPricesByCurrencyUnit(rows).map((row) => row.id).sort(), ["b", "c", "d"]);
     assert.equal(lowestPriceByCurrencyUnit([]), null);
+  });
+
+  it("a price of 0 is a price on request: never the lowest, and only shown when nothing is quoted", () => {
+    assert.equal(isPriceOnRequest("0"), true);
+    assert.equal(isPriceOnRequest("0.00"), true);
+    assert.equal(isPriceOnRequest("10"), false);
+    assert.equal(lowestPriceByCurrencyUnit([price("req", "0"), price("a", "20"), price("b", "10")])?.id, "b", "0 does not win as the cheapest");
+    assert.equal(lowestPriceByCurrencyUnit([price("req", "0"), price("req2", "0")])?.id, "req", "if nothing is quoted the group is on request");
+    assert.deepEqual([...groupLowestRows([price("req", "0"), price("a", "10")])], [], "one quoted price plus one on request is not a comparison");
+    assert.deepEqual([...groupLowestRows([price("req", "0"), price("a", "10"), price("b", "12")])], ["a"]);
   });
 
   it("marks Lowest only for two or more active prices in one currency and unit", () => {

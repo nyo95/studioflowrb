@@ -133,7 +133,7 @@ export function PriceMatrixDialog({ vendors, categories, units, onClose }: { ven
 
         {chosen.length === 0 ? <Text size="sm" tone="secondary">Choose the suppliers to open the grid.</Text> : (
           <div className="grid gap-2" onPaste={onPaste}>
-            <Text size="sm" tone="secondary">Tip: copy a block from Excel and paste it here — columns Name, Specification, then one amount per supplier in the order shown. a dash or “By Request” is read as no price.</Text>
+            <Text size="sm" tone="secondary">Tip: copy a block from Excel and paste it here — columns Name, Specification, then one amount per supplier in the order shown. a dash is read as no price, while “By Request”, TBC or 0 is kept as a price on request.</Text>
             {pasteNote ? <Text size="sm" tone="secondary">{pasteNote}</Text> : null}
             <div className="overflow-x-auto">
               <div className="grid min-w-max gap-2" style={{ gridTemplateColumns: columns }}>

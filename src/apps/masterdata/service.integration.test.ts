@@ -1576,11 +1576,11 @@ describe("Supplier and price database workbook", () => {
     assert.deepEqual(preview.errors, []);
     assert.equal(preview.totals.suppliersCreated, 2);
     assert.equal(preview.totals.suppliersFromPrices, 1, "Surojoyo Kreasindo only exists as a price column");
-    assert.equal(preview.totals.pricesCreated, 4);
+    assert.equal(preview.totals.pricesCreated, 5, "By Request is kept as a price of 0");
     assert.equal(await testDb.prisma.vendor.count(), 0, "a preview saves nothing");
 
     const applied = await service.applyPriceDatabaseImport({ ...importAs(file), hash: preview.hash });
-    assert.equal(applied.totals.pricesCreated, 4);
+    assert.equal(applied.totals.pricesCreated, 5);
     const afa = await testDb.prisma.vendor.findFirstOrThrow({ where: { name: "Afa Interindo" }, include: { contacts: true, categories: { include: { category: true } }, types: { include: { vendor_type: true } } } });
     assert.equal(afa.types[0].vendor_type.code, "SUBCON");
     assert.deepEqual(afa.categories.map((c) => c.category.name).sort(), ["Furniture", "Stairs"]);
@@ -1589,7 +1589,9 @@ describe("Supplier and price database workbook", () => {
     const joyo = await testDb.prisma.vendor.findFirstOrThrow({ where: { name: "Surojoyo Kreasindo" }, include: { contacts: true } });
     assert.equal(joyo.contacts[0].person_name, "Pak Joyo");
     const floor = await testDb.prisma.category.findFirstOrThrow({ where: { name: "Floor Works", kind: "WORK" } });
-    assert.equal(await testDb.prisma.priceLabor.count({ where: { category_id: floor.id } }), 4);
+    assert.equal(await testDb.prisma.priceLabor.count({ where: { category_id: floor.id } }), 5);
+    const onRequest = await testDb.prisma.priceLabor.findFirstOrThrow({ where: { name: "Lease Line MT1", vendor: { name: "Surojoyo Kreasindo" } } });
+    assert.equal(onRequest.amount.toString(), "0", "By Request in the sheet is a price of 0 (on request)");
     const install = await testDb.prisma.priceLabor.findFirstOrThrow({ where: { name: "Supply & Install Floor", vendor: { name: "Surojoyo Kreasindo" } }, include: { unit: true } });
     assert.equal(install.amount.toString(), "135000");
     assert.equal(install.unit.code, "m2");
@@ -1598,7 +1600,7 @@ describe("Supplier and price database workbook", () => {
 
     const again = await service.previewPriceDatabaseImport(importAs(file));
     assert.equal(again.totals.pricesCreated, 0);
-    assert.equal(again.totals.pricesUnchanged, 4);
+    assert.equal(again.totals.pricesUnchanged, 5);
     assert.equal(again.totals.suppliersExisting, 2);
   });
 
@@ -1614,7 +1616,7 @@ describe("Supplier and price database workbook", () => {
     const changed = Buffer.from(await wb.xlsx.writeBuffer());
     const preview = await service.previewPriceDatabaseImport(importAs(changed));
     assert.equal(preview.totals.pricesUpdated, 1);
-    assert.equal(preview.totals.pricesUnchanged, 3);
+    assert.equal(preview.totals.pricesUnchanged, 4);
     await service.applyPriceDatabaseImport({ ...importAs(changed), hash: preview.hash });
     const price = await testDb.prisma.priceLabor.findFirstOrThrow({ where: { name: "Screeding Base", vendor: { name: "Surojoyo Kreasindo" } } });
     assert.equal(price.amount.toString(), "125000");
@@ -1686,7 +1688,7 @@ describe("Supplier and price database workbook", () => {
     const b = (await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Round Trip B", vendorTypeIds: [(await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUBCON" } })).id] })).vendorId;
     const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
     const category = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Round Trip Works", kind: "WORK" });
-    await service.createWorkPricesBulk({ grants: GRANTS, actor: ACTOR, kind: "labor", vendorId: a, categoryId: category.categoryId, currency: "IDR", rows: [{ name: "Item One", unitId: unit.id, amount: "100", notes: "spec one" }, { name: "Item Two", unitId: unit.id, amount: "200" }] });
+    await service.createWorkPricesBulk({ grants: GRANTS, actor: ACTOR, kind: "labor", vendorId: a, categoryId: category.categoryId, currency: "IDR", rows: [{ name: "Item One", unitId: unit.id, amount: "100", notes: "spec one" }, { name: "Item Two", unitId: unit.id, amount: "200" }, { name: "Item On Request", unitId: unit.id, amount: "0" }] });
     await service.createWorkPricesBulk({ grants: GRANTS, actor: ACTOR, kind: "labor", vendorId: b, categoryId: category.categoryId, currency: "IDR", rows: [{ name: "Item One", unitId: unit.id, amount: "110", notes: "spec one" }] });
 
     const exported = await service.exportPriceDatabase({ grants: GRANTS });
@@ -1698,7 +1700,7 @@ describe("Supplier and price database workbook", () => {
 
     const preview = await service.previewPriceDatabaseImport({ grants: GRANTS, actor: ACTOR, file: exported.data, options: { priceKind: "labor" } });
     assert.deepEqual(preview.errors, []);
-    assert.equal(preview.totals.pricesUnchanged, 3);
+    assert.equal(preview.totals.pricesUnchanged, 4, "the on-request price exports as By Request and comes back as 0");
     assert.equal(preview.totals.pricesCreated + preview.totals.pricesUpdated, 0);
     assert.equal(preview.totals.suppliersExisting, 2);
   });

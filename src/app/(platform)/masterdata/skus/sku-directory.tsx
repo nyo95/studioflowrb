@@ -2,7 +2,7 @@
 import { FilterSummary, StatusFilterSelect } from "../directory-filters";
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
-import { lowestPricesByCurrencyUnit, matchesDirectoryStatus, type DirectoryStatus } from "../directory-findability";
+import { isPriceOnRequest, lowestPricesByCurrencyUnit, matchesDirectoryStatus, type DirectoryStatus } from "../directory-findability";
 import { DirectoryShell,DraftDialog,EntityPrimaryCell,Pagination,RowActionMenu,Text,usePagination } from "@/platform/ui_engine";
 
 
@@ -196,7 +196,7 @@ export function SkuDirectory({
                   <TableCell>
                     {lowestPrices.length ? (
                       <TableCellContent
-                        primary={<span>{lowestPrices.map((price, index) => <span key={`${price.currency}-${price.unit.code}`}>{index ? " · " : ""}<span className="font-semibold">from {formatMoney(createMoney(String(price.amount), price.currency))}</span><span className="text-ink-secondary"> / {price.unit.code}</span></span>)}</span>}
+                        primary={<span>{lowestPrices.map((price, index) => <span key={`${price.currency}-${price.unit.code}`}>{index ? " · " : ""}<span className="font-semibold">{isPriceOnRequest(price.amount) ? "By request" : `from ${formatMoney(createMoney(String(price.amount), price.currency))}`}</span><span className="text-ink-secondary"> / {price.unit.code}</span></span>)}</span>}
                         secondary={<span className="truncate max-w-[140px]">{sku.material_prices.length} price{sku.material_prices.length === 1 ? "" : "s"}</span>}
                       />
                     ) : (

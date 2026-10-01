@@ -635,3 +635,4 @@ inferred or created by fallback.
 | + | Party → Vendor rename | All FK references updated (supplier_party_id → supplier_vendor_id, etc.) |
 | + | Capability-based eligibility | Replaces role-based checks (can_supply_material / can_supply_labor) |
 | + | Cascade from parent | Vendor archived → prices archived. Brand archived → branded SKU/Price parent causes; restore is provenance-safe |
+| Q19 | Price of 0 | **Price on request** (owner, 2026-10-01). In the company's price lists a 0, "By Request", TBC or Nego means the price depends on the request; it is stored as an amount of 0 and shown as "By request". A dash or blank cell means the supplier does not offer the item and creates no price. A price on request is never the "lowest" price in comparisons. Downstream apps (BQ, StudioFlow) receive the amount 0 and must treat it as unquoted; BQ's TBC / By Owner price modes (BACKLOG) are the place to model it. |

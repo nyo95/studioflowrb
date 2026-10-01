@@ -10,10 +10,11 @@ export function parseIndonesianAmount(value: string): string | null {
   return `${integer}.${fraction}`;
 }
 
-/** One pasted spreadsheet cell as an amount: "-", "By Request", "n/a" and blanks mean "no price" (""). */
+/** One pasted spreadsheet cell as an amount: "-", "n/a" and blanks mean "no price" (""); "By Request", TBC, TBA and Nego mean a price on request ("0"). */
 export function parsePastedAmount(cell: string): string {
   const text = cell.trim();
-  if (!text || /^(-+|by request|n\/a|tbc|tba)$/i.test(text)) return "";
+  if (/^(by request|tbc|tba|nego|negotiable)$/i.test(text)) return "0";
+  if (!text || /^(-+|n\/a)$/i.test(text)) return "";
   const withoutCurrency = text.replace(/^rp\.?\s*/i, "");
   // "135000", "135.000", "135.000,50" and "135,000" all appear in workbooks; a lone dot or comma group of 3 is a thousands separator.
   if (/^\d{1,3}(,\d{3})+$/.test(withoutCurrency)) return withoutCurrency.replace(/,/g, "");

@@ -26,9 +26,16 @@ export function compareAmounts(a: unknown, b: unknown): -1 | 0 | 1 {
 
 type Priced = { amount: unknown; currency: string; unit: { code: string } };
 
+/** In the company's price lists a price of 0 means "depends on the request" (By Request); it is not a real zero price. */
+export function isPriceOnRequest(amount: unknown): boolean {
+  return compareAmounts(amount, "0") === 0;
+}
+
 /** The lowest price among rows; the caller decides what is comparable (see `lowestPricesByCurrencyUnit`). */
 export function lowestPriceByCurrencyUnit<T extends Priced>(rows: readonly T[]): T | null {
-  return rows.reduce<T | null>((lowest, row) => (!lowest || compareAmounts(row.amount, lowest.amount) < 0 ? row : lowest), null);
+  // A price on request is never "the lowest"; it only stands in when nothing in the group has a quoted price.
+  const quoted = rows.filter((row) => !isPriceOnRequest(row.amount));
+  return (quoted.length ? quoted : rows).reduce<T | null>((lowest, row) => (!lowest || compareAmounts(row.amount, lowest.amount) < 0 ? row : lowest), null);
 }
 
 /** One lowest price per currency and unit; prices in different currencies or units are never compared with each other. */
@@ -50,7 +57,7 @@ export function suppliedByNames(owner: { name: string } | null, suppliers: reado
  * currency and one unit; ties are all marked; archived rows are never marked and never counted; a mixed group is not marked.
  */
 export function groupLowestRows<T extends Priced & { id: string; deleted_at: Date | null }>(rows: readonly T[]): Set<string> {
-  const active = rows.filter((row) => row.deleted_at === null);
+  const active = rows.filter((row) => row.deleted_at === null && !isPriceOnRequest(row.amount));
   if (active.length < 2) return new Set();
   if (new Set(active.map((row) => `${row.currency}|${row.unit.code}`)).size !== 1) return new Set();
   const lowest = lowestPriceByCurrencyUnit(active)!;
