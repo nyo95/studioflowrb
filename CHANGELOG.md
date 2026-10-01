@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.281**
-- Next local revision: **R8.282**
+- Current revision after this entry is committed: **R8.282**
+- Next local revision: **R8.283**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -20,6 +20,13 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Updated service integration fixtures and the Unit form's functional input normalization. The boundary checker names this single approved cross-app migration exception.
 
 **Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow image warnings); `git diff --check`; migrations deployed to verified `studioflow_rebuild` and `studioflow_rebuild_test`. Production build intentionally not run per WO-MD-PROGRAM-01.
+
+## R8.282 | 2026-10-01 | docs(masterdata): plan WO-MD-PRICE-LABEL-01 (text price labels in quotation marks)
+
+- Replaced the finished WO-MD-PROGRAM-01 plan (completed by the Lead across R8.272 to R8.281 after the Executor reached its limit) with WO-MD-PRICE-LABEL-01, READY for the Executor (target R8.283): a price may be a number or a text label written in quotation marks, stored as an amount of 0 plus a label of up to 64 characters, parsed by one shared function in the amount field, pasted cells, and both workbooks, exposed additively on the public price reads, and written back with its quotes on export. The Lead builds the italic display and hints after it (R8.284).
+- Docs only; no code, schema, migration, or dependency change.
+
+**Checks.** `git diff --check`.
 
 ## R8.281 | 2026-10-01 | feat(masterdata): a price of 0 means "by request" (owner convention from the company price lists)
 
