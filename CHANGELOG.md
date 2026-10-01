@@ -21,6 +21,13 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 **Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow image warnings); `git diff --check`; migrations deployed to verified `studioflow_rebuild` and `studioflow_rebuild_test`. Production build intentionally not run per WO-MD-PROGRAM-01.
 
+## R8.271 | 2026-10-01 | feat(masterdata): enforce Brand supplier material pricing
+
+- Material pricing now requires the supplier to own or be linked to a branded SKU's Brand across create, update, restore, initial SKU prices, workbook import, and sample-price sync.
+- Brand unlink and SKU Brand changes now stop before creating an invalid live price chain. Added the idempotent, audited `linkBrandToSupplier` command and additive allowed `brandIds` in pricing references.
+
+**Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow image warnings); `git diff --check`. No migration or database rewrite; production build intentionally not run per WO-MD-PROGRAM-01.
+
 ## R8.269 | 2026-10-01 | docs(masterdata): review R8.268 (PASS) and plan WO-MD-PROGRAM-01
 
 - Reviewed R8.268 (`b4eac94`): PASS. The hardening migration now runs after the category merge, removes obsolete supplier-category rows before it closes the type lists, and the registry test compares exact sets; initial SKU prices now write their own audit events. Independent re-run: `npm test` and `npm run check` pass; migration status is clean. This closes WO-MD-HARDEN-01.

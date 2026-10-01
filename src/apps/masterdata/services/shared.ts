@@ -140,6 +140,14 @@ export async function assertVendorMaterialCapable(tx: TxClient, vendorId: string
   if (!capable) throw new AppError("VALIDATION", "VENDOR_NOT_MATERIAL_CAPABLE", "Supplier is not eligible to supply material.");
 }
 
+export async function assertPriceMaterialBrandSupplierChain(tx: TxClient, skuId: string, vendorId: string): Promise<void> {
+  const sku = await tx.sku.findUniqueOrThrow({ where: { id: skuId }, select: { brand_id: true, brand: { select: { name: true, owner_vendor_id: true } } } });
+  if (!sku.brand_id || !sku.brand || sku.brand.owner_vendor_id === vendorId) return;
+  if (await tx.brandSupplier.findFirst({ where: { brand_id: sku.brand_id, vendor_id: vendorId }, select: { id: true } })) return;
+  const vendor = await tx.vendor.findUniqueOrThrow({ where: { id: vendorId }, select: { name: true } });
+  throw new AppError("VALIDATION", "PRICE_BRAND_SUPPLIER_NOT_LINKED", `Supplier ${vendor.name} is not linked to Brand ${sku.brand.name}.`);
+}
+
 export async function assertVendorLaborCapable(tx: TxClient, vendorId: string): Promise<void> {
   const capable = await tx.vendorVendorType.findFirst({ where: { vendor_id: vendorId, vendor: { deleted_at: null }, vendor_type: { deleted_at: null, can_supply_labor: true } } });
   if (!capable) throw new AppError("VALIDATION", "VENDOR_NOT_LABOR_CAPABLE", "Supplier is not eligible to provide labor.");
@@ -231,6 +239,7 @@ export async function assertPriceMaterialRestorable(tx: TxClient, priceId: strin
   if (sourceLink?.brand.deleted_at) throw new AppError("CONFLICT", "PRICE_SOURCE_BRAND_ARCHIVED", "Price cannot be restored while its source Brand is archived.");
   if (sourceLink && sourceLink.brand_id !== sku.brand_id) throw new AppError("CONFLICT", "PRICE_SOURCE_LINK_BRAND_MISMATCH", "Source link brand no longer matches the SKU's current brand. Clear the source link before restoring.");
   await assertVendorMaterialCapable(tx, vendor.id); if (conflict) throw new AppError("CONFLICT", "PRICE_PAIR_CONFLICT", "A live price already exists for this SKU and Supplier.");
+  await assertPriceMaterialBrandSupplierChain(tx, price.sku_id, price.supplier_vendor_id);
 }
 
 export async function assertWorkPriceRestorable(tx: TxClient, table: "material-labor" | "labor", priceId: string): Promise<void> {

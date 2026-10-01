@@ -63,9 +63,9 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
         db.brand.findMany({ where: { deleted_at: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
         db.unit.findMany({ where: { status: "ACTIVE" }, orderBy: [{ name: "asc" }, { code: "asc" }], select: { id: true, code: true, name: true } }),
         db.category.findMany({ where: { status: "ACTIVE", kind: "PRODUCT" }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
-        db.vendor.findMany({ where: { deleted_at: null, types: { some: { vendor_type: { can_supply_material: true, deleted_at: null } } } }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+        db.vendor.findMany({ where: { deleted_at: null, types: { some: { vendor_type: { can_supply_material: true, deleted_at: null } } } }, orderBy: { name: "asc" }, select: { id: true, name: true, brand_suppliers: { select: { brand_id: true } }, owned_brands: { where: { deleted_at: null }, select: { id: true } } } }),
       ]);
-      return { skus, brands, units, productCategories, vendors };
+      return { skus, brands, units, productCategories, vendors: vendors.map((vendor) => ({ id: vendor.id, name: vendor.name, brandIds: [...new Set([...vendor.brand_suppliers.map((relation) => relation.brand_id), ...vendor.owned_brands.map((brand) => brand.id)])] })) };
     },
 
     async listPricingWorkRefs(input: { grants: PermissionGrants }) {

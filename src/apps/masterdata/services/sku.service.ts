@@ -5,7 +5,7 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, requiredCurrency, requiredAmount, resolveSkuIdentity, resolveSkuMeasurement, assertSkuRestorable, assertPriceMaterialRestorable, assertVendorMaterialCapable, assertWorkPriceRestorable, pruneOriginlessBrandCategories, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, requiredCurrency, requiredAmount, resolveSkuIdentity, resolveSkuMeasurement, assertSkuRestorable, assertPriceMaterialRestorable, assertVendorMaterialCapable, assertPriceMaterialBrandSupplierChain, assertWorkPriceRestorable, pruneOriginlessBrandCategories, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, createDeletionRequest, writeAudit } from "./shared";
 
 export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts) {
   const { runTransaction } = ports;
@@ -73,6 +73,7 @@ export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts
         const productCategoryIds = categories.filter((c) => c.kind === "PRODUCT").map((c) => c.id);
         for (const catId of input.brandId ? productCategoryIds : []) { let bc = await tx.brandCategory.findUnique({ where: { brand_id_category_id: { brand_id: input.brandId!, category_id: catId } } }); if (!bc) { bc = await tx.brandCategory.create({ data: { id: randomUUID(), brand_id: input.brandId!, category_id: catId } }); } await tx.brandCategoryOrigin.create({ data: { id: randomUUID(), brand_category_id: bc.id, kind: "SKU_ENRICHMENT", source_sku_id: skuId, actor_user_id: input.actor.userId ?? null, actor_label: input.actor.label } }); }
         const initialPrices = input.priceMaterials.map((pm) => ({ id: randomUUID(), sku_id: skuId, supplier_vendor_id: pm.supplierVendorId, amount: requiredAmount(pm.amount), currency: requiredCurrency(pm.currency), unit_id: priceUnitId, notes: pm.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label }));
+        for (const price of initialPrices) await assertPriceMaterialBrandSupplierChain(tx, skuId, price.supplier_vendor_id);
         await tx.priceMaterial.createMany({ data: initialPrices });
         await writeAudit(ports, tx, { action: "sku.created", entityType: "sku", entityId: skuId, actor: input.actor, metadata: { slug: identity.slug, brand_id: input.brandId, categories: categoryIds.length, prices: input.priceMaterials.length, purchase_to_base_factor: measurement.purchase_to_base_factor } });
         for (const price of initialPrices) await writeAudit(ports, tx, { action: "price-material.created", entityType: "price_material", entityId: price.id, actor: input.actor, metadata: { sku_id: skuId, vendor_id: price.supplier_vendor_id } });
@@ -101,6 +102,13 @@ export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts
         if ((input.brandId || null) !== (existing.brand_id || null)) {
           const linkedPriceCount = await tx.priceMaterial.count({ where: { sku_id: input.skuId, deleted_at: null, source_link_id: { not: null } } });
           if (linkedPriceCount > 0) throw new AppError("CONFLICT", "SKU_BRAND_CHANGE_BLOCKED", "Brand cannot be changed while live material prices have source links. Clear source links first.");
+          if (input.brandId) {
+            const prices = await tx.priceMaterial.findMany({ where: { sku_id: input.skuId, deleted_at: null }, select: { supplier_vendor_id: true } });
+            for (const price of prices) {
+              const relation = await tx.brandSupplier.findFirst({ where: { brand_id: input.brandId, vendor_id: price.supplier_vendor_id } });
+              if (brand?.owner_vendor_id !== price.supplier_vendor_id && !relation) throw new AppError("CONFLICT", "SKU_BRAND_CHANGE_BLOCKED", `Brand change would invalidate ${prices.length} live material price(s).`);
+            }
+          }
         }
         const categories = await tx.category.findMany({ where: { id: { in: categoryIds } }, select: { id: true, kind: true, status: true } });
         if (categories.length !== categoryIds.length) throw new AppError("VALIDATION", "SKU_CATEGORY_NOT_FOUND", "One or more categories not found.");

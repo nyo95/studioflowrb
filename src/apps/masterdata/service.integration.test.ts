@@ -61,6 +61,7 @@ async function createMaterialContext() {
       vendor_type_id: vendorType.id,
     },
   });
+  await testDb.prisma.brandSupplier.create({ data: { id: crypto.randomUUID(), brand_id: brand.brandId, vendor_id: vendor.vendorId, is_authorized: false, notes: null } });
   return { unit, categoryId: category.categoryId, vendorId: vendor.vendorId, brandId: brand.brandId };
 }
 

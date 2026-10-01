@@ -178,6 +178,11 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
         if (input.suppliers !== undefined) {
           const desiredSuppliers = new Map(input.suppliers.map((s) => [s.vendorId, s] as const));
           const removedSuppliers = existing.suppliers.filter((s) => !desiredSuppliers.has(s.vendor_id));
+          for (const removed of removedSuppliers) {
+            if (existing.owner_vendor_id === removed.vendor_id) continue;
+            const priceCount = await tx.priceMaterial.count({ where: { deleted_at: null, supplier_vendor_id: removed.vendor_id, sku: { brand_id: input.brandId } } });
+            if (priceCount > 0) throw new AppError("CONFLICT", "BRAND_SUPPLIER_IN_USE", `Supplier link cannot be removed while ${priceCount} live material price(s) use this Brand.`);
+          }
           if (removedSuppliers.length > 0) await tx.brandSupplier.deleteMany({ where: { id: { in: removedSuppliers.map((s) => s.id) } } });
           for (const existingSupplier of existing.suppliers) { const wanted = desiredSuppliers.get(existingSupplier.vendor_id); if (!wanted) continue; desiredSuppliers.delete(existingSupplier.vendor_id); const isAuthorized = wanted.isAuthorized ?? false; const supplierNotes = wanted.notes?.trim() || null; if (existingSupplier.is_authorized !== isAuthorized || existingSupplier.notes !== supplierNotes) await tx.brandSupplier.update({ where: { id: existingSupplier.id }, data: { is_authorized: isAuthorized, notes: supplierNotes } }); }
           for (const s of desiredSuppliers.values()) { await assertVendorMaterialCapable(tx, s.vendorId); await tx.brandSupplier.create({ data: { id: randomUUID(), brand_id: input.brandId, vendor_id: s.vendorId, is_authorized: s.isAuthorized ?? false, notes: s.notes?.trim() || null } }); }
@@ -192,6 +197,22 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
         }
         if (Object.keys(changes).length > 0) await writeAudit(ports, tx, { action: "brand.updated", entityType: "brand", entityId: input.brandId, actor: input.actor, changes });
         return { brandId: input.brandId };
+      });
+    },
+
+    async linkBrandToSupplier(input: { grants: PermissionGrants; actor: AuditActor; brandId: string; vendorId: string }) {
+      requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.brandManage, MASTERDATA_PERMISSIONS.vendorManage], "You do not have permission to link a Brand to a Supplier.");
+      actorIsUsable(input.actor);
+      return runTransaction(async (tx) => {
+        const brand = await tx.brand.findUniqueOrThrow({ where: { id: input.brandId } });
+        if (brand.deleted_at) throw new AppError("CONFLICT", "BRAND_ARCHIVED", "Cannot link an archived Brand.");
+        await assertVendorMaterialCapable(tx, input.vendorId);
+        const existing = await tx.brandSupplier.findFirst({ where: { brand_id: input.brandId, vendor_id: input.vendorId } });
+        if (!existing) {
+          await tx.brandSupplier.create({ data: { id: randomUUID(), brand_id: input.brandId, vendor_id: input.vendorId, is_authorized: false, notes: null } });
+          await writeAudit(ports, tx, { action: "brand.supplier-linked", entityType: "brand", entityId: input.brandId, actor: input.actor, metadata: { vendor_id: input.vendorId } });
+        }
+        return { brandId: input.brandId, vendorId: input.vendorId };
       });
     },
 
