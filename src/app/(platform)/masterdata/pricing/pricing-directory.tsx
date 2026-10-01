@@ -10,6 +10,8 @@ import { DirectoryShell,RowActionMenu,RowActionsCell,RowActionsHead } from "@/pl
 
 import { Badge,Button,ButtonMenu,Checkbox,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,Text,Tooltip,useFormDraftGuard,useOptionOverlay,type SortDirection } from "@/platform/ui_engine";
 import { VendorQuickCreateDialog } from "../vendor-quick-create-dialog";
+import { parseIndonesianAmount } from "./amount-format";
+import { PriceMatrixDialog } from "./price-matrix-dialog";
 import { compareDecimals,formatDecimal,type DecimalString } from "@platform/utilities/decimal";
 import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurement";
 import { createMoney,formatMoney } from "@platform/utilities/money";
@@ -32,7 +34,8 @@ const PRICE_PAGE_SIZE = 25;
 export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; contacts: Record<string, { name: string; phones: string[] }>; canManageVendors: boolean; canManageCategories: boolean; canManageSkus: boolean; canManageBrands: boolean; skus: SkuRef[]; brands: Ref[]; productCategories: Ref[]; vendors: Ref[]; materialVendors: Array<Ref & { brandIds: string[] }>; workVendors: Array<Ref & { categoryIds: string[] }>; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
   const { locale } = useDisplaySettings();
   const displayPrice = (amount: string, currency: string) => formatMoney(createMoney(amount, currency), { locale });
-  const [query, setQuery] = useState(""); const [status, setStatus] = useState<DirectoryStatus>("ACTIVE"); const [supplierFilter, setSupplierFilter] = useState("ALL"); const [brandFilter, setBrandFilter] = useState("ALL"); const [workCategoryFilter, setWorkCategoryFilter] = useState("ALL"); const [productCategoryFilter, setProductCategoryFilter] = useState("ALL"); const [groupByItem, setGroupByItem] = useState(false); const [page, setPage] = useState(1); const [sort, setSort] = useState<{ key: PriceSortKey; direction: SortDirection }>({ key: "name", direction: "asc" }); const [editor, setEditor] = useState<Editor | null>(null); const [formError, setFormError] = useState<string | null>(null);
+  const [query, setQuery] = useState(""); const [status, setStatus] = useState<DirectoryStatus>("ACTIVE"); const [supplierFilter, setSupplierFilter] = useState("ALL"); const [brandFilter, setBrandFilter] = useState("ALL"); const [workCategoryFilter, setWorkCategoryFilter] = useState("ALL"); const [productCategoryFilter, setProductCategoryFilter] = useState("ALL"); const [groupByItem, setGroupByItem] = useState(false); const [page, setPage] = useState(1); const [sort, setSort] = useState<{ key: PriceSortKey; direction: SortDirection }>({ key: "name", direction: "asc" }); const [matrixOpen, setMatrixOpen] = useState(false);
+  const [editor, setEditor] = useState<Editor | null>(null); const [formError, setFormError] = useState<string | null>(null);
   const [archive, setArchive] = useState<Target | null>(null); const [restore, setRestore] = useState<Target | null>(null); const [deletion, setDeletion] = useState<Target | null>(null); const [reason, setReason] = useState(""); const [rowError, setRowError] = useState<string | null>(null);
   const [savePending, setSavePending] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null); const [, startTransition] = useTransition();
@@ -189,6 +192,7 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
   };
   return <div className="flex min-h-0 flex-1 flex-col gap-4">
     {rowError ? <InlineError>{rowError}</InlineError> : null}
+    {matrixOpen && <PriceMatrixDialog vendors={props.workVendors} categories={props.workCategories} units={props.units} onClose={() => setMatrixOpen(false)} />}
     {editor && <PriceEditor pending={savePending} editor={editor} refs={{ ...props, vendors: editor.kind === "material" ? props.materialVendors : props.workVendors }} error={formError} onCancel={closeEditor} onSubmit={async (event) => { event.preventDefault(); if (savePending) return; setSavePending(true); setFormError(null); const formData = new FormData(event.currentTarget); try { const result = editor.kind === "material" && !editor.row && formData.get("materialEntryMode") === "new" ? await createMaterialSkuAction(formData) : await savePriceAction(editor.kind, formData); if (result.ok) closeEditor(); else if (result.ok === false) setFormError(result.error.safeMessage); } catch { setFormError("The price could not be saved. Please try again."); } finally { setSavePending(false); } }} />}
     <Tabs
       fill
@@ -200,6 +204,7 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
             ...(props.canManageMaterial ? [{ label: "Material price", description: "SKU supplier pricing", onSelect: () => setEditor({ kind: "material" as const }) }] : []),
             ...(props.canManageWork ? [{ label: "Material + labor price", description: "Combined unit price", onSelect: () => setEditor({ kind: "material-labor" as const }) }] : []),
             ...(props.canManageWork ? [{ label: "Labor price", description: "Labor-only unit price", onSelect: () => setEditor({ kind: "labor" as const }) }] : []),
+            ...(props.canManageWork ? [{ label: "Compare suppliers", description: "One grid: items by supplier", onSelect: () => setMatrixOpen(true) }] : []),
           ]}
         />
       ) : undefined}
@@ -233,17 +238,6 @@ type PriceEditorRefs = {
   brands: Ref[];
   productCategories: Ref[];
 };
-
-function parseIndonesianAmount(value: string): string | null {
-  const compact = value.replace(/\s/g, "").replace(/[^\d,.-]/g, "");
-  if (!compact) return "";
-  const commaIndex = compact.lastIndexOf(",");
-  if (commaIndex === -1) return compact.replace(/\D/g, "") || "";
-  const integer = compact.slice(0, commaIndex).replace(/\D/g, "") || "0";
-  const fraction = compact.slice(commaIndex + 1).replace(/\D/g, "");
-  if (!fraction) return integer;
-  return `${integer}.${fraction}`;
-}
 
 function FieldHelp({ label, content }: { label: string; content: string }) {
  return <Tooltip content={content}><IconButton label={`About ${label}`} icon={<CircleHelp size={14} />} size="sm" className="!h-4 !w-4 !min-h-4 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!bg-transparent hover:!text-ink" /></Tooltip>;

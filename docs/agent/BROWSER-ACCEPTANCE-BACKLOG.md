@@ -244,3 +244,11 @@ this backlog's former SF-A entries.)_
 - Steps: 1. Choose the supplier; its Brands' SKUs are listed first, the other Brand's SKU below with a "not linked" note. 2. Add three rows (Enter adds one); amounts format as you leave them. 3. Pick the unlinked SKU: the row shows "Link brand to supplier"; use it as the brand-manager and the SKU becomes priceable; as the price-only account the button is replaced by who to ask. 4. Enter an amount for a SKU this supplier already prices and press Create: that row is marked, nothing is saved. 5. Fix it and save. 6. Use "Create a new SKU with its first price", then "Back to the price table".
 - Acceptance: one failed row never leaves partial prices; each saved row has its own history entry; the unit follows the SKU; linking works only with the right permission.
 - Status: PENDING
+
+### [R8.277] Compare-suppliers grid
+- Surface: Master Data → Pricing → New price → Compare suppliers
+- Fixture: three labor-capable suppliers; one already holds a price named "Screeding base"; an Excel block of five items (one section heading line, one "-" cell, one "By Request" cell)
+- Viewport: desktop and a narrow tablet width
+- Steps: 1. Choose type, category and two suppliers; the grid opens with two amount columns. 2. Type two rows by hand; Enter in the last cell adds a row. 3. Paste the Excel block; items fill, the heading is skipped, the note says how many. 4. Set one cell to the existing "Screeding base" name and press Create: that row shows the supplier-named problem and nothing is saved. 5. Fix it and save; each supplier gains the category.
+- Acceptance: blank cells create nothing; pasted amounts with dots, commas and Rp read correctly; a failure never leaves partial prices.
+- Status: PENDING

@@ -8,6 +8,7 @@ import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, requiredSlug, requiredCurrency, requiredAmount, assertVendorMaterialCapable, assertVendorLaborCapable, assertPriceMaterialBrandSupplierChain, ensureVendorCategory, assertWorkPriceRestorable, assertPriceMaterialRestorable, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
 
 export const BULK_PRICE_ROW_LIMIT = 100;
+export const MATRIX_SUPPLIER_LIMIT = 12;
 
 export type BulkRowError = { rowIndex: number; field: string | null; code: string; message: string };
 
@@ -305,6 +306,47 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         }
         if (errors.length > 0) throw new AppError("VALIDATION", "BULK_ROWS_INVALID", `${errors.length} row(s) need fixing. Nothing was saved.`, { details: { rows: errors } });
         await writeAudit(ports, tx, { action: "price-bulk.created", entityType: "vendor", entityId: input.vendorId, actor: input.actor, metadata: { batch_id: batchId, kind: input.kind, count: ids.length, category_id: input.categoryId } });
+        return { batchId, ids };
+      });
+    },
+
+    /**
+     * Compare-suppliers entry: one category, several suppliers, rows of items with one amount per supplier (a blank cell
+     * means that supplier has no price for the item). Runs the per-supplier bulk command for each supplier inside one
+     * transaction, so the whole grid is all or nothing; every problem comes back as `details.rows` with its supplier.
+     */
+    async createWorkPriceMatrix(input: { grants: PermissionGrants; actor: AuditActor; kind: "labor" | "material-labor"; categoryId: string; currency: string; vendorIds: string[]; rows: Array<{ name: string; unitId: string; notes?: string | null; amounts: Record<string, string | null | undefined> }> }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkManage);
+      actorIsUsable(input.actor);
+      const vendorIds = [...new Set(input.vendorIds)];
+      if (vendorIds.length === 0) throw new AppError("VALIDATION", "BULK_EMPTY", "Choose at least one supplier.");
+      if (vendorIds.length > MATRIX_SUPPLIER_LIMIT) throw new AppError("VALIDATION", "BULK_TOO_MANY_SUPPLIERS", `A grid compares at most ${MATRIX_SUPPLIER_LIMIT} suppliers.`);
+      if (input.rows.length === 0) throw new AppError("VALIDATION", "BULK_EMPTY", "Add at least one row.");
+      if (input.rows.length > BULK_PRICE_ROW_LIMIT) throw new AppError("VALIDATION", "BULK_TOO_MANY_ROWS", `A batch holds at most ${BULK_PRICE_ROW_LIMIT} rows.`);
+      return runTransaction(async (tx: any) => {
+        const inner = createPricingService(tx as PrismaClient, { ...ports, runTransaction: async (work) => work(tx) });
+        const errors: Array<BulkRowError & { vendorId: string }> = [];
+        const ids: string[] = [];
+        const batchId = randomUUID();
+        for (const vendorId of vendorIds) {
+          const picked = input.rows.map((row, rowIndex) => ({ row, rowIndex })).filter(({ row }) => (row.amounts[vendorId] ?? "").trim() !== "");
+          if (picked.length === 0) continue;
+          try {
+            const created = await inner.createWorkPricesBulk({ grants: input.grants, actor: input.actor, kind: input.kind, vendorId, categoryId: input.categoryId, currency: input.currency, rows: picked.map(({ row }) => ({ name: row.name, unitId: row.unitId, amount: row.amounts[vendorId]!, notes: row.notes ?? undefined })) });
+            ids.push(...created.ids);
+          } catch (error) {
+            if (!(error instanceof AppError)) throw error;
+            const detailRows = (error.details as { rows?: BulkRowError[] } | undefined)?.rows;
+            if (error.code === "BULK_ROWS_INVALID" && detailRows) {
+              for (const detail of detailRows) errors.push({ ...detail, rowIndex: picked[detail.rowIndex]?.rowIndex ?? detail.rowIndex, vendorId });
+            } else {
+              errors.push({ rowIndex: picked[0]!.rowIndex, vendorId, field: null, code: error.code, message: error.safeMessage });
+            }
+          }
+        }
+        if (errors.length === 0 && ids.length === 0) throw new AppError("VALIDATION", "BULK_EMPTY", "Enter at least one amount.");
+        if (errors.length > 0) throw new AppError("VALIDATION", "BULK_ROWS_INVALID", `${errors.length} cell(s) need fixing. Nothing was saved.`, { details: { rows: errors } });
+        await writeAudit(ports, tx, { action: "price-matrix.created", entityType: "category", entityId: input.categoryId, actor: input.actor, metadata: { batch_id: batchId, kind: input.kind, suppliers: vendorIds.length, count: ids.length } });
         return { batchId, ids };
       });
     },

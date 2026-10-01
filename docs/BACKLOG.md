@@ -302,6 +302,54 @@ duration report derived from actual status-change history (these are
 duplicated `/studioflow/timeline`'s per-project view with no added
 information; `/studioflow/timeline` remains. See `CHANGELOG.md` R8.138.
 
+- **[PLANNED] Iteration-based phase tracking + project-card home (owner
+  design discussion, 2026-10-01 — direction agreed, NOT built, no Work Order
+  yet; a mockup and a gap check against the code come first).** Folds in
+  KB-060 (Open defects). Agreed so far:
+  - Only what is sent to the client is tracked; internal iterations and the
+    internal-review states are dropped.
+  - Main item per phase = a client-sent iteration (Layout 1, Layout 2; 3D D1,
+    D2 …), auto-named, renameable. Three states: not sent → sent / waiting
+    for client (date + days waiting) → answered, with inline choices
+    "Revision → next iteration" or "Done". No empty next iteration is created
+    automatically.
+  - Phase requirements are NOT merged into todos: they stay as non-blocking
+    reminders (today's `is_blocking = false` checklist items already do this),
+    can be satisfied any time (even at iteration 5), never gate anything, and
+    stay visible after the phase finishes until ticked or dismissed.
+  - Old "sub todo" idea becomes one free-text note per phase.
+  - Reopening an earlier phase (e.g. Moodboard) = "+ iteration" on it (no
+    reason-required Reopen); history kept; other phases keep running; a soft
+    reminder asks whether dependent phases still match.
+  - CD phase defaults to two items: **CD Mall** (civil only) then **CD Final**
+    (civil + interior fixture); both sent to the client (the client's PM
+    forwards to mall fit-out, outside the app). CD Mall offers "Revision" /
+    "Continue to CD Final" (no "Done"); only CD Final "Done" closes the phase.
+    CD Mall may be deleted/skipped when a project goes straight to Final.
+  - Supervision = dated site-visit entries (notes, optional photos), choices
+    "Next visit" / "Done (handover)"; home shows "last visit N days ago".
+  - Next phase activates automatically when a phase finishes, with a short
+    undo.
+  - Home page becomes one card per project (phase chips + iteration chips +
+    waiting-requirements marker + notes icon), replacing the task-based Today
+    (owner decided 2026-10-01: the card-per-project home REPLACES Today).
+    Two items are **[BLOCKED] on an owner decision** (parked 2026-10-01, owner
+    deferred to the next session; Lead recommendations recorded):
+    - [BLOCKED] Where the per-person task feed that Today carried now lives
+      ("my tasks today", overdue). Recommendation: a compact "My tasks" strip
+      above the project cards (collapsed by default), so the daily
+      "what is on my plate" view is not lost; the cards stay the main view.
+    - [BLOCKED] "All phases done — mark project completed?" prompt on the card
+      once every phase is finished (needed because completion is no longer
+      automatic). Recommendation: yes — a quiet, dismissible prompt on the
+      card; it only offers the "Mark as completed" action, never does it.
+  - Gap vs. current code (checked 2026-10-01): today a phase has 7 statuses
+    incl. internal review and v1.0/v1.1 revisions (minor = internal reject);
+    Today is a per-person task feed with an "In flight" phase strip;
+    `SfCdItem` models CD drawings; Supervision has a special
+    `completeSupervision`. The status-model change is backend-heavy work for a
+    Work Order, not a UI-only change.
+
 ### Owner roadmap review, 2026-09-26/27
 
 Owner brought several ideas over two sessions; each was checked against locked
@@ -431,6 +479,26 @@ header/page counter: browsers don't support it without a PDF-render pipeline,
 which the owner declined to add; see `STUDIOFLOW-REWORK-CONTRACT.md` §11.11.
 
 ### Open defects
+
+- [ ] [BUG] KB-060 — Project is marked COMPLETED while other phases are still
+  running (found by a ChatGPT second-opinion audit of R8.261, 2026-10-01;
+  re-verified in code). `completeProjectIfLast()` in
+  `src/apps/studioflow/phases/service.ts` only asks "is there a phase after
+  this one?", never "is every phase finished?". Phases may run in parallel, so
+  e.g. Layout `IN_PROGRESS` + CD skipped + Supervision finished completes the
+  project. `today/service.ts` then excludes COMPLETED projects, so the live
+  Layout work disappears from Today. An existing integration test asserts the
+  current behavior. Callers: `bypassPhase`, `approveClient`,
+  `completeSupervision`. **Do not fix in isolation: tackle together with the
+  iteration-model redesign below** (it rewrites "what makes a phase / project
+  done"), so the completion rule is defined once. **Owner decision
+  (2026-10-01): a project becomes COMPLETED only by an explicit "Mark as
+  completed" action. It never completes automatically — not when the last
+  phase finishes, and not even when every phase is finished.** So the fix is
+  to remove `completeProjectIfLast` from all three callers (and the existing
+  test that asserts the old behavior), not to tighten its condition. Lead
+  suggestion, not yet agreed: when every phase is finished, the home card may
+  show a quiet "All phases done — mark project completed?" prompt.
 
 **Fixed 2026-09-23 (R8.110):** KB-031 — Users and Roles & Access (and Master
 Data Settings) now render inside the shared `SettingsShell`/`SettingsNavigation`

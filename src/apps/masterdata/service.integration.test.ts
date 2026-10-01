@@ -1438,6 +1438,68 @@ describe("Bulk price entry", () => {
   });
 });
 
+describe("Compare-suppliers grid", () => {
+  async function workSupplier(name: string) {
+    const subcon = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUBCON" } });
+    const vendor = await service.createVendor({ grants: GRANTS, actor: ACTOR, name });
+    await testDb.prisma.vendorVendorType.create({ data: { id: crypto.randomUUID(), vendor_id: vendor.vendorId, vendor_type_id: subcon.id } });
+    return vendor.vendorId;
+  }
+
+  it("creates one price per filled cell, skips blank cells, and files each supplier under the category", async () => {
+    const a = await workSupplier("Grid Supplier A");
+    const b = await workSupplier("Grid Supplier B");
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
+    const category = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Grid Floor Works", kind: "WORK" });
+
+    const result = await service.createWorkPriceMatrix({ grants: GRANTS, actor: ACTOR, kind: "labor", categoryId: category.categoryId, currency: "IDR", vendorIds: [a, b], rows: [
+      { name: "Screeding base", unitId: unit.id, notes: "mortar", amounts: { [a]: "120000", [b]: "135000" } },
+      { name: "Lease line", unitId: unit.id, amounts: { [a]: "150000", [b]: "" } },
+      { name: "Cove ceiling", unitId: unit.id, amounts: { [b]: "170000" } },
+    ] });
+
+    assert.equal(result.ids.length, 4);
+    assert.equal(await testDb.prisma.priceLabor.count({ where: { vendor_id: a } }), 2);
+    assert.equal(await testDb.prisma.priceLabor.count({ where: { vendor_id: b } }), 2);
+    assert.equal(await testDb.prisma.vendorCategory.count({ where: { category_id: category.categoryId, vendor_id: { in: [a, b] } } }), 2);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "price-matrix.created", entity_id: category.categoryId } }), 1);
+  });
+
+  it("rolls the whole grid back when one supplier's cell is wrong and names the supplier and row", async () => {
+    const a = await workSupplier("Grid Rollback A");
+    const b = await workSupplier("Grid Rollback B");
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
+    const category = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Grid Rollback Works", kind: "WORK" });
+    await service.createPriceLabor({ grants: GRANTS, actor: ACTOR, name: "Existing item", categoryId: category.categoryId, vendorId: b, unitId: unit.id, amount: "1", currency: "IDR" });
+    const before = await testDb.prisma.priceLabor.count();
+
+    await assert.rejects(
+      () => service.createWorkPriceMatrix({ grants: GRANTS, actor: ACTOR, kind: "labor", categoryId: category.categoryId, currency: "IDR", vendorIds: [a, b], rows: [
+        { name: "Fine item", unitId: unit.id, amounts: { [a]: "10", [b]: "11" } },
+        { name: "Existing item", unitId: unit.id, amounts: { [a]: "12", [b]: "13" } },
+      ] }),
+      (error: unknown) => {
+        assert.ok(error instanceof AppError && error.code === "BULK_ROWS_INVALID");
+        const rows = (error.details as { rows: Array<{ rowIndex: number; vendorId: string; code: string }> }).rows;
+        assert.deepEqual(rows.map((row) => [row.rowIndex, row.vendorId, row.code]), [[1, b, "PRICE_IDENTITY_CONFLICT"]]);
+        return true;
+      },
+    );
+    assert.equal(await testDb.prisma.priceLabor.count(), before, "supplier A's valid cells were rolled back too");
+  });
+
+  it("limits suppliers, requires an amount somewhere, and keeps blank grids out", async () => {
+    const a = await workSupplier("Grid Limits A");
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
+    const category = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Grid Limits Works", kind: "WORK" });
+    const base = { grants: GRANTS, actor: ACTOR, kind: "labor" as const, categoryId: category.categoryId, currency: "IDR" };
+    await assert.rejects(() => service.createWorkPriceMatrix({ ...base, vendorIds: [], rows: [{ name: "x", unitId: unit.id, amounts: {} }] }), (error: unknown) => error instanceof AppError && error.code === "BULK_EMPTY");
+    await assert.rejects(() => service.createWorkPriceMatrix({ ...base, vendorIds: [a], rows: [{ name: "Blank", unitId: unit.id, amounts: { [a]: "" } }] }), (error: unknown) => error instanceof AppError && error.code === "BULK_EMPTY");
+    const many = Array.from({ length: 13 }, (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`);
+    await assert.rejects(() => service.createWorkPriceMatrix({ ...base, vendorIds: many, rows: [{ name: "x", unitId: unit.id, amounts: {} }] }), (error: unknown) => error instanceof AppError && error.code === "BULK_TOO_MANY_SUPPLIERS");
+  });
+});
+
 describe("Name capitalization", () => {
   it("stores typed names with the first letter of every word capitalized and everything else untouched", async () => {
     const type = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUBCON" } });

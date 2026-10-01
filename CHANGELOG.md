@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.276**
-- Next local revision: **R8.277**
+- Current revision after this entry is committed: **R8.277**
+- Next local revision: **R8.278**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -20,6 +20,15 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Updated service integration fixtures and the Unit form's functional input normalization. The boundary checker names this single approved cross-app migration exception.
 
 **Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow image warnings); `git diff --check`; migrations deployed to verified `studioflow_rebuild` and `studioflow_rebuild_test`. Production build intentionally not run per WO-MD-PROGRAM-01.
+
+## R8.277 | 2026-10-01 | feat(masterdata): compare-suppliers grid (items by supplier, paste from Excel)
+
+- New menu item **Compare suppliers** under New price: choose the price type, one pricing category, and up to 12 suppliers, then fill a grid of one item per row and one amount per supplier (a blank cell means that supplier has no price). Unit copies from the row above; notes carry the specification.
+- **Paste from Excel.** Copying a block from a spreadsheet and pasting it into the grid fills it: columns are Name, Specification, then one amount per chosen supplier in the order shown. Dashes, "By Request", "n/a" and blanks read as no price; "Rp", thousands dots and decimal commas are understood; section headings (lines with a name but no amount) are skipped and counted.
+- Service `createWorkPriceMatrix` (+ action `saveWorkPriceMatrixAction`): runs the per-supplier bulk command for every supplier in one transaction, so the whole grid is all or nothing; problems come back per row and supplier. Limits: 100 rows, 12 suppliers. One `price-matrix.created` event plus the per-price and per-supplier events.
+- The amount parser moved to `amount-format.ts` and is shared with the table dialogs. Three integration tests (sparse cells and category links, full rollback with the supplier named, limits). No migration.
+
+**Checks.** `npm test` 738 pass; `npm run check`; `npm run lint` (0 errors). Browser-checked that the dialog opens from the menu; filling, pasting and saving are queued for acceptance.
 
 ## R8.276 | 2026-10-01 | feat(masterdata): material price entry as a supplier-first table
 

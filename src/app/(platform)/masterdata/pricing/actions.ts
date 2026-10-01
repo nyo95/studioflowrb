@@ -311,3 +311,24 @@ export async function linkBrandToSupplierAction(input: unknown): Promise<ActionR
     return result;
   });
 }
+
+const matrixInput = z.object({
+  kind: z.enum(["labor", "material-labor"]),
+  categoryId: z.string().uuid(),
+  currency: z.string().length(3).default("IDR"),
+  vendorIds: z.array(z.string().uuid()).min(1).max(12),
+  rows: z.array(z.object({ name: z.string().min(1).max(128), unitId: z.string().uuid(), notes: bulkRowNotes, amounts: z.record(z.string(), z.string().max(32).nullish()) })).min(1).max(100),
+});
+
+/** Saves a compare-suppliers grid (one amount per item per supplier), all or nothing. Cell problems come back in `error.details.rows` with their supplier. */
+export async function saveWorkPriceMatrixAction(input: unknown): Promise<ActionResult<{ batchId: string; ids: string[] }>> {
+  return runSafeAction(async () => {
+    const parsed = matrixInput.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    const ctx = await context();
+    const result = await masterDataService.createWorkPriceMatrix({ ...ctx, ...parsed.data });
+    refreshPricing();
+    revalidatePath("/masterdata/vendors");
+    return result;
+  });
+}
