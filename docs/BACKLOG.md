@@ -132,6 +132,39 @@ No open items. (The pill-radius note from R8.83 was stale: `--ui-radius-pill` ha
   to it, and reject a material price whose brand the supplier is not linked to (with a "link this brand to the supplier" shortcut
   in the form). Owner confirmed the direction 2026-10-01; office data held no material prices when checked, so nothing needs cleanup.
 
+- [ ] [BUG][P0] **MD-AUD-001 — a malformed Supplier-contact payload deletes the existing contacts.** The update action converts a
+  JSON parse failure to an empty desired list, and the service then deletes every contact not in that list. Return a validation error
+  and preserve the prior contacts; add a regression test. Evidence and reproduction: `docs/audits/MASTERDATA-RELATIONAL-LOGIC-AUDIT-2026-10.md`.
+- [ ] [BUG][P1] **MD-AUD-002 — material prices do not enforce Brand → Supplier → Price.** Price creation, initial SKU prices,
+  BrandSupplier removal, restore, import and public reads can accept or retain a Supplier that is not linked to the SKU's Brand.
+  Deliver the already-planned supplier-first behavior through WO-MD-CHAIN-01.
+- [ ] [BUG][P1] **MD-AUD-003 — a Category can be deactivated while active records still use it.** Guard active SKU, Brand,
+  Supplier-category and work-price dependencies; require merge/reassignment instead of leaving hidden live relations.
+- [ ] [BUG][P1] **MD-AUD-004 — archiving a Vendor Type bypasses the existing capability-removal guard.** It can leave active
+  BrandSupplier or price records whose Supplier no longer has the required material/labor capability.
+- [ ] [BUG][P2] **MD-AUD-005 — several archived/inactive Master Data roots remain mutable through their services.** Brand,
+  Supplier, Unit, Category and Vendor Type updates need the same lifecycle guard already used by SKU and price updates.
+- [ ] [BUG][P2] **MD-AUD-006 — sample-request quote references are validated independently, not as one relation.** A live price
+  belonging to another SKU/Supplier can be linked to the intake; validate the selected price's own SKU and Supplier.
+- [ ] [BUG][P2] **MD-AUD-007 — public `suppressAudit` inputs allow SKU/price changes with no entity-level audit event.** Workbook
+  and sample-price sync leave only an aggregate event; make the bypass private/scoped and retain searchable child history.
+- [ ] [BUG][P2] **MD-AUD-008 — wide Master Data directory/public reads are unbounded.** Brand, Supplier, SKU and price lists can
+  load the whole catalogue (including nested Supplier relations); add one bounded pagination contract before volume grows.
+- [ ] [BUG][P2] **MD-AUD-009 — foreign-key columns lack leading indexes.** Six Master Data, four BQ and six StudioFlow FK columns
+  were verified from the PostgreSQL catalogue; add only non-duplicate indexes, split between the relevant hardening work orders.
+- [ ] [BUG][P2] **MD-AUD-010 — the database does not enforce several Master Data scalar/lifecycle invariants.** Add pre-checked
+  constraints for nonnegative prices, three-letter uppercase currency, allowed polymorphic types, DIRECT/PARENT ArchiveCause shape,
+  and idempotent uniqueness even when a direct cause has null parent fields.
+- [ ] [BUG][P2] **MD-AUD-011 — workbook Preview and Apply use different domain validation.** Preview can say a file is ready
+  before Apply rejects and rolls back it; reuse the apply validators in a no-write validation path.
+- [ ] [BUG][P2] **MD-AUD-012 — repeated relational ids can form cross-parent graphs.** StudioFlow project/phase/revision ids and a
+  BQ template section's parent are individually valid FKs but are not constrained to the same aggregate. Audit the owning services,
+  then add the narrowest composite constraint or service test that enforces the intended graph.
+- [ ] [BUG][P2] **MD-AUD-013 — `savePriceAction` trusts the TypeScript price-kind value at runtime.** An unknown value falls into
+  the labor branch; parse the same closed set already used by archive/restore actions before routing.
+- [ ] [CLEANUP][P3] **MD-AUD-014 — redundant live uniqueness indexes remain after migration history.** Brand, Supplier, SKU and
+  the three price tables contain semantically duplicate indexes. Confirm definitions/usage and drop only exact duplicates.
+
 **LOCK LIFTED (owner, 2026-09-28; was LOCKED 2026-09-24).** Audited on 2026-09-24: 35/35 masterdata
 integration tests pass, 0 open `[BUG]` entries, no TODO/FIXME in source, and
 the only apparent gap found (`vendor-contract.md` §14.4 "Brand permanent

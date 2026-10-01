@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.263**
-- Next local revision: **R8.264**
+- Current revision after this entry is committed: **R8.264**
+- Next local revision: **R8.265**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.264 | 2026-10-01 | docs(masterdata): audit relational schema and Master Data logic
+
+- Completed WO-MD-AUDIT-01 as a read-only audit: mapped all relations in the Platform, Master Data, StudioFlow and BQ schemas; checked foreign keys, delete behavior, indexes, constraints, lifecycle fields and application boundaries; and traced every Master Data public service method, action family, workbook/sample flow and public read port.
+- The office rebuild database was identified as `studioflow_rebuild` from the kantor configuration before access, and every inspection query ran in an explicit read-only transaction. Current data contained none of the searched integrity violations. The report records one P0, three P1, nine P2 and one P3 finding, each with evidence and a proposed work order; the open work is mirrored in `docs/BACKLOG.md`.
+- Documentation only. No source, schema, migration, test, contract, dependency or database data changed.
+
+**Checks.** Baseline and final `npm test`: 712/712 pass (158 suites) on both runs; `npm run check`; `npm run lint` (0 errors, two pre-existing StudioFlow image warnings); `npm run build`; `git diff --check`. Full evidence is recorded in the audit report.
 
 ## R8.263 | 2026-10-01 | docs(masterdata): plan the audit-first backend and hardening roadmap
 
