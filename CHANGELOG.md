@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.283**
-- Next local revision: **R8.284**
+- Current revision after this entry is committed: **R8.284**
+- Next local revision: **R8.285**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -20,6 +20,13 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Updated service integration fixtures and the Unit form's functional input normalization. The boundary checker names this single approved cross-app migration exception.
 
 **Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow image warnings); `git diff --check`; migrations deployed to verified `studioflow_rebuild` and `studioflow_rebuild_test`. Production build intentionally not run per WO-MD-PROGRAM-01.
+
+## R8.284 | 2026-10-01 | docs(studioflow): plan WO-SF-ITER-01 (client-sent iterations, explicit completion, project-card read models)
+
+- The owner approved the project-card home mockup and handed the StudioFlow backend to the Executor. `PLAN.md` is now WO-SF-ITER-01, READY, in three ordered phases: (1) model and migration — `SfRevision` becomes the iteration table (name, state NOT_SENT / SENT / ANSWERED / REVISED / DONE, sent and answered dates), phase status collapses to PENDING / ACTIVE / DONE, per-phase note, requirement dismissal, per-definition default iteration kinds (CD Mall then CD Final), an append-only phase event table, and a destructive but pre-checked migration of existing revisions; (2) commands — send, answer, Revision / Done / Continue to CD Final, supervision visits, auto-advance with a 5-minute same-actor undo, explicit `markProjectCompleted` and `reopenProject` with all automatic completion removed (this closes KB-060); (3) read models — `listProjectCards` and `myTasksSummary`. The Lead builds every screen afterwards.
+- The Master Data text-price-label plan (WO-MD-PRICE-LABEL-01) moved to `docs/agent/queued-plans/` because `PLAN.md` holds one plan; it is copied back to `PLAN.md` when this one is finished. Docs only; no code, schema, or migration change.
+
+**Checks.** `git diff --check`.
 
 ## R8.283 | 2026-10-01 | docs(studioflow): record the owner's two decisions on the project-card home
 
