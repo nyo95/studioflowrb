@@ -13,6 +13,14 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
 
+## R8.270 | 2026-10-01 | feat(masterdata): store unit codes in lowercase
+
+- Unit codes now accept any typed case but persist and read as lowercase, protected by a database CHECK. The migration stops before writing if lowercase collisions exist.
+- The one owner-approved migration-time exception normalized matching plain unit text in BQ and StudioFlow snapshots; free text did not change. The Phase 1 Review Card records the evidence and office row totals.
+- Updated service integration fixtures and the Unit form's functional input normalization. The boundary checker names this single approved cross-app migration exception.
+
+**Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow image warnings); `git diff --check`; migrations deployed to verified `studioflow_rebuild` and `studioflow_rebuild_test`. Production build intentionally not run per WO-MD-PROGRAM-01.
+
 ## R8.269 | 2026-10-01 | docs(masterdata): review R8.268 (PASS) and plan WO-MD-PROGRAM-01
 
 - Reviewed R8.268 (`b4eac94`): PASS. The hardening migration now runs after the category merge, removes obsolete supplier-category rows before it closes the type lists, and the registry test compares exact sets; initial SKU prices now write their own audit events. Independent re-run: `npm test` and `npm run check` pass; migration status is clean. This closes WO-MD-HARDEN-01.

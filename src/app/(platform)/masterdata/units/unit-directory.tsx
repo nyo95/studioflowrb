@@ -133,7 +133,7 @@ export function UnitDirectory({
         open={createOpen}
         onOpenChange={setCreateOpen}
         title="Create measurement unit"
-        description="Add a new standard unit code (e.g. PCS, M2, KG) used across SKUs and pricing."
+          description="Add a new standard unit code (e.g. pcs, m2, kg) used across SKUs and pricing."
       >
         <form
           onSubmit={async (e) => {
@@ -156,8 +156,8 @@ export function UnitDirectory({
           className="grid gap-4"
         >
           {createError ? <InlineError>{createError}</InlineError> : null}
-          <Field label="Unit code" required description="Uppercase symbol (e.g. PCS, SET, M2).">
-            <Input name="code" required maxLength={16} placeholder="PCS" autoFocus onInput={(event) => { event.currentTarget.value = event.currentTarget.value.toUpperCase(); }} />
+          <Field label="Unit code" required description="Lowercase symbol (e.g. pcs, set, m2).">
+            <Input name="code" required maxLength={16} placeholder="pcs" autoFocus onInput={(event) => { event.currentTarget.value = event.currentTarget.value.toLowerCase(); }} />
           </Field>
           <Field label="Display name" required description="Descriptive name (e.g. Pieces, Set, Square Meter).">
             <Input name="name" required maxLength={64} placeholder="Pieces" />

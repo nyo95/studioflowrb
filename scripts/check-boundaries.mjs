@@ -1187,6 +1187,9 @@ export async function collectServerClientCallViolations({ projectRoot = process.
  * this list (split it per app instead), and an entry whose migration no longer spans two schemas fails as stale.
  */
 export const MIGRATION_ISOLATION_ALLOW_LIST = [
+  // Owner-approved, migration-time-only Master Data vocabulary normalization.
+  // It is intentionally the sole cross-app write exception in WO-MD-PROGRAM-01.
+  "20261001100000_masterdata_lowercase_unit_codes",
   "20260906110000_bq_project_deletion_workflow",
   "20260907090000_regression_sku_and_custom_snapshot",
   "20260907091000_r6_21_db_invariants",

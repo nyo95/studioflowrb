@@ -123,7 +123,7 @@ No open items. (The pill-radius note from R8.83 was stale: `--ui-radius-pill` ha
   category filter load, and the labor price form asks for the supplier first and narrows Pricing category to it (MEP for PT Mulia
   Sejahtera Adi). Still to walk: saving a work price and seeing the supplier gain the category, creating a category inline from the
   Suppliers dialogs, "Show all categories", the "New for this supplier" hint, and a supplier with no categories.
-- [ ] [PLANNED] **Master Data backend roadmap (Lead, 2026-10-01; full sequence in `PLAN.md`).** In order: WO-MD-AUDIT-01 (read-only audit of
+- [ ] [PLANNED] **Master Data backend roadmap (Lead, 2026-10-01; full sequence in `PLAN.md`).** Phase 1, lowercase unit-code storage, shipped in R8.270. Remaining in order: WO-MD-AUDIT-01 (read-only audit of
   the whole relational schema and Master Data logic), WO-MD-HARDEN-01 (fix the audit's P0/P1 findings and cheap P2s), WO-MD-CHAIN-01
   (the brand → supplier → price entry below), WO-MD-BULK-01 (bulk price entry: one supplier and category, many rows, all-or-nothing),
   WO-MD-TEXT-01 (shared first-letter-capital normalization for names, lower-case for tags). Each is issued as its own plan after the

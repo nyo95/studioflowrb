@@ -41,7 +41,7 @@ export function createUnitService(db: PrismaClient, ports: MasterDataServicePort
     async createUnit(input: { grants: PermissionGrants; actor: AuditActor; code: string; name: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
       actorIsUsable(input.actor);
-      const code = requiredName(input.code, "UNIT_CODE_REQUIRED").toUpperCase();
+      const code = requiredName(input.code, "UNIT_CODE_REQUIRED").toLowerCase();
       const name = requiredName(input.name, "UNIT_NAME_REQUIRED");
       return runTransaction(async (tx) => {
         let unit;
@@ -54,7 +54,7 @@ export function createUnitService(db: PrismaClient, ports: MasterDataServicePort
     async updateUnit(input: { grants: PermissionGrants; actor: AuditActor; unitId: string; code: string; name: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.dictionaryManage);
       actorIsUsable(input.actor);
-      const code = requiredName(input.code, "UNIT_CODE_REQUIRED").toUpperCase();
+      const code = requiredName(input.code, "UNIT_CODE_REQUIRED").toLowerCase();
       const name = requiredName(input.name, "UNIT_NAME_REQUIRED");
       return runTransaction(async (tx) => {
         const existing = await tx.unit.findUniqueOrThrow({ where: { id: input.unitId } });
