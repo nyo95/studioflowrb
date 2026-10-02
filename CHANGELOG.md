@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.293**
-- Next local revision: **R8.294**
+- Current revision after this entry is committed: **R8.294**
+- Next local revision: **R8.295**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -47,6 +47,13 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## R8.290 | 2026-10-02 | docs(masterdata): activate WO-MD-PRICE-LABEL-01 as the Executor plan
 
 - WO-SF-ITER-01 is finished and reviewed (R8.285 to R8.289), so the queued Master Data plan for text price labels written in quotation marks moved from `docs/agent/queued-plans/` to the root `PLAN.md`, status READY, and its Executor prompt now requires every listed test, a scratch-database migration check, and a single uninterrupted run. The Executor takes the next revision (R8.291); the Lead builds the italic display afterwards. Docs only; no code, schema, or migration change.
+
+**Checks.** `git diff --check`.
+
+## R8.294 | 2026-10-02 | docs(bq): plan WO-BQ-INTEGRITY-01 and record the external audit
+
+- `PLAN.md` is now WO-BQ-INTEGRITY-01, READY for the Executor (expected R8.295): four minimal BQ fixes the Lead confirmed in the code against the external audit of R8.261 — Rupiah only, a lock readiness gate (non-empty, no Rp0 rows unless acknowledged), the Master Data price read permission checked on import, and no self-approval of a project deletion. The finished text-price-label plan (its backend landed in R8.291) was replaced.
+- `docs/BACKLOG.md` (BQ) records the whole audit: which findings are already fixed (01, 02, 06), which this plan fixes (03, 04, 05, 11), and which are parked until the estimator's feedback (09, 10, 12, 14 to 23) or are platform decisions (07, 08, 13). Docs only; no code change.
 
 **Checks.** `git diff --check`.
 

@@ -1,76 +1,102 @@
 # Active Plan
 
-Plan ID: WO-MD-PRICE-LABEL-01
-Scope: Master Data — a price may be a number or a quoted text label ("by request" with a reason). Backend and the shared parser only; the Lead builds the italic display and the form hints afterwards.
-Target revision: derive the next unused revision from `CHANGELOG.md` (Executor); the Lead UI follow-up takes the one after it. (WO-SF-ITER-01 is finished and reviewed: R8.285 to R8.289.)
+Plan ID: WO-BQ-INTEGRITY-01
+Scope: BQ — four minimal integrity fixes from the external audit (Rupiah only, lock readiness, Master Data price permission, no self-approval of deletion). Backend and the thinnest wiring only. No new features.
+Target revision: the next unused revision in `CHANGELOG.md` (expected R8.295; confirm). One local commit.
 Status: READY
-Priority: P2
-Owner: owner (Product Owner). Owner proposal 2026-10-01: use quotation marks to mark a text price; the value is whatever is inside the quotes, even "120".
+Priority: P0
+Owner: owner (Product Owner). Decisions answered 2026-10-02: follow the Lead's recommendation on all points, minimal fixes only; BQ enhancements wait for the estimator's feedback.
 Last updated: 2026-10-02
 
 ## Outcome
 
-In the company price lists a price is sometimes not a number ("depends on the request", "call sales", "per project"). Today a price of 0 means "by request" (decision Q19, R8.281) but the reason is lost. After this plan a price can carry a short text label next to its amount of 0, entered with quotation marks in the amount field, in pasted Excel cells, and in imported workbooks, and the label survives export and import.
+After this plan BQ cannot silently produce a wrong total or leak prices:
+1. Every amount in BQ is Rupiah. A line, library item, or assembly line in another currency is refused with a clear message.
+2. A project cannot be locked while it is empty. It cannot be locked while rows still have a price of Rp0 unless the caller explicitly confirms.
+3. Pulling a price from Master Data into a BQ line requires the matching Master Data read permission, on the server, not only in the picker.
+4. The person who asked for a project deletion cannot approve that same request.
 
-Context: WO-MD-PROGRAM-01 (units lowercase, Brand → Supplier → Price rule, bulk commands, name capitalization) was finished by the Lead after the Executor reached its limit (R8.272 to R8.281); there is nothing left of it to do. Read `docs/apps/masterdata/pricing-contract.md` Q19 and `CHANGELOG.md` R8.281 first.
+## Read first
+
+- `docs/apps/bq/bq-contract.md` (find the sections on lock/unlock, currency, and permanent deletion).
+- `src/apps/bq/services/projects.ts` (`lockProject`, `approveProjectDeletion`).
+- `src/apps/bq/services/project-tree.ts` (`addLineItem`, `updateLineItem`).
+- `src/apps/bq/services/library-items.ts`, `src/apps/bq/services/assemblies.ts`.
+- `src/app/(platform)/bq/[id]/actions.ts` (`addLineItemAction` around line 349, `lockProjectAction` around line 486) and `src/app/(platform)/bq/[id]/source-actions.ts` (the picker).
+- `src/apps/bq/service.integration.test.ts` for how tests are written here.
 
 ## Locked Decisions
 
-1. **Syntax.** The amount value as typed or read from a cell is interpreted by one function:
-   - A number (Indonesian or spreadsheet style, optional "Rp") is a numeric price, as today.
-   - A value that **starts with a quotation mark** (straight `"` or curly `“` `”`) is a text price: the label is the text inside the quotes (the closing quote is optional while typing), trimmed. The amount is stored as 0. This holds even when the inside looks like a number: `"120"` is the text 120, not a price of 120.
-   - Unquoted `By Request`, `TBC`, `TBA`, `Nego`, `Negotiable` stay a price on request with **no label** (as R8.281).
-   - `-`, `n/a`, and an empty cell still mean "not offered": no price is created (importer, grid and paste only; the single-price form still requires an amount).
-   - Any other unquoted text is rejected with a clear message that says to put it in quotation marks if it is meant as text (`PRICE_AMOUNT_INVALID`).
-   - An empty label (`""`) is rejected. A label is at most **64 characters**; longer is rejected (`PRICE_LABEL_TOO_LONG`) and the message points to Notes. Labels keep the case as typed (they are not title-cased) and have whitespace collapsed.
-2. **Storage.** A new nullable column `amount_label` (varchar 64) on `PriceMaterial`, `PriceMaterialLabor` and `PriceLabor`, with a CHECK `amount_label IS NULL OR (amount = 0 AND char_length(btrim(amount_label)) BETWEEN 1 AND 64)`. A numeric price never has a label; changing a price to a number clears the label. Existing rows keep their 0 as "by request" with no label. No data is rewritten.
-3. **One parser, three users.** A pure function (no server imports, usable from client components) turns a raw amount value into `{ amount: DecimalString, label: string | null }` or an error. The services call it, so the typed value can be passed straight through the existing `amount: string` inputs; the UI forms, the bulk and compare-suppliers commands, the SKU workbook and the new supplier/price workbook all use the same function. Existing numeric strings (`"120000"`, `"120000.50"`) keep working unchanged.
-4. **Semantics unchanged downstream.** A text price is a price on request: never the lowest in comparisons, excluded from nothing else. BQ and StudioFlow keep receiving the amount 0; the label is exposed as an **additive** field (`amountLabel: string | null`) on the public price reads, nothing else about those shapes changes.
-5. **Audit.** Create and update audit events record `amount_label` (from and to) when it changes, alongside the amount.
-6. **Export and import (supplier/price workbook).** Export writes a text price as the label **with its quotation marks** (`"call sales"`) and an unlabelled price on request as `By Request`, so an export imports back unchanged. Import reads the same syntax from cells; an unchanged amount and label count as unchanged, a changed label counts as an update. The preview lists every cell read as a text price (sheet, row, label) as an information note.
-7. The single-price edit form, the bulk tables and the compare grid already post the typed string; they keep doing so. No new UI field is added.
+1. **Rupiah only.** The only accepted currency code in BQ is `IDR` (compare case-insensitively after trimming; store `IDR`). No exchange rates, no schema change, no data rewrite.
+2. **Lock gate.** Locking requires: (a) the project has at least one item (a BqItem), and (b) no zero-price rows, unless the caller passes `acknowledgeZeroPrices: true`. A "zero-price row" is either a standalone item (an item with no sub-objects and no direct line items) whose `harga_snapshot` is null or 0, or any line item (under a sub-object or directly under an item) whose `harga_snapshot` is 0. Rows are counted; nothing is changed.
+3. **Permission.** Material imports need `MASTERDATA_PERMISSIONS.priceMaterialRead`; labor and material-labor imports need `MASTERDATA_PERMISSIONS.priceWorkRead`. Without it the import fails with a permission-denied error.
+4. **Deletion approval.** `approveProjectDeletion` is refused when the request's `requester_user_id` equals the approving user's id. Rejecting your own request stays allowed (it works as a cancel). There is no exception for a single-approver studio; the project then needs a second approver. Mention this in the changelog.
 
-## Business Rules and Architecture Constraints
+## Steps (do them in this order)
 
-- Capability labels: REUSE `requiredAmount` semantics for the numeric branch, `writeAudit`, `AppError`, and the existing price services; EXTEND the three price tables and the public price read types; ADD the pure parser module inside `src/apps/masterdata` (domain rule, app-owned, not a platform utility).
-- Apps keep their boundaries: the public read ports gain one optional field, no other app code is edited.
-- Migration begins with a pre-check (no existing row may violate the CHECK; none can, since the column is new) and is additive-safe. Apply it to the office development and disposable test databases after verifying the targets (`studioflow_rebuild`, `studioflow_rebuild_test` on `localhost`); never the legacy database.
-- Do not run `npm run build`, or restore `next-env.d.ts` before staging.
+### Step 1 — Rupiah only
 
-## Backend Contract
+1. Create `src/apps/bq/lib/currency.ts` exporting `requireRupiah(value: string): "IDR"`. If `value.trim().toUpperCase() !== "IDR"` throw `new AppError("VALIDATION", "bq.currency.rupiah-only", "BQ works in Rupiah only for now.")`; otherwise return `"IDR"`.
+2. Call `requireRupiah` wherever a currency is accepted from a caller:
+   - `addLineItem` and `updateLineItem` in `project-tree.ts` (`currencySnapshot`; in the update, only when it is not `undefined`).
+   - All four create and four update functions in `library-items.ts` (`currency`; in updates only when not `undefined`).
+   - In `assemblies.ts`, any create or update of an assembly line that takes a currency. If none takes one, say so in your report and change nothing there.
+3. In `src/app/(platform)/bq/[id]/source-actions.ts`, exclude Master Data options whose `currency` is not `IDR` from the picker result (BQ Library options are IDR already).
+4. Read-only check (do not change data): count rows with `currency_snapshot <> 'IDR'` in `bq.bq_line_item` and `bq.bq_assembly_line`, and rows with `currency <> 'IDR'` in the four library tables, against `studioflow_rebuild` only. Put the numbers in your report. If any number is above 0, still finish the plan and mention it as a limitation.
 
-- Parser module: given a raw string returns `{ amount: string; label: string | null }` (amount normalized as `requiredAmount` does) or throws `AppError` with the codes above. Table-driven unit tests cover: plain numbers in all styles, `Rp`, quoted text, quoted number, curly quotes, missing closing quote, empty quotes, 64 and 65 characters, whitespace, unquoted words (on request without label), dash and n/a (reported as "not offered" through a distinct result so callers decide), and rejected unquoted text.
-- Services: `createPriceMaterial`, `updatePriceMaterial`, `createPriceMaterialLabor`, `updatePriceMaterialLabor`, `createPriceLabor`, `updatePriceLabor`, `createSku` initial prices, the bulk, matrix and per-row commands, and the SKU price workbook apply all resolve the amount through the parser and persist `amount_label`. Reads (`list*`, `get*`, `listPricingMaterialRefs` untouched) select `amount_label`; the public price reads add `amountLabel`.
-- Restore and archive paths need no change; restoring a labelled price keeps its label.
-- Supplier/price workbook: export and import per Locked Decision 6, preview counts unchanged.
-- Error messages are readable by non-programmers and name the cell (sheet and row) where a cell is involved.
+### Step 2 — Lock gate
 
-## UI Contract
+1. In `projects.ts`, change the `lockProject` input to `{ grants, actor, id, acknowledgeZeroPrices?: boolean }`.
+2. After the existing status checks and before `transitionProjectStatus`, load the project's items (one query with relations; follow the model names in `prisma/schema/bq.prisma`: section, subsection, item, sub-object, line item).
+3. If there are no items, throw `new AppError("CONFLICT", "bq.project.lock-empty", "Add at least one item before locking the project.")`.
+4. Count zero-price rows per Locked Decision 2. If the count is above 0 and `acknowledgeZeroPrices` is not `true`, throw an `AppError("CONFLICT", "bq.project.lock-zero-prices", ...)` whose message reads "N row(s) have a price of Rp0. Fill them in, or confirm to lock anyway." and which carries `details: { count }`. Check how `details` is passed in other `AppError` calls in this repository and use the same form.
+5. When the project is locked with acknowledged zero prices, record the count (`zeroPriceRows`) in the existing `bq.project.locked` audit event the same way other BQ audit calls add metadata.
+6. In `actions.ts`, `lockProjectAction` passes `acknowledgeZeroPrices` from the form data (`formData.get("acknowledgeZeroPrices") === "true"`). Make no other UI change; the Lead builds the confirmation dialog afterwards.
 
-The Lead builds, after this plan: italic, muted display of the label (or "By request") in place of the amount in the three lists and the SKU list; a hint under every amount field ("Use quotation marks for text, e.g. "call sales""); search across labels. The Executor adds **no** UI beyond what compilation requires.
+### Step 3 — Master Data permission
 
-## Tests Required
+1. Create `src/apps/bq/lib/master-data-source.ts` exporting `async function snapshotFromMasterData(input: { grants; sourceKind: "material" | "labor" | "material-labor"; sourceRefId: string; read: Pick<typeof masterDataRead, "getMaterialPriceOption" | "listWorkPricesRead"> })` that returns the same snapshot object the action builds today, using `snapshotFromMaterialPrice` / `snapshotFromWorkPrice` from `snapshot.ts`.
+2. Inside it, before any read: `requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialRead)` for `material`, and `requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkRead)` for the other two kinds. Keep the existing "not found" errors exactly as they are in the action today.
+3. Replace the Master Data branch in `addLineItemAction` with a call to this function. Behavior for permitted users must not change.
 
-- Parser tests as above.
-- Integration: create and update with a label for each of the three price kinds (label stored, amount 0, audit shows the change; a numeric update clears it); CHECK rejects a label with a non-zero amount if written directly; bulk, matrix and per-row commands accept a quoted cell and report a rejected unquoted text with the row; the supplier/price workbook round trip with a labelled price, a quoted number and an unlabelled by-request price (all `unchanged` on re-import); the SKU workbook accepts a quoted amount; public reads include `amountLabel`.
-- Regression: all existing amount behavior (numbers, zero as by request, negative rejected) is unchanged.
+### Step 4 — Deletion approval
 
-## Regression Risks
+1. In `approveProjectDeletion` (`projects.ts`), right after the request is loaded and found pending, add: if `request.requester_user_id === input.actor.userId` throw `new AppError("CONFLICT", "bq.project.deletion-self-approval", "The person who asked for the deletion cannot approve it.")`.
+2. Do not change `rejectProjectDeletion`.
 
-- `requiredAmount` is also used by the sample-request flow and other numeric paths; leave those on the numeric function and use the new parser only where the user types or imports an amount.
-- Excel cells that are real text (not numbers) such as `"135.000"` unquoted must still be read as a number, as today.
-- The CHECK must not be added with `NOT VALID`; it applies to existing rows (all have a null label).
+### Step 5 — Documentation
+
+1. In `docs/apps/bq/bq-contract.md` add one short paragraph per decision (1 to 4), in the section that fits best, using the wording of the Locked Decisions. Do not rewrite other text.
+2. Add the changelog entry. In `docs/BACKLOG.md` (CRLF-aware edits) only tick or remove an item that this plan truly fixes. The Lead has already recorded the parked audit items; do not edit that entry.
+
+## Tests required (real assertions; each listed case must exist)
+
+Put them in `src/apps/bq/service.integration.test.ts`, plus a small unit test file next to each new `lib` file.
+
+- `requireRupiah`: `IDR`, ` idr `, `Idr` accepted; `USD`, empty string, `RP` refused with code `bq.currency.rupiah-only`.
+- `addLineItem` and `updateLineItem` refuse `USD`; library create and update refuse `USD` (test one kind directly and the other three through a loop over the kinds).
+- Lock: an empty project is refused with `bq.project.lock-empty`; a project with one standalone item priced 0 is refused with `bq.project.lock-zero-prices` and `details.count === 1`; the same project locks when `acknowledgeZeroPrices: true`; a fully priced project locks without the flag; a line item priced 0 under a sub-object is counted; a standalone item with a null price is counted. Update existing tests that lock an empty project so they first add one priced item.
+- `snapshotFromMasterData`: with fake read ports, a user without `priceMaterialRead` is refused for `material`; without `priceWorkRead` refused for `labor`; with the permission it returns the snapshot; the fake ports must NOT be called when the permission is missing (assert call count 0).
+- Deletion: request made by user A; approval by user A refused with `bq.project.deletion-self-approval` and the project still exists; approval by user B succeeds. Update existing deletion tests that used one user for both so they use two.
+
+## Non-goals (do not do these)
+
+Exchange rates or multi-currency; any UI change except the one form-data line in Step 2.6; changing Master Data code; schema changes or migrations; the other audit items (pagination, PDF, reorder, performance, splitting files); editing StudioFlow files; refactoring.
+
+## Regression risks
+
+- Existing BQ tests may create items with price 0 and then lock; fix the tests, not the rule.
+- Do not break picking a Library item: Library options are IDR.
+- `acknowledgeZeroPrices` must default to false everywhere.
 
 ## Verification
 
-`npm test`, `npm run check`, `npm run lint`, `git diff --cached --check`. Migration applied to both rebuild databases, pre-check output reported. Report the test counts before and after. Do not describe a skipped check as passed.
+`npm test` (report counts before and after; baseline 797 pass, 0 fail), `npm run check`, `npm run lint`, `git diff --cached --check`. Do not run `npm run build` (or restore `next-env.d.ts` before staging). Do not describe a skipped check as passed.
 
 ## Reviewer Acceptance
 
-The Lead re-runs the suite, spot-checks the parser and two service paths, then builds the UI (R8.285) and runs the browser pass: type a quoted text in the single form, a table row and the compare grid; paste cells; import and re-import the company file with a labelled cell; export and re-import.
+The Lead re-runs the suite, probes each of the four rules with a temporary test, then builds the lock confirmation dialog and the Rupiah-only picker note, and checks them in the browser.
 
 ## Executor Prompt
 
-You are the BACKEND EXECUTOR for this checkout (D:\Misc\ProjectsHUB\studioflowrb, office computer, `STUDIOFLOW_LOCATION=kantor`). Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, the root `PLAN.md` (WO-MD-PRICE-LABEL-01), `docs/apps/masterdata/pricing-contract.md` Q19, and `CHANGELOG.md` R8.281. Start from a clean committed tree and record HEAD and dirty files. Implement the whole plan in one run without progress stops: the pure parser with its table-driven tests, the migration with its pre-check applied to both rebuild databases, the three price tables and their services, bulk, matrix and per-row commands, the SKU and supplier/price workbooks, the additive public read field, and the regression tests. Every item under "Tests Required" must exist as a real test with real assertions; the Lead rejected the previous plan's correction pass for adding none, so do not report done without them. Add the changelog entry, update `docs/BACKLOG.md` (mind the CRLF), and make one local commit `<next unused revision> | feat(masterdata): text price labels written in quotation marks`.
-
-Rules: use only the rebuild databases after verifying the target; never the legacy database. Never run `prisma migrate reset` on `studioflow_rebuild` or `studioflow_rebuild_test`; verify the full migration chain on a disposable `studioflow_scratch_*` database and drop it afterwards, then diff against the Prisma schema (the only expected difference is the old `user_preference.updated_at` default). Do not run `npm run build` (or restore `next-env.d.ts` before staging). Re-run `npm test`, `npm run check`, and `npm run lint` yourself and report real counts (baseline: 759 tests pass, 0 fail). Stop with a `BLOCKED / CONFLICT` report only if a locked decision cannot be met. No push, PR, or merge. Finish with one Planner/Reviewer prompt only: outcome, commit, checks with real counts, limitations, dirty files.
+You are the BACKEND EXECUTOR for D:\Misc\ProjectsHUB\studioflowrb (office computer, `STUDIOFLOW_LOCATION=kantor`). Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and the root `PLAN.md` (WO-BQ-INTEGRITY-01, READY). Start from a clean committed tree and record HEAD and dirty files. Do the five steps in order, in one run, without progress stops. Every test listed under "Tests required" must exist with real assertions; a previous correction pass was rejected for adding none. Make one local commit with the next unused revision, `feat(bq): rupiah only, lock readiness, price permission, no self-approval`. Use only the rebuild databases (`studioflow_rebuild`, `studioflow_rebuild_test` on localhost), never the legacy database, and run read-only SQL only. Re-run `npm test`, `npm run check`, and `npm run lint` yourself and report the real counts. Do not run `npm run build`. No push, PR, or merge. Stop with a `BLOCKED / CONFLICT` report only if a locked decision cannot be met. Finish with one Planner/Reviewer prompt only: outcome per step, commit hash, checks with real counts, the non-IDR row counts, limitations, dirty files, and a request for the verdict.
