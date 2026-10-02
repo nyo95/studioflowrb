@@ -7,12 +7,14 @@ import {
   Badge,
   Checkbox,
   EmptyState,
+  Pagination,
   SearchField,
   Select,
   Surface,
   Tabs,
   Text,
   initialsOf,
+  usePagination,
 } from "@/platform/ui_engine";
 
 type LibraryBrand = {
@@ -29,6 +31,7 @@ type LibraryBrand = {
 };
 
 type FilterOption = { id: string; label: string };
+const PAGE_SIZE = 24;
 
 const LINK_ICONS = {
   CATALOG: BookOpenText,
@@ -86,7 +89,7 @@ function BrandCard({ brand }: { brand: LibraryBrand }) {
         {brand.imageUrl ? (
           // External website metadata is not a fixed image host, so Next Image optimization is intentionally skipped.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={brand.imageUrl} alt={`${brand.name} logo`} className="h-full w-full object-contain p-6" />
+          <img src={brand.imageUrl} alt={`${brand.name} logo`} loading="lazy" className="h-full w-full object-contain p-6" />
         ) : (
           <div role="img" aria-label="Brand image unavailable" className="grid h-full place-items-center text-ink-tertiary">
             <Text size="md" weight="semibold">{initialsOf(brand.name)}</Text>
@@ -159,6 +162,8 @@ export function LibraryDirectory({ brands }: { brands: LibraryBrand[] }) {
       return a.name.localeCompare(b.name);
     });
   }, [brands, categoryIds, hashtags, q, sort, vendorIds]);
+  const paging = usePagination(rows.length, PAGE_SIZE, JSON.stringify([q, [...categoryIds].sort(), [...vendorIds].sort(), [...hashtags].sort(), sort]));
+  const visibleRows = rows.slice(paging.offset, paging.offset + PAGE_SIZE);
 
   const toggle = (current: Set<string>, setCurrent: (value: Set<string>) => void, id: string) => {
     const next = new Set(current);
@@ -170,7 +175,7 @@ export function LibraryDirectory({ brands }: { brands: LibraryBrand[] }) {
   const content = (
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Text tone="secondary" size="sm">Showing {rows.length ? `1–${rows.length}` : "0"} of {brands.length} brands</Text>
+        <Text tone="secondary" size="sm">Showing {rows.length ? `${paging.offset + 1}–${Math.min(paging.offset + PAGE_SIZE, rows.length)}` : "0"} of {rows.length} brands</Text>
         <div className="flex items-center gap-2">
           <Text tone="secondary" size="sm">Sort</Text>
           <Select aria-label="Sort brands" density="compact" value={sort} onChange={(event) => setSort(event.target.value)}>
@@ -182,9 +187,10 @@ export function LibraryDirectory({ brands }: { brands: LibraryBrand[] }) {
       </div>
       {rows.length === 0 ? <EmptyState title={brands.length === 0 ? "No brands in Master Data yet" : "No brands match"} /> : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {rows.map((brand) => <BrandCard key={brand.id} brand={brand} />)}
+          {visibleRows.map((brand) => <BrandCard key={brand.id} brand={brand} />)}
         </div>
       )}
+      {rows.length > PAGE_SIZE ? <Pagination page={paging.page} pageCount={paging.pageCount} total={rows.length} pageSize={PAGE_SIZE} onPageChange={paging.setPage} label="Brand pages" /> : null}
     </div>
   );
 
