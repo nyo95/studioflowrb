@@ -61,6 +61,7 @@ export async function listLineItemSourcesAction(query: string): Promise<ActionRe
     if (hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialRead)) {
       const materials = await masterDataRead.listMaterialPriceOptions({ search, limit: 50 });
       for (const option of materials) {
+        if (option.currency.trim().toUpperCase() !== "IDR") continue;
         options.push({
           id: option.id,
           sourceType: "MASTERDATA",
@@ -78,6 +79,7 @@ export async function listLineItemSourcesAction(query: string): Promise<ActionRe
     if (hasPermission(grants, MASTERDATA_PERMISSIONS.priceWorkRead)) {
       const works = await masterDataRead.listWorkPricesRead({ search, limit: 80 });
       for (const option of works) {
+        if (option.currency.trim().toUpperCase() !== "IDR") continue;
         options.push({
           id: option.id,
           sourceType: "MASTERDATA",

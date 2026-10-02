@@ -4,6 +4,7 @@ import { AppError } from "@platform/core/errors";
 import { toDecimalString } from "@platform/utilities/decimal";
 
 import { BQ_PERMISSIONS, requireKategori, requirePositiveCoefficient, type BqServiceContext } from "./context";
+import { requireRupiah } from "../lib/currency";
 
 export function createAssemblyService(ctx: BqServiceContext) {
   const { db, runTransaction, runAutomaticSortTransaction, auditWriter, requireEditableProjectForItem } = ctx;
@@ -17,6 +18,7 @@ async function createAssemblyTemplate(input: { grants: PermissionGrants; actor: 
 
 async function addAssemblyCustomLine(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; assemblyId: string; title: string; purchaseUnit?: string; harga?: string; currency?: string; kategori?: string; qty?: string; koefisien?: string }) {
   requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+  const currency = requireRupiah(input.currency ?? "IDR");
   const koefisien = requirePositiveCoefficient(input.koefisien ?? "1");
   const assembly = await db.bqAssemblyTemplate.findUnique({ where: { id: input.assemblyId } });
   if (!assembly) throw new AppError("NOT_FOUND", "bq.assembly.not-found", "Assembly template not found");
@@ -28,7 +30,7 @@ async function addAssemblyCustomLine(input: { grants: PermissionGrants; actor: {
   const line = await runAutomaticSortTransaction(async (tx) => {
     const maxSortOrder = await tx.bqAssemblyLine.aggregate({ where: { assembly_template_id: input.assemblyId }, _max: { sort_order: true } });
     const nextSortOrder = (maxSortOrder._max.sort_order ?? -1) + 1;
-    return tx.bqAssemblyLine.create({ data: { assembly_template_id: assembly.id, source_type: "CUSTOM", title_snapshot: input.title, purchase_unit_snapshot: input.purchaseUnit ?? "ls", harga_snapshot: input.harga ?? "0", currency_snapshot: input.currency ?? "IDR", kategori: requireKategori(input.kategori ?? "MATERIAL"), qty: input.qty ?? "1", koefisien, sort_order: nextSortOrder } });
+    return tx.bqAssemblyLine.create({ data: { assembly_template_id: assembly.id, source_type: "CUSTOM", title_snapshot: input.title, purchase_unit_snapshot: input.purchaseUnit ?? "ls", harga_snapshot: input.harga ?? "0", currency_snapshot: currency, kategori: requireKategori(input.kategori ?? "MATERIAL"), qty: input.qty ?? "1", koefisien, sort_order: nextSortOrder } });
   });
   await auditWriter({ appId: "bq", action: "bq.assembly-line.created", entityType: "BqAssemblyLine", entityId: line.id, actor: input.actor });
   return line;
@@ -56,11 +58,12 @@ async function deleteAssemblyTemplate(input: { grants: PermissionGrants; actor: 
 
 async function updateAssemblyLine(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; lineId: string; title?: string; purchaseUnit?: string; harga?: string; currency?: string; kategori?: string; qty?: string; koefisien?: string; notes?: string }) {
   requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+  const currency = input.currency === undefined ? undefined : requireRupiah(input.currency);
   if (input.koefisien !== undefined) requirePositiveCoefficient(input.koefisien);
   const line = await db.bqAssemblyLine.findUnique({ where: { id: input.lineId } });
   if (!line) throw new AppError("NOT_FOUND", "bq.assembly-line.not-found", "Assembly line not found");
-  if ((input.title === undefined || input.title === line.title_snapshot) && (input.purchaseUnit === undefined || input.purchaseUnit === line.purchase_unit_snapshot) && (input.harga === undefined || toDecimalString(input.harga) === line.harga_snapshot.toString()) && (input.currency === undefined || input.currency === line.currency_snapshot) && (input.kategori === undefined || input.kategori === line.kategori) && (input.qty === undefined || toDecimalString(input.qty) === line.qty.toString()) && (input.koefisien === undefined || toDecimalString(input.koefisien) === line.koefisien.toString()) && (input.notes === undefined || (input.notes || null) === line.notes)) return line;
-  const updated = await db.bqAssemblyLine.update({ where: { id: input.lineId }, data: { ...(input.title !== undefined && { title_snapshot: input.title }), ...(input.purchaseUnit !== undefined && { purchase_unit_snapshot: input.purchaseUnit }), ...(input.harga !== undefined && { harga_snapshot: input.harga }), ...(input.currency !== undefined && { currency_snapshot: input.currency }), ...(input.kategori !== undefined && { kategori: requireKategori(input.kategori) }), ...(input.qty !== undefined && { qty: input.qty }), ...(input.koefisien !== undefined && { koefisien: input.koefisien }), ...(input.notes !== undefined && { notes: input.notes || null }) } });
+  if ((input.title === undefined || input.title === line.title_snapshot) && (input.purchaseUnit === undefined || input.purchaseUnit === line.purchase_unit_snapshot) && (input.harga === undefined || toDecimalString(input.harga) === line.harga_snapshot.toString()) && (currency === undefined || currency === line.currency_snapshot) && (input.kategori === undefined || input.kategori === line.kategori) && (input.qty === undefined || toDecimalString(input.qty) === line.qty.toString()) && (input.koefisien === undefined || toDecimalString(input.koefisien) === line.koefisien.toString()) && (input.notes === undefined || (input.notes || null) === line.notes)) return line;
+  const updated = await db.bqAssemblyLine.update({ where: { id: input.lineId }, data: { ...(input.title !== undefined && { title_snapshot: input.title }), ...(input.purchaseUnit !== undefined && { purchase_unit_snapshot: input.purchaseUnit }), ...(input.harga !== undefined && { harga_snapshot: input.harga }), ...(currency !== undefined && { currency_snapshot: currency }), ...(input.kategori !== undefined && { kategori: requireKategori(input.kategori) }), ...(input.qty !== undefined && { qty: input.qty }), ...(input.koefisien !== undefined && { koefisien: input.koefisien }), ...(input.notes !== undefined && { notes: input.notes || null }) } });
   await auditWriter({ appId: "bq", action: "bq.assembly-line.updated", entityType: "BqAssemblyLine", entityId: input.lineId, actor: input.actor });
   return updated;
 }

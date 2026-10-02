@@ -12,6 +12,7 @@ import {
   type BqKategori,
   type BqServiceContext,
 } from "./context";
+import { requireRupiah } from "../lib/currency";
 
 export function createProjectTreeService(ctx: BqServiceContext) {
   const {
@@ -417,6 +418,7 @@ async function addLineItem(input: {
   notes?: string | null;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+  const currencySnapshot = requireRupiah(input.currencySnapshot ?? "IDR");
 
   if (!input.subObjectId && !input.itemId) {
     throw new AppError("VALIDATION", "bq.line-item.no-parent", "Cost Component must belong to a Component Group or Work Item");
@@ -447,7 +449,7 @@ async function addLineItem(input: {
         purchase_to_base_factor_snapshot: input.purchaseToBaseFactorSnapshot ?? null,
         source_price_snapshot: input.sourceType === "CUSTOM" ? null : input.hargaSnapshot,
         harga_snapshot: input.hargaSnapshot,
-        currency_snapshot: input.currencySnapshot ?? "IDR",
+        currency_snapshot: currencySnapshot,
         kategori: requireKategori(input.kategori),
         qty: input.qty,
         koefisien: requirePositiveCoefficient(input.koefisien ?? "1"),
@@ -483,6 +485,7 @@ async function updateLineItem(input: {
   notes?: string | null;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+  const currencySnapshot = input.currencySnapshot === undefined ? undefined : requireRupiah(input.currencySnapshot);
   if (input.koefisien !== undefined) requirePositiveCoefficient(input.koefisien);
   await requireEditableProjectForLineItem(input.id);
   const existing = await db.bqLineItem.findUnique({ where: { id: input.id } });
@@ -509,7 +512,7 @@ async function updateLineItem(input: {
       ...(input.baseUnitSnapshot !== undefined && { base_unit_snapshot: input.baseUnitSnapshot }),
       ...(input.purchaseToBaseFactorSnapshot !== undefined && { purchase_to_base_factor_snapshot: input.purchaseToBaseFactorSnapshot }),
       ...(input.hargaSnapshot !== undefined && { harga_snapshot: input.hargaSnapshot }),
-      ...(input.currencySnapshot !== undefined && { currency_snapshot: input.currencySnapshot }),
+      ...(currencySnapshot !== undefined && { currency_snapshot: currencySnapshot }),
       ...(input.kategori !== undefined && { kategori: requireKategori(input.kategori) }),
       ...(input.qty !== undefined && { qty: input.qty }),
       ...(input.koefisien !== undefined && { koefisien: input.koefisien }),

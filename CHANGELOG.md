@@ -13,6 +13,15 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
 
+## R8.296 | 2026-10-02 | feat(bq): rupiah only, lock readiness, price permission, no self-approval
+
+- BQ now accepts and stores Rupiah (`IDR`) only for project lines, Library items, and assembly lines; non-IDR Master Data prices are excluded from the source picker.
+- Project locking now requires at least one Work Item and refuses zero-price rows unless explicitly acknowledged, recording the acknowledged row count in the lock audit event.
+- Master Data price imports enforce the matching price-read permission on the server before reading, and deletion requesters cannot approve their own request.
+- BQ contract documentation records the four integrity decisions. No schema or migration change; no Master Data or StudioFlow files changed.
+
+**Checks.** `npm test`; `npm run check`; `npm run lint`; `git diff --cached --check`. Production build intentionally not run per WO-BQ-INTEGRITY-01.
+
 ## R8.288 | 2026-10-02 | fix(studioflow): correct iteration undo and CD card rules (WO-SF-ITER-01 correction)
 
 - Reads the seeded CD iteration-kind JSON (`{ name }`) through one shared tolerant parser, used by commands and project-card choices. CD Mall cannot be closed directly; CD Final can.

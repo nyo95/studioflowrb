@@ -10,6 +10,7 @@ import {
   requirePositiveCoefficient,
   type BqServiceContext,
 } from "./context";
+import { requireRupiah } from "../lib/currency";
 
 export function createLibraryItemService(ctx: BqServiceContext) {
   const { db, auditWriter } = ctx;
@@ -26,13 +27,14 @@ async function createLibMaterial(input: {
   notes?: string;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+  const currency = requireRupiah(input.currency);
   const item = await db.bqLibMaterial.create({
     data: {
       name: input.name,
       purchase_unit: input.purchaseUnit,
       base_unit: input.baseUnit ?? null,
       harga: input.harga,
-      currency: input.currency,
+      currency,
       default_koefisien: requirePositiveCoefficient(input.defaultKoefisien ?? "1"),
       kategori: "MATERIAL",
       notes: input.notes ?? null,
@@ -62,6 +64,7 @@ async function updateLibMaterial(input: {
   notes?: string | null;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+  const currency = input.currency === undefined ? undefined : requireRupiah(input.currency);
   if (input.defaultKoefisien !== undefined) requirePositiveCoefficient(input.defaultKoefisien);
   const existing = await db.bqLibMaterial.findUnique({ where: { id: input.id } });
   if (!existing) throw new AppError("NOT_FOUND", "bq.lib-material.not-found", "Library material not found");
@@ -81,7 +84,7 @@ async function updateLibMaterial(input: {
       ...(input.purchaseUnit !== undefined && { purchase_unit: input.purchaseUnit }),
       ...(input.baseUnit !== undefined && { base_unit: input.baseUnit }),
       ...(input.harga !== undefined && { harga: input.harga }),
-      ...(input.currency !== undefined && { currency: input.currency }),
+      ...(currency !== undefined && { currency }),
       ...(input.defaultKoefisien !== undefined && { default_koefisien: input.defaultKoefisien }),
       ...(input.notes !== undefined && { notes: input.notes }),
     },
@@ -128,13 +131,14 @@ async function createLibLabor(input: {
   notes?: string;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+  const currency = requireRupiah(input.currency);
   const item = await db.bqLibLabor.create({
     data: {
       name: input.name,
       purchase_unit: input.purchaseUnit,
       base_unit: input.baseUnit ?? null,
       harga: input.harga,
-      currency: input.currency,
+      currency,
       default_koefisien: requirePositiveCoefficient(input.defaultKoefisien ?? "1"),
       kategori: "UPAH",
       notes: input.notes ?? null,
@@ -164,6 +168,7 @@ async function updateLibLabor(input: {
   notes?: string | null;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+  const currency = input.currency === undefined ? undefined : requireRupiah(input.currency);
   if (input.defaultKoefisien !== undefined) requirePositiveCoefficient(input.defaultKoefisien);
   const existing = await db.bqLibLabor.findUnique({ where: { id: input.id } });
   if (!existing) throw new AppError("NOT_FOUND", "bq.lib-labor.not-found", "Library labor not found");
@@ -183,7 +188,7 @@ async function updateLibLabor(input: {
       ...(input.purchaseUnit !== undefined && { purchase_unit: input.purchaseUnit }),
       ...(input.baseUnit !== undefined && { base_unit: input.baseUnit }),
       ...(input.harga !== undefined && { harga: input.harga }),
-      ...(input.currency !== undefined && { currency: input.currency }),
+      ...(currency !== undefined && { currency }),
       ...(input.defaultKoefisien !== undefined && { default_koefisien: input.defaultKoefisien }),
       ...(input.notes !== undefined && { notes: input.notes }),
     },
@@ -227,13 +232,14 @@ async function createLibMaterialLabor(input: {
   notes?: string;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+  const currency = requireRupiah(input.currency);
   const item = await db.bqLibMaterialLabor.create({
     data: {
       name: input.name,
       purchase_unit: input.purchaseUnit,
       base_unit: input.baseUnit ?? null,
       harga: input.harga,
-      currency: input.currency,
+      currency,
       default_koefisien: requirePositiveCoefficient(input.defaultKoefisien ?? "1"),
       kategori: "MATERIAL_UPAH",
       notes: input.notes ?? null,
@@ -263,6 +269,7 @@ async function updateLibMaterialLabor(input: {
   notes?: string | null;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+  const currency = input.currency === undefined ? undefined : requireRupiah(input.currency);
   if (input.defaultKoefisien !== undefined) requirePositiveCoefficient(input.defaultKoefisien);
   const existing = await db.bqLibMaterialLabor.findUnique({ where: { id: input.id } });
   if (!existing) throw new AppError("NOT_FOUND", "bq.lib-material-labor.not-found", "Library material+labor not found");
@@ -282,7 +289,7 @@ async function updateLibMaterialLabor(input: {
       ...(input.purchaseUnit !== undefined && { purchase_unit: input.purchaseUnit }),
       ...(input.baseUnit !== undefined && { base_unit: input.baseUnit }),
       ...(input.harga !== undefined && { harga: input.harga }),
-      ...(input.currency !== undefined && { currency: input.currency }),
+      ...(currency !== undefined && { currency }),
       ...(input.defaultKoefisien !== undefined && { default_koefisien: input.defaultKoefisien }),
       ...(input.notes !== undefined && { notes: input.notes }),
     },
@@ -326,12 +333,13 @@ async function createLibCustomItem(input: {
   notes?: string;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+  const currency = requireRupiah(input.currency);
   const item = await db.bqLibCustomItem.create({
     data: {
       name: input.name,
       purchase_unit: input.purchaseUnit,
       harga: input.harga,
-      currency: input.currency,
+      currency,
       default_koefisien: requirePositiveCoefficient(input.defaultKoefisien ?? "1"),
       kategori: requireKategori(input.kategori),
       notes: input.notes ?? null,
@@ -361,6 +369,7 @@ async function updateLibCustomItem(input: {
   notes?: string | null;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+  const currency = input.currency === undefined ? undefined : requireRupiah(input.currency);
   if (input.defaultKoefisien !== undefined) requirePositiveCoefficient(input.defaultKoefisien);
   const existing = await db.bqLibCustomItem.findUnique({ where: { id: input.id } });
   if (!existing) throw new AppError("NOT_FOUND", "bq.lib-custom-item.not-found", "Custom Library item not found");
@@ -379,7 +388,7 @@ async function updateLibCustomItem(input: {
       ...(input.name !== undefined && { name: input.name }),
       ...(input.purchaseUnit !== undefined && { purchase_unit: input.purchaseUnit }),
       ...(input.harga !== undefined && { harga: input.harga }),
-      ...(input.currency !== undefined && { currency: input.currency }),
+      ...(currency !== undefined && { currency }),
       ...(input.defaultKoefisien !== undefined && { default_koefisien: input.defaultKoefisien }),
       ...(input.kategori !== undefined && { kategori: input.kategori }),
       ...(input.notes !== undefined && { notes: input.notes }),

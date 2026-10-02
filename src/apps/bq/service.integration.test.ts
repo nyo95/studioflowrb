@@ -9,6 +9,7 @@ import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
 import { createBqService, BQ_PERMISSIONS } from "./service";
 
 const ACTOR = { kind: "USER" as const, userId: "bq-test-user", label: "BQ Test" };
+const ACTOR_B = { kind: "USER" as const, userId: "bq-test-approver", label: "BQ Approver" };
 const GRANTS = Object.values(BQ_PERMISSIONS);
 let testDb: TestDb;
 let service: ReturnType<typeof createBqService>;
@@ -48,7 +49,8 @@ async function projectTree() {
 
 describe("BQ R6.1 invariants", () => {
   it("enforces ACTIVE, LOCKED, and ARCHIVED transitions at the service layer", async () => {
-    const { project } = await projectTree();
+    const { project, item } = await projectTree();
+    await service.updateItem({ grants: GRANTS, actor: ACTOR, id: item.id, hargaSnapshot: "100" });
     await service.lockProject({ grants: GRANTS, actor: ACTOR, id: project.id });
     await assert.rejects(() => service.updateProject({ grants: GRANTS, actor: ACTOR, id: project.id, title: "Blocked" }), (error: unknown) => error instanceof AppError && error.code === "bq.project.locked");
     await service.unlockProject({ grants: GRANTS, actor: ACTOR, id: project.id });
@@ -120,6 +122,62 @@ describe("BQ R6.1 invariants", () => {
       () => service.updateLibMaterial({ grants: GRANTS, actor: ACTOR, id: material.id, defaultKoefisien: "0" }),
       (error: unknown) => error instanceof AppError && error.code === "bq.koefisien.not-positive",
     );
+  });
+
+  it("rejects non-IDR currency in project lines and all Library item kinds", async () => {
+    const { item } = await projectTree();
+    await assert.rejects(
+      () => service.addLineItem({ grants: GRANTS, actor: ACTOR, itemId: item.id, sourceType: "CUSTOM", titleSnapshot: "USD", purchaseUnitSnapshot: "PCS", hargaSnapshot: "10", currencySnapshot: "USD", kategori: "ALAT", qty: "1" }),
+      (error: unknown) => error instanceof AppError && error.code === "bq.currency.rupiah-only",
+    );
+    const line = await service.addLineItem({ grants: GRANTS, actor: ACTOR, itemId: item.id, sourceType: "CUSTOM", titleSnapshot: "IDR", purchaseUnitSnapshot: "PCS", hargaSnapshot: "10", currencySnapshot: "IDR", kategori: "ALAT", qty: "1" });
+    await assert.rejects(
+      () => service.updateLineItem({ grants: GRANTS, actor: ACTOR, id: line.id, currencySnapshot: "USD" }),
+      (error: unknown) => error instanceof AppError && error.code === "bq.currency.rupiah-only",
+    );
+
+    const material = await service.createLibMaterial({ grants: GRANTS, actor: ACTOR, name: "Material", purchaseUnit: "PCS", harga: "10", currency: "IDR" });
+    await assert.rejects(() => service.updateLibMaterial({ grants: GRANTS, actor: ACTOR, id: material.id, currency: "USD" }), (error: unknown) => error instanceof AppError && error.code === "bq.currency.rupiah-only");
+    const otherKinds = [
+      ["labor", () => service.createLibLabor({ grants: GRANTS, actor: ACTOR, name: "Labor", purchaseUnit: "HOUR", harga: "10", currency: "USD" })],
+      ["material-labor", () => service.createLibMaterialLabor({ grants: GRANTS, actor: ACTOR, name: "Combined", purchaseUnit: "HOUR", harga: "10", currency: "USD" })],
+      ["custom", () => service.createLibCustomItem({ grants: GRANTS, actor: ACTOR, name: "Custom", purchaseUnit: "LS", harga: "10", currency: "USD", kategori: "ALAT" })],
+    ] as const;
+    for (const [kind, create] of otherKinds) {
+      await assert.rejects(create, (error: unknown) => error instanceof AppError && error.code === "bq.currency.rupiah-only", `${kind} create must reject USD`);
+    }
+    const labor = await service.createLibLabor({ grants: GRANTS, actor: ACTOR, name: "Labor", purchaseUnit: "HOUR", harga: "10", currency: "IDR" });
+    const combined = await service.createLibMaterialLabor({ grants: GRANTS, actor: ACTOR, name: "Combined", purchaseUnit: "HOUR", harga: "10", currency: "IDR" });
+    const custom = await service.createLibCustomItem({ grants: GRANTS, actor: ACTOR, name: "Custom", purchaseUnit: "LS", harga: "10", currency: "IDR", kategori: "ALAT" });
+    await assert.rejects(() => service.updateLibLabor({ grants: GRANTS, actor: ACTOR, id: labor.id, currency: "USD" }), (error: unknown) => error instanceof AppError && error.code === "bq.currency.rupiah-only");
+    await assert.rejects(() => service.updateLibMaterialLabor({ grants: GRANTS, actor: ACTOR, id: combined.id, currency: "USD" }), (error: unknown) => error instanceof AppError && error.code === "bq.currency.rupiah-only");
+    await assert.rejects(() => service.updateLibCustomItem({ grants: GRANTS, actor: ACTOR, id: custom.id, currency: "USD" }), (error: unknown) => error instanceof AppError && error.code === "bq.currency.rupiah-only");
+  });
+
+  it("enforces project lock readiness and records acknowledged zero-price rows", async () => {
+    const empty = await service.createProject({ grants: GRANTS, actor: ACTOR, title: "Empty", clientName: "RAD" });
+    await assert.rejects(() => service.lockProject({ grants: GRANTS, actor: ACTOR, id: empty.id }), (error: unknown) => error instanceof AppError && error.code === "bq.project.lock-empty");
+
+    const zero = await projectTree();
+    await assert.rejects(
+      () => service.lockProject({ grants: GRANTS, actor: ACTOR, id: zero.project.id }),
+      (error: unknown) => error instanceof AppError && error.code === "bq.project.lock-zero-prices" && error.details?.count === 1,
+    );
+    await service.lockProject({ grants: GRANTS, actor: ACTOR, id: zero.project.id, acknowledgeZeroPrices: true });
+    const acknowledged = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "bq.project.locked", entity_id: zero.project.id } });
+    assert.deepEqual(acknowledged.metadata, { zeroPriceRows: 1 });
+
+    const priced = await projectTree();
+    await service.updateItem({ grants: GRANTS, actor: ACTOR, id: priced.item.id, hargaSnapshot: "100" });
+    await service.lockProject({ grants: GRANTS, actor: ACTOR, id: priced.project.id });
+
+    const grouped = await projectTree();
+    const subObject = await service.addSubObject({ grants: GRANTS, actor: ACTOR, itemId: grouped.item.id, name: "Body", qtyPerL1: "1" });
+    await service.addLineItem({ grants: GRANTS, actor: ACTOR, subObjectId: subObject.id, sourceType: "CUSTOM", titleSnapshot: "Zero", purchaseUnitSnapshot: "PCS", hargaSnapshot: "0", kategori: "ALAT", qty: "1" });
+    await assert.rejects(() => service.lockProject({ grants: GRANTS, actor: ACTOR, id: grouped.project.id }), (error: unknown) => error instanceof AppError && error.code === "bq.project.lock-zero-prices" && error.details?.count === 1);
+
+    const nullPrice = await projectTree();
+    await assert.rejects(() => service.lockProject({ grants: GRANTS, actor: ACTOR, id: nullPrice.project.id }), (error: unknown) => error instanceof AppError && error.code === "bq.project.lock-zero-prices" && error.details?.count === 1);
   });
 
   it("keeps the Library promotion state machine behind BQ request and Master Data approval grants", async () => {
@@ -372,7 +430,7 @@ describe("BQ R6.1 invariants", () => {
     );
     await service.restoreProject({ grants: GRANTS, actor: ACTOR, id: project.id });
     await assert.rejects(
-      () => service.approveProjectDeletion({ grants: GRANTS, actor: ACTOR, requestId: request.id }),
+      () => service.approveProjectDeletion({ grants: GRANTS, actor: ACTOR_B, requestId: request.id }),
       (error: unknown) => error instanceof AppError && error.code === "bq.project.not-archived",
     );
     assert.equal(
@@ -380,7 +438,12 @@ describe("BQ R6.1 invariants", () => {
       "PENDING",
     );
     await service.archiveProject({ grants: GRANTS, actor: ACTOR, id: project.id });
-    await service.approveProjectDeletion({ grants: GRANTS, actor: ACTOR, requestId: request.id });
+    await assert.rejects(
+      () => service.approveProjectDeletion({ grants: GRANTS, actor: ACTOR, requestId: request.id }),
+      (error: unknown) => error instanceof AppError && error.code === "bq.project.deletion-self-approval",
+    );
+    assert.ok(await testDb.prisma.bqProject.findUnique({ where: { id: project.id } }));
+    await service.approveProjectDeletion({ grants: GRANTS, actor: ACTOR_B, requestId: request.id });
     assert.equal(await testDb.prisma.bqProject.findUnique({ where: { id: project.id } }), null);
     assert.equal(
       (await testDb.prisma.bqProjectDeletionRequest.findUniqueOrThrow({ where: { id: request.id } })).status,
@@ -457,8 +520,8 @@ describe("BQ R6.1 invariants", () => {
     const request = await service.requestProjectDeletion({ grants: GRANTS, actor: ACTOR, id: project.id, reason: "Duplicate approval race" });
 
     const results = await Promise.allSettled([
-      service.approveProjectDeletion({ grants: GRANTS, actor: ACTOR, requestId: request.id }),
-      service.approveProjectDeletion({ grants: GRANTS, actor: ACTOR, requestId: request.id }),
+      service.approveProjectDeletion({ grants: GRANTS, actor: ACTOR_B, requestId: request.id }),
+      service.approveProjectDeletion({ grants: GRANTS, actor: ACTOR_B, requestId: request.id }),
     ]);
     assert.equal(results.filter((r) => r.status === "fulfilled").length, 1, "exactly one concurrent approval wins the race");
     const loser = results.find((r) => r.status === "rejected") as PromiseRejectedResult;

@@ -13,10 +13,9 @@ import type { BqProjectDetail } from "@/apps/bq/public";
 import {
   snapshotCustom,
   snapshotFromLibrary,
-  snapshotFromMaterialPrice,
-  snapshotFromWorkPrice,
   type LineItemCreateInput,
 } from "@/apps/bq/lib/snapshot";
+import { snapshotFromMasterData } from "@/apps/bq/lib/master-data-source";
 
 /**
  * Project structure actions.
@@ -383,17 +382,8 @@ export async function addLineItemAction(
       if (!value.sourceRefId || !value.sourceKind) {
         throw new AppError("VALIDATION", "bq.line-item.source-required", "Select a Master Data price");
       }
-      if (value.sourceKind === "material") {
-        const option = await masterDataRead.getMaterialPriceOption(value.sourceRefId);
-        if (!option) throw new AppError("NOT_FOUND", "bq.source.not-found", "That material price is no longer available");
-        snapshot = snapshotFromMaterialPrice(option);
-      } else {
-        const kind = value.sourceKind === "labor" ? "labor" : "material-labor";
-        const options = await masterDataRead.listWorkPricesRead({ kind });
-        const option = options.find((candidate) => candidate.id === value.sourceRefId);
-        if (!option) throw new AppError("NOT_FOUND", "bq.source.not-found", "That work price is no longer available");
-        snapshot = snapshotFromWorkPrice(option, kind);
-      }
+        if (value.sourceKind === "library") throw new AppError("VALIDATION", "bq.line-item.source-required", "Select a Master Data price");
+        snapshot = await snapshotFromMasterData({ grants, sourceKind: value.sourceKind, sourceRefId: value.sourceRefId, read: masterDataRead });
     }
 
     await bqService.addLineItem({
@@ -490,7 +480,7 @@ export async function lockProjectAction(
   return runSafeAction(async () => {
     const { grants, actor } = await authorize();
     const { projectId } = parse(z.object({ projectId: Id }), formData);
-    await bqService.lockProject({ grants, actor, id: projectId });
+    await bqService.lockProject({ grants, actor, id: projectId, acknowledgeZeroPrices: formData.get("acknowledgeZeroPrices") === "true" });
     return reload(projectId);
   });
 }

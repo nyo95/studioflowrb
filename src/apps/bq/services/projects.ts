@@ -164,6 +164,7 @@ async function lockProject(input: {
   grants: PermissionGrants;
   actor: { kind: string; userId?: string; label: string };
   id: string;
+  acknowledgeZeroPrices?: boolean;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
   const existing = await db.bqProject.findUnique({ where: { id: input.id } });
@@ -174,6 +175,43 @@ async function lockProject(input: {
   if (existing.status === "ARCHIVED") {
     throw new AppError("CONFLICT", "bq.project.archived", "Cannot lock an archived project");
   }
+  const tree = await db.bqProject.findUniqueOrThrow({
+    where: { id: input.id },
+    include: {
+      sections: {
+        include: {
+          items: { include: { sub_objects: { include: { line_items: true } }, line_items: true } },
+          subsections: { include: { items: { include: { sub_objects: { include: { line_items: true } }, line_items: true } } } },
+        },
+      },
+    },
+  });
+  const items = tree.sections.flatMap((section) => [
+    ...section.items,
+    ...section.subsections.flatMap((subsection) => subsection.items),
+  ]);
+  if (items.length === 0) {
+    throw new AppError("CONFLICT", "bq.project.lock-empty", "Add at least one item before locking the project.");
+  }
+  const zeroPriceRows = items.reduce((count, item) => {
+    const standaloneZero = item.sub_objects.length === 0
+      && item.line_items.length === 0
+      && (item.harga_snapshot === null || item.harga_snapshot.toString() === "0");
+    const directZero = item.line_items.filter((line) => line.harga_snapshot.toString() === "0").length;
+    const groupedZero = item.sub_objects.reduce(
+      (subCount, subObject) => subCount + subObject.line_items.filter((line) => line.harga_snapshot.toString() === "0").length,
+      0,
+    );
+    return count + (standaloneZero ? 1 : 0) + directZero + groupedZero;
+  }, 0);
+  if (zeroPriceRows > 0 && input.acknowledgeZeroPrices !== true) {
+    throw new AppError(
+      "CONFLICT",
+      "bq.project.lock-zero-prices",
+      `${zeroPriceRows} row(s) have a price of Rp0. Fill them in, or confirm to lock anyway.`,
+      { details: { count: zeroPriceRows } },
+    );
+  }
   await transitionProjectStatus(input.id, ["ACTIVE"], "LOCKED");
   const project = await db.bqProject.findUniqueOrThrow({ where: { id: input.id } });
   await auditWriter({
@@ -182,6 +220,7 @@ async function lockProject(input: {
     entityType: "BqProject",
     entityId: project.id,
     actor: input.actor,
+    ...(zeroPriceRows > 0 && { changes: { zeroPriceRows } }),
   });
   return project;
 }
@@ -314,6 +353,9 @@ async function approveProjectDeletion(input: {
   const request = await db.bqProjectDeletionRequest.findUnique({ where: { id: input.requestId } });
   if (!request || request.status !== "PENDING") {
     throw new AppError("CONFLICT", "bq.project.deletion-not-pending", "Deletion request is no longer pending");
+  }
+  if (request.requester_user_id === input.actor.userId) {
+    throw new AppError("CONFLICT", "bq.project.deletion-self-approval", "The person who asked for the deletion cannot approve it.");
   }
   const project = await db.bqProject.findUnique({ where: { id: request.project_id } });
   if (!project) throw new AppError("NOT_FOUND", "bq.project.not-found", "Project not found");

@@ -230,6 +230,8 @@ Semua tipe = snapshot. `source_type` hanya untuk traceability.
 
 Setelah snapshot, semua field L3 **bisa di-override per baris** tanpa mengubah Master Data.
 
+BQ hanya menerima kode mata uang `IDR`: perbandingan mengabaikan spasi di awal/akhir dan perbedaan huruf besar-kecil, lalu nilai disimpan sebagai `IDR`. Tidak ada kurs atau multi-mata-uang pada tahap ini.
+
 **Override / Revert semantics (R6.1):**
 - `source_price_snapshot` = baseline immutable saat import. Tidak pernah berubah.
 - `harga_snapshot` = working value. Estimator boleh mengubah kapanpun.
@@ -389,6 +391,8 @@ ACTIVE ──archive──▶ ARCHIVED ──restore──▶ ACTIVE
 ARCHIVED ──▶ deletion request (terpisah)
 ```
 
+Project hanya boleh dikunci bila memiliki sedikitnya satu Work Item. Baris dengan harga Rp0 harus diisi, kecuali pemanggil secara eksplisit mengonfirmasi bahwa project boleh dikunci dengan baris harga nol; baris yang terdampak dihitung dan tidak diubah.
+
 **Service-layer enforcement:** setiap mutation terhadap content BQ wajib melewati guard `requireEditableProject` yang reject bila status `LOCKED` atau `ARCHIVED`. Tidak cukup hanya disable tombol di UI.
 
 Permanent deletion is a separate, BQ-owned approval workflow:
@@ -400,6 +404,8 @@ Permanent deletion is a separate, BQ-owned approval workflow:
 - request, rejection, and successful deletion produce BQ audit events;
 - restoring the project before approval causes approval to fail while the
   request remains reviewable.
+
+Orang yang mengajukan permintaan penghapusan tidak boleh menyetujui permintaan yang sama. Menolak permintaan sendiri tetap boleh sebagai pembatalan; tidak ada pengecualian untuk studio dengan satu approver, sehingga diperlukan approver kedua.
 
 BQ Project berdiri sendiri dulu — integrasi formal ke StudioFlow via `external_ref` menyusul.
 
@@ -496,6 +502,8 @@ sedangkan "Impor" membuka picker pencarian Master Data dan BQ Library. Picker it
 tidak melanggar aturan inline — ia memilih dari mana sebuah baris berasal, bukan
 mengedit isinya. Setelah tersisip, Cost Component impor sama bisa di-edit inline seperti
 yang lain (K-05).
+
+Impor harga material memerlukan `MASTERDATA_PERMISSIONS.priceMaterialRead`; impor labor dan material-labor memerlukan `MASTERDATA_PERMISSIONS.priceWorkRead`. Pemeriksaan ini dilakukan di server sebelum pembacaan harga.
 
 ### 13.3 Halaman yang dibutuhkan
 
