@@ -213,11 +213,11 @@ export async function setProjectPriorityAction(projectId: string, priority: stri
   });
 }
 
-export async function setProjectStatusAction(projectId: string, status: string): Promise<ActionResult<unknown>> {
+export async function setProjectStatusAction(projectId: string, status: string, overrideReason?: string): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
     const id = parse(Id, projectId);
-    const result = await studioFlow.projects.setProjectStatus({ ...ctx, projectId: id, status: parse(z.enum(["ACTIVE", "ON_HOLD", "COMPLETED"]), status) });
+    const result = await studioFlow.projects.setProjectStatus({ ...ctx, projectId: id, status: parse(z.enum(["ACTIVE", "ON_HOLD", "COMPLETED"]), status), overrideReason });
     refresh(id);
     return result;
   });
@@ -334,12 +334,12 @@ export async function undoPhaseEventAction(input: z.infer<typeof UndoInput>): Pr
 }
 
 /** Marking a project completed (or reopening it) is always a person's explicit choice; no phase change does it. */
-export async function projectCompletionAction(projectId: string, change: "complete" | "reopen"): Promise<ActionResult<unknown>> {
+export async function projectCompletionAction(projectId: string, change: "complete" | "reopen", overrideReason?: string): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
     const id = parse(Id, projectId);
     const result = change === "complete"
-      ? await studioFlow.phases.markProjectCompleted({ ...ctx, projectId: id })
+      ? await studioFlow.phases.markProjectCompleted({ ...ctx, projectId: id, overrideReason })
       : await studioFlow.phases.reopenProject({ ...ctx, projectId: id });
     refresh(id);
     return result;

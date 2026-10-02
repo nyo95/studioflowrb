@@ -145,12 +145,26 @@ describe("WO-SF-ITER-01 phase 2 iteration commands", () => {
 
   it("completes explicitly and rejects phase writes until reopened", async () => {
     const { projectId } = await newProject("Explicit completion");
-    await sf.phases.markProjectCompleted({ ...as(designer), projectId });
+    await sf.phases.markProjectCompleted({ ...as(designer), projectId, overrideReason: "The project owner accepted the remaining work." });
     const moodboard = await phaseOf(projectId, "moodboard");
     const iteration = await testDb.prisma.sfRevision.findFirstOrThrow({ where: { phase_id: moodboard.id } });
     await rejectsWith(sf.phases.sendIteration({ ...as(designer), projectId, phaseId: moodboard.id, iterationId: iteration.id }), "PROJECT_COMPLETED");
     await sf.phases.reopenProject({ ...as(designer), projectId });
     await sf.phases.sendIteration({ ...as(designer), projectId, phaseId: moodboard.id, iterationId: iteration.id });
+  });
+
+  it("keeps closed-phase checklist work in Today and applies the same project completion gate everywhere", async () => {
+    const { projectId } = await newProject("Completion readiness");
+    const supervision = await phaseOf(projectId, "supervision");
+    await testDb.prisma.sfPhase.updateMany({ where: { project_id: projectId }, data: { status: "DONE", is_locked: true } });
+    await testDb.prisma.sfChecklistItem.create({ data: { id: randomUUID(), project_id: projectId, phase_id: supervision.id, label: "Close-out detail" } });
+    await rejectsWith(sf.phases.markProjectCompleted({ ...as(designer, ALL.filter((grant) => grant !== P.projectManage)), projectId }), "PROJECT_COMPLETION_NOT_READY");
+    await rejectsWith(sf.projects.setProjectStatus({ ...as(designer), projectId, status: "COMPLETED" }), "PROJECT_COMPLETION_OVERRIDE_REASON_REQUIRED");
+    const today = await sf.today.getToday({ ...as(designer), scope: "mine" });
+    assert.equal(today.groups.flatMap((group) => group.tasks).some((task) => task.label === "Close-out detail" && task.phaseId === supervision.id), true);
+    await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "COMPLETED", overrideReason: "Client accepted the remaining close-out item." });
+    const audit = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "studioflow.project.status-changed", entity_id: projectId } });
+    assert.equal((audit.metadata as { completionOverrideReason?: string }).completionOverrideReason, "Client accepted the remaining close-out item.");
   });
 });
 
@@ -2026,6 +2040,8 @@ describe("SF-V2-E phase definitions", () => {
     assert.ok(todo, "the open feedback must convert to a checklist item, not vanish once its revision closes");
     const activity = await testDb.prisma.sfActivity.findFirstOrThrow({ where: { phase_id: supervision.id, content: "Open note on the closed revision" } });
     assert.equal(activity.status, "COMPLETED", "the original feedback activity must be marked done so it no longer double-counts as open work");
+    const today = await sf.today.getToday({ ...as(designer), scope: "mine" });
+    assert.equal(today.groups.flatMap((group) => group.tasks).some((item) => item.id === todo.id), true, "the converted checklist task stays visible after the phase closes");
   });
 
   it("never rewrites project snapshots when the template is edited, and protects definitions in use", async () => {

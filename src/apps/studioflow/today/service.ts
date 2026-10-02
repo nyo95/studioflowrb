@@ -103,9 +103,15 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
           const active = (ACTIVE_PHASE_STATUSES as readonly string[]).includes(phase.status);
           const revision = phase.revisions[0];
           targets.push({ phaseId: phase.id, label, disabledReason: phase.is_locked ? "Approved" : !revision ? "Not started" : null });
-          if (!active) continue;
-          for (const a of revision?.activities ?? []) rows.push(activityRow(project.id, phase.id, phase.definition_id, label, a));
-          for (const item of phase.checklist_items) rows.push(itemRow(project.id, phase.definition_id, label, item));
+          // A completed phase no longer exposes revision activity, but converted
+          // supervision feedback remains a live checklist task until it is checked
+          // or dismissed. Keeping it here prevents a closed phase from hiding work.
+          if (active) {
+            for (const a of revision?.activities ?? []) rows.push(activityRow(project.id, phase.id, phase.definition_id, label, a));
+          }
+          if (active || phase.status === "DONE") {
+            for (const item of phase.checklist_items) rows.push(itemRow(project.id, phase.definition_id, label, item));
+          }
         }
         addTargets.push({ projectId: project.id, projectName: project.name, targets });
       }

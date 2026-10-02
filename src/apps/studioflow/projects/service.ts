@@ -36,6 +36,7 @@ import {
 } from "../shared";
 import { seedScheduleFromTemplates } from "../schedule/sync";
 import { seedChecklistFromTemplates } from "../tasks/sync";
+import { assertProjectCompletionReady } from "./completion";
 
 export const PROJECT_STATUSES = ["ACTIVE", "ON_HOLD", "COMPLETED"] as const;
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
@@ -532,14 +533,17 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
     },
 
     /** ACTIVE ↔ ON_HOLD, or COMPLETED (legacy `executeCompleteProject`), or reactivate. */
-    async setProjectStatus(input: CommandContext & { projectId: string; status: ProjectStatus }) {
+    async setProjectStatus(input: CommandContext & { projectId: string; status: ProjectStatus; overrideReason?: string | null }) {
       const userId = requireCommand(input, P.projectManage);
       return runTransaction(async (tx) => {
         await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
         const project = await loadWritableProject(tx, input.projectId);
         if (project.status === input.status) return { projectId: project.id };
+        const completion = input.status === "COMPLETED"
+          ? await assertProjectCompletionReady(tx, input)
+          : { overrideReason: null };
         await tx.sfProject.update({ where: { id: project.id }, data: { status: input.status } });
-        await writeAudit(ports, tx, { action: "studioflow.project.status-changed", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: project.status, to: input.status } }, metadata: { projectId: project.id } });
+        await writeAudit(ports, tx, { action: "studioflow.project.status-changed", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: project.status, to: input.status } }, metadata: { projectId: project.id, ...(completion.overrideReason ? { completionOverrideReason: completion.overrideReason } : {}) } });
         return { projectId: project.id };
       });
     },

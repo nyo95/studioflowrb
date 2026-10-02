@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.316**
-- Next local revision: **R8.317**
+- Current revision after this entry is committed: **R8.317**
+- Next local revision: **R8.318**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.317 | 2026-10-03 | fix(studioflow): keep close-out work visible and gate project completion
+
+- Checklist items that remain open on a completed phase now stay visible in Today under their project and phase. Revision activities of completed phases stay hidden, so closed work is not resurfaced as active feedback.
+- Both project-completion paths now use the same readiness check: every phase must be done, with no unchecked non-dismissed checklist item or open feedback. A project manager may override this only with a written reason, which is recorded in the audit history.
+- Updated the server actions for the optional override reason and added integration coverage for closed-phase Today work, both completion paths, manager override, and audit evidence. The Lead retains the completion-reason UI polish.
+
+**Checks.** Rebuild-only home databases `masterdata` and `masterdata_test` migrated through all 82 migrations. Typecheck, boundary check, legacy-runtime check, lint, focused StudioFlow integration tests (2/2), and full `npm test` (822/822; none skipped/cancelled) passed. Staged whitespace checked. No schema migration or dependency was added.
 
 ## R8.316 | 2026-10-03 | fix(studioflow): align Library toolbar and catalogue footer
 

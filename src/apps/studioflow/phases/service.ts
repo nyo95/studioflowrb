@@ -42,6 +42,7 @@ import {
   type TxClient,
 } from "../shared";
 import { readBlockerCounts, readBlockerCountsBatch, readBlockerItems } from "./blocker-query";
+import { assertProjectCompletionReady } from "../projects/completion";
 
 type PhaseRow = Awaited<ReturnType<TxClient["sfPhase"]["findUniqueOrThrow"]>>;
 type ProjectRow = Awaited<ReturnType<TxClient["sfProject"]["findUniqueOrThrow"]>>;
@@ -544,9 +545,9 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         return { eventId: event.id };
       });
     },
-    async markProjectCompleted(input: CommandContext & { projectId: string }) {
+    async markProjectCompleted(input: CommandContext & { projectId: string; overrideReason?: string | null }) {
       requireCommand(input, P.projectRead);
-      return runTransaction(async (tx) => { const project = await loadWritableProject(tx, input.projectId); const access = await getProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: project.id }); if (!access.override && !access.isDesigner && !access.isDrafter) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "Only a project PIC can complete this project."); if (project.status === "COMPLETED") return { projectId: project.id }; await tx.sfProject.update({ where: { id: project.id }, data: { status: "COMPLETED" } }); await writeAudit(ports, tx, { action: "studioflow.project.completed", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: project.status, to: "COMPLETED" } } }); return { projectId: project.id }; });
+      return runTransaction(async (tx) => { const project = await loadWritableProject(tx, input.projectId); const access = await getProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: project.id }); if (!access.override && !access.isDesigner && !access.isDrafter) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "Only a project PIC can complete this project."); if (project.status === "COMPLETED") return { projectId: project.id }; const completion = await assertProjectCompletionReady(tx, input); await tx.sfProject.update({ where: { id: project.id }, data: { status: "COMPLETED" } }); await writeAudit(ports, tx, { action: "studioflow.project.completed", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: project.status, to: "COMPLETED" } }, metadata: completion.overrideReason ? { completionOverrideReason: completion.overrideReason } : undefined }); return { projectId: project.id }; });
     },
     async reopenProject(input: CommandContext & { projectId: string }) {
       requireCommand(input, P.projectRead);
