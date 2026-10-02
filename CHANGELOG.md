@@ -5,13 +5,20 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.307**
-- Next local revision: **R8.308**
+- Current revision after this entry is committed: **R8.308**
+- Next local revision: **R8.309**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.308 | 2026-10-02 | fix(ui-engine): mobile nav items ignore the collapsed desktop width
+
+- When the desktop rail preference was saved as collapsed, mobile nav items kept the 36px icon width (`group-data-collapsed:w-9`, height 34px), so labels overflowed into the next item. The existing mobile override restored alignment, gap and padding but not size; it now also resets width and height to `auto`.
+- One class change in the shared rail item; desktop collapsed behavior is unchanged.
+
+**Checks.** `git diff --check` passed. `typecheck`/`lint` could not run: `node_modules` is not installed in this cloud container. Browser re-verification of the mobile nav is pending.
 
 ## R8.307 | 2026-10-02 | chore(repository): publish completed local revisions
 
