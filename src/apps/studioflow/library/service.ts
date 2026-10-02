@@ -1,6 +1,5 @@
 import { requireRead, type ReadContext, type StudioFlowPorts } from "../shared";
-import { discoverBrandImageUrl } from "./brand-image";
-import { discoverBrandWebsiteCatalogue } from "./website-catalogue";
+import { discoverBrandWebsite } from "./website-snapshot";
 
 /**
  * StudioFlow Library (owner, 2026-09-23; "wave 2+" per STUDIOFLOW-REWORK-CONTRACT.md §0/§14):
@@ -14,10 +13,7 @@ export function createLibraryService(ports: StudioFlowPorts) {
       requireRead(input.grants);
       const brands = await ports.masterData.listBrandLibraryReads({ search: input.search });
       return Promise.all(brands.map(async (brand) => {
-        const [imageUrl, websiteCatalogue] = await Promise.all([
-          discoverBrandImageUrl(brand.links),
-          discoverBrandWebsiteCatalogue(brand.links),
-        ]);
+        const { imageUrl, catalogue: websiteCatalogue } = await discoverBrandWebsite(brand.links);
         return {
           id: brand.id,
           name: brand.name,

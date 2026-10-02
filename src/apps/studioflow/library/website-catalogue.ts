@@ -1,9 +1,3 @@
-import { isSafeWebUrl } from "./brand-image";
-
-type BrandLink = { kind: string; url: string };
-
-const FETCH_TIMEOUT_MS = 3500;
-const MAX_HTML_BYTES = 512_000;
 const MAX_OFFERINGS = 12;
 const GENERIC_LABELS = new Set(["home", "about", "contact", "login", "menu", "shop", "products", "services"]);
 
@@ -68,29 +62,4 @@ export function extractWebsiteCatalogue(html: string, sourceUrl: string): Websit
   });
 
   return { sourceUrl, offerings: offerings.slice(0, MAX_OFFERINGS) };
-}
-
-export async function discoverBrandWebsiteCatalogue(links: readonly BrandLink[]): Promise<WebsiteCatalogue | null> {
-  const website = links.find((link) => link.kind.trim().toUpperCase() === "WEBSITE" && isSafeWebUrl(link.url));
-  if (!website) return null;
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const response = await fetch(website.url, {
-      headers: { accept: "text/html,application/xhtml+xml" },
-      redirect: "follow",
-      signal: controller.signal,
-    });
-    if (!response.ok || !isSafeWebUrl(response.url || website.url)) return null;
-    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
-    if (!contentType.includes("text/html") && !contentType.includes("application/xhtml+xml")) return null;
-    const html = (await response.text()).slice(0, MAX_HTML_BYTES);
-    const catalogue = extractWebsiteCatalogue(html, response.url || website.url);
-    return catalogue.offerings.length > 0 ? catalogue : null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
 }

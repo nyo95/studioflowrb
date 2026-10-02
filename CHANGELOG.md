@@ -5,13 +5,51 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.307**
-- Next local revision: **R8.308**
+- Current revision after this entry is committed: **R8.311**
+- Next local revision: **R8.312**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.311 | 2026-10-02 | feat(studioflow): Brand detail modal in Library
+
+- Owner decision (2026-10-02): the whole app stays English, and Brand detail opens as a modal, not a side drawer or a separate page.
+- Library cards now open a UI Engine `Dialog` (`md`) from the image/name area; the compact resource icons stay independent links. The modal shows the larger image, full notes, all categories and hashtags, labelled resource links, and the website-derived offerings under "From the brand's website" with a read-only note. Offerings remain off the card itself (R8.304 unchanged).
+- No data, schema, permission, or shared-code change. Modal open state lives in the page component, so filters, search, sort, and page are preserved when it closes.
+
+**Checks.** `tsc --noEmit`; `eslint` on the Library route; server-render smoke test. Not run: full `npm test` and browser acceptance of the modal (focus return, scroll lock, mobile height).
+
+## R8.310 | 2026-10-02 | feat(studioflow): polish Library catalogue skeleton with UI Engine components
+
+Result of the Library design critique. UI-only; no data, schema, permission, or shared-code change.
+
+- **Mobile filters.** Below `lg` the filter rail is replaced by a `Filters (n)` button opening a UI Engine `Drawer` (left, `sm`) that holds the same filter panel and a "Show N brands" action. Desktop keeps the sticky rail.
+- **Active filters.** A UI Engine `FilterBar` of removable `FilterChip`s with a clear-all action appears above the results; the empty state offers "Clear search and filters".
+- **Website match chip.** A Brand that matches only through its public-website offerings now shows a `Website: <term>` badge, so a hit is never unexplained. Matching on name, category, hashtag, or vendor shows no chip.
+- **Search.** A leading `#` is ignored (`#chair` finds hashtag `chair`); placeholder now says product search is included.
+- **Skeleton.** Removed the single-tab `Tabs`; the right column now uses `DirectoryShell` (toolbar, grid, pagination) per UI_ENGINE.md §6. Grid is 2/3/4 columns at `sm`/`xl`/`2xl` because the rail takes width.
+- **Card.** Categories stay as badges; hashtags become plain `#tag` text capped at 3 with `+n`; decorative website images use empty alt text and `referrerPolicy="no-referrer"`; resource link targets grow to 44px on coarse pointers.
+- UI language is unchanged (English); the owner has not yet chosen Indonesian.
+
+**Checks.** `tsc --noEmit`; `eslint` on the Library route; a server-render smoke test with 30 sample Brands (24 cards on page 1, Filters button, `+2` hashtag overflow, referrer policy). Not run: full `npm test`, and browser acceptance of the mobile drawer, contrast, and touch targets.
+
+## R8.309 | 2026-10-02 | fix(studioflow): harden and cache Library website reads
+
+- **Security.** The Library website reader accepted loopback/private hosts that the old text check missed (`[::1]`, `127.0.0.2`, `0.0.0.0`, `fd00::/8`, `100.64/10`, `metadata.google.internal`, IPv4-mapped IPv6). New `safe-fetch.ts` screens the URL text and every DNS answer, follows redirects manually (max 3) and checks each hop *before* requesting it, rejects credentials in URLs, and reads the body as a capped stream instead of downloading it whole. Residual risk, documented in code: the connection re-resolves DNS, so DNS rebinding is not fully closed.
+- **Load.** The image and catalogue readers fetched the same website twice per Brand on every page view. New `website-snapshot.ts` does one fetch per Brand website, caches successes for 24 h and failures for 15 min (in-process, 500 entries), de-duplicates in-flight reads, and limits concurrent fetches to 5. `service.ts` uses it; the Library stays read-only and no Master Data contract changed.
+- Removed the now-unused `discoverBrandImageUrl` and `discoverBrandWebsiteCatalogue`; `isSafeWebUrl` is still exported from `brand-image.ts`.
+- New `safe-fetch.test.ts` (6 tests) covers unsafe hosts, private DNS answers, unsafe redirect hops, redirect cap, body cap, and non-HTML. It caught an IPv4-mapped IPv6 bypass that is fixed here.
+
+**Checks.** Library tests (11 pass); `tsc --noEmit`; `eslint src/apps/studioflow --quiet`; `npm run check:boundaries` passed. Full `npm test` (needs the test database) and browser acceptance of `/studioflow/library` were not run; the cache is per server process, so a serverless deployment gets less benefit.
+
+## R8.308 | 2026-10-02 | fix(ui-engine): mobile nav items ignore the collapsed desktop width
+
+- When the desktop rail preference was saved as collapsed, mobile nav items kept the 36px icon width (`group-data-collapsed:w-9`, height 34px), so labels overflowed into the next item. The existing mobile override restored alignment, gap and padding but not size; it now also resets width and height to `auto`.
+- One class change in the shared rail item; desktop collapsed behavior is unchanged.
+
+**Checks.** `git diff --check` passed. `typecheck`/`lint` could not run: `node_modules` is not installed in this cloud container. Browser re-verification of the mobile nav is pending.
 
 ## R8.307 | 2026-10-02 | chore(repository): publish completed local revisions
 
