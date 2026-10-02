@@ -1,88 +1,76 @@
 # Active Plan
 
-Plan ID: WO-SF-ITER-01
-Scope: StudioFlow backend — replace revision/phase-status tracking with client-sent iterations, explicit project completion, and the read models behind the new project-card home. Backend, migration, and the minimum wiring needed to keep the app compiling and its tests green. The Lead builds all screens afterwards.
-Target revision: three ordered phases, one local revision each, starting at the next unused number in `CHANGELOG.md` (derive it; do not guess).
+Plan ID: WO-MD-PRICE-LABEL-01
+Scope: Master Data — a price may be a number or a quoted text label ("by request" with a reason). Backend and the shared parser only; the Lead builds the italic display and the form hints afterwards.
+Target revision: derive the next unused revision from `CHANGELOG.md` (Executor); the Lead UI follow-up takes the one after it. (WO-SF-ITER-01 is finished and reviewed: R8.285 to R8.289.)
 Status: READY
-Priority: P1
-Owner: owner (Product Owner). Direction agreed 2026-10-01; mockup approved by the owner the same day; the two open questions are decided (see Locked Decisions 9 and 10).
-Last updated: 2026-10-01
+Priority: P2
+Owner: owner (Product Owner). Owner proposal 2026-10-01: use quotation marks to mark a text price; the value is whatever is inside the quotes, even "120".
+Last updated: 2026-10-02
 
 ## Outcome
 
-StudioFlow tracks only what is sent to the client. Each phase has numbered iterations (Layout 1, Layout 2; 3D D1, D2 …); a project is completed only when a person presses "Mark as completed"; the home page can be rebuilt as one card per project from a single read. KB-060 disappears because automatic completion is removed.
+In the company price lists a price is sometimes not a number ("depends on the request", "call sales", "per project"). Today a price of 0 means "by request" (decision Q19, R8.281) but the reason is lost. After this plan a price can carry a short text label next to its amount of 0, entered with quotation marks in the amount field, in pasted Excel cells, and in imported workbooks, and the label survives export and import.
 
-Read first: `docs/BACKLOG.md` → StudioFlow → "Iteration-based phase tracking + project-card home" (the agreed spec), `docs/BACKLOG.md` KB-060, `src/apps/studioflow/phases/service.ts` (the current state machine), `src/apps/studioflow/today/service.ts`, `src/apps/studioflow/projects/service.ts` (`getAccess`), and `docs/apps/studioflow/`.
-
-## How to run this program
-
-- Three phases, in order, each its own cohesive local commit with a changelog entry and a Review Card appended to `docs/audits/WO-SF-ITER-01-REVIEW-CARDS.md` (what changed in plain words; requirement → evidence table with test names; three commands the Lead can run; rows migrated; deviations). `npm test`, `npm run check`, and `npm run lint` must be green before the next phase starts.
-- Re-run `npm test` yourself and report the real counts; an earlier Executor report of "all pass" was wrong twice.
-- Start from a clean committed tree; record HEAD and dirty files first. Use only the rebuild databases after verifying the target (`studioflow_rebuild`, `studioflow_rebuild_test` on `localhost`); never the legacy database. Apply every migration to both. Do not run `npm run build` (or restore `next-env.d.ts` before staging).
-- The existing screens (phase page, Today, project list) will change meaning under you. Keep the app compiling and the existing tests meaningful by adapting call sites with the smallest honest change, mapping new states onto what the screens show; do **not** design new screens. The Lead replaces those screens right after this plan, so a degraded look in between is expected. List every screen you had to touch in the Review Card.
-- Stop with a `BLOCKED / CONFLICT` report if a locked decision cannot be met.
+Context: WO-MD-PROGRAM-01 (units lowercase, Brand → Supplier → Price rule, bulk commands, name capitalization) was finished by the Lead after the Executor reached its limit (R8.272 to R8.281); there is nothing left of it to do. Read `docs/apps/masterdata/pricing-contract.md` Q19 and `CHANGELOG.md` R8.281 first.
 
 ## Locked Decisions
 
-1. **An iteration is a client-sent unit.** Internal iterations, internal review states, and minor (internal-reject) revisions are dropped. The existing `SfRevision` table becomes the iteration table (keeps its relations to activities and deliverables): add `name` (auto-named from the phase name and number, e.g. "Layout 2"; renameable), `state`, `sent_at`, `answered_at`, `done_at`; `major` is the iteration number, `minor` is removed.
-2. **Iteration states:** `NOT_SENT` → `SENT` (waiting for the client; `sent_at` set; "days waiting" derives from it) → `ANSWERED` (`answered_at` set) → then exactly one of `REVISED` (a new `NOT_SENT` iteration with the next number is created at that moment, never earlier) or `DONE`. No empty next iteration is created automatically. An iteration may go back one step only through the undo in decision 7.
-3. **Phase status becomes** `PENDING` (no iteration yet), `ACTIVE`, `DONE`. A phase is `DONE` when its closing iteration is `DONE`. Reopening an earlier phase is "+ iteration" on it (creates the next `NOT_SENT` iteration, phase returns to `ACTIVE`); there is no reason-required Reopen; history is kept; other phases keep running. A phase may have only one open iteration at a time. When a reopened phase has dependent later phases that are `DONE`, set a soft flag `dependents_review_suggested` on the project read (no blocking, no automatic change).
-4. **Requirements never gate anything.** Phase checklist items stay as non-blocking reminders: stop reading `is_blocking` anywhere in phase transitions (keep the column); unticked items are only counted for the card marker ("N requirements waiting"). They stay visible after a phase is done until ticked or dismissed (add a dismissal that does not delete: `dismissed_at`).
-5. **One free-text note per phase** (`note` text on `SfPhase`, edited by the phase's seat owner or override), replacing the old "sub todo" idea. Existing sub-items are left in place and unread by the new model.
-6. **CD phase.** The CD definition defaults to two iteration kinds in order: **CD Mall** (civil only) then **CD Final** (civil + interior fixture). CD Mall's outcomes are `REVISED` ("Revision") or **"Continue to CD Final"** (which closes CD Mall as `DONE` and creates `CD Final` as `NOT_SENT`); it has no plain "Done", so it cannot close the phase. Only CD Final `DONE` closes the phase. CD Mall may be deleted/skipped when a project goes straight to Final (a command that removes an iteration that was never sent). Model this with a per-definition list of default iteration kinds (a column on the phase definition) so other phases can opt in later; existing phase definitions without it behave as plain numbered iterations.
-7. **Auto-advance with undo.** When a phase becomes `DONE`, the next `PENDING` phase in order becomes `ACTIVE` with a first `NOT_SENT` iteration automatically (parallel phases, `allow_parallel`, keep their current meaning). Every iteration/phase transition writes an append-only row to a new `SfPhaseEvent` table (project, phase, iteration, from, to, actor, at, plus what the transition auto-created). `undoPhaseEvent(eventId)` is valid only for the **latest** event of the project, by the **same actor**, within **5 minutes**, and reverses exactly that transition including what it auto-created; it is audited. Anything else is rejected with a clear code.
-8. **Supervision** is dated site visits: each visit is an iteration-like entry with `visit_date`, a note, and (later) photos; outcomes are "Next visit" (creates the next visit) or "Done (handover)". The read model exposes "last visit N days ago". Photos are out of scope here (non-goal); leave the field/relationship ready only if trivial.
-9. **Project completion is explicit only** (owner, 2026-10-01). Remove `completeProjectIfLast` and every automatic path to `COMPLETED`; add `markProjectCompleted` (project PIC or override holder; allowed even when phases are not all done; audited) and `reopenProject`. While `COMPLETED`, phase commands are rejected with a clear code until the project is reopened. This closes KB-060 by removal; delete the `[BUG]` entry from `docs/BACKLOG.md` when verified, with the revision recorded in the changelog.
-10. **No "all phases done — mark completed?" prompt** exists anywhere in the backend or read model: do not return a flag whose purpose is to suggest completion. (An `all_phases_done` boolean for display is fine; it must not drive any command.) The per-person task feed that Today carried moves to a compact "My tasks" strip on the new home.
-11. **Access.** Reuse the PIC rules from R8.220 (`getAccess`): iteration and phase commands need the phase's seat owner (designer or drafter by `seat_snapshot`) or `studioflow.project.override`; `markProjectCompleted`/`reopenProject` need the project PIC (either seat) or override; reads need project read. Do not invent new permissions unless unavoidable (3-part IDs only).
-12. **Migration of existing data** (destructive, owner-approved; take the same care as the V2-E migration): per phase, group its `SfRevision` rows by `major`; the surviving row of each major is its highest `minor`; re-point activities and deliverables from the other rows of that major to the survivor, then delete them. State of the highest major: phase `IN_PROGRESS`/`ON_REVIEW_INTERNAL`/`APPROVED_INTERNAL` → `NOT_SENT`; `ON_REVIEW_CLIENT` → `SENT` with `sent_at = status_changed_at`; `READY_FOR_NEXT`/`COMPLETED` → `DONE` (`done_at = status_changed_at`); every lower major → `REVISED`. Phase status: `PENDING` → `PENDING`; the four middle statuses → `ACTIVE`; `READY_FOR_NEXT`/`COMPLETED` → `DONE`. A phase with no revision rows gets none (it stays `PENDING`/gets its first iteration lazily only if `ACTIVE`). Names: "<phase name snapshot> <major>". Projects already `COMPLETED` stay `COMPLETED`. The migration begins with pre-checks that print counts per table (phases, revisions to merge, activities and deliverables to re-point) and aborts with a clear message if any activity or deliverable would end up unattached; it reports before/after counts in the Review Card. Run it first against a copy-equivalent check on the disposable test database with seeded old-model data (include a test that seeds old rows and asserts the mapping).
+1. **Syntax.** The amount value as typed or read from a cell is interpreted by one function:
+   - A number (Indonesian or spreadsheet style, optional "Rp") is a numeric price, as today.
+   - A value that **starts with a quotation mark** (straight `"` or curly `“` `”`) is a text price: the label is the text inside the quotes (the closing quote is optional while typing), trimmed. The amount is stored as 0. This holds even when the inside looks like a number: `"120"` is the text 120, not a price of 120.
+   - Unquoted `By Request`, `TBC`, `TBA`, `Nego`, `Negotiable` stay a price on request with **no label** (as R8.281).
+   - `-`, `n/a`, and an empty cell still mean "not offered": no price is created (importer, grid and paste only; the single-price form still requires an amount).
+   - Any other unquoted text is rejected with a clear message that says to put it in quotation marks if it is meant as text (`PRICE_AMOUNT_INVALID`).
+   - An empty label (`""`) is rejected. A label is at most **64 characters**; longer is rejected (`PRICE_LABEL_TOO_LONG`) and the message points to Notes. Labels keep the case as typed (they are not title-cased) and have whitespace collapsed.
+2. **Storage.** A new nullable column `amount_label` (varchar 64) on `PriceMaterial`, `PriceMaterialLabor` and `PriceLabor`, with a CHECK `amount_label IS NULL OR (amount = 0 AND char_length(btrim(amount_label)) BETWEEN 1 AND 64)`. A numeric price never has a label; changing a price to a number clears the label. Existing rows keep their 0 as "by request" with no label. No data is rewritten.
+3. **One parser, three users.** A pure function (no server imports, usable from client components) turns a raw amount value into `{ amount: DecimalString, label: string | null }` or an error. The services call it, so the typed value can be passed straight through the existing `amount: string` inputs; the UI forms, the bulk and compare-suppliers commands, the SKU workbook and the new supplier/price workbook all use the same function. Existing numeric strings (`"120000"`, `"120000.50"`) keep working unchanged.
+4. **Semantics unchanged downstream.** A text price is a price on request: never the lowest in comparisons, excluded from nothing else. BQ and StudioFlow keep receiving the amount 0; the label is exposed as an **additive** field (`amountLabel: string | null`) on the public price reads, nothing else about those shapes changes.
+5. **Audit.** Create and update audit events record `amount_label` (from and to) when it changes, alongside the amount.
+6. **Export and import (supplier/price workbook).** Export writes a text price as the label **with its quotation marks** (`"call sales"`) and an unlabelled price on request as `By Request`, so an export imports back unchanged. Import reads the same syntax from cells; an unchanged amount and label count as unchanged, a changed label counts as an update. The preview lists every cell read as a text price (sheet, row, label) as an information note.
+7. The single-price edit form, the bulk tables and the compare grid already post the typed string; they keep doing so. No new UI field is added.
 
 ## Business Rules and Architecture Constraints
 
-- Capability labels: REUSE the PIC access read model, `writeAudit`, the platform notifications writer already used by phases (keep the existing notifications that still make sense: client-answered, assigned items), and the existing checklist and CD item tables; EXTEND `SfRevision`, `SfPhase`, `SfPhaseDefinition`, and the `today` read; ADD `SfPhaseEvent`. Policy stays app-owned inside `src/apps/studioflow`.
-- StudioFlow keeps its boundaries: no foreign keys to other apps; BQ and Master Data are not touched. Other readers of phase status (timeline, portfolio, tasks, presentation, schedule, projects list, notifications) must be found by search and adapted; list them in the Review Card.
-- Migrations: pre-check first, then the change; no silent data loss.
-
-## Phases
-
-### Phase 1 — model and migration
-Schema (iteration columns on `SfRevision`, phase status values, `SfPhase.note`, checklist `dismissed_at`, `SfPhaseDefinition` default iteration kinds, `SfPhaseEvent`), the data migration per decision 12 with its pre-checks, and adaptation of every reader/writer of the old fields so the app compiles. The old transition commands may still exist at the end of this phase only if they now write the new states correctly; they are replaced in Phase 2.
-
-### Phase 2 — commands, completion, undo
-Commands: add iteration, send to client, record client answer, choose Revision / Done / Continue to CD Final, rename iteration, delete a never-sent iteration, phase note edit, requirement dismiss, supervision visit create/choose, auto-advance, `undoPhaseEvent`, `markProjectCompleted`, `reopenProject`. Remove `completeProjectIfLast` and the review/approve/reject commands and their notifications' obsolete cases. Access per decision 11. Every command is transactional, audited, idempotent where a retry could double-apply, and returns a clear error code for invalid state.
-
-### Phase 3 — read models
-- `listProjectCards({ grants, filter: "all" | "mine" })` → one entry per non-archived project: id, name, client, status, pic ids, `all_phases_done`, `dependents_review_suggested`, `can_mark_completed`, `note_phases` (which phases have a note), `requirements_waiting` count, `last_update_at`, and per phase: id, name, order, status, `current_iteration` (id, name, state, `sent_at`, `waiting_days`, available choices), `iteration_count`, `has_note`, and for Supervision `last_visit_days_ago`.
-- `myTasksSummary({ grants })` → counts for today and overdue plus the item list, reusing the existing Today task logic (`today/service.ts`) so nothing the Today page showed is lost.
-- Keep both reads index-friendly (no per-project loops over queries); a test with many projects asserts a bounded query count or at least correct results at volume.
+- Capability labels: REUSE `requiredAmount` semantics for the numeric branch, `writeAudit`, `AppError`, and the existing price services; EXTEND the three price tables and the public price read types; ADD the pure parser module inside `src/apps/masterdata` (domain rule, app-owned, not a platform utility).
+- Apps keep their boundaries: the public read ports gain one optional field, no other app code is edited.
+- Migration begins with a pre-check (no existing row may violate the CHECK; none can, since the column is new) and is additive-safe. Apply it to the office development and disposable test databases after verifying the targets (`studioflow_rebuild`, `studioflow_rebuild_test` on `localhost`); never the legacy database.
+- Do not run `npm run build`, or restore `next-env.d.ts` before staging.
 
 ## Backend Contract
 
-Public (service) surface for the Lead's screens: the commands above, `listProjectCards`, `myTasksSummary`, and the existing project/phase reads adapted. Server actions are not required in this plan; add only the minimal ones needed to keep existing screens working.
+- Parser module: given a raw string returns `{ amount: string; label: string | null }` (amount normalized as `requiredAmount` does) or throws `AppError` with the codes above. Table-driven unit tests cover: plain numbers in all styles, `Rp`, quoted text, quoted number, curly quotes, missing closing quote, empty quotes, 64 and 65 characters, whitespace, unquoted words (on request without label), dash and n/a (reported as "not offered" through a distinct result so callers decide), and rejected unquoted text.
+- Services: `createPriceMaterial`, `updatePriceMaterial`, `createPriceMaterialLabor`, `updatePriceMaterialLabor`, `createPriceLabor`, `updatePriceLabor`, `createSku` initial prices, the bulk, matrix and per-row commands, and the SKU price workbook apply all resolve the amount through the parser and persist `amount_label`. Reads (`list*`, `get*`, `listPricingMaterialRefs` untouched) select `amount_label`; the public price reads add `amountLabel`.
+- Restore and archive paths need no change; restoring a labelled price keeps its label.
+- Supplier/price workbook: export and import per Locked Decision 6, preview counts unchanged.
+- Error messages are readable by non-programmers and name the cell (sheet and row) where a cell is involved.
 
 ## UI Contract
 
-None to build. The Lead builds the project-card home (approved mockup: phase chips with iteration chips, waiting-for-client chip with days, inline Revision/Done after an answer, undo toast, "My tasks" strip above the cards, notes icon, supervision visit actions, "Mark as completed" only in the project menu) and the new phase page. The Executor may touch existing screens only as described under "How to run this program".
+The Lead builds, after this plan: italic, muted display of the label (or "By request") in place of the amount in the three lists and the SKU list; a hint under every amount field ("Use quotation marks for text, e.g. "call sales""); search across labels. The Executor adds **no** UI beyond what compilation requires.
 
-## Non-goals
+## Tests Required
 
-Photos on supervision visits; any new screen; the BQ and Master Data apps; email/push notifications; changing permissions beyond decision 11; the Today page redesign (Lead).
+- Parser tests as above.
+- Integration: create and update with a label for each of the three price kinds (label stored, amount 0, audit shows the change; a numeric update clears it); CHECK rejects a label with a non-zero amount if written directly; bulk, matrix and per-row commands accept a quoted cell and report a rejected unquoted text with the row; the supplier/price workbook round trip with a labelled price, a quoted number and an unlabelled by-request price (all `unchanged` on re-import); the SKU workbook accepts a quoted amount; public reads include `amountLabel`.
+- Regression: all existing amount behavior (numbers, zero as by request, negative rejected) is unchanged.
 
 ## Regression Risks
 
-- Many readers use phase status or revision numbers (timeline, portfolio, tasks, presentation, schedule, notifications, `blocker-query.ts`): find them all with search, not memory.
-- The migration re-points activities and deliverables: a missed row leaves an orphan; the pre-check and post-check counts must reconcile exactly.
-- Undo must not resurrect deleted rows or double-send notifications: reverse only what the event recorded.
-- Parallel phases and the CD Mall/Final chain are the easiest places to get the auto-advance wrong; test them explicitly.
+- `requiredAmount` is also used by the sample-request flow and other numeric paths; leave those on the numeric function and use the new parser only where the user types or imports an amount.
+- Excel cells that are real text (not numbers) such as `"135.000"` unquoted must still be read as a number, as today.
+- The CHECK must not be added with `NOT VALID`; it applies to existing rows (all have a null label).
 
 ## Verification
 
-Per phase: `npm test` (report the real counts before and after), `npm run check`, `npm run lint`, `git diff --cached --check`, both rebuild databases migrated, and the Review Card complete. After Phase 1 also run all migrations from an empty scratch database on the rebuild server (create it, apply, diff against the Prisma schema with `prisma migrate diff --from-config-datasource --to-schema prisma/schema`, drop it) and report the result.
+`npm test`, `npm run check`, `npm run lint`, `git diff --cached --check`. Migration applied to both rebuild databases, pre-check output reported. Report the test counts before and after. Do not describe a skipped check as passed.
 
 ## Reviewer Acceptance
 
-After each phase the Lead reads the Review Card, reruns its three commands and the full suite, spot-checks the migration mapping and the state machine, and records PASS or one consolidated correction. Browser acceptance happens after the Lead builds the screens.
+The Lead re-runs the suite, spot-checks the parser and two service paths, then builds the UI (R8.285) and runs the browser pass: type a quoted text in the single form, a table row and the compare grid; paste cells; import and re-import the company file with a labelled cell; export and re-import.
 
 ## Executor Prompt
 
-You are the BACKEND EXECUTOR for this checkout (D:\Misc\ProjectsHUB\studioflowrb, office computer, `STUDIOFLOW_LOCATION=kantor`). Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, the root `PLAN.md` (WO-SF-ITER-01), and the files it names. Implement the three phases in order, one local commit per phase, each with its migrations and pre-checks, tests, changelog entry, and Review Card. Re-run `npm test` yourself and report real counts. Use only the rebuild databases after verifying the target; never the legacy database. Do not run `npm run build` (or restore `next-env.d.ts` before staging). Keep the backlog current (delete KB-060 with the revision recorded once verified). Stop with a `BLOCKED / CONFLICT` report if a locked decision cannot be met. Finish with one Planner/Reviewer prompt: outcome per phase, commit hashes, checks with real counts, rows migrated, screens touched, limitations, dirty files.
+You are the BACKEND EXECUTOR for this checkout (D:\Misc\ProjectsHUB\studioflowrb, office computer, `STUDIOFLOW_LOCATION=kantor`). Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, the root `PLAN.md` (WO-MD-PRICE-LABEL-01), `docs/apps/masterdata/pricing-contract.md` Q19, and `CHANGELOG.md` R8.281. Start from a clean committed tree and record HEAD and dirty files. Implement the whole plan in one run without progress stops: the pure parser with its table-driven tests, the migration with its pre-check applied to both rebuild databases, the three price tables and their services, bulk, matrix and per-row commands, the SKU and supplier/price workbooks, the additive public read field, and the regression tests. Every item under "Tests Required" must exist as a real test with real assertions; the Lead rejected the previous plan's correction pass for adding none, so do not report done without them. Add the changelog entry, update `docs/BACKLOG.md` (mind the CRLF), and make one local commit `<next unused revision> | feat(masterdata): text price labels written in quotation marks`.
+
+Rules: use only the rebuild databases after verifying the target; never the legacy database. Never run `prisma migrate reset` on `studioflow_rebuild` or `studioflow_rebuild_test`; verify the full migration chain on a disposable `studioflow_scratch_*` database and drop it afterwards, then diff against the Prisma schema (the only expected difference is the old `user_preference.updated_at` default). Do not run `npm run build` (or restore `next-env.d.ts` before staging). Re-run `npm test`, `npm run check`, and `npm run lint` yourself and report real counts (baseline: 759 tests pass, 0 fail). Stop with a `BLOCKED / CONFLICT` report only if a locked decision cannot be met. No push, PR, or merge. Finish with one Planner/Reviewer prompt only: outcome, commit, checks with real counts, limitations, dirty files.
