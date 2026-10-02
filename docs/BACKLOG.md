@@ -119,8 +119,7 @@ No open items. (The pill-radius note from R8.83 was stale: `--ui-radius-pill` ha
 
 ## Master Data
 
-- [ ] [PLANNED] **Text price labels in quotation marks (WO-MD-PRICE-LABEL-01, QUEUED in `docs/agent/queued-plans/`; copy it to `PLAN.md` after WO-SF-ITER-01).** A price is a number or a quoted text label (stored as amount 0 + a label up to 64 characters); Executor next, then the Lead UI (italic muted display, amount-field hint, label search).
-- [ ] [CLEANUP][P2] Prices of 0 now mean "by request" in Master Data (R8.281). BQ pickers and StudioFlow still receive a plain 0 amount; make them show "By request" and keep it out of totals, ideally with the planned BQ TBC / By Owner price modes.
+- [ ] [PLANNED] **Text price labels: Lead UI (backend done in R8.291).** Let a quotation mark through in the amount boxes of the single price form, the work and material tables, the compare grid and pasted cells (`amount-format.ts` and the amount `onChange` handlers currently strip everything but digits); show the label in italic, muted text in place of the amount in the three price lists and the SKU list (pages must pass `amountLabel`); add the hint "Use quotation marks for text, e.g. \"call sales\"" under every amount field; make search match labels; then browser-check typing, pasting, and importing and re-importing the company file with a labelled cell. Supplier/price workbook and SKU workbook already export and import quoted text.
 - [ ] [CLEANUP][P2] **UI Engine admission for the entry grids and `textCase` (Lead, 2026-10-01).** The work-price table, the material-price table and the
   compare-suppliers grid are three app-local copies of one generic capability (rows, add/remove, per-row problems, Enter adds a row, paste). Extract one
   `EntryGrid` pattern into the UI Engine with a consumer matrix and showcase entry, and add the same for `Input textCase` (no showcase, test or

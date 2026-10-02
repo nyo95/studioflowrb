@@ -5,7 +5,13 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, requiredSlug, requiredCurrency, requiredAmount, assertVendorMaterialCapable, assertVendorLaborCapable, assertPriceMaterialBrandSupplierChain, ensureVendorCategory, assertWorkPriceRestorable, assertPriceMaterialRestorable, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
+import { parsePriceAmount } from "../domain/price-amount";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, requiredSlug, requiredCurrency, requiredPriceAmount, assertVendorMaterialCapable, assertVendorLaborCapable, assertPriceMaterialBrandSupplierChain, ensureVendorCategory, assertWorkPriceRestorable, assertPriceMaterialRestorable, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
+
+/** A grid cell that is blank, "-" or "n/a" is not offered and skipped; unreadable text stays so its row reports the problem. */
+function isOffered(text: string): boolean {
+  try { return parsePriceAmount(text).kind !== "not-offered"; } catch { return true; }
+}
 
 export const BULK_PRICE_ROW_LIMIT = 100;
 export const MATRIX_SUPPLIER_LIMIT = 12;
@@ -14,7 +20,7 @@ export type BulkRowError = { rowIndex: number; field: string | null; code: strin
 
 function bulkErrorField(code: string): string | null {
   if (code.includes("NAME") || code.includes("IDENTITY") || code === "BULK_DUPLICATE_IN_BATCH") return "name";
-  if (code.includes("AMOUNT")) return "amount";
+  if (code.includes("AMOUNT") || code.includes("LABEL")) return "amount";
   if (code.includes("UNIT")) return "unitId";
   if (code.includes("SKU") || code.includes("PAIR") || code.includes("BRAND")) return "skuId";
   return null;
@@ -37,7 +43,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       return db.priceMaterial.findMany({
         where: { ...(input.includeArchived ? {} : { deleted_at: null }), ...(input.skuId ? { sku_id: input.skuId } : {}), ...(input.supplierVendorId ? { supplier_vendor_id: input.supplierVendorId } : {}), ...(input.brandId ? { sku: { brand_id: input.brandId } } : {}), ...(search ? { OR: [{ sku: { name: { contains: search, mode: "insensitive" } } }, { supplier_vendor: { name: { contains: search, mode: "insensitive" } } }] } : {}) },
         orderBy: [{ sku: { name: "asc" } }, { supplier_vendor: { name: "asc" } }],
-        select: { id: true, amount: true, currency: true, notes: true, updated_at: true, updated_by_label: true, deleted_at: true, sku: { select: { id: true, name: true, slug: true, code: true, brand: { select: { id: true, name: true, slug: true } }, categories: { select: { category: { select: { id: true, name: true } } } }, dimension_length: true, dimension_width: true, dimension_thickness: true, dimension_unit: { select: { code: true } } } }, supplier_vendor: { select: { id: true, name: true, slug: true } }, unit: { select: { id: true, code: true, name: true } }, source_link: { select: { id: true, kind: true, url: true, label: true } } },
+        select: { id: true, amount: true, amount_label: true, currency: true, notes: true, updated_at: true, updated_by_label: true, deleted_at: true, sku: { select: { id: true, name: true, slug: true, code: true, brand: { select: { id: true, name: true, slug: true } }, categories: { select: { category: { select: { id: true, name: true } } } }, dimension_length: true, dimension_width: true, dimension_thickness: true, dimension_unit: { select: { code: true } } } }, supplier_vendor: { select: { id: true, name: true, slug: true } }, unit: { select: { id: true, code: true, name: true } }, source_link: { select: { id: true, kind: true, url: true, label: true } } },
       });
     },
 
@@ -50,7 +56,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
       actorIsUsable(input.actor);
       const currency = requiredCurrency(input.currency);
-      const amount = requiredAmount(input.amount);
+      const { amount, label: amountLabel } = requiredPriceAmount(input.amount);
       return runTransaction(async (tx: any) => {
         const sku = await tx.sku.findUniqueOrThrow({ where: { id: input.skuId } });
         if (sku.deleted_at !== null) throw new AppError("VALIDATION", "SKU_ARCHIVED", "SKU is archived.");
@@ -61,7 +67,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         if (input.sourceLinkId) { const link = await tx.brandLink.findUniqueOrThrow({ where: { id: input.sourceLinkId } }); if (!sku.brand_id) throw new AppError("VALIDATION", "LINK_BRAND_REQUIRED", "Source link requires a SKU Brand."); if (link.brand_id !== sku.brand_id) throw new AppError("VALIDATION", "LINK_BRAND_MISMATCH", "Source link must belong to the SKU's Brand."); }
         const unitId = sku.purchase_unit_id ?? sku.base_unit_id;
         let price;
-        try { price = await tx.priceMaterial.create({ data: { id: randomUUID(), sku_id: input.skuId, supplier_vendor_id: input.supplierVendorId, amount, currency, unit_id: unitId, source_link_id: input.sourceLinkId || null, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
+        try { price = await tx.priceMaterial.create({ data: { id: randomUUID(), sku_id: input.skuId, supplier_vendor_id: input.supplierVendorId, amount, amount_label: amountLabel, currency, unit_id: unitId, source_link_id: input.sourceLinkId || null, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
         await writeAudit(ports, tx, { action: "price-material.created", entityType: "price_material", entityId: price!.id, actor: input.actor, metadata: { sku_id: input.skuId, vendor_id: input.supplierVendorId } });
         await linkVendorCategories(tx, input.actor, input.supplierVendorId, (await tx.skuCategory.findMany({ where: { sku_id: input.skuId }, select: { category_id: true } })).map((row: any) => row.category_id));
         return { priceMaterialId: price!.id };
@@ -72,7 +78,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
       actorIsUsable(input.actor);
       const currency = requiredCurrency(input.currency);
-      const amount = requiredAmount(input.amount);
+      const { amount, label: amountLabel } = requiredPriceAmount(input.amount);
       return runTransaction(async (tx: any) => {
         const existing = await tx.priceMaterial.findUniqueOrThrow({ where: { id: input.priceMaterialId }, include: { sku: true } });
         if (existing.deleted_at !== null) throw new AppError("CONFLICT", "PRICE_ARCHIVED", "Cannot update an archived price.");
@@ -85,12 +91,13 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         if (unitId !== allowedUnitId) throw new AppError("VALIDATION", "PRICE_UNIT_SKU_MISMATCH", "Unit must match the SKU's purchase unit or base unit.");
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (existing.amount.toString() !== amount) changes.amount = { from: existing.amount.toString(), to: amount };
+        if ((existing.amount_label ?? null) !== amountLabel) changes.amount_label = { from: existing.amount_label ?? null, to: amountLabel };
         if (existing.currency !== currency) changes.currency = { from: existing.currency, to: currency };
         if (existing.unit_id !== unitId) changes.unit_id = { from: existing.unit_id, to: unitId };
         if (input.sourceLinkId !== undefined && (existing.source_link_id || null) !== (input.sourceLinkId || null)) changes.source_link_id = { from: existing.source_link_id, to: input.sourceLinkId || null };
         if ((existing.notes || null) !== (input.notes?.trim() || null)) changes.notes = { from: existing.notes, to: input.notes?.trim() || null };
         if (Object.keys(changes).length === 0) return { priceMaterialId: input.priceMaterialId };
-        try { await tx.priceMaterial.update({ where: { id: input.priceMaterialId }, data: { amount, currency, unit_id: unitId, source_link_id: input.sourceLinkId !== undefined ? (input.sourceLinkId || null) : existing.source_link_id, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
+        try { await tx.priceMaterial.update({ where: { id: input.priceMaterialId }, data: { amount, amount_label: amountLabel, currency, unit_id: unitId, source_link_id: input.sourceLinkId !== undefined ? (input.sourceLinkId || null) : existing.source_link_id, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
         await writeAudit(ports, tx, { action: "price-material.updated", entityType: "price_material", entityId: input.priceMaterialId, actor: input.actor, changes: Object.keys(changes).length > 0 ? changes : undefined });
         return { priceMaterialId: input.priceMaterialId };
       });
@@ -145,7 +152,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       return db.priceMaterialLabor.findMany({
         where: { ...(input.includeArchived ? {} : { deleted_at: null }), ...(input.categoryId ? { category_id: input.categoryId } : {}), ...(input.vendorId ? { vendor_id: input.vendorId } : {}), ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { vendor: { name: { contains: search, mode: "insensitive" } } }, { category: { name: { contains: search, mode: "insensitive" } } }] } : {}) },
         orderBy: [{ name: "asc" }, { vendor: { name: "asc" } }],
-        select: { id: true, name: true, slug: true, amount: true, currency: true, scope_note: true, spec: true, dim_display: true, notes: true, updated_at: true, updated_by_label: true, deleted_at: true, category: { select: { id: true, name: true, slug: true } }, vendor: { select: { id: true, name: true, slug: true } }, unit: { select: { id: true, code: true, name: true } } },
+        select: { id: true, name: true, slug: true, amount: true, amount_label: true, currency: true, scope_note: true, spec: true, dim_display: true, notes: true, updated_at: true, updated_by_label: true, deleted_at: true, category: { select: { id: true, name: true, slug: true } }, vendor: { select: { id: true, name: true, slug: true } }, unit: { select: { id: true, code: true, name: true } } },
       });
     },
 
@@ -160,7 +167,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       const name = requiredTitleName(input.name, "PRICE_NAME_REQUIRED");
       const slug = requiredSlug(name);
       const currency = requiredCurrency(input.currency);
-      const amount = requiredAmount(input.amount);
+      const { amount, label: amountLabel } = requiredPriceAmount(input.amount);
       return runTransaction(async (tx: any) => {
         const category = await tx.category.findUniqueOrThrow({ where: { id: input.categoryId } });
         if (category.status !== "ACTIVE") throw new AppError("VALIDATION", "CATEGORY_INACTIVE", "Category is not active.");
@@ -171,7 +178,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         if (vendor.deleted_at !== null) throw new AppError("VALIDATION", "VENDOR_ARCHIVED", "Supplier is archived.");
         await assertVendorLaborCapable(tx, input.vendorId);
         let price;
-        try { price = await tx.priceMaterialLabor.create({ data: { id: randomUUID(), name, slug, category_id: input.categoryId, vendor_id: input.vendorId, unit_id: input.unitId, amount, currency, scope_note: input.scopeNote?.trim() || null, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
+        try { price = await tx.priceMaterialLabor.create({ data: { id: randomUUID(), name, slug, category_id: input.categoryId, vendor_id: input.vendorId, unit_id: input.unitId, amount, amount_label: amountLabel, currency, scope_note: input.scopeNote?.trim() || null, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
         await writeAudit(ports, tx, { action: "price-material-labor.created", entityType: "price_material_labor", entityId: price!.id, actor: input.actor, metadata: { vendor_id: input.vendorId, category_id: input.categoryId } });
         await linkVendorCategories(tx, input.actor, input.vendorId, [input.categoryId]);
         return { priceMaterialLaborId: price!.id };
@@ -184,7 +191,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       const name = requiredTitleName(input.name, "PRICE_NAME_REQUIRED");
       const slug = requiredSlug(name);
       const currency = requiredCurrency(input.currency);
-      const amount = requiredAmount(input.amount);
+      const { amount, label: amountLabel } = requiredPriceAmount(input.amount);
       return runTransaction(async (tx: any) => {
         const existing = await tx.priceMaterialLabor.findUniqueOrThrow({ where: { id: input.priceMaterialLaborId } });
         if (existing.deleted_at !== null) throw new AppError("CONFLICT", "PRICE_ARCHIVED", "Cannot update an archived price.");
@@ -199,6 +206,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (existing.name !== name) { changes.name = { from: existing.name, to: name }; changes.slug = { from: existing.slug, to: slug }; }
         if (existing.amount.toString() !== amount) changes.amount = { from: existing.amount.toString(), to: amount };
+        if ((existing.amount_label ?? null) !== amountLabel) changes.amount_label = { from: existing.amount_label ?? null, to: amountLabel };
         if (existing.currency !== currency) changes.currency = { from: existing.currency, to: currency };
         if (existing.category_id !== input.categoryId) changes.category_id = { from: existing.category_id, to: input.categoryId };
         if (existing.vendor_id !== input.vendorId) changes.vendor_id = { from: existing.vendor_id, to: input.vendorId };
@@ -206,7 +214,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         if ((existing.scope_note || null) !== (input.scopeNote?.trim() || null)) changes.scope_note = { from: existing.scope_note, to: input.scopeNote?.trim() || null };
         if ((existing.notes || null) !== (input.notes?.trim() || null)) changes.notes = { from: existing.notes, to: input.notes?.trim() || null };
         if (Object.keys(changes).length === 0) return { priceMaterialLaborId: input.priceMaterialLaborId };
-        try { await tx.priceMaterialLabor.update({ where: { id: input.priceMaterialLaborId }, data: { name, slug, category_id: input.categoryId, vendor_id: input.vendorId, unit_id: input.unitId, amount, currency, scope_note: input.scopeNote?.trim() || null, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
+        try { await tx.priceMaterialLabor.update({ where: { id: input.priceMaterialLaborId }, data: { name, slug, category_id: input.categoryId, vendor_id: input.vendorId, unit_id: input.unitId, amount, amount_label: amountLabel, currency, scope_note: input.scopeNote?.trim() || null, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
         await writeAudit(ports, tx, { action: "price-material-labor.updated", entityType: "price_material_labor", entityId: input.priceMaterialLaborId, actor: input.actor, changes: Object.keys(changes).length > 0 ? changes : undefined });
         await linkVendorCategories(tx, input.actor, input.vendorId, [input.categoryId]);
         return { priceMaterialLaborId: input.priceMaterialLaborId };
@@ -260,7 +268,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       return db.priceLabor.findMany({
         where: { ...(input.includeArchived ? {} : { deleted_at: null }), ...(input.categoryId ? { category_id: input.categoryId } : {}), ...(input.vendorId ? { vendor_id: input.vendorId } : {}), ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { vendor: { name: { contains: search, mode: "insensitive" } } }, { category: { name: { contains: search, mode: "insensitive" } } }] } : {}) },
         orderBy: [{ name: "asc" }, { vendor: { name: "asc" } }],
-        select: { id: true, name: true, slug: true, amount: true, currency: true, spec: true, dim_display: true, notes: true, updated_at: true, updated_by_label: true, deleted_at: true, category: { select: { id: true, name: true, slug: true } }, vendor: { select: { id: true, name: true, slug: true } }, unit: { select: { id: true, code: true, name: true } } },
+        select: { id: true, name: true, slug: true, amount: true, amount_label: true, currency: true, spec: true, dim_display: true, notes: true, updated_at: true, updated_by_label: true, deleted_at: true, category: { select: { id: true, name: true, slug: true } }, vendor: { select: { id: true, name: true, slug: true } }, unit: { select: { id: true, code: true, name: true } } },
       });
     },
 
@@ -329,7 +337,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         const ids: string[] = [];
         const batchId = randomUUID();
         for (const vendorId of vendorIds) {
-          const picked = input.rows.map((row, rowIndex) => ({ row, rowIndex })).filter(({ row }) => (row.amounts[vendorId] ?? "").trim() !== "");
+          const picked = input.rows.map((row, rowIndex) => ({ row, rowIndex })).filter(({ row }) => isOffered(row.amounts[vendorId] ?? ""));
           if (picked.length === 0) continue;
           try {
             const created = await inner.createWorkPricesBulk({ grants: input.grants, actor: input.actor, kind: input.kind, vendorId, categoryId: input.categoryId, currency: input.currency, rows: picked.map(({ row }) => ({ name: row.name, unitId: row.unitId, amount: row.amounts[vendorId]!, notes: row.notes ?? undefined })) });
@@ -400,7 +408,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       const name = requiredTitleName(input.name, "PRICE_NAME_REQUIRED");
       const slug = requiredSlug(name);
       const currency = requiredCurrency(input.currency);
-      const amount = requiredAmount(input.amount);
+      const { amount, label: amountLabel } = requiredPriceAmount(input.amount);
       return runTransaction(async (tx: any) => {
         const category = await tx.category.findUniqueOrThrow({ where: { id: input.categoryId } });
         if (category.status !== "ACTIVE") throw new AppError("VALIDATION", "CATEGORY_INACTIVE", "Category is not active.");
@@ -411,7 +419,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         if (vendor.deleted_at !== null) throw new AppError("VALIDATION", "VENDOR_ARCHIVED", "Supplier is archived.");
         await assertVendorLaborCapable(tx, input.vendorId);
         let price;
-        try { price = await tx.priceLabor.create({ data: { id: randomUUID(), name, slug, category_id: input.categoryId, vendor_id: input.vendorId, unit_id: input.unitId, amount, currency, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
+        try { price = await tx.priceLabor.create({ data: { id: randomUUID(), name, slug, category_id: input.categoryId, vendor_id: input.vendorId, unit_id: input.unitId, amount, amount_label: amountLabel, currency, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
         await writeAudit(ports, tx, { action: "price-labor.created", entityType: "price_labor", entityId: price!.id, actor: input.actor, metadata: { vendor_id: input.vendorId, category_id: input.categoryId } });
         await linkVendorCategories(tx, input.actor, input.vendorId, [input.categoryId]);
         return { priceLaborId: price!.id };
@@ -424,7 +432,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       const name = requiredTitleName(input.name, "PRICE_NAME_REQUIRED");
       const slug = requiredSlug(name);
       const currency = requiredCurrency(input.currency);
-      const amount = requiredAmount(input.amount);
+      const { amount, label: amountLabel } = requiredPriceAmount(input.amount);
       return runTransaction(async (tx: any) => {
         const existing = await tx.priceLabor.findUniqueOrThrow({ where: { id: input.priceLaborId } });
         if (existing.deleted_at !== null) throw new AppError("CONFLICT", "PRICE_ARCHIVED", "Cannot update an archived price.");
@@ -439,13 +447,14 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (existing.name !== name) { changes.name = { from: existing.name, to: name }; changes.slug = { from: existing.slug, to: slug }; }
         if (existing.amount.toString() !== amount) changes.amount = { from: existing.amount.toString(), to: amount };
+        if ((existing.amount_label ?? null) !== amountLabel) changes.amount_label = { from: existing.amount_label ?? null, to: amountLabel };
         if (existing.currency !== currency) changes.currency = { from: existing.currency, to: currency };
         if (existing.category_id !== input.categoryId) changes.category_id = { from: existing.category_id, to: input.categoryId };
         if (existing.vendor_id !== input.vendorId) changes.vendor_id = { from: existing.vendor_id, to: input.vendorId };
         if (existing.unit_id !== input.unitId) changes.unit_id = { from: existing.unit_id, to: input.unitId };
         if ((existing.notes || null) !== (input.notes?.trim() || null)) changes.notes = { from: existing.notes, to: input.notes?.trim() || null };
         if (Object.keys(changes).length === 0) return { priceLaborId: input.priceLaborId };
-        try { await tx.priceLabor.update({ where: { id: input.priceLaborId }, data: { name, slug, category_id: input.categoryId, vendor_id: input.vendorId, unit_id: input.unitId, amount, currency, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
+        try { await tx.priceLabor.update({ where: { id: input.priceLaborId }, data: { name, slug, category_id: input.categoryId, vendor_id: input.vendorId, unit_id: input.unitId, amount, amount_label: amountLabel, currency, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
         await writeAudit(ports, tx, { action: "price-labor.updated", entityType: "price_labor", entityId: input.priceLaborId, actor: input.actor, changes: Object.keys(changes).length > 0 ? changes : undefined });
         await linkVendorCategories(tx, input.actor, input.vendorId, [input.categoryId]);
         return { priceLaborId: input.priceLaborId };

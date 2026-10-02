@@ -331,6 +331,7 @@ model PriceMaterial {
   sku_id             String
   supplier_vendor_id String
   amount             Decimal   @db.Decimal(16, 2)
+  amount_label       String?   @db.VarChar(64)
   currency           String
   unit_id            String
   source_link_id     String?
@@ -362,6 +363,7 @@ model PriceMaterialLabor {
   vendor_id          String
   unit_id            String
   amount             Decimal   @db.Decimal(16, 2)
+  amount_label       String?   @db.VarChar(64)
   currency           String
   scope_note         String?
   spec               Json?
@@ -392,6 +394,7 @@ model PriceLabor {
   vendor_id          String
   unit_id            String
   amount             Decimal   @db.Decimal(16, 2)
+  amount_label       String?   @db.VarChar(64)
   currency           String
   spec               Json?
   dim_display        String?

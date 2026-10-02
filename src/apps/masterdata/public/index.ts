@@ -24,6 +24,8 @@ export type MaterialPriceOption = {
   skuCode: string | null;
   supplierVendor: { id: string; name: string; slug: string };
   amount: string;
+  /** Text shown for a price on request, e.g. "call sales"; null for a numeric price or an unlabelled price on request. */
+  amountLabel: string | null;
   currency: string;
   unit: { id: string; code: string; name: string };
   measurement: {
@@ -47,6 +49,8 @@ export type PriceWorkRead = {
   vendor: { id: string; name: string; slug: string };
   unit: { id: string; code: string; name: string };
   amount: string;
+  /** Text shown for a price on request, e.g. "call sales"; null for a numeric price or an unlabelled price on request. */
+  amountLabel: string | null;
   currency: string;
   scopeNote: string | null;
   spec: unknown;
@@ -62,6 +66,7 @@ const MATERIAL_PRICE_OPTION_SELECT = {
   id: true,
   sku_id: true,
   amount: true,
+  amount_label: true,
   currency: true,
   supplier_vendor: { select: { id: true, name: true, slug: true } },
   unit: { select: { id: true, code: true, name: true } },
@@ -85,6 +90,7 @@ type MaterialPriceRow = {
   id: string;
   sku_id: string;
   amount: { toString: () => string };
+  amount_label: string | null;
   currency: string;
   supplier_vendor: { id: string; name: string; slug: string };
   unit: { id: string; code: string; name: string };
@@ -110,6 +116,7 @@ function toMaterialPriceOption(p: MaterialPriceRow): MaterialPriceOption {
     skuCode: p.sku.code,
     supplierVendor: p.supplier_vendor,
     amount: p.amount.toString(),
+    amountLabel: p.amount_label ?? null,
     currency: p.currency,
     unit: p.unit,
     measurement: {
@@ -330,6 +337,7 @@ export function createMasterDataPublicRead(db: PrismaClient) {
             name: true,
             slug: true,
             amount: true,
+  amount_label: true,
             currency: true,
             scope_note: true,
             spec: true,
@@ -350,6 +358,7 @@ export function createMasterDataPublicRead(db: PrismaClient) {
             vendor: row.vendor,
             unit: row.unit,
             amount: row.amount.toString(),
+            amountLabel: row.amount_label ?? null,
             currency: row.currency,
             scopeNote: row.scope_note,
             spec: row.spec,
@@ -385,6 +394,7 @@ export function createMasterDataPublicRead(db: PrismaClient) {
             name: true,
             slug: true,
             amount: true,
+  amount_label: true,
             currency: true,
             spec: true,
             dim_display: true,
@@ -404,6 +414,7 @@ export function createMasterDataPublicRead(db: PrismaClient) {
             vendor: row.vendor,
             unit: row.unit,
             amount: row.amount.toString(),
+            amountLabel: row.amount_label ?? null,
             currency: row.currency,
             scopeNote: null,
             spec: row.spec,

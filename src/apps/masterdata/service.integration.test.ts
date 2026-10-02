@@ -2064,3 +2064,158 @@ describe("Sample request notifications (Master Data side, real database)", () =>
     }
   });
 });
+
+describe("Text price labels (WO-MD-PRICE-LABEL-01)", () => {
+  async function workContext(name: string) {
+    const subcon = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUBCON" } });
+    const vendor = await service.createVendor({ grants: GRANTS, actor: ACTOR, name });
+    await testDb.prisma.vendorVendorType.create({ data: { id: crypto.randomUUID(), vendor_id: vendor.vendorId, vendor_type_id: subcon.id } });
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
+    const category = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: `${name} Works`, kind: "WORK" });
+    return { vendorId: vendor.vendorId, unitId: unit.id, categoryId: category.categoryId };
+  }
+  const auditChanges = async (entityId: string) => (await testDb.prisma.auditEvent.findMany({ where: { entity_id: entityId, action: { endsWith: ".updated" } }, orderBy: { occurred_at: "desc" } }))[0]?.changes as Record<string, { from: unknown; to: unknown }> | undefined;
+
+  it("stores a quoted text as amount 0 plus a label for a material price, audits the change, and clears it on a number", async () => {
+    const context = await createMaterialContext();
+    const sku = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Label SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: '"call sales"', currency: "IDR" }] });
+    const created = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: sku.skuId } });
+    assert.equal(created.amount.toString(), "0");
+    assert.equal(created.amount_label, "call sales", "an initial price on a new SKU keeps its label");
+
+    await service.updatePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: created.id, amount: '"Per Project"', currency: "IDR" });
+    assert.equal((await testDb.prisma.priceMaterial.findUniqueOrThrow({ where: { id: created.id } })).amount_label, "Per Project", "labels keep the case as typed");
+    assert.deepEqual((await auditChanges(created.id))?.amount_label, { from: "call sales", to: "Per Project" });
+
+    await service.updatePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: created.id, amount: "125000", currency: "IDR" });
+    const numeric = await testDb.prisma.priceMaterial.findUniqueOrThrow({ where: { id: created.id } });
+    assert.equal(numeric.amount.toString(), "125000");
+    assert.equal(numeric.amount_label, null, "a numeric price never keeps a label");
+    assert.deepEqual((await auditChanges(created.id))?.amount_label, { from: "Per Project", to: null });
+  });
+
+  it("treats a quoted number as text and an unquoted word as an error on every work price kind", async () => {
+    const work = await workContext("Label Work");
+    const base = { grants: GRANTS, actor: ACTOR, categoryId: work.categoryId, vendorId: work.vendorId, unitId: work.unitId, currency: "IDR" };
+    const labor = await service.createPriceLabor({ ...base, name: "Labor Item", amount: '"120"' });
+    const materialLabor = await service.createPriceMaterialLabor({ ...base, name: "Material Labor Item", amount: "“by phone”" });
+    assert.deepEqual(await testDb.prisma.priceLabor.findUniqueOrThrow({ where: { id: labor.priceLaborId } }).then((row) => [row.amount.toString(), row.amount_label]), ["0", "120"], "the quoted 120 is the text 120, not a price");
+    assert.deepEqual(await testDb.prisma.priceMaterialLabor.findUniqueOrThrow({ where: { id: materialLabor.priceMaterialLaborId } }).then((row) => [row.amount.toString(), row.amount_label]), ["0", "by phone"]);
+
+    await service.updatePriceLabor({ ...base, priceLaborId: labor.priceLaborId, name: "Labor Item", amount: "99" });
+    assert.equal((await testDb.prisma.priceLabor.findUniqueOrThrow({ where: { id: labor.priceLaborId } })).amount_label, null);
+    await service.updatePriceMaterialLabor({ ...base, priceMaterialLaborId: materialLabor.priceMaterialLaborId, name: "Material Labor Item", amount: '"by phone, ask Budi"' });
+    assert.deepEqual((await auditChanges(materialLabor.priceMaterialLaborId))?.amount_label, { from: "by phone", to: "by phone, ask Budi" });
+
+    await assert.rejects(() => service.createPriceLabor({ ...base, name: "Bad Unquoted", amount: "call sales" }), (error: unknown) => error instanceof AppError && error.code === "PRICE_AMOUNT_INVALID" && /quotation marks/.test(error.safeMessage));
+    await assert.rejects(() => service.createPriceLabor({ ...base, name: "Bad Long", amount: `"${"x".repeat(65)}"` }), (error: unknown) => error instanceof AppError && error.code === "PRICE_LABEL_TOO_LONG");
+    await assert.rejects(() => service.createPriceLabor({ ...base, name: "Bad Empty", amount: '""' }), (error: unknown) => error instanceof AppError && error.code === "PRICE_AMOUNT_INVALID");
+    await assert.rejects(() => service.createPriceLabor({ ...base, name: "Bad Dash", amount: "-" }), (error: unknown) => error instanceof AppError && error.code === "PRICE_AMOUNT_INVALID", "a single price needs an amount");
+  });
+
+  it("is enforced by the database: a label needs an amount of 0", async () => {
+    const work = await workContext("Label Check");
+    const created = await service.createPriceLabor({ grants: GRANTS, actor: ACTOR, name: "Check Item", categoryId: work.categoryId, vendorId: work.vendorId, unitId: work.unitId, amount: '"ask"', currency: "IDR" });
+    await assert.rejects(() => testDb.prisma.priceLabor.update({ where: { id: created.priceLaborId }, data: { amount: "5" } }), /amount_label_check|check constraint/i);
+    await assert.rejects(() => testDb.prisma.priceLabor.update({ where: { id: created.priceLaborId }, data: { amount_label: "  " } }), /amount_label_check|check constraint/i);
+  });
+
+  it("accepts quoted cells in bulk, matrix and per-row saves and reports unquoted text with its row", async () => {
+    const work = await workContext("Label Bulk");
+    const other = (await workContext("Label Bulk Two")).vendorId;
+    const rows = [
+      { name: "Bulk A", unitId: work.unitId, amount: '"call sales"' },
+      { name: "Bulk B", unitId: work.unitId, amount: "5000" },
+      { name: "Bulk C", unitId: work.unitId, amount: "By Request" },
+    ];
+    const bulk = await service.createWorkPricesBulk({ grants: GRANTS, actor: ACTOR, kind: "labor", vendorId: work.vendorId, categoryId: work.categoryId, currency: "IDR", rows });
+    assert.equal(bulk.ids.length, 3);
+    assert.deepEqual((await testDb.prisma.priceLabor.findMany({ where: { vendor_id: work.vendorId }, orderBy: { name: "asc" } })).map((row) => [row.name, row.amount.toString(), row.amount_label]), [["Bulk A", "0", "call sales"], ["Bulk B", "5000", null], ["Bulk C", "0", null]]);
+
+    await assert.rejects(
+      () => service.createWorkPricesBulk({ grants: GRANTS, actor: ACTOR, kind: "labor", vendorId: work.vendorId, categoryId: work.categoryId, currency: "IDR", rows: [{ name: "Bulk D", unitId: work.unitId, amount: "ask later" }] }),
+      (error: unknown) => error instanceof AppError && error.code === "BULK_ROWS_INVALID" && (error.details as { rows: Array<{ code: string; field: string }> }).rows[0]!.code === "PRICE_AMOUNT_INVALID" && (error.details as { rows: Array<{ field: string }> }).rows[0]!.field === "amount",
+    );
+    assert.equal(await testDb.prisma.priceLabor.count({ where: { name: "Bulk D" } }), 0);
+
+    const matrix = await service.createWorkPriceMatrix({ grants: GRANTS, actor: ACTOR, kind: "labor", categoryId: work.categoryId, currency: "IDR", vendorIds: [work.vendorId, other], rows: [{ name: "Matrix A", unitId: work.unitId, amounts: { [work.vendorId]: '"per project"', [other]: "-" } }, { name: "Matrix B", unitId: work.unitId, amounts: { [work.vendorId]: "", [other]: "7000" } }] });
+    assert.equal(matrix.ids.length, 2, "a dash is not offered and is skipped");
+    assert.equal((await testDb.prisma.priceLabor.findFirstOrThrow({ where: { name: "Matrix A" } })).amount_label, "per project");
+
+    const context = await createMaterialContext();
+    const sku = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Row Label SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] });
+    const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    const second = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Label Row Supplier", vendorTypeIds: [supplierType.id] });
+    const perRow = await service.createMaterialPriceRows({ grants: GRANTS, actor: ACTOR, currency: "IDR", rows: [{ skuId: sku.skuId, vendorId: second.vendorId, amount: '"on site quote"' }] });
+    assert.equal((await testDb.prisma.priceMaterial.findUniqueOrThrow({ where: { id: perRow.ids[0]! } })).amount_label, "on site quote");
+  });
+
+  it("round-trips labelled, quoted-number, and unlabelled on-request prices through the supplier/price workbook", async () => {
+    const work = await workContext("Label Round Trip");
+    await service.createWorkPricesBulk({ grants: GRANTS, actor: ACTOR, kind: "labor", vendorId: work.vendorId, categoryId: work.categoryId, currency: "IDR", rows: [
+      { name: "Labelled Item", unitId: work.unitId, amount: '"call sales"' },
+      { name: "Quoted Number Item", unitId: work.unitId, amount: '"120"' },
+      { name: "On Request Item", unitId: work.unitId, amount: "By Request" },
+      { name: "Numeric Item", unitId: work.unitId, amount: "5000" },
+    ] });
+    const exported = await service.exportPriceDatabase({ grants: GRANTS });
+    const sheet = new ExcelJS.Workbook();
+    await sheet.xlsx.load(exported.data as unknown as ExcelJS.Buffer);
+    const cells: string[] = [];
+    sheet.getWorksheet("Database Harga - Labor")!.eachRow((row) => row.eachCell((cell) => { cells.push(String(cell.value)); }));
+    assert.ok(cells.includes('"call sales"'), "a text price is exported with its quotation marks");
+    assert.ok(cells.includes('"120"'));
+    assert.ok(cells.includes("By Request"));
+
+    const preview = await service.previewPriceDatabaseImport({ grants: GRANTS, actor: ACTOR, file: exported.data, options: { priceKind: "labor" } });
+    assert.deepEqual(preview.errors, []);
+    assert.equal(preview.totals.pricesUnchanged, 4, "importing the export again changes nothing");
+    assert.equal(preview.totals.pricesCreated + preview.totals.pricesUpdated, 0);
+    assert.equal(preview.messages.filter((m) => /is a text price/.test(m.message)).length, 2, "every text price is listed in the preview");
+
+    // Editing the label in the sheet is an update, and a numeric cell turns it back into a plain price.
+    const edited = new ExcelJS.Workbook();
+    await edited.xlsx.load(exported.data as unknown as ExcelJS.Buffer);
+    edited.getWorksheet("Database Harga - Labor")!.eachRow((row) => row.eachCell((cell) => { if (cell.value === '"call sales"') cell.value = '"per project"'; if (cell.value === '"120"') cell.value = 90000; }));
+    const file = Buffer.from(await edited.xlsx.writeBuffer());
+    const changed = await service.previewPriceDatabaseImport({ grants: GRANTS, actor: ACTOR, file, options: { priceKind: "labor" } });
+    assert.equal(changed.totals.pricesUpdated, 2);
+    await service.applyPriceDatabaseImport({ grants: GRANTS, actor: ACTOR, file, hash: changed.hash, options: { priceKind: "labor" } });
+    const rows = await testDb.prisma.priceLabor.findMany({ where: { vendor_id: work.vendorId }, orderBy: { name: "asc" } });
+    assert.deepEqual(rows.map((row) => [row.name, row.amount.toString(), row.amount_label]), [["Labelled Item", "0", "per project"], ["Numeric Item", "5000", null], ["On Request Item", "0", null], ["Quoted Number Item", "90000", null]]);
+  });
+
+  it("reads a quoted amount from the SKU price workbook and exports it back quoted", async () => {
+    const context = await createMaterialContext();
+    const sku = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Quoted Workbook SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "120", currency: "IDR" }] });
+    const book = new ExcelJS.Workbook();
+    await book.xlsx.load((await service.exportSkuPriceWorkbook({ grants: GRANTS })) as any);
+    const sheet = book.getWorksheet("SKU Prices")!;
+    sheet.getCell("O2").value = '"call sales"';
+    const edited = Buffer.from(await book.xlsx.writeBuffer());
+    const preview = await service.previewSkuPriceImport({ grants: GRANTS, file: { data: edited, name: "sku-prices.xlsx" } });
+    assert.deepEqual(preview.errors, []);
+    assert.equal(preview.totals.update, 1);
+    await service.applySkuPriceImport({ grants: GRANTS, actor: ACTOR, file: edited, hash: preview.hash });
+    const price = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: sku.skuId } });
+    assert.deepEqual([price.amount.toString(), price.amount_label], ["0", "call sales"]);
+
+    const again = new ExcelJS.Workbook();
+    await again.xlsx.load((await service.exportSkuPriceWorkbook({ grants: GRANTS })) as any);
+    assert.equal(again.getWorksheet("SKU Prices")!.getCell("O2").value, '"call sales"');
+    const unchanged = await service.previewSkuPriceImport({ grants: GRANTS, file: Buffer.from(await again.xlsx.writeBuffer()) });
+    assert.equal(unchanged.totals.unchanged, 1, "an unchanged label counts as unchanged");
+  });
+
+  it("exposes amountLabel on the public price reads without changing the amount", async () => {
+    const context = await createMaterialContext();
+    const sku = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Public Label SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: '"call sales"', currency: "IDR" }] });
+    const [option] = await publicRead.getSkuPricingOptions(sku.skuId);
+    assert.deepEqual([option!.amount, option!.amountLabel], ["0", "call sales"]);
+    const work = await workContext("Label Public");
+    await service.createPriceLabor({ grants: GRANTS, actor: ACTOR, name: "Public Labor", categoryId: work.categoryId, vendorId: work.vendorId, unitId: work.unitId, amount: '"ask Budi"', currency: "IDR" });
+    await service.createPriceLabor({ grants: GRANTS, actor: ACTOR, name: "Public Plain", categoryId: work.categoryId, vendorId: work.vendorId, unitId: work.unitId, amount: "5000", currency: "IDR" });
+    const works = await publicRead.listWorkPricesRead({ search: "Public" });
+    assert.deepEqual(works.map((row) => [row.name, row.amount, row.amountLabel]).sort(), [["Public Labor", "0", "ask Budi"], ["Public Plain", "5000", null]]);
+  });
+});

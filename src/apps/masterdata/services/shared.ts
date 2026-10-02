@@ -11,6 +11,7 @@ import { lowerCaseText, titleCaseWords } from "@platform/utilities/text-case";
 import { compareDecimals, toDecimalString } from "@platform/utilities/decimal";
 import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurement";
 import { MASTERDATA_ARCHIVE_ENTITY_TYPES, MASTERDATA_DELETION_TARGET_TYPES, type MasterDataArchiveEntityType, type MasterDataDeletionTargetType } from "./polymorphic-registry";
+import { parsePriceAmount } from "../domain/price-amount";
 
 export { hasPermission };
 export type TxClient = Prisma.TransactionClient;
@@ -85,6 +86,13 @@ export const MASTERDATA_PERMISSIONS = {
   deletionApprove: "masterdata.deletion.approve",
   sampleRequestManage: "masterdata.sample-request.manage",
 } as const;
+
+/** A typed or imported price: a number, a quoted text label (amount 0), or "by request". "Not offered" is not a price. */
+export function requiredPriceAmount(value: string): { amount: string; label: string | null } {
+  const parsed = parsePriceAmount(value);
+  if (parsed.kind === "not-offered") throw new AppError("VALIDATION", "PRICE_AMOUNT_INVALID", "Enter an amount, or text in quotation marks.");
+  return { amount: parsed.amount, label: parsed.label };
+}
 
 export function requiredAmount(value: string): string {
   let amount;

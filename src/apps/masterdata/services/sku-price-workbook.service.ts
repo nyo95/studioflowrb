@@ -7,9 +7,15 @@ import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 import { buildImportTemplate, exportTable, parseTabularFile, type FileResult, type ImportFormat, type TableColumn, type TableFormat } from "@platform/utilities/tabular";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, requiredAmount, requiredCurrency, resolveSkuMeasurement, assertVendorMaterialCapable } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, requiredPriceAmount, requiredCurrency, resolveSkuMeasurement, assertVendorMaterialCapable } from "./shared";
 
 const SHEET = "SKU Prices";
+/** True when a stored price already holds the typed amount: same number and same text label. */
+function samePriceAmount(price: { amount: { toString(): string }; amount_label?: string | null }, text: string): boolean {
+  const next = requiredPriceAmount(text);
+  return price.amount.toString() === next.amount && (price.amount_label ?? null) === next.label;
+}
+
 const HEADERS = ["SKU ID", "Code", "Name", "Brand", "Category", "Base unit", "Purchase unit", "Length", "Width", "Thickness", "Dimension unit", "Notes", "Price ID", "Supplier", "Amount", "Currency", "Price notes"] as const;
 const MAX_BYTES = 5 * 1024 * 1024;
 const COLUMNS: TableColumn[] = HEADERS.map((header) => ({ key: header, header, required: true }));
@@ -91,7 +97,7 @@ export function createSkuPriceWorkbookService(
       const hasPrice = Boolean(source.Supplier || source.Amount || source.Currency || source["Price notes"] || priceId);
       const supplierId = source.Supplier ? vendorByName.get(key(source.Supplier)) ?? null : null; if (source.Supplier && !supplierId) add("Supplier", "Supplier was not found.");
       if (hasPrice && !source.Supplier) add("Supplier", "Supplier is required for a material price."); if (hasPrice && !source.Amount) add("Amount", "Amount is required for a material price.");
-      if (source.Amount) try { requiredAmount(source.Amount); } catch { add("Amount", "Amount must be a non-negative decimal."); }
+      if (source.Amount) try { requiredPriceAmount(source.Amount); } catch (error) { add("Amount", error instanceof AppError ? error.safeMessage : "Amount must be a non-negative decimal, or text in quotation marks."); }
       if (hasPrice && !source.Currency) add("Currency", "Currency is required for a material price."); if (source.Currency) try { requiredCurrency(source.Currency); } catch { add("Currency", "Currency must be a 3-letter code."); }
       if (errors.length === 0) {
         try {
@@ -119,7 +125,7 @@ export function createSkuPriceWorkbookService(
       let outcome: Outcome = "error";
       if (errors.length === 0) {
         const skuChanged = !sku || !same(sku.name, source.Name || null) || !same(sku.code, source.Code || null) || !same(sku.notes, source.Notes || null) || sku.brand_id !== brandId || sku.base_unit_id !== baseUnitId || sku.purchase_unit_id !== purchaseUnitId || !same(sku.dimension_length?.toString() ?? null, source.Length || null) || !same(sku.dimension_width?.toString() ?? null, source.Width || null) || !same(sku.dimension_thickness?.toString() ?? null, source.Thickness || null) || sku.dimension_unit_id !== dimensionUnitId || sku.categories[0]?.category_id !== categoryId;
-        const priceChanged = hasPrice && (!price || price.amount.toString() !== requiredAmount(source.Amount) || price.currency !== requiredCurrency(source.Currency) || !same(price.notes, source["Price notes"] || null));
+        const priceChanged = hasPrice && (!price || !samePriceAmount(price, source.Amount) || price.currency !== requiredCurrency(source.Currency) || !same(price.notes, source["Price notes"] || null));
         outcome = !sku ? "create" : skuChanged || priceChanged ? "update" : "unchanged";
         valid.push(candidate);
       }
@@ -140,7 +146,7 @@ export function createSkuPriceWorkbookService(
       const rows: Array<Record<string, string>> = [];
       for (const sku of skus) {
         const common = { "SKU ID": sku.id, Code: sku.code ?? "", Name: sku.name ?? "", Brand: sku.brand?.name ?? "", Category: sku.categories[0]?.category.name ?? "", "Base unit": sku.base_unit.code, "Purchase unit": sku.purchase_unit?.code ?? "", Length: sku.dimension_length?.toString() ?? "", Width: sku.dimension_width?.toString() ?? "", Thickness: sku.dimension_thickness?.toString() ?? "", "Dimension unit": sku.dimension_unit?.code ?? "", Notes: sku.notes ?? "" };
-        for (const price of sku.material_prices.length ? sku.material_prices : [null]) rows.push({ ...common, "Price ID": price?.id ?? "", Supplier: price?.supplier_vendor.name ?? "", Amount: price?.amount.toString() ?? "", Currency: price?.currency ?? "", "Price notes": price?.notes ?? "" });
+        for (const price of sku.material_prices.length ? sku.material_prices : [null]) rows.push({ ...common, "Price ID": price?.id ?? "", Supplier: price?.supplier_vendor.name ?? "", Amount: price ? (price.amount_label ? `"${price.amount_label}"` : price.amount.toString()) : "", Currency: price?.currency ?? "", "Price notes": price?.notes ?? "" });
       }
       const reference: string[][] = [["Brands", "Categories", "Units", "Suppliers"]];
       for (let i = 0; i < Math.max(brands.length, categories.length, units.length, vendors.length); i += 1) reference.push([brands[i]?.name ?? "", categories[i]?.name ?? "", units[i] ? `${units[i].code} — ${units[i].name}` : "", vendors[i]?.name ?? ""]);
@@ -181,7 +187,7 @@ export function createSkuPriceWorkbookService(
           if (!skuId) { const group = `${key(row.Code)}:${key(row.Name)}`; if (completedNewGroups.has(group)) continue; const grouped = newRows.get(group)!; const result = await service.createSku({ ...skuInput, priceMaterials: grouped.map((entry) => ({ supplierVendorId: entry.supplierId!, amount: entry.Amount, currency: entry.Currency, notes: entry["Price notes"] || undefined })) }); skuId = result.skuId; completedNewGroups.add(group); created += 1; continue; }
           const before = check.rows.find((x) => x.row === row.row)!; if (before.outcome === "update") { await service.updateSku({ ...skuInput, skuId }); updated += 1; }
           if (row.Supplier && !row.price) { await service.createPriceMaterial({ grants: input.grants, actor: input.actor, skuId, supplierVendorId: row.supplierId!, amount: row.Amount, currency: row.Currency, notes: row["Price notes"] || undefined }); if (before.outcome !== "update") updated += 1; }
-          else if (row.price && (row.price.amount.toString() !== requiredAmount(row.Amount) || row.price.currency !== requiredCurrency(row.Currency) || !same(row.price.notes, row["Price notes"] || null))) await service.updatePriceMaterial({ grants: input.grants, actor: input.actor, priceMaterialId: row.price.id, amount: row.Amount, currency: row.Currency, notes: row["Price notes"] || null });
+          else if (row.price && (!samePriceAmount(row.price, row.Amount) || row.price.currency !== requiredCurrency(row.Currency) || !same(row.price.notes, row["Price notes"] || null))) await service.updatePriceMaterial({ grants: input.grants, actor: input.actor, priceMaterialId: row.price.id, amount: row.Amount, currency: row.Currency, notes: row["Price notes"] || null });
         }
         await ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "sku-price-workbook.applied", entityType: "sku_price_workbook", entityId: actual, actor: input.actor, metadata: { created, updated, unchanged: check.rows.filter((x) => x.outcome === "unchanged").length } }), tx as any);
         return { totals: { create: created, update: updated, unchanged: check.rows.filter((x) => x.outcome === "unchanged").length, error: 0 } };

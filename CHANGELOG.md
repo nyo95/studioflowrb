@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.290**
-- Next local revision: **R8.291**
+- Current revision after this entry is committed: **R8.291**
+- Next local revision: **R8.292**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -49,6 +49,15 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - WO-SF-ITER-01 is finished and reviewed (R8.285 to R8.289), so the queued Master Data plan for text price labels written in quotation marks moved from `docs/agent/queued-plans/` to the root `PLAN.md`, status READY, and its Executor prompt now requires every listed test, a scratch-database migration check, and a single uninterrupted run. The Executor takes the next revision (R8.291); the Lead builds the italic display afterwards. Docs only; no code, schema, or migration change.
 
 **Checks.** `git diff --check`.
+
+## R8.291 | 2026-10-02 | feat(masterdata): text price labels written in quotation marks
+
+- A price can now be a number or a short text written in quotation marks ("call sales", up to 64 characters). It is stored as an amount of 0 plus a label (`amount_label` on `PriceMaterial`, `PriceMaterialLabor`, `PriceLabor`, guarded by database checks), keeps its case as typed, and a quoted number such as "120" is the text 120. Unquoted By Request / TBC / TBA / Nego stay a price on request without a label; unquoted words are rejected with a message that points to quotation marks. Existing rows are untouched.
+- One pure grammar (`src/apps/masterdata/domain/price-amount.ts`) is used by all three price services (create and update, with the label change in the audit event), the new-SKU initial prices, the bulk, compare-suppliers and per-row saves (a dash cell is skipped, bad text is reported with its row), the SKU price workbook, and the supplier/price workbook. Both workbooks export a text price with its quotation marks and read it back unchanged; the supplier/price preview lists every text price as an information note. The public price reads gain an additive `amountLabel`; nothing else about their shape changed.
+- Screens are unchanged: the amount boxes still strip non-digits as people type, so quoted text cannot be typed yet. The Lead's UI follow-up (see `docs/BACKLOG.md`) lets quotes through, shows the label in italics, and adds the hint.
+- The Executor reached its limit mid-run with an incomplete draft (schema, parser stub, material price path); the Lead rewrote the parser, completed every other path and the tests, and replaced the draft's empty migration pre-check with a row-count report. The recorded migration checksum on both rebuild databases was updated to the final file.
+
+**Checks.** `npm test` (793 pass, 0 fail; was 759); `npm run check`; `npm run lint` (0 errors; two existing image warnings); full chain of 82 migrations from an empty scratch database plus schema diff (only the existing `user_preference.updated_at` default differs); migration present on `studioflow_rebuild` and `studioflow_rebuild_test`. Production build intentionally not run.
 
 ## R8.289 | 2026-10-02 | test(studioflow): Lead review of WO-SF-ITER-01 phases 2-3 - PASS with regression tests
 

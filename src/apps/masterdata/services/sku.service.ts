@@ -5,7 +5,7 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, requiredCurrency, requiredAmount, resolveSkuIdentity, resolveSkuMeasurement, assertSkuRestorable, assertPriceMaterialRestorable, assertVendorMaterialCapable, assertPriceMaterialBrandSupplierChain, assertWorkPriceRestorable, pruneOriginlessBrandCategories, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, requiredCurrency, requiredPriceAmount, resolveSkuIdentity, resolveSkuMeasurement, assertSkuRestorable, assertPriceMaterialRestorable, assertVendorMaterialCapable, assertPriceMaterialBrandSupplierChain, assertWorkPriceRestorable, pruneOriginlessBrandCategories, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, createDeletionRequest, writeAudit } from "./shared";
 
 export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts) {
   const { runTransaction } = ports;
@@ -30,7 +30,7 @@ export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts
           dimension_length: true, dimension_width: true, dimension_thickness: true, dimension_unit: { select: { id: true, code: true, name: true } },
           purchase_to_base_factor: true,
           categories: { select: { category: { select: { id: true, name: true, slug: true } } } },
-          material_prices: { where: { deleted_at: null }, select: { id: true, amount: true, currency: true, supplier_vendor: { select: { id: true, name: true } }, unit: { select: { id: true, code: true, name: true } } } },
+          material_prices: { where: { deleted_at: null }, select: { id: true, amount: true, amount_label: true, currency: true, supplier_vendor: { select: { id: true, name: true } }, unit: { select: { id: true, code: true, name: true } } } },
           _count: { select: { material_prices: true } },
         },
       });
@@ -65,14 +65,14 @@ export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts
         const brand = input.brandId ? await tx.brand.findUniqueOrThrow({ where: { id: input.brandId } }) : null;
         if (brand?.deleted_at) throw new AppError("VALIDATION", "SKU_BRAND_ARCHIVED", "Brand is archived.");
         const priceUnitId = input.purchaseUnitId ?? input.baseUnitId;
-        for (const pm of input.priceMaterials) { requiredCurrency(pm.currency); requiredAmount(pm.amount); const supplier = await tx.vendor.findUniqueOrThrow({ where: { id: pm.supplierVendorId } }); if (supplier.deleted_at !== null) throw new AppError("VALIDATION", "PRICE_VENDOR_ARCHIVED", "Supplier is archived."); await assertVendorMaterialCapable(tx, pm.supplierVendorId); }
+        for (const pm of input.priceMaterials) { requiredCurrency(pm.currency); requiredPriceAmount(pm.amount); const supplier = await tx.vendor.findUniqueOrThrow({ where: { id: pm.supplierVendorId } }); if (supplier.deleted_at !== null) throw new AppError("VALIDATION", "PRICE_VENDOR_ARCHIVED", "Supplier is archived."); await assertVendorMaterialCapable(tx, pm.supplierVendorId); }
         let sku;
         try { sku = await tx.sku.create({ data: { id: randomUUID(), name: identity.name, slug: identity.slug, code: identity.code, notes: input.notes?.trim() || null, brand_id: input.brandId || null, base_unit_id: input.baseUnitId, purchase_unit_id: input.purchaseUnitId ?? null, ...measurement } }); } catch (error) { mapWriteError(error); }
         const skuId = sku!.id;
         await tx.skuCategory.createMany({ data: categoryIds.map((categoryId) => ({ id: randomUUID(), sku_id: skuId, category_id: categoryId })) });
         const productCategoryIds = categories.filter((c) => c.kind === "PRODUCT").map((c) => c.id);
         for (const catId of input.brandId ? productCategoryIds : []) { let bc = await tx.brandCategory.findUnique({ where: { brand_id_category_id: { brand_id: input.brandId!, category_id: catId } } }); if (!bc) { bc = await tx.brandCategory.create({ data: { id: randomUUID(), brand_id: input.brandId!, category_id: catId } }); } await tx.brandCategoryOrigin.create({ data: { id: randomUUID(), brand_category_id: bc.id, kind: "SKU_ENRICHMENT", source_sku_id: skuId, actor_user_id: input.actor.userId ?? null, actor_label: input.actor.label } }); }
-        const initialPrices = input.priceMaterials.map((pm) => ({ id: randomUUID(), sku_id: skuId, supplier_vendor_id: pm.supplierVendorId, amount: requiredAmount(pm.amount), currency: requiredCurrency(pm.currency), unit_id: priceUnitId, notes: pm.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label }));
+        const initialPrices = input.priceMaterials.map((pm) => ({ id: randomUUID(), sku_id: skuId, supplier_vendor_id: pm.supplierVendorId, ...(({ amount, label }) => ({ amount, amount_label: label }))(requiredPriceAmount(pm.amount)), currency: requiredCurrency(pm.currency), unit_id: priceUnitId, notes: pm.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label }));
         for (const price of initialPrices) await assertPriceMaterialBrandSupplierChain(tx, skuId, price.supplier_vendor_id);
         await tx.priceMaterial.createMany({ data: initialPrices });
         await writeAudit(ports, tx, { action: "sku.created", entityType: "sku", entityId: skuId, actor: input.actor, metadata: { slug: identity.slug, brand_id: input.brandId, categories: categoryIds.length, prices: input.priceMaterials.length, purchase_to_base_factor: measurement.purchase_to_base_factor } });

@@ -7,7 +7,7 @@ import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 import { createWorkbook, loadWorkbook, workbookToBuffer, type Workbook, type WorkbookCellValue, type Worksheet, type WorksheetRow } from "@platform/utilities/tabular";
 import { titleCaseWords } from "@platform/utilities/text-case";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, requiredAmount } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, requiredPriceAmount } from "./shared";
 
 /**
  * The supplier-and-price database workbook, shaped like the owner's own Excel file so an existing file can be imported
@@ -64,10 +64,15 @@ function cellText(value: WorkbookCellValue): string {
   return "";
 }
 
-/** "Rp 1.250.000", "135000", 135000, "-" and "By Request" -> a plain decimal string, null for no price, undefined for unreadable. */
+/**
+ * "Rp 1.250.000", "135000", 135000, "-" and "By Request" -> a plain decimal string, null for no price, undefined for unreadable.
+ * A cell that starts with a quotation mark is a text price and is passed through untouched (still quoted) for the shared price grammar.
+ */
 function readAmount(value: WorkbookCellValue): string | null | undefined {
   if (typeof value === "number") return value < 0 || !Number.isFinite(value) ? undefined : Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, "");
-  const raw = cellText(value).replace(/^rp\.?\s*/i, "").trim();
+  const quoted = cellText(value);
+  if (/^["\u201c\u201d]/.test(quoted)) return quoted;
+  const raw = quoted.replace(/^rp\.?\s*/i, "").trim();
   if (ON_REQUEST.test(raw)) return "0";
   if (emptyText(raw)) return null;
   const text = raw.replace(/\s/g, "");
@@ -263,7 +268,9 @@ export function createPriceDatabaseWorkbookService(
       return units.find((u) => key(u.code) === alias || key(u.name) === k || key(u.code) === k)?.id ?? options.defaultUnitId ?? null;
     };
     const subcon = typeFor("SUBCON");
-    type Cell = { item: ParsedItem; name: string; vendorId: string; amount: string; unitId: string; categoryId: string };
+    type Cell = { item: ParsedItem; name: string; vendorId: string; amount: string; label: string | null; unitId: string; categoryId: string };
+    /** What the pricing services take: the plain decimal, or the label written back in quotation marks. */
+    const amountInput = (cell: { amount: string; label: string | null }) => (cell.label !== null ? `"${cell.label}"` : cell.amount);
     const cells: Cell[] = [];
     for (const item of parsed.items) {
       const where = { level: "error" as const, sheet: item.sheet, row: item.row };
@@ -288,9 +295,10 @@ export function createPriceDatabaseWorkbookService(
           }
         }
         if (!vendor.labor) { errors.push({ ...where, message: `${amount.supplier} cannot provide labor, so it cannot hold a work price.` }); continue; }
-        let normalized: string;
-        try { normalized = requiredAmount(amount.amount); } catch { errors.push({ ...where, message: `${amount.supplier}: amount "${amount.amount}" is not valid.` }); continue; }
-        cells.push({ item, name: item.name, vendorId: vendor.id, amount: normalized, unitId, categoryId: cat });
+        let normalized: { amount: string; label: string | null };
+        try { normalized = requiredPriceAmount(amount.amount); } catch (error) { errors.push({ ...where, message: `${amount.supplier}: ${error instanceof AppError ? error.safeMessage : `amount "${amount.amount}" is not valid.`}` }); continue; }
+        if (normalized.label !== null) messages.push({ level: "info", sheet: item.sheet, row: item.row, message: `${amount.supplier}: "${item.name}" is a text price: "${normalized.label}".` });
+        cells.push({ item, name: item.name, vendorId: vendor.id, amount: normalized.amount, label: normalized.label, unitId, categoryId: cat });
       }
     }
 
@@ -315,9 +323,9 @@ export function createPriceDatabaseWorkbookService(
       const found = existingByKey.get(`${cell.vendorId}|${key(cell.name)}`);
       if (!found) { const groupKey = `${cell.categoryId}|${cell.vendorId}`; toCreate.set(groupKey, [...(toCreate.get(groupKey) ?? []), cell]); continue; }
       const notes = cell.item.notes || null;
-      if (found.amount.toString() === cell.amount && found.unit_id === cell.unitId && found.category_id === cell.categoryId && (found.notes ?? null) === notes) { totals.pricesUnchanged += 1; continue; }
+      if (found.amount.toString() === cell.amount && (found.amount_label ?? null) === cell.label && found.unit_id === cell.unitId && found.category_id === cell.categoryId && (found.notes ?? null) === notes) { totals.pricesUnchanged += 1; continue; }
       try {
-        const common = { grants, actor, name: found.name, categoryId: cell.categoryId, vendorId: cell.vendorId, unitId: cell.unitId, amount: cell.amount, currency: found.currency, notes };
+        const common = { grants, actor, name: found.name, categoryId: cell.categoryId, vendorId: cell.vendorId, unitId: cell.unitId, amount: amountInput(cell), currency: found.currency, notes };
         if (options.priceKind === "labor") await s.updatePriceLabor!({ ...common, priceLaborId: found.id });
         else await s.updatePriceMaterialLabor!({ ...common, priceMaterialLaborId: found.id, scopeNote: found.scope_note });
         totals.pricesUpdated += 1;
@@ -330,7 +338,7 @@ export function createPriceDatabaseWorkbookService(
       for (let start = 0; start < group.length; start += 100) {
         const chunk = group.slice(start, start + 100);
         try {
-          const created = await s.createWorkPricesBulk!({ grants, actor, kind: options.priceKind, vendorId: chunk[0]!.vendorId, categoryId: chunk[0]!.categoryId, currency: "IDR", rows: chunk.map((cell) => ({ name: cell.name, unitId: cell.unitId, amount: cell.amount, notes: cell.item.notes || null })) });
+          const created = await s.createWorkPricesBulk!({ grants, actor, kind: options.priceKind, vendorId: chunk[0]!.vendorId, categoryId: chunk[0]!.categoryId, currency: "IDR", rows: chunk.map((cell) => ({ name: cell.name, unitId: cell.unitId, amount: amountInput(cell), notes: cell.item.notes || null })) });
           totals.pricesCreated += created.ids.length;
         } catch (error) {
           if (!(error instanceof AppError)) throw error;
@@ -391,7 +399,7 @@ export function createPriceDatabaseWorkbookService(
           for (const price of rows) items.set(key(price.name), [...(items.get(key(price.name)) ?? []), price]);
           for (const group of items.values()) {
             const first = group[0]!;
-            ws.addRow(["-", first.name, first.notes ?? "", first.unit.code, ...suppliers.map(([id]) => { const hit = group.find((p) => p.vendor.id === id); return hit ? (Number(hit.amount.toString()) === 0 ? "By Request" : Number(hit.amount.toString())) : null; }), ""]);
+            ws.addRow(["-", first.name, first.notes ?? "", first.unit.code, ...suppliers.map(([id]) => { const hit = group.find((p) => p.vendor.id === id); return hit ? (hit.amount_label ? `"${hit.amount_label}"` : Number(hit.amount.toString()) === 0 ? "By Request" : Number(hit.amount.toString())) : null; }), ""]);
           }
         }
         ws.columns.forEach((column, index) => { column.width = index === 1 ? 36 : index === 2 ? 40 : index === 3 ? 10 : 18; });
