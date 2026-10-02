@@ -609,7 +609,8 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       });
       const now = nowOf(ports);
       return rows.map((project) => {
-        const phases = project.phases.map((phase) => {
+        const phases = project.phases.map((phase, index) => {
+          const previous = index > 0 ? project.phases[index - 1]! : null;
           const current = phase.revisions.find((iteration) => ["NOT_SENT", "SENT", "ANSWERED"].includes(iteration.status)) ?? null;
           const isSupervision = phase.definition_id === "00000000-0000-4000-8000-000000000105";
           const visits = phase.revisions.filter((iteration) => iteration.visit_date);
@@ -620,16 +621,21 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
             id: phase.id, name: phase.name_snapshot, order: phase.order_index, status: phase.status as PhaseStatus,
             current_iteration: current ? { id: current.id, name: current.name, state: current.status, sent_at: current.sent_at, waiting_days: current.status === "SENT" ? waitingDays(current.sent_at, now) : null, available_choices: choices } : null,
             iteration_count: phase.revisions.length, has_note: Boolean(phase.note?.trim()),
+            is_supervision: isSupervision,
+            seat: phase.seat_snapshot as "designer" | "drafter",
+            /** A not-started phase may be started now: the project is active and the phase is parallel or its predecessor is done. */
+            can_start: phase.status === "PENDING" && project.status === "ACTIVE" && (phase.allow_parallel || !previous || previous.status === "DONE"),
             last_visit_days_ago: isSupervision ? waitingDays(lastVisit, now) : null,
           };
         });
         const allPhasesDone = project.phases.every((phase) => phase.status === "DONE");
         const earliestActive = project.phases.find((phase) => phase.status === "ACTIVE")?.order_index;
+        // A later sequential phase that is already done may no longer match a reopened earlier one. Parallel phases are expected to finish out of order.
         return {
           id: project.id, name: project.name, client: project.client, status: project.status as ProjectStatus,
           pic_ids: { designer: project.pic_designer_id, drafter: project.pic_drafter_id },
           all_phases_done: allPhasesDone,
-          dependents_review_suggested: earliestActive !== undefined && project.phases.some((phase) => phase.order_index > earliestActive && phase.status === "DONE"),
+          dependents_review_suggested: earliestActive !== undefined && project.phases.some((phase) => phase.order_index > earliestActive && phase.status === "DONE" && !phase.allow_parallel),
           can_mark_completed: project.status !== "COMPLETED" && Boolean(input.actorId && (project.pic_designer_id === input.actorId || project.pic_drafter_id === input.actorId || hasPermission(input.grants, P.projectOverride))),
           note_phases: project.phases.filter((phase) => Boolean(phase.note?.trim())).map((phase) => phase.id),
           requirements_waiting: project.phases.reduce((sum, phase) => sum + phase.checklist_items.length, 0),

@@ -10,6 +10,7 @@ import { getRevisionActivitiesAction } from "../../../../actions";
 type Revision = {
   id: string;
   label: string;
+  name: string;
   createdAt: Date;
   closedAt: Date | null;
   // V2-D1: SfActivity is FEEDBACK-only; todos live in SfChecklistItem
@@ -38,12 +39,12 @@ export function RevisionHistory({ revisions }: { revisions: Revision[] }) {
     }
   }
   return (
-    <SectionCard title="Revision history" count={revisions.length}>
+    <SectionCard title="Feedback history" count={revisions.length}>
       <div className="grid gap-2">
         {revisions.map((revision) => (
           <details key={revision.id} className="rounded-control border border-line px-3 py-2" onToggle={(event) => { if (event.currentTarget.open) void load(revision.id); }}>
             <summary className="flex cursor-pointer flex-wrap items-center gap-2">
-              <Badge>{revision.label}</Badge>
+              <Badge>{revision.name}</Badge>
               <Text size="sm" tone="secondary">
                 Opened <FormattedInstant value={revision.createdAt} locale={locale} timeZone={timezone} />
                 {revision.closedAt ? <> · closed <FormattedInstant value={revision.closedAt} locale={locale} timeZone={timezone} /></> : null}

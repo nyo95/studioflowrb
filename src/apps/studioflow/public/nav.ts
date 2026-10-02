@@ -30,7 +30,7 @@ export const STUDIOFLOW_NAV_LINKS: {
   utility: readonly StudioFlowNavLink[];
 } = {
   workspace: [
-    { href: "/studioflow", label: "Today", exact: true },
+    { href: "/studioflow", label: "Home", exact: true },
     { href: "/studioflow/projects", label: "Projects" },
     { href: "/studioflow/timeline", label: "Timeline" },
     { href: "/studioflow/clients", label: "Clients" },

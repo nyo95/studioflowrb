@@ -59,7 +59,7 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
         status: { not: "COMPLETED" },
         ...(scope === "mine" ? { OR: [{ pic_designer_id: userId }, { pic_drafter_id: userId }] } : {}),
       };
-      const notStale: Prisma.SfChecklistItemWhereInput = { NOT: { is_checked: true, checked_at: { lt: retention } } };
+      const notStale: Prisma.SfChecklistItemWhereInput = { dismissed_at: null, NOT: { is_checked: true, checked_at: { lt: retention } } };
       const projects = await db.sfProject.findMany({
         where,
         orderBy: [{ priority: "asc" }, { name: "asc" }],

@@ -6,7 +6,7 @@ import { createPrivateObjectKey } from "@platform/core/storage";
 
 import { fullBlockers, todoBlockers } from "../domain/blockers";
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
-import { isCdMall, iterationKinds } from "../domain/iteration-kinds";
+import { isCdMall, iterationChoices, iterationKinds } from "../domain/iteration-kinds";
 import {
   availablePhaseCommands,
   canActivatePhase,
@@ -47,6 +47,9 @@ type PhaseRow = Awaited<ReturnType<TxClient["sfPhase"]["findUniqueOrThrow"]>>;
 type ProjectRow = Awaited<ReturnType<TxClient["sfProject"]["findUniqueOrThrow"]>>;
 
 /** Iteration states that count as "the phase's open iteration". */
+/** Undo stays possible for this long after a change (WO-SF-ITER-01 decision 7). */
+export const UNDO_WINDOW_MS = 300_000;
+
 const OPEN_ITERATION_STATES: Array<"NOT_SENT" | "SENT" | "ANSWERED"> = ["NOT_SENT", "SENT", "ANSWERED"];
 
 function invalidState(message = "This action is not available in the phase's current state."): AppError {
@@ -380,6 +383,13 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     const occurredAt = latest && latest.occurred_at >= requested ? new Date(latest.occurred_at.getTime() + 1) : requested;
     return tx.sfPhaseEvent.create({ data: { id: randomUUID(), project_id: phase.project_id, phase_id: phase.id, iteration_id: iterationId, from_state: from, to_state: to, actor_id: input.actor.userId!, occurred_at: occurredAt, auto_created: autoCreated as never } });
   }
+  /** A phase that has not started follows the sequential rule: its predecessor must be done unless the phase runs in parallel. */
+  async function assertCanStart(tx: TxClient, phase: PhaseRow) {
+    const previous = await tx.sfPhase.findFirst({ where: { project_id: phase.project_id, order_index: phase.order_index - 1 } });
+    if (!canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null)) {
+      throw conflict("PHASE_SEQUENTIAL", `${resolvePhaseName(phase)} starts after ${resolvePhaseName(previous!)} is finished.`);
+    }
+  }
   async function createIteration(tx: TxClient, phase: PhaseRow, kind?: string | null, visit?: { date: Date; note: string | null }) {
     const latest = await latestRevision(tx, phase.id);
     const major = (latest?.major ?? 0) + 1;
@@ -427,6 +437,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       return runTransaction(async (tx) => {
         const { phase, project } = await writableIteration(tx, input);
         if (phase.status !== "PENDING" && phase.status !== "DONE") throw invalidState("An iteration can only be added to a new or finished phase.");
+        if (phase.status === "PENDING") await assertCanStart(tx, phase);
         const iteration = await createIteration(tx, phase, await defaultFirstKind(tx, phase));
         await setPhase(tx, phase, { status: "ACTIVE", is_locked: false });
         await recordEvent(tx, input, phase, null, phase.status, "NOT_SENT", { createdIteration: iterationUndo(iteration), phaseBefore: phase.status });
@@ -500,7 +511,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const item = await tx.sfChecklistItem.findFirst({ where: { id: input.itemId, phase_id: phase.id } }); if (!item) throw notFound("requirement"); if (item.dismissed_at) return { itemId: item.id }; await tx.sfChecklistItem.update({ where: { id: item.id }, data: { dismissed_at: nowOf(ports) } }); await recordEvent(tx, input, phase, null, "VISIBLE", "DISMISSED", { requirementId: item.id, dismissedAtBefore: null }); await audit(tx, input.actor, "requirement-dismissed", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { requirementId: item.id }); return { itemId: item.id }; });
     },
     async createSupervisionVisit(input: PhaseCommandInput & { visitDate: string; note?: string | null }) {
-      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); if (!isLegacySupervisionDefinition(phase.definition_id)) throw invalidState("Visits are available only for Supervision."); if (phase.status !== "PENDING" && phase.status !== "ACTIVE") throw invalidState(); if (await activeRevision(tx, phase.id)) throw invalidState("Finish the current visit before adding another."); const visit = await createIteration(tx, phase, undefined, { date: dateOnlyToDate(input.visitDate), note: input.note ? requiredText(input.note, "VISIT_NOTE_REQUIRED", "Visit note", 2000) : null }); if (phase.status === "PENDING") await setPhase(tx, phase, { status: "ACTIVE", is_locked: false }); await recordEvent(tx, input, phase, null, null, "NOT_SENT", { createdIteration: iterationUndo(visit), phaseBefore: phase.status }); return { iterationId: visit.id }; });
+      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); if (!isLegacySupervisionDefinition(phase.definition_id)) throw invalidState("Visits are available only for Supervision."); if (phase.status !== "PENDING" && phase.status !== "ACTIVE") throw invalidState(); if (phase.status === "PENDING") await assertCanStart(tx, phase); if (await activeRevision(tx, phase.id)) throw invalidState("Finish the current visit before adding another."); const visit = await createIteration(tx, phase, undefined, { date: dateOnlyToDate(input.visitDate), note: input.note ? requiredText(input.note, "VISIT_NOTE_REQUIRED", "Visit note", 2000) : null }); if (phase.status === "PENDING") await setPhase(tx, phase, { status: "ACTIVE", is_locked: false }); await recordEvent(tx, input, phase, null, null, "NOT_SENT", { createdIteration: iterationUndo(visit), phaseBefore: phase.status }); return { iterationId: visit.id }; });
     },
     async chooseSupervisionVisit(input: PhaseCommandInput & { iterationId: string; outcome: "NEXT_VISIT" | "DONE" }) {
       return runTransaction(async (tx) => { const { phase, project } = await writableIteration(tx, input); if (!isLegacySupervisionDefinition(phase.definition_id)) throw invalidState(); const visit = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } }); if (!visit || visit.status !== "NOT_SENT") throw invalidState("Only the open visit can be completed."); if (input.outcome === "NEXT_VISIT") { await tx.sfRevision.update({ where: { id: visit.id }, data: { status: "DONE", done_at: nowOf(ports) } }); await recordEvent(tx, input, phase, visit.id, "NOT_SENT", "DONE", { beforeIteration: iterationUndo(visit) }); return { iterationId: visit.id }; } return closePhase(tx, input, phase, project, visit); });
@@ -513,7 +524,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const latest = await tx.sfPhaseEvent.findFirst({ where: { project_id: input.projectId }, orderBy: { occurred_at: "desc" } });
         if (latest?.id !== event.id) throw conflict("UNDO_NOT_LATEST", "Only the latest project change can be undone.");
         if (event.actor_id !== input.actor.userId) throw conflict("UNDO_ACTOR_MISMATCH", "Only the person who made this change can undo it.");
-        if (event.undone_at || nowOf(ports).getTime() - event.occurred_at.getTime() > 300_000) throw conflict("UNDO_EXPIRED", "This change can no longer be undone.");
+        if (event.undone_at || nowOf(ports).getTime() - event.occurred_at.getTime() > UNDO_WINDOW_MS) throw conflict("UNDO_EXPIRED", "This change can no longer be undone.");
         const p = (event.auto_created ?? {}) as { beforeIteration?: ReturnType<typeof iterationUndo>; createdIteration?: ReturnType<typeof iterationUndo>; deletedIteration?: { iteration: ReturnType<typeof iterationUndo> }; autoAdvance?: { phaseId: string; iterationId: string } | null; phaseBefore?: string; phaseNoteBefore?: string | null; requirementId?: string; dismissedAtBefore?: string | null; feedback?: { itemIds: string[]; feedbackIds: string[] } };
         for (const created of [p.createdIteration, p.autoAdvance ? { id: p.autoAdvance.iterationId } : undefined]) {
           if (!created) continue;
@@ -763,12 +774,13 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         select: {
           id: true, project_id: true, definition_id: true, order_index: true, status: true, is_locked: true,
           allow_parallel: true, name_snapshot: true, prefix_snapshot: true, seat_snapshot: true,
-          status_changed_at: true,
+          status_changed_at: true, note: true,
+          definition: { select: { default_iteration_kinds: true } },
           project: { select: { id: true, name: true, archived_at: true, status: true, pic_designer_id: true, pic_drafter_id: true } },
           revisions: {
             orderBy: { major: "desc" },
             select: {
-              id: true, major: true, name: true, status: true, created_at: true, sent_at: true, answered_at: true, done_at: true,
+              id: true, major: true, name: true, status: true, created_at: true, sent_at: true, answered_at: true, done_at: true, visit_date: true, note: true,
               _count: { select: { activities: true } },
             },
           },
@@ -788,6 +800,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         return true;
       });
       const snap = phaseSnapshot(phase);
+      const isSupervision = isLegacySupervisionDefinition(phase.definition_id);
       const seatUserId = snap.seatSnapshot === "drafter" ? phase.project.pic_drafter_id : phase.project.pic_designer_id;
       // R2.4E: Warning projection — non-blocking indicators for UI.
       // Warning-only checklist items (the merged requirements) count here, never in blockers.
@@ -815,6 +828,19 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         blockers: fullBlockers(counts, blockerItems),
         todoBlockers: todoBlockers(counts),
         warnings: { optionalOpen, deliverableStatus: computeDeliverableStatus(deliverables, refRevisionId) },
+        note: phase.note,
+        isSupervision,
+        canStart: status === "PENDING" && phase.project.status === "ACTIVE" && canStart,
+        /** The open iteration with the next steps the server will accept (the same choices the project card shows). */
+        currentIteration: active ? {
+          id: active.id, name: active.name, state: active.status, sentAt: active.sent_at, visitDate: dateToDateOnly(active.visit_date),
+          waitingDays: active.status === "SENT" ? waitingDays(active.sent_at, nowOf(ports)) : null,
+          choices: iterationChoices({ state: active.status, phaseStatus: status, iterationName: active.name, kinds: iterationKinds(phase.definition.default_iteration_kinds), supervision: isSupervision }),
+        } : null,
+        iterations: phase.revisions.map((rev) => ({
+          id: rev.id, name: rev.name, state: rev.status, createdAt: rev.created_at, sentAt: rev.sent_at, answeredAt: rev.answered_at, doneAt: rev.done_at,
+          visitDate: dateToDateOnly(rev.visit_date), note: rev.note, activityCount: rev._count.activities,
+        })),
         activeRevision: active ? { id: active.id, label: revisionLabel(active, snap.prefixSnapshot), name: active.name, state: active.status, sentAt: active.sent_at, createdAt: active.created_at, activities: activeActivities } : null,
         history: phase.revisions.filter((rev) => !OPEN_ITERATION_STATES.includes(rev.status as "NOT_SENT" | "SENT" | "ANSWERED")).map((rev) => ({
           id: rev.id,
@@ -833,6 +859,23 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       const revision = await db.sfRevision.findUnique({ where: { id: input.revisionId }, select: { id: true } });
       if (!revision) throw notFound("revision");
       return readRevisionActivities(revision.id);
+    },
+
+    /** The project's latest phase event when this person may still undo it (same actor, within five minutes, not yet undone). */
+    async latestUndoableEvent(input: ReadContext & { actor: AuditActor; projectId: string }) {
+      requireRead(input.grants);
+      const event = await db.sfPhaseEvent.findFirst({ where: { project_id: input.projectId }, orderBy: [{ occurred_at: "desc" }, { id: "desc" }], include: { phase: { select: { name_snapshot: true } } } });
+      if (!event || event.undone_at || event.actor_id !== input.actor.userId) return null;
+      const expiresAt = new Date(event.occurred_at.getTime() + UNDO_WINDOW_MS);
+      if (nowOf(ports) >= expiresAt) return null;
+      return { id: event.id, phaseName: event.phase.name_snapshot, toState: event.to_state, expiresAt };
+    },
+
+    /** The free-text note of every phase of a project, for the card's notes dialog. */
+    async listPhaseNotes(input: ReadContext & { projectId: string }) {
+      requireRead(input.grants);
+      const rows = await db.sfPhase.findMany({ where: { project_id: input.projectId }, orderBy: { order_index: "asc" }, select: { id: true, name_snapshot: true, note: true } });
+      return rows.map((row) => ({ phaseId: row.id, phaseName: row.name_snapshot, note: row.note }));
     },
 
     capabilities(grants: ReadContext["grants"]) {

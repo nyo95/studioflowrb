@@ -1734,12 +1734,13 @@ describe("Optional (warning-only) checklist items", () => {
     assert.equal(detail.warnings.optionalOpen, 0);
   });
 
-  it("locked phase blocks tick and delete", async () => {
+  it("a locked phase still lets a requirement be ticked, but blocks deleting it", async () => {
     const { projectId } = await newProject();
     const phase = await phaseOf(projectId, "moodboard");
     const itemId = await optionalItem(projectId, phase.id);
     await testDb.prisma.sfPhase.update({ where: { id: phase.id }, data: { is_locked: true } });
-    await rejectsWith(sf.tasks.setItemChecked({ ...as(designer), projectId, itemId, checked: true }), "PHASE_LOCKED");
+    await sf.tasks.setItemChecked({ ...as(designer), projectId, itemId, checked: true });
+    assert.equal((await testDb.prisma.sfChecklistItem.findUniqueOrThrow({ where: { id: itemId } })).is_checked, true);
     await rejectsWith(sf.tasks.deleteItem({ ...as(designer), projectId, itemId }), "PHASE_LOCKED");
   });
 
@@ -2268,5 +2269,82 @@ describe("WO-SF-ITER-01 review regressions (undo, CD chain, carry-forward, acces
     await rejectsWith(sf.phases.sendIteration({ ...as(outsider, grants), projectId, phaseId: mb.id, iterationId: first.id }), "PERMISSION_DENIED");
     await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ON_HOLD" });
     await rejectsWith(sf.phases.sendIteration({ ...as(designer), projectId, phaseId: mb.id, iterationId: first.id }), "PROJECT_NOT_ACTIVE");
+  });
+});
+
+describe("WO-SF-ITER-01 screens support (Lead)", () => {
+  const latestEvent = (projectId: string) => testDb.prisma.sfPhaseEvent.findFirstOrThrow({ where: { project_id: projectId }, orderBy: { occurred_at: "desc" } });
+
+  it("keeps the sequential start rule for a phase that has not started and for supervision visits", async () => {
+    const { projectId } = await newProject("Sequential start");
+    const supervision = await phaseOf(projectId, "supervision");
+    await rejectsWith(sf.phases.addIteration({ ...as(designer), projectId, phaseId: supervision.id }), "PHASE_SEQUENTIAL");
+    await rejectsWith(sf.phases.createSupervisionVisit({ ...as(designer), projectId, phaseId: supervision.id, visitDate: "2026-09-20", note: null }), "PHASE_SEQUENTIAL");
+    const card = (await sf.projects.listProjectCards({ grants: ALL, filter: "all" })).find((item) => item.id === projectId)!;
+    const phase = card.phases.find((item) => item.id === supervision.id)!;
+    assert.deepEqual([phase.can_start, phase.is_supervision, phase.seat], [false, true, "designer"]);
+    const layoutId = (await phaseOf(projectId, "layout")).id;
+    const layout = card.phases.find((item) => item.id === layoutId)!;
+    assert.equal(layout.can_start, true, "a parallel phase may start any time");
+  });
+
+  it("offers a supervision visit only Next visit and Done (handover), and closes the phase on Done", async () => {
+    const { projectId } = await newProject("Supervision choices");
+    const supervision = await phaseOf(projectId, "supervision");
+    await testDb.prisma.sfPhase.updateMany({ where: { project_id: projectId, id: { not: supervision.id } }, data: { status: "DONE", is_locked: true } });
+    const visit = await sf.phases.createSupervisionVisit({ ...as(designer), projectId, phaseId: supervision.id, visitDate: "2026-09-20", note: "Site check" });
+    const card = (await sf.projects.listProjectCards({ grants: ALL, filter: "all" })).find((item) => item.id === projectId)!;
+    assert.deepEqual(card.phases.find((item) => item.id === supervision.id)!.current_iteration!.available_choices, ["next_visit", "done"]);
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: supervision.id });
+    assert.deepEqual(detail.currentIteration?.choices, ["next_visit", "done"]);
+    assert.equal(detail.isSupervision, true);
+    await sf.phases.chooseSupervisionVisit({ ...as(designer), projectId, phaseId: supervision.id, iterationId: visit.iterationId, outcome: "NEXT_VISIT" });
+    await sf.phases.createSupervisionVisit({ ...as(designer), projectId, phaseId: supervision.id, visitDate: "2026-09-27", note: null });
+    const second = await testDb.prisma.sfRevision.findFirstOrThrow({ where: { phase_id: supervision.id, status: "NOT_SENT" } });
+    await sf.phases.chooseSupervisionVisit({ ...as(designer), projectId, phaseId: supervision.id, iterationId: second.id, outcome: "DONE" });
+    assert.equal((await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: supervision.id } })).status, "DONE");
+    assert.equal((await sf.projects.getProject({ grants: ALL, projectId })).status, "ACTIVE", "finishing the last phase never completes the project");
+  });
+
+  it("lets a requirement be ticked or dismissed after its phase is done, and a dismissed one disappears", async () => {
+    await sf.tasks.createTemplate({ ...as(designer), definitionId: LEGACY.moodboard, label: "Late requirement" });
+    await sf.tasks.createTemplate({ ...as(designer), definitionId: LEGACY.moodboard, label: "Dismissed requirement" });
+    const { projectId } = await newProject("Requirements after done");
+    const moodboard = await phaseOf(projectId, "moodboard");
+    const first = await testDb.prisma.sfRevision.findFirstOrThrow({ where: { phase_id: moodboard.id } });
+    const base = { ...as(designer), projectId, phaseId: moodboard.id };
+    await sf.phases.sendIteration({ ...base, iterationId: first.id });
+    await sf.phases.recordClientAnswer({ ...base, iterationId: first.id });
+    await sf.phases.chooseIterationOutcome({ ...base, iterationId: first.id, outcome: "DONE" });
+    assert.equal((await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: moodboard.id } })).status, "DONE");
+
+    const items = await sf.tasks.listChecklist({ grants: ALL, projectId, phaseId: moodboard.id });
+    const late = items.find((item) => item.label === "Late requirement")!;
+    const dismissed = items.find((item) => item.label === "Dismissed requirement")!;
+    await sf.tasks.setItemChecked({ ...as(designer), projectId, itemId: late.id, checked: true });
+    await sf.phases.dismissRequirement({ ...base, itemId: dismissed.id });
+    const after = await sf.tasks.listChecklist({ grants: ALL, projectId, phaseId: moodboard.id });
+    assert.deepEqual(after.map((item) => [item.label, item.isChecked]), [["Late requirement", true]], "the dismissed requirement is gone and the ticked one stays");
+    const card = (await sf.projects.listProjectCards({ grants: ALL, filter: "all" })).find((item) => item.id === projectId)!;
+    assert.equal(card.requirements_waiting, 0);
+  });
+
+  it("offers the latest change for undo only to the same person within five minutes, and lists phase notes", async () => {
+    const { projectId } = await newProject("Undo window");
+    const moodboard = await phaseOf(projectId, "moodboard");
+    const first = await testDb.prisma.sfRevision.findFirstOrThrow({ where: { phase_id: moodboard.id } });
+    clock = new Date("2026-09-10T03:00:00Z");
+    assert.equal(await sf.phases.latestUndoableEvent({ grants: ALL, actor: designer.actor, projectId }), null);
+    await sf.phases.sendIteration({ ...as(designer), projectId, phaseId: moodboard.id, iterationId: first.id });
+    const event = await latestEvent(projectId);
+    const offered = await sf.phases.latestUndoableEvent({ grants: ALL, actor: designer.actor, projectId });
+    assert.equal(offered?.id, event.id);
+    assert.equal(await sf.phases.latestUndoableEvent({ grants: ALL, actor: drafter.actor, projectId }), null, "someone else cannot undo it");
+    clock = new Date("2026-09-10T03:06:00Z");
+    assert.equal(await sf.phases.latestUndoableEvent({ grants: ALL, actor: designer.actor, projectId }), null, "after five minutes it is gone");
+
+    await sf.phases.setPhaseNote({ ...as(designer), projectId, phaseId: moodboard.id, note: "Client prefers warm tones" });
+    const notes = await sf.phases.listPhaseNotes({ grants: ALL, projectId });
+    assert.deepEqual(notes.filter((item) => item.note).map((item) => [item.phaseName, item.note]), [["Moodboard", "Client prefers warm tones"]]);
   });
 });

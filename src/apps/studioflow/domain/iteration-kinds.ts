@@ -15,9 +15,10 @@ export function isCdMall(kinds: readonly string[], name: string): boolean {
 
 export function iterationChoices(input: { state: string; phaseStatus: string; iterationName: string; kinds: readonly string[]; supervision: boolean }): string[] {
   if (input.phaseStatus === "DONE") return ["add_iteration"];
+  // A supervision visit is never sent to a client: the open visit is closed with "Next visit" or "Done (handover)".
+  if (input.supervision) return input.state === "NOT_SENT" ? ["next_visit", "done"] : [];
   if (input.state === "NOT_SENT") return ["send"];
   if (input.state === "SENT") return ["record_answer"];
   if (input.state !== "ANSWERED") return [];
-  if (input.supervision) return ["next_visit", "done"];
   return isCdMall(input.kinds, input.iterationName) ? ["revision", "continue_cd_final"] : ["revision", "done"];
 }

@@ -123,11 +123,12 @@ function parseDue(value: string | null | undefined): Date | null | undefined {
 export function createTaskService(db: Db, ports: StudioFlowPorts) {
   const { runTransaction } = ports;
 
-  async function loadItem(tx: TxClient, projectId: string, itemId: string, access?: CommandContext) {
+  /** `allowLocked`: ticking a requirement stays possible after its phase is done (WO-SF-ITER-01 decision 4). */
+  async function loadItem(tx: TxClient, projectId: string, itemId: string, access?: CommandContext, options: { allowLocked?: boolean } = {}) {
     const item = await tx.sfChecklistItem.findUnique({ where: { id: itemId }, include: { project: true, phase: true } });
     if (!item || item.project_id !== projectId) throw notFound("checklist item");
     if (item.project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
-    if (item.phase && !isPhaseModifiable({ status: item.phase.status as PhaseStatus, isLocked: item.phase.is_locked })) {
+    if (!options.allowLocked && item.phase && !isPhaseModifiable({ status: item.phase.status as PhaseStatus, isLocked: item.phase.is_locked })) {
       throw conflict("PHASE_LOCKED", "This phase is approved and locked. Reopen it first.");
     }
     if (access?.actor.userId) await requireProjectAccess(tx, { grants: access.grants, actorId: access.actor.userId, projectId, phaseId: item.phase_id, kind: item.phase_id ? "content" : "document" });
@@ -150,7 +151,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
     async listChecklist(input: ReadContext & { projectId: string; phaseId?: string | null }) {
       requireRead(input.grants);
       const rows = await db.sfChecklistItem.findMany({
-        where: { project_id: input.projectId, ...(input.phaseId === undefined ? {} : { phase_id: input.phaseId }) },
+        where: { project_id: input.projectId, dismissed_at: null, ...(input.phaseId === undefined ? {} : { phase_id: input.phaseId }) },
         select: ITEM_SELECT,
         orderBy: ITEM_ORDER,
       });
@@ -291,11 +292,10 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
         throw new AppError("UNAUTHENTICATED", "ACTOR_REQUIRED", "An authenticated staff member is required.");
       }
       return runTransaction(async (tx) => {
-        const item = await loadItem(tx, input.projectId, input.itemId, input);
-        // A non-blocking root item is the merged "requirement" (warning-only, from the
-        // deleted RequirementsPanel): toggling it only needs phase-work access, matching
-        // that panel's own permission. Everything else still needs task-manage access.
-        const isMergedRequirement = item.parent_id === null && !item.is_blocking;
+        const item = await loadItem(tx, input.projectId, input.itemId, input, { allowLocked: true });
+        // A root item of a phase is a requirement (a reminder that gates nothing): ticking it only needs
+        // phase-work access. Everything else still needs task-manage access.
+        const isMergedRequirement = item.parent_id === null && item.phase_id !== null;
         if (!hasPermission(input.grants, P.taskManage) && !(isMergedRequirement && hasPermission(input.grants, P.phaseWork))) {
           requirePermission(input.grants, P.taskManage);
         }

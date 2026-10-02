@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { Badge, Button, Checkbox, EmptyState, InlineError, Input, RowActionMenu, type RowActionItem } from "@/platform/ui_engine";
 
-import { addChecklistItemAction, checklistAction } from "../actions";
+import { addChecklistItemAction, checklistAction, phaseCommandAction } from "../actions";
 import { DueLabel } from "./due-label";
 import { ItemEditDialog } from "./item-edit-dialog";
 import { PersonChip, type Person } from "./people";
@@ -45,6 +45,7 @@ export function ChecklistTree({
    * `canEdit` so callers that don't pass it keep today's behavior.
    */
   canToggleOptional = canEdit,
+  canDismiss = false,
   emptyText,
 }: {
   projectId: string;
@@ -54,6 +55,8 @@ export function ChecklistTree({
   people: readonly Person[];
   canEdit: boolean;
   canToggleOptional?: boolean;
+  /** Shows a "Dismiss" button on open phase requirements (they stay visible after the phase is done until ticked or dismissed). */
+  canDismiss?: boolean;
   emptyText: string;
 }) {
   const { run, pendingKey, error } = useCommand();
@@ -64,14 +67,13 @@ export function ChecklistTree({
   const [labelDraft, setLabelDraft] = useState("");
   const [addingRoot, setAddingRoot] = useState(false);
   const [rootDraft, setRootDraft] = useState("");
-  const [rootOptional, setRootOptional] = useState(false);
   const personById = new Map(people.map((p) => [p.id, p]));
 
   const addRoot = async () => {
     const label = rootDraft.trim();
     if (!label) { setAddingRoot(false); return; }
-    const ok = await run("add-root", () => addChecklistItemAction({ projectId, phaseId, label, isBlocking: !rootOptional }));
-    if (ok) { setRootDraft(""); setRootOptional(false); }
+    const ok = await run("add-root", () => addChecklistItemAction({ projectId, phaseId, label }));
+    if (ok) setRootDraft("");
   };
 
   const move = (siblings: readonly ChecklistNode[], index: number, delta: number) => {
@@ -87,13 +89,6 @@ export function ChecklistTree({
       { label: "Edit", onSelect: () => setEditing(node) },
       ...(depth === 0 ? [{ label: "Add subtask", onSelect: () => { setAddingTo(node.id); setDraft(""); } }] : []),
       { label: "Add label", onSelect: () => { setLabelFor(node.id); setLabelDraft(""); } },
-      // Only a root item can gate approval; a subtask never blocks, so the choice is meaningless there.
-      ...(depth === 0
-        ? [{
-            label: node.isBlocking ? "Make optional (won’t block approval)" : "Make it block approval",
-            onSelect: () => run(node.id, () => checklistAction({ op: "update", projectId, itemId: node.id, isBlocking: !node.isBlocking })),
-          }]
-        : []),
       ...node.labels.map((label) => ({ label: `Remove label “${label.name}”`, onSelect: () => run(node.id, () => checklistAction({ op: "unlabel", projectId, itemId: node.id, labelId: label.id })) })),
       { label: "Move up", disabled: index === 0, separatorBefore: true, onSelect: () => move(siblings, index, -1) },
       { label: "Move down", disabled: index === siblings.length - 1, onSelect: () => move(siblings, index, 1) },
@@ -106,19 +101,20 @@ export function ChecklistTree({
         <div className={`flex items-start gap-2.5 rounded-control px-1.5 py-1.5 hover:bg-surface-muted ${depth > 0 ? "ml-7" : ""}`}>
           <Checkbox
             checked={node.isChecked}
-            disabled={!(canEdit || (depth === 0 && !node.isBlocking && canToggleOptional)) || pendingKey === node.id}
+            disabled={!(canEdit || (depth === 0 && canToggleOptional)) || pendingKey === node.id}
             onCheckedChange={(checked) => run(node.id, () => checklistAction({ op: "check", projectId, itemId: node.id, checked: checked === true }))}
             label={<span className={node.isChecked ? "text-ink-tertiary line-through" : depth === 0 ? "font-medium" : ""}>{node.label}</span>}
             className="min-w-0 flex-1"
           />
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             {node.templateId ? <Link2 aria-label="From a Studio template" className="h-3.5 w-3.5 text-ink-tertiary" /> : null}
-            {/* Blocking is the default, so only the exception is badged. */}
-            {!node.isBlocking && depth === 0 ? <Badge title="Warning only — does not block approval">Optional</Badge> : null}
             {node.priority < 4 ? <Badge tone={PRIORITY_TONE[node.priority] ?? "neutral"}>P{node.priority}</Badge> : null}
             {node.labels.map((label) => <Badge key={label.id} tone={(label.color as "neutral") ?? "neutral"}>#{label.name}</Badge>)}
             <DueLabel date={node.dueDate} done={node.isChecked} />
             <PersonChip person={node.assigneeId ? personById.get(node.assigneeId) ?? { id: node.assigneeId, displayName: "Former member", active: false } : null} />
+            {canDismiss && phaseId && depth === 0 && !node.isChecked ? (
+              <Button size="sm" variant="ghost" title="Remove this reminder without ticking it" pending={pendingKey === `dismiss-${node.id}`} onClick={() => run(`dismiss-${node.id}`, () => phaseCommandAction({ command: "dismissRequirement", projectId, phaseId, itemId: node.id }))}>Dismiss</Button>
+            ) : null}
             {canEdit ? <RowActionMenu items={actions} pending={pendingKey === node.id} /> : null}
           </div>
         </div>
@@ -170,12 +166,6 @@ export function ChecklistTree({
               maxLength={200}
               onChange={(e) => setRootDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Escape") { setRootDraft(""); setAddingRoot(false); } }}
-            />
-            <Checkbox
-              checked={rootOptional}
-              onCheckedChange={(checked) => setRootOptional(checked === true)}
-              label={<span title="Warning only — does not block approval">Optional</span>}
-              className="text-sm"
             />
             <Button type="submit" size="sm" pending={pendingKey === "add-root"} disabled={!rootDraft.trim()}>Add</Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => { setRootDraft(""); setAddingRoot(false); }}>Done</Button>

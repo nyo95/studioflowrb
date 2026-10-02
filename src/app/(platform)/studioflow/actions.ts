@@ -275,17 +275,26 @@ export async function syncChecklistAction(projectId: string): Promise<ActionResu
 // ── Phase commands ──────────────────────────────────────────────────────────
 
 const PhaseCommand = z.discriminatedUnion("command", [
-  z.strictObject({ command: z.literal("activate"), projectId: Id, phaseId: Id }),
+  z.strictObject({ command: z.literal("addIteration"), projectId: Id, phaseId: Id }),
+  z.strictObject({ command: z.literal("sendIteration"), projectId: Id, phaseId: Id, iterationId: Id }),
+  z.strictObject({ command: z.literal("recordClientAnswer"), projectId: Id, phaseId: Id, iterationId: Id }),
+  z.strictObject({ command: z.literal("chooseOutcome"), projectId: Id, phaseId: Id, iterationId: Id, outcome: z.enum(["REVISION", "DONE", "CONTINUE_CD_FINAL"]) }),
+  z.strictObject({ command: z.literal("renameIteration"), projectId: Id, phaseId: Id, iterationId: Id, name: z.string().max(200) }),
+  z.strictObject({ command: z.literal("deleteIteration"), projectId: Id, phaseId: Id, iterationId: Id }),
+  z.strictObject({ command: z.literal("setPhaseNote"), projectId: Id, phaseId: Id, note: z.string().max(2000).nullable() }),
+  z.strictObject({ command: z.literal("dismissRequirement"), projectId: Id, phaseId: Id, itemId: Id }),
+  z.strictObject({ command: z.literal("createVisit"), projectId: Id, phaseId: Id, visitDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), note: z.string().max(2000).nullish() }),
+  z.strictObject({ command: z.literal("chooseVisit"), projectId: Id, phaseId: Id, iterationId: Id, outcome: z.enum(["NEXT_VISIT", "DONE"]) }),
   z.strictObject({ command: z.literal("bypass"), projectId: Id, phaseId: Id, reason: Reason }),
-  z.strictObject({ command: z.literal("submitClient"), projectId: Id, phaseId: Id }),
-  z.strictObject({ command: z.literal("approveClient"), projectId: Id, phaseId: Id }),
-  z.strictObject({ command: z.literal("rejectClient"), projectId: Id, phaseId: Id }),
-  z.strictObject({ command: z.literal("reopen"), projectId: Id, phaseId: Id, reason: Reason }),
-  z.strictObject({ command: z.literal("completeSupervision"), projectId: Id, phaseId: Id }),
   z.strictObject({ command: z.literal("override"), projectId: Id, phaseId: Id, mode: z.enum(["HARD_RESET_ACTIVE", "HARD_RESET_PENDING"]), major: z.number().int().optional(), note: z.string().max(1000) }),
 ]);
 
-export async function phaseCommandAction(input: z.infer<typeof PhaseCommand>): Promise<ActionResult<unknown>> {
+export type PhaseCommandInput = z.infer<typeof PhaseCommand>;
+
+/** What the screens need after a phase command: whether the change can still be undone, and until when. */
+export type PhaseCommandOutcome = { result: unknown; undo: { eventId: string; label: string; expiresAt: string } | null };
+
+export async function phaseCommandAction(input: PhaseCommandInput): Promise<ActionResult<PhaseCommandOutcome>> {
   return runSafeAction(async () => {
     const ctx = await context();
     const data = parse(PhaseCommand, input);
@@ -293,17 +302,54 @@ export async function phaseCommandAction(input: z.infer<typeof PhaseCommand>): P
     const phases = studioFlow.phases;
     let result: unknown;
     switch (data.command) {
-      case "activate": result = await phases.activatePhase(base); break;
+      case "addIteration": result = await phases.addIteration(base); break;
+      case "sendIteration": result = await phases.sendIteration({ ...base, iterationId: data.iterationId }); break;
+      case "recordClientAnswer": result = await phases.recordClientAnswer({ ...base, iterationId: data.iterationId }); break;
+      case "chooseOutcome": result = await phases.chooseIterationOutcome({ ...base, iterationId: data.iterationId, outcome: data.outcome }); break;
+      case "renameIteration": result = await phases.renameIteration({ ...base, iterationId: data.iterationId, name: data.name }); break;
+      case "deleteIteration": result = await phases.deleteNeverSentIteration({ ...base, iterationId: data.iterationId }); break;
+      case "setPhaseNote": result = await phases.setPhaseNote({ ...base, note: data.note }); break;
+      case "dismissRequirement": result = await phases.dismissRequirement({ ...base, itemId: data.itemId }); break;
+      case "createVisit": result = await phases.createSupervisionVisit({ ...base, visitDate: data.visitDate, note: data.note ?? null }); break;
+      case "chooseVisit": result = await phases.chooseSupervisionVisit({ ...base, iterationId: data.iterationId, outcome: data.outcome }); break;
       case "bypass": result = await phases.bypassPhase({ ...base, reason: data.reason }); break;
-      case "submitClient": result = await phases.submitForClientReview(base); break;
-      case "approveClient": result = await phases.approveClient(base); break;
-      case "rejectClient": result = await phases.rejectPhase({ ...base, type: "CLIENT" }); break;
-      case "reopen": result = await phases.reopenPhase({ ...base, reason: data.reason }); break;
-      case "completeSupervision": result = await phases.completeSupervision(base); break;
       case "override": result = await phases.overrideRevision({ ...base, mode: data.mode, major: data.major, note: data.note }); break;
     }
     refresh(data.projectId);
+    const undoable = await phases.latestUndoableEvent({ grants: ctx.grants, actor: ctx.actor, projectId: data.projectId });
+    const undo = undoable ? { eventId: undoable.id, label: `${undoable.phaseName}`, expiresAt: undoable.expiresAt.toISOString() } : null;
+    return { result, undo };
+  });
+}
+
+const UndoInput = z.strictObject({ projectId: Id, eventId: Id });
+export async function undoPhaseEventAction(input: z.infer<typeof UndoInput>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(UndoInput, input);
+    const result = await studioFlow.phases.undoPhaseEvent({ ...ctx, projectId: data.projectId, eventId: data.eventId });
+    refresh(data.projectId);
     return result;
+  });
+}
+
+/** Marking a project completed (or reopening it) is always a person's explicit choice; no phase change does it. */
+export async function projectCompletionAction(projectId: string, change: "complete" | "reopen"): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const id = parse(Id, projectId);
+    const result = change === "complete"
+      ? await studioFlow.phases.markProjectCompleted({ ...ctx, projectId: id })
+      : await studioFlow.phases.reopenProject({ ...ctx, projectId: id });
+    refresh(id);
+    return result;
+  });
+}
+
+export async function listPhaseNotesAction(projectId: string) {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    return studioFlow.phases.listPhaseNotes({ grants: ctx.grants, projectId: parse(Id, projectId) });
   });
 }
 

@@ -18,16 +18,9 @@ import {
   Text,
 } from "@/platform/ui_engine";
 
-import { ActivityList } from "../../_components/activity-list";
-import { CdList } from "../../_components/cd-list";
-import { ChecklistTree } from "../../_components/checklist-tree";
-import { PhaseGate } from "../../_components/phase-gate";
-import { PhaseStatusBadge } from "../../_components/phase-status";
-import { pageProjectAccess, pageSession } from "../../_components/session";
-import { ReadOnlyNotice } from "../../_components/read-only-notice";
-import { DeliverablesPanel } from "./phases/[phaseId]/deliverables-panel";
-import { PhaseActions } from "./phases/[phaseId]/phase-actions";
-import { RevisionHistory } from "./phases/[phaseId]/revision-history";
+
+import { PhaseCanvas } from "../../_components/phase-canvas";
+import { pageSession } from "../../_components/session";
 
 export const dynamic = "force-dynamic";
 
@@ -58,16 +51,13 @@ export default async function ProjectOverviewPage({
 
   const pipelineSteps = phases.map((phase) => {
     const display = phaseStatusDisplay(phase.status);
-    const pipelineState = phase.status === "PENDING" ? "upcoming"
-      : isPhaseFinished(phase.status) ? "done"
-      : phase.blockers.total > 0 && !phase.isLocked ? "blocked"
-      : "current";
+    const pipelineState = phase.status === "PENDING" ? "upcoming" : isPhaseFinished(phase.status) ? "done" : "current";
     return {
       id: phase.id,
       label: phase.label,
       note: display.label,
-      detail: phase.activeRevision ?? undefined,
-      state: pipelineState as "done" | "current" | "upcoming" | "blocked",
+      detail: phase.iterationName ?? undefined,
+      state: pipelineState as "done" | "current" | "upcoming",
       accentClass: phaseAccentDotClass(phase.definitionId),
       href: `?phase=${phase.id}`,
       selected: phase.id === selectedPhaseId,
@@ -97,142 +87,6 @@ export default async function ProjectOverviewPage({
         </SectionCard>
       )}
     </div>
-  );
-}
-
-// ── Canvas — suspends here; shell above stays ──────────────────────────────────
-
-type PersonItem = Awaited<ReturnType<typeof studioFlow.projects.listAssignablePeople>>[number];
-
-async function PhaseCanvas({
-  projectId,
-  phaseId,
-  people,
-  archived,
-}: {
-  projectId: string;
-  phaseId: string;
-  people: PersonItem[];
-  archived: boolean;
-}) {
-  const { grants } = await pageSession();
-  const caps = studioFlow.phases.capabilities(grants);
-  const access = await pageProjectAccess(projectId);
-
-  const phaseDetail = await studioFlow.phases.getPhaseDetail({ grants, projectId, phaseId }).catch((error) => {
-    if (error instanceof AppError && error.kind === "NOT_FOUND") return null;
-    throw error;
-  });
-  if (!phaseDetail) return <SectionCard padded><Text tone="secondary" size="sm">Phase not found.</Text></SectionCard>;
-
-  const [checklist, deliverablesResult, cdItems] = await Promise.all([
-    studioFlow.tasks.listChecklist({ grants, projectId, phaseId: phaseDetail.id }),
-    studioFlow.phases.listDeliverables({ grants, projectId, phaseId: phaseDetail.id }),
-    phaseDetail.seat === "drafter" ? studioFlow.cdList.list({ grants, projectId, phaseId: phaseDetail.id }) : Promise.resolve(null),
-  ]);
-  const { items: phaseDeliverables, status: deliverableStatus } = deliverablesResult;
-  const phaseAccess = access.phases.find((phase) => phase.phaseId === phaseDetail.id);
-  const canTransition = phaseAccess?.canTransition ?? false;
-  const canContent = phaseAccess?.canEditContent ?? false;
-  const canManage = hasPermission(grants, P.projectManage) && access.canEditProject;
-
-  return (
-    <>
-      {!archived && !canTransition && !canContent ? <ReadOnlyNotice scope={access.isDesigner || access.isDrafter ? "phase" : "project"} /> : null}
-
-      {/* Phase actions */}
-      <SectionCard padded>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <PhaseStatusBadge status={phaseDetail.status} waitingDays={phaseDetail.status === "PENDING" ? null : phaseDetail.waitingDays} />
-            {phaseDetail.activeRevision ? <Badge title="Active revision">{phaseDetail.activeRevision.label}</Badge> : null}
-            {phaseDetail.isLocked ? <Badge tone="success">Locked</Badge> : null}
-            {phaseDetail.seat === "drafter" ? <Text size="sm" tone="secondary" meta>drafter</Text> : null}
-          </div>
-          {!archived && canTransition ? (
-            <PhaseActions
-              projectId={projectId}
-              phaseId={phaseDetail.id}
-              commands={phaseDetail.commands}
-              blockers={phaseDetail.blockers}
-              todoBlockers={phaseDetail.todoBlockers}
-              canWork={caps.work}
-              canReview={caps.review}
-              canOverride={caps.override}
-              activeRevision={phaseDetail.activeRevision?.label ?? null}
-              openFeedback={phaseDetail.activeRevision?.activities.filter((a) => a.mode === "FEEDBACK" && !a.done).map((a) => a.content) ?? []}
-            />
-          ) : null}
-        </div>
-        {phaseDetail.startBlockedReason ? <Notice className="mt-3" tone="neutral" title="Not yet">{phaseDetail.startBlockedReason}</Notice> : null}
-        {phaseDetail.status !== "PENDING" && phaseDetail.blockers.total > 0 && !phaseDetail.isLocked ? (
-          <PhaseGate
-            projectId={projectId}
-            checklistItems={phaseDetail.blockers.checklistItems}
-            activityItems={phaseDetail.blockers.activityItems}
-            canWork={caps.work && canContent}
-          />
-        ) : null}
-      </SectionCard>
-
-      {/* Revision + Checklist */}
-      <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-4 max-[1100px]:grid-cols-1">
-        <SectionCard
-          title={phaseDetail.activeRevision ? `Revision ${phaseDetail.activeRevision.label}` : "Revision work"}
-          description="Client and reviewer feedback on this revision. Unresolved feedback becomes a to-do when the phase is sent back."
-        >
-          {phaseDetail.activeRevision ? (
-            <ActivityList
-              projectId={projectId}
-              phaseId={phaseDetail.id}
-              items={phaseDetail.activeRevision.activities}
-              people={people}
-              canEdit={phaseDetail.modifiable && caps.work && canContent}
-              emptyText="Nothing recorded for this revision"
-            />
-          ) : (
-            <Text tone="secondary" size="sm">
-              {phaseDetail.status === "PENDING" ? "Start the phase to open revision v1.0." : "This phase has no open revision."}
-            </Text>
-          )}
-        </SectionCard>
-
-        <SectionCard
-          title="Phase checklist"
-          description="Ticked items gate approval. Items marked Optional are warnings only. Subtasks never block."
-        >
-          <ChecklistTree
-            projectId={projectId}
-            phaseId={phaseDetail.id}
-            nodes={checklist}
-            people={people}
-            canEdit={phaseDetail.modifiable && hasPermission(grants, P.taskManage) && canContent}
-            canToggleOptional={phaseDetail.modifiable && caps.work && canContent}
-            emptyText="No checklist for this phase"
-          />
-        </SectionCard>
-      </div>
-
-      {cdItems ? (
-        <SectionCard title="Drawing list" description="The drawings this phase needs. Tick them off as they are drawn; it never blocks approval.">
-          <div className="px-(--ui-section-px) py-3">
-            <CdList projectId={projectId} phaseId={phaseDetail.id} items={cdItems} people={people} canEdit={phaseDetail.modifiable && caps.work && canContent} />
-          </div>
-        </SectionCard>
-      ) : null}
-
-      {/* Deliverables */}
-      <DeliverablesPanel
-        projectId={projectId}
-        phaseId={phaseDetail.id}
-        deliverables={phaseDeliverables}
-        status={deliverableStatus}
-        canWork={phaseDetail.modifiable && caps.work && canContent}
-        canManage={canManage}
-      />
-
-      {phaseDetail.history.length > 0 ? <RevisionHistory revisions={phaseDetail.history} /> : null}
-    </>
   );
 }
 

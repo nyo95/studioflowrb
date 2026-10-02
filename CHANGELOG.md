@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.291**
-- Next local revision: **R8.292**
+- Current revision after this entry is committed: **R8.292**
+- Next local revision: **R8.293**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -49,6 +49,15 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - WO-SF-ITER-01 is finished and reviewed (R8.285 to R8.289), so the queued Master Data plan for text price labels written in quotation marks moved from `docs/agent/queued-plans/` to the root `PLAN.md`, status READY, and its Executor prompt now requires every listed test, a scratch-database migration check, and a single uninterrupted run. The Executor takes the next revision (R8.291); the Lead builds the italic display afterwards. Docs only; no code, schema, or migration change.
 
 **Checks.** `git diff --check`.
+
+## R8.292 | 2026-10-02 | feat(studioflow): project-card home and iteration phase page
+
+- The StudioFlow home (`/studioflow`, nav label "Home") is now one card per project instead of the task-first Today page. Each card shows the project's phases as small blocks with the iteration that is with the client ("With client · 3d"), the next step as a button (Send to client, Client answered, Revision, Done, Continue to CD Final, Next visit, Done (handover), + iteration), a requirements-waiting marker, a notes button, and a project menu with Mark as completed / Reopen project. Finishing the last phase never completes a project. A change can be undone from a bar on the card for five minutes (same person, latest change). "My tasks" is a collapsed strip above the cards that holds the previous Today list. Running and Completed views; managers also get All projects.
+- The phase page (and the project overview, which now share one phase canvas) replaces the old review buttons with the same next-step buttons, a list of iterations (rename; delete one that was never sent), one note per phase, a site-visit dialog for Supervision, and Skip phase / Admin reset under More. The requirements list is reminders only: they can be ticked or dismissed even after the phase is done, and nothing is blocked by them.
+- Backend glue the screens needed: `latestUndoableEvent` and `listPhaseNotes` reads; `getPhaseDetail` returns the current iteration with its choices, the iteration list, the note, and whether the phase can start; the project card read adds `can_start`, `is_supervision`, `seat`; a supervision visit is closed with Next visit / Done (the read model had offered "Send"); a not-started phase and a first supervision visit follow the sequential rule; the "check later phases" hint ignores parallel phases; ticking a requirement is allowed on a finished phase; dismissed requirements no longer appear in the checklist or Today.
+- Removed screens and buttons: internal-review actions, the blocker gate, the phase-attention strip, the per-phase action menu. The old transitional service commands stay only for the test suite (see `docs/BACKLOG.md`).
+
+**Checks.** `npm test` (797 pass, 0 fail); `npm run check`; `npm run lint` (0 errors; two existing image warnings); `git diff --check`. Browser acceptance is pending: the Lead could not sign in to the development app (no test account). Production build intentionally not run.
 
 ## R8.291 | 2026-10-02 | feat(masterdata): text price labels written in quotation marks
 
