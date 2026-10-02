@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.310**
-- Next local revision: **R8.311**
+- Current revision after this entry is committed: **R8.311**
+- Next local revision: **R8.312**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.311 | 2026-10-02 | feat(studioflow): Brand detail modal in Library
+
+- Owner decision (2026-10-02): the whole app stays English, and Brand detail opens as a modal, not a side drawer or a separate page.
+- Library cards now open a UI Engine `Dialog` (`md`) from the image/name area; the compact resource icons stay independent links. The modal shows the larger image, full notes, all categories and hashtags, labelled resource links, and the website-derived offerings under "From the brand's website" with a read-only note. Offerings remain off the card itself (R8.304 unchanged).
+- No data, schema, permission, or shared-code change. Modal open state lives in the page component, so filters, search, sort, and page are preserved when it closes.
+
+**Checks.** `tsc --noEmit`; `eslint` on the Library route; server-render smoke test. Not run: full `npm test` and browser acceptance of the modal (focus return, scroll lock, mobile height).
 
 ## R8.310 | 2026-10-02 | feat(studioflow): polish Library catalogue skeleton with UI Engine components
 

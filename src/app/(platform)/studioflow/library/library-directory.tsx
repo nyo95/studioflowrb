@@ -8,6 +8,7 @@ import {
   Button,
   Checkbox,
   CountBadge,
+  Dialog,
   DirectoryShell,
   Drawer,
   EmptyState,
@@ -89,26 +90,28 @@ function FilterSection({
 
 const MAX_VISIBLE_HASHTAGS = 3;
 
-function BrandCard({ brand, websiteMatch }: { brand: LibraryBrand; websiteMatch: string | null }) {
+function BrandCard({ brand, websiteMatch, onOpen }: { brand: LibraryBrand; websiteMatch: string | null; onOpen: () => void }) {
   const hiddenHashtags = Math.max(0, brand.hashtags.length - MAX_VISIBLE_HASHTAGS);
   return (
     <Surface as="article" className="overflow-hidden">
-      <div className="relative aspect-[4/3] overflow-hidden bg-surface-muted">
-        {brand.imageUrl ? (
-          // External website metadata is not a fixed image host, so Next Image optimization is intentionally skipped.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={brand.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-contain p-6" />
-        ) : (
-          <div role="img" aria-label="Brand image unavailable" className="grid h-full place-items-center text-ink-tertiary">
-            <Text size="md" weight="semibold">{initialsOf(brand.name)}</Text>
-          </div>
-        )}
-      </div>
-      <div className="grid gap-3 p-3">
-        <div className="grid gap-1">
+      <button type="button" onClick={onOpen} aria-label={`View ${brand.name}`} className="block w-full text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-line-focus">
+        <div className="relative aspect-[4/3] overflow-hidden bg-surface-muted">
+          {brand.imageUrl ? (
+            // External website metadata is not a fixed image host, so Next Image optimization is intentionally skipped.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={brand.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-contain p-6" />
+          ) : (
+            <div role="img" aria-label="Brand image unavailable" className="grid h-full place-items-center text-ink-tertiary">
+              <Text size="md" weight="semibold">{initialsOf(brand.name)}</Text>
+            </div>
+          )}
+        </div>
+        <div className="grid gap-1 p-3 pb-0">
           <Text weight="semibold">{brand.name}</Text>
           {brand.ownerVendor ? <Text tone="secondary" size="sm">{brand.ownerVendor.name}</Text> : null}
         </div>
+      </button>
+      <div className="grid gap-3 p-3">
         {brand.notes ? <Text tone="secondary" size="sm" className="line-clamp-3 whitespace-pre-wrap">{brand.notes}</Text> : null}
         {websiteMatch ? <Badge tone="warning" title="Matched on the brand's public website">Website: {websiteMatch}</Badge> : null}
         {brand.categories.length > 0 ? (
@@ -140,6 +143,59 @@ function BrandCard({ brand, websiteMatch }: { brand: LibraryBrand; websiteMatch:
   );
 }
 
+function BrandDetail({ brand }: { brand: LibraryBrand }) {
+  return (
+    <div className="grid gap-4">
+      <div className="aspect-[16/9] overflow-hidden rounded-card bg-surface-muted">
+        {brand.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={brand.imageUrl} alt="" referrerPolicy="no-referrer" className="h-full w-full object-contain p-6" />
+        ) : (
+          <div role="img" aria-label="Brand image unavailable" className="grid h-full place-items-center text-ink-tertiary">
+            <Text size="md" weight="semibold">{initialsOf(brand.name)}</Text>
+          </div>
+        )}
+      </div>
+      {brand.notes ? <Text tone="secondary" className="whitespace-pre-wrap">{brand.notes}</Text> : null}
+      {brand.categories.length > 0 ? (
+        <div className="grid gap-1.5">
+          <Text weight="semibold" size="sm">Categories</Text>
+          <div className="flex flex-wrap gap-1.5">{brand.categories.map((category) => <Badge key={category.id}>{category.name}</Badge>)}</div>
+        </div>
+      ) : null}
+      {brand.hashtags.length > 0 ? (
+        <div className="grid gap-1.5">
+          <Text weight="semibold" size="sm">Hashtags</Text>
+          <Text tone="secondary" size="sm">{brand.hashtags.map((hashtag) => `#${hashtag.label}`).join("  ")}</Text>
+        </div>
+      ) : null}
+      {brand.websiteCatalogue ? (
+        <div className="grid gap-1.5">
+          <Text weight="semibold" size="sm">From the brand&apos;s website</Text>
+          <div className="flex flex-wrap gap-1.5">{brand.websiteCatalogue.offerings.map((offering) => <Badge key={offering}>{offering}</Badge>)}</div>
+          <Text tone="secondary" size="sm">Read-only hints from public pages; not saved to Master Data.</Text>
+        </div>
+      ) : null}
+      {brand.links.length > 0 ? (
+        <div className="grid gap-1.5">
+          <Text weight="semibold" size="sm">Resources</Text>
+          <div className="flex flex-wrap gap-2">
+            {brand.links.map((link) => {
+              const Icon = LINK_ICONS[link.kind.trim().toUpperCase() as keyof typeof LINK_ICONS] ?? Globe2;
+              return (
+                <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center gap-2 rounded-control border border-line px-3 text-sm text-action hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
+                  <Icon aria-hidden="true" size={16} />
+                  {linkLabel(link)}
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** Read-only Brand discovery over Master Data. The layout mirrors a catalogue without inventing product-only fields. */
 export function LibraryDirectory({ brands }: { brands: LibraryBrand[] }) {
   const [query, setQuery] = useState("");
@@ -148,6 +204,8 @@ export function LibraryDirectory({ brands }: { brands: LibraryBrand[] }) {
   const [vendorIds, setVendorIds] = useState<Set<string>>(new Set());
   const [hashtags, setHashtags] = useState<Set<string>>(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [openBrandId, setOpenBrandId] = useState<string | null>(null);
+  const openBrand = brands.find((brand) => brand.id === openBrandId) ?? null;
   // Hashtags are stored without "#", so a typed "#chair" must still find "chair".
   const q = query.trim().replace(/^#+/, "").toLowerCase();
 
@@ -247,6 +305,9 @@ export function LibraryDirectory({ brands }: { brands: LibraryBrand[] }) {
       <Drawer open={filtersOpen} onOpenChange={setFiltersOpen} side="left" size="sm" title="Filters" footer={<Button variant="primary" onClick={() => setFiltersOpen(false)}>Show {rows.length} brands</Button>}>
         {filterPanel}
       </Drawer>
+      <Dialog open={openBrand !== null} onOpenChange={(open) => { if (!open) setOpenBrandId(null); }} size="md" title={openBrand?.name ?? ""} description={openBrand?.ownerVendor?.name}>
+        {openBrand ? <BrandDetail brand={openBrand} /> : null}
+      </Dialog>
       <section className="min-w-0" aria-label="Brand catalogue">
         <DirectoryShell
           toolbar={toolbar}
@@ -259,7 +320,7 @@ export function LibraryDirectory({ brands }: { brands: LibraryBrand[] }) {
             />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              {visibleRows.map(({ brand, websiteMatch }) => <BrandCard key={brand.id} brand={brand} websiteMatch={websiteMatch} />)}
+              {visibleRows.map(({ brand, websiteMatch }) => <BrandCard key={brand.id} brand={brand} websiteMatch={websiteMatch} onOpen={() => setOpenBrandId(brand.id)} />)}
             </div>
           )}
         </DirectoryShell>
