@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.285**
-- Next local revision: **R8.286**
+- Current revision after this entry is committed: **R8.286**
+- Next local revision: **R8.287**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.286 | 2026-10-02 | feat(studioflow): command client-sent iterations and explicit completion (WO-SF-ITER-01 phase 2)
+
+- Added transactional iteration commands for send, client answer, Revision / Done / Continue to CD Final, iteration naming and deletion before send, phase notes, requirement dismissal, and dated Supervision visits. Each transition has an append-only event and audit record; undo is limited to the latest event, its actor, and five minutes, including exact auto-created rows.
+- Finishing a phase auto-starts the first eligible pending phase (including parallel definitions). Project completion is now only `markProjectCompleted`; `reopenProject` restores work. Phase writes reject completed projects. The old automatic completion paths were removed, closing KB-060.
+- Added focused integration coverage for the CD first-kind setup, auto-advance/undo, and explicit completion lock. No schema or migration change; both rebuild databases were already up to date.
+
+**Checks.** `npm test`; `npm run check`; `npm run lint`; `git diff --check`. Production build intentionally not run per WO-SF-ITER-01.
 
 ## R8.270 | 2026-10-01 | feat(masterdata): store unit codes in lowercase
 

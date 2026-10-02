@@ -123,6 +123,37 @@ async function revisions(phaseId: string) {
   return (await testDb.prisma.sfRevision.findMany({ where: { phase_id: phaseId }, orderBy: { major: "asc" } })).map((r) => `${r.name}:${r.status}`);
 }
 
+describe("WO-SF-ITER-01 phase 2 iteration commands", () => {
+  it("chains CD Mall to CD Final, auto-advances, and undoes only the latest event", async () => {
+    const { projectId } = await newProject("Iteration chain");
+    const moodboard = await phaseOf(projectId, "moodboard");
+    const first = await testDb.prisma.sfRevision.findFirstOrThrow({ where: { phase_id: moodboard.id, status: "NOT_SENT" } });
+    await sf.phases.sendIteration({ ...as(designer), projectId, phaseId: moodboard.id, iterationId: first.id });
+    await sf.phases.recordClientAnswer({ ...as(designer), projectId, phaseId: moodboard.id, iterationId: first.id });
+    await sf.phases.chooseIterationOutcome({ ...as(designer), projectId, phaseId: moodboard.id, iterationId: first.id, outcome: "DONE" });
+    const advanced = await testDb.prisma.sfPhase.findFirstOrThrow({ where: { project_id: projectId, definition_id: LEGACY.layout } });
+    assert.equal(advanced.status, "ACTIVE");
+    const event = await testDb.prisma.sfPhaseEvent.findFirstOrThrow({ where: { project_id: projectId }, orderBy: { occurred_at: "desc" } });
+    await sf.phases.undoPhaseEvent({ ...as(designer), projectId, eventId: event.id });
+    assert.equal((await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: moodboard.id } })).status, "ACTIVE");
+    await rejectsWith(sf.phases.undoPhaseEvent({ ...as(drafter, DRAFTER_GRANTS), projectId, eventId: event.id }), "UNDO_ACTOR_MISMATCH");
+    const cd = await phaseOf(projectId, "cd");
+    await testDb.prisma.sfPhaseDefinition.update({ where: { id: LEGACY.cd }, data: { default_iteration_kinds: ["CD Mall", "CD Final"] } });
+    const mall = await sf.phases.addIteration({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id });
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: mall.iterationId } })).name, "CD Mall");
+  });
+
+  it("completes explicitly and rejects phase writes until reopened", async () => {
+    const { projectId } = await newProject("Explicit completion");
+    await sf.phases.markProjectCompleted({ ...as(designer), projectId });
+    const moodboard = await phaseOf(projectId, "moodboard");
+    const iteration = await testDb.prisma.sfRevision.findFirstOrThrow({ where: { phase_id: moodboard.id } });
+    await rejectsWith(sf.phases.sendIteration({ ...as(designer), projectId, phaseId: moodboard.id, iterationId: iteration.id }), "PROJECT_COMPLETED");
+    await sf.phases.reopenProject({ ...as(designer), projectId });
+    await sf.phases.sendIteration({ ...as(designer), projectId, phaseId: moodboard.id, iterationId: iteration.id });
+  });
+});
+
 describe("WO-SF-CDLIST-01 Construction Drawing list", () => {
   it("lets both PICs manage sorted drawing items, records one audit event per change, and keeps the list informational", async () => {
     const { projectId } = await newProject();
@@ -723,7 +754,7 @@ describe("SF-R1 phase workflow (legacy parity)", () => {
     assert.equal(phases[0].blockers.total, 0);
   });
 
-  it("enforces sequential activation, parallel phases, ON_HOLD and completion", async () => {
+  it("enforces sequential activation, parallel phases, ON_HOLD and leaves completion explicit", async () => {
     const { projectId } = await newProject();
     const layout = await phaseOf(projectId, "layout");
     const supervision = await phaseOf(projectId, "supervision");
@@ -747,7 +778,7 @@ describe("SF-R1 phase workflow (legacy parity)", () => {
     await sf.phases.activatePhase({ ...as(designer), projectId, phaseId: supervision.id });
     await sf.phases.completeSupervision({ ...as(designer), projectId, phaseId: supervision.id });
     const project = await sf.projects.getProject({ grants: ALL, projectId });
-    assert.equal(project.status, "COMPLETED");
+    assert.equal(project.status, "ACTIVE");
   });
 
   it("uses the drafter as fallback assignee on CD and restricts review to reviewers", async () => {
@@ -1929,10 +1960,10 @@ describe("SF-V2-E phase definitions", () => {
     await sf.phases.activatePhase({ ...as(designer), projectId: standard.projectId, phaseId: supervision.id });
     assert.deepEqual((await sf.phases.getPhaseDetail({ grants: ALL, projectId: standard.projectId, phaseId: supervision.id })).commands, ["completeSupervision"]);
     await sf.phases.completeSupervision({ ...as(designer), projectId: standard.projectId, phaseId: supervision.id });
-    assert.equal((await sf.projects.getProject({ grants: ALL, projectId: standard.projectId })).status, "COMPLETED");
+    assert.equal((await sf.projects.getProject({ grants: ALL, projectId: standard.projectId })).status, "ACTIVE");
   });
 
-  it("completes the project when the last custom phase is approved", async () => {
+  it("does not complete the project when the last custom phase is approved", async () => {
     await seedTemplate("Two phases", [{ name: "Concept", prefix: "CN" }, { name: "Handover", prefix: "HO" }]);
     const { projectId } = await newProject();
     const [concept, handover] = await phasesOf(projectId);
@@ -1943,12 +1974,9 @@ describe("SF-V2-E phase definitions", () => {
     await sf.phases.activatePhase({ ...run, phaseId: handover.id });
     await sf.phases.submitForClientReview({ ...run, phaseId: handover.id });
     await sf.phases.approveClient({ ...run, phaseId: handover.id });
-    assert.equal((await sf.projects.getProject({ grants: ALL, projectId })).status, "COMPLETED");
+    assert.equal((await sf.projects.getProject({ grants: ALL, projectId })).status, "ACTIVE");
 
-    // Reopening the phase that completed the project must not leave the
-    // project stuck COMPLETED while the phase itself is IN_PROGRESS again —
-    // it would silently vanish from Today (which excludes COMPLETED projects)
-    // even though there is now active work on it.
+    // Reopening remains phase-local; project completion is an explicit command.
     await sf.phases.reopenPhase({ ...run, phaseId: handover.id, reason: "One more revision" });
     assert.equal((await sf.projects.getProject({ grants: ALL, projectId })).status, "ACTIVE");
     assert.equal((await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: handover.id })).status, "ACTIVE");

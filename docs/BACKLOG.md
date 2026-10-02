@@ -489,23 +489,6 @@ which the owner declined to add; see `STUDIOFLOW-REWORK-CONTRACT.md` §11.11.
 
 ### Open defects
 
-- [ ] [BUG] KB-060 — Project is marked COMPLETED while other phases are still
-  running (found by a ChatGPT second-opinion audit of R8.261, 2026-10-01;
-  re-verified in code). `completeProjectIfLast()` in
-  `src/apps/studioflow/phases/service.ts` only asks "is there a phase after
-  this one?", never "is every phase finished?". Phases may run in parallel, so
-  e.g. Layout `IN_PROGRESS` + CD skipped + Supervision finished completes the
-  project. `today/service.ts` then excludes COMPLETED projects, so the live
-  Layout work disappears from Today. An existing integration test asserts the
-  current behavior. Callers: `bypassPhase`, `approveClient`,
-  `completeSupervision`. **Do not fix in isolation: tackle together with the
-  iteration-model redesign below** (it rewrites "what makes a phase / project
-  done"), so the completion rule is defined once. **Owner decision
-  (2026-10-01): a project becomes COMPLETED only by an explicit "Mark as
-  completed" action. It never completes automatically — not when the last
-  phase finishes, and not even when every phase is finished.** So the fix is
-  to remove `completeProjectIfLast` from all three callers (and the existing
-  test that asserts the old behavior), not to tighten its condition. Lead
   suggestion, not yet agreed: when every phase is finished, the home card may
   show a quiet "All phases done — mark project completed?" prompt.
 

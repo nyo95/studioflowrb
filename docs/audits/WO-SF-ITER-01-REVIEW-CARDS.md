@@ -57,3 +57,36 @@ Rows migrated in the real databases: `studioflow_rebuild` 3 iterations (all `NOT
 - No automated test seeds old-model rows and checks the mapping (decision 12 asked for one). The old enum no longer exists in the test database, so the check was run as a scripted scratch-database exercise, recorded above. A reusable automated check is a candidate for Phase 2.
 - `completeProjectIfLast` still exists; it is removed in Phase 2 together with the KB-060 backlog entry.
 - Requirements still show as "blockers" in the read models for display; they gate nothing.
+
+## Phase 2 — commands, completion, undo (R8.286)
+
+### What changed
+
+Iterations now move through send, client answer, and an explicit client outcome. A revision opens the next numbered iteration only after the answer; a completed phase starts the next eligible phase automatically. CD starts with its configured first kind and can continue from CD Mall to CD Final. Supervision records dated visits. Completing a project is now a separate deliberate action, so finishing any phase never hides other live work.
+
+### Requirement → evidence
+
+| Requirement | Evidence | Result |
+| --- | --- | --- |
+| Iteration commands, CD first kind, and explicit completion lock | `service.integration.test.ts` — `WO-SF-ITER-01 phase 2 iteration commands` | PASS |
+| Auto-advance and reversal of generated work | Same test; `SfPhaseEvent` event payload plus `undoPhaseEvent` | PASS |
+| No automatic project completion | Existing phase completion integration cases now assert `ACTIVE`; `completeProjectIfLast` removed | PASS |
+| Phase/project PIC access and completed-project rejection | `writableIteration`, `markProjectCompleted`, `reopenProject` | PASS |
+
+### Lead re-check commands
+
+1. `npm test`.
+2. `npm run check`.
+3. `npm run lint`.
+
+### Rows migrated
+
+None. Phase 2 has no migration; `studioflow_rebuild` reported all 81 migrations up to date.
+
+### Screens touched
+
+None. Existing phase actions remain as temporary compatibility wiring until the Lead replaces the screens.
+
+### Deviations and limitations
+
+The old temporary phase commands remain callable for the existing screens during the Lead's UI replacement, but their automatic project-completion path is removed. New command actions are service-surface ready; the new UI owns their final server-action wiring.
