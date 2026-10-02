@@ -166,6 +166,8 @@ export function ProjectEditor({
   const [importTarget, setImportTarget] = useState<{ itemId?: string; subObjectId?: string } | null>(null);
   const [assemblyTarget, setAssemblyTarget] = useState<AssemblyTarget | null>(null);
   const [lockOpen, setLockOpen] = useState(false);
+  /** Set when the server refused to lock because rows still have a price of Rp0: the count to confirm. */
+  const [zeroPriceRows, setZeroPriceRows] = useState<number | null>(null);
   const [lifecycleConfirm, setLifecycleConfirm] = useState<"archive" | "restore" | "delete" | null>(null);
 
   const locked = project.status === "LOCKED" || project.status === "ARCHIVED";
@@ -191,7 +193,8 @@ export function ProjectEditor({
         const result = await action(null, data);
         if (result.ok === false) {
           setError(result.error.safeMessage);
-          reject(new Error(result.error.safeMessage));
+          const count = (result.error.details as { count?: unknown } | undefined)?.count;
+          reject(Object.assign(new Error(result.error.safeMessage), { code: result.error.code, count: typeof count === "number" ? count : undefined }));
           return;
         }
         setError(null);
@@ -409,7 +412,28 @@ export function ProjectEditor({
         pending={pending}
         requireTypedConfirmation="LOCK"
         onConfirm={() => {
-          void run(lockProjectAction, {}).catch(() => undefined).finally(() => setLockOpen(false));
+          void run(lockProjectAction, {})
+            .catch((caught: { code?: string; count?: number }) => {
+              // Rows priced Rp0 are not an error to hide: ask once more, then lock with the count recorded.
+              if (caught?.code === "bq.project.lock-zero-prices" && typeof caught.count === "number") {
+                setError(null);
+                setZeroPriceRows(caught.count);
+              }
+            })
+            .finally(() => setLockOpen(false));
+        }}
+      />
+
+      <ConfirmDialog
+        open={zeroPriceRows !== null}
+        onOpenChange={(open) => { if (!open) setZeroPriceRows(null); }}
+        title="Lock with unpriced rows?"
+        description={`${zeroPriceRows ?? 0} row${zeroPriceRows === 1 ? " has" : "s have"} a price of Rp0. If that is intended (for example a price by request), lock anyway. Otherwise cancel and fill the prices in first.`}
+        confirmLabel="Lock anyway"
+        tone="danger"
+        pending={pending}
+        onConfirm={() => {
+          void run(lockProjectAction, { acknowledgeZeroPrices: "true" }).catch(() => undefined).finally(() => setZeroPriceRows(null));
         }}
       />
 

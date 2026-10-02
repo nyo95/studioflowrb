@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.295**
-- Next local revision: **R8.296**
+- Current revision after this entry is committed: **R8.297**
+- Next local revision: **R8.298**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.297 | 2026-10-02 | feat(bq): lock confirmation for unpriced rows; Lead review of WO-BQ-INTEGRITY-01
+
+- Lead verdict on R8.296: PASS. The suite was re-run independently (803 pass, 0 fail) and the diff read: the Rupiah-only guard covers project lines, all four Library kinds and assembly lines, the picker hides other currencies, the lock gate counts standalone items without a price and zero-priced lines under sub-objects and directly under items, the Master Data import checks the read permission before any read, and a requester cannot approve their own deletion request.
+- Screens: when locking a project that still has rows priced Rp0, the lock dialog now continues with "Lock with unpriced rows?" showing how many rows, and "Lock anyway" locks with the count recorded in the audit event; an empty project shows the server's message. The Add Cost Component picker says that BQ works in Rupiah only and other-currency Master Data prices are not listed.
+- Browser-checked on a throwaway BQ project (archived afterwards) and on the existing TES project (locked and unlocked again): empty project refused, unpriced row prompts, confirm locks. Known limit: a studio with a single deletion approver now needs a second approver.
+
+**Checks.** `npm test` (803 pass, 0 fail); `npm run check`; `npm run lint` (0 errors; two existing image warnings).
 
 ## R8.296 | 2026-10-02 | feat(bq): rupiah only, lock readiness, price permission, no self-approval
 

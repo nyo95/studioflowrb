@@ -102,7 +102,7 @@ export function ImportDialog({
       open
       onOpenChange={(next) => { if (!next) onClose(); }}
       title="Add Cost Component"
-      description="The selected price is copied as a snapshot. Later source changes do not rewrite this Cost Component."
+      description="The selected price is copied as a snapshot. Later source changes do not rewrite this Cost Component. BQ works in Rupiah only, so Master Data prices in another currency are not listed."
       size="lg"
     >
       <div className="grid gap-3">
