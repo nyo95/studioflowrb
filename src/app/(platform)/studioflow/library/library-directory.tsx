@@ -70,6 +70,9 @@ function FilterSection({
 }
 
 function BrandCard({ brand }: { brand: LibraryBrand }) {
+  const visibleOfferings = brand.websiteCatalogue?.offerings.slice(0, 2) ?? [];
+  const hiddenOfferingCount = Math.max((brand.websiteCatalogue?.offerings.length ?? 0) - visibleOfferings.length, 0);
+
   return (
     <Surface as="article" className="overflow-hidden">
       <div className="relative aspect-[4/3] overflow-hidden bg-surface-muted">
@@ -95,12 +98,10 @@ function BrandCard({ brand }: { brand: LibraryBrand }) {
             {brand.hashtags.map((hashtag) => <Badge key={hashtag.id}>#{hashtag.label}</Badge>)}
           </div>
         ) : null}
-        {brand.websiteCatalogue?.offerings.length ? (
+        {visibleOfferings.length ? (
           <div className="grid gap-1">
             <Text tone="secondary" size="sm">Website offerings</Text>
-            <div className="flex flex-wrap gap-1.5">
-              {brand.websiteCatalogue.offerings.map((term) => <Badge key={term}>{term}</Badge>)}
-            </div>
+            <Text tone="secondary" size="sm" className="line-clamp-2">{visibleOfferings.join(" · ")}{hiddenOfferingCount > 0 ? ` · +${hiddenOfferingCount} more` : ""}</Text>
           </div>
         ) : null}
         {brand.links.length > 0 ? (
