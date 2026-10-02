@@ -5,13 +5,20 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.286**
-- Next local revision: **R8.287**
+- Current revision after this entry is committed: **R8.287**
+- Next local revision: **R8.288**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.287 | 2026-10-02 | feat(studioflow): read project cards and My tasks (WO-SF-ITER-01 phase 3)
+
+- Added the bounded project-card read: live projects, client/PIC facts, completion and dependent-review indicators, notes, undismissed requirements, most recent update, phase iteration state/choices, waiting days, and Supervision visit age all arrive from one project relation read.
+- Added `myTasksSummary`, which projects the existing Today feed instead of duplicating its task rules. The card-read test covers card notes/current iteration plus the compact task summary contract.
+
+**Checks.** `npm test`; `npm run check`; `npm run lint`; `git diff --check`. No migration or screen change. Production build intentionally not run per WO-SF-ITER-01.
 
 ## R8.286 | 2026-10-02 | feat(studioflow): command client-sent iterations and explicit completion (WO-SF-ITER-01 phase 2)
 

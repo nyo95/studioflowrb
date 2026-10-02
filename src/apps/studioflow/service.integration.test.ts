@@ -154,6 +154,23 @@ describe("WO-SF-ITER-01 phase 2 iteration commands", () => {
   });
 });
 
+describe("WO-SF-ITER-01 phase 3 card reads", () => {
+  it("returns one bounded project-card projection and reuses Today for My tasks", async () => {
+    const { projectId } = await newProject("Card projection");
+    const moodboard = await phaseOf(projectId, "moodboard");
+    await sf.phases.setPhaseNote({ ...as(designer), projectId, phaseId: moodboard.id, note: "Confirm palette" });
+    const cards = await sf.projects.listProjectCards({ grants: ALL, filter: "mine", actorId: designer.id });
+    const card = cards.find((item) => item.id === projectId)!;
+    assert.ok(card);
+    assert.equal(card.note_phases.includes(moodboard.id), true);
+    assert.equal(card.phases[0]?.current_iteration?.state, "NOT_SENT");
+    const summary = await sf.today.myTasksSummary({ ...as(designer) });
+    assert.ok(Array.isArray(summary.items));
+    assert.equal(typeof summary.today, "number");
+    assert.equal(typeof summary.overdue, "number");
+  });
+});
+
 describe("WO-SF-CDLIST-01 Construction Drawing list", () => {
   it("lets both PICs manage sorted drawing items, records one audit event per change, and keeps the list informational", async () => {
     const { projectId } = await newProject();

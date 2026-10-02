@@ -117,6 +117,19 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
       return { groups, addTargets, scope };
     },
 
+    /** Compact home-strip projection.  It intentionally delegates to Today so
+     * task filtering and retention stay one source of truth. */
+    async myTasksSummary(input: CommandContext) {
+      const today = await this.getToday({ ...input, scope: "mine" });
+      const now = dateToDateOnly(nowOf(ports))!;
+      const items = today.groups.flatMap((group) => group.tasks);
+      return {
+        today: items.filter((item) => !item.isChecked && item.dueDate === now).length,
+        overdue: items.filter((item) => !item.isChecked && item.dueDate !== null && item.dueDate < now).length,
+        items,
+      };
+    },
+
     /**
      * §7.3 Cross-project phase attention: every in-flight phase the user can read,
      * with its project, display status, waiting days, seat, available commands and blocker count.

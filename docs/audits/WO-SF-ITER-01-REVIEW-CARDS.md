@@ -90,3 +90,35 @@ None. Existing phase actions remain as temporary compatibility wiring until the 
 ### Deviations and limitations
 
 The old temporary phase commands remain callable for the existing screens during the Lead's UI replacement, but their automatic project-completion path is removed. New command actions are service-surface ready; the new UI owns their final server-action wiring.
+
+## Phase 3 — project-card and My tasks reads (R8.287)
+
+### What changed
+
+The new home can load one card for every live project without querying per card. Each card carries the project facts, phase/iteration chips, requirement and note markers, waiting time, and the gentle "review dependents" signal. The compact personal task strip reuses Today, so it applies the same due-date and retention rules.
+
+### Requirement → evidence
+
+| Requirement | Evidence | Result |
+| --- | --- | --- |
+| One card per non-archived project with iteration/note fields | `projects.listProjectCards` and `service.integration.test.ts` — `WO-SF-ITER-01 phase 3 card reads` | PASS |
+| My tasks retains Today rules | `today.myTasksSummary` delegates to `getToday`; same test | PASS |
+| No per-project query loop | One `sfProject.findMany` with relation includes in `listProjectCards` | PASS |
+
+### Lead re-check commands
+
+1. `npm test`.
+2. `npm run check`.
+3. `npm run lint`.
+
+### Rows migrated
+
+None. Phase 3 has no migration.
+
+### Screens touched
+
+None.
+
+### Deviations and limitations
+
+The `mine` filter accepts the signed-in `actorId` alongside grants because permission grants alone do not identify a person. The Lead's new home supplies that identity when it wires the read.

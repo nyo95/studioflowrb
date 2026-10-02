@@ -10,7 +10,7 @@ import { toDecimalString } from "@platform/utilities/decimal";
 import { normalizeText } from "@platform/utilities/normalization";
 
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
-import type { PhaseStatus } from "../domain/phase";
+import { waitingDays, type PhaseStatus } from "../domain/phase";
 import {
   P,
   conflict,
@@ -588,6 +588,52 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       requireRead(input.grants);
       if (input.actor.kind !== "USER" || !input.actor.userId) throw new AppError("UNAUTHENTICATED", "ACTOR_REQUIRED", "An authenticated staff member is required.");
       return getProjectAccess(db, { grants: input.grants, actorId: input.actor.userId, projectId: input.projectId });
+    },
+
+    /** WO-SF-ITER-01 card read. One relation query keeps card rendering bounded at volume. */
+    async listProjectCards(input: ReadContext & { filter: "all" | "mine"; actorId?: string }) {
+      requireRead(input.grants);
+      if (input.filter === "mine" && !input.actorId) throw invalid("ACTOR_REQUIRED", "My projects needs the signed-in user.");
+      const rows = await db.sfProject.findMany({
+        where: { archived_at: null, ...(input.filter === "mine" ? { OR: [{ pic_designer_id: input.actorId! }, { pic_drafter_id: input.actorId! }] } : {}) },
+        orderBy: [{ updated_at: "desc" }, { name: "asc" }],
+        include: {
+          client: { select: { id: true, name: true } },
+          phases: { orderBy: { order_index: "asc" }, include: {
+            revisions: { orderBy: { major: "desc" }, select: { id: true, major: true, name: true, status: true, sent_at: true, visit_date: true, created_at: true } },
+            checklist_items: { where: { is_checked: false, dismissed_at: null }, select: { id: true } },
+          } },
+        },
+      });
+      const now = nowOf(ports);
+      return rows.map((project) => {
+        const phases = project.phases.map((phase) => {
+          const current = phase.revisions.find((iteration) => ["NOT_SENT", "SENT", "ANSWERED"].includes(iteration.status)) ?? null;
+          const isSupervision = phase.definition_id === "00000000-0000-4000-8000-000000000105";
+          const visits = phase.revisions.filter((iteration) => iteration.visit_date);
+          const lastVisit = visits.sort((a, b) => (b.visit_date?.getTime() ?? 0) - (a.visit_date?.getTime() ?? 0))[0]?.visit_date ?? null;
+          const choices = !current ? [] : current.status === "NOT_SENT" ? ["send"] : current.status === "SENT" ? ["record_answer"] : isSupervision ? ["next_visit", "done"] : ["revision", "done"];
+          return {
+            id: phase.id, name: phase.name_snapshot, order: phase.order_index, status: phase.status as PhaseStatus,
+            current_iteration: current ? { id: current.id, name: current.name, state: current.status, sent_at: current.sent_at, waiting_days: current.status === "SENT" ? waitingDays(current.sent_at, now) : null, available_choices: choices } : null,
+            iteration_count: phase.revisions.length, has_note: Boolean(phase.note?.trim()),
+            last_visit_days_ago: isSupervision ? waitingDays(lastVisit, now) : null,
+          };
+        });
+        const allPhasesDone = project.phases.every((phase) => phase.status === "DONE");
+        const earliestActive = project.phases.find((phase) => phase.status === "ACTIVE")?.order_index;
+        return {
+          id: project.id, name: project.name, client: project.client, status: project.status as ProjectStatus,
+          pic_ids: { designer: project.pic_designer_id, drafter: project.pic_drafter_id },
+          all_phases_done: allPhasesDone,
+          dependents_review_suggested: earliestActive !== undefined && project.phases.some((phase) => phase.order_index > earliestActive && phase.status === "DONE"),
+          can_mark_completed: project.status !== "COMPLETED" && Boolean(input.actorId && (project.pic_designer_id === input.actorId || project.pic_drafter_id === input.actorId || hasPermission(input.grants, P.projectOverride))),
+          note_phases: project.phases.filter((phase) => Boolean(phase.note?.trim())).map((phase) => phase.id),
+          requirements_waiting: project.phases.reduce((sum, phase) => sum + phase.checklist_items.length, 0),
+          last_update_at: [project.updated_at, ...project.phases.map((phase) => phase.updated_at)].reduce((latest, value) => latest > value ? latest : value),
+          phases,
+        };
+      });
     },
 
     canManageProjects(grants: ReadContext["grants"]) {
