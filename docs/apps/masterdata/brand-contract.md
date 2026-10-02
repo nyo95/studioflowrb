@@ -222,8 +222,10 @@ A directly archived SKU or Price therefore remains archived.
 
 Permanent deletion requires an archived Brand. A Brand manager may submit a
 request; a holder of `masterdata.deletion.approve` may execute directly without
-a request. It is blocked while any branded SKU is active, or while BrandSupplier
-or Brand-scoped VendorContact references remain.
+a request. It is blocked while any branded SKU is active or while Brand-scoped
+VendorContact references remain. The Brand's BrandSupplier links are removed with it
+(owner decision, 2026-10-02: a link has no meaning without its Brand, and keeping
+them made an emptied Brand impossible to delete).
 Owner linkage is a field on the Brand and is removed with it.
 
 In the same approved transaction the service:

@@ -127,7 +127,6 @@ No open items. (The pill-radius note from R8.83 was stale: `--ui-radius-pill` ha
 - [ ] [CLEANUP][P3] Workbook import merges nothing into suppliers that already exist (sheet categories, contact) and its area suffix only separates repeats
   within one file. Decide whether a re-import should add missing categories and contacts.
 - [ ] [CLEANUP][P3] Pre-existing schema drift: `platform.user_preference.updated_at` has a database default the Prisma schema does not declare (R8.249).
-- [ ] [OWNER DECISION] Permanent deletion of an archived Brand now removes its supplier links (R8.279); the contract line about a BrandSupplier delete guard is relaxed in that single case.
 
 - [ ] [UNVERIFIED] **Supplier categories merged into categories (R8.262).** Browser-checked only as far as: the Suppliers page and its
   category filter load, and the labor price form asks for the supplier first and narrows Pricing category to it (MEP for PT Mulia

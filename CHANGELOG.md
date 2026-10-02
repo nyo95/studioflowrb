@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.292**
-- Next local revision: **R8.293**
+- Current revision after this entry is committed: **R8.293**
+- Next local revision: **R8.294**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -47,6 +47,12 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## R8.290 | 2026-10-02 | docs(masterdata): activate WO-MD-PRICE-LABEL-01 as the Executor plan
 
 - WO-SF-ITER-01 is finished and reviewed (R8.285 to R8.289), so the queued Master Data plan for text price labels written in quotation marks moved from `docs/agent/queued-plans/` to the root `PLAN.md`, status READY, and its Executor prompt now requires every listed test, a scratch-database migration check, and a single uninterrupted run. The Executor takes the next revision (R8.291); the Lead builds the italic display afterwards. Docs only; no code, schema, or migration change.
+
+**Checks.** `git diff --check`.
+
+## R8.293 | 2026-10-02 | docs(masterdata): record the owner's decision on deleting a Brand
+
+- Owner decision (2026-10-02): permanently deleting an archived, emptied Brand also removes its supplier links, because a link means nothing without the Brand and the old guard made such a Brand impossible to delete. Archiving stays the normal path and old quotations keep their own copied prices. `brand-contract.md` section 6.3 now says so, and the open owner-decision item is removed from `docs/BACKLOG.md`. Docs only.
 
 **Checks.** `git diff --check`.
 
