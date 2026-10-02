@@ -306,6 +306,9 @@ describe("UI Engine foundation", () => {
 
     const shells = readFileSync(new URL("./layouts/shells.tsx", import.meta.url), "utf8");
     assert.match(shells, /collapsible && !narrowNavigation/);
+    assert.match(shells, /group-data-collapsed:h-\[34px\] group-data-collapsed:w-9/);
+    assert.match(shells, /max-\[840px\]:group-data-collapsed:w-auto/);
+    assert.doesNotMatch(shells, /max-\[840px\]:group-data-collapsed:h-auto/);
   });
 
   it("removes the rail when a surface has no application navigation", () => {
@@ -345,6 +348,16 @@ describe("UI Engine foundation", () => {
     assert.match(overlays, /onOpenAutoFocus=\{\(\) => \{[\s\S]*document\.activeElement/);
     assert.match(overlays, /onCloseAutoFocus=\{\(event\) => \{[\s\S]*event\.preventDefault\(\);[\s\S]*opener\.focus\(\{ preventScroll: true \}\)/);
     assert.match(overlays, /opener\?\.isConnected/);
+  });
+
+  it("restores confirmation focus when no alert-dialog trigger exists", () => {
+    const overlays = readFileSync(new URL("./layouts/overlays.tsx", import.meta.url), "utf8");
+    const confirmStart = overlays.indexOf("export function ConfirmDialog");
+    const confirmEnd = overlays.indexOf("export type TooltipProps");
+    const confirmDialog = overlays.slice(confirmStart, confirmEnd);
+    assert.match(confirmDialog, /onOpenAutoFocus=\{\(\) => \{[\s\S]*document\.activeElement/);
+    assert.match(confirmDialog, /onCloseAutoFocus=\{\(event\) => \{[\s\S]*event\.preventDefault\(\);[\s\S]*opener\.focus\(\{ preventScroll: true \}\)/);
+    assert.match(confirmDialog, /opener\?\.isConnected/);
   });
 
   it("gates confirmation on exact typed text when one is required", () => {

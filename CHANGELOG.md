@@ -5,13 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.313**
-- Next local revision: **R8.314**
+- Current revision after this entry is committed: **R8.314**
+- Next local revision: **R8.315**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.314 | 2026-10-02 | fix(ui-engine): stabilize narrow navigation and confirmation focus
+
+- Completed the interrupted shared-navigation correction by removing the narrow-only automatic-height override from a transient collapsed `NavItem`. A desktop rail that was collapsed before entering the 390×844 layout now keeps each labeled mobile item on its canonical 34px row instead of leaving a collapsed 36px item whose label can overlap its neighbour. The desktop collapsed rail remains 36px wide and icon-only; expanded and other desktop behavior is unchanged.
+- Added the R8.313 opener-capture and close-focus restoration to the controlled UI Engine `ConfirmDialog`, whose `RAlertDialog` has no Radix trigger. Cancel and Escape now return focus to a connected opening control after the close animation. Added focused source regressions for both the narrow-nav class contract and the confirmation-specific focus path; no new dependency, schema, migration, product behavior, or UX was introduced.
+- Browser verification used the local kantor server. At 1200×844 the collapsed StudioFlow rail rendered five 36×34px icon-only items. After switching the same state to 390×844, all five labels were visible in distinct 34px item boxes with no overlap or document overflow. The Projects directory, project overview, and a phase route had zero document/body/main horizontal overflow; their long project navigation stayed inside its own horizontal scroller. The public UI Engine showcase returned `ConfirmDialog` focus to `Delete Arbor Linen` after both Cancel and Escape, and the browser console had no errors.
+- Verified the kantor rebuild fixture state without mutation: `ZZ Grid Test` / `ask Budi` remains archived with one direct archive cause and one archive audit, there are no active matching test-price rows, and no R8.313 pagination Brand remains.
+
+**Checks.** `npm run typecheck` passed; `npm run lint -- --quiet` passed; `npm run check:boundaries` passed; `npm run check:legacy-runtime` passed; `npm test` passed (820/820); `npm run build` passed; `prisma migrate deploy` passed for verified kantor databases `studioflow_rebuild` and `studioflow_rebuild_test` (82 migrations, none pending); staged and unstaged whitespace checks passed. No mandatory check was skipped.
 
 ## R8.313 | 2026-10-02 | fix(ui-engine): restore focus after controlled dialogs close
 

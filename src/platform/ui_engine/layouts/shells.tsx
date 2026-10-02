@@ -236,7 +236,7 @@ export function NavItem({ icon, active = false, disabled = false, badge, childre
     disabled ? NAV_ITEM_STATE_CLASSES.disabled : active ? NAV_ITEM_STATE_CLASSES.active : NAV_ITEM_STATE_CLASSES.idle,
     /* Collapsed rail degrades the item to its icon without the app re-rendering. */
     "group-data-collapsed:h-[34px] group-data-collapsed:w-9 group-data-collapsed:justify-center group-data-collapsed:gap-0 group-data-collapsed:px-0 group-data-collapsed:text-center",
-    "max-[840px]:group-data-collapsed:h-auto max-[840px]:group-data-collapsed:w-auto max-[840px]:group-data-collapsed:justify-start max-[840px]:group-data-collapsed:gap-2.5 max-[840px]:group-data-collapsed:px-2.5 max-[840px]:group-data-collapsed:py-[7px] max-[840px]:group-data-collapsed:text-left",
+    "max-[840px]:group-data-collapsed:w-auto max-[840px]:group-data-collapsed:justify-start max-[840px]:group-data-collapsed:gap-2.5 max-[840px]:group-data-collapsed:px-2.5 max-[840px]:group-data-collapsed:py-[7px] max-[840px]:group-data-collapsed:text-left",
     className,
   );
 

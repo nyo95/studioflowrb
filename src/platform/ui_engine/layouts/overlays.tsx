@@ -161,6 +161,7 @@ export function ConfirmDialog({
   requireTypedConfirmation,
   typedConfirmationLabel = (expected) => <>Type <strong>{expected}</strong> to confirm.</>,
 }: ConfirmDialogProps) {
+  const openerRef = useRef<HTMLElement | null>(null);
   const [typed, setTyped] = useState("");
   const [wasOpen, setWasOpen] = useState(open);
   const typedFieldId = useId();
@@ -181,6 +182,16 @@ export function ConfirmDialog({
         <RAlertDialog.Content
           className={cx(DIALOG_FRAME_CLASSES, "left-1/2 top-1/2 w-[min(calc(100%-32px),var(--dialog-width))] max-h-(--ui-dialog-max-height) [transform:translate(-50%,-50%)] max-[560px]:w-[calc(100%-20px)]")}
           style={{ "--dialog-width": "var(--ui-dialog-sm)" } as CSSProperties}
+          onOpenAutoFocus={() => {
+            openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          }}
+          onCloseAutoFocus={(event) => {
+            const opener = openerRef.current;
+            openerRef.current = null;
+            if (!opener?.isConnected) return;
+            event.preventDefault();
+            opener.focus({ preventScroll: true });
+          }}
         >
           <div className="min-h-0 overflow-auto p-4 py-5">
             <div className="grid gap-[3px]">
