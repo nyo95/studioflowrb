@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.298**
-- Next local revision: **R8.299**
+- Current revision after this entry is committed: **R8.299**
+- Next local revision: **R8.300**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.299 | 2026-10-02 | feat(studioflow): Library brand cards with website image discovery
+
+- StudioFlow Library now presents Brands as responsive catalogue cards with a visual placeholder when no website image is available.
+- The Library-only server utility reads only `WEBSITE` links, extracts safe `og:image`, Twitter image, or favicon metadata, and fails closed on malformed, private, non-web, unreachable, or non-HTML targets. It does not write to Master Data or add a shared dependency.
+- Existing Brand fields, read permission, client-side search, and external links remain unchanged. No schema or migration change.
+
+**Checks.** `brand-image.test.ts` (3 pass); `npm test` (810 pass, 0 fail); `npm run typecheck`; `npm run lint` (0 errors; two existing image warnings); `npm run check:boundaries`; `npm run check:legacy-runtime`; `npm run build` passed. Browser acceptance of this new card view remains pending.
 
 ## R8.298 | 2026-10-02 | feat(masterdata): text prices in quotation marks on screen
 
