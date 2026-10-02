@@ -5,13 +5,20 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.306**
-- Next local revision: **R8.307**
+- Current revision after this entry is committed: **R8.307**
+- Next local revision: **R8.308**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.307 | 2026-10-02 | chore(repository): publish completed local revisions
+
+- Marked the completed local revision series through R8.306 for publication to the configured GitHub remote.
+- The unfinished owner/Claude change in `src/platform/ui_engine/layouts/shells.tsx` remains unstaged and excluded from this publication.
+
+**Checks.** `git diff --check` passed; publication preserves the one known dirty UI Engine file.
 
 ## R8.306 | 2026-10-02 | feat(studioflow): paginate and lazy-load Library cards
 
