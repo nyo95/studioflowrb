@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import { BookOpenText, Camera, ChevronDown, Globe2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
@@ -29,6 +29,16 @@ type LibraryBrand = {
 };
 
 type FilterOption = { id: string; label: string };
+
+const LINK_ICONS = {
+  CATALOG: BookOpenText,
+  WEBSITE: Globe2,
+  INSTAGRAM: Camera,
+} as const;
+
+function linkLabel(link: LibraryBrand["links"][number]) {
+  return link.label ?? link.kind;
+}
 
 function FilterSection({
   title,
@@ -98,8 +108,12 @@ function BrandCard({ brand }: { brand: LibraryBrand }) {
         {brand.links.length > 0 ? (
           <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-line-subtle pt-3">
             {brand.links.map((link) => (
-              <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="text-sm text-action hover:underline">
-                {link.label ?? link.kind}
+              <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" aria-label={linkLabel(link)} title={linkLabel(link)} className="inline-grid size-8 place-items-center rounded-control text-action hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
+                {(() => {
+                  const Icon = LINK_ICONS[link.kind.trim().toUpperCase() as keyof typeof LINK_ICONS] ?? Globe2;
+                  return <Icon aria-hidden="true" size={16} />;
+                })()}
+                <span className="sr-only">{linkLabel(link)}</span>
               </a>
             ))}
           </div>
