@@ -6,7 +6,7 @@ import { useState, type ClipboardEvent, type FormEvent } from "react";
 import { Button, CreatableMultiSelect, CreatableSearch, Dialog, Field, FormActions, IconButton, InlineError, Input, Select, Text } from "@/platform/ui_engine";
 import { formatDecimal } from "@platform/utilities/decimal";
 
-import { parseIndonesianAmount, parsePastedAmount } from "./amount-format";
+import { blurDisplay, entryDisplay, parseAmountEntry, parsePastedAmount } from "./amount-format";
 import { saveWorkPriceMatrixAction } from "./actions";
 
 type Ref = { id: string; name: string };
@@ -62,7 +62,7 @@ export function PriceMatrixDialog({ vendors, categories, units, onClose }: { ven
       const cells: Record<string, Cell> = {};
       chosen.forEach((vendor, index) => {
         const value = parsePastedAmount(columns[2 + index] ?? "");
-        if (value) cells[vendor.id] = { value, display: formatDecimal(value) };
+        if (value) cells[vendor.id] = { value, display: blurDisplay(value) };
       });
       if (!name || Object.keys(cells).length === 0) { if (name || columns.some((column) => column.trim())) skipped += 1; continue; } // section headings and empty lines
       parsed.push({ key: nextKey++, name, unitId, notes: notes === "-" ? "" : notes, cells });
@@ -133,7 +133,7 @@ export function PriceMatrixDialog({ vendors, categories, units, onClose }: { ven
 
         {chosen.length === 0 ? <Text size="sm" tone="secondary">Choose the suppliers to open the grid.</Text> : (
           <div className="grid gap-2" onPaste={onPaste}>
-            <Text size="sm" tone="secondary">Tip: copy a block from Excel and paste it here — columns Name, Specification, then one amount per supplier in the order shown. a dash is read as no price, while “By Request”, TBC or 0 is kept as a price on request.</Text>
+            <Text size="sm" tone="secondary">Tip: copy a block from Excel and paste it here — columns Name, Specification, then one amount per supplier in the order shown. a dash is read as no price, while “By Request”, TBC or 0 is kept as a price on request. Put text in quotation marks, for example “call sales”, to show it instead of a number.</Text>
             {pasteNote ? <Text size="sm" tone="secondary">{pasteNote}</Text> : null}
             <div className="overflow-x-auto">
               <div className="grid min-w-max gap-2" style={{ gridTemplateColumns: columns }}>
@@ -150,9 +150,9 @@ export function PriceMatrixDialog({ vendors, categories, units, onClose }: { ven
                       {units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code}</option>)}
                     </Select>
                     {chosen.map((vendor, column) => (
-                      <Input key={vendor.id} aria-label={`${vendor.name}, row ${index + 1}`} density="compact" inputMode="decimal" placeholder="–" className="tabular-nums" value={row.cells[vendor.id]?.display ?? ""}
-                        onChange={(event) => { const parsed = parseIndonesianAmount(event.target.value); if (parsed === null) return; patchCell(row.key, vendor.id, { value: parsed, display: event.target.value.endsWith(",") ? event.target.value : parsed ? formatDecimal(parsed) : "" }); }}
-                        onBlur={() => { const cell = row.cells[vendor.id]; if (cell) patchCell(row.key, vendor.id, { value: cell.value, display: cell.value ? formatDecimal(cell.value) : "" }); }}
+                      <Input key={vendor.id} aria-label={`${vendor.name}, row ${index + 1}`} density="compact" inputMode="text" placeholder="–" className="tabular-nums" value={row.cells[vendor.id]?.display ?? ""}
+                        onChange={(event) => { const parsed = parseAmountEntry(event.target.value); if (parsed === null) return; patchCell(row.key, vendor.id, { value: parsed, display: entryDisplay(parsed, event.target.value) }); }}
+                        onBlur={() => { const cell = row.cells[vendor.id]; if (cell) patchCell(row.key, vendor.id, { value: cell.value, display: blurDisplay(cell.value) }); }}
                         onKeyDown={(event) => { if (event.key === "Enter" && index === rows.length - 1 && column === chosen.length - 1) { event.preventDefault(); addRow(); } }} />
                     ))}
                     <Input aria-label={`Notes, row ${index + 1}`} density="compact" maxLength={1000} placeholder="Specification, brand reference…" value={row.notes} onChange={(event) => patchRow(row.key, { notes: event.target.value })} />

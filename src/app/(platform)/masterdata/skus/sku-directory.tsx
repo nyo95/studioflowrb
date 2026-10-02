@@ -37,6 +37,7 @@ type SkuRow = {
   material_prices: Array<{
     id: string;
     amount: unknown;
+    amount_label?: string | null;
     currency: string;
     supplier_vendor: { id: string; name: string };
     unit: { id: string; code: string; name: string };
@@ -196,7 +197,7 @@ export function SkuDirectory({
                   <TableCell>
                     {lowestPrices.length ? (
                       <TableCellContent
-                        primary={<span>{lowestPrices.map((price, index) => <span key={`${price.currency}-${price.unit.code}`}>{index ? " · " : ""}<span className="font-semibold">{isPriceOnRequest(price.amount) ? "By request" : `from ${formatMoney(createMoney(String(price.amount), price.currency))}`}</span><span className="text-ink-secondary"> / {price.unit.code}</span></span>)}</span>}
+                        primary={<span>{lowestPrices.map((price, index) => <span key={`${price.currency}-${price.unit.code}`}>{index ? " · " : ""}<span className="font-semibold">{price.amount_label ? <span className="font-normal italic text-ink-secondary">{price.amount_label}</span> : isPriceOnRequest(price.amount) ? <span className="font-normal italic text-ink-secondary">By request</span> : `from ${formatMoney(createMoney(String(price.amount), price.currency))}`}</span><span className="text-ink-secondary"> / {price.unit.code}</span></span>)}</span>}
                         secondary={<span className="truncate max-w-[140px]">{sku.material_prices.length} price{sku.material_prices.length === 1 ? "" : "s"}</span>}
                       />
                     ) : (

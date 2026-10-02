@@ -257,17 +257,19 @@ export async function requestPriceDeletionAction(kind: PriceKind, id: string, re
 }
 
 const bulkRowNotes = z.string().max(1000).nullish();
+/** A 64-character text price label plus its two quotation marks, with room to spare (WO-MD-PRICE-LABEL-01). */
+const AMOUNT_TEXT_MAX = 80;
 const bulkWorkInput = z.object({
   kind: z.enum(["labor", "material-labor"]),
   vendorId: z.string().uuid(),
   categoryId: z.string().uuid(),
   currency: z.string().length(3).default("IDR"),
-  rows: z.array(z.object({ name: z.string().min(1).max(128), unitId: z.string().uuid(), amount: z.string().min(1).max(32), notes: bulkRowNotes, scopeNote: bulkRowNotes })).min(1).max(100),
+  rows: z.array(z.object({ name: z.string().min(1).max(128), unitId: z.string().uuid(), amount: z.string().min(1).max(AMOUNT_TEXT_MAX), notes: bulkRowNotes, scopeNote: bulkRowNotes })).min(1).max(100),
 });
 const bulkMaterialInput = z.object({
   vendorId: z.string().uuid(),
   currency: z.string().length(3).default("IDR"),
-  rows: z.array(z.object({ skuId: z.string().uuid(), amount: z.string().min(1).max(32), notes: bulkRowNotes })).min(1).max(100),
+  rows: z.array(z.object({ skuId: z.string().uuid(), amount: z.string().min(1).max(AMOUNT_TEXT_MAX), notes: bulkRowNotes })).min(1).max(100),
 });
 
 /** Saves many labor or material + labor prices for one supplier and category, all or nothing. Row problems come back in `error.details.rows`. */
@@ -317,7 +319,7 @@ const matrixInput = z.object({
   categoryId: z.string().uuid(),
   currency: z.string().length(3).default("IDR"),
   vendorIds: z.array(z.string().uuid()).min(1).max(12),
-  rows: z.array(z.object({ name: z.string().min(1).max(128), unitId: z.string().uuid(), notes: bulkRowNotes, amounts: z.record(z.string(), z.string().max(32).nullish()) })).min(1).max(100),
+  rows: z.array(z.object({ name: z.string().min(1).max(128), unitId: z.string().uuid(), notes: bulkRowNotes, amounts: z.record(z.string(), z.string().max(AMOUNT_TEXT_MAX).nullish()) })).min(1).max(100),
 });
 
 /** Saves a compare-suppliers grid (one amount per item per supplier), all or nothing. Cell problems come back in `error.details.rows` with their supplier. */
@@ -335,7 +337,7 @@ export async function saveWorkPriceMatrixAction(input: unknown): Promise<ActionR
 
 const materialRowsInput = z.object({
   currency: z.string().length(3).default("IDR"),
-  rows: z.array(z.object({ skuId: z.string().uuid(), vendorId: z.string().uuid(), amount: z.string().min(1).max(32), notes: bulkRowNotes })).min(1).max(100),
+  rows: z.array(z.object({ skuId: z.string().uuid(), vendorId: z.string().uuid(), amount: z.string().min(1).max(AMOUNT_TEXT_MAX), notes: bulkRowNotes })).min(1).max(100),
 });
 
 /** Saves many material prices where every row names its supplier, all or nothing. Row problems come back in `error.details.rows`. */

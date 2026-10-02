@@ -119,7 +119,7 @@ No open items. (The pill-radius note from R8.83 was stale: `--ui-radius-pill` ha
 
 ## Master Data
 
-- [ ] [PLANNED] **Text price labels: Lead UI (backend done in R8.291).** Let a quotation mark through in the amount boxes of the single price form, the work and material tables, the compare grid and pasted cells (`amount-format.ts` and the amount `onChange` handlers currently strip everything but digits); show the label in italic, muted text in place of the amount in the three price lists and the SKU list (pages must pass `amountLabel`); add the hint "Use quotation marks for text, e.g. \"call sales\"" under every amount field; make search match labels; then browser-check typing, pasting, and importing and re-importing the company file with a labelled cell. Supplier/price workbook and SKU workbook already export and import quoted text.
+- [ ] [UNVERIFIED] **Text price labels: still to try on screen (R8.298).** Typing and pasting a quoted text in the compare-suppliers grid (needs two labor suppliers), the material price table, and importing then re-importing the company file with a labelled cell; a text price shown in the SKU list ("from" line) and in the BQ picker is not shown as text yet (BQ reads the amount 0 only).
 - [ ] [CLEANUP][P2] **UI Engine admission for the entry grids and `textCase` (Lead, 2026-10-01).** The work-price table, the material-price table and the
   compare-suppliers grid are three app-local copies of one generic capability (rows, add/remove, per-row problems, Enter adds a row, paste). Extract one
   `EntryGrid` pattern into the UI Engine with a consumer matrix and showcase entry, and add the same for `Input textCase` (no showcase, test or

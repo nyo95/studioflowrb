@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { parseIndonesianAmount, parsePastedAmount } from "./amount-format";
+import { blurDisplay, entryDisplay, isTextAmount, parseAmountEntry, parseIndonesianAmount, parsePastedAmount, storedAmountText } from "./amount-format";
 
 describe("pasted amounts", () => {
   it("reads Indonesian and spreadsheet number styles", () => {
@@ -25,5 +25,35 @@ describe("pasted amounts", () => {
   it("typed amounts are read the Indonesian way", () => {
     assert.equal(parseIndonesianAmount("1.250,50"), "1250.50");
     assert.equal(parseIndonesianAmount(""), "");
+  });
+});
+
+describe("text prices in quotation marks", () => {
+  it("recognizes text that starts with a straight or curly quote", () => {
+    for (const text of ['"call sales"', '\u201ccall sales\u201d', '  "open', '"120"']) assert.equal(isTextAmount(text), true, text);
+    for (const text of ["120", "Rp 1.000", "call sales", "", "By Request"]) assert.equal(isTextAmount(text), false, text);
+  });
+
+  it("lets a typed quote through and keeps typing the text, but still groups numbers", () => {
+    assert.equal(parseAmountEntry('"call sa'), '"call sa');
+    assert.equal(parseAmountEntry("1.250,50"), "1250.50");
+    assert.equal(entryDisplay('"call sa', '"call sa'), '"call sa');
+    assert.equal(entryDisplay("1250", "1250"), "1.250");
+    assert.equal(entryDisplay("12", "12,"), "12,");
+    assert.equal(entryDisplay("", ""), "");
+  });
+
+  it("keeps text when the box is left and shows a stored label in quotes", () => {
+    assert.equal(blurDisplay('"call sales"'), '"call sales"');
+    assert.equal(blurDisplay("135000"), "135.000");
+    assert.equal(blurDisplay(""), "");
+    assert.equal(storedAmountText("0", "call sales"), '"call sales"');
+    assert.equal(storedAmountText("135000", null), "135000");
+  });
+
+  it("passes a quoted pasted cell through, even when it looks like a number", () => {
+    assert.equal(parsePastedAmount('"call sales"'), '"call sales"');
+    assert.equal(parsePastedAmount('"120"'), '"120"');
+    assert.equal(parsePastedAmount("120"), "120");
   });
 });

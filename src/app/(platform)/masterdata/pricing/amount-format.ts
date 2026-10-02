@@ -1,3 +1,32 @@
+import { formatDecimal } from "@platform/utilities/decimal";
+
+/** WO-MD-PRICE-LABEL-01: text that starts with a quotation mark is a text price ("call sales"), kept exactly as typed. */
+export function isTextAmount(value: string): boolean {
+  return /^\s*["\u201c\u201d]/.test(value);
+}
+
+/** Like `parseIndonesianAmount`, but a value starting with a quotation mark is passed through untouched for the server to read. */
+export function parseAmountEntry(value: string): string | null {
+  return isTextAmount(value) ? value.replace(/^\s+/, "") : parseIndonesianAmount(value);
+}
+
+/** What the box shows while typing: text as typed, a trailing comma kept, otherwise the grouped number. */
+export function entryDisplay(parsed: string, typed: string): string {
+  if (isTextAmount(parsed)) return parsed;
+  return typed.endsWith(",") ? typed : parsed ? formatDecimal(parsed) : "";
+}
+
+/** What the box shows once left: text as typed, otherwise the grouped number. */
+export function blurDisplay(value: string): string {
+  if (isTextAmount(value)) return value;
+  return value ? formatDecimal(value) : "";
+}
+
+/** The text a stored price shows in its amount box: the label in quotation marks, or the number. */
+export function storedAmountText(amount: string, label: string | null | undefined): string {
+  return label ? `"${label}"` : amount;
+}
+
 /** Reads an amount typed the Indonesian way ("1.250.000" or "12,5"). Returns a plain decimal string, "" when empty, null when unreadable. */
 export function parseIndonesianAmount(value: string): string | null {
   const compact = value.replace(/\s/g, "").replace(/[^\d,.-]/g, "");
@@ -13,6 +42,7 @@ export function parseIndonesianAmount(value: string): string | null {
 /** One pasted spreadsheet cell as an amount: "-", "n/a" and blanks mean "no price" (""); "By Request", TBC, TBA and Nego mean a price on request ("0"). */
 export function parsePastedAmount(cell: string): string {
   const text = cell.trim();
+  if (isTextAmount(text)) return text;
   if (/^(by request|tbc|tba|nego|negotiable)$/i.test(text)) return "0";
   if (!text || /^(-+|n\/a)$/i.test(text)) return "";
   const withoutCurrency = text.replace(/^rp\.?\s*/i, "");

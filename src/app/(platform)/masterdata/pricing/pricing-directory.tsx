@@ -10,7 +10,7 @@ import { DirectoryShell,RowActionMenu,RowActionsCell,RowActionsHead } from "@/pl
 
 import { Badge,Button,ButtonMenu,Checkbox,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,Text,Tooltip,useFormDraftGuard,useOptionOverlay,type SortDirection } from "@/platform/ui_engine";
 import { VendorQuickCreateDialog } from "../vendor-quick-create-dialog";
-import { parseIndonesianAmount } from "./amount-format";
+import { blurDisplay, entryDisplay, parseAmountEntry, storedAmountText } from "./amount-format";
 import { PriceMatrixDialog } from "./price-matrix-dialog";
 import { compareDecimals,formatDecimal,type DecimalString } from "@platform/utilities/decimal";
 import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurement";
@@ -21,8 +21,8 @@ import { archivePriceAction,createMaterialSkuAction,linkBrandToSupplierAction,sa
 
 type Kind = "material" | "material-labor" | "labor";
 type SkuRef = { id: string; name: string | null; code: string | null; brand: { id: string; name: string } | null; base_unit: { id: string; code: string; name: string } | null; purchase_unit: { id: string; code: string; name: string } | null; dimension_length: string | null; dimension_width: string | null; dimension_thickness: string | null; dimension_unit: { id: string; code: string; name: string } | null; purchase_to_base_factor: string | null };
-type MaterialRow = { id: string; sku: { id: string; name: string | null; code: string | null; brand: { id: string; name: string } | null; categories: Array<{ id: string; name: string }>; size: string }; supplier_vendor: { id: string; name: string }; amount: string; currency: string; unit: { id: string; code: string; name: string }; notes: string | null; updated_at: Date; updated_by_label: string; deleted_at: Date | null };
-type WorkRow = { id: string; name: string; category: { id: string; name: string }; vendor: { id: string; name: string }; amount: string; currency: string; unit: { id: string; code: string; name: string }; scope_note?: string | null; notes: string | null; updated_at: Date; updated_by_label: string; deleted_at: Date | null };
+type MaterialRow = { id: string; amount_label?: string | null; sku: { id: string; name: string | null; code: string | null; brand: { id: string; name: string } | null; categories: Array<{ id: string; name: string }>; size: string }; supplier_vendor: { id: string; name: string }; amount: string; currency: string; unit: { id: string; code: string; name: string }; notes: string | null; updated_at: Date; updated_by_label: string; deleted_at: Date | null };
+type WorkRow = { id: string; name: string; category: { id: string; name: string }; vendor: { id: string; name: string }; amount: string; amount_label?: string | null; currency: string; unit: { id: string; code: string; name: string }; scope_note?: string | null; notes: string | null; updated_at: Date; updated_by_label: string; deleted_at: Date | null };
 type Target = { kind: Kind; id: string; name: string };
 type Editor = { kind: Kind; row?: MaterialRow | WorkRow };
 type Ref = { id: string; name: string };
@@ -33,7 +33,10 @@ const PRICE_PAGE_SIZE = 25;
 
 export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; contacts: Record<string, { name: string; phones: string[] }>; canManageVendors: boolean; canManageCategories: boolean; canManageSkus: boolean; canManageBrands: boolean; skus: SkuRef[]; brands: Ref[]; productCategories: Ref[]; vendors: Ref[]; materialVendors: Array<Ref & { brandIds: string[] }>; workVendors: Array<Ref & { categoryIds: string[] }>; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
   const { locale } = useDisplaySettings();
-  const displayPrice = (amount: string, currency: string) => isPriceOnRequest(amount) ? "By request" : formatMoney(createMoney(amount, currency), { locale });
+  /** A text price or a price on request is shown in italic, muted text instead of a number. */
+  const displayPrice = (amount: string, currency: string, label?: string | null) => label
+    ? <span className="italic text-ink-secondary" title="Text price">{label}</span>
+    : isPriceOnRequest(amount) ? <span className="italic text-ink-secondary">By request</span> : formatMoney(createMoney(amount, currency), { locale });
   const [query, setQuery] = useState(""); const [status, setStatus] = useState<DirectoryStatus>("ACTIVE"); const [supplierFilter, setSupplierFilter] = useState("ALL"); const [brandFilter, setBrandFilter] = useState("ALL"); const [workCategoryFilter, setWorkCategoryFilter] = useState("ALL"); const [productCategoryFilter, setProductCategoryFilter] = useState("ALL"); const [groupByItem, setGroupByItem] = useState(false); const [page, setPage] = useState(1); const [sort, setSort] = useState<{ key: PriceSortKey; direction: SortDirection }>({ key: "name", direction: "asc" }); const [matrixOpen, setMatrixOpen] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null); const [formError, setFormError] = useState<string | null>(null);
   const [archive, setArchive] = useState<Target | null>(null); const [restore, setRestore] = useState<Target | null>(null); const [deletion, setDeletion] = useState<Target | null>(null); const [reason, setReason] = useState(""); const [rowError, setRowError] = useState<string | null>(null);
@@ -91,7 +94,7 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
   );
   const actions = (row: { id: string; deleted_at: Date | null }, target: Target, canManage: boolean, edit: () => void) => !canManage ? null : <RowActionsCell><RowActionMenu label={`Actions for ${target.name}`} pending={pendingId === row.id} items={[...(pendingId === row.id ? [] : []),...(!row.deleted_at ? [...[{ label: "Edit", onSelect: edit, disabled: undefined, danger: false, separatorBefore: false }],...[{ label: "Archive", onSelect: () => setArchive(target), disabled: undefined, danger: false, separatorBefore: false }]] : [...[{ label: "Restore", onSelect: () => setRestore(target), disabled: undefined, danger: false, separatorBefore: false }],...[{ label: "Request deletion", onSelect: () => setDeletion(target), disabled: undefined, danger: true, separatorBefore: true }]])]} /></RowActionsCell>;
   const material = props.materialPrices.filter((row) => matches(`${row.sku.name ?? ""} ${row.sku.code ?? ""} ${row.sku.brand?.name ?? ""} ${row.sku.categories.map((category) => category.name).join(" ")} ${row.supplier_vendor.name}`, row.deleted_at) && (supplierFilter === "ALL" || row.supplier_vendor.id === supplierFilter) && (brandFilter === "ALL" || row.sku.brand?.id === brandFilter) && (productCategoryFilter === "ALL" || row.sku.categories.some((category) => category.id === productCategoryFilter)));
-  const workFiltered = (rows: WorkRow[]) => rows.filter((row) => matches(`${row.name} ${row.notes ?? ""} ${row.scope_note ?? ""} ${row.category.name} ${row.vendor.name}`, row.deleted_at) && (supplierFilter === "ALL" || row.vendor.id === supplierFilter) && (workCategoryFilter === "ALL" || row.category.id === workCategoryFilter));
+  const workFiltered = (rows: WorkRow[]) => rows.filter((row) => matches(`${row.name} ${row.notes ?? ""} ${row.scope_note ?? ""} ${row.category.name} ${row.vendor.name} ${row.amount_label ?? ""}`, row.deleted_at) && (supplierFilter === "ALL" || row.vendor.id === supplierFilter) && (workCategoryFilter === "ALL" || row.category.id === workCategoryFilter));
   const materialLaborFiltered = workFiltered(props.materialLaborPrices);
   const laborFiltered = workFiltered(props.laborPrices);
 
@@ -103,8 +106,8 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
   const groupHeader = <T,>(rows: Array<Arranged<T>>, index: number, columns: number) => rows[index].group !== null && (index === 0 || rows[index - 1].groupKey !== rows[index].groupKey)
     ? <TableRow key={`group-${rows[index].groupKey}-${index}`}><TableCell colSpan={columns}><span className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-secondary">{rows[index].group}</span></TableCell></TableRow>
     : null;
-  const priceCell = (row: { amount: string; currency: string }, lowest: boolean) => (
-    <TableCell align="end"><span>{displayPrice(row.amount, row.currency)}</span>{lowest ? <span className="ml-2 align-middle"><Badge tone="success">Lowest</Badge></span> : null}</TableCell>
+  const priceCell = (row: { amount: string; amount_label?: string | null; currency: string }, lowest: boolean) => (
+    <TableCell align="end"><span>{displayPrice(row.amount, row.currency, row.amount_label)}</span>{lowest ? <span className="ml-2 align-middle"><Badge tone="success">Lowest</Badge></span> : null}</TableCell>
   );
   const supplierCell = (vendor: { id: string; name: string }) => {
     const contact = props.contacts[vendor.id];
@@ -281,8 +284,8 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
   const [selectedProductCategoryId, setSelectedProductCategoryId] = useState("");
   const [productCategorySearchId, setProductCategorySearchId] = useState("");
   const currency = row?.currency ?? "IDR";
-  const [amount, setAmount] = useState(row?.amount ?? "");
-  const [amountDisplay, setAmountDisplay] = useState(row?.amount ? formatDecimal(row.amount) : "");
+  const [amount, setAmount] = useState(row ? storedAmountText(row.amount, row.amount_label) : "");
+  const [amountDisplay, setAmountDisplay] = useState(row ? blurDisplay(storedAmountText(row.amount, row.amount_label)) : "");
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickName, setQuickName] = useState("");
   const [quickVendorTypeId, setQuickVendorTypeId] = useState("");
@@ -528,10 +531,10 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
   );
 
   const updateAmount = (display: string) => {
-    const parsed = parseIndonesianAmount(display);
+    const parsed = parseAmountEntry(display);
     if (parsed === null) return;
     setAmount(parsed);
-    setAmountDisplay(display.endsWith(",") ? display : parsed ? formatDecimal(parsed) : "");
+    setAmountDisplay(entryDisplay(parsed, display));
   };
 
   // Creating work prices happens as a table: one supplier and category, many rows, saved all together or not at all.
@@ -679,9 +682,9 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
               <option value="">Unit</option>
               {refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code}</option>)}
             </Select>
-            <Input aria-label={`Amount, row ${index + 1}`} density="compact" inputMode="decimal" placeholder="15.000 · 0 = by request" className="tabular-nums" value={entry.amountDisplay}
-              onChange={(event) => { const parsed = parseIndonesianAmount(event.target.value); if (parsed === null) return; patchRow(entry.key, { amount: parsed, amountDisplay: event.target.value.endsWith(",") ? event.target.value : parsed ? formatDecimal(parsed) : "" }); }}
-              onBlur={() => patchRow(entry.key, { amountDisplay: entry.amount ? formatDecimal(entry.amount) : "" })}
+            <Input aria-label={`Amount, row ${index + 1}`} density="compact" inputMode="text" placeholder={`15.000 · 0 = by request · "text"`} className="tabular-nums" value={entry.amountDisplay}
+              onChange={(event) => { const parsed = parseAmountEntry(event.target.value); if (parsed === null) return; patchRow(entry.key, { amount: parsed, amountDisplay: entryDisplay(parsed, event.target.value) }); }}
+              onBlur={() => patchRow(entry.key, { amountDisplay: blurDisplay(entry.amount) })}
               onKeyDown={(event) => { if (event.key === "Enter" && index === rows.length - 1) { event.preventDefault(); addRow(); } }}
               invalid={Boolean(rowProblems[entry.key])} />
             <Input aria-label={`Notes, row ${index + 1}`} density="compact" maxLength={1000} placeholder="Specification, brand reference…" value={entry.notes} onChange={(event) => patchRow(entry.key, { notes: event.target.value })} />
@@ -748,9 +751,9 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
                   className="w-full"
                 />
                 <div className="flex min-h-(--ui-control-height-sm) items-center px-1 font-ui-mono text-sm text-ink-secondary">{sku ? (sku.purchase_unit ?? sku.base_unit)?.code ?? "–" : "–"}</div>
-                <Input aria-label={`Amount, row ${index + 1}`} density="compact" inputMode="decimal" placeholder="15.000" className="tabular-nums" value={entry.amountDisplay}
-                  onChange={(event) => { const parsed = parseIndonesianAmount(event.target.value); if (parsed === null) return; patchMRow(entry.key, { amount: parsed, amountDisplay: event.target.value.endsWith(",") ? event.target.value : parsed ? formatDecimal(parsed) : "" }); }}
-                  onBlur={() => patchMRow(entry.key, { amountDisplay: entry.amount ? formatDecimal(entry.amount) : "" })}
+                <Input aria-label={`Amount, row ${index + 1}`} density="compact" inputMode="text" placeholder={`15.000 or "text"`} className="tabular-nums" value={entry.amountDisplay}
+                  onChange={(event) => { const parsed = parseAmountEntry(event.target.value); if (parsed === null) return; patchMRow(entry.key, { amount: parsed, amountDisplay: entryDisplay(parsed, event.target.value) }); }}
+                  onBlur={() => patchMRow(entry.key, { amountDisplay: blurDisplay(entry.amount) })}
                   onKeyDown={(event) => { if (event.key === "Enter" && index === mRows.length - 1) { event.preventDefault(); addMRow(); } }}
                   invalid={Boolean(rowProblems[entry.key])} />
                 <Input aria-label={`Notes, row ${index + 1}`} density="compact" maxLength={1000} placeholder="Quote reference, remarks…" value={entry.notes} onChange={(event) => patchMRow(entry.key, { notes: event.target.value })} />
@@ -794,7 +797,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
       {edit && <input type="hidden" name="id" value={row!.id} />}{error && <div role="alert" className="text-sm text-danger">{error}</div>}
       {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name ?? materialRow!.sku.code ?? "Unnamed SKU"} readOnly /></Field><Field label="Supplier"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Unit"><Input value={`${materialRow!.unit.name} (${materialRow!.unit.code})`} readOnly /></Field></> : newMaterialSku ? <><div><Button type="button" variant="ghost" size="sm" onClick={() => setMaterialEntryMode("existing")}>← Back to the price table</Button></div>{newMaterialFields}{vendorField}</> : <>{materialTable}</>) : bulk ? <>{vendorField}{categoryField}{bulkTable}</> : <><Field label="Name" required><Input name="name" textCase="title" defaultValue={workRow?.name} required /></Field>{edit ? <input type="hidden" name="vendorId" value={vendorId} required /> : vendorField}{categoryField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note" description="Describe included work or materials. Use bullets for a clear scope."><SimpleTextEditor name="scopeNote" defaultValue={workRow?.scope_note ?? ""} placeholder={"Example:\n- Installation labor\n- Adhesive and grout"} maxLength={1000} rows={5} /></Field>}</>}
       {!anyBulk && <><input type="hidden" name="amount" value={amount} /><input type="hidden" name="currency" value={currency} />
-      <Field label="Amount" description={`${currency} default currency`} required><div className="relative"><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-3 flex items-center font-ui-mono text-sm font-semibold text-ink-secondary">{currency}</span><Input aria-label="Amount" value={amountDisplay} onChange={(event) => updateAmount(event.target.value)} onBlur={() => setAmountDisplay(amount ? formatDecimal(amount) : "")} inputMode="decimal" placeholder="15.000" className="pl-14 tabular-nums" required /></div></Field><Field label="Notes"><SimpleTextEditor name="notes" defaultValue={row?.notes ?? ""} placeholder="Additional pricing context..." maxLength={1000} rows={3} /></Field></>}{anyBulk && bulkError ? <div role="alert" className="text-sm text-danger">{bulkError}</div> : null}<FormActions><Button type="button" variant="ghost" disabled={pending} onClick={() => void draftGuard.requestDiscard(onCancel)}>Cancel</Button><Button type="submit" variant="primary" pending={pending || bulkPending}>{edit ? "Save changes" : anyBulk ? `Create ${filledCount || ""} ${filledCount === 1 ? "price" : "prices"}`.replace("  ", " ") : "Create price"}</Button></FormActions>
+      <Field label="Amount" description={`${currency} default currency. Use quotation marks for text, e.g. "call sales".`} required><div className="relative"><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-3 flex items-center font-ui-mono text-sm font-semibold text-ink-secondary">{currency}</span><Input aria-label="Amount" value={amountDisplay} onChange={(event) => updateAmount(event.target.value)} onBlur={() => setAmountDisplay(blurDisplay(amount))} inputMode="text" placeholder={`15.000 or "call sales"`} className="pl-14 tabular-nums" required /></div></Field><Field label="Notes"><SimpleTextEditor name="notes" defaultValue={row?.notes ?? ""} placeholder="Additional pricing context..." maxLength={1000} rows={3} /></Field></>}{anyBulk && bulkError ? <div role="alert" className="text-sm text-danger">{bulkError}</div> : null}<FormActions><Button type="button" variant="ghost" disabled={pending} onClick={() => void draftGuard.requestDiscard(onCancel)}>Cancel</Button><Button type="submit" variant="primary" pending={pending || bulkPending}>{edit ? "Save changes" : anyBulk ? `Create ${filledCount || ""} ${filledCount === 1 ? "price" : "prices"}`.replace("  ", " ") : "Create price"}</Button></FormActions>
     </form></Dialog>
     {draftGuard.confirmDialog}
     <VendorQuickCreateDialog

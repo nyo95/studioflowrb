@@ -5,13 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.297**
-- Next local revision: **R8.298**
+- Current revision after this entry is committed: **R8.298**
+- Next local revision: **R8.299**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.298 | 2026-10-02 | feat(masterdata): text prices in quotation marks on screen
+
+- The amount boxes now accept a quotation mark: the single price form, the work and material price tables, the compare-suppliers grid, and pasted Excel cells keep text that starts with a straight or curly quote exactly as typed (the server reads it; a closing quote is optional) while numbers are still grouped as before. The boxes no longer ask for a numeric keypad on phones, and each shows a hint ("Use quotation marks for text, e.g. \"call sales\""). Editing a labelled price shows its label in quotes; saving a number clears the label.
+- A text price is shown in italic, muted text instead of a number in the three price lists and in the SKU list, and so is "By request". Searching the price lists also matches labels. The action limits for amounts were raised to fit a 64-character label plus its quotation marks.
+- One set of small helpers (`isTextAmount`, `parseAmountEntry`, `entryDisplay`, `blurDisplay`, `storedAmountText`) replaces six copies of the same typing logic; they are unit tested.
+- Browser-checked on throwaway prices (archived afterwards): typing a quoted text and a quoted number, saving, the italic display, searching by label, editing a label into a number. Not yet tried on screen: the compare grid and the material table (same helpers, unit tested), and the company-file import with a labelled cell; recorded in `docs/BACKLOG.md`.
+
+**Checks.** `npm test` (807 pass, 0 fail); `npm run check`; `npm run lint` (0 errors; two existing image warnings).
 
 ## R8.297 | 2026-10-02 | feat(bq): lock confirmation for unpriced rows; Lead review of WO-BQ-INTEGRITY-01
 

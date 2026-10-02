@@ -25,6 +25,7 @@ export const dynamic = "force-dynamic";
 function mapMaterialPrice(p: {
   id: string;
   amount: { toString(): string };
+  amount_label: string | null;
   currency: string;
   notes: string | null;
   updated_at: Date;
@@ -48,6 +49,7 @@ function mapMaterialPrice(p: {
     },
     supplier_vendor: p.supplier_vendor,
     amount: p.amount.toString(),
+    amount_label: p.amount_label ?? null,
     currency: p.currency,
     unit: p.unit,
     deleted_at: p.deleted_at,
@@ -62,6 +64,7 @@ function mapWorkPrice(p: {
   name: string;
   slug: string;
   amount: { toString(): string };
+  amount_label: string | null;
   currency: string;
   notes: string | null;
   updated_at: Date;
@@ -82,6 +85,7 @@ function mapWorkPrice(p: {
     vendor: p.vendor,
     unit: p.unit,
     amount: p.amount.toString(),
+    amount_label: p.amount_label ?? null,
     currency: p.currency,
     scope_note: p.scope_note ?? null,
     deleted_at: p.deleted_at,
