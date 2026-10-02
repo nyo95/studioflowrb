@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.311**
-- Next local revision: **R8.312**
+- Current revision after this entry is committed: **R8.312**
+- Next local revision: **R8.313**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.312 | 2026-10-02 | chore(repository): integrate and verify Library revisions
+
+- Merged `origin/claude/pensive-clarke-mvuuv2` into `main`, preserving incoming R8.308–R8.311 entries and the pre-existing owner change in `src/platform/ui_engine/layouts/shells.tsx` as an unstaged file.
+- Verified the kantor rebuild databases, Library security handling, responsive navigation, filter drawer, search, website-only match badge, hashtag search, active-filter clear, Brand Dialog content, resource links, and temporary-fixture archive/restore.
+- No schema or dependency changes were introduced by the merge.
+
+**Checks.** `prisma migrate deploy` passed for `studioflow_rebuild` and `studioflow_rebuild_test`; `npm run typecheck` passed; `npm run lint -- --quiet` passed; `npm run check:boundaries` passed; `npm run check:legacy-runtime` passed; `npm test` passed (818/818); `npm run build` passed. Browser: 5a passed; 5b passed for search/sort/filter rail, website-only badge, hashtag search, and card grid (pagination not exercised because the fixture has 14 Brands); 5c passed; 5d passed except Dialog focus return, recorded in `docs/BACKLOG.md`; 5e passed with a temporary `http://127.0.0.1` Brand and archive/restore cleanup; 5f empty-search clear passed, while dark-theme contrast and a no-links/no-image/no-hashtags Brand remain unverified.
 
 ## R8.311 | 2026-10-02 | feat(studioflow): Brand detail modal in Library
 

@@ -496,6 +496,8 @@ which the owner declined to add; see `STUDIOFLOW-REWORK-CONTRACT.md` §11.11.
 
 ### Open defects
 
+- [ ] [BUG][P2] **R8.312 browser acceptance: Library Brand Dialog does not restore focus to its trigger after `Esc`.** On `/studioflow/library`, opening a Brand card and pressing `Esc` closes the UI Engine Dialog but leaves focus on `body` instead of the card's image/name button. The modal content, scrollable phone layout, resource links, and filter/search preservation otherwise work. Fix in the UI Engine Dialog focus-return path; do not redesign the Library modal.
+
   suggestion, not yet agreed: when every phase is finished, the home card may
   show a quiet "All phases done — mark project completed?" prompt.
 
