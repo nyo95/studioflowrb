@@ -12,7 +12,7 @@ it("batch blocker reads use three statements even for many phases", async () => 
     const db = {
       sfRevision: { findMany: async (query: { where: unknown }) => {
         statements++;
-        assert.deepEqual(query.where, { phase_id: { in: ids }, status: "ACTIVE" });
+        assert.deepEqual(query.where, { phase_id: { in: ids }, status: { in: ["NOT_SENT", "SENT", "ANSWERED"] } });
         return ids.map((id) => ({ id: `revision-${id}`, phase_id: id }));
       } },
       sfActivity: { groupBy: async (query: { where: unknown; by: string[] }) => {

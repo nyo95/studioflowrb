@@ -10,9 +10,8 @@ import { useCommand } from "../../../../_components/use-command";
 
 type Blockers = { total: number; reasons: string[] };
 
-const PRIMARY_ORDER: PhaseCommand[] = ["activate", "approveClient", "approveInternal", "submitInternal", "submitClient", "completeSupervision", "reopen"];
-const REVIEW: ReadonlySet<PhaseCommand> = new Set(["bypass", "approveInternal", "rejectInternal", "submitClient", "approveClient", "rejectClient", "reopen", "completeSupervision"]);
-const NEEDS_FULL: ReadonlySet<PhaseCommand> = new Set(["approveInternal", "submitClient", "approveClient"]);
+const PRIMARY_ORDER: PhaseCommand[] = ["activate", "approveClient", "submitClient", "completeSupervision", "reopen"];
+const REVIEW: ReadonlySet<PhaseCommand> = new Set(["bypass", "submitClient", "approveClient", "rejectClient", "reopen", "completeSupervision"]);
 
 /**
  * Named actions instead of a state picker (contract §13.3). One primary
@@ -45,15 +44,13 @@ export function PhaseActions({
   const [confirm, setConfirm] = useState<PhaseCommand | null>(null);
   const [reasonFor, setReasonFor] = useState<"bypass" | "reopen" | null>(null);
   const [reason, setReason] = useState("");
-  const [intent, setIntent] = useState<"INTERNAL" | "CLIENT">("CLIENT");
   const [override, setOverride] = useState(false);
-  const [overrideForm, setOverrideForm] = useState({ mode: "HARD_RESET_ACTIVE" as "HARD_RESET_ACTIVE" | "HARD_RESET_PENDING", version: "1.0", note: "" });
+  const [overrideForm, setOverrideForm] = useState({ mode: "HARD_RESET_ACTIVE" as "HARD_RESET_ACTIVE" | "HARD_RESET_PENDING", iteration: "1", note: "" });
 
   const allowed = (command: PhaseCommand) => (REVIEW.has(command) ? canReview : canWork);
   const disabledReason = (command: PhaseCommand): string | null => {
     if (!allowed(command)) return "Your role cannot do this.";
-    if (NEEDS_FULL.has(command) && blockers.total > 0) return `Finish ${blockers.reasons.join(", ")} first.`;
-    if (command === "submitInternal" && todoBlockers.total > 0) return `Finish ${todoBlockers.reasons.join(", ")} first.`;
+    // Requirements are reminders only (WO-SF-ITER-01): they never block a step.
     return null;
   };
 
@@ -62,7 +59,7 @@ export function PhaseActions({
 
   const start = (command: PhaseCommand) => {
     if (command === "bypass" || command === "reopen") { setReason(""); setReasonFor(command); return; }
-    if (command === "rejectInternal" || command === "rejectClient" || command === "approveClient" || command === "completeSupervision") { setConfirm(command); return; }
+    if (command === "rejectClient" || command === "approveClient" || command === "completeSupervision") { setConfirm(command); return; }
     void exec(command);
   };
 
@@ -71,9 +68,8 @@ export function PhaseActions({
   const primaryReason = primary ? disabledReason(primary) : null;
 
   const confirmCopy: Partial<Record<PhaseCommand, { title: string; description: string; label: string; tone?: "danger" }>> = {
-    rejectInternal: { title: "Send back for changes", description: `${activeRevision ?? "The revision"} closes and a new minor revision opens. ${openFeedback.length} open feedback point(s) become to-dos${openFeedback.length ? `: ${openFeedback.slice(0, 5).join("; ")}${openFeedback.length > 5 ? "…" : ""}` : "."}`, label: "Send back" },
-    rejectClient: { title: "Client asked for changes", description: `${activeRevision ?? "The revision"} closes and a new major revision opens. ${openFeedback.length} open feedback point(s) become to-dos${openFeedback.length ? `: ${openFeedback.slice(0, 5).join("; ")}${openFeedback.length > 5 ? "…" : ""}` : ". Record the client's points as feedback first."}`, label: "Open next revision" },
-    approveClient: { title: "Client approved", description: "The phase is approved and locked. If it is the last phase, the project is marked completed.", label: "Approve phase" },
+    rejectClient: { title: "Client asked for changes", description: `${activeRevision ?? "The iteration"} is marked revised and the next iteration opens. ${openFeedback.length} open feedback point(s) become to-dos${openFeedback.length ? `: ${openFeedback.slice(0, 5).join("; ")}${openFeedback.length > 5 ? "…" : ""}` : ". Record the client's points as feedback first."}`, label: "Open next iteration" },
+    approveClient: { title: "Client approved", description: "The iteration is done and the phase is approved and locked. If it is the last phase, the project is marked completed.", label: "Approve phase" },
     completeSupervision: { title: "Finish supervision", description: "Supervision closes and the project is marked completed.", label: "Finish" },
   };
 
@@ -121,23 +117,12 @@ export function PhaseActions({
       ) : null}
 
       {reasonFor ? (
-        <Dialog open onOpenChange={(open) => { if (!open && !pending) setReasonFor(null); }} title={reasonFor === "bypass" ? "Skip this phase" : "Reopen phase"} description={reasonFor === "bypass" ? "The phase is marked approved without work. A reason is recorded." : "Work resumes in a new revision. A reason is recorded."}>
+        <Dialog open onOpenChange={(open) => { if (!open && !pending) setReasonFor(null); }} title={reasonFor === "bypass" ? "Skip this phase" : "Reopen phase"} description={reasonFor === "bypass" ? "The phase is marked approved without work. A reason is recorded." : "Work resumes in a new iteration. A reason is recorded."}>
           <form className="grid gap-3" onSubmit={async (e) => {
             e.preventDefault();
-            const ok = await exec(reasonFor, reasonFor === "reopen" ? { reason, intent } : { reason });
+            const ok = await exec(reasonFor, { reason });
             if (ok) setReasonFor(null);
           }}>
-            {reasonFor === "reopen" ? (
-              <RadioGroup
-                label="Why is it reopening?"
-                value={intent}
-                onValueChange={(v) => setIntent(v as "INTERNAL" | "CLIENT")}
-                options={[
-                  { value: "CLIENT", label: "Client asked for changes", description: "Opens the next major revision (v2.0, v3.0…)" },
-                  { value: "INTERNAL", label: "Internal correction", description: "Opens the next minor revision (v1.1, v1.2…)" },
-                ]}
-              />
-            ) : null}
             <Field label="Reason" required><Textarea rows={2} value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} /></Field>
             {error ? <InlineError>{error}</InlineError> : null}
             <FormActions>
@@ -152,8 +137,7 @@ export function PhaseActions({
         <Dialog open onOpenChange={(open) => { if (!open && !pending) setOverride(false); }} title="Reset revisions (admin)" description="Deletes every revision and its items for this phase. A full snapshot is kept in History.">
           <form className="grid gap-3" onSubmit={async (e) => {
             e.preventDefault();
-            const [major, minor] = overrideForm.version.split(".").map((part) => Number(part));
-            const ok = await exec("override" as PhaseCommand, { mode: overrideForm.mode, major, minor, note: overrideForm.note });
+            const ok = await exec("override" as PhaseCommand, { mode: overrideForm.mode, major: Number(overrideForm.iteration), note: overrideForm.note });
             if (ok) setOverride(false);
           }}>
             <RadioGroup
@@ -166,8 +150,8 @@ export function PhaseActions({
               ]}
             />
             {overrideForm.mode === "HARD_RESET_ACTIVE" ? (
-              <Field label="Revision" required description="Major.minor, e.g. 2.0">
-                <Input value={overrideForm.version} pattern="\d+\.\d+" onChange={(e) => setOverrideForm({ ...overrideForm, version: e.target.value })} />
+              <Field label="Iteration number" required description="Whole number, e.g. 2">
+                <Input value={overrideForm.iteration} pattern="\d+" onChange={(e) => setOverrideForm({ ...overrideForm, iteration: e.target.value })} />
               </Field>
             ) : null}
             <Field label="Note" required><Textarea rows={2} value={overrideForm.note} maxLength={1000} onChange={(e) => setOverrideForm({ ...overrideForm, note: e.target.value })} /></Field>

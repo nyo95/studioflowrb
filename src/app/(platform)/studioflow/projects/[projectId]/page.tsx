@@ -53,10 +53,7 @@ export default async function ProjectOverviewPage({
   ]);
 
   const archived = project.archivedAt !== null;
-  const activePhase = phases.find((p) =>
-    p.status === "IN_PROGRESS" || p.status === "ON_REVIEW_INTERNAL" ||
-    p.status === "APPROVED_INTERNAL" || p.status === "ON_REVIEW_CLIENT"
-  ) ?? null;
+  const activePhase = phases.find((p) => p.status === "ACTIVE") ?? null;
   const selectedPhaseId = (sp.phase || null) ?? activePhase?.id ?? phases[0]?.id ?? null;
 
   const pipelineSteps = phases.map((phase) => {

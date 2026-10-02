@@ -24,20 +24,19 @@ enum SfProjectPriority {
 
 enum SfPhaseStatus {
   PENDING
-  IN_PROGRESS
-  ON_REVIEW_INTERNAL
-  APPROVED_INTERNAL
-  ON_REVIEW_CLIENT
-  READY_FOR_NEXT
-  COMPLETED
+  ACTIVE
+  DONE
 
   @@map("sf_phase_status")
   @@schema("studioflow")
 }
 
 enum SfRevisionStatus {
-  ACTIVE
-  COMPLETED
+  NOT_SENT
+  SENT
+  ANSWERED
+  REVISED
+  DONE
 
   @@map("sf_revision_status")
   @@schema("studioflow")
@@ -142,6 +141,7 @@ model SfProject {
   schedule_entries SfScheduleEntry[]
   presentation_boards SfPresentationBoard[]
   deliverables     SfDeliverable[]
+  phase_events     SfPhaseEvent[]
 
   @@index([status, archived_at])
   @@index([pic_designer_id])
@@ -168,6 +168,8 @@ model SfPhase {
   seat_snapshot     String
   /// When status last changed; drives "waiting N days".
   status_changed_at DateTime?
+  /// One free-text working note; requirements remain separate reminders.
+  note              String?
   /// Portfolio Timeline (owner, 2026-09-23): overridable planned start/end; unset falls back to the equal-width sequence split.
   planned_start_date DateTime?    @db.Date
   planned_end_date   DateTime?    @db.Date
@@ -181,26 +183,34 @@ model SfPhase {
   checklist_items SfChecklistItem[]
   deliverables    SfDeliverable[]
   cd_items        SfCdItem[]
+  events          SfPhaseEvent[]
 
   @@unique([project_id, order_index])
   @@map("sf_phase")
   @@schema("studioflow")
 }
 
-/// At most one ACTIVE revision per phase (partial unique index in migration).
+/// A client-facing iteration. At most one open iteration per phase (partial unique index in migration).
 model SfRevision {
   id         String           @id @default(uuid())
   phase_id   String
   major      Int              @default(1)
-  minor      Int              @default(0)
-  status     SfRevisionStatus @default(ACTIVE)
+  name       String
+  status     SfRevisionStatus @default(NOT_SENT)
+  sent_at    DateTime?
+  answered_at DateTime?
+  done_at    DateTime?
+  /// Supervision visits reuse the iteration history with a dated visit and note.
+  visit_date DateTime?        @db.Date
+  note       String?
   created_at DateTime         @default(now())
-  closed_at  DateTime?
 
   phase        SfPhase        @relation(fields: [phase_id], references: [id], onDelete: Cascade)
   activities   SfActivity[]
   deliverables SfDeliverable[]
+  events       SfPhaseEvent[]
 
+  @@unique([phase_id, major])
   @@index([phase_id, status])
   @@map("sf_revision")
   @@schema("studioflow")
@@ -265,6 +275,8 @@ model SfChecklistItem {
   label          String
   is_checked     Boolean   @default(false)
   checked_at     DateTime?
+  /// A dismissed reminder remains historically present but no longer appears on cards.
+  dismissed_at   DateTime?
   /// False = warning-only (the former SfRequirement); an unticked root item blocks approval only when true.
   is_blocking    Boolean   @default(true)
   sort_order     Int       @default(0)
@@ -377,6 +389,8 @@ model SfPhaseDefinition {
   allow_parallel Boolean  @default(false)
   /// "designer" | "drafter"
   seat           String   @default("designer")
+  /// Ordered special iteration kinds, e.g. [{"name":"CD Mall"},{"name":"CD Final"}].
+  default_iteration_kinds Json?
   created_at     DateTime @default(now())
   updated_at     DateTime @updatedAt
 
@@ -388,6 +402,31 @@ model SfPhaseDefinition {
 
   @@unique([template_id, order_index])
   @@map("sf_phase_definition")
+  @@schema("studioflow")
+}
+
+/// Append-only record of every phase/iteration transition. `auto_created` is
+/// the exact row(s) the matching undo must remove again.
+model SfPhaseEvent {
+  id           String   @id @default(uuid())
+  project_id   String
+  phase_id     String
+  iteration_id String?
+  from_state   String?
+  to_state     String
+  actor_id     String
+  occurred_at  DateTime @default(now())
+  auto_created Json?
+  undone_at    DateTime?
+  undone_by_id String?
+
+  project   SfProject  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  phase     SfPhase    @relation(fields: [phase_id], references: [id], onDelete: Cascade)
+  iteration SfRevision? @relation(fields: [iteration_id], references: [id], onDelete: SetNull)
+
+  @@index([project_id, occurred_at])
+  @@index([phase_id, occurred_at])
+  @@map("sf_phase_event")
   @@schema("studioflow")
 }
 

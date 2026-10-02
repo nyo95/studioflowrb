@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { PHASE_COMMAND_LABELS, type PhaseCommand } from "@/apps/studioflow/domain/phase";
-import { Button, ButtonMenu, ConfirmDialog, Dialog, Field, FormActions, InlineError, Input, RadioGroup, Textarea } from "@/platform/ui_engine";
+import { Button, ButtonMenu, ConfirmDialog, Dialog, Field, FormActions, InlineError, Textarea } from "@/platform/ui_engine";
 
 import { phaseCommandAction } from "../../actions";
 import { useCommand } from "../../_components/use-command";
@@ -38,10 +38,9 @@ export function InlinePhaseAction({
   const [confirm, setConfirm] = useState<PhaseCommand | null>(null);
   const [reasonFor, setReasonFor] = useState<"bypass" | "reopen" | null>(null);
   const [reason, setReason] = useState("");
-  const [intent, setIntent] = useState<"INTERNAL" | "CLIENT">("CLIENT");
 
   const REVIEW_PERMS: Set<PhaseCommand> = new Set([
-    "bypass", "approveInternal", "rejectInternal", "submitClient",
+    "bypass", "submitClient",
     "approveClient", "rejectClient", "reopen", "completeSupervision",
   ]);
 
@@ -52,8 +51,7 @@ export function InlinePhaseAction({
 
   function isDisabled(cmd: PhaseCommand): boolean {
     if (!canUse(cmd)) return true;
-    if ((cmd === "approveInternal" || cmd === "submitClient" || cmd === "approveClient") && blockers.total > 0) return true;
-    if (cmd === "submitInternal" && todoBlockers.total > 0) return true;
+    // Requirements are reminders only (WO-SF-ITER-01): they never block a step.
     return false;
   }
 
@@ -69,7 +67,7 @@ export function InlinePhaseAction({
       setReason("");
       return;
     }
-    if (cmd === "rejectClient" || cmd === "rejectInternal" || cmd === "approveClient" || cmd === "completeSupervision") {
+    if (cmd === "rejectClient" || cmd === "approveClient" || cmd === "completeSupervision") {
       setConfirm(cmd);
       return;
     }
@@ -84,10 +82,10 @@ export function InlinePhaseAction({
       <div className="flex items-center gap-1.5 flex-none">
         <Button
           size="sm"
-          variant={command === "activate" || command === "approveClient" || command === "approveInternal" ? "primary" : "secondary"}
+          variant={command === "activate" || command === "approveClient" ? "primary" : "secondary"}
           disabled={isDisabled(command) || pending}
           onClick={() => handleClick(command)}
-          title={isDisabled(command) && blockers.total > 0 ? `Blocked: ${blockers.reasons.join(", ")}` : undefined}
+          title={blockers.total > 0 ? `Still open: ${blockers.reasons.join(", ")}` : undefined}
         >
           {PHASE_COMMAND_LABELS[command]}
         </Button>
@@ -116,19 +114,6 @@ export function InlinePhaseAction({
         <Field label="Reason" required>
           <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Explain why…" rows={3} />
         </Field>
-        {reasonFor === "reopen" ? (
-          <Field label="New revision intent">
-            <RadioGroup
-              label="New revision intent"
-              value={intent}
-              onValueChange={(v) => setIntent(v as "INTERNAL" | "CLIENT")}
-              options={[
-                { value: "INTERNAL", label: "Internal (minor bump)" },
-                { value: "CLIENT", label: "Client-requested (major bump)" },
-              ]}
-            />
-          </Field>
-        ) : null}
         <FormActions>
           <Button
             variant="primary"
@@ -136,7 +121,7 @@ export function InlinePhaseAction({
             onClick={() => {
               if (!reasonFor) return;
               if (reasonFor === "bypass") execute("bypass", { reason });
-              else execute("reopen", { intent, reason });
+              else execute("reopen", { reason });
               setReasonFor(null);
             }}
           >
@@ -150,12 +135,8 @@ export function InlinePhaseAction({
       <ConfirmDialog
         open={confirm !== null}
         onOpenChange={(open) => { if (!open) setConfirm(null); }}
-        title={confirm === "rejectClient" ? "Client requested changes" : "Internal review — needs changes"}
-        description={
-          confirm === "rejectClient"
-            ? "This opens a new major revision. Open feedback will become to-dos in the new revision."
-            : "This opens a new minor revision. Open feedback will become to-dos in the new revision."
-        }
+        title="Client requested changes"
+        description="This opens the next iteration. Open feedback will become to-dos in it."
         confirmLabel="Send back"
         onConfirm={() => {
           if (confirm) execute(confirm);

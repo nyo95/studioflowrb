@@ -10,12 +10,8 @@ export type PhaseSeat = "designer" | "drafter";
 
 export const PHASE_STATUSES = [
   "PENDING",
-  "IN_PROGRESS",
-  "ON_REVIEW_INTERNAL",
-  "APPROVED_INTERNAL",
-  "ON_REVIEW_CLIENT",
-  "READY_FOR_NEXT",
-  "COMPLETED",
+  "ACTIVE",
+  "DONE",
 ] as const;
 export type PhaseStatus = (typeof PHASE_STATUSES)[number];
 
@@ -60,17 +56,13 @@ export function isLegacySupervisionDefinition(definitionId: string | null | unde
 
 // ── Simplified display (RW-01, contract §5.3) ──────────────────────────────
 
-export type PhaseDisplayGroup = "Not started" | "Working" | "In review" | "Approved" | "Done";
+export type PhaseDisplayGroup = "Not started" | "Working" | "Done" | "Approved";
 export type PhaseTone = "neutral" | "success" | "warning" | "danger";
 
 const DISPLAY: Record<PhaseStatus, { label: string; group: PhaseDisplayGroup; tone: PhaseTone }> = {
   PENDING: { label: "Not started", group: "Not started", tone: "neutral" },
-  IN_PROGRESS: { label: "Working", group: "Working", tone: "warning" },
-  ON_REVIEW_INTERNAL: { label: "Internal review", group: "In review", tone: "warning" },
-  APPROVED_INTERNAL: { label: "Ready to send", group: "In review", tone: "warning" },
-  ON_REVIEW_CLIENT: { label: "With client", group: "In review", tone: "warning" },
-  READY_FOR_NEXT: { label: "Approved", group: "Approved", tone: "success" },
-  COMPLETED: { label: "Done", group: "Done", tone: "success" },
+  ACTIVE: { label: "Active", group: "Working", tone: "warning" },
+  DONE: { label: "Done", group: "Done", tone: "success" },
 };
 
 export function phaseStatusDisplay(status: PhaseStatus) {
@@ -84,11 +76,11 @@ export type PhaseState = { status: PhaseStatus; isLocked: boolean };
 /** Content (activities, checklist) may change only on an unlocked, unfinished phase. */
 export function isPhaseModifiable(phase: PhaseState): boolean {
   if (phase.isLocked) return false;
-  return phase.status !== "READY_FOR_NEXT" && phase.status !== "COMPLETED";
+  return phase.status !== "DONE";
 }
 
 export function isPhaseFinished(status: PhaseStatus): boolean {
-  return status === "READY_FOR_NEXT" || status === "COMPLETED";
+  return status === "DONE";
 }
 
 /** Sequential activation: the first phase and parallel phases start freely. */
@@ -102,13 +94,9 @@ export function canActivatePhase(
 }
 
 const TRANSITIONS: Record<PhaseStatus, readonly PhaseStatus[]> = {
-  PENDING: ["IN_PROGRESS", "READY_FOR_NEXT", "COMPLETED"],
-  IN_PROGRESS: ["ON_REVIEW_INTERNAL", "ON_REVIEW_CLIENT", "READY_FOR_NEXT"],
-  ON_REVIEW_INTERNAL: ["IN_PROGRESS", "APPROVED_INTERNAL", "ON_REVIEW_CLIENT"],
-  APPROVED_INTERNAL: ["ON_REVIEW_CLIENT", "IN_PROGRESS"],
-  ON_REVIEW_CLIENT: ["IN_PROGRESS", "READY_FOR_NEXT", "COMPLETED"],
-  READY_FOR_NEXT: ["IN_PROGRESS"],
-  COMPLETED: ["IN_PROGRESS"],
+  PENDING: ["ACTIVE"],
+  ACTIVE: ["DONE"],
+  DONE: ["ACTIVE"],
 };
 
 export function isValidPhaseTransition(from: PhaseStatus, to: PhaseStatus): boolean {
@@ -120,36 +108,34 @@ export function isValidPhaseTransition(from: PhaseStatus, to: PhaseStatus): bool
 export type PhaseCommand =
   | "activate"
   | "bypass"
-  | "submitInternal"
-  | "approveInternal"
-  | "rejectInternal"
   | "submitClient"
   | "approveClient"
   | "rejectClient"
   | "reopen"
   | "completeSupervision";
 
-export function availablePhaseCommands(phase: PhaseState & { legacySupervision?: boolean }): PhaseCommand[] {
+/**
+ * WO-SF-ITER-01 Phase 1: internal review is gone, so only the client-facing steps remain.
+ * Phase 2 replaces this set with the iteration commands.
+ */
+export type IterationState = "NOT_SENT" | "SENT" | "ANSWERED" | "REVISED" | "DONE";
+
+export function availablePhaseCommands(phase: PhaseState & { legacySupervision?: boolean; iterationState?: IterationState | null }): PhaseCommand[] {
   const commands: PhaseCommand[] = [];
-  const { status, isLocked, legacySupervision = false } = phase;
+  const { status, isLocked, legacySupervision = false, iterationState = null } = phase;
   if (status === "PENDING") commands.push("activate", "bypass");
-  if (!isLocked) {
-    if (status === "IN_PROGRESS" && legacySupervision) commands.push("completeSupervision");
-    else if (status === "IN_PROGRESS") commands.push("submitInternal", "submitClient");
-    if (status === "ON_REVIEW_INTERNAL") commands.push("approveInternal", "rejectInternal", "submitClient");
-    if (status === "APPROVED_INTERNAL") commands.push("submitClient");
-    if (status === "ON_REVIEW_CLIENT") commands.push("approveClient", "rejectClient");
+  if (status === "ACTIVE" && !isLocked) {
+    if (legacySupervision) commands.push("completeSupervision");
+    else if (iterationState === "SENT") commands.push("approveClient", "rejectClient");
+    else commands.push("submitClient");
   }
-  if (isLocked || status === "PENDING") commands.push("reopen");
+  if (status === "DONE") commands.push("reopen");
   return commands;
 }
 
 export const PHASE_COMMAND_LABELS: Record<PhaseCommand, string> = {
   activate: "Start phase",
   bypass: "Skip phase",
-  submitInternal: "Send for internal review",
-  approveInternal: "Approve internally",
-  rejectInternal: "Needs changes (internal)",
   submitClient: "Send to client",
   approveClient: "Client approved",
   rejectClient: "Client asked for changes",
@@ -159,19 +145,15 @@ export const PHASE_COMMAND_LABELS: Record<PhaseCommand, string> = {
 
 // ── Revisions ────────────────────────────────────────────────────────────
 
-export type RevisionNumber = { major: number; minor: number };
+export type RevisionNumber = { major: number };
 
 export function revisionLabel(revision: RevisionNumber, prefix = "v"): string {
-  return `${prefix}${revision.major}.${revision.minor}`;
+  return `${prefix}${revision.major}`;
 }
 
-/** CLIENT feedback opens a new major revision; INTERNAL feedback a new minor. */
-export function nextRevision(current: RevisionNumber | null, intent: "INTERNAL" | "CLIENT"): RevisionNumber {
-  // A phase without any revision always starts at v1.0 (never v0.x).
-  if (!current) return { major: 1, minor: 0 };
-  const major = current.major;
-  const minor = current.minor;
-  return intent === "CLIENT" ? { major: major + 1, minor: 0 } : { major, minor: minor + 1 };
+/** The next iteration number for a phase (1 when it has none). */
+export function nextRevision(current: RevisionNumber | null): RevisionNumber {
+  return { major: (current?.major ?? 0) + 1 };
 }
 
 /** Whole days since `since` (floored, never negative); null when unknown. */

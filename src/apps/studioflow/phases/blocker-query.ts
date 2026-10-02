@@ -4,7 +4,7 @@ import type { Db, TxClient } from "../shared";
 /** Same projection as the single-phase reader, with three statements for any batch. */
 export async function readBlockerCountsBatch(client: Db | TxClient, phaseIds: string[]): Promise<Map<string, PhaseBlockerCounts>> {
   const active = await client.sfRevision.findMany({
-    where: { phase_id: { in: phaseIds }, status: "ACTIVE" },
+    where: { phase_id: { in: phaseIds }, status: { in: ["NOT_SENT", "SENT", "ANSWERED"] } },
     select: { id: true, phase_id: true },
   });
   const [activities, checklist] = await Promise.all([
@@ -28,7 +28,7 @@ export async function readBlockerCountsBatch(client: Db | TxClient, phaseIds: st
 
 /** Reads the counts behind the single blocker projection (contract §6.4). */
 export async function readBlockerCounts(client: Db | TxClient, phaseId: string): Promise<PhaseBlockerCounts> {
-  const active = await client.sfRevision.findFirst({ where: { phase_id: phaseId, status: "ACTIVE" }, select: { id: true } });
+  const active = await client.sfRevision.findFirst({ where: { phase_id: phaseId, status: { in: ["NOT_SENT", "SENT", "ANSWERED"] } }, select: { id: true } });
   const [openRevisionActivities, openRootChecklistItems] = await Promise.all([
     // V2-D1: SfActivity is FEEDBACK-only; mode filter removed
     active ? client.sfActivity.count({ where: { revision_id: active.id, status: "OPEN" } }) : 0,

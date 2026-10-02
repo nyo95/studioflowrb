@@ -21,7 +21,7 @@ import { ITEM_ORDER, ITEM_SELECT, toItemView } from "../tasks/service";
 export const DONE_RETENTION_DAYS = 7;
 
 /** Phases whose items count as today's work (legacy `ACTIVE_PHASE_STATUSES`). */
-const ACTIVE_PHASE_STATUSES = ["IN_PROGRESS", "ON_REVIEW_INTERNAL", "APPROVED_INTERNAL", "ON_REVIEW_CLIENT"] as const;
+const ACTIVE_PHASE_STATUSES = ["ACTIVE"] as const;
 
 export type TodayAddTarget = {
   projectId: string;
@@ -67,7 +67,7 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
           phases: {
             orderBy: { order_index: "asc" },
             include: {
-              revisions: { where: { status: "ACTIVE" }, take: 1, include: { activities: { orderBy: { created_at: "asc" } } } },
+              revisions: { where: { status: { in: ["NOT_SENT", "SENT", "ANSWERED"] } }, take: 1, include: { activities: { orderBy: { created_at: "asc" } } } },
               checklist_items: { where: notStale, select: ITEM_SELECT, orderBy: ITEM_ORDER },
             },
           },
@@ -139,6 +139,7 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
           status: true,
           is_locked: true,
           status_changed_at: true,
+          revisions: { where: { status: { in: ["NOT_SENT", "SENT", "ANSWERED"] } }, take: 1, select: { status: true, sent_at: true } },
           project: { select: { id: true, name: true } },
         },
       });
@@ -151,6 +152,7 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
             status,
             isLocked: phase.is_locked,
             legacySupervision: isLegacySupervisionDefinition(phase.definition_id),
+            iterationState: phase.revisions[0]?.status ?? null,
           });
           return {
             phaseId: phase.id,
@@ -161,7 +163,7 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
             accentDotClass: phaseAccentDotClass(phase.definition_id),
             status,
             statusDisplay: phaseStatusDisplay(status),
-            waitingDays: waitingDays(phase.status_changed_at, now),
+            waitingDays: waitingDays(phase.revisions[0]?.status === "SENT" ? phase.revisions[0].sent_at : phase.status_changed_at, now),
             seat: phase.seat_snapshot as PhaseSeat,
             commands,
             blockers: fullBlockers(counts),

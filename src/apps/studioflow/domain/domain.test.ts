@@ -44,49 +44,48 @@ describe("phase policy (legacy parity)", () => {
     assert.equal(phaseAccentDotClass(undefined), "bg-line-strong");
   });
 
-  it("never shows a raw enum and maps to five simplified groups", () => {
+  it("never shows a raw enum and maps to three simplified groups", () => {
     for (const status of PHASE_STATUSES) {
       const display = phaseStatusDisplay(status);
       assert.doesNotMatch(display.label, /_/);
-      assert.ok(["Not started", "Working", "In review", "Approved", "Done"].includes(display.group));
+      assert.ok(["Not started", "Working", "Done"].includes(display.group));
     }
-    assert.equal(phaseStatusDisplay("ON_REVIEW_CLIENT").label, "With client");
+    assert.equal(phaseStatusDisplay("ACTIVE").label, "Active");
   });
 
   it("enforces sequential activation unless parallel", () => {
     assert.equal(canActivatePhase({ orderIndex: 1, allowParallel: false }, null), true);
-    assert.equal(canActivatePhase({ orderIndex: 5, allowParallel: false }, { status: "IN_PROGRESS" }), false);
-    assert.equal(canActivatePhase({ orderIndex: 5, allowParallel: false }, { status: "READY_FOR_NEXT" }), true);
+    assert.equal(canActivatePhase({ orderIndex: 5, allowParallel: false }, { status: "ACTIVE" }), false);
+    assert.equal(canActivatePhase({ orderIndex: 5, allowParallel: false }, { status: "DONE" }), true);
     assert.equal(canActivatePhase({ orderIndex: 3, allowParallel: true }, { status: "PENDING" }), true);
   });
 
-  it("follows the legacy transition table", () => {
-    assert.equal(isValidPhaseTransition("PENDING", "IN_PROGRESS"), true);
-    assert.equal(isValidPhaseTransition("IN_PROGRESS", "APPROVED_INTERNAL"), false);
-    assert.equal(isValidPhaseTransition("APPROVED_INTERNAL", "ON_REVIEW_CLIENT"), true);
-    assert.equal(isValidPhaseTransition("COMPLETED", "IN_PROGRESS"), true);
+  it("follows the phase transition table", () => {
+    assert.equal(isValidPhaseTransition("PENDING", "ACTIVE"), true);
+    assert.equal(isValidPhaseTransition("PENDING", "DONE"), false);
+    assert.equal(isValidPhaseTransition("ACTIVE", "DONE"), true);
+    assert.equal(isValidPhaseTransition("DONE", "ACTIVE"), true);
   });
 
   it("locks content once approved or locked", () => {
-    assert.equal(isPhaseModifiable({ status: "IN_PROGRESS", isLocked: false }), true);
-    assert.equal(isPhaseModifiable({ status: "READY_FOR_NEXT", isLocked: false }), false);
-    assert.equal(isPhaseModifiable({ status: "IN_PROGRESS", isLocked: true }), false);
+    assert.equal(isPhaseModifiable({ status: "ACTIVE", isLocked: false }), true);
+    assert.equal(isPhaseModifiable({ status: "DONE", isLocked: false }), false);
+    assert.equal(isPhaseModifiable({ status: "ACTIVE", isLocked: true }), false);
   });
 
   it("offers the right commands per state", () => {
-    assert.deepEqual(availablePhaseCommands({ status: "PENDING", isLocked: false }), ["activate", "bypass", "reopen"]);
-    assert.deepEqual(availablePhaseCommands({ status: "IN_PROGRESS", isLocked: false }), ["submitInternal", "submitClient"]);
-    assert.deepEqual(availablePhaseCommands({ status: "IN_PROGRESS", isLocked: false, legacySupervision: true }), ["completeSupervision"]);
-    assert.deepEqual(availablePhaseCommands({ status: "ON_REVIEW_CLIENT", isLocked: false }), ["approveClient", "rejectClient"]);
-    assert.deepEqual(availablePhaseCommands({ status: "READY_FOR_NEXT", isLocked: true }), ["reopen"]);
+    assert.deepEqual(availablePhaseCommands({ status: "PENDING", isLocked: false }), ["activate", "bypass"]);
+    assert.deepEqual(availablePhaseCommands({ status: "ACTIVE", isLocked: false, iterationState: "NOT_SENT" }), ["submitClient"]);
+    assert.deepEqual(availablePhaseCommands({ status: "ACTIVE", isLocked: false, legacySupervision: true }), ["completeSupervision"]);
+    assert.deepEqual(availablePhaseCommands({ status: "ACTIVE", isLocked: false, iterationState: "SENT" }), ["approveClient", "rejectClient"]);
+    assert.deepEqual(availablePhaseCommands({ status: "DONE", isLocked: true }), ["reopen"]);
   });
 
-  it("numbers revisions like legacy", () => {
-    assert.deepEqual(nextRevision({ major: 1, minor: 0 }, "INTERNAL"), { major: 1, minor: 1 });
-    assert.deepEqual(nextRevision({ major: 1, minor: 3 }, "CLIENT"), { major: 2, minor: 0 });
-    assert.deepEqual(nextRevision(null, "CLIENT"), { major: 1, minor: 0 });
-    assert.deepEqual(nextRevision(null, "INTERNAL"), { major: 1, minor: 0 }, "no v0.x revisions");
-    assert.equal(revisionLabel({ major: 2, minor: 1 }), "v2.1");
+  it("numbers iterations from 1", () => {
+    assert.deepEqual(nextRevision({ major: 1 }), { major: 2 });
+    assert.deepEqual(nextRevision({ major: 4 }), { major: 5 });
+    assert.deepEqual(nextRevision(null), { major: 1 });
+    assert.equal(revisionLabel({ major: 2 }), "v2");
   });
 
   it("reports waiting days, never negative, unknown as null", () => {

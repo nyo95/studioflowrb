@@ -277,15 +277,12 @@ export async function syncChecklistAction(projectId: string): Promise<ActionResu
 const PhaseCommand = z.discriminatedUnion("command", [
   z.strictObject({ command: z.literal("activate"), projectId: Id, phaseId: Id }),
   z.strictObject({ command: z.literal("bypass"), projectId: Id, phaseId: Id, reason: Reason }),
-  z.strictObject({ command: z.literal("submitInternal"), projectId: Id, phaseId: Id }),
-  z.strictObject({ command: z.literal("approveInternal"), projectId: Id, phaseId: Id }),
-  z.strictObject({ command: z.literal("rejectInternal"), projectId: Id, phaseId: Id }),
   z.strictObject({ command: z.literal("submitClient"), projectId: Id, phaseId: Id }),
   z.strictObject({ command: z.literal("approveClient"), projectId: Id, phaseId: Id }),
   z.strictObject({ command: z.literal("rejectClient"), projectId: Id, phaseId: Id }),
-  z.strictObject({ command: z.literal("reopen"), projectId: Id, phaseId: Id, reason: Reason, intent: z.enum(["INTERNAL", "CLIENT"]) }),
+  z.strictObject({ command: z.literal("reopen"), projectId: Id, phaseId: Id, reason: Reason }),
   z.strictObject({ command: z.literal("completeSupervision"), projectId: Id, phaseId: Id }),
-  z.strictObject({ command: z.literal("override"), projectId: Id, phaseId: Id, mode: z.enum(["HARD_RESET_ACTIVE", "HARD_RESET_PENDING"]), major: z.number().int().optional(), minor: z.number().int().optional(), note: z.string().max(1000) }),
+  z.strictObject({ command: z.literal("override"), projectId: Id, phaseId: Id, mode: z.enum(["HARD_RESET_ACTIVE", "HARD_RESET_PENDING"]), major: z.number().int().optional(), note: z.string().max(1000) }),
 ]);
 
 export async function phaseCommandAction(input: z.infer<typeof PhaseCommand>): Promise<ActionResult<unknown>> {
@@ -298,15 +295,12 @@ export async function phaseCommandAction(input: z.infer<typeof PhaseCommand>): P
     switch (data.command) {
       case "activate": result = await phases.activatePhase(base); break;
       case "bypass": result = await phases.bypassPhase({ ...base, reason: data.reason }); break;
-      case "submitInternal": result = await phases.submitForInternalReview(base); break;
-      case "approveInternal": result = await phases.approveInternal(base); break;
-      case "rejectInternal": result = await phases.rejectPhase({ ...base, type: "INTERNAL" }); break;
       case "submitClient": result = await phases.submitForClientReview(base); break;
       case "approveClient": result = await phases.approveClient(base); break;
       case "rejectClient": result = await phases.rejectPhase({ ...base, type: "CLIENT" }); break;
-      case "reopen": result = await phases.reopenPhase({ ...base, intent: data.intent, reason: data.reason }); break;
+      case "reopen": result = await phases.reopenPhase({ ...base, reason: data.reason }); break;
       case "completeSupervision": result = await phases.completeSupervision(base); break;
-      case "override": result = await phases.overrideRevision({ ...base, mode: data.mode, major: data.major, minor: data.minor, note: data.note }); break;
+      case "override": result = await phases.overrideRevision({ ...base, mode: data.mode, major: data.major, note: data.note }); break;
     }
     refresh(data.projectId);
     return result;

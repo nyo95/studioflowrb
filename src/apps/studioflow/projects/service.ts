@@ -454,12 +454,12 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
               name_snapshot: def.name,
               prefix_snapshot: def.prefix,
               seat_snapshot: def.seat,
-              status: isFirst ? "IN_PROGRESS" : "PENDING",
+              status: isFirst ? "ACTIVE" : "PENDING",
               status_changed_at: isFirst ? now : null,
             },
           });
         }
-        await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phaseIds[0]!, major: 1, minor: 0, status: "ACTIVE" } });
+        await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phaseIds[0]!, major: 1, name: `${defaultTemplate.definitions[0]!.name} 1`, status: "NOT_SENT" } });
         const seeded = await seedChecklistFromTemplates(tx, projectId, userId);
         // Legacy: default schedule categories and template items land on every new project.
         const scheduleRows = await seedScheduleFromTemplates(tx, projectId);

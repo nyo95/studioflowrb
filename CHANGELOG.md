@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.284**
-- Next local revision: **R8.285**
+- Current revision after this entry is committed: **R8.285**
+- Next local revision: **R8.286**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -20,6 +20,15 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Updated service integration fixtures and the Unit form's functional input normalization. The boundary checker names this single approved cross-app migration exception.
 
 **Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow image warnings); `git diff --check`; migrations deployed to verified `studioflow_rebuild` and `studioflow_rebuild_test`. Production build intentionally not run per WO-MD-PROGRAM-01.
+
+## R8.285 | 2026-10-02 | feat(studioflow): phases track client-sent iterations (WO-SF-ITER-01 phase 1)
+
+- A phase is now Not started, Active, or Done, and carries numbered iterations (name, state NOT_SENT / SENT / ANSWERED / REVISED / DONE, sent/answered/done dates) in place of v1.0-style revisions. Internal review and minor revisions are removed; the client steps (start, skip, send to client, client approved, client asked for changes, reopen, finish supervision) write the new states, and a client change request marks the sent iteration revised and opens the next one.
+- Unticked requirements no longer block any step; they stay visible as reminders. New columns and the append-only phase-event table (note per phase, dismissed requirements, default iteration kinds for CD Mall / CD Final) are in place for Phase 2.
+- The data migration pre-checks, merges each former major's minors into its highest minor, re-points activities and deliverables, and reconciles counts. The Lead fixed a mapping defect in the Executor's draft (earlier majors of a phase waiting on or finished with the client are `REVISED`, not `SENT`/`DONE`) and re-verified on a scratch database with seeded old rows; both rebuild databases' recorded migration checksum was updated to the corrected file. Review Card: `docs/audits/WO-SF-ITER-01-REVIEW-CARDS.md`.
+- Existing screens were adapted only enough to compile and keep working (internal-review buttons removed); the Lead replaces them next. Project auto-completion and KB-060 remain until Phase 2.
+
+**Checks.** `npm test` (750 pass, 0 fail); `npm run check`; `npm run lint` (0 errors; two existing image warnings); full migration chain from an empty scratch database plus schema diff (only the existing `user_preference.updated_at` default differs); `git diff --check`. Production build intentionally not run.
 
 ## R8.284 | 2026-10-01 | docs(studioflow): plan WO-SF-ITER-01 (client-sent iterations, explicit completion, project-card read models)
 
