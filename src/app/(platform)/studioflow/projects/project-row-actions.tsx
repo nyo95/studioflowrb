@@ -51,7 +51,7 @@ export function ProjectRowActions({ project, designers, drafters, clients, archi
         { label: "Archive project…", danger: true, separatorBefore: true, onSelect: () => { setReason(""); setDialog("archive"); } },
       ]} />
       {dialog === "archive" ? (
-        <Dialog open onOpenChange={(open) => { if (!open && !pending) setDialog(null); }} title="Archive project" description={`Archived projects are hidden from Today and become read-only. Their files (deliverables, meeting-note images, schedule photos) are kept for ${archiveRetentionDays} days, then removed. Restore the project before then to keep them.`}>
+        <Dialog open onOpenChange={(open) => { if (!open && !pending) setDialog(null); }} title="Archive project" description={`Archived projects are hidden from Home and become read-only. Their files (deliverables, meeting-note images, schedule photos) are kept for ${archiveRetentionDays} days, then removed. Restore the project before then to keep them.`}>
           <form className="grid gap-3" onSubmit={async (e) => { e.preventDefault(); if (await run("archive", () => archiveProjectAction(project.id, reason))) setDialog(null); }}>
             <Field label="Reason" required><Textarea rows={2} value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} /></Field>
             {error ? <InlineError>{error}</InlineError> : null}

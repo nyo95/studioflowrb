@@ -118,7 +118,8 @@ export function IterationButtons({
       ? { label: "Done (handover)", primary: true, run: () => run("done", { ...it, command: "chooseVisit", outcome: "DONE" }, `${phase.name} done`) }
       : { label: "Done", primary: true, run: () => run("done", { ...it, command: "chooseOutcome", outcome: "DONE" }, `${current.name} done`) },
     continue_cd_final: { label: "Continue to CD Final", primary: true, run: () => run("continue", { ...it, command: "chooseOutcome", outcome: "CONTINUE_CD_FINAL" }, `${current.name} done, CD Final opened`) },
-    next_visit: { label: "Next visit", run: () => run("next", { ...it, command: "chooseVisit", outcome: "NEXT_VISIT" }, `${current.name} closed`) },
+    // Closing a visit as "Next visit" goes straight on to planning the following one.
+    next_visit: { label: "Next visit", run: () => void commands.exec(`${phase.id}:next`, { ...it, command: "chooseVisit", outcome: "NEXT_VISIT" }, `${current.name} closed`).then((ok) => { if (ok) onNewVisit(); }) },
   };
   return (
     <>

@@ -316,10 +316,10 @@ duration report derived from actual status-change history (these are
 duplicated `/studioflow/timeline`'s per-project view with no added
 information; `/studioflow/timeline` remains. See `CHANGELOG.md` R8.138.
 
-- [ ] [UNVERIFIED] **Project-card home and iteration phase page (R8.292) need the browser pass.** Sign in to the dev app and check: card layout with five phases at desktop and phone width; Start / Send / Client answered / Revision / Done on an ordinary phase; CD Mall then Continue to CD Final (the CD definition must hold the migrated `{ name }` kinds); a Supervision visit created, Next visit, Done (handover); Undo bar appears and works within five minutes; Mark as completed and Reopen project; phase notes dialog and the note field on the phase page; tick and dismiss a requirement after its phase is done; My tasks strip expand/collapse; All projects for a manager. Remove the [PLANNED] iteration entry below once this passes.
+- [ ] [UNVERIFIED] **Project-card home: three checks left after the 2026-10-02 browser pass (R8.295).** Expand the "My tasks" strip and use a task in it; the All projects scope as a manager with several designers; the project overview page's pipeline strip at phone width. The StudioFlow top navigation overlaps its icons and labels at phone width (an older shell issue, not from R8.292): fix it with the Lead's next UI pass.
 - [ ] [CLEANUP][P2] Retire the transitional StudioFlow phase commands (`activatePhase`, `submitForClientReview`, `rejectPhase`, `approveClient`, `reopenPhase`, `completeSupervision`) and the old `PhaseCommand` / `availablePhaseCommands` / `listPhaseAttention` code. No screen calls them any more; only about 60 integration-test call sites do. Move those tests to the iteration commands, then delete the old ones (they skip the event log and the CD rules).
 - [ ] [CLEANUP][P3] The undo bar on cards is app-local (a composed notice, not a floating toast). If a second app needs transient "saved · Undo" feedback, admit one generic toast to the UI Engine with a showcase and consumer matrix instead of copying it.
-- **[PLANNED] Iteration-based phase tracking + project-card home (owner
+- **[DONE R8.285-R8.295, browser-accepted 2026-10-02] Iteration-based phase tracking + project-card home (owner
   design discussion, 2026-10-01 — direction agreed, NOT built, no Work Order
   yet; a mockup and a gap check against the code come first; the owner's open decisions are all answered as of 2026-10-01).** Folds in
   KB-060 (Open defects). Agreed so far:

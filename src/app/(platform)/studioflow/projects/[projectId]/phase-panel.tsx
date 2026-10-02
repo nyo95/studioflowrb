@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { Badge, Button, ButtonMenu, Dialog, Field, FormActions, FormattedInstant, InlineError, Input, RadioGroup, RowActionMenu, SectionCard, Text, Textarea } from "@/platform/ui_engine";
@@ -60,6 +60,17 @@ export function PhasePanel({
   const [noteDraft, setNoteDraft] = useState(note ?? "");
   const noteChanged = noteDraft.trim() !== (note ?? "").trim();
   const acting = canAct && !archived;
+
+  // A dialog opened from a menu loses autofocus to the menu trigger; put the cursor in the name box ourselves.
+  useEffect(() => {
+    if (!renaming) return;
+    const timer = window.setTimeout(() => {
+      const field = document.getElementById("rename-iteration-name") as HTMLInputElement | null;
+      field?.focus();
+      field?.select();
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [renaming]);
 
   const menuItems = [
     ...(phase.status === "PENDING" && acting ? [{ label: "Skip this phase…", description: "Marks it done without work. A reason is recorded.", onSelect: () => { setReason(""); setSkipOpen(true); } }] : []),
@@ -151,7 +162,7 @@ export function PhasePanel({
             event.preventDefault();
             if (await commands.exec("rename", { command: "renameIteration", phaseId: phase.id, iterationId: renaming.id, name: renameDraft }, `Renamed to ${renameDraft.trim()}`)) setRenaming(null);
           }}>
-            <Field label="Name" required><Input value={renameDraft} maxLength={200} autoFocus onChange={(event) => setRenameDraft(event.target.value)} /></Field>
+            <Field label="Name" required><Input id="rename-iteration-name" value={renameDraft} maxLength={200} autoFocus onChange={(event) => setRenameDraft(event.target.value)} /></Field>
             {commands.error ? <InlineError>{commands.error}</InlineError> : null}
             <FormActions>
               <Button type="button" onClick={() => setRenaming(null)} disabled={commands.isPending("rename")}>Cancel</Button>

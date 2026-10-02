@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.294**
-- Next local revision: **R8.295**
+- Current revision after this entry is committed: **R8.295**
+- Next local revision: **R8.296**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -49,6 +49,14 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - WO-SF-ITER-01 is finished and reviewed (R8.285 to R8.289), so the queued Master Data plan for text price labels written in quotation marks moved from `docs/agent/queued-plans/` to the root `PLAN.md`, status READY, and its Executor prompt now requires every listed test, a scratch-database migration check, and a single uninterrupted run. The Executor takes the next revision (R8.291); the Lead builds the italic display afterwards. Docs only; no code, schema, or migration change.
 
 **Checks.** `git diff --check`.
+
+## R8.295 | 2026-10-02 | fix(studioflow): acceptance pass on the project-card home
+
+- Browser acceptance of R8.292 on a throwaway project (since archived) in the development app: Send to client, Client answered, Revision, Done, Undo (including an undo that reversed a phase closing and its auto-advance), auto-advance of the next phase, CD Mall to Continue to CD Final to Done (no plain Done offered on CD Mall), a Supervision visit with Next visit and Done (handover) (the project stays running), the phase notes dialog, ticking a requirement after its phase was done, dismissing a requirement, renaming an iteration, Mark as completed and Reopen project, and the card layout at desktop and phone width. All behaved as designed.
+- Two small fixes found: the rename dialog opened from the menu did not put the cursor in the name box (focus is now set explicitly); "Next visit" now goes straight on to the new-visit dialog instead of leaving the card with only a "New visit" button. The Archive dialog said projects are hidden from "Today"; it now says "Home".
+- Not covered and recorded in `docs/BACKLOG.md`: the My tasks strip in use, the All projects scope for a manager, and the older overlap of the StudioFlow top navigation at phone width. The iteration redesign entry in the backlog is marked done.
+
+**Checks.** `npm test` (797 pass, 0 fail); `npm run check`; `npm run lint` (0 errors; two existing image warnings).
 
 ## R8.294 | 2026-10-02 | docs(bq): plan WO-BQ-INTEGRITY-01 and record the external audit
 
