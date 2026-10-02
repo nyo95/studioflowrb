@@ -271,15 +271,11 @@ export function LibraryDirectory({ brands }: { brands: LibraryBrand[] }) {
 
   const toolbar = (
     <div className="grid gap-3">
-      <SearchField label="Search brands" value={query} onChange={(event) => setQuery(event.target.value)} onClear={() => setQuery("")} placeholder="Search brand, category, vendor, hashtag, or product…" />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Text tone="secondary" size="sm" role="status">
-          {rows.length ? `${paging.offset + 1}–${Math.min(paging.offset + PAGE_SIZE, rows.length)} of ${rows.length}` : "0"} brands
-        </Text>
-        <div className="flex items-center gap-2">
-          <Button className="lg:hidden" leadingIcon={<SlidersHorizontal aria-hidden="true" />} onClick={() => setFiltersOpen(true)}>
-            Filters{activeFilters.length > 0 ? <CountBadge>{activeFilters.length}</CountBadge> : null}
-          </Button>
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <SearchField label="Search brands" value={query} onChange={(event) => setQuery(event.target.value)} onClear={() => setQuery("")} placeholder="Search brand, category, vendor, hashtag, or product…" />
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
           <Text tone="secondary" size="sm" className="max-[420px]:sr-only">Sort</Text>
           <Select aria-label="Sort brands" density="compact" value={sort} onChange={(event) => setSort(event.target.value)}>
             <option value="name-asc">Name A–Z</option>
@@ -288,6 +284,9 @@ export function LibraryDirectory({ brands }: { brands: LibraryBrand[] }) {
           </Select>
         </div>
       </div>
+      <Button className="w-fit lg:hidden" leadingIcon={<SlidersHorizontal aria-hidden="true" />} onClick={() => setFiltersOpen(true)}>
+        Filters{activeFilters.length > 0 ? <CountBadge>{activeFilters.length}</CountBadge> : null}
+      </Button>
       {activeFilters.length > 0 ? (
         <FilterBar active onClear={clearFilters} className="w-fit max-w-full" aria-label="Active filters">
           {activeFilters.map((filter) => <FilterChip key={filter.key} selected onClick={filter.remove} title="Remove filter">{filter.label}</FilterChip>)}
@@ -297,34 +296,45 @@ export function LibraryDirectory({ brands }: { brands: LibraryBrand[] }) {
   );
 
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-      <aside className="hidden gap-3 lg:sticky lg:top-4 lg:grid" aria-label="Library filters">
-        <Text weight="semibold">Filter</Text>
-        {filterPanel}
-      </aside>
-      <Drawer open={filtersOpen} onOpenChange={setFiltersOpen} side="left" size="sm" title="Filters" footer={<Button variant="primary" onClick={() => setFiltersOpen(false)}>Show {rows.length} brands</Button>}>
-        {filterPanel}
-      </Drawer>
-      <Dialog open={openBrand !== null} onOpenChange={(open) => { if (!open) setOpenBrandId(null); }} size="md" title={openBrand?.name ?? ""} description={openBrand?.ownerVendor?.name}>
-        {openBrand ? <BrandDetail brand={openBrand} /> : null}
-      </Dialog>
-      <section className="min-w-0" aria-label="Brand catalogue">
-        <DirectoryShell
-          toolbar={toolbar}
-          pagination={rows.length > PAGE_SIZE ? <Pagination page={paging.page} pageCount={paging.pageCount} total={rows.length} pageSize={PAGE_SIZE} onPageChange={paging.setPage} label="Brand pages" /> : null}
-        >
-          {rows.length === 0 ? (
-            <EmptyState
-              title={brands.length === 0 ? "No brands in Master Data yet" : "No brands match"}
-              action={brands.length > 0 && (activeFilters.length > 0 || q !== "") ? <Button onClick={() => { clearFilters(); setQuery(""); }}>Clear search and filters</Button> : undefined}
-            />
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              {visibleRows.map(({ brand, websiteMatch }) => <BrandCard key={brand.id} brand={brand} websiteMatch={websiteMatch} onOpen={() => setOpenBrandId(brand.id)} />)}
-            </div>
-          )}
-        </DirectoryShell>
-      </section>
+    <div className="grid gap-4">
+      <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-x-6">
+        <Text weight="semibold" className="hidden self-center lg:block">Filter</Text>
+        {toolbar}
+      </div>
+      <div className="grid items-start gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className="hidden lg:sticky lg:top-4 lg:block" aria-label="Library filters">
+          {filterPanel}
+        </aside>
+        <Drawer open={filtersOpen} onOpenChange={setFiltersOpen} side="left" size="sm" title="Filters" footer={<Button variant="primary" onClick={() => setFiltersOpen(false)}>Show {rows.length} brands</Button>}>
+          {filterPanel}
+        </Drawer>
+        <Dialog open={openBrand !== null} onOpenChange={(open) => { if (!open) setOpenBrandId(null); }} size="md" title={openBrand?.name ?? ""} description={openBrand?.ownerVendor?.name}>
+          {openBrand ? <BrandDetail brand={openBrand} /> : null}
+        </Dialog>
+        <section className="min-w-0" aria-label="Brand catalogue">
+          <DirectoryShell
+            pagination={
+              <div className="grid gap-3">
+                <Text tone="secondary" size="sm" role="status">
+                  {rows.length ? `${paging.offset + 1}–${Math.min(paging.offset + PAGE_SIZE, rows.length)} of ${rows.length}` : "0"} brands
+                </Text>
+                {rows.length > PAGE_SIZE ? <Pagination page={paging.page} pageCount={paging.pageCount} onPageChange={paging.setPage} label="Brand pages" /> : null}
+              </div>
+            }
+          >
+            {rows.length === 0 ? (
+              <EmptyState
+                title={brands.length === 0 ? "No brands in Master Data yet" : "No brands match"}
+                action={brands.length > 0 && (activeFilters.length > 0 || q !== "") ? <Button onClick={() => { clearFilters(); setQuery(""); }}>Clear search and filters</Button> : undefined}
+              />
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                {visibleRows.map(({ brand, websiteMatch }) => <BrandCard key={brand.id} brand={brand} websiteMatch={websiteMatch} onOpen={() => setOpenBrandId(brand.id)} />)}
+              </div>
+            )}
+          </DirectoryShell>
+        </section>
+      </div>
     </div>
   );
 }

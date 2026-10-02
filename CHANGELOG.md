@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.315**
-- Next local revision: **R8.316**
+- Current revision after this entry is committed: **R8.316**
+- Next local revision: **R8.317**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.316 | 2026-10-03 | fix(studioflow): align Library toolbar and catalogue footer
+
+- Owner authorized the Library UI composition changes: move the Brand range/count to the catalogue footer, place Sort on the Search row, and align the first card with the Category panel. The shared upper grid keeps both columns aligned even when active-filter chips are present. On narrow screens Search and Sort remain on one row, with Filters below. Existing filtering, sorting, page size, pagination reset, modal, and read-only data behavior are unchanged.
+- Reused existing UI Engine controls and DirectoryShell slots; no dependency, abstraction, schema, migration, or database fixture was added. Pagination no longer repeats the range already shown in the footer. The prior R8.315 shared screen-scroll repair is retained without further shell changes.
+- Browser verification used the running kantor dev server: at 1265×805 the Category panel and first card both start at y=221.5; Search and Sort are vertically centered on the same row. Filtering, descending sort, and empty search were checked. At 390×844 Search and Sort remain side-by-side, Filters opens and Escape restores opener focus, and the footer shows 1–14 of 14 brands after the final card. Repeated scrolling leaves window.scrollY=0 and the document viewport-bound. In-memory server-render smoke checks covered 0, 14, and 30 Brands, including the footer range and two-page pagination. Multi-page browser interaction was not repeated and is not claimed PASS; no development-database fixture was needed. Independent Reviewer acceptance remains pending.
+
+**Checks.** Typecheck, lint, boundary check, legacy-runtime check, full tests (821/821, none skipped/cancelled), and final production build passed. Kantor migrations passed for verified localhost:5433 rebuild-only databases studioflow_rebuild and studioflow_rebuild_test (82 migrations, none pending). Build-generated next-env.d.ts changes were restored and excluded. Whitespace and staged diff inspected before commit. Owner explicitly authorized pushing main to GitHub, including local R8.315; no PR, deployment, or release requested.
 
 ## R8.315 | 2026-10-02 | fix(ui-engine): contain scrolling inside the application frame
 
