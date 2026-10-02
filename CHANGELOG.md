@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.301**
-- Next local revision: **R8.302**
+- Current revision after this entry is committed: **R8.302**
+- Next local revision: **R8.303**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.302 | 2026-10-02 | feat(studioflow): read website catalogue hints in Library
+
+- Replaced the fixed `chair`/`kursi` semantic mapping in StudioFlow Library with a bounded, read-only website catalogue reader.
+- The reader uses public page headings and JSON-LD `Product`, `Offer`, and `ItemList` data to expose website offerings on Brand cards and include them in normal Library search. It does not write tags or persist enrichment.
+- Reuses the existing safe website URL boundary, 512 KB response cap, HTML-only check, redirect validation, and timeout behavior. No AI SDK or cross-app dependency was introduced because this checkout has no configured AI provider; the extraction is the safe first layer for a later model-backed reader.
+
+**Checks.** `website-catalogue.test.ts` and `brand-image.test.ts` (5 pass); `npm run typecheck`; `npm run lint -- --quiet`; `git diff --check` passed.
 
 ## R8.301 | 2026-10-02 | feat(studioflow): semantic reader hints for Library tags
 

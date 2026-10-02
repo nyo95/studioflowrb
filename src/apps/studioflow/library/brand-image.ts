@@ -2,7 +2,7 @@ type BrandLink = { kind: string; url: string };
 
 const FETCH_TIMEOUT_MS = 2500;
 
-function isSafeWebUrl(value: string): boolean {
+export function isSafeWebUrl(value: string): boolean {
   try {
     const url = new URL(value);
     if (url.protocol !== "https:" && url.protocol !== "http:") return false;
