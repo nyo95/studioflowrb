@@ -5,13 +5,27 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.309**
-- Next local revision: **R8.310**
+- Current revision after this entry is committed: **R8.310**
+- Next local revision: **R8.311**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.310 | 2026-10-02 | feat(studioflow): polish Library catalogue skeleton with UI Engine components
+
+Result of the Library design critique. UI-only; no data, schema, permission, or shared-code change.
+
+- **Mobile filters.** Below `lg` the filter rail is replaced by a `Filters (n)` button opening a UI Engine `Drawer` (left, `sm`) that holds the same filter panel and a "Show N brands" action. Desktop keeps the sticky rail.
+- **Active filters.** A UI Engine `FilterBar` of removable `FilterChip`s with a clear-all action appears above the results; the empty state offers "Clear search and filters".
+- **Website match chip.** A Brand that matches only through its public-website offerings now shows a `Website: <term>` badge, so a hit is never unexplained. Matching on name, category, hashtag, or vendor shows no chip.
+- **Search.** A leading `#` is ignored (`#chair` finds hashtag `chair`); placeholder now says product search is included.
+- **Skeleton.** Removed the single-tab `Tabs`; the right column now uses `DirectoryShell` (toolbar, grid, pagination) per UI_ENGINE.md §6. Grid is 2/3/4 columns at `sm`/`xl`/`2xl` because the rail takes width.
+- **Card.** Categories stay as badges; hashtags become plain `#tag` text capped at 3 with `+n`; decorative website images use empty alt text and `referrerPolicy="no-referrer"`; resource link targets grow to 44px on coarse pointers.
+- UI language is unchanged (English); the owner has not yet chosen Indonesian.
+
+**Checks.** `tsc --noEmit`; `eslint` on the Library route; a server-render smoke test with 30 sample Brands (24 cards on page 1, Filters button, `+2` hashtag overflow, referrer policy). Not run: full `npm test`, and browser acceptance of the mobile drawer, contrast, and touch targets.
 
 ## R8.309 | 2026-10-02 | fix(studioflow): harden and cache Library website reads
 
