@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.299**
-- Next local revision: **R8.300**
+- Current revision after this entry is committed: **R8.300**
+- Next local revision: **R8.301**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.300 | 2026-10-02 | feat(studioflow): catalogue structure for Library cards
+
+- StudioFlow Library now follows the approved catalogue skeleton: a filter rail, search and result toolbar, a Brand context tab, sorting, and a responsive card grid.
+- Filters are limited to fields owned by the Library read contract: active Brand categories, owner vendor, and hashtags. No product-only price, rating, location, or store behavior was invented.
+- The card and filter surfaces use existing UI Engine primitives and tokens, including `Surface`, `Tabs`, `Checkbox`, `Select`, and the shared radius tokens. No shared UI Engine or cross-app code changed.
+
+**Checks.** `npm test` (810 pass, 0 fail); `npm run typecheck`; `npm run lint` (0 errors; two existing image warnings); `npm run check:boundaries`; `npm run check:legacy-runtime`; `npm run build` passed. Browser acceptance remains pending.
 
 ## R8.299 | 2026-10-02 | feat(studioflow): Library brand cards with website image discovery
 
