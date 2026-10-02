@@ -10,6 +10,7 @@ import { toDecimalString } from "@platform/utilities/decimal";
 import { normalizeText } from "@platform/utilities/normalization";
 
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
+import { iterationChoices, iterationKinds } from "../domain/iteration-kinds";
 import { waitingDays, type PhaseStatus } from "../domain/phase";
 import {
   P,
@@ -600,6 +601,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         include: {
           client: { select: { id: true, name: true } },
           phases: { orderBy: { order_index: "asc" }, include: {
+            definition: { select: { default_iteration_kinds: true } },
             revisions: { orderBy: { major: "desc" }, select: { id: true, major: true, name: true, status: true, sent_at: true, visit_date: true, created_at: true } },
             checklist_items: { where: { is_checked: false, dismissed_at: null }, select: { id: true } },
           } },
@@ -612,7 +614,8 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           const isSupervision = phase.definition_id === "00000000-0000-4000-8000-000000000105";
           const visits = phase.revisions.filter((iteration) => iteration.visit_date);
           const lastVisit = visits.sort((a, b) => (b.visit_date?.getTime() ?? 0) - (a.visit_date?.getTime() ?? 0))[0]?.visit_date ?? null;
-          const choices = !current ? [] : current.status === "NOT_SENT" ? ["send"] : current.status === "SENT" ? ["record_answer"] : isSupervision ? ["next_visit", "done"] : ["revision", "done"];
+          const kinds = iterationKinds(phase.definition.default_iteration_kinds);
+          const choices = !current ? (phase.status === "DONE" ? ["add_iteration"] : []) : iterationChoices({ state: current.status, phaseStatus: phase.status, iterationName: current.name, kinds, supervision: isSupervision });
           return {
             id: phase.id, name: phase.name_snapshot, order: phase.order_index, status: phase.status as PhaseStatus,
             current_iteration: current ? { id: current.id, name: current.name, state: current.status, sent_at: current.sent_at, waiting_days: current.status === "SENT" ? waitingDays(current.sent_at, now) : null, available_choices: choices } : null,

@@ -6,6 +6,7 @@ import { createPrivateObjectKey } from "@platform/core/storage";
 
 import { fullBlockers, todoBlockers } from "../domain/blockers";
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
+import { isCdMall, iterationKinds } from "../domain/iteration-kinds";
 import {
   availablePhaseCommands,
   canActivatePhase,
@@ -368,6 +369,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     requireCommand(input, P.phaseWork);
     const loaded = await loadPhase(tx, input.projectId, input.phaseId, input);
     if (loaded.project.status === "COMPLETED") throw conflict("PROJECT_COMPLETED", "Reopen the project before changing a phase.");
+    if (loaded.project.status !== "ACTIVE") throw conflict("PROJECT_NOT_ACTIVE", "The project must be active before changing an iteration.");
     return loaded;
   }
   async function recordEvent(tx: TxClient, input: PhaseCommandInput, phase: PhaseRow, iterationId: string | null, from: string | null, to: string, autoCreated: Record<string, unknown> = {}) {
@@ -383,9 +385,20 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     const major = (latest?.major ?? 0) + 1;
     return tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phase.id, major, name: kind ?? `${phase.name_snapshot} ${major}`, status: "NOT_SENT", visit_date: visit?.date, note: visit?.note } });
   }
+  function iterationUndo(row: { id: string; phase_id: string; major: number; name: string; status: string; sent_at: Date | null; answered_at: Date | null; done_at: Date | null; visit_date: Date | null; note: string | null }) {
+    return { id: row.id, phaseId: row.phase_id, major: row.major, name: row.name, status: row.status, sentAt: row.sent_at?.toISOString() ?? null, answeredAt: row.answered_at?.toISOString() ?? null, doneAt: row.done_at?.toISOString() ?? null, visitDate: row.visit_date?.toISOString() ?? null, note: row.note };
+  }
+  async function carryForwardFeedback(tx: TxClient, phase: PhaseRow, project: ProjectRow, revisionId: string) {
+    const feedback = await tx.sfActivity.findMany({ where: { revision_id: revisionId, mode: "FEEDBACK", status: "OPEN" } });
+    const assignee = phase.seat_snapshot === "drafter" ? project.pic_drafter_id : project.pic_designer_id;
+    const itemIds: string[] = [];
+    for (const item of feedback) { const created = await tx.sfChecklistItem.create({ data: { id: randomUUID(), project_id: project.id, phase_id: phase.id, label: item.content, assigned_to_id: item.assigned_to_id ?? assignee, due_at: item.due_at, created_by_id: item.created_by_id } }); itemIds.push(created.id); }
+    if (feedback.length) await tx.sfActivity.updateMany({ where: { id: { in: feedback.map((item) => item.id) } }, data: { status: "COMPLETED", completed_at: nowOf(ports) } });
+    return { itemIds, feedbackIds: feedback.map((item) => item.id) };
+  }
   async function defaultFirstKind(tx: TxClient, phase: PhaseRow) {
     const definition = await tx.sfPhaseDefinition.findUnique({ where: { id: phase.definition_id }, select: { default_iteration_kinds: true } });
-    return Array.isArray(definition?.default_iteration_kinds) && typeof definition.default_iteration_kinds[0] === "string" ? definition.default_iteration_kinds[0] : undefined;
+    return iterationKinds(definition?.default_iteration_kinds)[0];
   }
   async function autoAdvance(tx: TxClient, input: PhaseCommandInput, completed: PhaseRow) {
     const candidates = await tx.sfPhase.findMany({ where: { project_id: completed.project_id, status: "PENDING" }, orderBy: { order_index: "asc" } });
@@ -398,12 +411,13 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     }
     return null;
   }
-  async function closePhase(tx: TxClient, input: PhaseCommandInput, phase: PhaseRow, iteration: { id: string; status: string }) {
+  async function closePhase(tx: TxClient, input: PhaseCommandInput, phase: PhaseRow, project: ProjectRow, iteration: { id: string; status: string; phase_id: string; major: number; name: string; sent_at: Date | null; answered_at: Date | null; done_at: Date | null; visit_date: Date | null; note: string | null }) {
     const at = nowOf(ports);
+    const feedback = await carryForwardFeedback(tx, phase, project, iteration.id);
     await tx.sfRevision.update({ where: { id: iteration.id }, data: { status: "DONE", answered_at: at, done_at: at } });
     await setPhase(tx, phase, { status: "DONE", is_locked: true });
     const auto = await autoAdvance(tx, input, phase);
-    await recordEvent(tx, input, phase, iteration.id, iteration.status, "DONE", { phaseBefore: "ACTIVE", autoAdvance: auto });
+    await recordEvent(tx, input, phase, iteration.id, iteration.status, "DONE", { beforeIteration: iterationUndo(iteration), phaseBefore: "ACTIVE", autoAdvance: auto, feedback });
     await audit(tx, input.actor, "iteration-done", phase, "ACTIVE", "DONE", { iterationId: iteration.id, autoAdvance: auto });
     return { phaseId: phase.id, autoAdvance: auto };
   }
@@ -411,24 +425,24 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
   const iterationCommands = {
     async addIteration(input: PhaseCommandInput) {
       return runTransaction(async (tx) => {
-        const { phase } = await writableIteration(tx, input);
+        const { phase, project } = await writableIteration(tx, input);
         if (phase.status !== "PENDING" && phase.status !== "DONE") throw invalidState("An iteration can only be added to a new or finished phase.");
         const iteration = await createIteration(tx, phase, await defaultFirstKind(tx, phase));
         await setPhase(tx, phase, { status: "ACTIVE", is_locked: false });
-        await recordEvent(tx, input, phase, iteration.id, phase.status, "NOT_SENT", { createdIterationId: iteration.id, phaseBefore: phase.status });
+        await recordEvent(tx, input, phase, null, phase.status, "NOT_SENT", { createdIteration: iterationUndo(iteration), phaseBefore: phase.status });
         await audit(tx, input.actor, "iteration-added", phase, phase.status as PhaseStatus, "ACTIVE", { iterationId: iteration.id });
         return { phaseId: phase.id, iterationId: iteration.id };
       });
     },
     async sendIteration(input: PhaseCommandInput & { iterationId: string }) {
       return runTransaction(async (tx) => {
-        const { phase } = await writableIteration(tx, input);
+        const { phase, project } = await writableIteration(tx, input);
         const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } });
         if (!iteration) throw notFound("iteration");
         if (iteration.status === "SENT") return { iterationId: iteration.id };
         if (phase.status !== "ACTIVE" || iteration.status !== "NOT_SENT") throw invalidState("Only the current unsent iteration can be sent.");
         await tx.sfRevision.update({ where: { id: iteration.id }, data: { status: "SENT", sent_at: nowOf(ports) } });
-        await recordEvent(tx, input, phase, iteration.id, "NOT_SENT", "SENT");
+        await recordEvent(tx, input, phase, iteration.id, "NOT_SENT", "SENT", { beforeIteration: iterationUndo(iteration) });
         await audit(tx, input.actor, "iteration-sent", phase, "ACTIVE", "ACTIVE", { iterationId: iteration.id });
         return { iterationId: iteration.id };
       });
@@ -441,23 +455,23 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         if (iteration.status === "ANSWERED") return { iterationId: iteration.id };
         if (iteration.status !== "SENT") throw invalidState("Only an iteration sent to the client can receive an answer.");
         await tx.sfRevision.update({ where: { id: iteration.id }, data: { status: "ANSWERED", answered_at: nowOf(ports) } });
-        await recordEvent(tx, input, phase, iteration.id, "SENT", "ANSWERED");
+        await recordEvent(tx, input, phase, iteration.id, "SENT", "ANSWERED", { beforeIteration: iterationUndo(iteration) });
         await audit(tx, input.actor, "client-answer-recorded", phase, "ACTIVE", "ACTIVE", { iterationId: iteration.id });
         return { iterationId: iteration.id };
       });
     },
     async chooseIterationOutcome(input: PhaseCommandInput & { iterationId: string; outcome: "REVISION" | "DONE" | "CONTINUE_CD_FINAL" }) {
       return runTransaction(async (tx) => {
-        const { phase } = await writableIteration(tx, input);
+        const { phase, project } = await writableIteration(tx, input);
         const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } });
         if (!iteration || iteration.status !== "ANSWERED") throw invalidState("Choose an outcome only after the client answer is recorded.");
         const definition = await tx.sfPhaseDefinition.findUniqueOrThrow({ where: { id: phase.definition_id }, select: { default_iteration_kinds: true } });
-        const kinds = Array.isArray(definition.default_iteration_kinds) ? definition.default_iteration_kinds.filter((value): value is string => typeof value === "string") : [];
-        const isMall = kinds[0] === iteration.name;
+        const kinds = iterationKinds(definition.default_iteration_kinds);
+        const isMall = isCdMall(kinds, iteration.name);
         if (input.outcome === "REVISION") {
-          const at = nowOf(ports); await tx.sfRevision.update({ where: { id: iteration.id }, data: { status: "REVISED", done_at: at } });
+          const feedback = await carryForwardFeedback(tx, phase, project, iteration.id); const at = nowOf(ports); await tx.sfRevision.update({ where: { id: iteration.id }, data: { status: "REVISED", done_at: at } });
           const next = await createIteration(tx, phase);
-          await recordEvent(tx, input, phase, iteration.id, "ANSWERED", "REVISED", { createdIterationId: next.id });
+          await recordEvent(tx, input, phase, iteration.id, "ANSWERED", "REVISED", { beforeIteration: iterationUndo(iteration), createdIteration: iterationUndo(next), feedback });
           await audit(tx, input.actor, "iteration-revised", phase, "ACTIVE", "ACTIVE", { iterationId: iteration.id, nextIterationId: next.id });
           return { iterationId: iteration.id, nextIterationId: next.id };
         }
@@ -465,43 +479,67 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           if (!isMall || !kinds[1]) throw invalidState("Only CD Mall can continue to CD Final.");
           const at = nowOf(ports); await tx.sfRevision.update({ where: { id: iteration.id }, data: { status: "DONE", done_at: at } });
           const next = await createIteration(tx, phase, kinds[1]);
-          await recordEvent(tx, input, phase, iteration.id, "ANSWERED", "DONE", { createdIterationId: next.id, cdContinuation: true });
+          await recordEvent(tx, input, phase, iteration.id, "ANSWERED", "DONE", { beforeIteration: iterationUndo(iteration), createdIteration: iterationUndo(next), cdContinuation: true });
           return { iterationId: iteration.id, nextIterationId: next.id };
         }
         if (isMall) throw invalidState("CD Mall must be revised or continued to CD Final.");
-        return closePhase(tx, input, phase, iteration);
+        return closePhase(tx, input, phase, project, iteration);
       });
     },
     async renameIteration(input: PhaseCommandInput & { iterationId: string; name: string }) {
       const name = requiredText(input.name, "ITERATION_NAME_REQUIRED", "Iteration name", 200);
-      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } }); if (!iteration) throw notFound("iteration"); if (iteration.name === name) return { iterationId: iteration.id }; await tx.sfRevision.update({ where: { id: iteration.id }, data: { name } }); await recordEvent(tx, input, phase, iteration.id, iteration.name, name); await audit(tx, input.actor, "iteration-renamed", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { iterationId: iteration.id }); return { iterationId: iteration.id }; });
+      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } }); if (!iteration) throw notFound("iteration"); if (iteration.name === name) return { iterationId: iteration.id }; await tx.sfRevision.update({ where: { id: iteration.id }, data: { name } }); await recordEvent(tx, input, phase, iteration.id, iteration.name, name, { beforeIteration: iterationUndo(iteration) }); await audit(tx, input.actor, "iteration-renamed", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { iterationId: iteration.id }); return { iterationId: iteration.id }; });
     },
     async deleteNeverSentIteration(input: PhaseCommandInput & { iterationId: string }) {
-      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } }); if (!iteration) throw notFound("iteration"); if (iteration.status !== "NOT_SENT") throw invalidState("Only an iteration that was never sent can be deleted."); await tx.sfRevision.delete({ where: { id: iteration.id } }); await recordEvent(tx, input, phase, null, "NOT_SENT", "DELETED", { deletedIteration: { id: iteration.id, major: iteration.major, name: iteration.name } }); await audit(tx, input.actor, "iteration-deleted", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { iterationId: iteration.id }); return { iterationId: iteration.id }; });
+      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id }, include: { activities: true, deliverables: true } }); if (!iteration) throw notFound("iteration"); if (iteration.status !== "NOT_SENT") throw invalidState("Only an iteration that was never sent can be deleted."); const snapshot = { iteration: iterationUndo(iteration), activities: iteration.activities.map((a) => ({ id: a.id, revisionId: a.revision_id })), deliverables: iteration.deliverables.map((d) => ({ id: d.id, revisionId: d.revision_id })) }; await tx.sfRevision.delete({ where: { id: iteration.id } }); await recordEvent(tx, input, phase, null, "NOT_SENT", "DELETED", { deletedIteration: snapshot }); await audit(tx, input.actor, "iteration-deleted", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { iterationId: iteration.id }); return { iterationId: iteration.id }; });
     },
     async setPhaseNote(input: PhaseCommandInput & { note: string | null }) {
-      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const note = input.note === null ? null : requiredText(input.note, "PHASE_NOTE_REQUIRED", "Note", 2000); if (phase.note === note) return { phaseId: phase.id }; await tx.sfPhase.update({ where: { id: phase.id }, data: { note } }); await recordEvent(tx, input, phase, null, phase.note, note ?? ""); await audit(tx, input.actor, "note-set", phase, phase.status as PhaseStatus, phase.status as PhaseStatus); return { phaseId: phase.id }; });
+      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const note = input.note === null ? null : requiredText(input.note, "PHASE_NOTE_REQUIRED", "Note", 2000); if (phase.note === note) return { phaseId: phase.id }; await tx.sfPhase.update({ where: { id: phase.id }, data: { note } }); await recordEvent(tx, input, phase, null, phase.note, note ?? "", { phaseNoteBefore: phase.note }); await audit(tx, input.actor, "note-set", phase, phase.status as PhaseStatus, phase.status as PhaseStatus); return { phaseId: phase.id }; });
     },
     async dismissRequirement(input: PhaseCommandInput & { itemId: string }) {
-      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const item = await tx.sfChecklistItem.findFirst({ where: { id: input.itemId, phase_id: phase.id } }); if (!item) throw notFound("requirement"); if (item.dismissed_at) return { itemId: item.id }; await tx.sfChecklistItem.update({ where: { id: item.id }, data: { dismissed_at: nowOf(ports) } }); await recordEvent(tx, input, phase, null, "VISIBLE", "DISMISSED", { requirementId: item.id }); await audit(tx, input.actor, "requirement-dismissed", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { requirementId: item.id }); return { itemId: item.id }; });
+      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const item = await tx.sfChecklistItem.findFirst({ where: { id: input.itemId, phase_id: phase.id } }); if (!item) throw notFound("requirement"); if (item.dismissed_at) return { itemId: item.id }; await tx.sfChecklistItem.update({ where: { id: item.id }, data: { dismissed_at: nowOf(ports) } }); await recordEvent(tx, input, phase, null, "VISIBLE", "DISMISSED", { requirementId: item.id, dismissedAtBefore: null }); await audit(tx, input.actor, "requirement-dismissed", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { requirementId: item.id }); return { itemId: item.id }; });
     },
     async createSupervisionVisit(input: PhaseCommandInput & { visitDate: string; note?: string | null }) {
-      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); if (!isLegacySupervisionDefinition(phase.definition_id)) throw invalidState("Visits are available only for Supervision."); if (phase.status !== "PENDING" && phase.status !== "ACTIVE") throw invalidState(); if (await activeRevision(tx, phase.id)) throw invalidState("Finish the current visit before adding another."); const visit = await createIteration(tx, phase, undefined, { date: dateOnlyToDate(input.visitDate), note: input.note ? requiredText(input.note, "VISIT_NOTE_REQUIRED", "Visit note", 2000) : null }); if (phase.status === "PENDING") await setPhase(tx, phase, { status: "ACTIVE", is_locked: false }); await recordEvent(tx, input, phase, visit.id, null, "NOT_SENT", { createdIterationId: visit.id }); return { iterationId: visit.id }; });
+      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); if (!isLegacySupervisionDefinition(phase.definition_id)) throw invalidState("Visits are available only for Supervision."); if (phase.status !== "PENDING" && phase.status !== "ACTIVE") throw invalidState(); if (await activeRevision(tx, phase.id)) throw invalidState("Finish the current visit before adding another."); const visit = await createIteration(tx, phase, undefined, { date: dateOnlyToDate(input.visitDate), note: input.note ? requiredText(input.note, "VISIT_NOTE_REQUIRED", "Visit note", 2000) : null }); if (phase.status === "PENDING") await setPhase(tx, phase, { status: "ACTIVE", is_locked: false }); await recordEvent(tx, input, phase, null, null, "NOT_SENT", { createdIteration: iterationUndo(visit), phaseBefore: phase.status }); return { iterationId: visit.id }; });
     },
     async chooseSupervisionVisit(input: PhaseCommandInput & { iterationId: string; outcome: "NEXT_VISIT" | "DONE" }) {
-      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); if (!isLegacySupervisionDefinition(phase.definition_id)) throw invalidState(); const visit = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } }); if (!visit || visit.status !== "NOT_SENT") throw invalidState("Only the open visit can be completed."); if (input.outcome === "NEXT_VISIT") { await tx.sfRevision.update({ where: { id: visit.id }, data: { status: "DONE", done_at: nowOf(ports) } }); await recordEvent(tx, input, phase, visit.id, "NOT_SENT", "DONE"); return { iterationId: visit.id }; } return closePhase(tx, input, phase, visit); });
+      return runTransaction(async (tx) => { const { phase, project } = await writableIteration(tx, input); if (!isLegacySupervisionDefinition(phase.definition_id)) throw invalidState(); const visit = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } }); if (!visit || visit.status !== "NOT_SENT") throw invalidState("Only the open visit can be completed."); if (input.outcome === "NEXT_VISIT") { await tx.sfRevision.update({ where: { id: visit.id }, data: { status: "DONE", done_at: nowOf(ports) } }); await recordEvent(tx, input, phase, visit.id, "NOT_SENT", "DONE", { beforeIteration: iterationUndo(visit) }); return { iterationId: visit.id }; } return closePhase(tx, input, phase, project, visit); });
     },
     async undoPhaseEvent(input: CommandContext & { projectId: string; eventId: string }) {
       requireCommand(input, P.phaseWork);
-      return runTransaction(async (tx) => { const event = await tx.sfPhaseEvent.findUnique({ where: { id: input.eventId }, include: { phase: true } }); if (!event || event.project_id !== input.projectId) throw notFound("phase event"); const latest = await tx.sfPhaseEvent.findFirst({ where: { project_id: input.projectId }, orderBy: [{ occurred_at: "desc" }, { id: "desc" }] }); if (latest?.id !== event.id) throw conflict("UNDO_NOT_LATEST", "Only the latest project change can be undone."); if (event.actor_id !== input.actor.userId) throw conflict("UNDO_ACTOR_MISMATCH", "Only the person who made this change can undo it."); if (event.undone_at || nowOf(ports).getTime() - event.occurred_at.getTime() > 300_000) throw conflict("UNDO_EXPIRED", "This change can no longer be undone."); const payload = (event.auto_created ?? {}) as { createdIterationId?: string; autoAdvance?: { phaseId: string; iterationId: string } | null; phaseBefore?: string }; if (payload.autoAdvance) { await tx.sfRevision.delete({ where: { id: payload.autoAdvance.iterationId } }); await tx.sfPhase.update({ where: { id: payload.autoAdvance.phaseId }, data: { status: "PENDING", is_locked: false } }); } if (payload.createdIterationId) await tx.sfRevision.delete({ where: { id: payload.createdIterationId } }); if (event.iteration_id) await tx.sfRevision.update({ where: { id: event.iteration_id }, data: { status: event.from_state as "NOT_SENT" | "SENT" | "ANSWERED" | "REVISED" | "DONE", sent_at: event.from_state === "SENT" ? event.occurred_at : null, answered_at: null, done_at: null } }); if (payload.phaseBefore) await tx.sfPhase.update({ where: { id: event.phase_id }, data: { status: payload.phaseBefore as PhaseStatus, is_locked: false } }); await tx.sfPhaseEvent.update({ where: { id: event.id }, data: { undone_at: nowOf(ports), undone_by_id: input.actor.userId } }); await writeAudit(ports, tx, { action: "studioflow.phase-event.undone", entityType: "phase-event", entityId: event.id, actor: input.actor, metadata: { projectId: input.projectId } }); return { eventId: event.id }; });
+      return runTransaction(async (tx) => {
+        const event = await tx.sfPhaseEvent.findUnique({ where: { id: input.eventId } });
+        if (!event || event.project_id !== input.projectId) throw notFound("phase event");
+        const latest = await tx.sfPhaseEvent.findFirst({ where: { project_id: input.projectId }, orderBy: { occurred_at: "desc" } });
+        if (latest?.id !== event.id) throw conflict("UNDO_NOT_LATEST", "Only the latest project change can be undone.");
+        if (event.actor_id !== input.actor.userId) throw conflict("UNDO_ACTOR_MISMATCH", "Only the person who made this change can undo it.");
+        if (event.undone_at || nowOf(ports).getTime() - event.occurred_at.getTime() > 300_000) throw conflict("UNDO_EXPIRED", "This change can no longer be undone.");
+        const p = (event.auto_created ?? {}) as { beforeIteration?: ReturnType<typeof iterationUndo>; createdIteration?: ReturnType<typeof iterationUndo>; deletedIteration?: { iteration: ReturnType<typeof iterationUndo> }; autoAdvance?: { phaseId: string; iterationId: string } | null; phaseBefore?: string; phaseNoteBefore?: string | null; requirementId?: string; dismissedAtBefore?: string | null; feedback?: { itemIds: string[]; feedbackIds: string[] } };
+        for (const created of [p.createdIteration, p.autoAdvance ? { id: p.autoAdvance.iterationId } : undefined]) {
+          if (!created) continue;
+          const attached = await tx.sfRevision.findUnique({ where: { id: created.id }, select: { _count: { select: { activities: true, deliverables: true } } } });
+          if (attached && attached._count.activities + attached._count.deliverables > 0) throw conflict("UNDO_HAS_NEWER_DATA", "This change now has attached work and cannot be undone.");
+        }
+        if (p.autoAdvance) { await tx.sfRevision.delete({ where: { id: p.autoAdvance.iterationId } }); await tx.sfPhase.update({ where: { id: p.autoAdvance.phaseId }, data: { status: "PENDING", is_locked: false } }); }
+        if (p.createdIteration) await tx.sfRevision.delete({ where: { id: p.createdIteration.id } });
+        if (p.deletedIteration) { const row = p.deletedIteration.iteration; await tx.sfRevision.create({ data: { id: row.id, phase_id: row.phaseId, major: row.major, name: row.name, status: row.status as "NOT_SENT", sent_at: row.sentAt ? new Date(row.sentAt) : null, answered_at: row.answeredAt ? new Date(row.answeredAt) : null, done_at: row.doneAt ? new Date(row.doneAt) : null, visit_date: row.visitDate ? new Date(row.visitDate) : null, note: row.note } }); }
+        if (p.beforeIteration) { const row = p.beforeIteration; await tx.sfRevision.update({ where: { id: row.id }, data: { name: row.name, status: row.status as "NOT_SENT" | "SENT" | "ANSWERED" | "REVISED" | "DONE", sent_at: row.sentAt ? new Date(row.sentAt) : null, answered_at: row.answeredAt ? new Date(row.answeredAt) : null, done_at: row.doneAt ? new Date(row.doneAt) : null, visit_date: row.visitDate ? new Date(row.visitDate) : null, note: row.note } }); }
+        if (p.feedback) { if (p.feedback.itemIds.length) await tx.sfChecklistItem.deleteMany({ where: { id: { in: p.feedback.itemIds } } }); if (p.feedback.feedbackIds.length) await tx.sfActivity.updateMany({ where: { id: { in: p.feedback.feedbackIds } }, data: { status: "OPEN", completed_at: null } }); }
+        if (p.requirementId) await tx.sfChecklistItem.update({ where: { id: p.requirementId }, data: { dismissed_at: p.dismissedAtBefore ? new Date(p.dismissedAtBefore) : null } });
+        if (p.phaseNoteBefore !== undefined) await tx.sfPhase.update({ where: { id: event.phase_id }, data: { note: p.phaseNoteBefore } });
+        if (p.phaseBefore) await tx.sfPhase.update({ where: { id: event.phase_id }, data: { status: p.phaseBefore as PhaseStatus, is_locked: false } });
+        await tx.sfPhaseEvent.update({ where: { id: event.id }, data: { undone_at: nowOf(ports), undone_by_id: input.actor.userId } });
+        await writeAudit(ports, tx, { action: "studioflow.phase-event.undone", entityType: "phase-event", entityId: event.id, actor: input.actor, metadata: { projectId: input.projectId } });
+        return { eventId: event.id };
+      });
     },
     async markProjectCompleted(input: CommandContext & { projectId: string }) {
       requireCommand(input, P.projectRead);
-      return runTransaction(async (tx) => { const project = await loadWritableProject(tx, input.projectId); const access = await getProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: project.id }); if (!access.override && !access.isDesigner && !access.isDrafter) throw conflict("PERMISSION_DENIED", "Only a project PIC can complete this project."); if (project.status === "COMPLETED") return { projectId: project.id }; await tx.sfProject.update({ where: { id: project.id }, data: { status: "COMPLETED" } }); await writeAudit(ports, tx, { action: "studioflow.project.completed", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: project.status, to: "COMPLETED" } } }); return { projectId: project.id }; });
+      return runTransaction(async (tx) => { const project = await loadWritableProject(tx, input.projectId); const access = await getProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: project.id }); if (!access.override && !access.isDesigner && !access.isDrafter) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "Only a project PIC can complete this project."); if (project.status === "COMPLETED") return { projectId: project.id }; await tx.sfProject.update({ where: { id: project.id }, data: { status: "COMPLETED" } }); await writeAudit(ports, tx, { action: "studioflow.project.completed", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: project.status, to: "COMPLETED" } } }); return { projectId: project.id }; });
     },
     async reopenProject(input: CommandContext & { projectId: string }) {
       requireCommand(input, P.projectRead);
-      return runTransaction(async (tx) => { const project = await loadWritableProject(tx, input.projectId); const access = await getProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: project.id }); if (!access.override && !access.isDesigner && !access.isDrafter) throw conflict("PERMISSION_DENIED", "Only a project PIC can reopen this project."); if (project.status !== "COMPLETED") return { projectId: project.id }; await tx.sfProject.update({ where: { id: project.id }, data: { status: "ACTIVE" } }); await writeAudit(ports, tx, { action: "studioflow.project.reopened", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: "COMPLETED", to: "ACTIVE" } } }); return { projectId: project.id }; });
+      return runTransaction(async (tx) => { const project = await loadWritableProject(tx, input.projectId); const access = await getProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: project.id }); if (!access.override && !access.isDesigner && !access.isDrafter) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "Only a project PIC can reopen this project."); if (project.status !== "COMPLETED") return { projectId: project.id }; await tx.sfProject.update({ where: { id: project.id }, data: { status: "ACTIVE" } }); await writeAudit(ports, tx, { action: "studioflow.project.reopened", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: "COMPLETED", to: "ACTIVE" } } }); return { projectId: project.id }; });
     },
   };
 

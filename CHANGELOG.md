@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.287**
-- Next local revision: **R8.288**
+- Current revision after this entry is committed: **R8.288**
+- Next local revision: **R8.289**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.288 | 2026-10-02 | fix(studioflow): correct iteration undo and CD card rules (WO-SF-ITER-01 correction)
+
+- Reads the seeded CD iteration-kind JSON (`{ name }`) through one shared tolerant parser, used by commands and project-card choices. CD Mall cannot be closed directly; CD Final can.
+- Event payloads now retain before-values and generated rows for reversal. Undo restores exact iteration dates/state, notes and requirement dismissal, reverses carry-forward feedback, and refuses to remove an iteration that acquired attached work. Phase commands now reject ON_HOLD projects, and PIC authorization returns the standard forbidden error.
+- The Revision and close paths again carry open client feedback into checklist tasks, preserving visibility in Today and card counts.
+
+**Checks.** `npm test`; `npm run check`; `npm run lint`; `git diff --check`. No migration or screen change. Production build intentionally not run.
 
 ## R8.287 | 2026-10-02 | feat(studioflow): read project cards and My tasks (WO-SF-ITER-01 phase 3)
 

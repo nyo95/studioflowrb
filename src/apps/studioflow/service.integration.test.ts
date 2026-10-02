@@ -138,7 +138,7 @@ describe("WO-SF-ITER-01 phase 2 iteration commands", () => {
     assert.equal((await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: moodboard.id } })).status, "ACTIVE");
     await rejectsWith(sf.phases.undoPhaseEvent({ ...as(drafter, DRAFTER_GRANTS), projectId, eventId: event.id }), "UNDO_ACTOR_MISMATCH");
     const cd = await phaseOf(projectId, "cd");
-    await testDb.prisma.sfPhaseDefinition.update({ where: { id: LEGACY.cd }, data: { default_iteration_kinds: ["CD Mall", "CD Final"] } });
+    await testDb.prisma.sfPhaseDefinition.update({ where: { id: LEGACY.cd }, data: { default_iteration_kinds: [{ name: "CD Mall" }, { name: "CD Final" }] } });
     const mall = await sf.phases.addIteration({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id });
     assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: mall.iterationId } })).name, "CD Mall");
   });

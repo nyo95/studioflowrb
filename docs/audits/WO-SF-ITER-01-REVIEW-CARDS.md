@@ -122,3 +122,15 @@ None.
 ### Deviations and limitations
 
 The `mine` filter accepts the signed-in `actorId` alongside grants because permission grants alone do not identify a person. The Lead's new home supplies that identity when it wires the read.
+
+## Correction — R8.288
+
+The correction makes the existing CD definition's stored `{ name: "CD Mall" }` values authoritative in both commands and cards. Undo events now carry exact prior values and generated-row snapshots; reversals restore those values, feedback carry-forward items, notes, and dismissed requirements, while refusing to remove iterations that have acquired attached work. Revision and closing outcomes again convert open client feedback into phase checklist work. Iteration writes reject held projects, and project completion access uses the normal forbidden error.
+
+| Lead finding | Evidence | Result |
+| --- | --- | --- |
+| CD JSON shape and matching card choices | `domain/iteration-kinds.ts`; phase/project services | PASS |
+| Exact event reversal and feedback carry-forward | `phases/service.ts` event snapshots and undo path | PASS |
+| ON_HOLD and permission normalization | `writableIteration`, project completion commands | PASS |
+
+No migration and no screens changed.
