@@ -5,13 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.312**
-- Next local revision: **R8.313**
+- Current revision after this entry is committed: **R8.313**
+- Next local revision: **R8.314**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.313 | 2026-10-02 | fix(ui-engine): restore focus after controlled dialogs close
+
+- Fixed the shared UI Engine `Dialog`/`Drawer` focus-return path for controlled overlays that have no Radix trigger: the engine now remembers the focused opener as the overlay opens and restores it after any normal dismissal. Library Brand details return to the opening card after `Esc`, the close button, and backdrop click; all existing Dialog and Drawer consumers inherit the same correction.
+- Added a UI Engine regression assertion for opener capture, disconnected-opener safety, prevented fallback focus, and scroll-preserving restoration. Removed the R8.312 Library focus-return bug from `docs/BACKLOG.md` only after desktop and mobile browser verification.
+- Completed Library browser item 5f with 27 temporary rebuild-only Brand fixtures: one Brand had no links, image, or hashtags; 26 crossed the 24-card page boundary and exercised page navigation, combined filter/search/sort, and filter-triggered reset to page 1. Deleted the fixtures and their 52 relations afterwards; the Brand count (14 active) and state hash returned exactly to the pre-test values.
+- Dark-theme WCAG AA calculations used the actual Library/UI Engine token pairs. Ratios were 15.39:1 primary text on surface/filter rail, 6.40:1 secondary text and hashtags, 5.42:1 neutral badge text, 7.06:1 warning badge text, and 5.91–14.22:1 modal text; every tested pair exceeds the 4.5:1 normal-text threshold. No schema, migration, dependency, product behavior, or Library UX change.
+
+**Checks.** `npm run typecheck` passed; `npm run lint -- --quiet` passed; `npm run check:boundaries` passed; `npm run check:legacy-runtime` passed; `npm test` passed (819/819); `npm run build` passed; `prisma migrate deploy` passed for verified kantor databases `studioflow_rebuild` and `studioflow_rebuild_test` (82 migrations, none pending). Browser: 5a passed again at desktop and 390×844 mobile; 5b passed again for 41-row pagination plus combined search/sort/hashtag filtering and page reset; 5c passed again for the one-column mobile grid, full-width filter drawer, non-overlapping scrollable navigation, and bounded modal; 5d passed for complete and empty Brand details, scroll lock, resource links, and focus return through `Esc`, close, and backdrop; 5e remains passed from R8.312 and its unchanged safe-fetch suite passed; 5f passed for the empty optional fields, calculated dark-theme contrast, empty-search behavior, and pagination fixtures. Browser console reported no errors.
 
 ## R8.312 | 2026-10-02 | chore(repository): integrate and verify Library revisions
 

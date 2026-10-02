@@ -2,7 +2,7 @@
 
 import { CircleHelp, X } from "lucide-react";
 import { AlertDialog as RAlertDialog,Dialog as RDialog,Tooltip as RTooltip } from "radix-ui";
-import { cloneElement,isValidElement,useId,useState,type CSSProperties,type ReactElement,type ReactNode } from "react";
+import { cloneElement,isValidElement,useId,useRef,useState,type CSSProperties,type ReactElement,type ReactNode } from "react";
 
 import { cx } from "../internal/cx";
 import { Button,Heading,IconButton,Input,Text } from "../primitives";
@@ -47,6 +47,7 @@ function DialogFrame({
   closeLabel = "Close",
   dismissible = true,
 }: DialogProps & { drawer?: boolean; side?: "left" | "right" }) {
+  const openerRef = useRef<HTMLElement | null>(null);
   const blockDismiss = (event: { preventDefault: () => void }) => {
     if (!dismissible) event.preventDefault();
   };
@@ -73,6 +74,16 @@ function DialogFrame({
           data-side={drawer ? side : undefined}
           data-dismissible={dismissible ? undefined : "false"}
           style={{ "--dialog-width": `var(--ui-dialog-${size})` } as CSSProperties}
+          onOpenAutoFocus={() => {
+            openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          }}
+          onCloseAutoFocus={(event) => {
+            const opener = openerRef.current;
+            openerRef.current = null;
+            if (!opener?.isConnected) return;
+            event.preventDefault();
+            opener.focus({ preventScroll: true });
+          }}
           onEscapeKeyDown={blockDismiss}
           onPointerDownOutside={blockDismiss}
           onInteractOutside={blockDismiss}

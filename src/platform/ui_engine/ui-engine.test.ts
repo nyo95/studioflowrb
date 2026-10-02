@@ -340,6 +340,13 @@ describe("UI Engine foundation", () => {
     assert.match(overlays, /dismissible = true/);
   });
 
+  it("restores dialog focus to the control that opened it", () => {
+    const overlays = readFileSync(new URL("./layouts/overlays.tsx", import.meta.url), "utf8");
+    assert.match(overlays, /onOpenAutoFocus=\{\(\) => \{[\s\S]*document\.activeElement/);
+    assert.match(overlays, /onCloseAutoFocus=\{\(event\) => \{[\s\S]*event\.preventDefault\(\);[\s\S]*opener\.focus\(\{ preventScroll: true \}\)/);
+    assert.match(overlays, /opener\?\.isConnected/);
+  });
+
   it("gates confirmation on exact typed text when one is required", () => {
     const overlays = readFileSync(new URL("./layouts/overlays.tsx", import.meta.url), "utf8");
     assert.match(overlays, /requireTypedConfirmation/);
