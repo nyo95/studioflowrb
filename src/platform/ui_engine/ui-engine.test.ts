@@ -318,6 +318,43 @@ describe("UI Engine foundation", () => {
     assert.match(shells, /: "grid-cols-1"/);
   });
 
+  it("bounds long content and rail menus inside the viewport at every screen width", () => {
+    for (const state of [{ railVisible: true, collapsed: true }, { railVisible: true, collapsed: false }, { railVisible: false }]) {
+      const props = {
+        ...state,
+        collapsible: true,
+        brand: "UI",
+        topbar: "Application",
+        navigation: Array.from({ length: 40 }, (_, index) => createElement("button", { key: index }, `Navigation ${index}`)),
+        utility: createElement("button", null, "Utility"),
+        children: createElement("div", { style: { height: 4000 } }, "Long content", createElement("span", { className: "sr-only" }, "Accessible resource label")),
+      };
+      const markup = renderToStaticMarkup(createElement(ui.AppShell, props));
+      const classes = (tag: string) => new Set(markup.match(new RegExp(`<${tag} class="([^"]+)"`))?.[1].split(" "));
+
+      for (const value of ["relative", "h-dvh", "flex", "flex-col", "overflow-hidden", "print:h-auto", "print:overflow-visible"]) {
+        assert.ok(classes("div").has(value), `Frame must contain ${value}`);
+      }
+      assert.ok(classes("header").has("shrink-0"));
+      for (const value of ["relative", "flex-1", "min-h-0", "overflow-auto", "overscroll-contain", "print:overflow-visible"]) {
+        assert.ok(classes("main").has(value), `Content must contain ${value}`);
+      }
+      assert.ok(!classes("main").has("max-[840px]:overflow-visible"));
+      assert.ok(!classes("main").has("max-[840px]:h-auto"));
+      if (state.railVisible) {
+        for (const value of ["h-full", "min-h-0", "shrink-0", "overflow-hidden", "max-[840px]:h-auto"]) {
+          assert.ok(classes("aside").has(value), `Rail must contain ${value}`);
+        }
+        for (const value of ["min-h-0", "flex-1", "overflow-auto", "overscroll-contain", "max-[840px]:overflow-x-auto"]) {
+          assert.ok(classes("nav").has(value), `Rail menu must contain ${value}`);
+        }
+        assert.match(markup, /max-\[840px\]:flex-col/);
+      } else {
+        assert.doesNotMatch(markup, /<aside/);
+      }
+    }
+  });
+
   it("moves combobox focus across enabled options without landing on disabled choices", () => {
     const disabled = [false, true, false, false];
     assert.equal(getComboboxNavigationIndex(disabled, -1, "ArrowDown"), 0);

@@ -5,13 +5,23 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.314**
-- Next local revision: **R8.315**
+- Current revision after this entry is committed: **R8.315**
+- Next local revision: **R8.316**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.315 | 2026-10-02 | fix(ui-engine): contain scrolling inside the application frame
+
+- Owner explicitly authorized this UI Engine/UI repair and locked the screen rule: the application frame stays viewport-bound, only content scrolls, and a long rail menu scrolls inside its own region. This owner-directed slice supersedes the unrelated stale BQ Work Order for this change; no BQ domain work was added.
+- Reproduced Library's second document scrollbar: at 1280×720, the main content already had an internal scrollbar but the document measured 2312px high. Absolutely positioned `sr-only` resource labels had no local positioning context and extended root overflow past the clipped content. Scrolling beyond the content boundary then moved the entire rail and exposed the blank canvas.
+- Fixed the canonical `AppShell` once for all consumers: a viewport-height flex frame, bounded flex/grid ancestors, non-shrinking topbar, local positioning contexts, and internally scrolling content with contained overscroll. Narrow navigation remains a labeled horizontal row, with content scrolling beneath it instead of expanding the document. The desktop rail has its own bounded menu scroller; utility controls stay outside it. Added the binding screen-scroll contract to `UI_ENGINE.md` and a rendered-markup regression covering collapsed, expanded, and absent rails with long content, an accessible resource label, and 40 menu entries. The regression checks structural classes; actual overflow behavior was verified in the browser.
+- Browser diagnosis/verification used the running local kantor dev server. Library at 945×626 and 1200×844 stayed exactly viewport-high, with `window.scrollY = 0` after repeated content-boundary scrolls, and both collapsed and expanded rails stayed between the topbar and viewport bottom. At 390×844, all five nav labels occupied separate 34px items; horizontal menu scroll did not move the document, and the content bottom stayed at the viewport boundary. Brand modal Escape restored opener focus, and the mobile filter Drawer covered the viewport and restored focus to Filters. Projects, project overview, and a phase route had no document/main horizontal overflow on mobile; phase desktop and 840/841px boundary checks retained viewport containment. At 945×200, keyboard navigation scrolled the overflowing rail menu while its utility/toggle area remained visible and the document stayed still. Master Data Brands and BQ directories were smoke-tested at desktop/mobile, and `/account` was verified without a rail.
+- No app-specific layout patch, dependency, schema, migration, business behavior, or development-database fixture was introduced. Screen containment has print overrides; standalone document routes remain outside `AppShell`. Actual print rendering, mobile virtual-keyboard behavior, and non-Chromium browsers were not exercised and are not claimed PASS. Independent Reviewer acceptance remains pending.
+
+**Checks.** `npm run typecheck` passed; `npm run lint -- --quiet` passed after correcting the new test's React props style; `npm run check:boundaries` passed; `npm run check:legacy-runtime` passed; `npm test` passed (821/821, no skipped/cancelled tests); the final focused UI Engine suite passed (46/46); `npm run build` passed; `prisma migrate deploy` passed for verified kantor databases `studioflow_rebuild` and `studioflow_rebuild_test` in `studioflowrb-gateb-test-db` (82 migrations, none pending); staged and unstaged whitespace checks passed. No mandatory check was skipped. Build-generated changes to `next-env.d.ts` were restored and excluded from the slice. Local commit only; no push, PR, or deployment.
 
 ## R8.314 | 2026-10-02 | fix(ui-engine): stabilize narrow navigation and confirmation focus
 

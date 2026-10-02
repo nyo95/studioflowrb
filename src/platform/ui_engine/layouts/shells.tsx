@@ -82,19 +82,19 @@ export function AppShell({
 
   return (
     <RailContext.Provider value={{ collapsed: isCollapsed }}>
-      <div className={cx("min-h-dvh overflow-x-clip", className)} data-collapsed={isCollapsed || undefined}>
+      <div className={cx("relative flex h-dvh min-h-0 flex-col overflow-hidden print:h-auto print:overflow-visible", className)} data-collapsed={isCollapsed || undefined}>
         {/* One fixed line. Its height, width and content never depend on the rail
             state, so the mark is the compact one in both states — the rail owns
             no brand block of its own. */}
-        <header className="sticky top-0 z-20 flex h-(--ui-topbar-height) items-center gap-2.5 border-b border-line-subtle bg-surface/82 px-3.5 backdrop-blur-[12px] max-[840px]:px-3">
+        <header className="sticky top-0 z-20 flex h-(--ui-topbar-height) shrink-0 items-center gap-2.5 border-b border-line-subtle bg-surface/82 px-3.5 backdrop-blur-[12px] max-[840px]:px-3">
           <div className="flex shrink-0 items-center">{brand}</div>
           <div className="flex min-w-0 flex-1 items-center gap-2.5">{topbar}</div>
         </header>
         <div
           className={cx(
-            "grid min-h-[calc(100dvh-var(--ui-topbar-height))] overflow-x-clip transition-[grid-template-columns] duration-[var(--ui-motion-base)] motion-reduce:transition-none",
+            "grid min-h-0 min-w-0 flex-1 overflow-hidden transition-[grid-template-columns] duration-[var(--ui-motion-base)] motion-reduce:transition-none print:block print:overflow-visible",
             railVisible
-              ? "grid-cols-[var(--ui-rail-width)_minmax(0,1fr)] max-[840px]:grid-cols-1 max-[840px]:block"
+              ? "grid-cols-[var(--ui-rail-width)_minmax(0,1fr)] max-[840px]:flex max-[840px]:flex-col"
               : "grid-cols-1",
           )}
           /* The expanded width is set inline, not as a `[--ui-rail-width:…]`
@@ -115,16 +115,16 @@ export function AppShell({
               --ui-rail with the record workspace rail beside it. */}
           {railVisible ? <aside
             className={cx(
-              "group relative sticky top-(--ui-topbar-height) flex h-[calc(100dvh-var(--ui-topbar-height))] max-w-screen min-w-0 flex-col overflow-hidden border-r border-line-subtle",
+              "group relative flex h-full max-w-screen min-h-0 min-w-0 shrink-0 flex-col overflow-hidden border-r border-line-subtle print:h-auto print:overflow-visible",
               "bg-rail",
-              "max-[840px]:static max-[840px]:h-auto max-[840px]:border-b max-[840px]:border-r-0",
+              "max-[840px]:h-auto max-[840px]:border-b max-[840px]:border-r-0",
             )}
             aria-label={navigationLabel}
             data-collapsed={isCollapsed || undefined}
           >
             <nav
               className={cx(
-                "min-w-0 flex-1 overflow-auto px-[9px] pt-2 pb-2",
+                "min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain px-[9px] pt-2 pb-2 print:overflow-visible",
                 isCollapsed && "px-[5px]",
                 "max-[840px]:flex max-[840px]:flex-none max-[840px]:gap-1 max-[840px]:overflow-x-auto max-[840px]:p-2.5 max-[840px]:[scrollbar-width:none] max-[840px]:[&::-webkit-scrollbar]:hidden",
               )}
@@ -154,7 +154,9 @@ export function AppShell({
               </button>
             ) : null}
           </aside> : null}
-          <main className="flex h-[calc(100dvh-var(--ui-topbar-height))] min-h-0 min-w-0 flex-col overflow-auto max-[840px]:h-auto max-[840px]:overflow-visible">{children}</main>
+          {/* Relative positioning also contains absolute screen-reader labels:
+              without a local containing block they can extend root overflow. */}
+          <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-auto overscroll-contain print:overflow-visible">{children}</main>
         </div>
       </div>
     </RailContext.Provider>

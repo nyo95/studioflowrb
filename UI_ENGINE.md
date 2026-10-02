@@ -281,6 +281,20 @@ Feature-specific globals such as `--ui-brand-table-col-*`, `--ui-pricing-materia
 ### AppShell
 Owns global navigation frame, content viewport, and responsive shell behavior. Apps provide navigation configuration.
 
+**Screen scroll contract (owner decision, R8.315).** At every screen width,
+`AppShell` fills exactly the dynamic viewport height and clips overflow at the
+outer frame. The topbar and navigation rail must stay in that frame; the document
+must not acquire a second scrollbar. The content viewport scrolls internally,
+including below `840px`, where labeled horizontal navigation occupies its own
+non-shrinking row above it. A long desktop rail menu scrolls only inside the rail;
+utility controls remain outside that menu scroller. Both scroll regions contain
+overscroll so reaching an edge cannot move the outer page. The frame and content
+establish local positioning contexts: absolute content, including screen-reader
+labels, must contribute overflow only to its own region. Use flex/grid fill
+with `min-height: 0` through the bounded ancestors, never an app-owned root lock
+or an arbitrary content height. Printing releases the screen-only containment;
+standalone `DocumentSheet` flow is unchanged.
+
 The expanded rail is warm application chrome rather than a white content card.
 The sticky topbar is one fixed 46px line: its height, width and content never
 depend on the rail state, and it is the shell's only brand position — the rail
