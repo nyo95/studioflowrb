@@ -134,3 +134,11 @@ The correction makes the existing CD definition's stored `{ name: "CD Mall" }` v
 | ON_HOLD and permission normalization | `writableIteration`, project completion commands | PASS |
 
 No migration and no screens changed.
+
+## Lead verdict on phases 2-3 (R8.289)
+
+**PASS.** First review (R8.286-R8.287) returned CORRECTION REQUIRED for four proven defects; the Executor's correction (R8.288) fixed all of them. Verified by the Lead with new tests, not from the report: undo of add / answer / dismiss / delete now restores exactly the previous state (same ids, original sent date), undo expires after five minutes, CD Mall cannot be marked Done and continues to CD Final from the migrated data shape, open feedback becomes a to-do on Revision, card choices follow the same rule, and an ON_HOLD project refuses iteration commands.
+
+Lead re-check commands: `npm test` (759 pass), `npm run check`, `npm run lint`.
+
+Left open: transitional commands still bypass events until the new screens replace them; supervision visits, parallel auto-advance and card volume have no automated test yet.

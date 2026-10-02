@@ -5,8 +5,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.288**
-- Next local revision: **R8.289**
+- Current revision after this entry is committed: **R8.289**
+- Next local revision: **R8.290**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
@@ -43,6 +43,14 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Updated service integration fixtures and the Unit form's functional input normalization. The boundary checker names this single approved cross-app migration exception.
 
 **Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two pre-existing StudioFlow image warnings); `git diff --check`; migrations deployed to verified `studioflow_rebuild` and `studioflow_rebuild_test`. Production build intentionally not run per WO-MD-PROGRAM-01.
+
+## R8.289 | 2026-10-02 | test(studioflow): Lead review of WO-SF-ITER-01 phases 2-3 - PASS with regression tests
+
+- Verdict on R8.286-R8.288: PASS. The Lead re-ran the suite and probed the Executor's correction independently; every defect from the first review (CD iteration kinds read in the migrated `{ name }` shape, undo of add / answer / dismiss / delete, feedback carry-forward on Revision, CD choices on the project card, ON_HOLD and permission errors) is fixed in code.
+- The correction commit added no tests (one fixture line changed), so the Lead added six permanent regression tests: undo of an added iteration, undo of a client answer keeping the sent date plus the five-minute expiry, undo of a dismissed requirement and of a deleted unsent iteration, the CD Mall to CD Final chain on the migrated data shape (plain Done rejected on Mall, card choices, undo), feedback carried forward as a to-do with undo, and access plus ON_HOLD rules.
+- Known gaps left for the Lead's screen work: the transitional phase commands (`approveClient` and others) bypass the event log and CD rules until the new screens replace them; no automated test yet for supervision visits, parallel-phase auto-advance, or `listProjectCards` at volume.
+
+**Checks.** `npm test` (759 pass, 0 fail); `npm run check`; `npm run lint` (0 errors; two existing image warnings).
 
 ## R8.285 | 2026-10-02 | feat(studioflow): phases track client-sent iterations (WO-SF-ITER-01 phase 1)
 

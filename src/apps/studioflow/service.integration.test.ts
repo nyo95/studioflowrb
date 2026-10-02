@@ -2180,3 +2180,93 @@ describe("Sample-request notifications (StudioFlow side, real database)", () => 
     assert.equal(await testDb.prisma.notification.count(), 1, "the refused duplicate wrote no second notification");
   });
 });
+
+describe("WO-SF-ITER-01 review regressions (undo, CD chain, carry-forward, access)", () => {
+  const latestEvent = (projectId: string) => testDb.prisma.sfPhaseEvent.findFirstOrThrow({ where: { project_id: projectId }, orderBy: { occurred_at: "desc" } });
+  const undo = async (projectId: string) => sf.phases.undoPhaseEvent({ ...as(designer), projectId, eventId: (await latestEvent(projectId)).id });
+
+  it("undoes an added iteration and returns the phase to not started", async () => {
+    const { projectId } = await newProject("Undo add");
+    const layout = await phaseOf(projectId, "layout");
+    await sf.phases.addIteration({ ...as(designer), projectId, phaseId: layout.id });
+    await undo(projectId);
+    assert.equal(await testDb.prisma.sfRevision.count({ where: { phase_id: layout.id } }), 0);
+    assert.equal((await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: layout.id } })).status, "PENDING");
+  });
+
+  it("undoing a client answer keeps the original sent date, and undo expires after five minutes", async () => {
+    const { projectId } = await newProject("Undo answer");
+    const mb = await phaseOf(projectId, "moodboard");
+    const first = await testDb.prisma.sfRevision.findFirstOrThrow({ where: { phase_id: mb.id } });
+    clock = new Date("2026-09-10T03:00:00Z");
+    await sf.phases.sendIteration({ ...as(designer), projectId, phaseId: mb.id, iterationId: first.id });
+    clock = new Date("2026-09-10T03:02:00Z");
+    await sf.phases.recordClientAnswer({ ...as(designer), projectId, phaseId: mb.id, iterationId: first.id });
+    await undo(projectId);
+    const after = await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: first.id } });
+    assert.equal(after.status, "SENT");
+    assert.equal(after.sent_at?.toISOString(), "2026-09-10T03:00:00.000Z");
+    clock = new Date("2026-09-10T03:20:00Z");
+    await rejectsWith(undo(projectId), "UNDO_EXPIRED");
+  });
+
+  it("undoes a dismissed requirement and a deleted never-sent iteration, restoring the same rows", async () => {
+    await sf.tasks.createTemplate({ ...as(designer), definitionId: LEGACY.moodboard, label: "Undo requirement" });
+    const { projectId } = await newProject("Undo dismiss");
+    const mb = await phaseOf(projectId, "moodboard");
+    const [requirement] = await sf.tasks.listChecklist({ grants: ALL, projectId, phaseId: mb.id });
+    await sf.phases.dismissRequirement({ ...as(designer), projectId, phaseId: mb.id, itemId: requirement.id });
+    await undo(projectId);
+    assert.equal((await testDb.prisma.sfChecklistItem.findUniqueOrThrow({ where: { id: requirement.id } })).dismissed_at, null);
+    const layout = await phaseOf(projectId, "layout");
+    const added = await sf.phases.addIteration({ ...as(designer), projectId, phaseId: layout.id });
+    await sf.phases.deleteNeverSentIteration({ ...as(designer), projectId, phaseId: layout.id, iterationId: added.iterationId });
+    await undo(projectId);
+    assert.equal(await testDb.prisma.sfRevision.count({ where: { id: added.iterationId } }), 1);
+  });
+
+  it("chains CD Mall to CD Final using the migrated data shape and undoes the continuation", async () => {
+    const { projectId } = await newProject("CD chain");
+    const cd = await phaseOf(projectId, "cd");
+    await testDb.prisma.sfPhaseDefinition.update({ where: { id: LEGACY.cd }, data: { default_iteration_kinds: [{ name: "CD Mall" }, { name: "CD Final" }] } });
+    const mall = await sf.phases.addIteration({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id });
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: mall.iterationId } })).name, "CD Mall");
+    const base = { ...as(designer), projectId, phaseId: cd.id, iterationId: mall.iterationId };
+    await sf.phases.sendIteration(base);
+    await sf.phases.recordClientAnswer(base);
+    await rejectsWith(sf.phases.chooseIterationOutcome({ ...base, outcome: "DONE" }), "PHASE_INVALID_STATE");
+    const cards = await sf.projects.listProjectCards({ grants: ALL, filter: "all" });
+    assert.deepEqual(cards.find((c) => c.id === projectId)!.phases.find((p) => p.id === cd.id)!.current_iteration!.available_choices, ["revision", "continue_cd_final"]);
+    const next = await sf.phases.chooseIterationOutcome({ ...base, outcome: "CONTINUE_CD_FINAL" }) as { nextIterationId: string };
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: next.nextIterationId } })).name, "CD Final");
+    await undo(projectId);
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: mall.iterationId } })).status, "ANSWERED");
+    assert.equal(await testDb.prisma.sfRevision.count({ where: { id: next.nextIterationId } }), 0);
+  });
+
+  it("carries open client feedback forward as a to-do on Revision, and undo removes it again", async () => {
+    const { projectId } = await newProject("Carry forward");
+    const mb = await phaseOf(projectId, "moodboard");
+    const first = await testDb.prisma.sfRevision.findFirstOrThrow({ where: { phase_id: mb.id } });
+    const base = { ...as(designer), projectId, phaseId: mb.id, iterationId: first.id };
+    await sf.phases.addActivity({ ...as(designer), projectId, phaseId: mb.id, content: "Warmer palette", mode: "FEEDBACK" });
+    await sf.phases.sendIteration(base);
+    await sf.phases.recordClientAnswer(base);
+    await sf.phases.chooseIterationOutcome({ ...base, outcome: "REVISION" });
+    assert.equal(await testDb.prisma.sfChecklistItem.count({ where: { phase_id: mb.id, label: "Warmer palette", is_checked: false } }), 1);
+    await undo(projectId);
+    assert.equal(await testDb.prisma.sfChecklistItem.count({ where: { phase_id: mb.id, label: "Warmer palette" } }), 0);
+  });
+
+  it("limits iteration commands to the seat owner, completion to a PIC, and refuses writes on a project on hold", async () => {
+    const { projectId } = await newProject("Access");
+    const grants = ALL.filter((grant) => grant !== P.projectOverride);
+    const outsider = await seedUser("Not a PIC", grants);
+    const mb = await phaseOf(projectId, "moodboard");
+    const first = await testDb.prisma.sfRevision.findFirstOrThrow({ where: { phase_id: mb.id } });
+    await rejectsWith(sf.phases.markProjectCompleted({ ...as(outsider, grants), projectId }), "PERMISSION_DENIED");
+    await rejectsWith(sf.phases.sendIteration({ ...as(outsider, grants), projectId, phaseId: mb.id, iterationId: first.id }), "PERMISSION_DENIED");
+    await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ON_HOLD" });
+    await rejectsWith(sf.phases.sendIteration({ ...as(designer), projectId, phaseId: mb.id, iterationId: first.id }), "PROJECT_NOT_ACTIVE");
+  });
+});
