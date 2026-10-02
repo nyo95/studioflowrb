@@ -5,13 +5,22 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.308**
-- Next local revision: **R8.309**
+- Current revision after this entry is committed: **R8.309**
+- Next local revision: **R8.310**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.309 | 2026-10-02 | fix(studioflow): harden and cache Library website reads
+
+- **Security.** The Library website reader accepted loopback/private hosts that the old text check missed (`[::1]`, `127.0.0.2`, `0.0.0.0`, `fd00::/8`, `100.64/10`, `metadata.google.internal`, IPv4-mapped IPv6). New `safe-fetch.ts` screens the URL text and every DNS answer, follows redirects manually (max 3) and checks each hop *before* requesting it, rejects credentials in URLs, and reads the body as a capped stream instead of downloading it whole. Residual risk, documented in code: the connection re-resolves DNS, so DNS rebinding is not fully closed.
+- **Load.** The image and catalogue readers fetched the same website twice per Brand on every page view. New `website-snapshot.ts` does one fetch per Brand website, caches successes for 24 h and failures for 15 min (in-process, 500 entries), de-duplicates in-flight reads, and limits concurrent fetches to 5. `service.ts` uses it; the Library stays read-only and no Master Data contract changed.
+- Removed the now-unused `discoverBrandImageUrl` and `discoverBrandWebsiteCatalogue`; `isSafeWebUrl` is still exported from `brand-image.ts`.
+- New `safe-fetch.test.ts` (6 tests) covers unsafe hosts, private DNS answers, unsafe redirect hops, redirect cap, body cap, and non-HTML. It caught an IPv4-mapped IPv6 bypass that is fixed here.
+
+**Checks.** Library tests (11 pass); `tsc --noEmit`; `eslint src/apps/studioflow --quiet`; `npm run check:boundaries` passed. Full `npm test` (needs the test database) and browser acceptance of `/studioflow/library` were not run; the cache is per server process, so a serverless deployment gets less benefit.
 
 ## R8.308 | 2026-10-02 | fix(ui-engine): mobile nav items ignore the collapsed desktop width
 
