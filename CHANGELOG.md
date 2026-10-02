@@ -5,13 +5,21 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.300**
-- Next local revision: **R8.301**
+- Current revision after this entry is committed: **R8.301**
+- Next local revision: **R8.302**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
 - Ledger gap: R8.163 (`ee9e09e`) was backfilled by the remote R8.164 work; the local note that it
   was not backfilled is superseded.
+
+## R8.301 | 2026-10-02 | feat(studioflow): semantic reader hints for Library tags
+
+- StudioFlow Library search now expands known read-only semantic terms, such as `chair` and `kursi`, and includes related options such as `bench`, `stool`, and `armchair`.
+- Brand cards show these related terms as temporary discovery hints when the source Brand hashtag matches. Original Master Data tags remain unchanged; no write path, schema change, AI SDK, or cross-app dependency was added.
+- The utility is Library-local and intentionally treats related terms as discovery aids rather than silently declaring them exact synonyms.
+
+**Checks.** `semantic-terms.test.ts` (3 pass); `npm run typecheck`; `npm run lint -- --quiet`; `git diff --check` passed.
 
 ## R8.300 | 2026-10-02 | feat(studioflow): catalogue structure for Library cards
 

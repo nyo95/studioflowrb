@@ -14,6 +14,7 @@ import {
   Text,
   initialsOf,
 } from "@/platform/ui_engine";
+import { expandLibrarySearchTerms, relatedLibraryTerms } from "@/apps/studioflow/library/semantic-terms";
 
 type LibraryBrand = {
   id: string;
@@ -69,6 +70,8 @@ function FilterSection({
 }
 
 function BrandCard({ brand }: { brand: LibraryBrand }) {
+  const semanticHints = [...new Set(brand.hashtags.flatMap((hashtag) => relatedLibraryTerms(hashtag.label)))];
+
   return (
     <Surface as="article" className="overflow-hidden">
       <div className="relative aspect-[4/3] overflow-hidden bg-surface-muted">
@@ -94,6 +97,14 @@ function BrandCard({ brand }: { brand: LibraryBrand }) {
             {brand.hashtags.map((hashtag) => <Badge key={hashtag.id}>#{hashtag.label}</Badge>)}
           </div>
         ) : null}
+        {semanticHints.length > 0 ? (
+          <div className="grid gap-1">
+            <Text tone="secondary" size="sm">Related terms</Text>
+            <div className="flex flex-wrap gap-1.5">
+              {semanticHints.map((term) => <Badge key={term}>{term}</Badge>)}
+            </div>
+          </div>
+        ) : null}
         {brand.links.length > 0 ? (
           <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-line-subtle pt-3">
             {brand.links.map((link) => (
@@ -116,6 +127,7 @@ export function LibraryDirectory({ brands }: { brands: LibraryBrand[] }) {
   const [vendorIds, setVendorIds] = useState<Set<string>>(new Set());
   const [hashtags, setHashtags] = useState<Set<string>>(new Set());
   const q = query.trim().toLowerCase();
+  const searchTerms = useMemo(() => expandLibrarySearchTerms(q), [q]);
 
   const filterOptions = useMemo(() => ({
     categories: [...new Map(brands.flatMap((brand) => brand.categories.map((category) => [category.id, { id: category.id, label: category.name }] as const))).values()].sort((a, b) => a.label.localeCompare(b.label)),
@@ -125,11 +137,13 @@ export function LibraryDirectory({ brands }: { brands: LibraryBrand[] }) {
 
   const rows = useMemo(() => {
     const filtered = brands.filter((brand) => {
-      const matchesQuery = q === ""
-        || brand.name.toLowerCase().includes(q)
-        || brand.categories.some((category) => category.name.toLowerCase().includes(q))
-        || brand.hashtags.some((hashtag) => hashtag.label.toLowerCase().includes(q))
-        || (brand.ownerVendor?.name.toLowerCase().includes(q) ?? false);
+      const searchableValues = [
+        brand.name,
+        ...brand.categories.map((category) => category.name),
+        ...brand.hashtags.map((hashtag) => hashtag.label),
+        ...(brand.ownerVendor ? [brand.ownerVendor.name] : []),
+      ].map((value) => value.toLowerCase());
+      const matchesQuery = searchTerms.length === 0 || searchTerms.some((term) => searchableValues.some((value) => value.includes(term)));
       const matchesCategory = categoryIds.size === 0 || brand.categories.some((category) => categoryIds.has(category.id));
       const matchesVendor = vendorIds.size === 0 || (brand.ownerVendor ? vendorIds.has(brand.ownerVendor.id) : false);
       const matchesHashtag = hashtags.size === 0 || brand.hashtags.some((hashtag) => hashtags.has(hashtag.normalized));
