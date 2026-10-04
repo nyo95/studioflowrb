@@ -1,13 +1,14 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
-import { useState, type ClipboardEvent, type FormEvent } from "react";
+import { useState, type ClipboardEvent, type FormEvent, type ReactNode } from "react";
 
-import { Button, CreatableMultiSelect, CreatableSearch, Dialog, Field, FormActions, IconButton, InlineError, Input, Select, Text } from "@/platform/ui_engine";
+import { Button, ConfirmDialog, CreatableMultiSelect, CreatableSearch, Dialog, Field, FormActions, IconButton, InlineError, Input, Select, Text } from "@/platform/ui_engine";
 import { formatDecimal } from "@platform/utilities/decimal";
 
-import { blurDisplay, entryDisplay, parseAmountEntry, parsePastedAmount } from "./amount-format";
+import { blurDisplay, parsePastedAmount, readTypedAmount } from "./amount-format";
 import { saveWorkPriceMatrixAction } from "./actions";
+import type { PriceEntry } from "./price-entry-modes";
 
 type Ref = { id: string; name: string };
 type Cell = { display: string; value: string };
@@ -21,12 +22,14 @@ function emptyRow(key: number, unitId: string): MatrixRow {
 }
 
 /**
- * Compare-suppliers entry: one category, several suppliers, one row per item with an amount per supplier.
+ * Multi-supplier price entry (the "Several suppliers" mode of New price; formerly labelled "Compare suppliers",
+ * which it never was — it creates prices, it does not compare stored ones): one category, several suppliers,
+ * one row per item with an amount per supplier, saved all together or not at all.
  * Blank cells mean "this supplier has no price for the item". A block copied from Excel can be pasted straight in:
  * columns are Name, Specification (goes to notes), then one amount per chosen supplier in the order shown.
  */
-export function PriceMatrixDialog({ vendors, categories, units, onClose }: { vendors: Ref[]; categories: Ref[]; units: Array<Ref & { code: string }>; onClose: () => void }) {
-  const [kind, setKind] = useState<"labor" | "material-labor">("labor");
+export function PriceMatrixDialog({ kind, modes, onSwitch, vendors, categories, units, onClose }: { kind: "labor" | "material-labor"; modes: (onChange: (next: PriceEntry) => void) => ReactNode; onSwitch: (next: PriceEntry) => void; vendors: Ref[]; categories: Ref[]; units: Array<Ref & { code: string }>; onClose: () => void }) {
+  const [pendingSwitch, setPendingSwitch] = useState<PriceEntry | null>(null);
   const [categoryId, setCategoryId] = useState("");
   const [vendorIds, setVendorIds] = useState<string[]>([]);
   const [keyCounter, setKeyCounter] = useState(1);
@@ -44,6 +47,7 @@ export function PriceMatrixDialog({ vendors, categories, units, onClose }: { ven
   const removeRow = (key: number) => setRows((current) => current.length === 1 ? [emptyRow(keyCounter, current[0]?.unitId ?? defaultUnit)] : current.filter((row) => row.key !== key));
   const isFilled = (row: MatrixRow) => row.name.trim() !== "" || chosen.some((vendor) => (row.cells[vendor.id]?.value ?? "") !== "");
   const filled = rows.filter(isFilled);
+  const requestSwitch = (next: PriceEntry) => { if (filled.length > 0 || vendorIds.length > 0 || categoryId) setPendingSwitch(next); else onSwitch(next); };
   const priceCount = filled.reduce((total, row) => total + chosen.filter((vendor) => (row.cells[vendor.id]?.value ?? "") !== "").length, 0);
 
   const onPaste = (event: ClipboardEvent<HTMLDivElement>) => {
@@ -114,15 +118,10 @@ export function PriceMatrixDialog({ vendors, categories, units, onClose }: { ven
   const columns = `minmax(10rem,2fr) 6rem ${chosen.map(() => "minmax(7.5rem,1fr)").join(" ")} minmax(8rem,1.4fr) 2rem`;
 
   return (
-    <Dialog open size="full" dismissible={!pending} onOpenChange={(open) => { if (!open && !pending) onClose(); }} title="Compare suppliers" description="Enter one item per row and one amount per supplier. Leave a cell blank when that supplier has no price.">
+    <Dialog open size="full" dismissible={!pending} onOpenChange={(open) => { if (!open && !pending) onClose(); }} title="New price" description="Several suppliers: one item per row and one amount per supplier. Leave a cell blank when that supplier has no price.">
       <form className="grid gap-4" onSubmit={submit}>
-        <div className="grid gap-3 sm:grid-cols-[12rem_minmax(0,1fr)_minmax(0,2fr)]">
-          <Field label="Price type" required>
-            <Select value={kind} onChange={(event) => setKind(event.target.value === "material-labor" ? "material-labor" : "labor")}>
-              <option value="labor">Labor only</option>
-              <option value="material-labor">Material + labor</option>
-            </Select>
-          </Field>
+        {modes(requestSwitch)}
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
           <Field label="Pricing category" required>
             <CreatableSearch label="Pricing category" options={categories.map((category) => ({ id: category.id, label: category.name }))} value={categoryId} onValueChange={setCategoryId} placeholder="Search or select category" searchPlaceholder="Search pricing categories…" emptyLabel="No pricing category matches this search." className="w-full" />
           </Field>
@@ -151,7 +150,7 @@ export function PriceMatrixDialog({ vendors, categories, units, onClose }: { ven
                     </Select>
                     {chosen.map((vendor, column) => (
                       <Input key={vendor.id} aria-label={`${vendor.name}, row ${index + 1}`} density="compact" inputMode="text" placeholder="–" className="tabular-nums" value={row.cells[vendor.id]?.display ?? ""}
-                        onChange={(event) => { const parsed = parseAmountEntry(event.target.value); if (parsed === null) return; patchCell(row.key, vendor.id, { value: parsed, display: entryDisplay(parsed, event.target.value) }); }}
+                        onChange={(event) => { const read = readTypedAmount(event.target.value); if (read === null) return; patchCell(row.key, vendor.id, { value: read.value, display: read.display }); }}
                         onBlur={() => { const cell = row.cells[vendor.id]; if (cell) patchCell(row.key, vendor.id, { value: cell.value, display: blurDisplay(cell.value) }); }}
                         onKeyDown={(event) => { if (event.key === "Enter" && index === rows.length - 1 && column === chosen.length - 1) { event.preventDefault(); addRow(); } }} />
                     ))}
@@ -172,6 +171,15 @@ export function PriceMatrixDialog({ vendors, categories, units, onClose }: { ven
           <Button type="submit" variant="primary" pending={pending}>{priceCount > 0 ? `Create ${priceCount} ${priceCount === 1 ? "price" : "prices"}` : "Create prices"}</Button>
         </FormActions>
       </form>
+      <ConfirmDialog
+        open={pendingSwitch !== null}
+        onOpenChange={(open) => { if (!open) setPendingSwitch(null); }}
+        title="Discard this price draft?"
+        description="The suppliers and amounts entered here have not been saved."
+        confirmLabel="Discard"
+        tone="danger"
+        onConfirm={() => { const next = pendingSwitch; setPendingSwitch(null); if (next) onSwitch(next); }}
+      />
     </Dialog>
   );
 }

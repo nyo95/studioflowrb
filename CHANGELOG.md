@@ -2,6 +2,17 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.323 | 2026-10-04 | feat(masterdata): one New price entry with type and supplier modes, one amount reader
+
+- Owner question "kok di master data ada compare" and owner decision (2026-10-04): one New price entry instead of a four-item menu, English UI copy. "Compare suppliers" (R8.277) was never a comparison of stored prices: it is a multi-supplier entry grid backed by the all-or-nothing `createWorkPriceMatrix`. Backend unchanged.
+- **One "New price" button** opens one dialog for every new price; its type follows the tab being viewed (Material, Material + labor, Labor), falling back to a type the person may manage. Inside the dialog, `PriceEntryModes` switches the type and — for work prices — **One supplier / Several suppliers** with the same chip pattern as Product Schedule's Add item. Several suppliers is the former Compare grid; Material keeps its per-row supplier table and "Create a new SKU with its first price". Switching with unsaved input asks before discarding (the editor's draft guard; a confirm in the grid). Create titles read "New price"; edit titles are unchanged. The grid's own "Price type" select is gone (the chips own it).
+- **One amount reader.** `readTypedAmount` replaces `parseAmountEntry` for every typed amount box (single price, work rows, material rows, grid cells) and reads a value the way `parsePastedAmount` reads a pasted cell: quoted text passes through, "By Request"/TBC/TBA/Nego mean a price on request ("0"), "Rp 15.000" is a number. Before, letters were dropped as they were typed, so "By Request" could not be typed at all and typed/pasted input disagreed (external audit). Typed plain numbers stay Indonesian (comma decimal); the comma-thousands spreadsheet form remains a paste rule.
+- Browser acceptance backlog entry R8.277 updated to the new path.
+
+**Browser evidence** (Chromium, `next dev` on the disposable rebuild-only dev database with a bootstrapped owner): Pricing shows one "New price" button; it opens "New price" on Material (SKU/supplier table with type chips); Labor shows One supplier / Several suppliers; Several suppliers opens the category + supplier grid. Saving prices through the grid was not exercised in the browser (no suppliers in the fixture); its server path is unchanged.
+
+**Checks.** `npm run typecheck`, eslint (Master Data pricing), `amount-format` suite (9/9, including typed = pasted for every pasted form) passed.
+
 ## R8.322 | 2026-10-04 | fix(ui-engine): match the narrow-navigation query to its CSS and keep the showcase rail contained
 
 - Owner report ("UI Engine di Foundation sidebar-nya bisa bocor"), reproduced in the browser on `/ui-engine`. Two causes, both fixed:
@@ -57,8 +68,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.322**
-- Next local revision: **R8.323**
+- Current revision after this entry is committed: **R8.323**
+- Next local revision: **R8.324**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

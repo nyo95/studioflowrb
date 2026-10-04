@@ -8,15 +8,16 @@ import { getPaginationSlice } from "@platform/utilities/pagination";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { DirectoryShell,RowActionMenu,RowActionsCell,RowActionsHead } from "@/platform/ui_engine";
 
-import { Badge,Button,ButtonMenu,Checkbox,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,Text,Tooltip,useFormDraftGuard,useOptionOverlay,type SortDirection } from "@/platform/ui_engine";
+import { Badge,Button,Checkbox,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,Text,Tooltip,useFormDraftGuard,useOptionOverlay,type SortDirection } from "@/platform/ui_engine";
 import { VendorQuickCreateDialog } from "../vendor-quick-create-dialog";
-import { blurDisplay, entryDisplay, parseAmountEntry, storedAmountText } from "./amount-format";
+import { blurDisplay, readTypedAmount, storedAmountText } from "./amount-format";
 import { PriceMatrixDialog } from "./price-matrix-dialog";
+import { PriceEntryModes, type PriceEntry } from "./price-entry-modes";
 import { compareDecimals,formatDecimal,type DecimalString } from "@platform/utilities/decimal";
 import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurement";
 import { createMoney,formatMoney } from "@platform/utilities/money";
 import { CircleHelp, Plus, Trash2 } from "lucide-react";
-import { useEffect,useRef,useState,useTransition,type FormEvent } from "react";
+import { useEffect,useRef,useState,useTransition,type FormEvent,type ReactNode } from "react";
 import { archivePriceAction,createMaterialSkuAction,linkBrandToSupplierAction,saveBulkWorkPricesAction,saveMaterialPriceRowsAction,createPricingBrandQuickAction,createPricingProductCategoryQuickAction,createPricingVendorQuickAction,createPricingWorkCategoryQuickAction,requestPriceDeletionAction,restorePriceAction,savePriceAction } from "./actions";
 
 type Kind = "material" | "material-labor" | "labor";
@@ -37,7 +38,8 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
   const displayPrice = (amount: string, currency: string, label?: string | null) => label
     ? <span className="italic text-ink-secondary" title="Text price">{label}</span>
     : isPriceOnRequest(amount) ? <span className="italic text-ink-secondary">By request</span> : formatMoney(createMoney(amount, currency), { locale });
-  const [query, setQuery] = useState(""); const [status, setStatus] = useState<DirectoryStatus>("ACTIVE"); const [supplierFilter, setSupplierFilter] = useState("ALL"); const [brandFilter, setBrandFilter] = useState("ALL"); const [workCategoryFilter, setWorkCategoryFilter] = useState("ALL"); const [productCategoryFilter, setProductCategoryFilter] = useState("ALL"); const [groupByItem, setGroupByItem] = useState(false); const [page, setPage] = useState(1); const [sort, setSort] = useState<{ key: PriceSortKey; direction: SortDirection }>({ key: "name", direction: "asc" }); const [matrixOpen, setMatrixOpen] = useState(false);
+  const [query, setQuery] = useState(""); const [status, setStatus] = useState<DirectoryStatus>("ACTIVE"); const [supplierFilter, setSupplierFilter] = useState("ALL"); const [brandFilter, setBrandFilter] = useState("ALL"); const [workCategoryFilter, setWorkCategoryFilter] = useState("ALL"); const [productCategoryFilter, setProductCategoryFilter] = useState("ALL"); const [groupByItem, setGroupByItem] = useState(false); const [page, setPage] = useState(1); const [sort, setSort] = useState<{ key: PriceSortKey; direction: SortDirection }>({ key: "name", direction: "asc" }); const [matrixKind, setMatrixKind] = useState<"labor" | "material-labor" | null>(null);
+  const [tab, setTab] = useState<Kind>(props.canReadMaterial ? "material" : "material-labor");
   const [editor, setEditor] = useState<Editor | null>(null); const [formError, setFormError] = useState<string | null>(null);
   const [archive, setArchive] = useState<Target | null>(null); const [restore, setRestore] = useState<Target | null>(null); const [deletion, setDeletion] = useState<Target | null>(null); const [reason, setReason] = useState(""); const [rowError, setRowError] = useState<string | null>(null);
   const [savePending, setSavePending] = useState(false);
@@ -59,6 +61,15 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
     });
   };
   const closeEditor = () => { setEditor(null); setFormError(null); };
+  /** One entry for every new price: the type and supplier mode are switched inside the form (owner, 2026-10-04). */
+  const openEntry = (next: PriceEntry) => {
+    setFormError(null);
+    if (next.multiSupplier && next.kind !== "material") { setEditor(null); setMatrixKind(next.kind); return; }
+    setMatrixKind(null); setEditor({ kind: next.kind });
+  };
+  const canManageKind = (kind: Kind) => kind === "material" ? props.canManageMaterial : props.canManageWork;
+  const newPriceKind: Kind = canManageKind(tab) ? tab : props.canManageMaterial ? "material" : "material-labor";
+  const entryModes = (entry: PriceEntry, onChange: (next: PriceEntry) => void) => <PriceEntryModes entry={entry} canManageMaterial={props.canManageMaterial} canManageWork={props.canManageWork} onChange={onChange} />;
   type SortBy<T> = { name: (row: T) => string; vendor: (row: T) => string; category: (row: T) => string; brand: (row: T) => string };
   const sortRows = <T extends MaterialRow | WorkRow>(rows: T[], by: SortBy<T>) => [...rows].sort((left, right) => {
     const compared = sort.key === "amount" ? compareAmounts(left.amount, right.amount)
@@ -195,21 +206,15 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
   };
   return <div className="flex min-h-0 flex-1 flex-col gap-4">
     {rowError ? <InlineError>{rowError}</InlineError> : null}
-    {matrixOpen && <PriceMatrixDialog vendors={props.workVendors} categories={props.workCategories} units={props.units} onClose={() => setMatrixOpen(false)} />}
-    {editor && <PriceEditor pending={savePending} editor={editor} refs={{ ...props, vendors: editor.kind === "material" ? props.materialVendors : props.workVendors }} error={formError} onCancel={closeEditor} onSubmit={async (event) => { event.preventDefault(); if (savePending) return; setSavePending(true); setFormError(null); const formData = new FormData(event.currentTarget); try { const result = editor.kind === "material" && !editor.row && formData.get("materialEntryMode") === "new" ? await createMaterialSkuAction(formData) : await savePriceAction(editor.kind, formData); if (result.ok) closeEditor(); else if (result.ok === false) setFormError(result.error.safeMessage); } catch { setFormError("The price could not be saved. Please try again."); } finally { setSavePending(false); } }} />}
+    {matrixKind && <PriceMatrixDialog key={matrixKind} kind={matrixKind} modes={(onChange) => entryModes({ kind: matrixKind, multiSupplier: true }, onChange)} onSwitch={openEntry} vendors={props.workVendors} categories={props.workCategories} units={props.units} onClose={() => setMatrixKind(null)} />}
+    {editor && <PriceEditor key={`${editor.kind}-${editor.row?.id ?? "new"}`} modes={editor.row ? undefined : (onChange) => entryModes({ kind: editor.kind, multiSupplier: false }, onChange)} onSwitch={openEntry} pending={savePending} editor={editor} refs={{ ...props, vendors: editor.kind === "material" ? props.materialVendors : props.workVendors }} error={formError} onCancel={closeEditor} onSubmit={async (event) => { event.preventDefault(); if (savePending) return; setSavePending(true); setFormError(null); const formData = new FormData(event.currentTarget); try { const result = editor.kind === "material" && !editor.row && formData.get("materialEntryMode") === "new" ? await createMaterialSkuAction(formData) : await savePriceAction(editor.kind, formData); if (result.ok) closeEditor(); else if (result.ok === false) setFormError(result.error.safeMessage); } catch { setFormError("The price could not be saved. Please try again."); } finally { setSavePending(false); } }} />}
     <Tabs
       fill
+      value={tab}
+      onValueChange={(value) => setTab(value as Kind)}
       distribution="equal"
       actions={(props.canManageMaterial || props.canManageWork) ? (
-        <ButtonMenu
-          label="New price"
-          items={[
-            ...(props.canManageMaterial ? [{ label: "Material price", description: "SKU supplier pricing", onSelect: () => setEditor({ kind: "material" as const }) }] : []),
-            ...(props.canManageWork ? [{ label: "Material + labor price", description: "Combined unit price", onSelect: () => setEditor({ kind: "material-labor" as const }) }] : []),
-            ...(props.canManageWork ? [{ label: "Labor price", description: "Labor-only unit price", onSelect: () => setEditor({ kind: "labor" as const }) }] : []),
-            ...(props.canManageWork ? [{ label: "Compare suppliers", description: "One grid: items by supplier", onSelect: () => setMatrixOpen(true) }] : []),
-          ]}
-        />
+        <Button variant="primary" leadingIcon={<Plus aria-hidden="true" />} onClick={() => openEntry({ kind: newPriceKind, multiSupplier: false })}>New price</Button>
       ) : undefined}
       items={[
       { value: "material", label: tabCountLabel("Material Prices", material.length), disabled: !props.canReadMaterial, content: materialTab },
@@ -264,7 +269,7 @@ function SkuMeasurementSummary({ sku }: { sku: SkuRef }) {
   );
 }
 
-function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pending: boolean; editor: Editor; refs: PriceEditorRefs; error: string | null; onCancel: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
+function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, onSwitch }: { pending: boolean; editor: Editor; refs: PriceEditorRefs; error: string | null; onCancel: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>; modes?: (onChange: (next: PriceEntry) => void) => ReactNode; onSwitch: (next: PriceEntry) => void }) {
   const edit = Boolean(editor.row);
   const material = editor.kind === "material";
   const row = editor.row;
@@ -531,10 +536,10 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
   );
 
   const updateAmount = (display: string) => {
-    const parsed = parseAmountEntry(display);
-    if (parsed === null) return;
-    setAmount(parsed);
-    setAmountDisplay(entryDisplay(parsed, display));
+    const read = readTypedAmount(display);
+    if (read === null) return;
+    setAmount(read.value);
+    setAmountDisplay(read.display);
   };
 
   // Creating work prices happens as a table: one supplier and category, many rows, saved all together or not at all.
@@ -683,7 +688,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
               {refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code}</option>)}
             </Select>
             <Input aria-label={`Amount, row ${index + 1}`} density="compact" inputMode="text" placeholder={`15.000 · 0 = by request · "text"`} className="tabular-nums" value={entry.amountDisplay}
-              onChange={(event) => { const parsed = parseAmountEntry(event.target.value); if (parsed === null) return; patchRow(entry.key, { amount: parsed, amountDisplay: entryDisplay(parsed, event.target.value) }); }}
+              onChange={(event) => { const read = readTypedAmount(event.target.value); if (read === null) return; patchRow(entry.key, { amount: read.value, amountDisplay: read.display }); }}
               onBlur={() => patchRow(entry.key, { amountDisplay: blurDisplay(entry.amount) })}
               onKeyDown={(event) => { if (event.key === "Enter" && index === rows.length - 1) { event.preventDefault(); addRow(); } }}
               invalid={Boolean(rowProblems[entry.key])} />
@@ -752,7 +757,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
                 />
                 <div className="flex min-h-(--ui-control-height-sm) items-center px-1 font-ui-mono text-sm text-ink-secondary">{sku ? (sku.purchase_unit ?? sku.base_unit)?.code ?? "–" : "–"}</div>
                 <Input aria-label={`Amount, row ${index + 1}`} density="compact" inputMode="text" placeholder={`15.000 or "text"`} className="tabular-nums" value={entry.amountDisplay}
-                  onChange={(event) => { const parsed = parseAmountEntry(event.target.value); if (parsed === null) return; patchMRow(entry.key, { amount: parsed, amountDisplay: entryDisplay(parsed, event.target.value) }); }}
+                  onChange={(event) => { const read = readTypedAmount(event.target.value); if (read === null) return; patchMRow(entry.key, { amount: read.value, amountDisplay: read.display }); }}
                   onBlur={() => patchMRow(entry.key, { amountDisplay: blurDisplay(entry.amount) })}
                   onKeyDown={(event) => { if (event.key === "Enter" && index === mRows.length - 1) { event.preventDefault(); addMRow(); } }}
                   invalid={Boolean(rowProblems[entry.key])} />
@@ -792,7 +797,8 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit }: { pen
   });
 
   return <>
-    <Dialog open size={anyBulk ? "xl" : "md"} dismissible={!pending && !bulkPending} onOpenChange={(open) => !open && !pending && void draftGuard.requestDiscard(onCancel)} title={`${edit ? "Edit" : "Create"} ${newMaterialSku ? "SKU + material price" : anyBulk ? `${priceLabel}s` : priceLabel}`} description={material && edit ? "SKU and supplier identity are read-only." : "Choose only active and eligible catalog references."}><form ref={formRef} onChange={draftGuard.onFormChange} className="grid gap-4" onSubmit={anyBulk ? submitBulk : onSubmit}>
+    <Dialog open size={anyBulk ? "xl" : "md"} dismissible={!pending && !bulkPending} onOpenChange={(open) => !open && !pending && void draftGuard.requestDiscard(onCancel)} title={edit ? `Edit ${priceLabel}` : newMaterialSku ? "New SKU + material price" : "New price"} description={material && edit ? "SKU and supplier identity are read-only." : edit ? "Choose only active and eligible catalog references." : material ? "One row per SKU and supplier, saved together." : "One supplier and category, one row per item, saved together."}><form ref={formRef} onChange={draftGuard.onFormChange} className="grid gap-4" onSubmit={anyBulk ? submitBulk : onSubmit}>
+      {modes && !newMaterialSku ? modes((next) => void draftGuard.requestDiscard(() => onSwitch(next))) : null}
       <input type="hidden" name="materialEntryMode" value={materialEntryMode} />
       {edit && <input type="hidden" name="id" value={row!.id} />}{error && <div role="alert" className="text-sm text-danger">{error}</div>}
       {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name ?? materialRow!.sku.code ?? "Unnamed SKU"} readOnly /></Field><Field label="Supplier"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Unit"><Input value={`${materialRow!.unit.name} (${materialRow!.unit.code})`} readOnly /></Field></> : newMaterialSku ? <><div><Button type="button" variant="ghost" size="sm" onClick={() => setMaterialEntryMode("existing")}>← Back to the price table</Button></div>{newMaterialFields}{vendorField}</> : <>{materialTable}</>) : bulk ? <>{vendorField}{categoryField}{bulkTable}</> : <><Field label="Name" required><Input name="name" textCase="title" defaultValue={workRow?.name} required /></Field>{edit ? <input type="hidden" name="vendorId" value={vendorId} required /> : vendorField}{categoryField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note" description="Describe included work or materials. Use bullets for a clear scope."><SimpleTextEditor name="scopeNote" defaultValue={workRow?.scope_note ?? ""} placeholder={"Example:\n- Installation labor\n- Adhesive and grout"} maxLength={1000} rows={5} /></Field>}</>}

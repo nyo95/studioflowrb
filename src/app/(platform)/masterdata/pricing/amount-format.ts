@@ -5,9 +5,19 @@ export function isTextAmount(value: string): boolean {
   return /^\s*["\u201c\u201d]/.test(value);
 }
 
-/** Like `parseIndonesianAmount`, but a value starting with a quotation mark is passed through untouched for the server to read. */
-export function parseAmountEntry(value: string): string | null {
-  return isTextAmount(value) ? value.replace(/^\s+/, "") : parseIndonesianAmount(value);
+/**
+ * One typed amount box, read the same way as a pasted cell (`parsePastedAmount`), so typing and pasting
+ * never disagree: a quoted text price passes through, "By Request"/TBC/TBA/Nego mean a price on request
+ * ("0"), "Rp 15.000" is a number, and a plain number is read the Indonesian way and grouped as it is typed.
+ * Letters stay visible while typing (so "By Request" can be typed at all); the box shows the result when
+ * it is left (`blurDisplay`). Null refuses the keystroke.
+ */
+export function readTypedAmount(typed: string): { value: string; display: string } | null {
+  if (isTextAmount(typed)) return { value: typed.replace(/^\s+/, ""), display: typed };
+  if (/[a-z]/i.test(typed)) return { value: parsePastedAmount(typed), display: typed };
+  const value = parseIndonesianAmount(typed);
+  if (value === null) return null;
+  return { value, display: entryDisplay(value, typed) };
 }
 
 /** What the box shows while typing: text as typed, a trailing comma kept, otherwise the grouped number. */
