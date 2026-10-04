@@ -6,7 +6,7 @@ import { DropdownMenu } from "radix-ui";
 import { createContext,useContext,useEffect,useState,type AnchorHTMLAttributes,type ButtonHTMLAttributes,type CSSProperties,type HTMLAttributes,type ReactNode } from "react";
 
 import { cx } from "../internal/cx";
-import { getEffectiveRailCollapsed } from "../internal/rail-state";
+import { getEffectiveRailCollapsed, NARROW_NAVIGATION_QUERY } from "../internal/rail-state";
 import { Heading,Text } from "../primitives";
 import { Tooltip } from "./overlays";
 
@@ -16,7 +16,7 @@ function useNarrowNavigation(): boolean {
   const [narrow, setNarrow] = useState(false);
 
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 840px)");
+    const media = window.matchMedia(NARROW_NAVIGATION_QUERY);
     const update = () => setNarrow(media.matches);
     update();
     media.addEventListener("change", update);

@@ -2,6 +2,18 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.322 | 2026-10-04 | fix(ui-engine): match the narrow-navigation query to its CSS and keep the showcase rail contained
+
+- Owner report ("UI Engine di Foundation sidebar-nya bisa bocor"), reproduced in the browser on `/ui-engine`. Two causes, both fixed:
+  1. **840px boundary disagreement (shared, affected every app).** The shell's CSS uses Tailwind v4 `max-[840px]:`, which compiles to `(width < 840px)`, while the runtime used `matchMedia("(max-width: 840px)")`. At exactly 840px the CSS drew the desktop rail but the runtime treated it as narrow: the rail stood vertical, forced expanded, with no collapse control. The runtime now uses `NARROW_NAVIGATION_QUERY = "(width < 840px)"` (internal/rail-state.ts), the same widths as the CSS. UI_ENGINE.md now says "below 840px".
+  2. **Showcase utility slot (Foundation page only).** `/ui-engine` passed plain text Buttons ("Desktop rail", "Collapsed rail") into the rail's utility slot; in the 48px collapsed rail their labels spilled past the rail edge. It now uses `UtilitySection` + rail-aware `NavItem`s, the same pattern as StudioFlow's real utility navigation (which was not affected).
+- The external audit's "AppShell forces 100dvh inside a smaller preview container" hypothesis does not apply: the showcase renders AppShell as the whole page.
+- UI Engine test pins the query, its use in the shell, and the showcase utility pattern.
+
+**Browser evidence** (Chromium, `next dev`, `/ui-engine`): at 1280×800 and 1280×400 collapsed rail 48px → expanded 212px with the toggle visible, no rail child overflowing, document exactly viewport-high; 841×700 and 840×700 now both desktop (collapsible, toggle visible); 839×700 and 390×844 narrow (labeled row, no toggle); resizing 1280→600→1280 restores the collapsed desktop rail. Before the fix 840×700 rendered a 212px vertical rail with no toggle, and the collapsed rail showed clipped "D"/"C" label fragments.
+
+**Checks.** `npm run typecheck`, eslint (UI Engine, showcase), UI Engine suite (48/48) passed. A geometry test inside `npm test` would need a browser test dependency, which this slice does not add; the browser pass above is the layout evidence.
+
 ## R8.321 | 2026-10-04 | refactor(studioflow): retire the pre-iteration phase commands and their read model
 
 - External-audit finding A ("two sources of phase-button rules"). Verified worse than reported: besides the stale `availablePhaseCommands` read model (`commands` on `listProjectPhases`/`getPhaseDetail`, and the whole `listPhaseAttention` read), the service still held a parallel set of pre-iteration write commands — `activatePhase`, `submitForClientReview`, `rejectPhase`, `approveClient`, `reopenPhase`, `completeSupervision`. No screen or server action reached them, but they bypassed the new rules (approve without a recorded client answer, no undo event, no auto-advance), and about 25 integration-test calls exercised them, so a green suite partly proved the retired workflow.
@@ -45,8 +57,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.321**
-- Next local revision: **R8.322**
+- Current revision after this entry is committed: **R8.322**
+- Next local revision: **R8.323**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

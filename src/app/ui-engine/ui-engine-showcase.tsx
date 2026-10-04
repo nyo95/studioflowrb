@@ -2,7 +2,7 @@
 import { CurateShowcase } from "./curate-showcase";
 
 import { useMemo, useState } from "react";
-import { ArrowRight, CircleAlert, Filter, LayoutGrid, PanelLeftClose, PanelLeftOpen, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { ArrowRight, CircleAlert, Filter, LayoutGrid, LifeBuoy, Pencil, Settings2, Sparkles, Trash2 } from "lucide-react";
 
 import {
   AppShell,
@@ -59,6 +59,7 @@ import {
   Tabs,
   Text,
   Textarea,
+  UtilitySection,
   type SortDirection,
   useConfirm,
   useDebouncedValue,
@@ -164,15 +165,13 @@ export function UiEngineShowcase() {
           <NavItem href="#overlays" icon={<CircleAlert size={16} />}>Overlays</NavItem>
         </div>
       }
+      /* The utility slot takes the same rail-aware NavItems as the menu (inside UtilitySection), so a collapsed
+         rail shows icons only. Plain buttons here kept their text and spilled past the 48px rail. */
       utility={
-        <div className="grid gap-1">
-          <Button variant="ghost" className="justify-start" leadingIcon={<PanelLeftOpen aria-hidden="true" />}>
-            Desktop rail
-          </Button>
-          <Button variant="ghost" className="justify-start" leadingIcon={<PanelLeftClose aria-hidden="true" />}>
-            Collapsed rail
-          </Button>
-        </div>
+        <UtilitySection>
+          <NavItem href="#forms" icon={<Settings2 size={16} />}>Settings</NavItem>
+          <NavItem href="#overlays" icon={<LifeBuoy size={16} />}>Help</NavItem>
+        </UtilitySection>
       }
       topbar={
         <div className="flex w-full flex-col items-start gap-1.5 px-(--ui-page-padding) sm:flex-row sm:items-center">

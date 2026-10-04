@@ -10,7 +10,7 @@ import * as ui from "./index";
 import { getComboboxNavigationIndex } from "./internal/combobox-navigation";
 import { withCreatedOption } from "./internal/creatable-options";
 import { matchesAccept, selectFiles } from "./internal/file-drop";
-import { getEffectiveRailCollapsed } from "./internal/rail-state";
+import { getEffectiveRailCollapsed, NARROW_NAVIGATION_QUERY } from "./internal/rail-state";
 
 describe("UI Engine foundation", () => {
   it("exports the deliberate shared surface", () => {
@@ -456,6 +456,18 @@ describe("UI Engine foundation", () => {
     assert.match(creatable, /if \(creating\) return;/);
     assert.match(creatable, /catch \(error\) \{\s*\n\s*setCreateError\(createErrorLabel\(error\)\)/);
     assert.match(creatable, /role="alert"/);
+  });
+
+  it("switches to narrow navigation at exactly the width its CSS does", () => {
+    // Tailwind v4 compiles max-[840px] to (width < 840px); the runtime query must select the same widths,
+    // or at 840px the desktop rail is drawn while the runtime forces it open without a collapse control.
+    assert.equal(NARROW_NAVIGATION_QUERY, "(width < 840px)");
+    const shells = readFileSync(new URL("./layouts/shells.tsx", import.meta.url), "utf8");
+    assert.match(shells, /window\.matchMedia\(NARROW_NAVIGATION_QUERY\)/);
+    assert.doesNotMatch(shells, /max-width: 840px/);
+    assert.doesNotMatch(shells, /max-\[841px\]|min-\[840px\]/);
+    const showcase = readFileSync(new URL("../../app/ui-engine/ui-engine-showcase.tsx", import.meta.url), "utf8");
+    assert.match(showcase, /utility=\{\s*<UtilitySection>/, "the showcase rail utility uses rail-aware items");
   });
 
   it("keeps naming a created value until the app's options carry it", () => {
