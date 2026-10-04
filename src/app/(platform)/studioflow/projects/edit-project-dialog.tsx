@@ -40,7 +40,8 @@ export function EditProjectDialog({ project, designers, drafters, clients, onClo
     picDesignerId: project.designer.id,
     picDrafterId: project.drafter.id,
     priority: project.priority,
-    status: project.status,
+    // Completion has its own confirmation (readiness, reason); this form only toggles Active / On hold.
+    status: project.status === "COMPLETED" ? "ACTIVE" as const : project.status,
     clientContact: project.clientContact ?? "",
     address: project.address ?? "",
     area: project.area ?? "",
@@ -61,7 +62,7 @@ export function EditProjectDialog({ project, designers, drafters, clients, onClo
     }));
     if (!ok) return;
     if (form.priority !== project.priority) await run("priority", () => setProjectPriorityAction(project.id, form.priority));
-    if (form.status !== project.status) await run("status", () => setProjectStatusAction(project.id, form.status));
+    if (project.status !== "COMPLETED" && form.status !== project.status) await run("status", () => setProjectStatusAction(project.id, form.status));
     onClose();
   };
 
@@ -89,7 +90,6 @@ export function EditProjectDialog({ project, designers, drafters, clients, onClo
             <Select value={form.status} onChange={(e) => set("status", e.target.value as typeof form.status)}>
               <option value="ACTIVE">Active</option>
               <option value="ON_HOLD">On hold</option>
-              <option value="COMPLETED">Completed</option>
             </Select>
           </Field>
           <Field label="Area (m²)"><Input inputMode="decimal" value={form.area} onChange={(e) => set("area", e.target.value)} /></Field>

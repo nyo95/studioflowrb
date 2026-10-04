@@ -156,8 +156,13 @@ describe("WO-SF-ITER-01 phase 2 iteration commands", () => {
   it("keeps closed-phase checklist work in Today and applies the same project completion gate everywhere", async () => {
     const { projectId } = await newProject("Completion readiness");
     const supervision = await phaseOf(projectId, "supervision");
-    await testDb.prisma.sfPhase.updateMany({ where: { project_id: projectId }, data: { status: "DONE", is_locked: true } });
+    const layout = await phaseOf(projectId, "layout");
+    await testDb.prisma.sfPhase.updateMany({ where: { project_id: projectId, id: { not: layout.id } }, data: { status: "DONE", is_locked: true } });
     await testDb.prisma.sfChecklistItem.create({ data: { id: randomUUID(), project_id: projectId, phase_id: supervision.id, label: "Close-out detail" } });
+    const notReady = await sf.phases.getProjectCompletionReadiness({ ...as(designer), projectId });
+    assert.deepEqual(notReady.unfinishedPhases.map((phase) => phase.id), [layout.id]);
+    assert.equal(notReady.openReminders, 1);
+    assert.equal(notReady.ready, false);
     await rejectsWith(sf.phases.markProjectCompleted({ ...as(designer, ALL.filter((grant) => grant !== P.projectManage)), projectId }), "PROJECT_COMPLETION_NOT_READY");
     await rejectsWith(sf.projects.setProjectStatus({ ...as(designer), projectId, status: "COMPLETED" }), "PROJECT_COMPLETION_OVERRIDE_REASON_REQUIRED");
     const today = await sf.today.getToday({ ...as(designer), scope: "mine" });
@@ -165,6 +170,47 @@ describe("WO-SF-ITER-01 phase 2 iteration commands", () => {
     await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "COMPLETED", overrideReason: "Client accepted the remaining close-out item." });
     const audit = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "studioflow.project.status-changed", entity_id: projectId } });
     assert.equal((audit.metadata as { completionOverrideReason?: string }).completionOverrideReason, "Client accepted the remaining close-out item.");
+  });
+
+  it("lets open requirements stay as reminders: only unfinished phases and open feedback block completion", async () => {
+    const { projectId } = await newProject("Reminders never block");
+    const moodboard = await phaseOf(projectId, "moodboard");
+    await testDb.prisma.sfPhase.updateMany({ where: { project_id: projectId }, data: { status: "DONE", is_locked: true } });
+    await testDb.prisma.sfChecklistItem.create({ data: { id: randomUUID(), project_id: projectId, phase_id: moodboard.id, label: "Unticked reminder" } });
+    await testDb.prisma.sfChecklistItem.create({ data: { id: randomUUID(), project_id: projectId, phase_id: null, label: "Unticked general to-do" } });
+    const iteration = await testDb.prisma.sfRevision.findFirstOrThrow({ where: { phase_id: moodboard.id } });
+    const feedback = await testDb.prisma.sfActivity.create({ data: { project_id: projectId, phase_id: moodboard.id, revision_id: iteration.id, content: "Client wants a warmer palette", mode: "FEEDBACK" } });
+    const withFeedback = await sf.phases.getProjectCompletionReadiness({ ...as(designer), projectId });
+    assert.deepEqual({ ready: withFeedback.ready, openFeedback: withFeedback.openFeedback, openReminders: withFeedback.openReminders, canChange: withFeedback.canChange }, { ready: false, openFeedback: 1, openReminders: 2, canChange: true });
+    const picOnly = ALL.filter((grant) => grant !== P.projectManage);
+    await rejectsWith(sf.phases.markProjectCompleted({ ...as(designer, picOnly), projectId }), "PROJECT_COMPLETION_NOT_READY");
+    await testDb.prisma.sfActivity.update({ where: { id: feedback.id }, data: { status: "COMPLETED" } });
+    assert.equal((await sf.phases.getProjectCompletionReadiness({ ...as(designer), projectId })).ready, true);
+    await sf.phases.markProjectCompleted({ ...as(designer, picOnly), projectId });
+    const project = await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: projectId } });
+    assert.equal(project.status, "COMPLETED");
+    assert.equal(await testDb.prisma.sfChecklistItem.count({ where: { project_id: projectId, is_checked: false } }), 2, "reminders stay on the project as they are");
+  });
+
+  it("makes a completed project read-only in every module until it is reopened, while archive and reopen still work", async () => {
+    const { projectId } = await newProject("Read-only after completion");
+    const moodboard = await phaseOf(projectId, "moodboard");
+    const item = await sf.tasks.createItem({ ...as(designer), projectId, phaseId: moodboard.id, label: "Before completion" });
+    await testDb.prisma.sfPhase.updateMany({ where: { project_id: projectId }, data: { status: "DONE", is_locked: true } });
+    await sf.phases.markProjectCompleted({ ...as(designer), projectId });
+    const access = await sf.projects.getAccess({ ...as(designer), projectId });
+    assert.deepEqual({ completed: access.completed, project: access.canEditProject, documents: access.canEditDocuments, phases: access.phases.some((phase) => phase.canTransition || phase.canEditContent) }, { completed: true, project: false, documents: false, phases: false });
+    await rejectsWith(sf.tasks.createItem({ ...as(designer), projectId, phaseId: null, label: "After completion" }), "PROJECT_COMPLETED");
+    await rejectsWith(sf.tasks.setItemChecked({ ...as(designer), projectId, itemId: item.itemId, checked: true }), "PROJECT_COMPLETED");
+    await rejectsWith(sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" }), "PROJECT_COMPLETED");
+    await rejectsWith(sf.mom.createDocument({ ...as(designer), projectId, topic: "After completion" }), "PROJECT_COMPLETED");
+    await rejectsWith(sf.phases.setPhaseNote({ ...as(designer), projectId, phaseId: moodboard.id, note: "After completion" }), "PROJECT_COMPLETED");
+    await rejectsWith(sf.projects.setProjectPriority({ ...as(designer), projectId, priority: "URGENT" }), "PROJECT_COMPLETED");
+    await rejectsWith(sf.projects.updateProject({ ...as(designer), projectId, name: "Renamed" }), "PROJECT_COMPLETED");
+    await sf.projects.archiveProject({ ...as(designer), projectId, reason: "Done and handed over" });
+    await sf.projects.restoreProject({ ...as(designer), projectId });
+    await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ACTIVE" });
+    await sf.tasks.setItemChecked({ ...as(designer), projectId, itemId: item.itemId, checked: true });
   });
 });
 

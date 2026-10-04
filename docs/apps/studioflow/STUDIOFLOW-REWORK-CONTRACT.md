@@ -180,10 +180,22 @@ default entries (§11.5, when SF-R4 exists) → audit `project.bootstrapped`.
 
 ### 4.4 Lifecycle
 
-`executeCompleteProject` (legacy) sets `COMPLETED`; approving the last phase or
-completing Supervision also completes the project. `ON_HOLD` blocks phase
-activation (legacy "Project must be ACTIVE"). Archive requires a reason; an
-archived project is read-only everywhere and hidden from Today by default.
+`executeCompleteProject` (legacy) sets `COMPLETED`. Since WO-SF-ITER-01 no
+phase change completes the project: completion is always a person's explicit
+choice. `ON_HOLD` blocks phase activation (legacy "Project must be ACTIVE").
+Archive requires a reason; an archived project is read-only everywhere and
+hidden from Today by default.
+
+**Completion (owner, 2026-10-04).** Every phase must be done and no client
+feedback may be open; a project manager may complete a blocked project only
+with a written reason, kept in the audit history. Requirements and to-dos are
+reminders: they never block completion, are only listed in the confirmation,
+and stay on the project as they are. **A completed project is read-only
+everywhere** (phases, iterations, checklist, feedback, files, MOM, Product
+Schedule, presentation, project details) until a PIC or override holder
+reopens it; archiving and restoring stay available. The rule is enforced in
+the services (`assertProjectWritable`, `requireProjectAccess`), and the access
+model reports `completed` so screens hide edit controls from one source.
 
 ## 5. Phases and revisions
 

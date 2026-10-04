@@ -24,7 +24,7 @@ export default async function ProjectMomPage({ params }: { params: Promise<{ pro
   const canEdit = studioFlow.mom.canManage(grants) && project.archivedAt === null && access.canEditDocuments;
   return (
     <>
-    {project.archivedAt === null && !access.canEditDocuments ? <ReadOnlyNotice scope="project" className="mb-3" /> : null}
+    {project.archivedAt === null && !access.completed && !access.canEditDocuments ? <ReadOnlyNotice scope="project" className="mb-3" /> : null}
     <SectionCard title="MOM" description="Minutes of meeting and site reports, newest first." count={documents.length} padded={false}>
       <MomDocumentList projectId={projectId} documents={documents} canEdit={canEdit} />
     </SectionCard>

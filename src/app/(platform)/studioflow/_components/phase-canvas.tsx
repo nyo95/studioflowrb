@@ -43,7 +43,7 @@ export async function PhaseCanvas({ projectId, phaseId, people, archived }: { pr
 
   return (
     <>
-      {!archived && !canTransition && !canContent ? <ReadOnlyNotice scope={access.isDesigner || access.isDrafter ? "phase" : "project"} /> : null}
+      {!archived && !access.completed && !canTransition && !canContent ? <ReadOnlyNotice scope={access.isDesigner || access.isDrafter ? "phase" : "project"} /> : null}
       {phase.startBlockedReason ? <Notice tone="neutral" title="Not yet">{phase.startBlockedReason}</Notice> : null}
 
       <PhasePanel

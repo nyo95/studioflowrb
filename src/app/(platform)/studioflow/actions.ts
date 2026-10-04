@@ -338,11 +338,20 @@ export async function projectCompletionAction(projectId: string, change: "comple
   return runSafeAction(async () => {
     const ctx = await context();
     const id = parse(Id, projectId);
+    const reason = parse(z.string().max(500).optional(), overrideReason);
     const result = change === "complete"
-      ? await studioFlow.phases.markProjectCompleted({ ...ctx, projectId: id, overrideReason })
+      ? await studioFlow.phases.markProjectCompleted({ ...ctx, projectId: id, overrideReason: reason })
       : await studioFlow.phases.reopenProject({ ...ctx, projectId: id });
     refresh(id);
     return result;
+  });
+}
+
+/** What completing the project would meet right now, for the confirmation dialog. Writes nothing. */
+export async function projectCompletionReadinessAction(projectId: string) {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    return studioFlow.phases.getProjectCompletionReadiness({ grants: ctx.grants, actor: ctx.actor, projectId: parse(Id, projectId) });
   });
 }
 

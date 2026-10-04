@@ -5,11 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { Badge, ConfirmDialog, IconButton, InlineError, RowActionMenu, type RowActionItem } from "@/platform/ui_engine";
+import { Badge, IconButton, InlineError, RowActionMenu, type RowActionItem } from "@/platform/ui_engine";
 
 import { projectCompletionAction } from "../actions";
 import { IterationButtons, UndoBar, usePhaseCommands, VisitDialog, type IterationView, type PhaseView } from "./phase-commands";
 import { PhaseNotesDialog } from "./phase-notes-dialog";
+import { ProjectCompletionDialog } from "./project-completion";
 import { useCommand } from "./use-command";
 
 export type ProjectCardPhase = {
@@ -65,7 +66,7 @@ export function ProjectCard({ card, viewer }: { card: ProjectCardData; viewer: {
 
   const menu: RowActionItem[] = [
     { label: "Open project", onSelect: () => router.push(`/studioflow/projects/${card.id}`) },
-    ...(canManage && !completed ? [{ label: "Mark as completed", separatorBefore: true, onSelect: () => setConfirmComplete(true) }] : []),
+    ...(canManage && !completed ? [{ label: "Mark as completed…", separatorBefore: true, onSelect: () => setConfirmComplete(true) }] : []),
     ...(canManage && completed ? [{ label: "Reopen project", separatorBefore: true, onSelect: () => void completion.run("reopen", () => projectCompletionAction(card.id, "reopen")) }] : []),
   ];
 
@@ -79,7 +80,7 @@ export function ProjectCard({ card, viewer }: { card: ProjectCardData; viewer: {
         <div className="flex flex-wrap items-center justify-end gap-1.5">
           {card.status === "ON_HOLD" ? <Badge tone="warning">On hold</Badge> : null}
           {completed ? <Badge tone="success"><Check className="h-3 w-3" aria-hidden="true" />Completed</Badge> : null}
-          {card.requirements_waiting > 0 ? <Badge title="Reminders only. They never block a step.">{card.requirements_waiting} requirement{card.requirements_waiting === 1 ? "" : "s"} waiting</Badge> : null}
+          {card.requirements_waiting > 0 ? <Badge title="Reminders only. They never block a step or completing the project.">{card.requirements_waiting} requirement{card.requirements_waiting === 1 ? "" : "s"} waiting</Badge> : null}
           {card.dependents_review_suggested ? <Badge tone="warning" title="An earlier phase is active again while a later one is already done.">Check later phases</Badge> : null}
           <span className="relative inline-flex">
             <IconButton size="sm" variant="ghost" label="Phase notes" icon={<StickyNote aria-hidden="true" />} onClick={() => setNotesOpen(true)} />
@@ -136,16 +137,7 @@ export function ProjectCard({ card, viewer }: { card: ProjectCardData; viewer: {
         onSave={(visitDate, note) => commands.exec(`${visitPhaseId}:visit`, { command: "createVisit", phaseId: visitPhaseId!, visitDate, note }, "Site visit added")}
       />
       <PhaseNotesDialog projectId={card.id} open={notesOpen} onOpenChange={setNotesOpen} canEdit={canManage || card.phases.some(seatOwner)} />
-      <ConfirmDialog
-        open={confirmComplete}
-        onOpenChange={setConfirmComplete}
-        title="Mark this project as completed?"
-        description="Phases that are still open stay as they are. You can reopen the project later."
-        confirmLabel="Mark as completed"
-        pending={completion.pending}
-        error={completion.error}
-        onConfirm={async () => { if (await completion.run("complete", () => projectCompletionAction(card.id, "complete"))) setConfirmComplete(false); }}
-      />
+      <ProjectCompletionDialog projectId={card.id} projectName={card.name} open={confirmComplete} onOpenChange={setConfirmComplete} />
     </article>
   );
 }

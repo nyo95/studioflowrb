@@ -2,11 +2,22 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.318 | 2026-10-04 | fix(studioflow): completed projects are read-only and reminders never block completion
+
+- Owner decisions (2026-10-04), from the external-audit review: a completed project is read-only everywhere until reopened, and requirements/to-dos never block completion.
+- Completion gate: only unfinished phases and open client feedback block; open requirements/to-dos are counted for the confirmation and stay on the project as they are. A project manager may still complete a blocked project with a written reason (audited). Added `getProjectCompletionReadiness` and `projectCompletionReadinessAction` (read-only).
+- Read-only after completion, enforced in the services: `assertProjectWritable` (archived or completed) now backs `loadWritableProject`, the phase/activity/checklist loaders and checklist create/sync; `requireProjectAccess` rejects a completed project with `PROJECT_COMPLETED`. Only `markProjectCompleted`, `reopenProject`, `setProjectStatus`, `archiveProject` and `restoreProject` pass `allowCompleted`. `ProjectAccess` gains `completed`; every `can*` flag is false while completed, so screens hide edit controls from the same source.
+- UI (Lead): one `ProjectCompletionDialog` replaces the old confirmation ("Phases that are still open stay as they are", which the R8.317 gate contradicted and which had no way to give the override reason). It reads readiness first, names unfinished phases and open feedback, lists reminders as non-blocking, and asks a project manager for the reason inline. Used from the project card and the Projects row menu (which now also offers "Mark as completed…", and only "Reopen project"/"Archive" for a completed project). The edit dialog toggles Active/On hold only. A completed project shows a "Completed — read-only" notice with "Reopen project"; PIC "View only" notices no longer misfire on completed projects.
+- Contract §4.4 updated with the completion and read-only rule.
+- Tests: rewrote the R8.317 completion test for the new gate and added coverage for reminders-never-block, readiness reads, and read-only enforcement across checklist, schedule, MOM, phase note, priority and project details, with archive/restore/reopen still allowed.
+
+**Checks.** Disposable rebuild-only PostgreSQL 16 in the session container (`studioflow_rebuild_test`, port 55432) migrated through all 82 migrations. `npm run typecheck`, eslint (StudioFlow), `check:boundaries`, `check:legacy-runtime` passed. `npm test`: 823/824 passed; the one failure is the pre-existing `scripts/test-legacy-runtime-checker.mjs` fixture expecting a Windows path (`D:\\…`) to be detected, which also fails on the untouched base `b28619f` in this Linux container — not caused by this slice. Browser acceptance of the dialog and notice is covered in the closing verification revision of this branch.
+
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.317**
-- Next local revision: **R8.318**
+- Current revision after this entry is committed: **R8.318**
+- Next local revision: **R8.319**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

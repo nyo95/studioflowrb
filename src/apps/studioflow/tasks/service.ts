@@ -18,6 +18,7 @@ import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
 import { isPhaseModifiable, type PhaseStatus } from "../domain/phase";
 import {
   P,
+  assertProjectWritable,
   conflict,
   hasPermission,
   invalid,
@@ -127,7 +128,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
   async function loadItem(tx: TxClient, projectId: string, itemId: string, access?: CommandContext, options: { allowLocked?: boolean } = {}) {
     const item = await tx.sfChecklistItem.findUnique({ where: { id: itemId }, include: { project: true, phase: true } });
     if (!item || item.project_id !== projectId) throw notFound("checklist item");
-    if (item.project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
+    assertProjectWritable(item.project);
     if (!options.allowLocked && item.phase && !isPhaseModifiable({ status: item.phase.status as PhaseStatus, isLocked: item.phase.is_locked })) {
       throw conflict("PHASE_LOCKED", "This phase is approved and locked. Reopen it first.");
     }
@@ -180,9 +181,9 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
       const due = parseDue(input.dueDate) ?? null;
       await assertAssignee(input.assignedToId);
       return runTransaction(async (tx) => {
-        const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true, archived_at: true } });
+        const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true, archived_at: true, status: true } });
         if (!project) throw notFound("project");
-        if (project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
+        assertProjectWritable(project);
         await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, phaseId: input.phaseId, kind: input.phaseId ? "content" : "document" });
         if (input.phaseId) {
           const phase = await tx.sfPhase.findUnique({ where: { id: input.phaseId }, select: { project_id: true, status: true, is_locked: true } });
@@ -484,7 +485,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
       return runTransaction(async (tx) => {
         const project = await tx.sfProject.findUnique({ where: { id: input.projectId } });
         if (!project) throw notFound("project");
-        if (project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
+        assertProjectWritable(project);
         await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "document" });
         const created = await seedChecklistFromTemplates(tx, project.id, userId);
         if (created > 0) await writeAudit(ports, tx, { action: "studioflow.checklist.synced", entityType: "project", entityId: project.id, actor: input.actor, metadata: { projectId: project.id, created } });

@@ -536,8 +536,8 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
     async setProjectStatus(input: CommandContext & { projectId: string; status: ProjectStatus; overrideReason?: string | null }) {
       const userId = requireCommand(input, P.projectManage);
       return runTransaction(async (tx) => {
-        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
-        const project = await loadWritableProject(tx, input.projectId);
+        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project", allowCompleted: true });
+        const project = await loadWritableProject(tx, input.projectId, { allowCompleted: true });
         if (project.status === input.status) return { projectId: project.id };
         const completion = input.status === "COMPLETED"
           ? await assertProjectCompletionReady(tx, input)
@@ -552,7 +552,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       const userId = requireCommand(input, P.projectManage);
       const reason = requiredText(input.reason, "ARCHIVE_REASON_REQUIRED", "A reason", 500);
       return runTransaction(async (tx) => {
-        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
+        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project", allowCompleted: true });
         const project = await tx.sfProject.findUnique({ where: { id: input.projectId } });
         if (!project) throw notFound("project");
         if (project.archived_at) throw conflict("PROJECT_ALREADY_ARCHIVED", "This project is already archived.");
@@ -567,7 +567,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
     async restoreProject(input: CommandContext & { projectId: string; reason?: string | null }) {
       const userId = requireCommand(input, P.projectManage);
       return runTransaction(async (tx) => {
-        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
+        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project", allowCompleted: true });
         const project = await tx.sfProject.findUnique({ where: { id: input.projectId } });
         if (!project) throw notFound("project");
         if (!project.archived_at) throw conflict("PROJECT_NOT_ARCHIVED", "This project is not archived.");

@@ -21,6 +21,8 @@ import {
 } from "../domain/phase";
 import {
   P,
+  assertProjectWritable,
+  canChangeCompletion,
   conflict,
   getProjectAccess,
   hasPermission,
@@ -42,7 +44,7 @@ import {
   type TxClient,
 } from "../shared";
 import { readBlockerCounts, readBlockerCountsBatch, readBlockerItems } from "./blocker-query";
-import { assertProjectCompletionReady } from "../projects/completion";
+import { assertProjectCompletionReady, readProjectCompletionReadiness } from "../projects/completion";
 
 type PhaseRow = Awaited<ReturnType<TxClient["sfPhase"]["findUniqueOrThrow"]>>;
 type ProjectRow = Awaited<ReturnType<TxClient["sfProject"]["findUniqueOrThrow"]>>;
@@ -71,7 +73,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
   async function loadPhase(tx: TxClient, projectId: string, phaseId: string, access?: CommandContext): Promise<{ phase: PhaseRow; project: ProjectRow }> {
     const phase = await tx.sfPhase.findUnique({ where: { id: phaseId }, include: { project: true } });
     if (!phase || phase.project_id !== projectId) throw notFound("phase");
-    if (phase.project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
+    assertProjectWritable(phase.project);
     if (access?.actor.userId) await requireProjectAccess(tx, { grants: access.grants, actorId: access.actor.userId, projectId, phaseId, kind: "transition" });
     const { project, ...rest } = phase;
     return { phase: rest, project };
@@ -372,7 +374,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
   async function writableIteration(tx: TxClient, input: PhaseCommandInput) {
     requireCommand(input, P.phaseWork);
     const loaded = await loadPhase(tx, input.projectId, input.phaseId, input);
-    if (loaded.project.status === "COMPLETED") throw conflict("PROJECT_COMPLETED", "Reopen the project before changing a phase.");
     if (loaded.project.status !== "ACTIVE") throw conflict("PROJECT_NOT_ACTIVE", "The project must be active before changing an iteration.");
     return loaded;
   }
@@ -547,11 +548,36 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     },
     async markProjectCompleted(input: CommandContext & { projectId: string; overrideReason?: string | null }) {
       requireCommand(input, P.projectRead);
-      return runTransaction(async (tx) => { const project = await loadWritableProject(tx, input.projectId); const access = await getProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: project.id }); if (!access.override && !access.isDesigner && !access.isDrafter) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "Only a project PIC can complete this project."); if (project.status === "COMPLETED") return { projectId: project.id }; const completion = await assertProjectCompletionReady(tx, input); await tx.sfProject.update({ where: { id: project.id }, data: { status: "COMPLETED" } }); await writeAudit(ports, tx, { action: "studioflow.project.completed", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: project.status, to: "COMPLETED" } }, metadata: completion.overrideReason ? { completionOverrideReason: completion.overrideReason } : undefined }); return { projectId: project.id }; });
+      return runTransaction(async (tx) => {
+        const project = await loadWritableProject(tx, input.projectId, { allowCompleted: true });
+        const access = await getProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: project.id });
+        if (!canChangeCompletion(access)) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "Only a project PIC can complete this project.");
+        if (project.status === "COMPLETED") return { projectId: project.id };
+        const completion = await assertProjectCompletionReady(tx, input);
+        await tx.sfProject.update({ where: { id: project.id }, data: { status: "COMPLETED" } });
+        await writeAudit(ports, tx, { action: "studioflow.project.completed", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: project.status, to: "COMPLETED" } }, metadata: completion.overrideReason ? { completionOverrideReason: completion.overrideReason } : undefined });
+        return { projectId: project.id };
+      });
     },
     async reopenProject(input: CommandContext & { projectId: string }) {
       requireCommand(input, P.projectRead);
-      return runTransaction(async (tx) => { const project = await loadWritableProject(tx, input.projectId); const access = await getProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: project.id }); if (!access.override && !access.isDesigner && !access.isDrafter) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "Only a project PIC can reopen this project."); if (project.status !== "COMPLETED") return { projectId: project.id }; await tx.sfProject.update({ where: { id: project.id }, data: { status: "ACTIVE" } }); await writeAudit(ports, tx, { action: "studioflow.project.reopened", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: "COMPLETED", to: "ACTIVE" } } }); return { projectId: project.id }; });
+      return runTransaction(async (tx) => {
+        const project = await loadWritableProject(tx, input.projectId, { allowCompleted: true });
+        const access = await getProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: project.id });
+        if (!canChangeCompletion(access)) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "Only a project PIC can reopen this project.");
+        if (project.status !== "COMPLETED") return { projectId: project.id };
+        await tx.sfProject.update({ where: { id: project.id }, data: { status: "ACTIVE" } });
+        await writeAudit(ports, tx, { action: "studioflow.project.reopened", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: "COMPLETED", to: "ACTIVE" } } });
+        return { projectId: project.id };
+      });
+    },
+    /** What completing the project would meet right now: unfinished phases and open client feedback
+     * block it; open requirements are reminders that are only reported (owner, 2026-10-04). */
+    async getProjectCompletionReadiness(input: ReadContext & { actor: CommandContext["actor"]; projectId: string }) {
+      requireRead(input.grants);
+      const readiness = await readProjectCompletionReadiness(db, input.projectId);
+      const access = input.actor.userId ? await getProjectAccess(db, { grants: input.grants, actorId: input.actor.userId, projectId: input.projectId }) : null;
+      return { ...readiness, canChange: access ? canChangeCompletion(access) : false, canOverride: hasPermission(input.grants, P.projectManage) };
     },
   };
 
@@ -560,7 +586,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
   async function loadActivity(tx: TxClient, projectId: string, activityId: string, access?: CommandContext) {
     const activity = await tx.sfActivity.findUnique({ where: { id: activityId }, include: { project: true, phase: true, revision: true } });
     if (!activity || activity.project_id !== projectId) throw notFound("item");
-    if (activity.project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
+    assertProjectWritable(activity.project);
     if (activity.phase && !isPhaseModifiable({ status: activity.phase.status as PhaseStatus, isLocked: activity.phase.is_locked })) throw lockedError();
     if (access?.actor.userId) await requireProjectAccess(tx, { grants: access.grants, actorId: access.actor.userId, projectId, phaseId: activity.phase_id, kind: "content" });
     return activity;

@@ -28,7 +28,7 @@ export default async function ProjectSchedulePage({ params }: { params: Promise<
 
   return (
     <>
-    {project.archivedAt === null && !access.canEditDocuments ? <ReadOnlyNotice scope="project" className="mb-3" /> : null}
+    {project.archivedAt === null && !access.completed && !access.canEditDocuments ? <ReadOnlyNotice scope="project" className="mb-3" /> : null}
     <SectionCard title="Product Schedule" description="Materials and fixtures specified for this project, each with its options and the chosen final one." count={entries.length} padded={false}>
       <ScheduleBoard
         projectId={projectId}
