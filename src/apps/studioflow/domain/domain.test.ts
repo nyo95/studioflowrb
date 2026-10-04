@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { fullBlockers, todoBlockers } from "./blockers";
+import { iterationChoices } from "./iteration-kinds";
 import { buildMomSnapshot, isPermutation, momSnapshotImageKeys, momSnapshotsEqual, moveId, parseMomSnapshot } from "./mom";
 import { REVISION_RETENTION, nextRevisionNumber, revisionsToPrune, versionLabel } from "./revisions";
 import { compareOptionLabels, fallbackPrefix, nextOptionLabel, normalizeScheduleCategory, optionLabel, optionLabelIndex, parseLegacyScheduleCsv, parseLegacyScheduleSheet, parseScheduleCode, scheduleCode, scheduleSearchKey } from "./schedule";
@@ -20,7 +21,6 @@ import { countOpen, groupFeed, nestFeed, sortFeed, type FeedTask } from "./feed"
 import {
   LEGACY_PHASE_DEFINITION_IDS,
   PHASE_STATUSES,
-  availablePhaseCommands,
   canActivatePhase,
   isLegacySupervisionDefinition,
   isPhaseModifiable,
@@ -74,12 +74,14 @@ describe("phase policy (legacy parity)", () => {
     assert.equal(isPhaseModifiable({ status: "ACTIVE", isLocked: true }), false);
   });
 
-  it("offers the right commands per state", () => {
-    assert.deepEqual(availablePhaseCommands({ status: "PENDING", isLocked: false }), ["activate", "bypass"]);
-    assert.deepEqual(availablePhaseCommands({ status: "ACTIVE", isLocked: false, iterationState: "NOT_SENT" }), ["submitClient"]);
-    assert.deepEqual(availablePhaseCommands({ status: "ACTIVE", isLocked: false, legacySupervision: true }), ["completeSupervision"]);
-    assert.deepEqual(availablePhaseCommands({ status: "ACTIVE", isLocked: false, iterationState: "SENT" }), ["approveClient", "rejectClient"]);
-    assert.deepEqual(availablePhaseCommands({ status: "DONE", isLocked: true }), ["reopen"]);
+  it("offers the next steps of the client-sent iteration lifecycle (the one source for every screen)", () => {
+    const base = { phaseStatus: "ACTIVE", iterationName: "Moodboard 1", kinds: [], supervision: false };
+    assert.deepEqual(iterationChoices({ ...base, state: "NOT_SENT" }), ["send"]);
+    assert.deepEqual(iterationChoices({ ...base, state: "SENT" }), ["record_answer"], "an outcome needs the client answer first");
+    assert.deepEqual(iterationChoices({ ...base, state: "ANSWERED" }), ["revision", "done"]);
+    assert.deepEqual(iterationChoices({ ...base, state: "ANSWERED", iterationName: "CD Mall", kinds: ["CD Mall", "CD Final"] }), ["revision", "continue_cd_final"]);
+    assert.deepEqual(iterationChoices({ ...base, state: "NOT_SENT", supervision: true }), ["next_visit", "done"]);
+    assert.deepEqual(iterationChoices({ ...base, state: "DONE", phaseStatus: "DONE" }), ["add_iteration"]);
   });
 
   it("numbers iterations from 1", () => {

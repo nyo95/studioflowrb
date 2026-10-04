@@ -2,6 +2,16 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.321 | 2026-10-04 | refactor(studioflow): retire the pre-iteration phase commands and their read model
+
+- External-audit finding A ("two sources of phase-button rules"). Verified worse than reported: besides the stale `availablePhaseCommands` read model (`commands` on `listProjectPhases`/`getPhaseDetail`, and the whole `listPhaseAttention` read), the service still held a parallel set of pre-iteration write commands — `activatePhase`, `submitForClientReview`, `rejectPhase`, `approveClient`, `reopenPhase`, `completeSupervision`. No screen or server action reached them, but they bypassed the new rules (approve without a recorded client answer, no undo event, no auto-advance), and about 25 integration-test calls exercised them, so a green suite partly proved the retired workflow.
+- Removed: those six service commands and their now-unused helpers (`closeRevision`, `nextPhaseExists`, `assertFullyUnblocked`); `availablePhaseCommands`, `PhaseCommand`, `PHASE_COMMAND_LABELS`; the `commands` field of both phase reads; `today.listPhaseAttention`/`PhaseAttentionRow` (no consumer). `iterationChoices` is now the only next-step rule; `bypassPhase` and `overrideRevision` stay (they are live actions).
+- Tests ported to the live lifecycle (`addIteration`, `sendIteration`, `recordClientAnswer`, `chooseIterationOutcome`, `createSupervisionVisit`, `chooseSupervisionVisit`) with two helpers (`openIteration`, `clientRound`): the iteration workflow suite, sequential/parallel/ON_HOLD starts, CD drafter fallback, "add an iteration to a finished phase" (replacing reopen-with-reason), custom-template lifecycle and prefix, Supervision-only visits, explicit project completion, Supervision close-out feedback conversion, deliverable OUTDATED after a revision, and the PIC access matrix. The domain test now pins `iterationChoices` (answer before outcome, CD Mall, Supervision, finished phase).
+- Contract §5.2 is marked superseded by WO-SF-ITER-01 with the live command set; the legacy table stays as evidence. `fullBlockers` doc comment no longer claims to gate steps.
+- No product behavior changed for any screen: nothing visible used the removed paths.
+
+**Checks.** `npm run typecheck` (also with `--noUnusedLocals` on the touched files), eslint (StudioFlow), StudioFlow integration + domain suites (149/149) passed on the disposable rebuild-only test database. Full suite in the closing verification revision.
+
 ## R8.320 | 2026-10-04 | fix(studioflow): let Today tick phase requirements under the service rule
 
 - External-audit finding C: the service lets a person with phase-work access (no task-manage) tick a phase requirement, but Today disabled that checkbox (`editable = canManageTasks` for every checklist row). This hid the close-out work R8.317 started showing in Today from the designer who owns it.
@@ -35,8 +45,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.320**
-- Next local revision: **R8.321**
+- Current revision after this entry is committed: **R8.321**
+- Next local revision: **R8.322**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

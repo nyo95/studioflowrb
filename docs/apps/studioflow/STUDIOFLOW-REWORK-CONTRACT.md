@@ -207,6 +207,18 @@ not an administered template.
 
 ### 5.2 State machine (port `PhasePolicy` + `phaseService`)
 
+> **Superseded by WO-SF-ITER-01 (R8.285–R8.292); legacy commands removed in
+> R8.321.** Phases are `PENDING → ACTIVE → DONE`; the work is a chain of
+> client-sent iterations `NOT_SENT → SENT → ANSWERED → REVISED | DONE` (CD
+> Mall continues to CD Final; Supervision runs on site visits that close with
+> "Next visit" or "Done"). The commands are `addIteration`, `sendIteration`,
+> `recordClientAnswer`, `chooseIterationOutcome`, `createSupervisionVisit`,
+> `chooseSupervisionVisit`, plus `bypassPhase` and `overrideRevision`; each
+> writes an undoable phase event. Screens take their next steps from
+> `iterationChoices`, the same rule the commands enforce. There is no internal
+> review, nothing gates a step on checklist items, and finishing a phase never
+> completes the project (§4.4). The table below is kept as legacy evidence only.
+
 Stored states: `PENDING`, `IN_PROGRESS`, `ON_REVIEW_INTERNAL`,
 `APPROVED_INTERNAL`, `ON_REVIEW_CLIENT`, `READY_FOR_NEXT`, `COMPLETED`, plus
 `is_locked`, `allow_parallel`, `status_changed_at`.

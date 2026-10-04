@@ -119,6 +119,19 @@ async function phaseOf(projectId: string, legacy: keyof typeof LEGACY) {
   return testDb.prisma.sfPhase.findFirstOrThrow({ where: { project_id: projectId, definition_id: LEGACY[legacy] } });
 }
 
+/** The phase's open iteration (not sent, with the client, or answered). */
+async function openIteration(phaseId: string) {
+  return testDb.prisma.sfRevision.findFirstOrThrow({ where: { phase_id: phaseId, status: { in: ["NOT_SENT", "SENT", "ANSWERED"] } }, orderBy: { major: "desc" } });
+}
+
+/** One full client round on the open iteration: send it, record the answer, choose the outcome. */
+async function clientRound(base: ReturnType<typeof as> & { projectId: string; phaseId: string }, outcome: "REVISION" | "DONE") {
+  const iteration = await openIteration(base.phaseId);
+  await sf.phases.sendIteration({ ...base, iterationId: iteration.id });
+  await sf.phases.recordClientAnswer({ ...base, iterationId: iteration.id });
+  return sf.phases.chooseIterationOutcome({ ...base, iterationId: iteration.id, outcome });
+}
+
 async function revisions(phaseId: string) {
   return (await testDb.prisma.sfRevision.findMany({ where: { phase_id: phaseId }, orderBy: { major: "asc" } })).map((r) => `${r.name}:${r.status}`);
 }
@@ -593,7 +606,6 @@ describe("WO-BE-01 backend regressions", () => {
     assert.equal(batch.size, phases.length);
     assert.deepEqual(await readBlockerCountsBatch(db, []), new Map());
     const list = await sf.phases.listProjectPhases({ grants: ALL, projectId });
-    const attention = await sf.today.listPhaseAttention({ grants: ALL });
     const nav = await sf.phases.listNavPhases({ grants: ALL, projectId });
     assert.deepEqual(list.map((p) => p.id), phases.map((p) => p.id));
     assert.deepEqual(nav.map((p) => p.id), phases.map((p) => p.id));
@@ -602,7 +614,6 @@ describe("WO-BE-01 backend regressions", () => {
       assert.deepEqual(batch.get(phase.id), single);
       assert.deepEqual(single, { openRevisionActivities: index < 2 ? index + 1 : 0, openRootChecklistItems: index < 2 ? 1 : 0 });
       assert.deepEqual(list[index].blockers, fullBlockers(single));
-      if (index < 2) assert.deepEqual(attention.find((p) => p.phaseId === phase.id)?.blockers, fullBlockers(single));
       assert.equal(nav[index].openCount, index < 2 ? 2 : 0);
     }
   });
@@ -714,7 +725,7 @@ describe("SF-R1 bootstrap and naming", () => {
     const cd = await phaseOf(projectId, "cd");
 
     await rejectsWith(sf.projects.setProjectPriority({ ...as(outsider, unassignedGrants), projectId, priority: "URGENT" }), "PERMISSION_DENIED");
-    await rejectsWith(sf.phases.submitForClientReview({ ...as(outsider, unassignedGrants), projectId, phaseId: moodboard.id }), "PERMISSION_DENIED");
+    await rejectsWith(sf.phases.sendIteration({ ...as(outsider, unassignedGrants), projectId, phaseId: moodboard.id, iterationId: (await openIteration(moodboard.id)).id }), "PERMISSION_DENIED");
     await rejectsWith(sf.tasks.createItem({ ...as(outsider, unassignedGrants), projectId, phaseId: null, label: "Denied" }), "PERMISSION_DENIED");
     await rejectsWith(sf.mom.createDocument({ ...as(outsider, unassignedGrants), projectId, topic: "Denied" }), "PERMISSION_DENIED");
     await rejectsWith(sf.schedule.createEntry({ ...as(outsider, unassignedGrants), projectId, section: "MATERIAL", category: "Panel" }), "PERMISSION_DENIED");
@@ -722,7 +733,7 @@ describe("SF-R1 bootstrap and naming", () => {
 
     await sf.projects.setProjectPriority({ ...as(designer), projectId, priority: "URGENT" });
     await sf.mom.createDocument({ ...as(drafter, [...DRAFTER_GRANTS, P.momManage]), projectId, topic: "Drafter can edit documents" });
-    await sf.phases.activatePhase({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id });
+    await sf.phases.addIteration({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id });
     await sf.phases.addActivity({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id, content: "Drafter-seat content", mode: "FEEDBACK" });
     const access = await sf.projects.getAccess({ grants: DRAFTER_GRANTS, actor: drafter.actor, projectId });
     assert.deepEqual({ project: access.canEditProject, documents: access.canEditDocuments }, { project: false, documents: true });
@@ -731,7 +742,7 @@ describe("SF-R1 bootstrap and naming", () => {
     assert.equal(access.phases.find((phase) => phase.phaseId === cd.id)?.canTransition, true);
     assert.equal(access.phases.find((phase) => phase.phaseId === cd.id)?.canEditContent, true);
 
-    await rejectsWith(sf.phases.activatePhase({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: moodboard.id }), "PERMISSION_DENIED");
+    await rejectsWith(sf.phases.addIteration({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: moodboard.id }), "PERMISSION_DENIED");
     await rejectsWith(sf.phases.addActivity({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: moodboard.id, content: "Not the drafter's phase", mode: "FEEDBACK" }), "PERMISSION_DENIED");
     await rejectsWith(sf.projects.setProjectPriority({ ...as(drafter, DRAFTER_GRANTS), projectId, priority: "LOW" }), "PERMISSION_DENIED");
     const override = await seedUser("Override", ALL);
@@ -755,8 +766,8 @@ describe("SF-R1 bootstrap and naming", () => {
   });
 });
 
-describe("SF-R1 phase workflow (legacy parity)", () => {
-  it("sends iterations to the client, records client changes, and approves", async () => {
+describe("Iteration workflow (WO-SF-ITER-01)", () => {
+  it("sends iterations to the client, records client changes, and finishes", async () => {
     const { projectId } = await newProject();
     const phase = await phaseOf(projectId, "moodboard");
     const base = { ...as(designer), projectId, phaseId: phase.id };
@@ -765,16 +776,18 @@ describe("SF-R1 phase workflow (legacy parity)", () => {
     await sf.tasks.createTemplate({ ...as(designer), definitionId: LEGACY.moodboard, label: "Draft board" });
     await sf.tasks.syncProjectChecklist({ ...as(designer), projectId });
     const items = await sf.tasks.listChecklist({ grants: ALL, projectId, phaseId: phase.id });
-    const todo = items[0];
-    assert.ok(todo, "an unticked requirement exists");
-    await sf.phases.submitForClientReview(base); // requirements are reminders and never block
+    assert.ok(items[0], "an unticked requirement exists");
+    const first = await openIteration(phase.id);
+    await sf.phases.sendIteration({ ...base, iterationId: first.id }); // requirements are reminders and never block
     assert.deepEqual(await revisions(phase.id), ["Moodboard 1:SENT"]);
 
     await sf.phases.addActivity({ ...base, content: "Warmer palette", mode: "FEEDBACK" });
-    const rejected = await sf.phases.rejectPhase({ ...base, type: "CLIENT" });
-    assert.equal(rejected.revision, "Moodboard 2");
-    assert.equal(rejected.converted, 1);
-    // V2: converted feedback becomes a SfChecklistItem, not a SfActivity(TODO)
+    await rejectsWith(sf.phases.chooseIterationOutcome({ ...base, iterationId: first.id, outcome: "REVISION" }), "PHASE_INVALID_STATE");
+    await sf.phases.recordClientAnswer({ ...base, iterationId: first.id });
+    const revised = await sf.phases.chooseIterationOutcome({ ...base, iterationId: first.id, outcome: "REVISION" });
+    assert.ok("nextIterationId" in revised);
+    assert.deepEqual(await revisions(phase.id), ["Moodboard 1:REVISED", "Moodboard 2:NOT_SENT"]);
+    // V2: carried-forward feedback becomes a SfChecklistItem, not a SfActivity(TODO)
     const converted = await testDb.prisma.sfChecklistItem.findFirstOrThrow({ where: { phase_id: phase.id, is_checked: false, label: "Warmer palette" } });
     assert.equal(converted.assigned_to_id, designer.id);
     const original = await testDb.prisma.sfActivity.findFirstOrThrow({ where: { phase_id: phase.id, mode: "FEEDBACK" } });
@@ -790,28 +803,27 @@ describe("SF-R1 phase workflow (legacy parity)", () => {
     await rejectsWith(sf.phases.updateActivity({ ...base, activityId: original.id, assignedToId: viewer.id }), "ASSIGNEE_NOT_ELIGIBLE");
 
     await sf.tasks.setItemChecked({ ...as(designer), projectId, itemId: converted.id, checked: true });
-    await sf.phases.submitForClientReview(base);
+    const second = await openIteration(phase.id);
+    await sf.phases.sendIteration({ ...base, iterationId: second.id });
     await sf.phases.addActivity({ ...base, content: "Client wants marble", mode: "FEEDBACK" });
-    const clientReject = await sf.phases.rejectPhase({ ...base, type: "CLIENT" });
-    assert.equal(clientReject.revision, "Moodboard 3");
+    await sf.phases.recordClientAnswer({ ...base, iterationId: second.id });
+    await sf.phases.chooseIterationOutcome({ ...base, iterationId: second.id, outcome: "REVISION" });
     assert.deepEqual(await revisions(phase.id), ["Moodboard 1:REVISED", "Moodboard 2:REVISED", "Moodboard 3:NOT_SENT"]);
 
-    // V2: client feedback converts to checklist item on rejection, so complete that instead.
     const marble = await testDb.prisma.sfChecklistItem.findFirstOrThrow({ where: { phase_id: phase.id, label: "Client wants marble", is_checked: false } });
     await sf.tasks.setItemChecked({ ...as(designer), projectId, itemId: marble.id, checked: true });
-    await sf.phases.submitForClientReview(base);
     clock = new Date("2026-09-18T03:00:00Z");
-    const approved = await sf.phases.approveClient(base);
-    assert.equal(approved.projectCompleted, false);
+    await clientRound(base, "DONE");
     const after = await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: phase.id } });
     assert.equal(after.status, "DONE");
     assert.equal(after.is_locked, true);
     assert.deepEqual(await revisions(phase.id), ["Moodboard 1:REVISED", "Moodboard 2:REVISED", "Moodboard 3:DONE"]);
+    assert.equal((await sf.projects.getProject({ grants: ALL, projectId })).status, "ACTIVE", "finishing a phase never completes the project");
     await rejectsWith(sf.phases.addActivity({ ...base, content: "late", mode: "FEEDBACK" }), "PHASE_LOCKED");
 
     const actions = (await testDb.prisma.auditEvent.findMany({ where: { entity_id: phase.id }, orderBy: { occurred_at: "asc" } })).map((e) => e.action);
-    assert.ok(actions.includes("studioflow.phase.rejected-client"));
-    assert.ok(actions.includes("studioflow.phase.approved-client"));
+    assert.ok(actions.includes("studioflow.phase.iteration-revised"));
+    assert.ok(actions.includes("studioflow.phase.iteration-done"));
   });
 
   it("never blocks a client step on unchecked checklist items", async () => {
@@ -826,24 +838,22 @@ describe("SF-R1 phase workflow (legacy parity)", () => {
     const child = await testDb.prisma.sfChecklistItem.findUniqueOrThrow({ where: { id: sub.itemId } });
     assert.equal(child.is_checked, true, "parent cascades down");
     await sf.tasks.setItemChecked({ ...as(designer), projectId, itemId: sub.itemId, checked: false });
-    await sf.phases.submitForClientReview(base);
+    await sf.phases.sendIteration({ ...base, iterationId: (await openIteration(phase.id)).id });
     const phases = await sf.phases.listProjectPhases({ grants: ALL, projectId });
     assert.equal(phases[0].blockers.total, 0);
   });
 
-  it("enforces sequential activation, parallel phases, ON_HOLD and leaves completion explicit", async () => {
+  it("enforces sequential starts, parallel phases, ON_HOLD and leaves completion explicit", async () => {
     const { projectId } = await newProject();
     const layout = await phaseOf(projectId, "layout");
     const supervision = await phaseOf(projectId, "supervision");
-    await sf.phases.activatePhase({ ...as(designer), projectId, phaseId: layout.id });
-    await rejectsWith(sf.phases.activatePhase({ ...as(designer), projectId, phaseId: supervision.id }), "PHASE_SEQUENTIAL");
-    // "Reopen" must not sidestep the start rules for a phase that has not started.
-    await rejectsWith(sf.phases.reopenPhase({ ...as(designer), projectId, phaseId: supervision.id, reason: "early" }), "PHASE_INVALID_STATE");
-    const supervisionDetail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: supervision.id });
-    assert.equal(supervisionDetail.commands.includes("reopen"), false);
+    await sf.phases.addIteration({ ...as(designer), projectId, phaseId: layout.id });
+    await rejectsWith(sf.phases.addIteration({ ...as(designer), projectId, phaseId: supervision.id }), "PHASE_SEQUENTIAL");
+    await rejectsWith(sf.phases.createSupervisionVisit({ ...as(designer), projectId, phaseId: supervision.id, visitDate: "2026-09-20" }), "PHASE_SEQUENTIAL");
+    assert.equal((await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: supervision.id })).canStart, false);
     const cd = await phaseOf(projectId, "cd");
     await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ON_HOLD" });
-    await rejectsWith(sf.phases.activatePhase({ ...as(designer), projectId, phaseId: cd.id }), "PROJECT_NOT_ACTIVE");
+    await rejectsWith(sf.phases.addIteration({ ...as(designer), projectId, phaseId: cd.id }), "PROJECT_NOT_ACTIVE");
     await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ACTIVE" });
     const before = await sf.phases.listProjectPhases({ grants: ALL, projectId });
     assert.equal(before.find((p) => p.definitionId === LEGACY.supervision)?.startBlockedReason, "Starts after Construction Drawing is approved.");
@@ -851,39 +861,41 @@ describe("SF-R1 phase workflow (legacy parity)", () => {
     const phases = await sf.phases.listProjectPhases({ grants: ALL, projectId });
     assert.equal(phases.find((p) => p.definitionId === LEGACY.cd)?.status, "DONE");
     assert.equal(phases.find((p) => p.definitionId === LEGACY.supervision)?.startBlockedReason, null);
-    // CD approved → Supervision can start (its predecessor is CD).
-    await sf.phases.activatePhase({ ...as(designer), projectId, phaseId: supervision.id });
-    await sf.phases.completeSupervision({ ...as(designer), projectId, phaseId: supervision.id });
+    // CD done → Supervision can start (its predecessor is CD) with its first visit.
+    const visit = await sf.phases.createSupervisionVisit({ ...as(designer), projectId, phaseId: supervision.id, visitDate: "2026-09-20" });
+    await sf.phases.chooseSupervisionVisit({ ...as(designer), projectId, phaseId: supervision.id, iterationId: visit.iterationId, outcome: "DONE" });
+    assert.equal((await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: supervision.id } })).status, "DONE");
     const project = await sf.projects.getProject({ grants: ALL, projectId });
     assert.equal(project.status, "ACTIVE");
   });
 
-  it("uses the drafter as fallback assignee on CD and restricts review to reviewers", async () => {
+  it("lets the drafter run CD with the drafter as fallback assignee, and keeps the designer's phases off-limits", async () => {
     const { projectId } = await newProject();
     const cd = await phaseOf(projectId, "cd");
-    const base = { projectId, phaseId: cd.id };
-    await sf.phases.activatePhase({ ...as(drafter, DRAFTER_GRANTS), ...base });
-    await rejectsWith(sf.phases.submitForClientReview({ ...as(drafter, DRAFTER_GRANTS), ...base }), "PERMISSION_DENIED");
-    await sf.phases.submitForClientReview({ ...as(designer), ...base });
-    await sf.phases.addActivity({ ...as(designer), ...base, content: "Fix section A", mode: "FEEDBACK" });
-    await sf.phases.rejectPhase({ ...as(designer), ...base, type: "CLIENT" });
-    // V2: rejected feedback converts to SfChecklistItem with drafter as fallback assignee
+    const moodboard = await phaseOf(projectId, "moodboard");
+    const base = { ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id };
+    await sf.phases.addIteration(base);
+    await rejectsWith(sf.phases.sendIteration({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: moodboard.id, iterationId: (await openIteration(moodboard.id)).id }), "PERMISSION_DENIED");
+    const iteration = await openIteration(cd.id);
+    await sf.phases.sendIteration({ ...base, iterationId: iteration.id });
+    await sf.phases.addActivity({ ...as(designer), projectId, phaseId: cd.id, content: "Fix section A", mode: "FEEDBACK" });
+    await sf.phases.recordClientAnswer({ ...base, iterationId: iteration.id });
+    await sf.phases.chooseIterationOutcome({ ...base, iterationId: iteration.id, outcome: "REVISION" });
+    // V2: carried-forward feedback converts to SfChecklistItem with the drafter as fallback assignee
     const todo = await testDb.prisma.sfChecklistItem.findFirstOrThrow({ where: { phase_id: cd.id } });
     assert.equal(todo.assigned_to_id, drafter.id);
   });
 
-  it("reopens with a reason and overrides with a history snapshot", async () => {
+  it("adds an iteration to a finished phase and overrides with a history snapshot", async () => {
     const { projectId } = await newProject();
     const phase = await phaseOf(projectId, "moodboard");
     const base = { ...as(designer), projectId, phaseId: phase.id };
     const fb = await sf.phases.addActivity({ ...base, content: "feedback", mode: "FEEDBACK" });
     await sf.phases.deleteActivity({ ...base, activityId: fb.activityId });
-    // Reach the approved state: send to the client, then approve
-    await sf.phases.submitForClientReview(base);
-    await sf.phases.approveClient(base);
-    await rejectsWith(sf.phases.reopenPhase({ ...base, reason: "" }), "REOPEN_REASON_REQUIRED");
-    const reopened = await sf.phases.reopenPhase({ ...base, reason: "Client changed brief" });
-    assert.equal(reopened.revision, "Moodboard 2");
+    await clientRound(base, "DONE");
+    const reopened = await sf.phases.addIteration(base);
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: reopened.iterationId } })).name, "Moodboard 2");
+    assert.equal((await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: phase.id } })).status, "ACTIVE");
     await rejectsWith(sf.phases.overrideRevision({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: phase.id, mode: "HARD_RESET_PENDING", note: "x" }), "PERMISSION_DENIED");
     await sf.phases.overrideRevision({ ...base, mode: "HARD_RESET_ACTIVE", major: 3, note: "Align with client numbering" });
     assert.deepEqual(await revisions(phase.id), ["Moodboard 3:NOT_SENT"]);
@@ -1751,10 +1763,9 @@ describe("Snapshot runtime truth", () => {
   it("custom seat controls fallback assignee", async () => {
     const { projectId } = await newProject();
     const cd = await phaseOf(projectId, "cd");
-    await sf.phases.activatePhase({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id });
-    await sf.phases.submitForClientReview({ ...as(designer), projectId, phaseId: cd.id });
+    await sf.phases.addIteration({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id });
     await sf.phases.addActivity({ ...as(designer), projectId, phaseId: cd.id, content: "Fix", mode: "FEEDBACK" });
-    await sf.phases.rejectPhase({ ...as(designer), projectId, phaseId: cd.id, type: "CLIENT" });
+    await clientRound({ ...as(designer), projectId, phaseId: cd.id }, "REVISION");
     const todo = await testDb.prisma.sfChecklistItem.findFirstOrThrow({ where: { phase_id: cd.id } });
     assert.equal(todo.assigned_to_id, drafter.id, "CD fallback assignee is drafter from snapshot");
   });
@@ -1877,9 +1888,8 @@ describe("Deliverable reference revision", () => {
     await sf.phases.uploadDeliverable({ ...base, name: "design.pdf", file: { body: new Uint8Array(100), contentType: "application/pdf" } });
     const before = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
     assert.equal(before.status, "CURRENT");
-    await sf.phases.submitForClientReview(base);
     await sf.phases.addActivity({ ...base, content: "Needs revision", mode: "FEEDBACK" });
-    await sf.phases.rejectPhase({ ...base, type: "CLIENT" });
+    await clientRound(base, "REVISION");
     const after = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
     assert.equal(after.status, "OUTDATED", "files belong to old revision after reject");
   });
@@ -2012,111 +2022,98 @@ describe("SF-V2-E phase definitions", () => {
     assert.equal(phases[3].seat_snapshot, "drafter");
     const listed = await sf.phases.listProjectPhases({ grants: ALL, projectId });
     assert.equal(listed[0].activeRevision, "CN1");
-    assert.equal(listed.every((p) => !p.commands.includes("completeSupervision")), true);
   });
 
-  it("runs a custom phase through the normal state machine with its own prefix", async () => {
+  it("runs a custom phase through the iteration lifecycle with its own prefix", async () => {
     await seedTemplate("Studio flow", SIX_PHASES);
     const { projectId } = await newProject();
-    const [concept, planning, visualization] = await phasesOf(projectId);
+    const [concept, planning, , documentation] = await phasesOf(projectId);
     const detail = (phaseId: string) => sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId });
     const run = { ...as(designer), projectId };
 
-    assert.deepEqual((await detail(concept.id)).commands, ["submitClient"]);
-    await sf.phases.submitForClientReview({ ...run, phaseId: concept.id });
-    assert.deepEqual((await detail(concept.id)).commands, ["approveClient", "rejectClient"]);
-
-    const rejected = await sf.phases.rejectPhase({ ...run, phaseId: concept.id, type: "CLIENT" });
-    assert.equal(rejected.revision, "Concept 2");
-    await sf.phases.submitForClientReview({ ...run, phaseId: concept.id });
-    await sf.phases.approveClient({ ...run, phaseId: concept.id });
+    const first = await openIteration(concept.id);
+    assert.deepEqual((await detail(concept.id)).currentIteration?.choices, ["send"]);
+    await sf.phases.sendIteration({ ...run, phaseId: concept.id, iterationId: first.id });
+    assert.deepEqual((await detail(concept.id)).currentIteration?.choices, ["record_answer"], "the client answer comes before any outcome");
+    await sf.phases.recordClientAnswer({ ...run, phaseId: concept.id, iterationId: first.id });
+    assert.deepEqual((await detail(concept.id)).currentIteration?.choices, ["revision", "done"]);
+    const revised = await sf.phases.chooseIterationOutcome({ ...run, phaseId: concept.id, iterationId: first.id, outcome: "REVISION" });
+    assert.ok("nextIterationId" in revised);
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: revised.nextIterationId } })).name, "Concept 2");
+    await clientRound({ ...run, phaseId: concept.id }, "DONE");
     assert.equal((await detail(concept.id)).status, "DONE");
 
-    await sf.phases.activatePhase({ ...run, phaseId: planning.id });
+    // Finishing Concept starts the next phase with its first iteration.
     assert.equal((await detail(planning.id)).activeRevision?.label, "PL1");
-    await sf.phases.submitForClientReview({ ...run, phaseId: planning.id });
+    await sf.phases.sendIteration({ ...run, phaseId: planning.id, iterationId: (await openIteration(planning.id)).id });
     assert.equal((await detail(planning.id)).activeRevision?.state, "SENT", "the iteration is with the client while the phase stays active");
-    await sf.phases.approveClient({ ...run, phaseId: planning.id });
 
-    await sf.phases.bypassPhase({ ...run, phaseId: visualization.id, reason: "Not needed" });
-    assert.equal((await detail(visualization.id)).status, "DONE");
+    await sf.phases.bypassPhase({ ...run, phaseId: documentation.id, reason: "Not needed" });
+    assert.equal((await detail(documentation.id)).status, "DONE");
 
-    const reopened = await sf.phases.reopenPhase({ ...run, phaseId: concept.id, reason: "New brief" });
-    assert.equal(reopened.revision, "Concept 3");
+    const again = await sf.phases.addIteration({ ...run, phaseId: concept.id });
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: again.iterationId } })).name, "Concept 3");
   });
 
-  it("gives the special completion only to the legacy Supervision definition", async () => {
+  it("gives site visits only to the legacy Supervision definition", async () => {
     const custom = await seedTemplate("Custom", [{ name: "Concept", prefix: "CN" }, { name: "Supervision", prefix: "SV" }]);
     const customProject = await newProject("Custom named Supervision");
     const [conceptPhase, namedSupervision] = await phasesOf(customProject.projectId);
     const run = { ...as(designer), projectId: customProject.projectId };
-    // Concept is the first phase and starts IN_PROGRESS, so it is finished via approval, not bypass.
-    await sf.phases.submitForClientReview({ ...run, phaseId: conceptPhase.id });
-    await sf.phases.approveClient({ ...run, phaseId: conceptPhase.id });
-    await sf.phases.activatePhase({ ...run, phaseId: namedSupervision.id });
+    await clientRound({ ...run, phaseId: conceptPhase.id }, "DONE");
     const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId: customProject.projectId, phaseId: namedSupervision.id });
-    assert.deepEqual(detail.commands, ["submitClient"], "a custom phase called Supervision is an ordinary phase");
-    await rejectsWith(sf.phases.completeSupervision({ ...run, phaseId: namedSupervision.id }), "PHASE_INVALID_STATE");
+    assert.equal(detail.isSupervision, false, "a custom phase called Supervision is an ordinary phase");
+    assert.deepEqual(detail.currentIteration?.choices, ["send"]);
+    await rejectsWith(sf.phases.createSupervisionVisit({ ...run, phaseId: namedSupervision.id, visitDate: "2026-09-20" }), "PHASE_INVALID_STATE");
     assert.equal(custom.ids.includes(namedSupervision.definition_id), true);
 
-    // Back to the standard template: the migrated Supervision keeps its command.
+    // Back to the standard template: the migrated Supervision runs on visits.
     await sf.phases.updatePhaseTemplate({ ...as(designer), templateId: (await testDb.prisma.sfPhaseTemplate.findFirstOrThrow({ where: { name: "Standard" } })).id, isDefault: true });
     const standard = await newProject("Standard supervision");
     const supervision = await phaseOf(standard.projectId, "supervision");
-    // Moodboard (order 1) starts IN_PROGRESS, so it cannot be bypassed; Supervision only
-    // cares about its immediate predecessor CD, so Moodboard's state is irrelevant here.
+    // Supervision only cares about its immediate predecessor CD, so Moodboard's state is irrelevant here.
     for (const key of ["layout", "design3d", "cd"] as const) {
       await sf.phases.bypassPhase({ ...as(designer), projectId: standard.projectId, phaseId: (await phaseOf(standard.projectId, key)).id, reason: "Skip" });
     }
-    await sf.phases.activatePhase({ ...as(designer), projectId: standard.projectId, phaseId: supervision.id });
-    assert.deepEqual((await sf.phases.getPhaseDetail({ grants: ALL, projectId: standard.projectId, phaseId: supervision.id })).commands, ["completeSupervision"]);
-    await sf.phases.completeSupervision({ ...as(designer), projectId: standard.projectId, phaseId: supervision.id });
+    const visit = await sf.phases.createSupervisionVisit({ ...as(designer), projectId: standard.projectId, phaseId: supervision.id, visitDate: "2026-09-20" });
+    const visitDetail = await sf.phases.getPhaseDetail({ grants: ALL, projectId: standard.projectId, phaseId: supervision.id });
+    assert.equal(visitDetail.isSupervision, true);
+    assert.deepEqual(visitDetail.currentIteration?.choices, ["next_visit", "done"]);
+    await sf.phases.chooseSupervisionVisit({ ...as(designer), projectId: standard.projectId, phaseId: supervision.id, iterationId: visit.iterationId, outcome: "DONE" });
     assert.equal((await sf.projects.getProject({ grants: ALL, projectId: standard.projectId })).status, "ACTIVE");
   });
 
-  it("does not complete the project when the last custom phase is approved", async () => {
+  it("does not complete the project when the last custom phase is finished", async () => {
     await seedTemplate("Two phases", [{ name: "Concept", prefix: "CN" }, { name: "Handover", prefix: "HO" }]);
     const { projectId } = await newProject();
     const [concept, handover] = await phasesOf(projectId);
     const run = { ...as(designer), projectId };
-    await sf.phases.submitForClientReview({ ...run, phaseId: concept.id });
-    await sf.phases.approveClient({ ...run, phaseId: concept.id });
+    await clientRound({ ...run, phaseId: concept.id }, "DONE");
     assert.equal((await sf.projects.getProject({ grants: ALL, projectId })).status, "ACTIVE");
-    await sf.phases.activatePhase({ ...run, phaseId: handover.id });
-    await sf.phases.submitForClientReview({ ...run, phaseId: handover.id });
-    await sf.phases.approveClient({ ...run, phaseId: handover.id });
+    await clientRound({ ...run, phaseId: handover.id }, "DONE");
     assert.equal((await sf.projects.getProject({ grants: ALL, projectId })).status, "ACTIVE");
 
-    // Reopening remains phase-local; project completion is an explicit command.
-    await sf.phases.reopenPhase({ ...run, phaseId: handover.id, reason: "One more revision" });
+    // Another iteration on a finished phase stays phase-local; project completion is an explicit command.
+    await sf.phases.addIteration({ ...run, phaseId: handover.id });
     assert.equal((await sf.projects.getProject({ grants: ALL, projectId })).status, "ACTIVE");
     assert.equal((await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: handover.id })).status, "ACTIVE");
   });
 
-  it("converts open feedback instead of orphaning it when completeSupervision closes the revision (the one lock path with no blocker check)", async () => {
-    // approveInternal/approveClient refuse to lock a phase with open feedback
-    // (assertFullyUnblocked), and rejectPhase converts it explicitly — but
-    // completeSupervision is legacy-parity lenient (no blocker gate) and used
-    // to close the revision without doing either, permanently orphaning any
-    // still-OPEN feedback (invisible to Today/blockers once the revision is
-    // no longer ACTIVE, with nothing left to resurface it on).
+  it("converts open feedback instead of orphaning it when the last Supervision visit closes the phase", async () => {
     const { projectId } = await newProject();
-    // Moodboard starts IN_PROGRESS (cannot be bypassed); finish it normally.
-    const moodboard = await phaseOf(projectId, "moodboard");
-    await sf.phases.submitForClientReview({ ...as(designer), projectId, phaseId: moodboard.id });
-    await sf.phases.approveClient({ ...as(designer), projectId, phaseId: moodboard.id });
+    // Supervision only needs CD done; Moodboard stays in progress.
     for (const key of ["layout", "design3d", "cd"] as const) {
       await sf.phases.bypassPhase({ ...as(designer), projectId, phaseId: (await phaseOf(projectId, key)).id, reason: "Skip" });
     }
     const supervision = await phaseOf(projectId, "supervision");
     const base = { ...as(designer), projectId, phaseId: supervision.id };
-    await sf.phases.activatePhase(base);
+    const visit = await sf.phases.createSupervisionVisit({ ...base, visitDate: "2026-09-20" });
     await sf.phases.addActivity({ ...base, content: "Open note on the closed revision", mode: "FEEDBACK" });
 
-    await sf.phases.completeSupervision(base);
+    await sf.phases.chooseSupervisionVisit({ ...base, iterationId: visit.iterationId, outcome: "DONE" });
 
     const todo = await testDb.prisma.sfChecklistItem.findFirst({ where: { phase_id: supervision.id, label: "Open note on the closed revision" } });
-    assert.ok(todo, "the open feedback must convert to a checklist item, not vanish once its revision closes");
+    assert.ok(todo, "the open feedback must convert to a checklist item, not vanish once its visit closes");
     const activity = await testDb.prisma.sfActivity.findFirstOrThrow({ where: { phase_id: supervision.id, content: "Open note on the closed revision" } });
     assert.equal(activity.status, "COMPLETED", "the original feedback activity must be marked done so it no longer double-counts as open work");
     const today = await sf.today.getToday({ ...as(designer), scope: "mine" });

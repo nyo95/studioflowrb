@@ -8,11 +8,9 @@ import { fullBlockers, todoBlockers } from "../domain/blockers";
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
 import { isCdMall, iterationChoices, iterationKinds } from "../domain/iteration-kinds";
 import {
-  availablePhaseCommands,
   canActivatePhase,
   isLegacySupervisionDefinition,
   isPhaseModifiable,
-  nextRevision,
   revisionLabel,
   waitingDays,
   type PhaseSeat,
@@ -87,23 +85,8 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     return tx.sfRevision.findFirst({ where: { phase_id: phaseId }, orderBy: { major: "desc" } });
   }
 
-  async function closeRevision(tx: TxClient, revisionId: string) {
-    await tx.sfRevision.update({ where: { id: revisionId }, data: { status: "DONE", done_at: nowOf(ports) } });
-  }
-
   async function setPhase(tx: TxClient, phase: PhaseRow, data: { status: PhaseStatus; is_locked?: boolean }) {
     await tx.sfPhase.update({ where: { id: phase.id }, data: { ...data, status_changed_at: nowOf(ports) } });
-  }
-
-  async function nextPhaseExists(tx: TxClient, phase: PhaseRow): Promise<boolean> {
-    return (await tx.sfPhase.count({ where: { project_id: phase.project_id, order_index: phase.order_index + 1 } })) > 0;
-  }
-
-  async function assertFullyUnblocked(tx: TxClient, phaseId: string) {
-    const blockers = fullBlockers(await readBlockerCounts(tx, phaseId));
-    if (blockers.total > 0) {
-      throw new AppError("CONFLICT", "PHASE_APPROVAL_BLOCKED", `Cannot proceed: ${blockers.reasons.join(", ")}.`, { details: { reasons: blockers.reasons } });
-    }
   }
 
   async function audit(tx: TxClient, actor: AuditActor, action: string, phase: PhaseRow, from: PhaseStatus, to: PhaseStatus, metadata: Record<string, unknown> = {}) {
@@ -120,25 +103,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
   type PhaseCommandInput = CommandContext & { projectId: string; phaseId: string };
 
   const commands = {
-    async activatePhase(input: PhaseCommandInput) {
-      requireCommand(input, P.phaseWork);
-      return runTransaction(async (tx) => {
-        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
-        if (phase.status !== "PENDING") throw invalidState("Only a phase that has not started can be started.");
-        if (project.status !== "ACTIVE") throw conflict("PROJECT_NOT_ACTIVE", "The project must be active to start a phase.");
-        const previous = await tx.sfPhase.findFirst({ where: { project_id: project.id, order_index: phase.order_index - 1 } });
-        if (!canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null)) {
-          throw conflict("PHASE_SEQUENTIAL", `${resolvePhaseName(phase)} starts after ${resolvePhaseName(previous!)} is approved.`);
-        }
-        const latest = await latestRevision(tx, phase.id);
-        const number = nextRevision(latest);
-        await setPhase(tx, phase, { status: "ACTIVE", is_locked: false });
-        const revision = await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phase.id, ...number, name: `${phase.name_snapshot} ${number.major}`, status: "NOT_SENT" } });
-        await audit(tx, input.actor, "activated", phase, "PENDING", "ACTIVE", { revisionId: revision.id, revision: revisionLabel(number, phase.prefix_snapshot) });
-        return { phaseId: phase.id };
-      });
-    },
-
     async bypassPhase(input: PhaseCommandInput & { reason: string }) {
       requireCommand(input, P.phaseReview);
       const reason = requiredText(input.reason, "BYPASS_REASON_REQUIRED", "A reason", 500);
@@ -151,140 +115,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const latest = await latestRevision(tx, phase.id);
         if (!latest) await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phase.id, major: 1, name: `${phase.name_snapshot} 1`, status: "DONE", done_at: nowOf(ports) } });
         await audit(tx, input.actor, "bypassed", phase, "PENDING", target, { reason });
-        return { phaseId: phase.id };
-      });
-    },
-
-    /** Sends the open iteration to the client (iteration NOT_SENT -> SENT). */
-    async submitForClientReview(input: PhaseCommandInput) {
-      requireCommand(input, P.phaseReview);
-      return runTransaction(async (tx) => {
-        const { phase } = await loadPhase(tx, input.projectId, input.phaseId, input);
-        if (phase.is_locked) throw lockedError();
-        if (phase.status !== "ACTIVE") throw invalidState("This phase cannot be sent to the client now.");
-        const current = await activeRevision(tx, phase.id);
-        if (!current || current.status !== "NOT_SENT") throw invalidState("There is no iteration ready to send.");
-        await tx.sfRevision.update({ where: { id: current.id }, data: { status: "SENT", sent_at: nowOf(ports) } });
-        await setPhase(tx, phase, { status: "ACTIVE" });
-        await audit(tx, input.actor, "submitted-client", phase, "ACTIVE", "ACTIVE", { revisionId: current.id, revision: current.name });
-        return { phaseId: phase.id };
-      });
-    },
-
-    /** The client asked for changes: the sent iteration becomes REVISED and the next one opens. Open FEEDBACK activities become checklist todos (V2-D1). */
-    async rejectPhase(input: PhaseCommandInput & { type: "CLIENT" }) {
-      requireCommand(input, P.phaseReview);
-      return runTransaction(async (tx) => {
-        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
-        if (phase.is_locked) throw lockedError();
-        const current = await activeRevision(tx, phase.id);
-        if (phase.status !== "ACTIVE" || !current || current.status !== "SENT") throw invalidState("Only a phase with the client can record client changes.");
-        const at = nowOf(ports);
-        await tx.sfRevision.update({ where: { id: current.id }, data: { status: "REVISED", answered_at: at } });
-        const number = nextRevision(current);
-        const revision = await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phase.id, ...number, name: `${phase.name_snapshot} ${number.major}`, status: "NOT_SENT" } });
-        const feedback = await tx.sfActivity.findMany({ where: { revision_id: current.id, mode: "FEEDBACK", status: "OPEN" }, orderBy: { created_at: "asc" } });
-        const fallbackAssignee = phaseSnapshot(phase).seatSnapshot === "drafter" ? project.pic_drafter_id : project.pic_designer_id;
-        const converted: string[] = [];
-        for (const item of feedback) {
-          // V2-D1: Feedback converts to SfChecklistItem (Todo SSOT) instead of a new SfActivity(TODO).
-          const id = randomUUID();
-          await tx.sfChecklistItem.create({
-            data: {
-              id,
-              project_id: project.id,
-              phase_id: phase.id,
-              label: item.content,
-              is_checked: false,
-              assigned_to_id: item.assigned_to_id ?? fallbackAssignee,
-              due_at: item.due_at,
-              created_by_id: item.created_by_id,
-            },
-          });
-          converted.push(id);
-        }
-        // Mark the original feedback activities as completed so they no longer count as open work.
-        if (feedback.length > 0) {
-          await tx.sfActivity.updateMany({ where: { id: { in: feedback.map((item) => item.id) } }, data: { status: "COMPLETED", completed_at: at } });
-        }
-        await setPhase(tx, phase, { status: "ACTIVE" });
-        await audit(tx, input.actor, "rejected-client", phase, "ACTIVE", "ACTIVE", {
-          previousRevision: current.name,
-          revision: revision.name,
-          revisionId: revision.id,
-          feedbackConverted: converted.length,
-        });
-        return { phaseId: phase.id, revision: revision.name, converted: converted.length };
-      });
-    },
-
-    /** The client approved the sent iteration: it is DONE and the phase is DONE. */
-    async approveClient(input: PhaseCommandInput) {
-      requireCommand(input, P.phaseReview);
-      return runTransaction(async (tx) => {
-        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
-        if (phase.is_locked) throw lockedError();
-        const current = await activeRevision(tx, phase.id);
-        if (phase.status !== "ACTIVE" || !current || current.status !== "SENT") throw invalidState("Only a phase with the client can be approved.");
-        const at = nowOf(ports);
-        await tx.sfRevision.update({ where: { id: current.id }, data: { status: "DONE", answered_at: at, done_at: at } });
-        await setPhase(tx, phase, { status: "DONE", is_locked: true });
-        await audit(tx, input.actor, "approved-client", phase, "ACTIVE", "DONE", { revision: current.name });
-        const projectCompleted = false;
-        return { phaseId: phase.id, projectCompleted };
-      });
-    },
-
-    /** A finished phase gets one more iteration and returns to ACTIVE. */
-    async reopenPhase(input: PhaseCommandInput & { reason: string }) {
-      requireCommand(input, P.phaseReview);
-      const reason = requiredText(input.reason, "REOPEN_REASON_REQUIRED", "A reason", 500);
-      return runTransaction(async (tx) => {
-        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
-        if (phase.status !== "DONE") throw invalidState("Only a finished phase can be reopened.");
-        const number = nextRevision(await latestRevision(tx, phase.id));
-        const revision = await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phase.id, ...number, name: `${phase.name_snapshot} ${number.major}`, status: "NOT_SENT" } });
-        await setPhase(tx, phase, { status: "ACTIVE", is_locked: false });
-        await audit(tx, input.actor, "reopened", phase, "DONE", "ACTIVE", { reason, revision: revision.name, revisionId: revision.id });
-        return { phaseId: phase.id, revision: revision.name };
-      });
-    },
-
-    async completeSupervision(input: PhaseCommandInput) {
-      requireCommand(input, P.phaseReview);
-      return runTransaction(async (tx) => {
-        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
-        if (!isLegacySupervisionDefinition(phase.definition_id) || phase.status !== "ACTIVE" || phase.is_locked) throw invalidState("Only Supervision in progress can be finished.");
-        await setPhase(tx, phase, { status: "DONE", is_locked: true });
-        const current = await activeRevision(tx, phase.id);
-        const converted: string[] = [];
-        if (current) {
-          // This completion has no gate (legacy parity: Supervision finishes on its own terms). Open FEEDBACK is converted
-          // to checklist todos the same way a client rejection does, so it is never orphaned on a closed iteration.
-          const feedback = await tx.sfActivity.findMany({ where: { revision_id: current.id, mode: "FEEDBACK", status: "OPEN" }, orderBy: { created_at: "asc" } });
-          const fallbackAssignee = phaseSnapshot(phase).seatSnapshot === "drafter" ? project.pic_drafter_id : project.pic_designer_id;
-          for (const item of feedback) {
-            const id = randomUUID();
-            await tx.sfChecklistItem.create({
-              data: {
-                id,
-                project_id: project.id,
-                phase_id: phase.id,
-                label: item.content,
-                is_checked: false,
-                assigned_to_id: item.assigned_to_id ?? fallbackAssignee,
-                due_at: item.due_at,
-                created_by_id: item.created_by_id,
-              },
-            });
-            converted.push(id);
-          }
-          if (feedback.length > 0) {
-            await tx.sfActivity.updateMany({ where: { id: { in: feedback.map((item) => item.id) } }, data: { status: "COMPLETED", completed_at: nowOf(ports) } });
-          }
-          await closeRevision(tx, current.id);
-        }
-        await audit(tx, input.actor, "supervision-completed", phase, "ACTIVE", "DONE", { feedbackConverted: converted.length });
         return { phaseId: phase.id };
       });
     },
@@ -737,12 +567,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const status = phase.status as PhaseStatus;
         const previous = phases.find((p) => p.order_index === phase.order_index - 1) ?? null;
         const canStart = canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null);
-        const archived = project?.archived_at != null;
-        const commands = archived ? [] : availablePhaseCommands({ status, isLocked: phase.is_locked, legacySupervision: isLegacySupervisionDefinition(phase.definition_id), iterationState: phase.revisions[0]?.status ?? null }).filter((command) => {
-          if (command === "activate") return canStart && project?.status === "ACTIVE";
-          if (command === "bypass") return project?.status === "ACTIVE";
-          return true;
-        });
         const snap = phaseSnapshot(phase);
         results.push({
           id: phase.id,
@@ -763,7 +587,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           openRootChecklist: counts.openRootChecklistItems,
           blockers: fullBlockers(counts),
           todoBlockers: todoBlockers(counts),
-          commands,
           startBlockedReason: status === "PENDING" && !canStart && previous ? `Starts after ${phaseSnapshot(previous).nameSnapshot} is approved.` : null,
         });
       }
@@ -821,11 +644,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       const active = phase.revisions.find((rev) => OPEN_ITERATION_STATES.includes(rev.status as "NOT_SENT" | "SENT" | "ANSWERED")) ?? null;
       const activeActivities = active ? await readRevisionActivities(active.id) : [];
       const archived = phase.project.archived_at !== null;
-      const commands = archived ? [] : availablePhaseCommands({ status, isLocked: phase.is_locked, legacySupervision: isLegacySupervisionDefinition(phase.definition_id), iterationState: active?.status ?? null }).filter((command) => {
-        if (command === "activate") return canStart && phase.project.status === "ACTIVE";
-        if (command === "bypass") return phase.project.status === "ACTIVE";
-        return true;
-      });
       const snap = phaseSnapshot(phase);
       const isSupervision = isLegacySupervisionDefinition(phase.definition_id);
       const seatUserId = snap.seatSnapshot === "drafter" ? phase.project.pic_drafter_id : phase.project.pic_designer_id;
@@ -851,7 +669,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         waitingDays: status !== "ACTIVE" ? null : waitingDays(active?.status === "SENT" ? active.sent_at : phase.status_changed_at, nowOf(ports)),
         modifiable: !archived && isPhaseModifiable({ status, isLocked: phase.is_locked }),
         startBlockedReason: status === "PENDING" && !canStart && previous ? `Starts after ${resolvePhaseName(previous)} is approved.` : phase.project.status !== "ACTIVE" && status === "PENDING" ? "The project is not active." : null,
-        commands,
         blockers: fullBlockers(counts, blockerItems),
         todoBlockers: todoBlockers(counts),
         warnings: { optionalOpen, deliverableStatus: computeDeliverableStatus(deliverables, refRevisionId) },

@@ -24,7 +24,7 @@ function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
-/** Blockers for approveInternal, submitClient, approveClient. */
+/** What is still open on a phase, shown as information. Since WO-SF-ITER-01 no phase step is gated by it. */
 export function fullBlockers(
   counts: PhaseBlockerCounts,
   items?: { activityItems: { id: string; content: string }[]; checklistItems: { id: string; label: string }[] },
