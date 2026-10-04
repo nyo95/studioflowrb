@@ -8,6 +8,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import * as ui from "./index";
 import { getComboboxNavigationIndex } from "./internal/combobox-navigation";
+import { withCreatedOption } from "./internal/creatable-options";
 import { matchesAccept, selectFiles } from "./internal/file-drop";
 import { getEffectiveRailCollapsed } from "./internal/rail-state";
 
@@ -455,6 +456,16 @@ describe("UI Engine foundation", () => {
     assert.match(creatable, /if \(creating\) return;/);
     assert.match(creatable, /catch \(error\) \{\s*\n\s*setCreateError\(createErrorLabel\(error\)\)/);
     assert.match(creatable, /role="alert"/);
+  });
+
+  it("keeps naming a created value until the app's options carry it", () => {
+    const options = [{ id: "paint", label: "Paint" }];
+    assert.deepEqual(withCreatedOption(options, null), options);
+    assert.deepEqual(withCreatedOption(options, { id: "Tile", label: "Tile" }).map((option) => option.label), ["Paint", "Tile"]);
+    assert.deepEqual(withCreatedOption([...options, { id: "Tile", label: "Tile (saved)" }], { id: "Tile", label: "Tile" }).map((option) => option.label), ["Paint", "Tile (saved)"], "the app's own option wins once it exists");
+    const creatable = readFileSync(new URL("./patterns/creatable-search.tsx", import.meta.url), "utf8");
+    assert.match(creatable, /withCreatedOption<CreatableSearchOption>\(/);
+    assert.match(creatable, /setCreated\(\{ id: nextValue, label: text \}\)/);
   });
 
   it("puts combobox semantics on the field that owns the query", () => {

@@ -2,6 +2,17 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.319 | 2026-10-04 | fix(studioflow,ui-engine): show created categories and keep one code prefix per category
+
+- Owner-reported defect ("category creatable di Product Schedule rusak") and external-audit P0 (shared prefix breaks per-category reorder).
+- UI Engine `CreatableSearch`: a value created from the search box now stays named in the trigger (and listed) until the app's options carry it. Previously a new category kept the value but the trigger fell back to the placeholder, so creating looked like it failed. Fixed once in the shared component (`internal/creatable-options.ts`), so every consumer benefits; Brand's own custom-option workaround keeps working.
+- Add item dialog: categories are per section. Switching Material/Fixture now switches the category list and resets the default, instead of offering (and silently saving) a Material category on a Fixture row.
+- Prefixes: `categoryPrefix` (sync.ts) is the one rule for add, template seeding, import and "move to category": a category already in the project keeps its spelling and prefix; a new one takes the dictionary/fallback prefix unless another category of that project section already numbers under it, then the next free letter pair from its name (Wall panel beside Wallpaper → WL) or a numbered variant. `moveEntryToCategory` now follows the project's existing prefix for the target category (it used the dictionary prefix and could start a mixed PA/PT sequence). `upsertPrefix` refuses a prefix already used by another category of the section (`SCHEDULE_PREFIX_IN_USE`); the sheet import only records a sheet prefix in the dictionary when no other category holds it.
+- Older projects that already share a prefix between categories: `reorderEntries` accepts one category's rows and gives them back the code slots they held, leaving the other category's slots untouched; up/down moves within the row's own category. No data migration: existing codes are not renumbered.
+- Contract §11.2 records the one-prefix-per-category rule. Integration and UI Engine tests cover the WA/WL case, per-section reuse, the dictionary refusal, a pre-existing ambiguous dictionary on import, and reorder/up-down inside a shared legacy prefix.
+
+**Checks.** `npm run typecheck`, eslint on the touched areas, UI Engine suite (47/47), StudioFlow integration suite (118/118) passed on the disposable rebuild-only test database. Full suite, boundary and legacy-runtime checks are repeated in the closing verification revision of this branch. No schema migration or dependency.
+
 ## R8.318 | 2026-10-04 | fix(studioflow): completed projects are read-only and reminders never block completion
 
 - Owner decisions (2026-10-04), from the external-audit review: a completed project is read-only everywhere until reopened, and requirements/to-dos never block completion.
@@ -16,8 +27,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.318**
-- Next local revision: **R8.319**
+- Current revision after this entry is committed: **R8.319**
+- Next local revision: **R8.320**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

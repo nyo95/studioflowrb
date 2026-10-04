@@ -46,7 +46,7 @@ import {
   type TxClient,
 } from "../shared";
 
-import { cleanSnapshot, createEntryWithOptionalOption, optionData, resolvePrefix, seedScheduleFromTemplates, type SnapshotInput } from "./sync";
+import { categoryPrefix, cleanSnapshot, createEntryWithOptionalOption, optionData, seedScheduleFromTemplates, type SnapshotInput } from "./sync";
 
 /** `card_fields` is JSON on the row: null = no override, array = explicit (possibly empty). */
 function cardFieldsOf(value: unknown): string[] | null {
@@ -209,12 +209,32 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     return item;
   }
 
-  async function entryIds(tx: TxClient, projectId: string, section: ScheduleSection, prefix: string) {
-    return (await tx.sfScheduleEntry.findMany({
+  async function codeGroup(tx: TxClient, projectId: string, section: ScheduleSection, prefix: string) {
+    return tx.sfScheduleEntry.findMany({
       where: { project_id: projectId, section, prefix },
       orderBy: [{ increment: "asc" }, { created_at: "asc" }],
-      select: { id: true },
-    })).map((row) => row.id);
+      select: { id: true, category_key: true },
+    });
+  }
+
+  async function entryIds(tx: TxClient, projectId: string, section: ScheduleSection, prefix: string) {
+    return (await codeGroup(tx, projectId, section, prefix)).map((row) => row.id);
+  }
+
+  /**
+   * The full code-group order after reordering one category inside it. New categories never share a
+   * prefix (`categoryPrefix`), but projects created before that rule may hold two categories under one
+   * prefix; the screen reorders one category at a time, so its rows take back the code slots they held
+   * and the other category's rows keep theirs. Null when the ids are not exactly one category's rows.
+   */
+  function mergeCategoryOrder(group: Array<{ id: string; category_key: string }>, orderedIds: readonly string[]): string[] | null {
+    if (isPermutation(group.map((row) => row.id), orderedIds)) return [...orderedIds];
+    const key = group.find((row) => row.id === orderedIds[0])?.category_key;
+    if (key === undefined) return null;
+    const own = group.filter((row) => row.category_key === key).map((row) => row.id);
+    if (!isPermutation(own, orderedIds)) return null;
+    let next = 0;
+    return group.map((row) => (row.category_key === key ? orderedIds[next++] : row.id));
   }
 
   async function renumber(tx: TxClient, projectId: string, section: ScheduleSection, prefix: string, orderedIds?: readonly string[]) {
@@ -348,6 +368,9 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       const category = categoryOf(input.category);
       const prefix = prefixOf(input.prefix, category.label);
       return runTransaction(async (tx) => {
+        // One prefix names one category: a shared prefix would merge two categories into one code sequence.
+        const clash = await tx.sfSchedulePrefix.findFirst({ where: { section, prefix, category_key: { not: category.key } }, select: { category: true } });
+        if (clash) throw conflict("SCHEDULE_PREFIX_IN_USE", `${prefix} is already the prefix of ${clash.category}. Choose another prefix.`);
         const row = await tx.sfSchedulePrefix.upsert({
           where: { section_category_key: { section, category_key: category.key } },
           update: { category: category.label, prefix },
@@ -596,9 +619,9 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       const prefix = prefixOf(input.prefix, "Item");
       return runTransaction(async (tx) => {
         await loadWritableProject(tx, input.projectId);
-        const current = await entryIds(tx, input.projectId, section, prefix);
-        if (!isPermutation(current, input.orderedIds)) throw invalid("SCHEDULE_REORDER_INVALID", "The schedule changed. Refresh and try again.");
-        await renumber(tx, input.projectId, section, prefix, input.orderedIds);
+        const merged = mergeCategoryOrder(await codeGroup(tx, input.projectId, section, prefix), input.orderedIds);
+        if (!merged) throw invalid("SCHEDULE_REORDER_INVALID", "The schedule changed. Refresh and try again.");
+        await renumber(tx, input.projectId, section, prefix, merged);
         await writeAudit(ports, tx, { action: "studioflow.schedule.entries-reordered", entityType: "project", entityId: input.projectId, actor: input.actor, metadata: { section, prefix, count: input.orderedIds.length } });
         return { count: input.orderedIds.length };
       });
@@ -609,11 +632,14 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       await requireScheduleCommand(input);
       return runTransaction(async (tx) => {
         const entry = await loadEntry(tx, input.projectId, input.entryId, true);
-        const ids = await entryIds(tx, input.projectId, entry.section, entry.prefix);
-        const index = ids.indexOf(entry.id);
+        const group = await codeGroup(tx, input.projectId, entry.section, entry.prefix);
+        // Up/down moves within the row's own category, even where an older project shares the prefix.
+        const own = group.filter((row) => row.category_key === entry.category_key).map((row) => row.id);
+        const index = own.indexOf(entry.id);
         const target = input.direction === "up" ? index - 1 : index + 1;
-        if (index < 0 || target < 0 || target >= ids.length) return { entryId: entry.id };
-        [ids[index], ids[target]] = [ids[target], ids[index]];
+        if (index < 0 || target < 0 || target >= own.length) return { entryId: entry.id };
+        [own[index], own[target]] = [own[target], own[index]];
+        const ids = mergeCategoryOrder(group, own)!;
         await renumber(tx, input.projectId, entry.section, entry.prefix, ids);
         await writeAudit(ports, tx, { action: "studioflow.schedule.entries-reordered", entityType: "project", entityId: input.projectId, actor: input.actor, metadata: { projectId: input.projectId, section: entry.section, prefix: entry.prefix, count: ids.length } });
         return { entryId: entry.id };
@@ -628,10 +654,13 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         const entry = await loadEntry(tx, input.projectId, input.entryId, true);
         if (entry.category_key === category.key) return { entryId: entry.id };
         // Reuse the spelling already used for that category (project rows first, then the prefix dictionary).
-        const known = await tx.sfScheduleEntry.findFirst({ where: { project_id: input.projectId, section: entry.section, category_key: category.key }, select: { category: true } })
-          ?? await tx.sfSchedulePrefix.findUnique({ where: { section_category_key: { section: entry.section, category_key: category.key } }, select: { category: true } });
+        const known = await tx.sfSchedulePrefix.findUnique({ where: { section_category_key: { section: entry.section, category_key: category.key } }, select: { category: true } });
         if (known) category.label = known.category;
-        const prefix = await resolvePrefix(tx, entry.section, category.label, category.key);
+        // The same rule as adding a row: the project's spelling and prefix for that category, else a prefix no
+        // other category of the project numbers under.
+        const target = await categoryPrefix(tx, { projectId: input.projectId, section: entry.section, category: category.label, categoryKey: category.key, excludeEntryId: entry.id });
+        category.label = target.label;
+        const prefix = target.prefix;
         const fromCode = scheduleCode(entry.prefix, entry.increment);
         if (prefix === entry.prefix) {
           await tx.sfScheduleEntry.update({ where: { id: entry.id }, data: { category: category.label, category_key: category.key } });
@@ -939,7 +968,8 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
             // A category seen for the first time keeps the sheet's prefix, so imported codes stay recognisable.
             if (code) {
               const known = await tx.sfSchedulePrefix.findUnique({ where: { section_category_key: { section, category_key: category.key } } });
-              if (!known) await tx.sfSchedulePrefix.create({ data: { section, category: category.label, category_key: category.key, prefix: code.prefix } });
+              const clash = known ? null : await tx.sfSchedulePrefix.findFirst({ where: { section, prefix: code.prefix }, select: { id: true } });
+              if (!known && !clash) await tx.sfSchedulePrefix.create({ data: { section, category: category.label, category_key: category.key, prefix: code.prefix } });
             }
             await createEntryWithOptionalOption(tx, {
               projectId: input.projectId,

@@ -1377,6 +1377,37 @@ describe("SF-R3 Product Schedule", () => {
     assert.equal(second.entryId.length > 0, true);
   });
 
+  it("never lets two categories share a code sequence, and reorders one category inside an older shared prefix", async () => {
+    const { projectId } = await newProject();
+    const wallpaper = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Wallpaper" });
+    const panel = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Wall panel" });
+    await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Wallpaper" });
+    const codes = Object.fromEntries((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((row) => [row.id, row.code]));
+    assert.equal(codes[wallpaper.entryId], "WA-01");
+    assert.equal(codes[panel.entryId], "WL-01", "Wall panel takes its own prefix instead of WA-02");
+    // A Fixture category may reuse WA: numbering is per section.
+    const fixture = await sf.schedule.createEntry({ ...as(designer), projectId, section: "FIXTURE", category: "Wardrobe" });
+    assert.equal((await sf.schedule.listSchedule({ grants: ALL, projectId, section: "FIXTURE" })).find((row) => row.id === fixture.entryId)!.code, "WA-01");
+
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Wallpaper", prefix: "WP" });
+    await rejectsWith(sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Wall panel", prefix: "WP" }), "SCHEDULE_PREFIX_IN_USE");
+
+    // A project from before this rule: Granite and Gypsum both numbered under GR, interleaved.
+    const legacy = await newProject("Shared prefix project");
+    const granite1 = await sf.schedule.createEntry({ ...as(designer), projectId: legacy.projectId, section: "MATERIAL", category: "Granite" });
+    const gypsum1 = await sf.schedule.createEntry({ ...as(designer), projectId: legacy.projectId, section: "MATERIAL", category: "Gypsum" });
+    const granite2 = await sf.schedule.createEntry({ ...as(designer), projectId: legacy.projectId, section: "MATERIAL", category: "Granite" });
+    await testDb.prisma.sfScheduleEntry.update({ where: { id: gypsum1.entryId }, data: { prefix: "GR", increment: 50 } });
+    await testDb.prisma.sfScheduleEntry.update({ where: { id: granite2.entryId }, data: { increment: 3 } });
+    await testDb.prisma.sfScheduleEntry.update({ where: { id: gypsum1.entryId }, data: { increment: 2 } });
+    await sf.schedule.reorderEntries({ ...as(designer), projectId: legacy.projectId, section: "MATERIAL", prefix: "GR", orderedIds: [granite2.entryId, granite1.entryId] });
+    const after = Object.fromEntries((await sf.schedule.listSchedule({ grants: ALL, projectId: legacy.projectId })).map((row) => [row.id, row.code]));
+    assert.deepEqual([after[granite2.entryId], after[gypsum1.entryId], after[granite1.entryId]], ["GR-01", "GR-02", "GR-03"], "Gypsum keeps its slot; the two Granite rows swap");
+    await sf.schedule.moveEntry({ ...as(designer), projectId: legacy.projectId, entryId: granite1.entryId, direction: "up" });
+    const moved = Object.fromEntries((await sf.schedule.listSchedule({ grants: ALL, projectId: legacy.projectId })).map((row) => [row.id, row.code]));
+    assert.deepEqual([moved[granite1.entryId], moved[gypsum1.entryId], moved[granite2.entryId]], ["GR-01", "GR-02", "GR-03"], "up/down skips the other category's row");
+  });
+
   it("preserves pattern through template items, seeding, reuse, and search", async () => {
     await sf.schedule.createTemplateItem({
       ...as(designer),
@@ -1500,7 +1531,9 @@ describe("SF-R3 Product Schedule", () => {
     assert.deepEqual(rows.filter((row) => row.category === "Floor Tile").map((row) => row.code), ["FL-01", "FL-02"], "a new category keeps the sheet prefix");
 
     await rejectsWith(sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", csv: "Code,Product Category,Ex,Type\nZZ-01,,Brand,Thing" }), "SCHEDULE_CSV_CATEGORY");
-    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Tile Wall", prefix: "FL" });
+    await rejectsWith(sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Tile Wall", prefix: "FL" }), "SCHEDULE_PREFIX_IN_USE");
+    // A dictionary from before that rule may still hold one prefix twice; an import then refuses to guess.
+    await testDb.prisma.sfSchedulePrefix.create({ data: { section: "MATERIAL", category: "Tile Wall", category_key: "TILE WALL", prefix: "FL" } });
     await rejectsWith(sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", csv: "Code,Product Category,Ex,Type\nFL-09,,Brand,Thing" }), "SCHEDULE_CSV_CATEGORY");
     assert.equal((await sf.schedule.listSchedule({ grants: ALL, projectId })).length, 3, "a failed import writes nothing");
   });

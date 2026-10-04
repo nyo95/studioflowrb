@@ -523,6 +523,18 @@ transactional renumber that uses a deferrable unique constraint or a
 two-phase update inside the service (Executor chooses; behavior must match:
 codes stay gapless per `(project, section, prefix)` after add/delete/reorder).
 
+**One prefix per category (2026-10-04).** Because numbering, reorder and
+move are per prefix, two categories must never share one inside a project
+section. A category already in the project keeps its spelling and historical
+prefix; a new one takes the dictionary/fallback prefix unless another category
+of the project numbers under it, in which case it takes the next free letter
+pair from its name (`Wall panel` beside `Wallpaper` → `WL`, not `WA-02`), then
+a numbered variant. The prefix dictionary refuses a prefix already used by
+another category of the same section (`SCHEDULE_PREFIX_IN_USE`). Projects
+created before this rule may still hold two categories under one prefix:
+reorder and up/down then move rows only within their own category, and the
+other category keeps its code slots.
+
 ### 11.3 Option (the spec)
 
 `label` (A, B, C…), `is_final`, `status` DRAFT/APPROVED/NOT_USED, snapshot as
