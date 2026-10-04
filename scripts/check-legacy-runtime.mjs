@@ -174,7 +174,10 @@ export async function collectLegacyRuntimeReferences({ projectRoot = process.cwd
       LEGACY_PATH_PATTERN.lastIndex = 0;
       for (const match of value.text.matchAll(LEGACY_PATH_PATTERN)) {
         const token = extendTokenFromMatch(value.text, match.index);
-        if (isInside(projectRoot, resolve(dirname(file), token))) continue;
+        // A drive-letter path (`D:\Projects\studioflow\...`) is absolute on any host. POSIX `resolve` would
+        // treat it as relative and place it inside the project, so on Linux CI it was silently skipped.
+        const foreignAbsolute = process.platform !== "win32" && /^[A-Za-z]:[\\/]/.test(token);
+        if (!foreignAbsolute && isInside(projectRoot, resolve(dirname(file), token))) continue;
         const newlinesBeforeMatch = value.text.slice(0, match.index).split("\n").length - 1;
         violations.push({
           rule: RULE_LEGACY_RUNTIME_REFERENCE,

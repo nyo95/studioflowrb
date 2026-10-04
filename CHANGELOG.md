@@ -2,6 +2,15 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.326 | 2026-10-04 | chore(repository): verify the audit-alignment branch and fix the legacy-path checker on Linux
+
+- Closing verification of the external-audit alignment branch (R8.318–R8.325), plus one checker fix found while running it.
+- **Legacy-runtime checker (`scripts/check-legacy-runtime.mjs`).** On Linux, a Windows drive-letter legacy path (`D:\Projects\studioflow\…`) was resolved with POSIX `resolve` as a path *inside* the project and silently skipped, so the guard missed the very form legacy checkouts take on the office machines; its own fixture test failed on every Linux run (also on the untouched base `b28619f`). Drive-letter tokens are now treated as absolute off Windows. The real repository still has no legacy runtime reference.
+- **BACKLOG.** Closed the `[CLEANUP][P2]` "retire the transitional phase commands" item (done in R8.321) and the "use a task in My tasks" check of the R8.295 item. Added "External audit follow-ups": a `[UNVERIFIED]` list of what was walked on the disposable dev database and what still needs real data, plus three `[CLEANUP][P3]` items (SKU workbook `any` scoped service, unused imports flagged by `--noUnusedLocals`, stale Phase Engine V2 contract text) and one `[PLANNED][P3]` (browser geometry test needs an owner decision on a test dependency).
+- **Browser acceptance walked** (Chromium, `next dev` against a disposable rebuild-only PostgreSQL in the session container, owner bootstrapped with `scripts/bootstrap.ts`, fixtures created through the StudioFlow services): a phase-work-only drafter ticked a CD close-out requirement in Home → My tasks (checkbox enabled, no quick edit, persisted); "Mark as completed…" on a running project listed the five unfinished phases with the reason field and kept "Complete anyway" disabled until a reason is typed; on a project with every phase done and one unticked requirement it showed "Ready" plus the reminder note and completed; the completed project's Schedule showed the "Completed" read-only notice with "Reopen project" and no Add item, and after Reopen the notice was gone and Add item was back; in Product Schedule a typed new category stayed named in the trigger, Wallpaper got WA-01 and Wall panel WL-01, and switching the dialog to Fixture reset the category list. Master Data New price, Library batching and the `/ui-engine` rail were walked in their own revisions.
+
+**Checks.** `npm run typecheck`, `npm run lint -- --quiet`, `npm run check:boundaries`, `npm run check:legacy-runtime` passed. `npm test`: **830/830 passed** (none failed, skipped or cancelled) on the disposable rebuild-only `studioflow_rebuild_test` (PostgreSQL 16, port 55432, all 82 migrations). `npm run build` passed. No schema migration or dependency in the whole branch. Local `.env.test.local` and the fixture script were not committed. Not done: the real-data walk listed in BACKLOG, and any push/PR (needs owner instruction).
+
 ## R8.325 | 2026-10-04 | refactor(masterdata): type the price workbook's transaction-scoped commands
 
 - External-audit P3 (unsafe transactional casts in the Master Data workbook services), triaged: of the three `as unknown as` casts, the one that mattered was the price-database workbook's transaction-scoped service, typed as `Record<string, (input: any) => Promise<any>>` and called with non-null assertions. It is now `PriceWorkbookScopedService`, a `Pick` of the five commands the import runs (`createCategory`, `createVendor`, `createWorkPricesBulk`, `updatePriceLabor`, `updatePriceMaterialLabor`), so argument and result shapes are type-checked; the cast and the `!` assertions are gone. It compiled without any other change, i.e. the call sites already matched.
@@ -85,8 +94,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.325**
-- Next local revision: **R8.326**
+- Current revision after this entry is committed: **R8.326**
+- Next local revision: **R8.327**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

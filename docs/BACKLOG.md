@@ -316,8 +316,7 @@ duration report derived from actual status-change history (these are
 duplicated `/studioflow/timeline`'s per-project view with no added
 information; `/studioflow/timeline` remains. See `CHANGELOG.md` R8.138.
 
-- [ ] [UNVERIFIED] **Project-card home: three checks left after the 2026-10-02 browser pass (R8.295).** Expand the "My tasks" strip and use a task in it; the All projects scope as a manager with several designers; the project overview page's pipeline strip at phone width. The StudioFlow top navigation overlaps its icons and labels at phone width (an older shell issue, not from R8.292): fix it with the Lead's next UI pass.
-- [ ] [CLEANUP][P2] Retire the transitional StudioFlow phase commands (`activatePhase`, `submitForClientReview`, `rejectPhase`, `approveClient`, `reopenPhase`, `completeSupervision`) and the old `PhaseCommand` / `availablePhaseCommands` / `listPhaseAttention` code. No screen calls them any more; only about 60 integration-test call sites do. Move those tests to the iteration commands, then delete the old ones (they skip the event log and the CD rules).
+- [ ] [UNVERIFIED] **Project-card home: two checks left after the 2026-10-02 browser pass (R8.295).** ("Expand My tasks and use a task" was walked in R8.326: a drafter ticked a close-out requirement there.) The All projects scope as a manager with several designers; the project overview page's pipeline strip at phone width. The StudioFlow top navigation overlaps its icons and labels at phone width (an older shell issue, not from R8.292): fix it with the Lead's next UI pass.
 - [ ] [CLEANUP][P3] The undo bar on cards is app-local (a composed notice, not a floating toast). If a second app needs transient "saved · Undo" feedback, admit one generic toast to the UI Engine with a showcase and consumer matrix instead of copying it.
 - **[DONE R8.285-R8.295, browser-accepted 2026-10-02] Iteration-based phase tracking + project-card home (owner
   design discussion, 2026-10-01 — direction agreed, NOT built, no Work Order
@@ -493,6 +492,33 @@ one. Paper size/orientation are user-selectable (`DocumentSheet.printFormat`
 gap the owner named in legacy's fixed-layout export. No true per-page running
 header/page counter: browsers don't support it without a PDF-render pipeline,
 which the owner declined to add; see `STUDIOFLOW-REWORK-CONTRACT.md` §11.11.
+
+### External audit follow-ups (2026-10-04, after R8.318–R8.326)
+
+The owner's external audit of R8.285–R8.317 was verified against the code; its
+findings were fixed in R8.318–R8.325 (see `CHANGELOG.md`). What remains:
+
+- [ ] [UNVERIFIED] **R8.318–R8.324 browser pass on real data.** Walked on a disposable
+  dev database (completion dialog blocked/ready/override field, completed project
+  read-only and reopen, Today requirement tick by a phase-work-only drafter, new
+  category display and WA/WL prefixes, Fixture list reset, New price modes, Library
+  batching, `/ui-engine` rail at 839/840/841 px). Still to walk with real data: the
+  manager override with a reason end to end, "Complete anyway" audit entry in History,
+  saving a multi-supplier grid with real suppliers, typing "By Request" in each price
+  table, Library images from real Brand websites, and the StudioFlow rail at 840 px.
+- [ ] [CLEANUP][P3] SKU price workbook's transaction-scoped service still takes `any`
+  inputs (`sku-price-workbook.service.ts` `createScopedService`), and the header-keyed
+  `ParsedRow` is assembled through a cast. Type it like `PriceWorkbookScopedService` (R8.325).
+- [ ] [CLEANUP][P3] Unused imports flagged by `tsc --noUnusedLocals` in StudioFlow screens
+  (project overview page, presentation page, schedule board, studio settings view, Today
+  view) and in presentation/phases services (unused `project` destructures). No behavior;
+  remove in a UI pass.
+- [ ] [CLEANUP][P3] `docs/apps/studioflow/STUDIOFLOW-PHASE-ENGINE-V2-CONTRACT.md` still
+  describes `approveClient` / `rejectClient` / `rejectPhase`; those commands were removed in
+  R8.321. Mark the sections superseded the way `STUDIOFLOW-REWORK-CONTRACT.md` §5.2 now is.
+- [ ] [PLANNED][P3] A browser geometry test for the UI Engine shell (rail states × 839/840/841
+  × long content) inside `npm test` needs a browser test dependency, which needs an owner
+  decision; R8.322 pins the query and records the manual geometry pass instead.
 
 ### Open defects
 
