@@ -2,6 +2,16 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.324 | 2026-10-04 | perf(studioflow): render the Library catalogue before Brand website reads
+
+- External-audit P2 (Library website enrichment before client pagination), verified: `listBrands` awaited a website read for every Brand (5 at a time, 24 h cache) before the page could render a single card, so a cold cache made the first paint wait on every Brand website.
+- Website offerings are deliberately searchable (R8.302/R8.304), so reading only the visible page would have dropped search matches. Instead the catalogue renders at once and the reads stream in: `listBrands` returns Master Data rows only; new `readBrandWebsites` (≤ 24 Brands per call, only links stored in Master Data, same cached and SSRF-screened `discoverBrandWebsite`) backs `libraryBrandWebsitesAction`. On screen, `BrandWebsiteLoader` (read through `useSyncExternalStore`) asks for the visible page first, then the rest of the catalogue one batch at a time, so website-offering search covers every Brand once the reads finish; while they run, a search shows "still reading brand websites, more matches may appear". A failed batch leaves those Brands on their initials, as before.
+- Integration test: Brand rows no longer carry website fields; the website read returns only stored Brands and caps empty input.
+
+**Browser evidence** (Chromium, `next dev`, disposable dev database with 30 Brands, 3 with a website link): first card visible ~0.4–1.4 s after navigation; exactly two website reads (24 Brands, then 6), the visible page first; footer "1–24 of 30 brands"; no page errors. External sites were not reachable from the session sandbox, so the image path itself was not observed loading (initials shown); the reader is unchanged.
+
+**Checks.** `npm run typecheck`, eslint (Library), StudioFlow Library integration test passed. Full suite in the closing verification revision.
+
 ## R8.323 | 2026-10-04 | feat(masterdata): one New price entry with type and supplier modes, one amount reader
 
 - Owner question "kok di master data ada compare" and owner decision (2026-10-04): one New price entry instead of a four-item menu, English UI copy. "Compare suppliers" (R8.277) was never a comparison of stored prices: it is a multi-supplier entry grid backed by the all-or-nothing `createWorkPriceMatrix`. Backend unchanged.
@@ -68,8 +78,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.323**
-- Next local revision: **R8.324**
+- Current revision after this entry is committed: **R8.324**
+- Next local revision: **R8.325**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

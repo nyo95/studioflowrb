@@ -1,7 +1,9 @@
 "use client";
 
 import { BookOpenText, Camera, ChevronDown, Globe2, SlidersHorizontal } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+
+import { libraryBrandWebsitesAction } from "../actions";
 
 import {
   Badge,
@@ -35,6 +37,62 @@ type LibraryBrand = {
   imageUrl: string | null;
   websiteCatalogue: { sourceUrl: string; offerings: string[] } | null;
 };
+
+type BaseBrand = Omit<LibraryBrand, "imageUrl" | "websiteCatalogue">;
+type BrandWebsite = Pick<LibraryBrand, "imageUrl" | "websiteCatalogue">;
+const WEBSITE_BATCH = 24;
+
+/**
+ * Brand website images and offerings arrive after the catalogue renders (external audit, 2026-10-04): the
+ * visible page is read first, then every other Brand in batches, one request at a time, so website-offering
+ * search covers the whole catalogue once the reads finish. A Brand whose read failed shows its initials,
+ * exactly as one without a website does. Kept outside React state so the screen subscribes to it instead of
+ * scheduling renders from effects.
+ */
+type WebsiteState = { websites: ReadonlyMap<string, BrandWebsite>; settled: ReadonlySet<string> };
+const EMPTY_WEBSITES: WebsiteState = { websites: new Map(), settled: new Set() };
+
+class BrandWebsiteLoader {
+  private state: WebsiteState = EMPTY_WEBSITES;
+  private queue: string[] = [];
+  private readonly inFlight = new Set<string>();
+  private busy = false;
+  private readonly listeners = new Set<() => void>();
+
+  subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
+  getSnapshot = () => this.state;
+  getServerSnapshot = () => EMPTY_WEBSITES;
+
+  /** Queue Brands; `first` puts them ahead of the rest (the page being looked at). */
+  request(ids: readonly string[], first = false) {
+    const wanted = new Set(ids.filter((id) => !this.state.settled.has(id) && !this.inFlight.has(id)));
+    const rest = this.queue.filter((id) => !wanted.has(id));
+    const added = [...wanted].filter((id) => first || !this.queue.includes(id));
+    this.queue = first ? [...added, ...rest] : [...this.queue, ...added];
+    void this.pump();
+  }
+
+  private async pump() {
+    if (this.busy) return;
+    const batch = this.queue.splice(0, WEBSITE_BATCH);
+    if (batch.length === 0) return;
+    this.busy = true;
+    batch.forEach((id) => this.inFlight.add(id));
+    const websites = new Map(this.state.websites);
+    try {
+      const result = await libraryBrandWebsitesAction(batch);
+      if (result.ok) for (const row of result.data) websites.set(row.id, { imageUrl: row.imageUrl, websiteCatalogue: row.websiteCatalogue });
+    } catch {
+      // A failed batch leaves those Brands on their initials; the catalogue itself is unaffected.
+    } finally {
+      this.state = { websites, settled: new Set([...this.state.settled, ...batch]) };
+      batch.forEach((id) => this.inFlight.delete(id));
+      this.busy = false;
+      this.listeners.forEach((listener) => listener());
+    }
+    void this.pump();
+  }
+}
 
 type FilterOption = { id: string; label: string };
 const PAGE_SIZE = 24;
@@ -197,7 +255,7 @@ function BrandDetail({ brand }: { brand: LibraryBrand }) {
 }
 
 /** Read-only Brand discovery over Master Data. The layout mirrors a catalogue without inventing product-only fields. */
-export function LibraryDirectory({ brands }: { brands: LibraryBrand[] }) {
+export function LibraryDirectory({ brands: baseBrands }: { brands: BaseBrand[] }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("name-asc");
   const [categoryIds, setCategoryIds] = useState<Set<string>>(new Set());
@@ -205,6 +263,11 @@ export function LibraryDirectory({ brands }: { brands: LibraryBrand[] }) {
   const [hashtags, setHashtags] = useState<Set<string>>(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [openBrandId, setOpenBrandId] = useState<string | null>(null);
+  const [loader] = useState(() => new BrandWebsiteLoader());
+  const { websites, settled } = useSyncExternalStore(loader.subscribe, loader.getSnapshot, loader.getServerSnapshot);
+  useEffect(() => { loader.request(baseBrands.map((brand) => brand.id)); }, [baseBrands, loader]);
+  const websitesLoading = baseBrands.some((brand) => !settled.has(brand.id));
+  const brands = useMemo<LibraryBrand[]>(() => baseBrands.map((brand) => ({ ...brand, ...(websites.get(brand.id) ?? { imageUrl: null, websiteCatalogue: null }) })), [baseBrands, websites]);
   const openBrand = brands.find((brand) => brand.id === openBrandId) ?? null;
   // Hashtags are stored without "#", so a typed "#chair" must still find "chair".
   const q = query.trim().replace(/^#+/, "").toLowerCase();
@@ -241,6 +304,8 @@ export function LibraryDirectory({ brands }: { brands: LibraryBrand[] }) {
   }, [brands, categoryIds, hashtags, q, sort, vendorIds]);
   const paging = usePagination(rows.length, PAGE_SIZE, JSON.stringify([q, [...categoryIds].sort(), [...vendorIds].sort(), [...hashtags].sort(), sort]));
   const visibleRows = rows.slice(paging.offset, paging.offset + PAGE_SIZE);
+  const visibleKey = visibleRows.map((row) => row.brand.id).join(",");
+  useEffect(() => { if (visibleKey) loader.request(visibleKey.split(","), true); }, [visibleKey, loader]);
 
   const activeFilters = [
     ...filterOptions.categories.filter((option) => categoryIds.has(option.id)).map((option) => ({ key: `c:${option.id}`, label: option.label, remove: () => toggle(categoryIds, setCategoryIds, option.id) })),
@@ -317,6 +382,7 @@ export function LibraryDirectory({ brands }: { brands: LibraryBrand[] }) {
               <div className="grid gap-3">
                 <Text tone="secondary" size="sm" role="status">
                   {rows.length ? `${paging.offset + 1}–${Math.min(paging.offset + PAGE_SIZE, rows.length)} of ${rows.length}` : "0"} brands
+                  {q && websitesLoading ? " · still reading brand websites, more matches may appear" : ""}
                 </Text>
                 {rows.length > PAGE_SIZE ? <Pagination page={paging.page} pageCount={paging.pageCount} onPageChange={paging.setPage} label="Brand pages" /> : null}
               </div>

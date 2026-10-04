@@ -347,6 +347,14 @@ export async function projectCompletionAction(projectId: string, change: "comple
   });
 }
 
+/** Library: website images and offerings for one batch of Brands (read-only). */
+export async function libraryBrandWebsitesAction(brandIds: string[]) {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    return studioFlow.library.readBrandWebsites({ grants: ctx.grants, brandIds: parse(z.array(Id).max(24), brandIds) });
+  });
+}
+
 /** What completing the project would meet right now, for the confirmation dialog. Writes nothing. */
 export async function projectCompletionReadinessAction(projectId: string) {
   return runSafeAction(async () => {

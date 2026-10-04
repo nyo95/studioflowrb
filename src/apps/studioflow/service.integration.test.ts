@@ -1653,6 +1653,11 @@ describe("StudioFlow Library", () => {
 
     const noMatch = await sf.library.listBrands({ grants: ALL, search: `nonexistent-${tag}` });
     assert.deepEqual(noMatch, []);
+
+    // Brand rows never wait on websites; the website read is separate, batched and keyed by stored Brands only.
+    assert.equal("imageUrl" in found, false);
+    assert.deepEqual(await sf.library.readBrandWebsites({ grants: ALL, brandIds: [brand.id, randomUUID()] }), [{ id: brand.id, imageUrl: null, websiteCatalogue: null }]);
+    assert.deepEqual(await sf.library.readBrandWebsites({ grants: ALL, brandIds: [] }), []);
   });
 });
 
