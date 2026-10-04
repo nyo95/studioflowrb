@@ -2,6 +2,14 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.320 | 2026-10-04 | fix(studioflow): let Today tick phase requirements under the service rule
+
+- External-audit finding C: the service lets a person with phase-work access (no task-manage) tick a phase requirement, but Today disabled that checkbox (`editable = canManageTasks` for every checklist row). This hid the close-out work R8.317 started showing in Today from the designer who owns it.
+- One rule now: `canTickChecklistItem` (domain/checklist.ts) is used by `setItemChecked` and by Today. A phase requirement (root item of a phase) needs phase-work; a general to-do or a subtask needs task-manage. Quick edit, delete and adding items in Today still need task-manage. The phase page already followed this rule.
+- Domain test covers the four combinations.
+
+**Checks.** `npm run typecheck`, eslint on the touched files, domain suite (31/31), StudioFlow integration suite (118/118) passed on the disposable rebuild-only test database. Full suite repeated in the closing verification revision.
+
 ## R8.319 | 2026-10-04 | fix(studioflow,ui-engine): show created categories and keep one code prefix per category
 
 - Owner-reported defect ("category creatable di Product Schedule rusak") and external-audit P0 (shared prefix breaks per-category reorder).
@@ -27,8 +35,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.319**
-- Next local revision: **R8.320**
+- Current revision after this entry is committed: **R8.320**
+- Next local revision: **R8.321**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

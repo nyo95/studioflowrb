@@ -10,6 +10,7 @@ import {
   CHECKLIST_PRIORITY_NONE,
   CHECKLIST_SORT_STEP,
   buildTree,
+  canTickChecklistItem,
   cascadeTargets,
   steppedSortOrders,
   type ChecklistFilterQuery,
@@ -294,10 +295,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
       }
       return runTransaction(async (tx) => {
         const item = await loadItem(tx, input.projectId, input.itemId, input, { allowLocked: true });
-        // A root item of a phase is a requirement (a reminder that gates nothing): ticking it only needs
-        // phase-work access. Everything else still needs task-manage access.
-        const isMergedRequirement = item.parent_id === null && item.phase_id !== null;
-        if (!hasPermission(input.grants, P.taskManage) && !(isMergedRequirement && hasPermission(input.grants, P.phaseWork))) {
+        if (!canTickChecklistItem({ parentId: item.parent_id, phaseId: item.phase_id }, { canManageTasks: hasPermission(input.grants, P.taskManage), canWork: hasPermission(input.grants, P.phaseWork) })) {
           requirePermission(input.grants, P.taskManage);
         }
         const children = item.parent_id === null ? await tx.sfChecklistItem.findMany({ where: { parent_id: item.id }, select: { id: true } }) : [];

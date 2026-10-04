@@ -7,6 +7,7 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 
 import {
   applyChecklistFilter,
+  canTickChecklistItem,
   countChecklistFilters,
   fromChecklistFilterQuery,
   toChecklistFilterQuery,
@@ -125,6 +126,9 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
       : run(task.key, () => checklistAction({ op: "check", projectId: task.projectId, itemId: task.id, checked }));
 
   const renderTask = (task: FeedTask, nested = false) => {
+    // Ticking follows the service rule: a phase requirement only needs phase-work access (it shows up here
+    // after its phase is done, as close-out work). Editing and deleting a checklist item still need task-manage.
+    const tickable = task.source === "activity" ? canWork : canTickChecklistItem({ parentId: task.parentId, phaseId: task.phaseId }, { canManageTasks, canWork });
     const editable = task.source === "activity" ? canWork : canManageTasks;
     return (
       <li key={task.key} className={`grid gap-px ${nested ? "ml-7" : ""}`}>
@@ -132,7 +136,7 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
           {task.mode === "FEEDBACK" ? <MessageSquareText aria-label="Feedback" className="mt-0.5 h-4 w-4 shrink-0 text-warning" /> : null}
           <Checkbox
             checked={task.isChecked}
-            disabled={!editable || pendingKey === task.key}
+            disabled={!tickable || pendingKey === task.key}
             onCheckedChange={(checked) => toggle(task, checked === true)}
             label={<span className={task.isChecked ? "text-ink-tertiary line-through" : ""}>{task.label}</span>}
             className="min-w-0 flex-1"

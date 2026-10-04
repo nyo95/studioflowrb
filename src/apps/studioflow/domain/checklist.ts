@@ -124,3 +124,13 @@ export function steppedSortOrders(ids: readonly string[]): Array<{ id: string; s
 export function cascadeTargets(item: { id: string; parentId: string | null }, childIds: readonly string[]): string[] {
   return item.parentId === null ? [item.id, ...childIds] : [item.id];
 }
+
+/**
+ * Who may tick a checklist item (one rule for the service and every screen). A root item of a phase is a
+ * requirement, a reminder that gates nothing, so phase-work access is enough; anything else — a general
+ * to-do or a subtask — needs task-manage access.
+ */
+export function canTickChecklistItem(item: { parentId: string | null; phaseId: string | null }, access: { canManageTasks: boolean; canWork: boolean }): boolean {
+  if (access.canManageTasks) return true;
+  return access.canWork && item.parentId === null && item.phaseId !== null;
+}

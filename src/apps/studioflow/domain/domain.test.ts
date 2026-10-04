@@ -9,6 +9,7 @@ import { compareOptionLabels, fallbackPrefix, nextOptionLabel, normalizeSchedule
 import {
   applyChecklistFilter,
   buildTree,
+  canTickChecklistItem,
   cascadeTargets,
   countChecklistFilters,
   fromChecklistFilterQuery,
@@ -110,6 +111,15 @@ describe("blockers", () => {
 });
 
 describe("checklist rules", () => {
+  it("lets phase work tick a phase requirement, but needs task-manage for to-dos and subtasks", () => {
+    const worker = { canManageTasks: false, canWork: true };
+    assert.equal(canTickChecklistItem({ parentId: null, phaseId: "p" }, worker), true);
+    assert.equal(canTickChecklistItem({ parentId: null, phaseId: null }, worker), false);
+    assert.equal(canTickChecklistItem({ parentId: "root", phaseId: "p" }, worker), false);
+    assert.equal(canTickChecklistItem({ parentId: "root", phaseId: null }, { canManageTasks: true, canWork: false }), true);
+    assert.equal(canTickChecklistItem({ parentId: null, phaseId: "p" }, { canManageTasks: false, canWork: false }), false);
+  });
+
   const tasks = [
     { id: "a", isChecked: false, dueDate: "2026-09-10", priority: 1, assigneeId: "u1" },
     { id: "b", isChecked: true, dueDate: "2026-09-10", priority: 1, assigneeId: null },
