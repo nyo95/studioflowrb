@@ -2,6 +2,13 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.325 | 2026-10-04 | refactor(masterdata): type the price workbook's transaction-scoped commands
+
+- External-audit P3 (unsafe transactional casts in the Master Data workbook services), triaged: of the three `as unknown as` casts, the one that mattered was the price-database workbook's transaction-scoped service, typed as `Record<string, (input: any) => Promise<any>>` and called with non-null assertions. It is now `PriceWorkbookScopedService`, a `Pick` of the five commands the import runs (`createCategory`, `createVendor`, `createWorkPricesBulk`, `updatePriceLabor`, `updatePriceMaterialLabor`), so argument and result shapes are type-checked; the cast and the `!` assertions are gone. It compiled without any other change, i.e. the call sites already matched.
+- Left as they are (narrow, local, documented here rather than churned): the ExcelJS cell-object read in `cellText` and the header-keyed `ParsedRow` assembly in the SKU workbook. The SKU workbook's scoped service still uses `any` parameters; recorded in BACKLOG as `[CLEANUP]`.
+
+**Checks.** `npm run typecheck`, eslint (Master Data), Master Data suites (100/100) passed on the disposable rebuild-only test database.
+
 ## R8.324 | 2026-10-04 | perf(studioflow): render the Library catalogue before Brand website reads
 
 - External-audit P2 (Library website enrichment before client pagination), verified: `listBrands` awaited a website read for every Brand (5 at a time, 24 h cache) before the page could render a single card, so a cold cache made the first paint wait on every Brand website.
@@ -78,8 +85,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.324**
-- Next local revision: **R8.325**
+- Current revision after this entry is committed: **R8.325**
+- Next local revision: **R8.326**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

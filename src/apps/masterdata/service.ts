@@ -39,7 +39,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
   const priceDatabaseWorkbookService = createPriceDatabaseWorkbookService(db, p, (tx) => createMasterDataService(tx as PrismaClient, {
     ...p,
     runTransaction: async (work) => work(tx as any),
-  }) as unknown as Record<string, (input: any) => Promise<any>>);
+  }));
 
   return {
     async summary(input: { grants: PermissionGrants }) {

@@ -7,7 +7,15 @@ import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 import { createWorkbook, loadWorkbook, workbookToBuffer, type Workbook, type WorkbookCellValue, type Worksheet, type WorksheetRow } from "@platform/utilities/tabular";
 import { titleCaseWords } from "@platform/utilities/text-case";
 
+import type { createCategoryService } from "./category.service";
+import type { createPricingService } from "./pricing.service";
 import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, requiredPriceAmount } from "./shared";
+import type { createVendorService } from "./vendor.service";
+
+/** The Master Data commands an import runs inside its own transaction (typed, instead of any-keyed). */
+export type PriceWorkbookScopedService = Pick<ReturnType<typeof createCategoryService>, "createCategory">
+  & Pick<ReturnType<typeof createVendorService>, "createVendor">
+  & Pick<ReturnType<typeof createPricingService>, "createWorkPricesBulk" | "updatePriceLabor" | "updatePriceMaterialLabor">;
 
 /**
  * The supplier-and-price database workbook, shaped like the owner's own Excel file so an existing file can be imported
@@ -194,7 +202,7 @@ function parseWorkbook(workbook: Workbook): Parsed {
 export function createPriceDatabaseWorkbookService(
   db: PrismaClient,
   ports: MasterDataServicePorts,
-  createScopedService: (tx: unknown) => Record<string, (input: any) => Promise<any>>,
+  createScopedService: (tx: unknown) => PriceWorkbookScopedService,
 ) {
   async function load(file: WorkbookFile): Promise<{ data: Buffer; parsed: Parsed }> {
     const { data, name } = bytesOf(file);
@@ -230,7 +238,7 @@ export function createPriceDatabaseWorkbookService(
       const found = matches.find((c) => c.kind === "WORK") ?? matches[0];
       if (found) { categoryCache.set(k, found.id); return found.id; }
       try {
-        const created = await s.createCategory!({ grants, actor, name, kind: "WORK" });
+        const created = await s.createCategory({ grants, actor, name, kind: "WORK" });
         categoryCache.set(k, created.categoryId);
         totals.categoriesCreated += 1;
         return created.categoryId;
@@ -252,7 +260,7 @@ export function createPriceDatabaseWorkbookService(
       for (const name of supplier.categories) { const id = await categoryId(name, where); if (id) categoryIds.push(id); }
       const person = supplier.pic ?? (supplier.phones.length || supplier.email ? supplier.name : null);
       try {
-        const created = await s.createVendor!({ grants, actor, name: supplier.name, address: supplier.address ?? undefined, notes: supplier.notes ?? undefined, vendorTypeIds: [type.id], categoryIds, contacts: person ? [{ personName: person, phones: supplier.phones.slice(0, 3), email: supplier.email, isPrimary: true }] : [] });
+        const created = await s.createVendor({ grants, actor, name: supplier.name, address: supplier.address ?? undefined, notes: supplier.notes ?? undefined, vendorTypeIds: [type.id], categoryIds, contacts: person ? [{ personName: person, phones: supplier.phones.slice(0, 3), email: supplier.email, isPrimary: true }] : [] });
         vendorByKey.set(key(supplier.name), { id: created.vendorId, labor: type.can_supply_labor });
         totals.suppliersCreated += 1;
       } catch (error) {
@@ -283,7 +291,7 @@ export function createPriceDatabaseWorkbookService(
         if (!vendor) {
           if (!subcon) { errors.push({ ...where, message: `Supplier "${amount.supplier}" does not exist and there is no Subcon type to create it with.` }); continue; }
           try {
-            const created = await s.createVendor!({ grants, actor, name: amount.supplier, vendorTypeIds: [subcon.id], contacts: amount.pic ? [{ personName: amount.pic, isPrimary: true }] : [] });
+            const created = await s.createVendor({ grants, actor, name: amount.supplier, vendorTypeIds: [subcon.id], contacts: amount.pic ? [{ personName: amount.pic, isPrimary: true }] : [] });
             vendor = { id: created.vendorId, labor: subcon.can_supply_labor };
             vendorByKey.set(key(amount.supplier), vendor);
             totals.suppliersFromPrices += 1;
@@ -326,8 +334,8 @@ export function createPriceDatabaseWorkbookService(
       if (found.amount.toString() === cell.amount && (found.amount_label ?? null) === cell.label && found.unit_id === cell.unitId && found.category_id === cell.categoryId && (found.notes ?? null) === notes) { totals.pricesUnchanged += 1; continue; }
       try {
         const common = { grants, actor, name: found.name, categoryId: cell.categoryId, vendorId: cell.vendorId, unitId: cell.unitId, amount: amountInput(cell), currency: found.currency, notes };
-        if (options.priceKind === "labor") await s.updatePriceLabor!({ ...common, priceLaborId: found.id });
-        else await s.updatePriceMaterialLabor!({ ...common, priceMaterialLaborId: found.id, scopeNote: found.scope_note });
+        if (options.priceKind === "labor") await s.updatePriceLabor({ ...common, priceLaborId: found.id });
+        else await s.updatePriceMaterialLabor({ ...common, priceMaterialLaborId: found.id, scopeNote: found.scope_note });
         totals.pricesUpdated += 1;
       } catch (error) {
         if (!(error instanceof AppError)) throw error;
@@ -338,7 +346,7 @@ export function createPriceDatabaseWorkbookService(
       for (let start = 0; start < group.length; start += 100) {
         const chunk = group.slice(start, start + 100);
         try {
-          const created = await s.createWorkPricesBulk!({ grants, actor, kind: options.priceKind, vendorId: chunk[0]!.vendorId, categoryId: chunk[0]!.categoryId, currency: "IDR", rows: chunk.map((cell) => ({ name: cell.name, unitId: cell.unitId, amount: amountInput(cell), notes: cell.item.notes || null })) });
+          const created = await s.createWorkPricesBulk({ grants, actor, kind: options.priceKind, vendorId: chunk[0]!.vendorId, categoryId: chunk[0]!.categoryId, currency: "IDR", rows: chunk.map((cell) => ({ name: cell.name, unitId: cell.unitId, amount: amountInput(cell), notes: cell.item.notes || null })) });
           totals.pricesCreated += created.ids.length;
         } catch (error) {
           if (!(error instanceof AppError)) throw error;
