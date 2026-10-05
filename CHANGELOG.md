@@ -2,6 +2,15 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.334 | 2026-10-06 | fix(studioflow,ui-engine): "Change photo" opens the file picker directly
+
+- Owner (2026-10-06): pressing "Change photo" / "Add photo" on a schedule item showed a second step with a "Choose image" button. It now goes straight to the file picker. The code comment already promised this but nothing implemented it.
+- UI Engine `ImageWorkspace` gains an optional `openOnMount` (generic, off by default); the schedule photo editor sets it. If the browser declines to open the picker, "Choose image" is still there. The MOM photo flow is unchanged.
+- Verified in the browser pane (`next dev`): one click on "Change photo of PT-01" triggered exactly one file-picker open.
+- Review leftovers: `projectCompletionAction` validates its `change` argument (an unknown value no longer falls through to reopen); `receiveSample` stamps the received time from the injected clock like the other commands.
+
+**Checks.** `npm run typecheck`, `npm run lint -- --quiet`, `check:boundaries` passed; `npm test` **838/838** (none failed, skipped or cancelled) on the disposable rebuild-only test database.
+
 ## R8.333 | 2026-10-06 | fix(studioflow): list projects A to Z
 
 - Owner decision (2026-10-06): project lists order by priority, then name **A→Z** (they were Z→A, a legacy carry-over): the Projects list, the header quick-search and a client's project list. "My projects" on the home cards stays the signed-in user's own PIC projects; the two open questions are closed in BACKLOG.
@@ -172,8 +181,8 @@ Logic, backend and flow review of the StudioFlow phase, task and Today code afte
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.333**
-- Next local revision: **R8.334**
+- Current revision after this entry is committed: **R8.334**
+- Next local revision: **R8.335**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

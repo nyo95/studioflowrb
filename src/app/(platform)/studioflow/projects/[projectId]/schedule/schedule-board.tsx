@@ -103,8 +103,9 @@ const PHOTO_ASPECT = 4 / 5;
  * own `Dialog` — the entry panel is already a modal, and stacking a second
  * modal on top of it read as two disconnected popups for one action (owner,
  * 2026-09-24: "modalnya jd 1 aja"). `ImageWorkspace` opens the OS file
- * picker itself as soon as it mounts, so swapping the row in already gives
- * "click photo → file picker appears" with no extra click of our own.
+ * picker itself as soon as it mounts (`openOnMount`), so "Change photo" goes
+ * straight to choosing a file; "Choose image" stays as the fallback when the
+ * browser declines to open it.
  */
 function InlinePhotoEditor({
   projectId,
@@ -146,7 +147,7 @@ function InlinePhotoEditor({
         </div>
         <Button type="button" size="sm" variant="ghost" onClick={onClose} disabled={isPending(pendingKey)}>Cancel</Button>
       </div>
-      <ImageWorkspace label="Schedule photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" onPrepared={onPrepared} disabled={isPending(pendingKey)} />
+      <ImageWorkspace label="Schedule photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" onPrepared={onPrepared} disabled={isPending(pendingKey)} openOnMount />
       {photoError ? <InlineError>{photoError}</InlineError> : null}
     </div>
   );

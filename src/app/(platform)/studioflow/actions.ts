@@ -341,7 +341,7 @@ export async function projectCompletionAction(projectId: string, change: "comple
     const ctx = await context();
     const id = parse(Id, projectId);
     const reason = parse(z.string().max(500).optional(), overrideReason);
-    const result = change === "complete"
+    const result = parse(z.enum(["complete", "reopen"]), change) === "complete"
       ? await studioFlow.phases.markProjectCompleted({ ...ctx, projectId: id, overrideReason: reason })
       : await studioFlow.phases.reopenProject({ ...ctx, projectId: id });
     refresh(id);

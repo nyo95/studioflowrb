@@ -31,6 +31,7 @@ import {
   invalid,
   loadWritableProject,
   notFound,
+  nowOf,
   optionalText,
   requireCommand,
   requireProjectAccess,
@@ -817,7 +818,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         if (request.status !== "REQUESTED") throw conflict("SAMPLE_NOT_PENDING", "This sample request was already resolved.");
         await tx.sfScheduleSampleRequest.update({
           where: { id: request.id },
-          data: { status: "RECEIVED", received_by_id: userId, received_by_name: input.actor.label, received_at: new Date(), received_note: receivedNote },
+          data: { status: "RECEIVED", received_by_id: userId, received_by_name: input.actor.label, received_at: nowOf(ports), received_note: receivedNote },
         });
         await writeAudit(ports, tx, { action: "studioflow.schedule.sample-received", entityType: OPTION_ENTITY, entityId: request.option_id, actor: input.actor, metadata: { projectId: input.projectId, entryId: request.option.entry_id, label: request.option.label } });
         return { requestId: request.id };

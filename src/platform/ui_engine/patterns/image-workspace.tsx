@@ -39,6 +39,11 @@ export type ImageWorkspaceProps = {
    * An image that already fits is encoded once with the settings above.
    */
   targetBytes?: number;
+  /**
+   * Open the file picker as soon as the workspace appears, for a "Change photo" click that should go straight to
+   * choosing a file. The browser only allows this right after a user click; if it declines, "Choose image" stays.
+   */
+  openOnMount?: boolean;
   disabled?: boolean;
 };
 
@@ -105,8 +110,9 @@ function drawStrokes(context: CanvasRenderingContext2D, strokes: readonly Stroke
 }
 
 /** Browser image preparation only; storage and consumer policy stay outside. */
-export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jpeg,image/webp", maxBytes = 30 * 1024 * 1024, maxDimension = 1800, outputType = "image/png", outputQuality = 0.86, aspect, targetBytes = DEFAULT_TARGET_BYTES, disabled = false }: ImageWorkspaceProps) {
+export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jpeg,image/webp", maxBytes = 30 * 1024 * 1024, maxDimension = 1800, outputType = "image/png", outputQuality = 0.86, aspect, targetBytes = DEFAULT_TARGET_BYTES, disabled = false, openOnMount = false }: ImageWorkspaceProps) {
   const pickerRef = useRef<HTMLInputElement>(null);
+  const opened = useRef(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const panState = useRef<{ pointerId: number; startX: number; startY: number; startPanX: number; startPanY: number } | null>(null);
@@ -127,6 +133,12 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
   const [colorSupported] = useState(canBakeColorFilter);
 
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
+
+  useEffect(() => {
+    if (!openOnMount || disabled || opened.current) return;
+    opened.current = true;
+    pickerRef.current?.click();
+  }, [openOnMount, disabled]);
 
   useEffect(() => {
     const canvas = overlayRef.current;
