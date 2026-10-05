@@ -186,8 +186,9 @@ choice. `ON_HOLD` blocks phase activation (legacy "Project must be ACTIVE").
 Archive requires a reason; an archived project is read-only everywhere and
 hidden from Today by default.
 
-**Completion (owner, 2026-10-04).** Every phase must be done and no client
-feedback may be open; a project manager may complete a blocked project only
+**Completion (owner, 2026-10-04; feedback clause removed 2026-10-05).** Every
+phase must be done (client notes carry no open state, so the client's OK on
+each phase is the whole test); a project manager may complete a blocked project only
 with a written reason, kept in the audit history. Requirements and to-dos are
 reminders: they never block completion, are only listed in the confirmation,
 and stay on the project as they are. **A completed project is read-only
@@ -280,6 +281,33 @@ do not exist on the rebuilt model. Project/phase to-dos live exclusively in
 defer command) was fully purged in R8.98. Adding a `mode: "TODO"` activity is
 rejected with `ACTIVITY_TODO_DEPRECATED`.
 
+**Superseded again: client notes per iteration (owner, 2026-10-05, R8.327).**
+Per-point feedback is retired. What the client said about an iteration is
+that iteration's **client notes** (`SfRevision.note`, one text; Supervision
+visits already used it). Flow: send → "Client answered" (write the notes) →
+OK (phase done) or Revision (the next iteration shows the previous notes as
+its brief) → … until OK. Notes are never copied, ticked, assigned or carried:
+a Revision answers them. They are editable on any iteration while the project
+is open (`setIterationNote`, undoable like every iteration event) and are kept
+in the admin reset snapshot. The R8.9x conversion of carried-forward feedback
+into root checklist items is removed: it had made client remarks
+indistinguishable from requirements (legacy at `c4b0c466` kept them apart —
+feedback became revision TODO activities, never checklist rows). The add/
+edit/tick/delete feedback commands, their actions and screens, the Today
+feedback rows, and the feedback count in the open-items projection are gone.
+Migration `20261005090000_sf_iteration_notes_replace_feedback` appended every
+feedback point to its iteration's notes, removed the checklist copies made
+from it, turned project-level loose feedback into general to-dos, and closed
+the `sf_activity` rows, which stay as history.
+
+Three kinds of text now exist per phase, kept apart:
+- **Client notes** (per iteration): what the client said.
+- **Pinned note** (`SfPhase.note`, one per phase): what holds for the whole
+  phase, whatever the iteration.
+- **Requirements** (root checklist items of the phase, normally from
+  templates): the standard checklist; reminders that never block a step or
+  completing the project.
+
 ### 6.2 Checklist item (project/phase tasks)
 
 Legacy `ProjectChecklist`: `project_id`, `phase_id?` (null = general),
@@ -297,6 +325,9 @@ Sync is idempotent on `(template_id, phase_id)` and appends after existing
 rows. Deleting a template detaches generated rows (they become plain tasks).
 
 ### 6.4 Blocker projection
+
+> Since WO-SF-ITER-01 nothing is gated by this projection, and since R8.327 it
+> counts only unchecked root checklist items (no feedback). Legacy text below.
 
 Two pure projections over the same counts (`domain/blockers.ts`), used by the
 phase commands and shown in the UI before the button is pressed:

@@ -5,22 +5,11 @@ import { createProjectService } from "./projects/service";
 import { STUDIOFLOW_PERMISSIONS as P } from "./permissions";
 import type { Db, StudioFlowPorts } from "./shared";
 
-it("batch blocker reads use three statements even for many phases", async () => {
+it("batch blocker reads use one statement even for many phases", async () => {
   for (const size of [0, 1, 30]) {
     const ids = Array.from({ length: size }, (_, i) => `phase-${i}`);
     let statements = 0;
     const db = {
-      sfRevision: { findMany: async (query: { where: unknown }) => {
-        statements++;
-        assert.deepEqual(query.where, { phase_id: { in: ids }, status: { in: ["NOT_SENT", "SENT", "ANSWERED"] } });
-        return ids.map((id) => ({ id: `revision-${id}`, phase_id: id }));
-      } },
-      sfActivity: { groupBy: async (query: { where: unknown; by: string[] }) => {
-        statements++;
-        assert.deepEqual(query.by, ["revision_id"]);
-        assert.deepEqual(query.where, { revision_id: { in: ids.map((id) => `revision-${id}`) }, status: "OPEN" });
-        return ids.map((id) => ({ revision_id: `revision-${id}`, _count: { _all: 2 } }));
-      } },
       sfChecklistItem: { groupBy: async (query: { where: unknown; by: string[] }) => {
         statements++;
         assert.deepEqual(query.by, ["phase_id"]);
@@ -29,9 +18,9 @@ it("batch blocker reads use three statements even for many phases", async () => 
       } },
     } as unknown as Db;
     const result = await readBlockerCountsBatch(db, ids);
-    assert.equal(statements, 3);
+    assert.equal(statements, 1);
     assert.equal(result.size, size);
-    for (const id of ids) assert.deepEqual(result.get(id), { openRevisionActivities: 2, openRootChecklistItems: 3 });
+    for (const id of ids) assert.deepEqual(result.get(id), { openRootChecklistItems: 3 });
   }
 });
 

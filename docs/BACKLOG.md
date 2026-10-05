@@ -506,6 +506,13 @@ findings were fixed in R8.318–R8.325 (see `CHANGELOG.md`). What remains:
   manager override with a reason end to end, "Complete anyway" audit entry in History,
   saving a multi-supplier grid with real suppliers, typing "By Request" in each price
   table, Library images from real Brand websites, and the StudioFlow rail at 840 px.
+- [ ] [UNVERIFIED] **Client notes replace feedback (R8.327): run the data migration on real data.**
+  Verified on a disposable copy seeded with old-model rows (feedback on iterations, detached, phase without
+  iterations, converted checklist copies with and without subtasks). On the office/home databases: read the
+  migration's precheck NOTICE, then spot-check a few projects' iteration notes and Requirements lists.
+- [ ] [CLEANUP][P3] `sf_activity` is history only since R8.327 (no command writes it; every row is closed).
+  Drop the table, its relations and the `activity.*` History labels once nobody needs the old rows, after the
+  notes migration has run everywhere.
 - [ ] [CLEANUP][P3] SKU price workbook's transaction-scoped service still takes `any`
   inputs (`sku-price-workbook.service.ts` `createScopedService`), and the header-keyed
   `ParsedRow` is assembled through a cast. Type it like `PriceWorkbookScopedService` (R8.325).

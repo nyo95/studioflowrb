@@ -76,6 +76,10 @@ export type IterationView = {
   state: "NOT_SENT" | "SENT" | "ANSWERED" | "REVISED" | "DONE";
   waitingDays: number | null;
   choices: readonly string[];
+  /** The outcomes offered once the client has answered (Revision / Done, or Continue to CD Final on CD Mall). */
+  answerChoices?: readonly string[];
+  /** What the client said about this iteration. */
+  note?: string | null;
 };
 
 export type PhaseView = { id: string; name: string; status: "PENDING" | "ACTIVE" | "DONE"; isSupervision: boolean; canStart: boolean };
@@ -94,6 +98,7 @@ export function IterationButtons({
   canAct: boolean;
   onNewVisit: () => void;
 }) {
+  const [answering, setAnswering] = useState(false);
   const base = { phaseId: phase.id };
   const run = (key: string, body: PhaseCommandBody, summary: string) => void commands.exec(`${phase.id}:${key}`, body, summary);
   const busy = (key: string) => commands.isPending(`${phase.id}:${key}`);
@@ -112,7 +117,7 @@ export function IterationButtons({
   const it = { ...base, iterationId: current.id };
   const known: Record<string, { label: string; primary?: boolean; run: () => void }> = {
     send: { label: "Send to client", primary: true, run: () => run("send", { ...it, command: "sendIteration" }, `${current.name} sent to the client`) },
-    record_answer: { label: "Client answered", primary: true, run: () => run("answer", { ...it, command: "recordClientAnswer" }, `${current.name}: client answered`) },
+    record_answer: { label: "Client answered", primary: true, run: () => setAnswering(true) },
     revision: { label: "Revision", run: () => run("revision", { ...it, command: "chooseOutcome", outcome: "REVISION" }, `${current.name} needs a revision`) },
     done: phase.isSupervision
       ? { label: "Done (handover)", primary: true, run: () => run("done", { ...it, command: "chooseVisit", outcome: "DONE" }, `${phase.name} done`) }
@@ -128,7 +133,64 @@ export function IterationButtons({
         if (!item) return null;
         return <Button key={choice} size="sm" variant={item.primary ? "primary" : "secondary"} pending={busy(choice === "record_answer" ? "answer" : choice === "continue_cd_final" ? "continue" : choice === "next_visit" ? "next" : choice)} onClick={item.run}>{item.label}</Button>;
       })}
+      {answering ? <ClientAnswerDialog phase={phase} iteration={current} commands={commands} onClose={() => setAnswering(false)} /> : null}
     </>
+  );
+}
+
+const OUTCOME: Record<string, { label: string; outcome: "REVISION" | "DONE" | "CONTINUE_CD_FINAL"; primary?: boolean; summary: (name: string) => string }> = {
+  revision: { label: "Revision", outcome: "REVISION", summary: (name) => `${name} needs a revision` },
+  done: { label: "OK – done", outcome: "DONE", primary: true, summary: (name) => `${name} done` },
+  continue_cd_final: { label: "Continue to CD Final", outcome: "CONTINUE_CD_FINAL", primary: true, summary: (name) => `${name} done, CD Final opened` },
+};
+
+/**
+ * "Client answered" (owner, 2026-10-05): what the client said is the iteration's notes, written here in one box,
+ * then the outcome — OK, or a Revision whose next iteration shows these notes as its brief. "Decide later" keeps the
+ * answer and the notes and leaves the choice on the card.
+ */
+export function ClientAnswerDialog({ phase, iteration, commands, onClose }: { phase: PhaseView; iteration: IterationView; commands: PhaseCommands; onClose: () => void }) {
+  const [note, setNote] = useState(iteration.note ?? "");
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const choices = (iteration.answerChoices ?? ["revision", "done"]).filter((choice) => OUTCOME[choice]);
+  const it = { phaseId: phase.id, iterationId: iteration.id };
+  const answer = async (choice: string | null) => {
+    setBusyKey(choice ?? "later");
+    try {
+      const answered = await commands.exec(`${phase.id}:answer`, { ...it, command: "recordClientAnswer", note: note.trim() ? note.trim() : null }, `${iteration.name}: client answered`);
+      if (!answered) return;
+      if (choice) {
+        const picked = OUTCOME[choice]!;
+        if (!(await commands.exec(`${phase.id}:${choice}`, { ...it, command: "chooseOutcome", outcome: picked.outcome }, picked.summary(iteration.name)))) return;
+      }
+      onClose();
+    } finally {
+      setBusyKey(null);
+    }
+  };
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => { if (!open && !busyKey) onClose(); }}
+      title={`${iteration.name}: the client answered`}
+      description="Write what the client said. If you choose Revision, the next iteration shows these notes as its brief."
+      dismissible={!busyKey}
+      footer={
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="ghost" disabled={Boolean(busyKey)} onClick={() => void answer(null)} pending={busyKey === "later"}>Save, decide later</Button>
+          {choices.map((choice) => (
+            <Button key={choice} variant={OUTCOME[choice]!.primary ? "primary" : "secondary"} disabled={Boolean(busyKey)} pending={busyKey === choice} onClick={() => void answer(choice)}>{OUTCOME[choice]!.label}</Button>
+          ))}
+        </div>
+      }
+    >
+      <div className="grid gap-3">
+        <Field label="Client notes" description="One point per line is easiest to read later.">
+          <Textarea rows={6} maxLength={4000} value={note} onChange={(event) => setNote(event.target.value)} placeholder={"e.g.\n- Warmer palette for the lounge\n- Keep the marble at reception"} autoFocus />
+        </Field>
+        {commands.error ? <InlineError>{commands.error}</InlineError> : null}
+      </div>
+    </Dialog>
   );
 }
 

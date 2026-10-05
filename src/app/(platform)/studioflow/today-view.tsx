@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CalendarCheck2, ChevronDown, ChevronRight, MessageSquareText, MoreHorizontal, Plus } from "lucide-react";
+import { AlertTriangle, CalendarCheck2, ChevronDown, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
 import Link from "next/link";
 import { Popover } from "radix-ui";
 import { useMemo, useState, useSyncExternalStore } from "react";
@@ -39,7 +39,7 @@ import {
   Text,
 } from "@/platform/ui_engine";
 
-import { activityAction, addChecklistItemAction, checklistAction, deleteFilterViewAction, saveFilterViewAction } from "./actions";
+import { addChecklistItemAction, checklistAction, deleteFilterViewAction, saveFilterViewAction } from "./actions";
 import { DueLabel } from "./_components/due-label";
 import { PersonChip, PersonSelect, type Person } from "./_components/people";
 import { useCommand } from "./_components/use-command";
@@ -121,19 +121,16 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
   const totalOpen = groups.reduce((sum, g) => sum + countOpen(g.tasks), 0);
 
   const toggle = (task: FeedTask, checked: boolean) =>
-    task.source === "activity"
-      ? run(task.key, () => activityAction({ op: "done", projectId: task.projectId, activityId: task.id, done: checked }))
-      : run(task.key, () => checklistAction({ op: "check", projectId: task.projectId, itemId: task.id, checked }));
+    run(task.key, () => checklistAction({ op: "check", projectId: task.projectId, itemId: task.id, checked }));
 
   const renderTask = (task: FeedTask, nested = false) => {
     // Ticking follows the service rule: a phase requirement only needs phase-work access (it shows up here
     // after its phase is done, as close-out work). Editing and deleting a checklist item still need task-manage.
-    const tickable = task.source === "activity" ? canWork : canTickChecklistItem({ parentId: task.parentId, phaseId: task.phaseId }, { canManageTasks, canWork });
-    const editable = task.source === "activity" ? canWork : canManageTasks;
+    const tickable = canTickChecklistItem({ parentId: task.parentId, phaseId: task.phaseId }, { canManageTasks, canWork });
+    const editable = canManageTasks;
     return (
       <li key={task.key} className={`grid gap-px ${nested ? "ml-7" : ""}`}>
         <div className="group flex items-start gap-2.5 rounded-control px-1.5 py-1.5 hover:bg-surface-muted">
-          {task.mode === "FEEDBACK" ? <MessageSquareText aria-label="Feedback" className="mt-0.5 h-4 w-4 shrink-0 text-warning" /> : null}
           <Checkbox
             checked={task.isChecked}
             disabled={!tickable || pendingKey === task.key}
@@ -155,9 +152,6 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
             <DueLabel date={task.dueDate} done={task.isChecked} />
             <PersonChip person={task.assigneeId ? personById.get(task.assigneeId) : null} />
             {editable && !task.isChecked ? <TaskQuickEdit task={task} people={people} labels={labels} /> : null}
-            {task.source === "activity" && canWork ? (
-              <RowActionMenu items={[{ label: "Delete", danger: true, onSelect: () => run(task.key, () => activityAction({ op: "delete", projectId: task.projectId, activityId: task.id })) }]} />
-            ) : null}
           </div>
         </div>
         {task.children.length > 0 ? <ul className="m-0 grid list-none gap-px p-0">{task.children.map((child) => renderTask(child, true))}</ul> : null}
@@ -286,15 +280,11 @@ function TaskQuickEdit({ task, people, labels }: { task: FeedTask; people: Perso
   const { run, pending } = useCommand();
   const [open, setOpen] = useState(false);
   const [newLabel, setNewLabel] = useState("");
-  const isChecklist = task.source !== "activity";
 
   const updateDue = (value: string) =>
     void run(
       `due-${task.key}`,
-      () =>
-        task.source === "activity"
-          ? activityAction({ op: "update", projectId: task.projectId, activityId: task.id, dueDate: value })
-          : checklistAction({ op: "update", projectId: task.projectId, itemId: task.id, dueDate: value }),
+      () => checklistAction({ op: "update", projectId: task.projectId, itemId: task.id, dueDate: value }),
     );
   const updatePriority = (priority: number) =>
     void run(`pr-${task.key}`, () => checklistAction({ op: "update", projectId: task.projectId, itemId: task.id, priority }));
@@ -319,24 +309,22 @@ function TaskQuickEdit({ task, people, labels }: { task: FeedTask; people: Perso
       <Popover.Portal>
         <Popover.Content align="end" sideOffset={6} className="z-[65] w-60 overflow-hidden rounded-control border border-line bg-surface-raised p-2.5 shadow-elevated">
           <div className="grid gap-3">
-            {isChecklist ? (
-              <div className="grid gap-1">
-                <p className="text-label text-ink-tertiary">Priority</p>
-                <div className="flex gap-1">
-                  {[1, 2, 3, 4].map((level) => (
-                    <button
-                      key={level}
-                      type="button"
-                      disabled={pending}
-                      onClick={() => updatePriority(level)}
-                      className={`flex-1 rounded-action border py-1 text-xs font-semibold ${PRIORITY_STYLE[level]} ${task.priority === level ? "ring-1 ring-action" : ""}`}
-                    >
-                      P{level}
-                    </button>
-                  ))}
-                </div>
+            <div className="grid gap-1">
+              <p className="text-label text-ink-tertiary">Priority</p>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4].map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    disabled={pending}
+                    onClick={() => updatePriority(level)}
+                    className={`flex-1 rounded-action border py-1 text-xs font-semibold ${PRIORITY_STYLE[level]} ${task.priority === level ? "ring-1 ring-action" : ""}`}
+                  >
+                    P{level}
+                  </button>
+                ))}
               </div>
-            ) : null}
+            </div>
             <div className="grid gap-1">
               <p className="text-label text-ink-tertiary">Due date</p>
               <div className="flex items-center gap-1.5">
@@ -344,50 +332,46 @@ function TaskQuickEdit({ task, people, labels }: { task: FeedTask; people: Perso
                 {task.dueDate ? <Button type="button" size="sm" variant="ghost" onClick={() => updateDue("")}>Clear</Button> : null}
               </div>
             </div>
-            {isChecklist ? (
-              <div className="grid gap-1">
-                <p className="text-label text-ink-tertiary">Assignee</p>
-                <PersonSelect people={people} value={task.assigneeId} onChange={updateAssignee} />
-              </div>
-            ) : null}
-            {isChecklist ? (
-              <div className="grid gap-1">
-                <p className="text-label text-ink-tertiary">Labels</p>
-                {labels.length > 0 ? (
-                  <div className="flex flex-wrap gap-1">
-                    {labels.map((label) => {
-                      const attached = task.labels.some((l) => l.id === label.id);
-                      return (
-                        <button
-                          key={label.id}
-                          type="button"
-                          disabled={pending}
-                          onClick={() => (attached ? detachLabel(label.id) : attachLabel(label.name))}
-                          className={`rounded-pill border px-2 py-0.5 text-xs ${attached ? "border-action bg-action/10 text-ink" : "border-line text-ink-secondary hover:bg-surface-muted"}`}
-                        >
-                          #{label.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : null}
-                <Input
-                  density="compact"
-                  placeholder="New label…"
-                  value={newLabel}
-                  disabled={pending}
-                  onChange={(event) => setNewLabel(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key !== "Enter") return;
-                    event.preventDefault();
-                    const trimmed = newLabel.trim();
-                    if (!trimmed) return;
-                    setNewLabel("");
-                    attachLabel(trimmed);
-                  }}
-                />
-              </div>
-            ) : null}
+            <div className="grid gap-1">
+              <p className="text-label text-ink-tertiary">Assignee</p>
+              <PersonSelect people={people} value={task.assigneeId} onChange={updateAssignee} />
+            </div>
+            <div className="grid gap-1">
+              <p className="text-label text-ink-tertiary">Labels</p>
+              {labels.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {labels.map((label) => {
+                    const attached = task.labels.some((l) => l.id === label.id);
+                    return (
+                      <button
+                        key={label.id}
+                        type="button"
+                        disabled={pending}
+                        onClick={() => (attached ? detachLabel(label.id) : attachLabel(label.name))}
+                        className={`rounded-pill border px-2 py-0.5 text-xs ${attached ? "border-action bg-action/10 text-ink" : "border-line text-ink-secondary hover:bg-surface-muted"}`}
+                      >
+                        #{label.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+              <Input
+                density="compact"
+                placeholder="New label…"
+                value={newLabel}
+                disabled={pending}
+                onChange={(event) => setNewLabel(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") return;
+                  event.preventDefault();
+                  const trimmed = newLabel.trim();
+                  if (!trimmed) return;
+                  setNewLabel("");
+                  attachLabel(trimmed);
+                }}
+              />
+            </div>
           </div>
         </Popover.Content>
       </Popover.Portal>

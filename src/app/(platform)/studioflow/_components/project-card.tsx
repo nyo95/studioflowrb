@@ -23,7 +23,7 @@ export type ProjectCardPhase = {
   has_note: boolean;
   iteration_count: number;
   last_visit_days_ago: number | null;
-  current_iteration: { id: string; name: string; state: IterationView["state"]; waiting_days: number | null; available_choices: string[] } | null;
+  current_iteration: { id: string; name: string; state: IterationView["state"]; waiting_days: number | null; available_choices: string[]; answer_choices: string[]; note: string | null } | null;
 };
 
 export type ProjectCardData = {
@@ -80,10 +80,10 @@ export function ProjectCard({ card, viewer }: { card: ProjectCardData; viewer: {
         <div className="flex flex-wrap items-center justify-end gap-1.5">
           {card.status === "ON_HOLD" ? <Badge tone="warning">On hold</Badge> : null}
           {completed ? <Badge tone="success"><Check className="h-3 w-3" aria-hidden="true" />Completed</Badge> : null}
-          {card.requirements_waiting > 0 ? <Badge title="Reminders only. They never block a step or completing the project.">{card.requirements_waiting} requirement{card.requirements_waiting === 1 ? "" : "s"} waiting</Badge> : null}
+          {card.requirements_waiting > 0 ? <Badge title="Requirements are reminders. They never block a step or completing the project.">{card.requirements_waiting} requirement{card.requirements_waiting === 1 ? "" : "s"} waiting</Badge> : null}
           {card.dependents_review_suggested ? <Badge tone="warning" title="An earlier phase is active again while a later one is already done.">Check later phases</Badge> : null}
           <span className="relative inline-flex">
-            <IconButton size="sm" variant="ghost" label="Phase notes" icon={<StickyNote aria-hidden="true" />} onClick={() => setNotesOpen(true)} />
+            <IconButton size="sm" variant="ghost" label="Pinned notes" icon={<StickyNote aria-hidden="true" />} onClick={() => setNotesOpen(true)} />
             {card.note_phases.length > 0 ? <span className="pointer-events-none absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-warning" aria-hidden="true" /> : null}
           </span>
           <RowActionMenu items={menu} label="Project actions" pending={completion.pending} />
@@ -94,7 +94,7 @@ export function ProjectCard({ card, viewer }: { card: ProjectCardData; viewer: {
         {card.phases.map((phase) => {
           const current = phase.current_iteration;
           const view: PhaseView = { id: phase.id, name: phase.name, status: phase.status, isSupervision: phase.is_supervision, canStart: phase.can_start };
-          const iteration: IterationView | null = current ? { id: current.id, name: current.name, state: current.state, waitingDays: current.waiting_days, choices: current.available_choices } : null;
+          const iteration: IterationView | null = current ? { id: current.id, name: current.name, state: current.state, waitingDays: current.waiting_days, choices: current.available_choices, answerChoices: current.answer_choices, note: current.note } : null;
           const acting = !completed && projectActive && seatOwner(phase);
           return (
             <li
@@ -103,7 +103,7 @@ export function ProjectCard({ card, viewer }: { card: ProjectCardData; viewer: {
             >
               <div className="flex items-center justify-between gap-2">
                 <Link href={`/studioflow/projects/${card.id}?phase=${phase.id}`} className={`truncate text-sm font-medium hover:underline ${phase.status === "PENDING" ? "text-ink-tertiary" : "text-ink"}`}>{phase.name}</Link>
-                {phase.has_note ? <StickyNote aria-label="Has a note" className="h-3.5 w-3.5 shrink-0 text-ink-tertiary" /> : null}
+                {phase.has_note ? <StickyNote aria-label="Has a pinned note" className="h-3.5 w-3.5 shrink-0 text-ink-tertiary" /> : null}
               </div>
               <div className="flex flex-wrap items-center gap-1.5 text-xs text-ink-secondary">
                 {phase.status === "DONE" ? <span className="inline-flex items-center gap-1 text-success"><Check className="h-3 w-3" aria-hidden="true" />Done</span> : null}

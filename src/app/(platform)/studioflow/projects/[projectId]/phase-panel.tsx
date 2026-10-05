@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { Badge, Button, ButtonMenu, Dialog, Field, FormActions, FormattedInstant, InlineError, Input, RadioGroup, RowActionMenu, SectionCard, Text, Textarea } from "@/platform/ui_engine";
@@ -17,15 +17,15 @@ type IterationRow = {
   doneAt: Date | null;
   visitDate: string | null;
   note: string | null;
-  activityCount: number;
 };
 
 const STATE_LABEL: Record<IterationView["state"], string> = { NOT_SENT: "Not sent", SENT: "With client", ANSWERED: "Answered", REVISED: "Revised", DONE: "Done" };
 const STATE_TONE: Record<IterationView["state"], "neutral" | "warning" | "success"> = { NOT_SENT: "neutral", SENT: "warning", ANSWERED: "success", REVISED: "neutral", DONE: "success" };
 
 /**
- * The phase page's working strip: where the phase is, the one next step, the iterations so far (rename or delete an
- * unsent one), and the phase note. Everything goes through the same commands as the project card.
+ * The phase page's working strip: where the phase is, the one next step, the iterations so far with what the client
+ * said about each (their notes; rename or delete an unsent one), and the phase's pinned note. Everything goes through
+ * the same commands as the project card.
  */
 export function PhasePanel({
   projectId,
@@ -37,6 +37,7 @@ export function PhasePanel({
   canNote,
   canOverride,
   archived,
+  children,
 }: {
   projectId: string;
   phase: PhaseView;
@@ -47,11 +48,15 @@ export function PhasePanel({
   canNote: boolean;
   canOverride: boolean;
   archived: boolean;
+  /** The phase's working area (client notes, requirements), shown right under the next step. */
+  children?: ReactNode;
 }) {
   const commands = usePhaseCommands(projectId);
   const { locale, timezone } = useDisplaySettings();
   const [visitOpen, setVisitOpen] = useState(false);
   const [renaming, setRenaming] = useState<IterationRow | null>(null);
+  const [notesFor, setNotesFor] = useState<IterationRow | null>(null);
+  const [notesDraft, setNotesDraft] = useState("");
   const [renameDraft, setRenameDraft] = useState("");
   const [skipOpen, setSkipOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
@@ -100,9 +105,11 @@ export function PhasePanel({
         </div>
         <div className="mt-3 grid gap-2">
           <UndoBar commands={commands} />
-          {commands.error && !visitOpen && !renaming && !skipOpen && !resetOpen ? <InlineError>{commands.error}</InlineError> : null}
+          {commands.error && !visitOpen && !renaming && !notesFor && !skipOpen && !resetOpen ? <InlineError>{commands.error}</InlineError> : null}
         </div>
       </SectionCard>
+
+      {children}
 
       <SectionCard title="Iterations" count={iterations.length} description="Each one is what was sent to the client, in order.">
         {iterations.length === 0 ? (
@@ -111,6 +118,7 @@ export function PhasePanel({
           <ul className="m-0 grid list-none gap-px p-0">
             {iterations.map((iteration) => {
               const actions = acting ? [
+                { label: iteration.note ? "Edit client notes" : "Add client notes", onSelect: () => { setNotesFor(iteration); setNotesDraft(iteration.note ?? ""); } },
                 { label: "Rename", onSelect: () => { setRenaming(iteration); setRenameDraft(iteration.name); } },
                 ...(iteration.state === "NOT_SENT" ? [{ label: "Delete (never sent)", danger: true, separatorBefore: true, onSelect: () => void commands.exec(`delete:${iteration.id}`, { command: "deleteIteration", phaseId: phase.id, iterationId: iteration.id }, `${iteration.name} deleted`) }] : []),
               ] : [];
@@ -125,10 +133,9 @@ export function PhasePanel({
                       {iteration.answeredAt ? <> · answered <FormattedInstant value={iteration.answeredAt} locale={locale} timeZone={timezone} /></> : null}
                       {iteration.doneAt ? <> · closed <FormattedInstant value={iteration.doneAt} locale={locale} timeZone={timezone} /></> : null}
                     </Text>
-                    {iteration.activityCount > 0 ? <Text size="sm" tone="tertiary">{iteration.activityCount} feedback item{iteration.activityCount === 1 ? "" : "s"}</Text> : null}
                   </div>
-                  {iteration.note ? <Text size="sm" tone="secondary" className="basis-full">{iteration.note}</Text> : null}
                   {actions.length > 0 ? <RowActionMenu items={actions} label={`${iteration.name} actions`} /> : null}
+                  {iteration.note ? <Text size="sm" tone="secondary" className="basis-full whitespace-pre-line">{iteration.note}</Text> : null}
                 </li>
               );
             })}
@@ -136,12 +143,12 @@ export function PhasePanel({
         )}
       </SectionCard>
 
-      <SectionCard title="Phase note" description="One short note for anything the next person should know.">
+      <SectionCard title="Pinned note" description="What holds for the whole phase, whatever the iteration: anything the next person should know.">
         <div className="grid gap-2 px-(--ui-section-px) py-3">
-          <Textarea aria-label="Phase note" rows={3} maxLength={2000} value={noteDraft} disabled={!canNote || archived} placeholder={canNote ? "No note yet" : "No note"} onChange={(event) => setNoteDraft(event.target.value)} />
+          <Textarea aria-label="Pinned note" rows={3} maxLength={2000} value={noteDraft} disabled={!canNote || archived} placeholder={canNote ? "No note yet" : "No note"} onChange={(event) => setNoteDraft(event.target.value)} />
           {canNote && !archived && noteChanged ? (
             <div className="flex gap-2">
-              <Button size="sm" variant="primary" pending={commands.isPending("note")} onClick={() => void commands.exec("note", { command: "setPhaseNote", phaseId: phase.id, note: noteDraft.trim() ? noteDraft.trim() : null }, "Note saved")}>Save note</Button>
+              <Button size="sm" variant="primary" pending={commands.isPending("note")} onClick={() => void commands.exec("note", { command: "setPhaseNote", phaseId: phase.id, note: noteDraft.trim() ? noteDraft.trim() : null }, "Pinned note saved")}>Save note</Button>
               <Button size="sm" variant="ghost" onClick={() => setNoteDraft(note ?? "")}>Discard</Button>
             </div>
           ) : null}
@@ -155,6 +162,22 @@ export function PhasePanel({
         error={commands.error}
         onSave={(visitDate, visitNote) => commands.exec("visit", { command: "createVisit", phaseId: phase.id, visitDate, note: visitNote }, "Site visit added")}
       />
+
+      {notesFor ? (
+        <Dialog open onOpenChange={(open) => { if (!open && !commands.isPending("iteration-notes")) setNotesFor(null); }} title={`${notesFor.name}: client notes`} description="What the client said about this iteration.">
+          <form className="grid gap-3" onSubmit={async (event) => {
+            event.preventDefault();
+            if (await commands.exec("iteration-notes", { command: "setIterationNote", phaseId: phase.id, iterationId: notesFor.id, note: notesDraft.trim() ? notesDraft.trim() : null }, `${notesFor.name}: notes saved`)) setNotesFor(null);
+          }}>
+            <Field label="Client notes"><Textarea rows={6} maxLength={4000} value={notesDraft} autoFocus onChange={(event) => setNotesDraft(event.target.value)} /></Field>
+            {commands.error ? <InlineError>{commands.error}</InlineError> : null}
+            <FormActions>
+              <Button type="button" onClick={() => setNotesFor(null)} disabled={commands.isPending("iteration-notes")}>Cancel</Button>
+              <Button type="submit" variant="primary" pending={commands.isPending("iteration-notes")}>Save notes</Button>
+            </FormActions>
+          </form>
+        </Dialog>
+      ) : null}
 
       {renaming ? (
         <Dialog open onOpenChange={(open) => { if (!open && !commands.isPending("rename")) setRenaming(null); }} title="Rename iteration">
@@ -189,7 +212,7 @@ export function PhasePanel({
       ) : null}
 
       {resetOpen ? (
-        <Dialog open onOpenChange={(open) => { if (!open && !commands.isPending("reset")) setResetOpen(false); }} title="Reset iterations (admin)" description="Deletes every iteration and its feedback for this phase. A full snapshot is kept in History.">
+        <Dialog open onOpenChange={(open) => { if (!open && !commands.isPending("reset")) setResetOpen(false); }} title="Reset iterations (admin)" description="Deletes every iteration and its client notes for this phase. A full snapshot is kept in History.">
           <form className="grid gap-3" onSubmit={async (event) => {
             event.preventDefault();
             if (await commands.exec("reset", { command: "override", phaseId: phase.id, mode: reset.mode, major: Number(reset.iteration), note: reset.note }, "Iterations reset")) setResetOpen(false);

@@ -100,15 +100,16 @@ describe("phase policy (legacy parity)", () => {
 });
 
 describe("blockers", () => {
-  const counts = { openRevisionActivities: 2, openRootChecklistItems: 3 };
-  it("counts root checklist and revision activities for approval", () => {
+  const counts = { openRootChecklistItems: 3 };
+  it("counts open root checklist items, as information only", () => {
     const result = fullBlockers(counts);
-    assert.equal(result.total, 5);
-    assert.equal(result.reasons.length, 2);
+    assert.equal(result.total, 3);
+    assert.deepEqual(result.reasons, ["3 checklist items not ticked"]);
+    assert.equal(fullBlockers({ openRootChecklistItems: 0 }).total, 0);
   });
-  it("counts only checklist items for internal submission", () => {
+  it("reports the same count as open to-dos", () => {
     assert.equal(todoBlockers(counts).total, 3);
-    assert.equal(todoBlockers({ ...counts, openRootChecklistItems: 0 }).total, 0);
+    assert.equal(todoBlockers({ openRootChecklistItems: 0 }).total, 0);
   });
 });
 
@@ -157,10 +158,10 @@ describe("checklist rules", () => {
 describe("today feed", () => {
   const base = { projectId: "p1", phaseId: null, phaseDefinitionId: null, phaseLabel: null, assigneeId: null, labels: [], templateId: null, children: [] };
   const rows: FeedTask[] = [
-    { ...base, key: "checklist:c", id: "c", source: "checklist", label: "child", isChecked: false, priority: 4, dueDate: null, mode: null, parentId: "r" },
-    { ...base, key: "checklist:r", id: "r", source: "checklist", label: "root", isChecked: false, priority: 2, dueDate: null, mode: null, parentId: null },
-    { ...base, key: "activity:a", id: "a", source: "activity", label: "todo", isChecked: false, priority: 4, dueDate: "2026-09-01", mode: "FEEDBACK", parentId: null },
-    { ...base, key: "activity:d", id: "d", source: "activity", label: "done", isChecked: true, priority: 4, dueDate: "2026-08-01", mode: "FEEDBACK", parentId: null },
+    { ...base, key: "checklist:c", id: "c", source: "checklist", label: "child", isChecked: false, priority: 4, dueDate: null, parentId: "r" },
+    { ...base, key: "checklist:r", id: "r", source: "checklist", label: "root", isChecked: false, priority: 2, dueDate: null, parentId: null },
+    { ...base, key: "checklist:a", id: "a", source: "checklist", label: "todo", isChecked: false, priority: 4, dueDate: "2026-09-01", parentId: null },
+    { ...base, key: "checklist:d", id: "d", source: "checklist", label: "done", isChecked: true, priority: 4, dueDate: "2026-08-01", parentId: null },
   ];
   it("nests, sorts, and keeps empty projects", () => {
     const nested = nestFeed(rows);

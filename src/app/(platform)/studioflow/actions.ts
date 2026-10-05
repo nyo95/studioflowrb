@@ -277,7 +277,8 @@ export async function syncChecklistAction(projectId: string): Promise<ActionResu
 const PhaseCommand = z.discriminatedUnion("command", [
   z.strictObject({ command: z.literal("addIteration"), projectId: Id, phaseId: Id }),
   z.strictObject({ command: z.literal("sendIteration"), projectId: Id, phaseId: Id, iterationId: Id }),
-  z.strictObject({ command: z.literal("recordClientAnswer"), projectId: Id, phaseId: Id, iterationId: Id }),
+  z.strictObject({ command: z.literal("recordClientAnswer"), projectId: Id, phaseId: Id, iterationId: Id, note: z.string().max(4000).nullish() }),
+  z.strictObject({ command: z.literal("setIterationNote"), projectId: Id, phaseId: Id, iterationId: Id, note: z.string().max(4000).nullable() }),
   z.strictObject({ command: z.literal("chooseOutcome"), projectId: Id, phaseId: Id, iterationId: Id, outcome: z.enum(["REVISION", "DONE", "CONTINUE_CD_FINAL"]) }),
   z.strictObject({ command: z.literal("renameIteration"), projectId: Id, phaseId: Id, iterationId: Id, name: z.string().max(200) }),
   z.strictObject({ command: z.literal("deleteIteration"), projectId: Id, phaseId: Id, iterationId: Id }),
@@ -304,7 +305,8 @@ export async function phaseCommandAction(input: PhaseCommandInput): Promise<Acti
     switch (data.command) {
       case "addIteration": result = await phases.addIteration(base); break;
       case "sendIteration": result = await phases.sendIteration({ ...base, iterationId: data.iterationId }); break;
-      case "recordClientAnswer": result = await phases.recordClientAnswer({ ...base, iterationId: data.iterationId }); break;
+      case "recordClientAnswer": result = await phases.recordClientAnswer({ ...base, iterationId: data.iterationId, note: data.note }); break;
+      case "setIterationNote": result = await phases.setIterationNote({ ...base, iterationId: data.iterationId, note: data.note }); break;
       case "chooseOutcome": result = await phases.chooseIterationOutcome({ ...base, iterationId: data.iterationId, outcome: data.outcome }); break;
       case "renameIteration": result = await phases.renameIteration({ ...base, iterationId: data.iterationId, name: data.name }); break;
       case "deleteIteration": result = await phases.deleteNeverSentIteration({ ...base, iterationId: data.iterationId }); break;
@@ -390,38 +392,6 @@ export async function setPhasePlannedDatesAction(input: z.infer<typeof PhasePlan
   });
 }
 
-// ── Activities ──────────────────────────────────────────────────────────────
-
-// V2-D1: SfActivity is FEEDBACK-only. phaseId is required. For todos use checklistAction.
-const ActivityAdd = z.strictObject({ projectId: Id, phaseId: Id, content: z.string().min(1).max(2000), mode: z.literal("FEEDBACK"), dueDate: DateOnly, assignedToId: Id.nullish() });
-export async function addActivityAction(input: z.infer<typeof ActivityAdd>): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => {
-    const ctx = await context();
-    const data = parse(ActivityAdd, input);
-    const result = await studioFlow.phases.addActivity({ ...ctx, ...data, dueDate: data.dueDate || null });
-    refresh(data.projectId);
-    return result;
-  });
-}
-
-const ActivityOp = z.discriminatedUnion("op", [
-  z.strictObject({ op: z.literal("done"), projectId: Id, activityId: Id, done: z.boolean() }),
-  z.strictObject({ op: z.literal("update"), projectId: Id, activityId: Id, content: z.string().max(2000).optional(), dueDate: DateOnly.optional(), assignedToId: Id.nullish() }),
-  z.strictObject({ op: z.literal("delete"), projectId: Id, activityId: Id }),
-]);
-export async function activityAction(input: z.infer<typeof ActivityOp>): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => {
-    const ctx = await context();
-    const data = parse(ActivityOp, input);
-    const base = { ...ctx, projectId: data.projectId, activityId: data.activityId };
-    let result: unknown;
-    if (data.op === "done") result = await studioFlow.phases.setActivityDone({ ...base, done: data.done });
-    if (data.op === "update") result = await studioFlow.phases.updateActivity({ ...base, content: data.content, dueDate: data.dueDate === "" ? null : data.dueDate, assignedToId: data.assignedToId });
-    if (data.op === "delete") result = await studioFlow.phases.deleteActivity(base);
-    refresh(data.projectId);
-    return result;
-  });
-}
 
 // ── Checklist ───────────────────────────────────────────────────────────────
 
@@ -1260,12 +1230,5 @@ export async function globalSearchAction(query: string): Promise<ActionResult<Gl
     const ctx = await context();
     const q = parse(SearchQuery, query);
     return studioFlow.projects.quickSearch({ ...ctx, search: q });
-  });
-}
-
-export async function getRevisionActivitiesAction(revisionId: string) {
-  return runSafeAction(async () => {
-    const ctx = await context();
-    return studioFlow.phases.getRevisionActivities({ ...ctx, revisionId: parse(Id, revisionId) });
   });
 }

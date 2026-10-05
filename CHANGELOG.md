@@ -2,6 +2,20 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.327 | 2026-10-05 | feat(studioflow): client notes per iteration replace per-point feedback
+
+- Owner decision (2026-10-05): per-point client feedback is replaced by **client notes per iteration**; the flow is D1 → client answered → notes → OK (phase done), or Revision → D2 (with D1's notes as its brief) → … until OK. The phase's own note becomes the **pinned note**; **requirements** stay a separate standard checklist. Legacy at `c4b0c466` confirms requirements were always apart: feedback became revision TODO activities there, never checklist rows. The rebuild's V2-D1 conversion of carried-forward feedback into root checklist items had made client remarks indistinguishable from requirements (shown under Requirements, counted as "requirements waiting", dismissible, and — after R8.318 — never blocking completion).
+- **Backend.** `recordClientAnswer` takes the notes; new `setIterationNote` edits any iteration's notes while the project is open (phase event + audit, undoable). Revision and Done no longer convert anything (`carryForwardFeedback` removed). Retired: `addActivity`, `updateActivity`, `setActivityDone`, `deleteActivity`, `getRevisionActivities` and their server actions. Phase detail exposes `currentIteration.note`/`answerChoices` and `previousIteration` (the brief); the project card read adds `answer_choices` and the iteration note. Today no longer lists feedback rows (`FeedSource` is checklist only). The blocker projection and the projects list "open items" count only checklist items. Completion readiness drops the open-feedback clause: every phase done is the whole test. The admin reset snapshot now keeps each iteration's notes and visit date. "Requirements waiting" on the card counts root items only (subtasks were counted).
+- **Migration `20261005090000_sf_iteration_notes_replace_feedback`** (data only, no schema change; precheck NOTICE with counts): appends every feedback point, oldest first, to its iteration's notes (keeping existing notes); moves detached feedback to the phase's latest iteration; turns feedback with no iteration to land on into a general to-do; deletes the checklist copies made from feedback (same phase and text, no template, no subtasks — copies with subtasks are kept); closes every `sf_activity` row, which stays as history.
+- **UI (Lead).** "Client answered" opens one dialog: client notes, then Revision / OK – done (Continue to CD Final on CD Mall) / Save, decide later. The phase page shows, right under the next step, "Client notes on <iteration>" with "Brief from <previous>" beside Requirements; the Iterations list shows each iteration's notes with Add/Edit client notes; "Phase note" is "Pinned note" (card icon and dialog too). The feedback list and the per-revision history panel are removed. History gains labels for the iteration-era events.
+- Contract §6.1 records the decision and the three kinds of text per phase; §6.4 and §4.4 updated. BACKLOG: real-data migration check, and dropping `sf_activity` later.
+
+**Migration evidence.** Disposable copy (`studioflow_rebuild_migcheck`, dropped afterwards) seeded with old-model rows: NOTICE "3 on iterations, 2 detached, 0 loose; 1 converted"; Layout 1 notes "- Warmer palette / - Keep marble"; Layout 2 kept "existing note" and gained "- Bigger table / - Deferred point"; the converted copy without subtasks was removed, the one with a subtask and the template requirement kept; feedback on a phase without iterations became a general to-do; all activities closed.
+
+**Browser evidence** (Chromium, `next dev`, disposable dev database): Send to client → Client answered dialog → notes typed → Revision; the card showed Moodboard 2 "Not sent"; the phase page showed "Client notes on Moodboard 2/3" with "Brief from Moodboard 1/2", Requirements beside it, the Iterations list with each iteration's notes and its row menu, and "Pinned note"; no feedback section; no page errors.
+
+**Checks.** `npm run typecheck`, `npm run lint -- --quiet`, `check:boundaries`, `check:legacy-runtime` passed; `npm test` **830/830** (none failed, skipped or cancelled) on the disposable rebuild-only test database with the new migration applied (83 migrations); `npm run build` passed (`next-env.d.ts` restored).
+
 ## R8.326 | 2026-10-04 | chore(repository): verify the audit-alignment branch and fix the legacy-path checker on Linux
 
 - Closing verification of the external-audit alignment branch (R8.318–R8.325), plus one checker fix found while running it.
@@ -94,8 +108,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.326**
-- Next local revision: **R8.327**
+- Current revision after this entry is committed: **R8.327**
+- Next local revision: **R8.328**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

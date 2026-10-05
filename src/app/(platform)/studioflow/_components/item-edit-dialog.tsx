@@ -30,7 +30,7 @@ export function ItemEditDialog({
   pending: boolean;
   error: string | null;
   onSave: (values: ItemEditValues) => void;
-  /** Checklist labels are capped at 200 characters; activity text at 2000. */
+  /** Checklist labels are capped at 200 characters. */
   maxLength?: number;
 }) {
   const [values, setValues] = useState(initial);

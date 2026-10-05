@@ -9,7 +9,6 @@ import { useCommand } from "./use-command";
 
 type Readiness = {
   unfinishedPhases: Array<{ id: string; name: string }>;
-  openFeedback: number;
   openReminders: number;
   ready: boolean;
   canChange: boolean;
@@ -19,9 +18,9 @@ type Readiness = {
 const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
 
 /**
- * The one confirmation for completing a project (owner, 2026-10-04). It reads what the server would check
- * before asking: unfinished phases and open client feedback block completion; open requirements are only
- * reminders and are listed, not enforced. A project manager may complete a blocked project with a written
+ * The one confirmation for completing a project (owner, 2026-10-04/05). It reads what the server would check
+ * before asking: unfinished phases block completion; open requirements are only reminders and are listed,
+ * not enforced. A project manager may complete a blocked project with a written
  * reason, which the server records in the history. A completed project is read-only until it is reopened.
  */
 export function ProjectCompletionDialog({ projectId, projectName, open, onOpenChange }: { projectId: string; projectName: string; open: boolean; onOpenChange: (open: boolean) => void }) {
@@ -77,12 +76,11 @@ export function ProjectCompletionDialog({ projectId, projectName, open, onOpenCh
         {readiness ? (
           <>
             {readiness.ready ? (
-              <Notice tone="success" title="Ready">Every phase is done and no client feedback is open.</Notice>
+              <Notice tone="success" title="Ready">Every phase is done.</Notice>
             ) : (
               <Notice tone="warning" title="Not finished yet">
                 <span className="grid gap-1">
                   {readiness.unfinishedPhases.length > 0 ? <span>Phases not done: {readiness.unfinishedPhases.map((phase) => phase.name).join(", ")}.</span> : null}
-                  {readiness.openFeedback > 0 ? <span>{plural(readiness.openFeedback, "client feedback item")} still open.</span> : null}
                 </span>
               </Notice>
             )}
@@ -97,7 +95,7 @@ export function ProjectCompletionDialog({ projectId, projectName, open, onOpenCh
                 <Textarea rows={2} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. Client accepted the handover without the last revision" />
               </Field>
             ) : null}
-            {blocked && readiness.canChange && !readiness.canOverride ? <Text tone="secondary" size="sm">Finish the phases and feedback above first, or ask a project manager to complete it with a reason.</Text> : null}
+            {blocked && readiness.canChange && !readiness.canOverride ? <Text tone="secondary" size="sm">Finish the phases above first, or ask a project manager to complete it with a reason.</Text> : null}
           </>
         ) : null}
         {command.error ? <InlineError>{command.error}</InlineError> : null}
