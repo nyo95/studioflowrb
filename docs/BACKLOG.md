@@ -116,6 +116,8 @@ No open items. (The pill-radius note from R8.83 was stale: `--ui-radius-pill` ha
   compare-suppliers grid are three app-local copies of one generic capability (rows, add/remove, per-row problems, Enter adds a row, paste). Extract one
   `EntryGrid` pattern into the UI Engine with a consumer matrix and showcase entry, and add the same for `Input textCase` (no showcase, test or
   documentation yet). AGENTS.md forbids an app-private substitute for a generic capability.
+- [ ] [UNVERIFIED][P3] **Project and client lists sort A→Z or Z→A? (R8.332 review).** `listProjects`, `quickSearch` and a client's project list order by priority and then name **descending** (Z→A), carried over from the legacy port without a recorded reason. Confirm with the owner that Z→A is wanted; otherwise change the three `orderBy: { name: "desc" }` to ascending.
+- [ ] [UNVERIFIED][P3] **"My projects" on the home cards lists only projects the user is PIC of (R8.332 review).** My Today now also lists a project where the user only has an assigned task (R8.331). Confirm the cards should stay PIC-only.
 - [ ] [PLANNED][P3] **Deferred (owner decision): ** Workbook import merges nothing into suppliers that already exist (sheet categories, contact) and its area suffix only separates repeats
   within one file. Decide whether a re-import should add missing categories and contacts.
 - [x] [CLEANUP][P3] Fixed R8.331: the Prisma schema now declares `@default(now())` on `platform.user_preference.updated_at`, matching the database (no migration needed).

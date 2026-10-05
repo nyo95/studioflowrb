@@ -294,7 +294,9 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
         throw new AppError("UNAUTHENTICATED", "ACTOR_REQUIRED", "An authenticated staff member is required.");
       }
       return runTransaction(async (tx) => {
-        const item = await loadItem(tx, input.projectId, input.itemId, input, { allowLocked: true });
+        // Whoever an item is assigned to may tick it (My Today lists it for them) even when they are not a PIC of the project.
+        const item = await loadItem(tx, input.projectId, input.itemId, undefined, { allowLocked: true });
+        if (item.assigned_to_id !== input.actor.userId) await requireProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: input.projectId, phaseId: item.phase_id, kind: item.phase_id ? "content" : "document" });
         if (!canTickChecklistItem({ parentId: item.parent_id, phaseId: item.phase_id }, { canManageTasks: hasPermission(input.grants, P.taskManage), canWork: hasPermission(input.grants, P.phaseWork) })) {
           requirePermission(input.grants, P.taskManage);
         }

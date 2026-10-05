@@ -231,7 +231,9 @@ describe("WO-SF-ITER-01 phase 2 iteration commands", () => {
     const itemId = randomUUID();
     await testDb.prisma.sfChecklistItem.create({ data: { id: itemId, project_id: projectId, label: "Assigned task", assigned_to_id: assigned.id } });
     const read = () => sf.today.getToday({ grants: [P.access, P.projectRead], actor: assigned.actor, scope: "mine" });
-    assert.equal((await read()).groups.some((group) => group.project.id === projectId), true);
+    const listed = await read();
+    assert.equal(listed.groups.some((group) => group.project.id === projectId), true);
+    assert.equal(listed.addTargets.find((target) => target.projectId === projectId)!.targets.every((target) => target.disabledReason !== null), true, "a non-PIC assignee cannot add tasks to this project");
     await testDb.prisma.sfChecklistItem.update({ where: { id: itemId }, data: { is_checked: true, checked_at: new Date() } });
     const after = await read();
     assert.equal(after.groups.some((group) => group.project.id === projectId && group.tasks.some((task) => !task.isChecked)), false);
@@ -944,6 +946,8 @@ describe("SF-R1 checklist and Today", () => {
     assert.deepEqual(today.groups[0].tasks.map((t) => t.label), ["Call client", "Board"], "layout items stay quiet until the phase starts");
     const layoutTarget = today.addTargets[0].targets.find((t) => t.label === "Layout Plan");
     assert.equal(layoutTarget?.disabledReason, "Not started");
+    const general = today.addTargets[0].targets.find((t) => t.phaseId === null);
+    assert.equal(general?.disabledReason, null, "a PIC may add general work");
 
     const outsider = await seedUser("Other", ALL);
     const empty = await sf.today.getToday({ ...as(outsider) });
@@ -2437,5 +2441,59 @@ describe("WO-SF-ITER-01 screens support (Lead)", () => {
     await sf.phases.setPhaseNote({ ...as(designer), projectId, phaseId: moodboard.id, note: "Client prefers warm tones" });
     const notes = await sf.phases.listPhaseNotes({ grants: ALL, projectId });
     assert.deepEqual(notes.filter((item) => item.note).map((item) => [item.phaseName, item.note]), [["Moodboard", "Client prefers warm tones"]]);
+  });
+});
+
+describe("R8.332 logic review fixes", () => {
+  it("undoing an added iteration on a finished phase leaves the phase finished and locked", async () => {
+    const { projectId } = await newProject("Undo keeps lock");
+    const moodboard = await phaseOf(projectId, "moodboard");
+    await testDb.prisma.sfRevision.deleteMany({ where: { phase_id: moodboard.id } });
+    await testDb.prisma.sfRevision.create({ data: { id: randomUUID(), phase_id: moodboard.id, major: 1, name: "Moodboard 1", status: "DONE" } });
+    await testDb.prisma.sfPhase.update({ where: { id: moodboard.id }, data: { status: "DONE", is_locked: true } });
+    await sf.phases.addIteration({ ...as(designer), projectId, phaseId: moodboard.id });
+    const event = await testDb.prisma.sfPhaseEvent.findFirstOrThrow({ where: { project_id: projectId }, orderBy: { occurred_at: "desc" } });
+    await sf.phases.undoPhaseEvent({ ...as(designer), projectId, eventId: event.id });
+    const after = await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: moodboard.id } });
+    assert.deepEqual({ status: after.status, locked: after.is_locked }, { status: "DONE", locked: true });
+  });
+
+  it("does not let undo change a completed project", async () => {
+    const { projectId } = await newProject("Undo after completion");
+    const moodboard = await phaseOf(projectId, "moodboard");
+    const first = await openIteration(moodboard.id);
+    await sf.phases.sendIteration({ ...as(designer), projectId, phaseId: moodboard.id, iterationId: first.id });
+    const event = await testDb.prisma.sfPhaseEvent.findFirstOrThrow({ where: { project_id: projectId }, orderBy: { occurred_at: "desc" } });
+    await sf.phases.markProjectCompleted({ ...as(designer), projectId, overrideReason: "Handed over early." });
+    await rejectsWith(sf.phases.undoPhaseEvent({ ...as(designer), projectId, eventId: event.id }), "PROJECT_COMPLETED");
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: first.id } })).status, "SENT");
+  });
+
+  it("keeps a revised CD Mall as CD Mall so the phase still has to reach CD Final", async () => {
+    const { projectId } = await newProject("CD Mall revision");
+    const cd = await phaseOf(projectId, "cd");
+    await testDb.prisma.sfPhaseDefinition.update({ where: { id: LEGACY.cd }, data: { default_iteration_kinds: [{ name: "CD Mall" }, { name: "CD Final" }] } });
+    const base = { ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id };
+    await sf.phases.addIteration(base);
+    await clientRound(base, "REVISION");
+    assert.equal((await openIteration(cd.id)).name, "CD Mall");
+    const second = await openIteration(cd.id);
+    await sf.phases.sendIteration({ ...base, iterationId: second.id });
+    await sf.phases.recordClientAnswer({ ...base, iterationId: second.id });
+    await rejectsWith(sf.phases.chooseIterationOutcome({ ...base, iterationId: second.id, outcome: "DONE" }), "PHASE_INVALID_STATE");
+    await sf.phases.chooseIterationOutcome({ ...base, iterationId: second.id, outcome: "CONTINUE_CD_FINAL" });
+    assert.equal((await openIteration(cd.id)).name, "CD Final");
+  });
+
+  it("lets the person a task is assigned to tick it without being a PIC, but not anyone else", async () => {
+    const assignee = await seedUser("Assignee", [P.access, P.projectRead, P.phaseWork, P.taskManage]);
+    const bystander = await seedUser("Bystander", [P.access, P.projectRead, P.phaseWork, P.taskManage]);
+    const { projectId } = await newProject("Assigned tick");
+    const itemId = randomUUID();
+    await testDb.prisma.sfChecklistItem.create({ data: { id: itemId, project_id: projectId, label: "Send samples", assigned_to_id: assignee.id } });
+    const grants = [P.access, P.projectRead, P.phaseWork, P.taskManage];
+    await rejectsWith(sf.tasks.setItemChecked({ grants, actor: bystander.actor, projectId, itemId, checked: true }), "PERMISSION_DENIED");
+    await sf.tasks.setItemChecked({ grants, actor: assignee.actor, projectId, itemId, checked: true });
+    assert.equal((await testDb.prisma.sfChecklistItem.findUniqueOrThrow({ where: { id: itemId } })).is_checked, true);
   });
 });

@@ -60,15 +60,21 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
         };
       };
 
+      // The same rule the server applies when a task is added (project access): only a PIC or an override holder may add.
+      const override = hasPermission(input.grants, P.projectOverride);
       const addTargets: TodayAddTarget[] = [];
       for (const project of projects) {
+        const isDesigner = project.pic_designer_id === userId;
+        const isDrafter = project.pic_drafter_id === userId;
+        const notYours = "Not your project";
         for (const item of project.checklist_items) rows.push(itemRow(project.id, null, null, item));
-        const targets: TodayAddTarget["targets"] = [{ phaseId: null, label: "General", disabledReason: null }];
+        const targets: TodayAddTarget["targets"] = [{ phaseId: null, label: "General", disabledReason: override || isDesigner || isDrafter ? null : notYours }];
         for (const phase of project.phases) {
           const label = phase.name_snapshot;
           const active = (ACTIVE_PHASE_STATUSES as readonly string[]).includes(phase.status);
           const revision = phase.revisions[0];
-          targets.push({ phaseId: phase.id, label, disabledReason: phase.is_locked ? "Approved" : !revision ? "Not started" : null });
+          const seatHolder = override || isDesigner || (isDrafter && phase.seat_snapshot === "drafter");
+          targets.push({ phaseId: phase.id, label, disabledReason: phase.is_locked ? "Approved" : !revision ? "Not started" : !seatHolder ? (isDesigner || isDrafter ? "Not your phase" : notYours) : null });
           // Client remarks are iteration notes, not tasks (owner, 2026-10-05). A finished phase keeps its
           // unticked requirements here until they are ticked or dismissed.
           if (active || phase.status === "DONE") {

@@ -2,6 +2,20 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.332 | 2026-10-06 | fix(studioflow): logic review — undo, CD Mall, assignee ticking, Today add targets
+
+Logic, backend and flow review of the StudioFlow phase, task and Today code after R8.318–R8.331. Six defects found and fixed, each with a test (`R8.332 logic review fixes`, plus an extended Today test).
+
+- **Undo reopened locked phases.** Undoing "Add iteration" on a finished phase restored it as DONE but **unlocked**; it now stays locked (`is_locked` follows the restored status).
+- **Undo ignored read-only projects.** `undoPhaseEvent` never checked the project: within five minutes of the change, a completed, archived or paused project could be changed through Undo. It now requires an active, writable project.
+- **A revised CD Mall lost its kind.** Revision created an iteration named "<phase> N", so the phase no longer recognised it as CD Mall and could be marked Done without ever reaching CD Final. A revised CD Mall keeps the CD Mall name.
+- **Assigned person could see but not tick a task.** After R8.331 lists assigned-task projects in My Today, `setItemChecked` still required PIC access. The assignee of an item may now tick it; anyone else without PIC access is still refused.
+- **Today offered "Add task" where it would be refused.** Add targets are now disabled ("Not your project" / "Not your phase") when the user is neither a PIC nor an override holder, matching the server rule.
+- **Audit and naming gaps.** Continue-to-CD-Final, supervision visit created and visit completed now write audit events; a new project's first iteration uses the phase's first configured kind (as auto-advance already did).
+- BACKLOG: two `[UNVERIFIED]` owner questions (Z→A project ordering; PIC-only "My projects").
+
+**Checks.** `npm run typecheck`, `npm run lint -- --quiet`, `check:boundaries` passed; `npm test` **837/837** (none failed, skipped or cancelled) on the disposable rebuild-only test database (`masterdata_test`).
+
 ## R8.331 | 2026-10-05 | fix(studioflow): My Today follows assigned tasks; close every open bug and cleanup
 
 - **My Today (owner: "fix all open bugs").** `getToday` scope `mine` now lists a project when the user is its PIC Designer/Drafter **or** has an open (unticked, undismissed) task assigned there; it disappears once the task is ticked/dismissed. Test replaced: includes while open, drops after ticking.
@@ -151,8 +165,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.331**
-- Next local revision: **R8.332**
+- Current revision after this entry is committed: **R8.332**
+- Next local revision: **R8.333**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
