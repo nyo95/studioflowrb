@@ -929,17 +929,24 @@ describe("SF-R1 checklist and Today", () => {
   });
 
   it("builds Today per project for the PIC, including empty and general work", async () => {
+    await sf.tasks.createTemplate({ ...as(designer), definitionId: null, label: "File Existing Project" });
     const one = await newProject("One");
     await newProject("Two");
     await sf.projects.setProjectPriority({ ...as(designer), projectId: one.projectId, priority: "URGENT" });
-    await sf.tasks.createItem({ ...as(designer), projectId: one.projectId, phaseId: null, label: "Call client", dueDate: "2026-09-14" });
+    const todo = await sf.tasks.createItem({ ...as(designer), projectId: one.projectId, phaseId: null, label: "Call client", dueDate: "2026-09-14" });
+    await sf.tasks.createSubtask({ ...as(designer), projectId: one.projectId, parentId: todo.itemId, label: "Prepare talking points" });
+    const generalRequirement = (await sf.tasks.listChecklist({ grants: ALL, projectId: one.projectId, phaseId: null }))
+      .find((item) => item.label === "File Existing Project")!;
+    await sf.tasks.createSubtask({ ...as(designer), projectId: one.projectId, parentId: generalRequirement.id, label: "Collect old drawings" });
     const moodboard = await phaseOf(one.projectId, "moodboard");
     await sf.tasks.createItem({ ...as(designer), projectId: one.projectId, phaseId: moodboard.id, label: "Board", assignedToId: drafter.id });
 
     const today = await sf.today.getToday({ ...as(drafter, DRAFTER_GRANTS), scope: "all" });
     assert.equal(today.scope, "mine", "scope all needs manage grant");
     assert.deepEqual(today.groups.map((g) => [g.project.name, g.project.isUrgent, g.tasks.length]), [["One", true, 1], ["Two", false, 0]]);
-    assert.deepEqual(today.groups[0].tasks.map((t) => t.label), ["Call client"], "phase requirements stay in the phase instead of appearing as to-dos");
+    assert.deepEqual(today.groups[0].tasks.map((t) => [t.label, t.children.map((child) => child.label)]), [["Call client", ["Prepare talking points"]]], "template and phase requirements stay out while an ad-hoc to-do keeps its children");
+    const card = (await sf.projects.listProjectCards({ grants: ALL, filter: "all" })).find((item) => item.id === one.projectId)!;
+    assert.equal(card.requirements_waiting, 2, "general template requirements and phase requirements both contribute to the waiting count");
 
     const outsider = await seedUser("Other", ALL);
     const empty = await sf.today.getToday({ ...as(outsider) });

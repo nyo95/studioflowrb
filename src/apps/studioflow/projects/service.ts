@@ -603,6 +603,9 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         orderBy: [{ updated_at: "desc" }, { name: "asc" }],
         include: {
           client: { select: { id: true, name: true } },
+          // General rows copied from requirement templates stay requirements;
+          // detached/ad-hoc project rows are personal to-dos instead.
+          checklist_items: { where: { phase_id: null, template_id: { not: null }, is_checked: false, dismissed_at: null, parent_id: null }, select: { id: true } },
           phases: { orderBy: { order_index: "asc" }, include: {
             definition: { select: { default_iteration_kinds: true } },
             revisions: { orderBy: { major: "desc" }, select: { id: true, major: true, name: true, status: true, sent_at: true, visit_date: true, created_at: true, note: true } },
@@ -642,7 +645,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           dependents_review_suggested: earliestActive !== undefined && project.phases.some((phase) => phase.order_index > earliestActive && phase.status === "DONE" && !phase.allow_parallel),
           can_mark_completed: project.status !== "COMPLETED" && Boolean(input.actorId && (project.pic_designer_id === input.actorId || project.pic_drafter_id === input.actorId || hasPermission(input.grants, P.projectOverride))),
           note_phases: project.phases.filter((phase) => Boolean(phase.note?.trim())).map((phase) => phase.id),
-          requirements_waiting: project.phases.reduce((sum, phase) => sum + phase.checklist_items.length, 0),
+          requirements_waiting: project.checklist_items.length + project.phases.reduce((sum, phase) => sum + phase.checklist_items.length, 0),
           last_update_at: [project.updated_at, ...project.phases.map((phase) => phase.updated_at)].reduce((latest, value) => latest > value ? latest : value),
           phases,
         };

@@ -1,6 +1,7 @@
 /**
- * My Tasks projection: project-level to-dos and their subtasks.
- * Phase requirements stay in their phase and are not duplicated as personal to-dos (owner, 2026-10-05).
+ * My Tasks projection: ad-hoc project-level to-dos and their subtasks.
+ * Template-backed requirements (including general ones) and phase requirements are not
+ * duplicated as personal to-dos (owner, 2026-10-05).
  * Client remarks are iteration notes, not feed rows.
  */
 export type FeedSource = "checklist";

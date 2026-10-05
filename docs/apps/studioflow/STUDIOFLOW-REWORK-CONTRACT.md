@@ -348,13 +348,14 @@ introduced in R8.331:
   "All projects" is available to holders of `studioflow.project.manage`
   (rebuild addition).
 - Grouped by project, a project with an empty queue still shows.
-- **My Tasks contains project-level to-dos and their subtasks only** (owner,
-  2026-10-05). Phase requirements stay in the phase and are represented on
-  Home only by the separate "requirements waiting" count; they are not
-  duplicated or counted as personal to-dos.
+- **My Tasks contains ad-hoc project-level to-dos and their subtasks only**
+  (owner, 2026-10-05). A template-backed row remains a requirement even when
+  its scope is General; it and its subtasks are represented on Home only by
+  the separate "requirements waiting" count. Phase requirements likewise stay
+  in their phase. Neither kind is duplicated or counted as a personal to-do.
 - Filter tabs, due, priority, assignee, labels, saved filters, inline add,
   and Quick add remain. Inline/Quick add here always creates a project-level
-  to-do; requirements are added and managed from their phase.
+  to-do; requirements are added and managed from their requirement scope.
 - Legacy KB-023 (general todos on the home page) is satisfied by this page.
 
 ## 7a. Library (owner, 2026-09-23 — shipped ahead of wave 2)
@@ -919,7 +920,8 @@ Implementation notes recorded in R8.71:
   does not select a phase, because phase-scoped rows are requirements rather
   than personal to-dos (owner, 2026-10-05).
 - Checked project-level to-dos older than 7 days drop out of Today (legacy
-  retention); nothing is deleted. Phase requirements do not enter Today.
+  retention); nothing is deleted. Template-backed general requirements and
+  phase requirements do not enter Today.
 
 ## 13. UI/UX direction (owner may veto)
 

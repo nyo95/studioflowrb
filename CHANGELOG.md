@@ -2,6 +2,16 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.339 | 2026-10-06 | fix(studioflow): distinguish general requirements from to-dos
+
+- Owner correction: scope alone does not make an item a to-do. A row copied from a requirement template remains a requirement even when its scope is General, so My Tasks now contains only ad-hoc project-level to-dos and their subtasks. Subtasks beneath a template requirement stay with that requirement instead of being promoted as orphan to-dos.
+- The project card's “requirements waiting” marker now counts open general template requirements as well as phase requirements, while detached template rows and ad-hoc General rows remain personal to-dos. The displayed task and requirement totals therefore describe the same business classification.
+- The StudioFlow contract and integration coverage lock the distinction, including a general template requirement with a subtask, an ad-hoc to-do with a subtask, a phase requirement, and the combined card count. No schema, migration, stored row, permission, completion, or requirement lifecycle changed.
+
+**Browser evidence.** On the office project, My Tasks changed from 6 to 0, “File Existing Project” and the other general template rows disappeared from the task list, and the same project changed from “11 requirements waiting” to “17 requirements waiting”. The five phase columns and Add to-do path remained available.
+
+**Checks.** Full `npm test` passed (834/834, none failed, skipped, or cancelled); typecheck, boundary check, and legacy-runtime check passed. Full lint passed with zero errors and the two pre-existing `<img>` optimization warnings. Production build passed; `next-env.d.ts` was restored afterward.
+
 ## R8.338 | 2026-10-06 | fix(studioflow): align phase actions and trim task metadata
 
 - Owner UI correction: project-level rows in My Tasks no longer repeat the “General” destination. After R8.332, every row on this surface is already general project work, so the label added noise without distinguishing anything.
@@ -11,8 +21,6 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 **Browser evidence.** The office project rendered all six My Tasks rows without “General”; the four visible “Send to client” buttons measured at the same vertical position (`top = 565px` for each), and the page had no horizontal overflow at the 1187px viewport.
 
 **Checks.** Full `npm test` passed (834/834, none failed, skipped, or cancelled); typecheck, boundary check, legacy-runtime check, and production build passed. Full lint passed with zero errors and the two pre-existing `<img>` optimization warnings. `next-env.d.ts` was restored after the production build.
-
-## R8.332 | 2026-10-05 | fix(studioflow): keep phase requirements out of My Tasks
 
 ## R8.337 | 2026-10-06 | fix(studioflow): keep phase requirements out of My Tasks
 
@@ -25,8 +33,6 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 
 **Checks.** Full `npm test` passed (834/834, none failed, skipped, or cancelled); typecheck, boundary check, legacy-runtime check, and production build passed. Full lint passed with zero errors and the two pre-existing `<img>` optimization warnings. `next-env.d.ts` was restored after the production build.
 
-## R8.331 | 2026-10-05 | feat(studioflow): fold personal tasks into scalable project rows
-
 ## R8.336 | 2026-10-06 | feat(studioflow): fold personal tasks into scalable project rows
 
 - Owner-directed UI takeover, shaped with the `frontend-skill`: Home is now a quiet project ledger instead of a task panel followed by nested project and phase cards. Each project owns its viewer's open tasks, shows at most the first three until “Show all”, and keeps the existing per-task controls and inline Add to-do path.
@@ -37,8 +43,6 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 **Browser evidence.** StudioFlow Home rendered the three-task project preview and flat five-phase ledger; “My tasks · 17” opened the full filtered task view; the project collapsed to a single summary row and expanded again; at 390×844 the document width stayed exactly 390px with no horizontal overflow. No page error remained after a fresh reload.
 
 **Checks.** Full `npm test` passed (834/834, none failed, skipped, or cancelled); typecheck, boundary check, legacy-runtime check, and production build passed. Full lint passed with zero errors and the two pre-existing `<img>` optimization warnings. `next-env.d.ts` was restored after the production build.
-
-## R8.330 | 2026-10-05 | fix(masterdata): show Rupiah prefixes on numeric price inputs
 
 ## R8.335 | 2026-10-06 | fix(masterdata): show Rupiah prefixes on numeric price inputs
 
@@ -228,8 +232,8 @@ Logic, backend and flow review of the StudioFlow phase, task and Today code afte
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.335**
-- Next local revision: **R8.336**
+- Current revision after this entry is committed: **R8.339**
+- Next local revision: **R8.340**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

@@ -16,9 +16,10 @@ export type TodayAddTarget = {
 export function createTodayService(db: Db, ports: StudioFlowPorts) {
   return {
     /**
-     * My Tasks feed: project-level to-dos for every non-completed project the
+     * My Tasks feed: ad-hoc project-level to-dos for every non-completed project the
      * user holds as PIC or has an open to-do assigned in, or all live projects when `scope = "all"` (managers only).
-     * Phase requirements remain on their phase and are deliberately not duplicated here.
+     * Template-backed requirements remain requirements even when they are general,
+     * and phase requirements remain on their phase; neither is duplicated here.
      */
     async getToday(input: CommandContext & { scope?: "mine" | "all" }): Promise<{ groups: FeedGroup[]; addTargets: TodayAddTarget[]; scope: "mine" | "all" }> {
       const userId = requireCommand(input, P.projectRead);
@@ -52,7 +53,16 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
 
       const addTargets: TodayAddTarget[] = [];
       for (const project of projects) {
-        for (const item of project.checklist_items) rows.push(itemRow(project.id, null, null, item));
+        const todoRootIds = new Set(
+          project.checklist_items
+            .filter((item) => item.parent_id === null && item.template_id === null)
+            .map((item) => item.id),
+        );
+        for (const item of project.checklist_items) {
+          if (todoRootIds.has(item.id) || (item.parent_id !== null && todoRootIds.has(item.parent_id))) {
+            rows.push(itemRow(project.id, null, null, item));
+          }
+        }
         addTargets.push({ projectId: project.id, projectName: project.name });
       }
 
