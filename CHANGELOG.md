@@ -2,6 +2,13 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.333 | 2026-10-06 | fix(studioflow): list projects A to Z
+
+- Owner decision (2026-10-06): project lists order by priority, then name **A→Z** (they were Z→A, a legacy carry-over): the Projects list, the header quick-search and a client's project list. "My projects" on the home cards stays the signed-in user's own PIC projects; the two open questions are closed in BACKLOG.
+- Test: priority first, then A→Z, for the list and quick search.
+
+**Checks.** `npm run typecheck`, `npm run lint -- --quiet` passed; `npm test` **838/838** (none failed, skipped or cancelled) on the disposable rebuild-only test database.
+
 ## R8.332 | 2026-10-06 | fix(studioflow): logic review — undo, CD Mall, assignee ticking, Today add targets
 
 Logic, backend and flow review of the StudioFlow phase, task and Today code after R8.318–R8.331. Six defects found and fixed, each with a test (`R8.332 logic review fixes`, plus an extended Today test).
@@ -165,8 +172,8 @@ Logic, backend and flow review of the StudioFlow phase, task and Today code afte
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.332**
-- Next local revision: **R8.333**
+- Current revision after this entry is committed: **R8.333**
+- Next local revision: **R8.334**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

@@ -2496,4 +2496,15 @@ describe("R8.332 logic review fixes", () => {
     await sf.tasks.setItemChecked({ grants, actor: assignee.actor, projectId, itemId, checked: true });
     assert.equal((await testDb.prisma.sfChecklistItem.findUniqueOrThrow({ where: { id: itemId } })).is_checked, true);
   });
+
+  it("lists projects by priority, then name A to Z", async () => {
+    await newProject("Beta house");
+    await newProject("Alpha house");
+    const urgent = await newProject("Zeta urgent");
+    await sf.projects.setProjectPriority({ ...as(designer), projectId: urgent.projectId, priority: "URGENT" });
+    const list = await sf.projects.listProjects({ grants: ALL });
+    assert.deepEqual(list.map((project) => project.name), ["Zeta urgent", "Alpha house", "Beta house"]);
+    const found = await sf.projects.quickSearch({ grants: ALL, search: "house" });
+    assert.deepEqual(found.projects.map((project) => project.name), ["Alpha house", "Beta house"]);
+  });
 });

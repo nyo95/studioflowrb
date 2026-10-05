@@ -217,7 +217,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       requireRead(input.grants);
       const client = await db.sfClient.findUnique({
         where: { id: input.clientId },
-        include: { projects: { orderBy: { name: "desc" }, select: { id: true, name: true, status: true, priority: true, archived_at: true } } },
+        include: { projects: { orderBy: { name: "asc" }, select: { id: true, name: true, status: true, priority: true, archived_at: true } } },
       });
       if (!client) throw notFound("client");
       return client;
@@ -306,7 +306,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
             archived_at: null,
             ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" as const } }, { client: { name: { contains: search, mode: "insensitive" as const } } }] } : {}),
           },
-          orderBy: [{ priority: "asc" }, { name: "desc" }],
+          orderBy: [{ priority: "asc" }, { name: "asc" }],
           take: limit,
           select: { id: true, name: true, client: { select: { name: true } } },
         }),
@@ -344,7 +344,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       };
       const rows = await db.sfProject.findMany({
         where,
-        orderBy: [{ priority: "asc" }, { name: "desc" }],
+        orderBy: [{ priority: "asc" }, { name: "asc" }],
         include: {
           client: { select: { id: true, name: true } },
           phases: { orderBy: { order_index: "asc" }, select: { id: true, definition_id: true, status: true, is_locked: true, status_changed_at: true, name_snapshot: true, planned_start_date: true, planned_end_date: true } },
