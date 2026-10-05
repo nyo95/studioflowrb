@@ -341,16 +341,20 @@ phase commands and shown in the UI before the button is pressed:
 
 ## 7. Today (StudioFlow home)
 
-`/studioflow` is Today (D-SF-01 kept). Port legacy `TasksPage` + `TodayView`:
+`/studioflow` is Home/Today (D-SF-01 kept), presented as the project ledger
+introduced in R8.331:
 
 - Scope = active projects where I am PIC designer or drafter; a toggle
   "All projects" is available to holders of `studioflow.project.manage`
   (rebuild addition).
 - Grouped by project, a project with an empty queue still shows.
-- Rows unify activities and checklist items (`fromActivity`,
-  `fromChecklistTask`, `nestChecklistSubtasks`, `sortFeedTasks`).
+- **My Tasks contains project-level to-dos and their subtasks only** (owner,
+  2026-10-05). Phase requirements stay in the phase and are represented on
+  Home only by the separate "requirements waiting" count; they are not
+  duplicated or counted as personal to-dos.
 - Filter tabs, due, priority, assignee, labels, saved filters, inline add,
-  quick-add dialog (project + phase target).
+  and Quick add remain. Inline/Quick add here always creates a project-level
+  to-do; requirements are added and managed from their phase.
 - Legacy KB-023 (general todos on the home page) is satisfied by this page.
 
 ## 7a. Library (owner, 2026-09-23 — shipped ahead of wave 2)
@@ -911,10 +915,11 @@ Implementation notes recorded in R8.71:
 - Checklist root items come only from templates (legacy rule); people add
   one level of subtasks. General ad-hoc work is a project-level to-do
   (activity with no phase), which Quick add on Today also creates.
-- Legacy `#PHASE` tags inside to-do text are not ported; Quick add selects the
-  phase explicitly.
-- Checked checklist rows older than 7 days drop out of Today (legacy
-  retention); nothing is deleted.
+- Legacy `#PHASE` tags inside to-do text are not ported. My Tasks Quick add
+  does not select a phase, because phase-scoped rows are requirements rather
+  than personal to-dos (owner, 2026-10-05).
+- Checked project-level to-dos older than 7 days drop out of Today (legacy
+  retention); nothing is deleted. Phase requirements do not enter Today.
 
 ## 13. UI/UX direction (owner may veto)
 

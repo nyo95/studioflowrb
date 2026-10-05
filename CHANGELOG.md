@@ -2,6 +2,19 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.337 | 2026-10-06 | fix(studioflow): keep phase requirements out of My Tasks
+
+- Owner clarification: a phase requirement is a phase reminder, not a personal to-do. The Home/My Tasks feed now reads only project-level to-dos and their subtasks; phase requirements remain available in their phase and continue to be summarized separately by “requirements waiting”. Completion reminders, permissions, ticking, dismissal, and phase behavior are unchanged.
+- Inline Add to-do and the full Quick add dialog now always create a project-level to-do. The phase destination was removed from My Tasks so a person cannot create a requirement from the to-do surface and then see it disappear from that same list.
+- The StudioFlow rework contract records the separation, and integration coverage proves active and finished-phase requirements stay out of My Tasks while general project work and empty project groups remain.
+- No schema, migration, dependency, stored data, requirement lifecycle, or project-completion rule changed.
+
+**Browser evidence.** On the office data, My Tasks changed from 17 to 6 while the same project retained “11 requirements waiting”. The full My Tasks dialog listed only the six General rows; Quick add exposed Project, Due date, and Assignee with no phase destination.
+
+**Checks.** Full `npm test` passed (834/834, none failed, skipped, or cancelled); typecheck, boundary check, legacy-runtime check, and production build passed. Full lint passed with zero errors and the two pre-existing `<img>` optimization warnings. `next-env.d.ts` was restored after the production build.
+
+## R8.331 | 2026-10-05 | feat(studioflow): fold personal tasks into scalable project rows
+
 ## R8.336 | 2026-10-06 | feat(studioflow): fold personal tasks into scalable project rows
 
 - Owner-directed UI takeover, shaped with the `frontend-skill`: Home is now a quiet project ledger instead of a task panel followed by nested project and phase cards. Each project owns its viewer's open tasks, shows at most the first three until “Show all”, and keeps the existing per-task controls and inline Add to-do path.

@@ -166,9 +166,6 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
     const tasks = group?.tasks ?? [];
     const visibleTasks = embeddedExpanded ? tasks : tasks.slice(0, 3);
     const openCount = group ? countOpen(group.tasks) : 0;
-    const targets = group
-      ? addTargets.find((target) => target.projectId === group.project.id)?.targets ?? null
-      : null;
 
     return (
       <div className="grid gap-2.5">
@@ -194,7 +191,7 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
           <Text size="sm" tone="tertiary">Nothing open for you in this project.</Text>
         )}
 
-        {canManageTasks && group ? <InlineAddRow projectId={group.project.id} targets={targets} /> : null}
+        {canManageTasks && group ? <InlineAddRow projectId={group.project.id} /> : null}
       </div>
     );
   }
@@ -289,7 +286,7 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
               <ul className="m-0 grid list-none gap-px p-0">{group.tasks.map((task) => renderTask(task))}</ul>
             )}
             {canManageTasks && !collapsed.includes(group.project.id) ? (
-              <InlineAddRow projectId={group.project.id} targets={addTargets.find((t) => t.projectId === group.project.id)?.targets ?? null} />
+              <InlineAddRow projectId={group.project.id} />
             ) : null}
           </SectionCard>
         ))
@@ -454,13 +451,10 @@ function TaskQuickEdit({ task, people, labels }: { task: FeedTask; people: Perso
  * ergonomics (no modal for the common case) without its `#phase` hashtag
  * autocomplete, which targeted legacy's now-removed Activity-as-Todo model.
  */
-function InlineAddRow({ projectId, targets }: { projectId: string; targets: TodayAddTarget["targets"] | null }) {
+function InlineAddRow({ projectId }: { projectId: string }) {
   const { run, pending, error } = useCommand();
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState("");
-  const [phaseId, setPhaseId] = useState("");
-
-  if (!targets || targets.length === 0) return null;
 
   const submit = async () => {
     const trimmed = label.trim();
@@ -468,10 +462,9 @@ function InlineAddRow({ projectId, targets }: { projectId: string; targets: Toda
       setEditing(false);
       return;
     }
-    const ok = await run("add", () => addChecklistItemAction({ projectId, phaseId: phaseId || null, label: trimmed }));
+    const ok = await run("add", () => addChecklistItemAction({ projectId, phaseId: null, label: trimmed }));
     if (ok) {
       setLabel("");
-      setPhaseId("");
       setEditing(false);
     }
   };
@@ -516,17 +509,6 @@ function InlineAddRow({ projectId, targets }: { projectId: string; targets: Toda
           }
         }}
       />
-      {targets.length > 1 ? (
-        <div className="w-40 shrink-0">
-          <Select aria-label="Phase" density="compact" value={phaseId} disabled={pending} onChange={(event) => setPhaseId(event.target.value)}>
-            {targets.map((t) => (
-              <option key={t.phaseId ?? "general"} value={t.phaseId ?? ""} disabled={t.disabledReason !== null}>
-                {t.label}{t.disabledReason ? ` — ${t.disabledReason}` : ""}
-              </option>
-            ))}
-          </Select>
-        </div>
-      ) : null}
       <Button type="submit" size="sm" pending={pending} disabled={!label.trim()}>Add</Button>
       {error ? <InlineError>{error}</InlineError> : null}
     </form>
@@ -536,18 +518,15 @@ function InlineAddRow({ projectId, targets }: { projectId: string; targets: Toda
 function QuickAddDialog({ targets, people, onClose }: { targets: TodayAddTarget[]; people: Person[]; onClose: () => void }) {
   const { run, pending, error } = useCommand();
   const [projectId, setProjectId] = useState(targets[0]?.projectId ?? "");
-  const project = targets.find((t) => t.projectId === projectId);
-  const [phaseChoice, setPhaseChoice] = useState<string>("general");
   const [content, setContent] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [assignee, setAssignee] = useState<string | null>(null);
-  const phaseId = phaseChoice === "general" ? null : phaseChoice;
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open && !pending) onClose(); }} title="Quick add to-do" dismissible={!pending}>
       <form className="grid gap-3.5" onSubmit={async (event) => {
         event.preventDefault();
-        const ok = await run("quick-add", () => addChecklistItemAction({ projectId, phaseId, label: content, dueDate: dueDate || null, assignedToId: assignee }));
+        const ok = await run("quick-add", () => addChecklistItemAction({ projectId, phaseId: null, label: content, dueDate: dueDate || null, assignedToId: assignee }));
         if (ok) onClose();
       }}>
         <Field label="To-do" required>
@@ -555,17 +534,8 @@ function QuickAddDialog({ targets, people, onClose }: { targets: TodayAddTarget[
         </Field>
         <div className="grid grid-cols-2 gap-3 max-[560px]:grid-cols-1">
           <Field label="Project" required>
-            <Select value={projectId} onChange={(e) => { setProjectId(e.target.value); setPhaseChoice("general"); }}>
+            <Select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
               {targets.map((t) => <option key={t.projectId} value={t.projectId}>{t.projectName}</option>)}
-            </Select>
-          </Field>
-          <Field label="Where">
-            <Select value={phaseChoice} onChange={(e) => setPhaseChoice(e.target.value)}>
-              {project?.targets.map((t) => (
-                <option key={t.phaseId ?? "general"} value={t.phaseId ?? "general"} disabled={t.disabledReason !== null}>
-                  {t.label}{t.disabledReason ? ` — ${t.disabledReason}` : ""}
-                </option>
-              ))}
             </Select>
           </Field>
           <Field label="Due date"><Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></Field>

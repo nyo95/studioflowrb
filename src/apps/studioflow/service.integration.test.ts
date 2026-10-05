@@ -166,7 +166,7 @@ describe("WO-SF-ITER-01 phase 2 iteration commands", () => {
     await sf.phases.sendIteration({ ...as(designer), projectId, phaseId: moodboard.id, iterationId: iteration.id });
   });
 
-  it("keeps closed-phase checklist work in Today and applies the same project completion gate everywhere", async () => {
+  it("keeps closed-phase requirements out of My Tasks and applies the same project completion gate everywhere", async () => {
     const { projectId } = await newProject("Completion readiness");
     const supervision = await phaseOf(projectId, "supervision");
     const layout = await phaseOf(projectId, "layout");
@@ -179,7 +179,7 @@ describe("WO-SF-ITER-01 phase 2 iteration commands", () => {
     await rejectsWith(sf.phases.markProjectCompleted({ ...as(designer, ALL.filter((grant) => grant !== P.projectManage)), projectId }), "PROJECT_COMPLETION_NOT_READY");
     await rejectsWith(sf.projects.setProjectStatus({ ...as(designer), projectId, status: "COMPLETED" }), "PROJECT_COMPLETION_OVERRIDE_REASON_REQUIRED");
     const today = await sf.today.getToday({ ...as(designer), scope: "mine" });
-    assert.equal(today.groups.flatMap((group) => group.tasks).some((task) => task.label === "Close-out detail" && task.phaseId === supervision.id), true);
+    assert.equal(today.groups.flatMap((group) => group.tasks).some((task) => task.label === "Close-out detail"), false, "phase requirements stay in their phase");
     await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "COMPLETED", overrideReason: "Client accepted the remaining close-out item." });
     const audit = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "studioflow.project.status-changed", entity_id: projectId } });
     assert.equal((audit.metadata as { completionOverrideReason?: string }).completionOverrideReason, "Client accepted the remaining close-out item.");
@@ -233,7 +233,6 @@ describe("WO-SF-ITER-01 phase 2 iteration commands", () => {
     const read = () => sf.today.getToday({ grants: [P.access, P.projectRead], actor: assigned.actor, scope: "mine" });
     const listed = await read();
     assert.equal(listed.groups.some((group) => group.project.id === projectId), true);
-    assert.equal(listed.addTargets.find((target) => target.projectId === projectId)!.targets.every((target) => target.disabledReason !== null), true, "a non-PIC assignee cannot add tasks to this project");
     await testDb.prisma.sfChecklistItem.update({ where: { id: itemId }, data: { is_checked: true, checked_at: new Date() } });
     const after = await read();
     assert.equal(after.groups.some((group) => group.project.id === projectId && group.tasks.some((task) => !task.isChecked)), false);
@@ -930,24 +929,17 @@ describe("SF-R1 checklist and Today", () => {
   });
 
   it("builds Today per project for the PIC, including empty and general work", async () => {
-    await sf.tasks.createTemplate({ ...as(designer), definitionId: LEGACY.layout, label: "Layout checklist" });
     const one = await newProject("One");
     await newProject("Two");
     await sf.projects.setProjectPriority({ ...as(designer), projectId: one.projectId, priority: "URGENT" });
-    // V2: general tasks are checklist items (phaseId: null); FEEDBACK requires a phase
     await sf.tasks.createItem({ ...as(designer), projectId: one.projectId, phaseId: null, label: "Call client", dueDate: "2026-09-14" });
-    // V2: phaseId: null is rejected by TypeScript (addActivity requires phaseId: string); runtime guard is FEEDBACK_PHASE_REQUIRED
     const moodboard = await phaseOf(one.projectId, "moodboard");
     await sf.tasks.createItem({ ...as(designer), projectId: one.projectId, phaseId: moodboard.id, label: "Board", assignedToId: drafter.id });
 
     const today = await sf.today.getToday({ ...as(drafter, DRAFTER_GRANTS), scope: "all" });
     assert.equal(today.scope, "mine", "scope all needs manage grant");
-    assert.deepEqual(today.groups.map((g) => [g.project.name, g.project.isUrgent, g.tasks.length]), [["One", true, 2], ["Two", false, 0]]);
-    assert.deepEqual(today.groups[0].tasks.map((t) => t.label), ["Call client", "Board"], "layout items stay quiet until the phase starts");
-    const layoutTarget = today.addTargets[0].targets.find((t) => t.label === "Layout Plan");
-    assert.equal(layoutTarget?.disabledReason, "Not started");
-    const general = today.addTargets[0].targets.find((t) => t.phaseId === null);
-    assert.equal(general?.disabledReason, null, "a PIC may add general work");
+    assert.deepEqual(today.groups.map((g) => [g.project.name, g.project.isUrgent, g.tasks.length]), [["One", true, 1], ["Two", false, 0]]);
+    assert.deepEqual(today.groups[0].tasks.map((t) => t.label), ["Call client"], "phase requirements stay in the phase instead of appearing as to-dos");
 
     const outsider = await seedUser("Other", ALL);
     const empty = await sf.today.getToday({ ...as(outsider) });
@@ -1793,13 +1785,13 @@ describe("Snapshot runtime truth", () => {
     assert.equal(moodboard.label, "Moodboard", "label from snapshot, not legacy key");
   });
 
-  it("today feed uses snapshot phase names", async () => {
-    const { projectId } = await newProject();
+  it("today quick-add exposes projects without phase requirement destinations", async () => {
+    const { projectId } = await newProject("Quick-add project");
     const result = await sf.today.getToday({ ...as(designer) });
-    const project = result.addTargets.find((t) => t.projectId === projectId);
-    assert.ok(project, "project in today targets");
-    const moodboardTarget = project.targets.find((t) => t.label === "Moodboard");
-    assert.ok(moodboardTarget, "Today addTargets uses snapshot label, not legacy key");
+    assert.deepEqual(result.addTargets.find((target) => target.projectId === projectId), {
+      projectId,
+      projectName: "Quick-add project",
+    });
   });
 
   it("project directory uses snapshot phase labels", async () => {

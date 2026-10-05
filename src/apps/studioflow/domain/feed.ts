@@ -1,6 +1,7 @@
 /**
- * Today feed projection (legacy `task-feed.ts`): checklist items (requirements, to-dos and their subtasks).
- * Client remarks are iteration notes since 2026-10-05, not feed rows.
+ * My Tasks projection: project-level to-dos and their subtasks.
+ * Phase requirements stay in their phase and are not duplicated as personal to-dos (owner, 2026-10-05).
+ * Client remarks are iteration notes, not feed rows.
  */
 export type FeedSource = "checklist";
 
