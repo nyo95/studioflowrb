@@ -130,7 +130,7 @@ export function ProjectCard({
           return (
             <li
               key={phase.id}
-              className={`grid content-start gap-1.5 border-l-2 py-1 pl-3 pr-2 ${phase.status === "PENDING" ? "border-line" : phase.status === "DONE" ? "border-success" : "border-ink"}`}
+              className={`grid grid-rows-[auto_1fr_auto] content-start gap-1.5 border-l-2 py-1 pl-3 pr-2 ${phase.status === "PENDING" ? "border-line" : phase.status === "DONE" ? "border-success" : "border-ink"}`}
             >
               <div className="flex items-center justify-between gap-2">
                 <Link href={`/studioflow/projects/${card.id}?phase=${phase.id}`} className={`truncate text-sm font-medium hover:underline ${phase.status === "PENDING" ? "text-ink-tertiary" : "text-ink"}`}>{phase.name}</Link>
@@ -148,7 +148,7 @@ export function ProjectCard({
                 {phase.iteration_count > 1 ? <span className="text-ink-tertiary">{phase.iteration_count} in total</span> : null}
                 {phase.is_supervision && phase.last_visit_days_ago !== null ? <span className="text-ink-tertiary">Last visit {phase.last_visit_days_ago === 0 ? "today" : `${phase.last_visit_days_ago}d ago`}</span> : null}
               </div>
-              <div className="flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5 self-end">
                 <IterationButtons phase={view} current={iteration} commands={commands} canAct={acting} onNewVisit={() => setVisitPhaseId(phase.id)} />
               </div>
             </li>

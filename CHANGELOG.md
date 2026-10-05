@@ -2,6 +2,18 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.338 | 2026-10-06 | fix(studioflow): align phase actions and trim task metadata
+
+- Owner UI correction: project-level rows in My Tasks no longer repeat the “General” destination. After R8.332, every row on this surface is already general project work, so the label added noise without distinguishing anything.
+- Phase ledger columns now reserve the middle status area and anchor their action row to the bottom. Different revision/status copy can wrap independently while every available “Send to client” button stays on one baseline.
+- No workflow, action availability, permission, persistence, task, requirement, or phase rule changed.
+
+**Browser evidence.** The office project rendered all six My Tasks rows without “General”; the four visible “Send to client” buttons measured at the same vertical position (`top = 565px` for each), and the page had no horizontal overflow at the 1187px viewport.
+
+**Checks.** Full `npm test` passed (834/834, none failed, skipped, or cancelled); typecheck, boundary check, legacy-runtime check, and production build passed. Full lint passed with zero errors and the two pre-existing `<img>` optimization warnings. `next-env.d.ts` was restored after the production build.
+
+## R8.332 | 2026-10-05 | fix(studioflow): keep phase requirements out of My Tasks
+
 ## R8.337 | 2026-10-06 | fix(studioflow): keep phase requirements out of My Tasks
 
 - Owner clarification: a phase requirement is a phase reminder, not a personal to-do. The Home/My Tasks feed now reads only project-level to-dos and their subtasks; phase requirements remain available in their phase and continue to be summarized separately by “requirements waiting”. Completion reminders, permissions, ticking, dismissal, and phase behavior are unchanged.

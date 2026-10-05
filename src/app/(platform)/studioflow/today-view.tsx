@@ -146,7 +146,7 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
                   {task.phaseLabel}
                 </Link>
               </span>
-            ) : <Text size="sm" tone="tertiary">General</Text>}
+            ) : null}
             {task.priority < 4 ? <Badge tone={task.priority === 1 ? "danger" : task.priority === 2 ? "warning" : "neutral"}>P{task.priority}</Badge> : null}
             {task.labels.map((label) => <Badge key={label.id}>#{label.name}</Badge>)}
             <DueLabel date={task.dueDate} done={task.isChecked} />
