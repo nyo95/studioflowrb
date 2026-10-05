@@ -225,13 +225,18 @@ describe("WO-SF-ITER-01 phase 2 iteration commands", () => {
     await sf.tasks.setItemChecked({ ...as(designer), projectId, itemId: item.itemId, checked: true });
   });
 
-  it("does not include a task-assigned non-PIC project in My Today", async () => {
+  it("includes a project in My Today when the user has an open task assigned there, and drops it once the task is ticked", async () => {
     const assigned = await seedUser("Task assignee", [P.access, P.projectRead]);
-    const { projectId } = await newProject("PIC-only Today");
-    await testDb.prisma.sfChecklistItem.create({ data: { id: randomUUID(), project_id: projectId, label: "Assigned task", assigned_to_id: assigned.id } });
-    const today = await sf.today.getToday({ grants: [P.access, P.projectRead], actor: assigned.actor, scope: "mine" });
-    assert.equal(today.groups.some((group) => group.project.id === projectId), false);
+    const { projectId } = await newProject("Assigned-task Today");
+    const itemId = randomUUID();
+    await testDb.prisma.sfChecklistItem.create({ data: { id: itemId, project_id: projectId, label: "Assigned task", assigned_to_id: assigned.id } });
+    const read = () => sf.today.getToday({ grants: [P.access, P.projectRead], actor: assigned.actor, scope: "mine" });
+    assert.equal((await read()).groups.some((group) => group.project.id === projectId), true);
+    await testDb.prisma.sfChecklistItem.update({ where: { id: itemId }, data: { is_checked: true, checked_at: new Date() } });
+    const after = await read();
+    assert.equal(after.groups.some((group) => group.project.id === projectId && group.tasks.some((task) => !task.isChecked)), false);
   });
+
 });
 
 describe("WO-SF-ITER-01 phase 3 card reads", () => {

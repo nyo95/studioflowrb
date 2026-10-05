@@ -7,6 +7,8 @@ import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 import { buildImportTemplate, exportTable, parseTabularFile, type FileResult, type ImportFormat, type TableColumn, type TableFormat } from "@platform/utilities/tabular";
 
+import type { createPricingService } from "./pricing.service";
+import type { createSkuService } from "./sku.service";
 import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, requiredPriceAmount, requiredCurrency, resolveSkuMeasurement, assertVendorMaterialCapable } from "./shared";
 
 const SHEET = "SKU Prices";
@@ -39,10 +41,14 @@ function fileError(message: string): never { throw new AppError("VALIDATION", "S
 const INVALID_CELL = "__SKU_PRICE_INVALID_CELL__";
 function same(a: string | null | undefined, b: string | null | undefined): boolean { return (a ?? "") === (b ?? ""); }
 
+/** The Master Data commands an SKU workbook import runs inside its own transaction. */
+export type SkuWorkbookScopedService = Pick<ReturnType<typeof createSkuService>, "createSku" | "updateSku">
+  & Pick<ReturnType<typeof createPricingService>, "createPriceMaterial" | "updatePriceMaterial">;
+
 export function createSkuPriceWorkbookService(
   db: PrismaClient,
   ports: MasterDataServicePorts,
-  createScopedService: (tx: unknown) => { createSku: (input: any) => Promise<{ skuId: string }>; updateSku: (input: any) => Promise<unknown>; createPriceMaterial: (input: any) => Promise<{ priceMaterialId: string }>; updatePriceMaterial: (input: any) => Promise<unknown> },
+  createScopedService: (tx: unknown) => SkuWorkbookScopedService,
 ) {
   async function readRows(file: WorkbookFile): Promise<{ data: Buffer; rows: ParsedRow[] }> {
     const input = bytesOf(file);
@@ -184,7 +190,7 @@ export function createSkuPriceWorkbookService(
         for (const row of check.valid) {
           const skuInput = { grants: input.grants, actor: input.actor, name: row.Name || null, code: row.Code || null, notes: row.Notes || null, brandId: row.brandId, baseUnitId: row.baseUnitId, purchaseUnitId: row.purchaseUnitId, dimensionLength: row.Length || null, dimensionWidth: row.Width || null, dimensionThickness: row.Thickness || null, dimensionUnitId: row.dimensionUnitId, categoryId: row.categoryId };
           let skuId = row.sku?.id;
-          if (!skuId) { const group = `${key(row.Code)}:${key(row.Name)}`; if (completedNewGroups.has(group)) continue; const grouped = newRows.get(group)!; const result = await service.createSku({ ...skuInput, priceMaterials: grouped.map((entry) => ({ supplierVendorId: entry.supplierId!, amount: entry.Amount, currency: entry.Currency, notes: entry["Price notes"] || undefined })) }); skuId = result.skuId; completedNewGroups.add(group); created += 1; continue; }
+          if (!skuId) { const group = `${key(row.Code)}:${key(row.Name)}`; if (completedNewGroups.has(group)) continue; const grouped = newRows.get(group)!; const result = await service.createSku({ ...skuInput, notes: skuInput.notes ?? undefined, purchaseUnitId: skuInput.purchaseUnitId ?? undefined, dimensionLength: skuInput.dimensionLength ?? undefined, dimensionWidth: skuInput.dimensionWidth ?? undefined, dimensionThickness: skuInput.dimensionThickness ?? undefined, dimensionUnitId: skuInput.dimensionUnitId ?? undefined, priceMaterials: grouped.map((entry) => ({ supplierVendorId: entry.supplierId!, amount: entry.Amount, currency: entry.Currency, notes: entry["Price notes"] || undefined })) }); skuId = result.skuId; completedNewGroups.add(group); created += 1; continue; }
           const before = check.rows.find((x) => x.row === row.row)!; if (before.outcome === "update") { await service.updateSku({ ...skuInput, skuId }); updated += 1; }
           if (row.Supplier && !row.price) { await service.createPriceMaterial({ grants: input.grants, actor: input.actor, skuId, supplierVendorId: row.supplierId!, amount: row.Amount, currency: row.Currency, notes: row["Price notes"] || undefined }); if (before.outcome !== "update") updated += 1; }
           else if (row.price && (!samePriceAmount(row.price, row.Amount) || row.price.currency !== requiredCurrency(row.Currency) || !same(row.price.notes, row["Price notes"] || null))) await service.updatePriceMaterial({ grants: input.grants, actor: input.actor, priceMaterialId: row.price.id, amount: row.Amount, currency: row.Currency, notes: row["Price notes"] || null });

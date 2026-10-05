@@ -2,17 +2,13 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 
 import { AppError } from "@platform/core/errors";
-import { hasPermission } from "@platform/core/rbac";
 import {
   isPhaseFinished,
   phaseAccentDotClass,
   phaseStatusDisplay,
 } from "@/apps/studioflow/domain/phase";
-import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import {
-  Badge,
-  Notice,
   PipelineStrip,
   SectionCard,
   Text,

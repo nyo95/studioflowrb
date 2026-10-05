@@ -20,8 +20,8 @@ export type TodayAddTarget = {
 export function createTodayService(db: Db, ports: StudioFlowPorts) {
   return {
     /**
-     * Legacy Today feed: every non-completed project the user holds as PIC,
-     * or all live projects when `scope = "all"` (managers only).
+     * Legacy Today feed: every non-completed project the user holds as PIC or has an open task
+     * assigned in, or all live projects when `scope = "all"` (managers only).
      */
     async getToday(input: CommandContext & { scope?: "mine" | "all" }): Promise<{ groups: FeedGroup[]; addTargets: TodayAddTarget[]; scope: "mine" | "all" }> {
       const userId = requireCommand(input, P.projectRead);
@@ -30,7 +30,9 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
       const where: Prisma.SfProjectWhereInput = {
         archived_at: null,
         status: { not: "COMPLETED" },
-        ...(scope === "mine" ? { OR: [{ pic_designer_id: userId }, { pic_drafter_id: userId }] } : {}),
+        ...(scope === "mine"
+          ? { OR: [{ pic_designer_id: userId }, { pic_drafter_id: userId }, { checklist_items: { some: { assigned_to_id: userId, is_checked: false, dismissed_at: null } } }] }
+          : {}),
       };
       const notStale: Prisma.SfChecklistItemWhereInput = { dismissed_at: null, NOT: { is_checked: true, checked_at: { lt: retention } } };
       const projects = await db.sfProject.findMany({

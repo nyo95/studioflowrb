@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { AppError } from "@platform/core/errors";
 import { hasPermission } from "@platform/core/rbac";
-import { STUDIOFLOW_PERMISSIONS, STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
+import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { SectionCard } from "@/platform/ui_engine";
 

@@ -61,10 +61,6 @@ function invalidState(message = "This action is not available in the phase's cur
   return conflict("PHASE_INVALID_STATE", message);
 }
 
-function lockedError(): AppError {
-  return conflict("PHASE_LOCKED", "This project is approved and locked. Reopen it first.");
-}
-
 function resolvePhaseName(phase: { name_snapshot: string }): string {
   return phase.name_snapshot;
 }
@@ -133,7 +129,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         }
       }
       return runTransaction(async (tx) => {
-        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
+        const { phase } = await loadPhase(tx, input.projectId, input.phaseId, input);
         const revisions = await tx.sfRevision.findMany({
           where: { phase_id: phase.id },
           orderBy: { major: "asc" },
@@ -268,7 +264,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
   const iterationCommands = {
     async addIteration(input: PhaseCommandInput) {
       return runTransaction(async (tx) => {
-        const { phase, project } = await writableIteration(tx, input);
+        const { phase } = await writableIteration(tx, input);
         if (phase.status !== "PENDING" && phase.status !== "DONE") throw invalidState("An iteration can only be added to a new or finished phase.");
         if (phase.status === "PENDING") await assertCanStart(tx, phase);
         const iteration = await createIteration(tx, phase, await defaultFirstKind(tx, phase));
@@ -280,7 +276,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     },
     async sendIteration(input: PhaseCommandInput & { iterationId: string }) {
       return runTransaction(async (tx) => {
-        const { phase, project } = await writableIteration(tx, input);
+        const { phase } = await writableIteration(tx, input);
         const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } });
         if (!iteration) throw notFound("iteration");
         if (iteration.status === "SENT") return { iterationId: iteration.id };
@@ -454,7 +450,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           revisions: { where: { status: { in: OPEN_ITERATION_STATES } }, take: 1, select: { major: true, name: true, status: true, sent_at: true } },
         },
       });
-      const project = await db.sfProject.findUnique({ where: { id: input.projectId }, select: { status: true, archived_at: true } });
       const results = [];
       const countsByPhase = await readBlockerCountsBatch(db, phases.map((phase) => phase.id));
       for (const phase of phases) {

@@ -5,7 +5,6 @@ import { STUDIOFLOW_IMAGE_TYPES, sniffImage } from "../domain/images";
 import { scheduleCode } from "../domain/schedule";
 import {
   P,
-  conflict,
   hasPermission,
   invalid,
   loadWritableProject,

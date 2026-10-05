@@ -2,6 +2,17 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.331 | 2026-10-05 | fix(studioflow): My Today follows assigned tasks; close every open bug and cleanup
+
+- **My Today (owner: "fix all open bugs").** `getToday` scope `mine` now lists a project when the user is its PIC Designer/Drafter **or** has an open (unticked, undismissed) task assigned there; it disappears once the task is ticked/dismissed. Test replaced: includes while open, drops after ticking.
+- **SKU price workbook.** The transaction-scoped service is typed (`SkuWorkbookScopedService`, replacing `any`). The cast was hiding `null` optional fields passed to `createSku`; create now sends `undefined`.
+- **Phase list.** Removed an unused project read (one wasted query per call) and dead locals/imports in StudioFlow screens and services.
+- **Schema.** `platform.user_preference.updated_at` declares `@default(now())`, matching the database (no migration).
+- **Docs.** Phase Engine V2 contract marks the removed client-approval commands and the feedback-to-todo conversion as superseded.
+- **BACKLOG.** No open `[BUG]`/`[CLEANUP]` remains; the four leftovers are `[PLANNED]` with the reason they are deferred (shared EntryGrid, workbook merge rules, shared toast, dropping `sf_activity`).
+
+**Checks.** `npm run typecheck`, `npm run lint -- --quiet`, `check:boundaries` passed; `npm test` **833/833** (none failed, skipped or cancelled) on the disposable rebuild-only test database (`masterdata_test`, 84 migrations). The dev database `masterdata` was also migrated (additive migrations R8.327/R8.328).
+
 ## R8.330 | 2026-10-05 | test(studioflow): record that My Today shows only PIC projects
 
 - After pulling R8.318–R8.329 the local completion-override UI was dropped as superseded by `ProjectCompletionDialog`; two independent items are kept.
@@ -140,8 +151,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.330**
-- Next local revision: **R8.331**
+- Current revision after this entry is committed: **R8.331**
+- Next local revision: **R8.332**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

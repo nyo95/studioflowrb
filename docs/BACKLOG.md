@@ -112,13 +112,13 @@ No open items. (The pill-radius note from R8.83 was stale: `--ui-radius-pill` ha
 ## Master Data
 
 - [ ] [UNVERIFIED] **Text price labels: still to try on screen (R8.298).** Typing and pasting a quoted text in the compare-suppliers grid (needs two labor suppliers), the material price table, and importing then re-importing the company file with a labelled cell; a text price shown in the SKU list ("from" line) and in the BQ picker is not shown as text yet (BQ reads the amount 0 only).
-- [ ] [CLEANUP][P2] **UI Engine admission for the entry grids and `textCase` (Lead, 2026-10-01).** The work-price table, the material-price table and the
+- [ ] [PLANNED][P2] **Deferred (needs its own plan): UI Engine admission for the entry grids and `textCase` (Lead, 2026-10-01).** The work-price table, the material-price table and the
   compare-suppliers grid are three app-local copies of one generic capability (rows, add/remove, per-row problems, Enter adds a row, paste). Extract one
   `EntryGrid` pattern into the UI Engine with a consumer matrix and showcase entry, and add the same for `Input textCase` (no showcase, test or
   documentation yet). AGENTS.md forbids an app-private substitute for a generic capability.
-- [ ] [CLEANUP][P3] Workbook import merges nothing into suppliers that already exist (sheet categories, contact) and its area suffix only separates repeats
+- [ ] [PLANNED][P3] **Deferred (owner decision): ** Workbook import merges nothing into suppliers that already exist (sheet categories, contact) and its area suffix only separates repeats
   within one file. Decide whether a re-import should add missing categories and contacts.
-- [ ] [CLEANUP][P3] Pre-existing schema drift: `platform.user_preference.updated_at` has a database default the Prisma schema does not declare (R8.249).
+- [x] [CLEANUP][P3] Fixed R8.331: the Prisma schema now declares `@default(now())` on `platform.user_preference.updated_at`, matching the database (no migration needed).
 
 - [ ] [UNVERIFIED] **Supplier categories merged into categories (R8.262).** Browser-checked only as far as: the Suppliers page and its
   category filter load, and the labor price form asks for the supplier first and narrows Pricing category to it (MEP for PT Mulia
@@ -314,7 +314,7 @@ duplicated `/studioflow/timeline`'s per-project view with no added
 information; `/studioflow/timeline` remains. See `CHANGELOG.md` R8.138.
 
 - [ ] [UNVERIFIED] **Project-card home: two checks left after the 2026-10-02 browser pass (R8.295).** ("Expand My tasks and use a task" was walked in R8.326: a drafter ticked a close-out requirement there.) The All projects scope as a manager with several designers; the project overview page's pipeline strip at phone width. The StudioFlow top navigation overlaps its icons and labels at phone width (an older shell issue, not from R8.292): fix it with the Lead's next UI pass.
-- [ ] [CLEANUP][P3] The undo bar on cards is app-local (a composed notice, not a floating toast). If a second app needs transient "saved · Undo" feedback, admit one generic toast to the UI Engine with a showcase and consumer matrix instead of copying it.
+- [ ] [PLANNED][P3] **Deferred until a second app needs it:** The undo bar on cards is app-local (a composed notice, not a floating toast). If a second app needs transient "saved · Undo" feedback, admit one generic toast to the UI Engine with a showcase and consumer matrix instead of copying it.
 - **[DONE R8.285-R8.295, browser-accepted 2026-10-02] Iteration-based phase tracking + project-card home (owner
   design discussion, 2026-10-01 — direction agreed, NOT built, no Work Order
   yet; a mockup and a gap check against the code come first; the owner's open decisions are all answered as of 2026-10-01).** Folds in
@@ -355,7 +355,7 @@ information; `/studioflow/timeline` remains. See `CHANGELOG.md` R8.138.
       the card. A project completes **only** when someone presses "Mark as
       completed"; nothing on the card suggests or does it automatically, even
       when every phase is finished.
-    - [BUG][P2] Staff assigned to tasks but not PIC Designer/Drafter do not see the project in My Today: `getToday` scope `mine` selects projects only by PIC Designer/Drafter. Owner decision needed before changing this visibility rule.
+    - [x] [BUG][P2] Fixed R8.331: My Today now also lists a project when the user has an open task assigned there (not only as PIC Designer/Drafter); it drops out when the task is ticked or dismissed.
   - Gap vs. current code (checked 2026-10-01): today a phase has 7 statuses
     incl. internal review and v1.0/v1.1 revisions (minor = internal reject);
     Today is a per-person task feed with an "In flight" phase strip;
@@ -485,17 +485,17 @@ findings were fixed in R8.318–R8.325 (see `CHANGELOG.md`). What remains:
   Verified on a disposable copy seeded with old-model rows (feedback on iterations, detached, phase without
   iterations, converted checklist copies with and without subtasks). On the office/home databases: read the
   migration's precheck NOTICE, then spot-check a few projects' iteration notes and Requirements lists.
-- [ ] [CLEANUP][P3] `sf_activity` is history only since R8.327 (no command writes it; every row is closed).
+- [ ] [PLANNED][P3] **Deferred until the notes migration has run on real data:** `sf_activity` is history only since R8.327 (no command writes it; every row is closed).
   Drop the table, its relations and the `activity.*` History labels once nobody needs the old rows, after the
   notes migration has run everywhere.
-- [ ] [CLEANUP][P3] SKU price workbook's transaction-scoped service still takes `any`
+- [x] [CLEANUP][P3] Fixed R8.331 (`SkuWorkbookScopedService`; the cast hid `null` notes on SKU create, now `undefined`). SKU price workbook's transaction-scoped service took `any`
   inputs (`sku-price-workbook.service.ts` `createScopedService`), and the header-keyed
   `ParsedRow` is assembled through a cast. Type it like `PriceWorkbookScopedService` (R8.325).
-- [ ] [CLEANUP][P3] Unused imports flagged by `tsc --noUnusedLocals` in StudioFlow screens
+- [x] [CLEANUP][P3] Fixed R8.331 for StudioFlow (also removed an unused project read in the phase list). Unused imports flagged by `tsc --noUnusedLocals` in StudioFlow screens
   (project overview page, presentation page, schedule board, studio settings view, Today
   view) and in presentation/phases services (unused `project` destructures). No behavior;
   remove in a UI pass.
-- [ ] [CLEANUP][P3] `docs/apps/studioflow/STUDIOFLOW-PHASE-ENGINE-V2-CONTRACT.md` still
+- [x] [CLEANUP][P3] Fixed R8.331 (sections marked superseded). `docs/apps/studioflow/STUDIOFLOW-PHASE-ENGINE-V2-CONTRACT.md` still
   describes `approveClient` / `rejectClient` / `rejectPhase`; those commands were removed in
   R8.321. Mark the sections superseded the way `STUDIOFLOW-REWORK-CONTRACT.md` §5.2 now is.
 - [ ] [PLANNED][P3] A browser geometry test for the UI Engine shell (rail states × 839/840/841

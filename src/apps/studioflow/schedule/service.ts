@@ -6,7 +6,6 @@ import { buildImportTemplate, parseCsvText, readTabularGrid, type FileResult, ty
 
 import { STUDIOFLOW_IMAGE_TYPES, sniffImage } from "../domain/images";
 import {
-  SCHEDULE_DEFAULT_CARD_FIELDS,
   SCHEDULE_IMAGE_BYTES,
   SCHEDULE_SECTIONS,
   compareOptionLabels,
@@ -23,7 +22,6 @@ import {
   parseLegacyScheduleSheet,
   parseScheduleCode,
   scheduleCode,
-  scheduleSearchKey,
   type ScheduleSection,
 } from "../domain/schedule";
 import {
@@ -37,7 +35,6 @@ import {
   requireCommand,
   requireProjectAccess,
   requireRead,
-  requiredText,
   writeAudit,
   type CommandContext,
   type Db,

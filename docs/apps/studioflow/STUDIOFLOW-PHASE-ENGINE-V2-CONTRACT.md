@@ -50,6 +50,12 @@ Presentation names and gate UX change; stored values stay identical.
 | READY_FOR_NEXT | Approved |
 | COMPLETED | Done |
 
+> **Superseded by WO-SF-ITER-01 (R8.285–R8.292); the commands named below
+> (`approveClient`, `rejectClient`, `rejectPhase`, `rejectInternal`, `submitClient`) were removed in
+> R8.321 and client remarks became iteration notes (R8.327). Phases are
+> `PENDING → ACTIVE → DONE`; see `STUDIOFLOW-REWORK-CONTRACT.md` §5.2 and §6.1.
+> The text below is history only.**
+
 State machine changes (V2-D7):
 - `rejectInternal` (minor bump) is **removed** from `ON_REVIEW_CLIENT` state.
   From client review, only `approveClient` (major approved) or `rejectClient` (major bump) are available.
@@ -67,7 +73,7 @@ State machine changes (V2-D7):
 `SfActivity` is **restricted to FEEDBACK mode only**.
 - `SfActivityMode.TODO` is deprecated; no new TODO-mode activities may be created.
 - Existing TODO-mode activities remain readable; migration to SfChecklistItem is wave 2.
-- The feedback→todo conversion on `rejectPhase` **changes target**: instead of creating a new SfActivity(TODO), it creates a `SfChecklistItem` in the same project+phase.
+- *(Superseded, R8.321/R8.327: no feedback-to-todo conversion exists; client remarks are iteration notes.)* The feedback→todo conversion on `rejectPhase` **changes target**: instead of creating a new SfActivity(TODO), it creates a `SfChecklistItem` in the same project+phase.
 
 The "General to-dos" section on the Overview that previously showed SfActivity(TODO) now shows SfChecklistItem with `phase_id IS NULL`.
 The "General checklist" and "Phase checklist" are the same model (SfChecklistItem) — the distinction is `phase_id` only.

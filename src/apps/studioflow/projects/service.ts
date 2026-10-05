@@ -5,7 +5,6 @@ import { Prisma } from "@/generated/prisma/client";
 import { AppError } from "@platform/core/errors";
 import { listAuditEvents } from "@platform/core/audit/persistence";
 import type { PersonSummary } from "@platform/core/rbac/people";
-import { currentDateOnly } from "@platform/utilities/date";
 import { toDecimalString } from "@platform/utilities/decimal";
 import { normalizeText } from "@platform/utilities/normalization";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 
 
 import { ArchiveRetentionSettings } from "./archive-retention-settings";
@@ -9,7 +9,6 @@ import {
   Badge,
   Button,
   Checkbox,
-  DataTable,
   Dialog,
   Field,
   InlineError,
@@ -18,13 +17,7 @@ import {
   SectionCard,
   Select,
   Switch,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   Text,
-  Textarea,
 } from "@/platform/ui_engine";
 
 import {

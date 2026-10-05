@@ -21,7 +21,6 @@ import {
   type ScheduleEntryView,
   type ScheduleExtraField,
   type ScheduleOptionView,
-  type ScheduleSampleRequestView,
 } from "@/apps/studioflow/domain/schedule";
 import {
   Badge,

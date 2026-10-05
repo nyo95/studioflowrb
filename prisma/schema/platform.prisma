@@ -47,7 +47,7 @@ model UserPreference {
   locale     String?
   timezone   String?
   start_page String?
-  updated_at DateTime @updatedAt
+  updated_at DateTime @default(now()) @updatedAt
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
