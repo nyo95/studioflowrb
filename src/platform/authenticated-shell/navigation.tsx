@@ -60,11 +60,16 @@ export function HeaderApplicationNavigation({ apps }: { apps: readonly ShellAppL
             type="button"
             onMouseEnter={openNow}
             onMouseLeave={closeSoon}
-            aria-label="Switch application"
+            aria-label={activeApp ? `Switch application (current: ${activeApp.name})` : "Switch application"}
+            title={activeApp?.name ?? "Applications"}
             className="inline-flex h-[26px] min-w-0 shrink-0 items-center gap-1.5 rounded-action border border-line-subtle bg-rail-soft px-2.5 text-[12.5px] font-semibold text-ink transition-colors hover:bg-surface-muted"
           >
-            {activeApp ? <AppIcon icon={activeApp.icon} className="shrink-0 text-ink-secondary" /> : null}
-            {activeApp ? <span className="truncate font-semibold text-ink">{activeApp.name}</span> : null}
+            {/* Outside every app (Settings, Account) the chip still names what it opens instead of
+                showing a bare chevron. */}
+            <AppIcon icon={activeApp?.icon} className="shrink-0 text-ink-secondary" />
+            {/* On a phone the chip keeps only the app icon (the name stays as its title), so the search
+                field beside it keeps a usable width instead of shrinking to one letter. */}
+            <span className="truncate font-semibold text-ink max-[560px]:sr-only">{activeApp?.name ?? "Apps"}</span>
             {apps.length > 1 ? <ChevronDown size={12} aria-hidden="true" className="shrink-0 text-ink-tertiary" /> : null}
           </button>
         </Popover.Trigger>

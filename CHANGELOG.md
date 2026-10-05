@@ -2,6 +2,17 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.329 | 2026-10-05 | feat(platform): one navigation column from the top edge and a usable phone header
+
+- Owner's "#4" (2026-10-05): the open BACKLOG item "redesign the top-header/sidebar boundary" (`GLOBAL-MENU-DESIGN-BRIEF.md`). Already built earlier: one Settings entry and settings canvas (R8.110), the Option B app switcher beside the mark (R8.121), per-app icons. Left open were the boundary itself and the phone treatment; the Lead decided and built both.
+- **Boundary (`AppShell`, UI Engine).** Navigation now reads as one column from the top edge down: the mark sits in a cell exactly as wide as the rail (48px collapsed / 212px expanded; the live `--ui-rail-width` moved from the grid to the shell root so both share it), in the rail's recessed colour and without a rule under it; the bar's bottom rule spans only the workspace. Bar content still never moves when the rail toggles (the mark is centred when collapsed and aligned with the nav icons when expanded). Below 840px the rail stays a strip under the bar and the mark cell joins the bar; a surface without a rail keeps a plain bar. Marked `data-shell-brand` for checks.
+- **Phone (authenticated shell).** Below 560px the app chip shows only the app icon (name kept as accessible name and tooltip). The spacer that split the free width with the search is replaced by an auto margin on the personal controls, so the search takes the whole gap on a phone (was ~47px wide, now ~125px at 390px) and keeps its 300px cap on desktop. Outside every app (Settings) the chip reads "Apps" with the neutral icon instead of a bare chevron.
+- Brief gains an "Outcome" section with the answers to its decision inputs; BACKLOG item closed.
+
+**Browser evidence** (Chromium, `next dev`, disposable dev database): at 1440 and 900px the mark cell and the rail measured the same width collapsed and expanded (212/212 expanded); StudioFlow, Master Data, Settings and `/ui-engine` showed the continuous rail column and the bar rule over the workspace only; at 390px StudioFlow and BQ showed the icon-only chip, a 125px search and the controls on the right; no page errors.
+
+**Checks.** `npm run typecheck`, `npm run lint -- --quiet`, `check:boundaries` passed; `npm test` **832/832** (none failed, skipped or cancelled) on the disposable rebuild-only test database; `npm run build` passed for the whole branch including R8.328's quotation route (`next-env.d.ts` restored).
+
 ## R8.328 | 2026-10-05 | feat(bq): TBC and By Owner price modes and the quotation document
 
 - Two BQ items the owner queued as "#2" (2026-10-05): **price modes TBC / By Owner** and **Quotation PDF with Terms & Conditions** (bq-contract §16 deferred list; owner decision 2026-09-23: both modes are marker lines whose price is blank and not counted). No legacy evidence exists for either; designed by the Lead.
@@ -121,8 +132,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.328**
-- Next local revision: **R8.329**
+- Current revision after this entry is committed: **R8.329**
+- Next local revision: **R8.330**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

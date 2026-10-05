@@ -82,13 +82,40 @@ export function AppShell({
 
   return (
     <RailContext.Provider value={{ collapsed: isCollapsed }}>
-      <div className={cx("relative flex h-dvh min-h-0 flex-col overflow-hidden print:h-auto print:overflow-visible", className)} data-collapsed={isCollapsed || undefined}>
-        {/* One fixed line. Its height, width and content never depend on the rail
-            state, so the mark is the compact one in both states — the rail owns
-            no brand block of its own. */}
-        <header className="sticky top-0 z-20 flex h-(--ui-topbar-height) shrink-0 items-center gap-2.5 border-b border-line-subtle bg-surface/82 px-3.5 backdrop-blur-[12px] max-[840px]:px-3">
-          <div className="flex shrink-0 items-center">{brand}</div>
-          <div className="flex min-w-0 flex-1 items-center gap-2.5">{topbar}</div>
+      <div
+        className={cx("relative flex h-dvh min-h-0 flex-col overflow-hidden print:h-auto print:overflow-visible", className)}
+        data-collapsed={isCollapsed || undefined}
+        /* The live rail width is set here, above both the top bar and the grid, so
+           the mark's cell and the rail column always share one width. */
+        style={railVisible && !isCollapsed
+          ? ({ "--ui-rail-width": "var(--ui-rail-expanded-width)" } as CSSProperties)
+          : undefined}
+      >
+        {/* One fixed line. Its height and content never depend on the rail state,
+            so the mark is the compact one in both states — the rail owns no brand
+            block of its own. The header/sidebar boundary (GLOBAL-MENU-DESIGN-BRIEF,
+            R8.329): on desktop the mark sits in a cell exactly as wide as the rail
+            and in the rail's recessed colour, with no rule under it, so navigation
+            reads as one column from the top edge to the bottom and the top bar
+            (with its rule) spans only the workspace. Below 840px the rail turns
+            into a strip under the bar, so the cell becomes part of the bar again. */}
+        <header className="sticky top-0 z-20 flex h-(--ui-topbar-height) shrink-0 items-stretch bg-surface/82 backdrop-blur-[12px] max-[840px]:border-b max-[840px]:border-line-subtle">
+          <div
+            className={cx(
+              "flex shrink-0 items-center",
+              railVisible
+                ? cx(
+                    "w-(--ui-rail-width) border-r border-line-subtle bg-rail transition-[width,padding] duration-[var(--ui-motion-base)] motion-reduce:transition-none",
+                    isCollapsed ? "justify-center" : "justify-start pl-[17px]",
+                    "max-[840px]:w-auto max-[840px]:justify-start max-[840px]:border-r-0 max-[840px]:bg-transparent max-[840px]:pl-3",
+                  )
+                : "border-b border-line-subtle pl-3.5 max-[840px]:border-b-0 max-[840px]:pl-3",
+            )}
+            data-shell-brand=""
+          >
+            {brand}
+          </div>
+          <div className="flex min-w-0 flex-1 items-center gap-2.5 border-b border-line-subtle px-3.5 max-[840px]:border-b-0 max-[840px]:px-3">{topbar}</div>
         </header>
         <div
           className={cx(
@@ -97,7 +124,7 @@ export function AppShell({
               ? "grid-cols-[var(--ui-rail-width)_minmax(0,1fr)] max-[840px]:flex max-[840px]:flex-col"
               : "grid-cols-1",
           )}
-          /* The expanded width is set inline, not as a `[--ui-rail-width:…]`
+          /* The expanded width is set inline on the root, not as a `[--ui-rail-width:…]`
              utility. Tailwind emits no rule for that arbitrary-property form
              here, so the override silently did nothing — which went unnoticed
              because the previous value it pointed at, --ui-rail-collapsed-width,
@@ -106,9 +133,6 @@ export function AppShell({
              An inline custom property always applies, and the grid-cols utility
              above (which does generate) picks it up. Mobile keeps its own
              grid-template-columns classes because this touches only the token. */
-          style={railVisible && !isCollapsed
-            ? ({ "--ui-rail-width": "var(--ui-rail-expanded-width)" } as CSSProperties)
-            : undefined}
         >
           {/* Recessed chrome: the rail sits BELOW the ground, not above it, so it
               reads as the machine rather than another sheet of work. It shares

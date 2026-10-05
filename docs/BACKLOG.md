@@ -97,21 +97,13 @@ Rules carried over unchanged from the prior trackers:
   future file consumers (Master Data media, sample photos) remain, each through its own approved work order. Phase 5 (cloud profile) is parked.
 - [ ] [PLANNED] **Notifications (platform) — inbox built in R8.185, retention in R8.232.** Read notifications are removed 90 days after they were read (unread never); in-app inbox only, polling every 60 s while the tab is visible.
   Email, push, preferences, and digests stay deferred. Private user-to-user messaging below is separate and still blocked.
-- [ ] [PLANNED] Redesign the top-header/sidebar boundary. Design input already
-  captured in `apps/platform/GLOBAL-MENU-DESIGN-BRIEF.md` (owner feedback,
-  2026-09-16). Preserve the approved semantic colors. **Partially executed
-  2026-09-23 (R8.110):** logo shrunk, account menu slimmed to
-  `Account / Settings / Sign out` (brief line 138-140), and the "one settings
-  sidebar" direction (brief line 133) is now fully built (closes KB-031, see
-  StudioFlow section). **App switcher — Option B built 2026-09-23 (R8.121):**
-  turned out to already be ~90% built since R8.107 (a single Popover-based
-  control showing the current app name, opening a menu to switch apps — not
-  per-app text links as the brief's "Observed UI" section describes, which
-  predates that commit); the only real gap was placement (`ml-auto` pushed it
-  to the far right instead of next to the brand/logo) — fixed in
-  `authenticated-shell/navigation.tsx`/`index.tsx`. Mobile/narrow-viewport
-  treatment beyond generic truncation, and per-app icons, remain undecided —
-  not blocking, no icon field exists in the apps registry yet.
+- [x] [PLANNED] Redesign the top-header/sidebar boundary
+  (`apps/platform/GLOBAL-MENU-DESIGN-BRIEF.md`). Done: account menu and one
+  settings canvas (R8.110), Option B app switcher next to the mark (R8.121),
+  per-app icons (already in the apps registry), and in R8.329 the boundary
+  itself (the mark's cell is part of the rail column, the bar's rule spans only
+  the workspace) plus the phone treatment (icon-only app chip, full-width
+  search). The brief's "Outcome" section records the answers.
 
 ## UI Engine and Shared Utilities
 
